@@ -14,7 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      generations: {
+        Row: {
+          created_at: string
+          id: string
+          input_url: string | null
+          output_url: string | null
+          prompt: string | null
+          status: Database["public"]["Enums"]["gen_status"]
+          type: Database["public"]["Enums"]["gen_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input_url?: string | null
+          output_url?: string | null
+          prompt?: string | null
+          status?: Database["public"]["Enums"]["gen_status"]
+          type: Database["public"]["Enums"]["gen_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input_url?: string | null
+          output_url?: string | null
+          prompt?: string | null
+          status?: Database["public"]["Enums"]["gen_status"]
+          type?: Database["public"]["Enums"]["gen_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          credits: number
+          currency: string
+          display_name: string | null
+          email: string | null
+          id: string
+          plan: Database["public"]["Enums"]["plan_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number
+          currency?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+          plan?: Database["public"]["Enums"]["plan_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          currency?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          plan?: Database["public"]["Enums"]["plan_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +88,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      gen_status: "pending" | "processing" | "success" | "failed"
+      gen_type: "image" | "video"
+      plan_type: "free" | "pro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +217,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      gen_status: ["pending", "processing", "success", "failed"],
+      gen_type: ["image", "video"],
+      plan_type: ["free", "pro"],
+    },
   },
 } as const
