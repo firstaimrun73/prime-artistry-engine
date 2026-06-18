@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Upload, Sparkles, Download, Lock, Image as ImageIcon, Video } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/editor")({
-  component: Editor;
+  component: Editor,
 });
 
 type GenState = "idle" | "loading" | "success" | "blocked";
