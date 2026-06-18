@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SuccessRouteImport } from './routes/success'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as CheckoutRouteImport } from './routes/checkout'
@@ -24,6 +25,11 @@ import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.c
 const SuccessRoute = SuccessRouteImport.update({
   id: '/success',
   path: '/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -108,6 +116,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/pricing'
     | '/reset-password'
+    | '/sitemap.xml'
     | '/success'
     | '/chat'
     | '/dashboard'
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/pricing'
     | '/reset-password'
+    | '/sitemap.xml'
     | '/success'
     | '/chat'
     | '/dashboard'
@@ -147,6 +158,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/pricing'
     | '/reset-password'
+    | '/sitemap.xml'
     | '/success'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
@@ -161,6 +173,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   PricingRoute: typeof PricingRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SuccessRoute: typeof SuccessRoute
 }
 
@@ -171,6 +184,13 @@ declare module '@tanstack/react-router' {
       path: '/success'
       fullPath: '/success'
       preLoaderRoute: typeof SuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -271,6 +291,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   PricingRoute: PricingRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   SuccessRoute: SuccessRoute,
 }
 export const routeTree = rootRouteImport
