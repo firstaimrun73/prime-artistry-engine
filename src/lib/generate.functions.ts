@@ -92,7 +92,7 @@ export const generateMedia = createServerFn({ method: "POST" })
   });
 
 const checkoutSchema = z.object({
-  plan: z.enum(["free", "pro"]),
+  plan: z.enum(["free", "pro", "studio"]),
   currency: z.string().min(1).max(8),
 });
 
@@ -101,7 +101,7 @@ export const completeCheckout = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => checkoutSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const credits = data.plan === "pro" ? 500 : 15;
+    const credits = PLAN_CREDITS[data.plan as PlanId];
     const { error } = await supabase
       .from("profiles")
       .update({ plan: data.plan, credits, currency: data.currency })
