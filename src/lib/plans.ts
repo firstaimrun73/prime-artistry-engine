@@ -69,17 +69,33 @@ export const PLANS: Plan[] = [
     ],
   },
   {
+    id: "plus",
+    name: "Plus",
+    credits: 600,
+    video: false,
+    priority: false,
+    price: { USD: 9.99, EUR: 9.99, INR: 799 },
+    features: [
+      "600 monthly credits",
+      "HD exports, watermark removed",
+      "Faster processing & priority queue",
+      "Commercial usage",
+      "Basic support",
+    ],
+  },
+  {
     id: "pro",
     name: "Pro",
     credits: 2000,
     video: true,
     priority: true,
-    price: { USD: 29, EUR: 29, INR: 2400 },
+    price: { USD: 29.99, EUR: 29.99, INR: 2400 },
     features: [
       "2,000 monthly credits",
+      "4K exports & advanced AI models",
       "Image + Video generation",
-      "Priority processing",
-      "Download outputs",
+      "Priority processing & larger cloud storage",
+      "Commercial license + priority support",
     ],
   },
   {
@@ -92,16 +108,17 @@ export const PLANS: Plan[] = [
     price: { USD: 99, EUR: 99, INR: 8200 },
     features: [
       "8,000 monthly credits",
+      "Premium AI models + studio workflow",
       "Image + Video generation",
-      "Fastest priority queue",
-      "Best quality (highest model tier)",
-      "Built for heavy users & creators",
+      "Fastest priority queue + team support",
+      "Enterprise-grade exports & commercial rights",
     ],
   },
 ];
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
   free: 50,
+  plus: 600,
   pro: 2000,
   studio: 8000,
 };
