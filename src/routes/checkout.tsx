@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { getPlan, CURRENCY_SYMBOL, CURRENCY_METHODS, ALL_METHODS, type Currency, type PlanId } from "@/lib/plans";
+import { getPlan, CURRENCY_SYMBOL, CURRENCY_METHODS, ALL_METHODS, TRANSACTION_FEE, type Currency, type PlanId } from "@/lib/plans";
 import { completeCheckout } from "@/lib/generate.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -96,10 +96,21 @@ function Checkout() {
             <span className="text-muted-foreground">Credits</span>
             <span className="font-medium">{plan.credits}</span>
           </div>
+          {planId !== "free" && (
+            <div className="mt-2 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Transaction fee</span>
+              <span className="font-medium">{symbol}{TRANSACTION_FEE[currency as Currency]}</span>
+            </div>
+          )}
           <div className="my-4 h-px bg-border" />
           <div className="flex items-center justify-between font-semibold">
             <span>Total</span>
-            <span>{symbol}{plan.price[currency as Currency]}</span>
+            <span>
+              {symbol}
+              {planId === "free"
+                ? plan.price[currency as Currency]
+                : (plan.price[currency as Currency] + TRANSACTION_FEE[currency as Currency]).toFixed(2)}
+            </span>
           </div>
           <Button className="mt-6 w-full" onClick={handlePay} disabled={processing}>
             {processing ? "Processing…" : planId === "free" ? "Activate free plan" : "Pay now"}
