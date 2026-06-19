@@ -58,9 +58,14 @@ export function Header() {
                   {profile.credits} credits
                 </Link>
               )}
-              <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/dashboard" })}>
-                Account
-              </Button>
+              <Link to="/dashboard" aria-label="Account" className="transition-opacity hover:opacity-80">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile?.avatar_signed_url ?? undefined} alt={profile?.display_name ?? "Account"} />
+                  <AvatarFallback className="text-xs">
+                    {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
             </>
           ) : (
             <>
