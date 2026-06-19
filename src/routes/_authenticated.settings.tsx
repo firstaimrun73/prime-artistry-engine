@@ -53,11 +53,16 @@ function SettingsPage() {
   const [pw, setPw] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [language, setLanguage] = useState("en");
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [notifs, setNotifs] = useState<NotifPrefs>(DEFAULT_NOTIFS);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(LANG_KEY);
       if (stored) setLanguage(stored);
+      const n = localStorage.getItem(NOTIF_KEY);
+      if (n) setNotifs({ ...DEFAULT_NOTIFS, ...JSON.parse(n) });
     } catch {
       // ignore
     }
