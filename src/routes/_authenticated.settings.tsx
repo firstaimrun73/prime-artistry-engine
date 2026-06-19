@@ -72,9 +72,9 @@ function SettingsPage() {
             <span className="font-medium">{plan.video ? "Enabled" : "Disabled"}</span>
           </div>
         </div>
-        {profile.plan === "free" && (
+        {profile.plan !== "studio" && (
           <Button asChild className="mt-4">
-            <Link to="/pricing">Upgrade to Pro</Link>
+            <Link to="/pricing">{profile.plan === "free" ? "Upgrade plan" : "Upgrade to Studio"}</Link>
           </Button>
         )}
       </section>
