@@ -46,7 +46,7 @@ function Editor() {
     }
     if (noCredits) {
       setState("blocked");
-      return toast.error("You're out of credits.");
+      return toast.error(`Not enough credits. This costs ${cost} credits.`);
     }
     setState("loading");
     setOutput(null);
