@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import {
@@ -53,12 +54,46 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
-    title: "Privacy & Security",
+    title: "AI Image Editing",
+    items: [
+      { q: "How do I edit an image with AI?", a: "Upload an image in the editor, describe the change you want in the prompt, and generate. You can refine the result with follow-up prompts." },
+      { q: "What image formats can I upload?", a: "JPG, PNG, and WEBP are supported. For best results, use high-resolution source images." },
+      { q: "Can I remove or replace backgrounds?", a: "Yes — describe the change in your prompt (e.g. 'remove background' or 'replace with a studio backdrop') and generate." },
+      { q: "How many credits does image editing use?", a: "Image generation costs 12 credits per result. Your balance updates instantly after each generation." },
+    ],
+  },
+  {
+    title: "Payments",
+    items: [
+      { q: "What payment methods are accepted?", a: "Card payments (via Stripe) are available everywhere, with UPI and Crypto in supported regions. Switch currency on the pricing page to see local options." },
+      { q: "Is my payment information secure?", a: "Yes. Payments are handled by PCI-DSS compliant processors. We never see or store your full card details." },
+      { q: "When am I charged?", a: "Paid plans are billed at the start of each billing cycle. You can view your plan and billing details in Settings." },
+      { q: "Will my subscription renew automatically?", a: "Yes — plans renew automatically until you cancel. You keep access until the end of the current period after cancelling." },
+    ],
+  },
+  {
+    title: "Security & Privacy",
     items: [
       { q: "Is my content private?", a: "Yes. Your content stays private to your account and is never shared publicly without your action." },
       { q: "Are files encrypted?", a: "Yes — data is encrypted in transit and at rest using industry-standard encryption." },
       { q: "Is my data shared with third parties?", a: "We do not sell your data. Files are only processed by trusted infrastructure required to deliver generations." },
       { q: "How secure is Motio2Edit?", a: "We use encryption, secure payments, restricted access, and continuous monitoring. See the Security page for full details." },
+    ],
+  },
+  {
+    title: "Refunds",
+    items: [
+      { q: "What is your refund policy?", a: "Refunds are reviewed case by case. If you experienced a billing error or a technical issue, contact us and we'll make it right." },
+      { q: "How do I request a refund?", a: "Open a ticket from the Tickets page with the Billing category, or email support@motio2edit.com with your account details." },
+      { q: "Are used credits refundable?", a: "Credits already spent on completed generations are generally non-refundable, but reach out if something went wrong." },
+    ],
+  },
+  {
+    title: "API & Integrations",
+    items: [
+      { q: "Does Motio2Edit offer an API?", a: "API access is on our roadmap. Contact Support to register your interest and be notified when it launches." },
+      { q: "Can I integrate Motio2Edit with other tools?", a: "Integrations are planned. For now, you can download your generated assets and use them anywhere." },
+      { q: "Is there a commercial usage license?", a: "Higher-tier plans include broader usage rights. See the pricing page or contact Support for licensing questions." },
     ],
   },
   {
@@ -123,6 +158,7 @@ function FAQ() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

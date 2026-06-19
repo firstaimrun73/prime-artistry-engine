@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrustRouteImport } from './routes/trust'
+import { Route as TicketsRouteImport } from './routes/tickets'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SuccessRouteImport } from './routes/success'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -30,6 +32,16 @@ import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.c
 const TrustRoute = TrustRouteImport.update({
   id: '/trust',
   path: '/trust',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TicketsRoute = TicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SupportRoute = SupportRouteImport.update({
@@ -124,6 +136,8 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
+  '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -142,6 +156,8 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
+  '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -162,6 +178,8 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
+  '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -182,6 +200,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/success'
     | '/support'
+    | '/terms'
+    | '/tickets'
     | '/trust'
     | '/chat'
     | '/dashboard'
@@ -200,6 +220,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/success'
     | '/support'
+    | '/terms'
+    | '/tickets'
     | '/trust'
     | '/chat'
     | '/dashboard'
@@ -219,6 +241,8 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/success'
     | '/support'
+    | '/terms'
+    | '/tickets'
     | '/trust'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
@@ -239,6 +263,8 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SuccessRoute: typeof SuccessRoute
   SupportRoute: typeof SupportRoute
+  TermsRoute: typeof TermsRoute
+  TicketsRoute: typeof TicketsRoute
   TrustRoute: typeof TrustRoute
 }
 
@@ -249,6 +275,20 @@ declare module '@tanstack/react-router' {
       path: '/trust'
       fullPath: '/trust'
       preLoaderRoute: typeof TrustRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tickets': {
+      id: '/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof TicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/support': {
@@ -397,6 +437,8 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SuccessRoute: SuccessRoute,
   SupportRoute: SupportRoute,
+  TermsRoute: TermsRoute,
+  TicketsRoute: TicketsRoute,
   TrustRoute: TrustRoute,
 }
 export const routeTree = rootRouteImport

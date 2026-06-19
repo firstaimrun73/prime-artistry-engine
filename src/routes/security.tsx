@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import {
   Lock,
   ShieldCheck,
@@ -84,6 +85,7 @@ function Security() {
           <Link to="/trust" className="text-primary hover:underline">Trust &amp; Security</Link> page.
         </p>
       </div>
+      <Footer />
     </div>
   );
 }
