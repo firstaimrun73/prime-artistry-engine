@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrustRouteImport } from './routes/trust'
+import { Route as TicketsRouteImport } from './routes/tickets'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SuccessRouteImport } from './routes/success'
@@ -31,6 +32,11 @@ import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.c
 const TrustRoute = TrustRouteImport.update({
   id: '/trust',
   path: '/trust',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TicketsRoute = TicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -131,6 +137,7 @@ export interface FileRoutesByFullPath {
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
+  '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
+  '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
+  '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -192,6 +201,7 @@ export interface FileRouteTypes {
     | '/success'
     | '/support'
     | '/terms'
+    | '/tickets'
     | '/trust'
     | '/chat'
     | '/dashboard'
@@ -211,6 +221,7 @@ export interface FileRouteTypes {
     | '/success'
     | '/support'
     | '/terms'
+    | '/tickets'
     | '/trust'
     | '/chat'
     | '/dashboard'
@@ -231,6 +242,7 @@ export interface FileRouteTypes {
     | '/success'
     | '/support'
     | '/terms'
+    | '/tickets'
     | '/trust'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
@@ -252,6 +264,7 @@ export interface RootRouteChildren {
   SuccessRoute: typeof SuccessRoute
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
+  TicketsRoute: typeof TicketsRoute
   TrustRoute: typeof TrustRoute
 }
 
@@ -262,6 +275,13 @@ declare module '@tanstack/react-router' {
       path: '/trust'
       fullPath: '/trust'
       preLoaderRoute: typeof TrustRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tickets': {
+      id: '/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof TicketsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -418,6 +438,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuccessRoute: SuccessRoute,
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,
+  TicketsRoute: TicketsRoute,
   TrustRoute: TrustRoute,
 }
 export const routeTree = rootRouteImport
