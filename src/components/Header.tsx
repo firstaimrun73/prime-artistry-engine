@@ -6,6 +6,7 @@ import { Sparkles, Coins, Moon, Sun } from "lucide-react";
 
 export function Header() {
   const { user, profile, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   return (
