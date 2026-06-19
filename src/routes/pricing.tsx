@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { PLANS, CURRENCY_SYMBOL, type Currency, type PlanId } from "@/lib/plans";
 import { Check } from "lucide-react";
@@ -110,6 +111,7 @@ function Pricing() {
           ))}
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
