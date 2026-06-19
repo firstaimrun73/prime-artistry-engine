@@ -131,6 +131,7 @@ function Dashboard() {
         </div>
       </section>
 
+      <section className="mt-10">
         <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-bold">Recent projects</h2>
