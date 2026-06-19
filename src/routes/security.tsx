@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import {
   Lock,
@@ -78,6 +78,11 @@ function Security() {
             </div>
           ))}
         </div>
+
+        <p className="mt-10 text-center text-sm text-muted-foreground">
+          Looking for more detail on our practices? Visit our{" "}
+          <Link to="/trust" className="text-primary hover:underline">Trust &amp; Security</Link> page.
+        </p>
       </div>
     </div>
   );
