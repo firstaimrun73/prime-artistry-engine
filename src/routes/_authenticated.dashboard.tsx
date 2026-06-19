@@ -104,6 +104,34 @@ function Dashboard() {
 
       <section className="mt-10">
         <div className="flex items-center gap-2">
+          <LifeBuoy className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-bold">Support</h2>
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Link to="/tickets" className="rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary">
+            <Ticket className="h-5 w-5 text-primary" />
+            <p className="mt-3 font-medium">My Tickets</p>
+            <p className="mt-1 text-xs text-muted-foreground">View and track your tickets.</p>
+          </Link>
+          <Link to="/tickets" className="rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary">
+            <Ticket className="h-5 w-5 text-primary" />
+            <p className="mt-3 font-medium">Open New Ticket</p>
+            <p className="mt-1 text-xs text-muted-foreground">Report an issue or request help.</p>
+          </Link>
+          <Link to="/faq" className="rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary">
+            <HelpCircle className="h-5 w-5 text-primary" />
+            <p className="mt-3 font-medium">FAQ</p>
+            <p className="mt-1 text-xs text-muted-foreground">Find quick answers.</p>
+          </Link>
+          <Link to="/support" className="rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary">
+            <Mail className="h-5 w-5 text-primary" />
+            <p className="mt-3 font-medium">Contact Support</p>
+            <p className="mt-1 text-xs text-muted-foreground">Reach the support center.</p>
+          </Link>
+        </div>
+      </section>
+
+        <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-bold">Recent projects</h2>
         </div>
