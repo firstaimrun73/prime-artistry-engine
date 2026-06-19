@@ -70,6 +70,8 @@ function Index() {
           </Button>
         </div>
       </section>
+
+      <Footer />
     </div>
   );
 }
