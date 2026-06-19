@@ -15,6 +15,10 @@ export type Profile = {
   plan: "free" | "plus" | "pro" | "studio";
   credits: number;
   currency: string;
+  /** Raw storage path of the avatar (in the private "avatars" bucket). */
+  avatar_url: string | null;
+  /** Resolved signed URL for display, derived from avatar_url. */
+  avatar_signed_url?: string | null;
 };
 
 type AuthContextValue = {
