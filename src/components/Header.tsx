@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Coins } from "lucide-react";
+import { Sparkles, Coins, Moon, Sun } from "lucide-react";
 
 export function Header() {
   const { user, profile, signOut } = useAuth();
