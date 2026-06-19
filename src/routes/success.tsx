@@ -6,7 +6,7 @@ import { CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/success")({
   validateSearch: (s: Record<string, unknown>) => ({
-    plan: (["free", "pro", "studio"].includes(s.plan as string) ? s.plan : "free") as PlanId,
+    plan: (["free", "plus", "pro", "studio"].includes(s.plan as string) ? s.plan : "free") as PlanId,
   }),
   component: Success,
 });

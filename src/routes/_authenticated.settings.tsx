@@ -1,21 +1,56 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { supabase } from "@/integrations/supabase/client";
 import { getPlan } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "pt", label: "Português" },
+  { code: "zh", label: "中文" },
+];
+
+const LANG_KEY = "motio2edit-language";
+
 function SettingsPage() {
   const { profile, user, refreshProfile, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [saving, setSaving] = useState(false);
+  const [pw, setPw] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [language, setLanguage] = useState("en");
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LANG_KEY);
+      if (stored) setLanguage(stored);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
@@ -27,8 +62,38 @@ function SettingsPage() {
     if (error) toast.error(error.message);
     else {
       await refreshProfile();
-      toast.success("Saved.");
+      toast.success("Profile updated.");
     }
+  };
+
+  const changePassword = async () => {
+    if (pw.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setPwSaving(false);
+    if (error) toast.error(error.message);
+    else {
+      setPw("");
+      toast.success("Password changed.");
+    }
+  };
+
+  const changeLanguage = (code: string) => {
+    setLanguage(code);
+    try {
+      localStorage.setItem(LANG_KEY, code);
+    } catch {
+      // ignore
+    }
+    toast.success("Language preference saved.");
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/auth" });
   };
 
   return (
@@ -36,14 +101,14 @@ function SettingsPage() {
       <h1 className="text-2xl font-bold">Settings</h1>
 
       <section className="mt-8 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Account details</h2>
+        <h2 className="font-semibold">Profile</h2>
         <div className="mt-4 space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
             <Input id="email" value={user?.email ?? ""} disabled className="mt-1.5" />
           </div>
           <div>
-            <Label htmlFor="name">Display name</Label>
+            <Label htmlFor="name">Username / display name</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5" />
           </div>
           <Button onClick={save} disabled={saving}>
@@ -53,7 +118,69 @@ function SettingsPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Billing & plan</h2>
+        <h2 className="font-semibold">Security</h2>
+        <div className="mt-4 space-y-4">
+          <div>
+            <Label htmlFor="pw">New password</Label>
+            <Input
+              id="pw"
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder="At least 8 characters"
+              className="mt-1.5"
+            />
+          </div>
+          <Button onClick={changePassword} disabled={pwSaving} variant="outline">
+            {pwSaving ? "Updating…" : "Change password"}
+          </Button>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">Appearance</h2>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Theme</span>
+          <div className="flex gap-2">
+            <Button
+              variant={theme === "light" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTheme("light")}
+            >
+              <Sun className="mr-1.5 h-4 w-4" /> Light
+            </Button>
+            <Button
+              variant={theme === "dark" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTheme("dark")}
+            >
+              <Moon className="mr-1.5 h-4 w-4" /> Dark
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">Language</h2>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Preferred language</span>
+          <Select value={language} onValueChange={changeLanguage}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGES.map((l) => (
+                <SelectItem key={l.code} value={l.code}>
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">Subscription &amp; billing</h2>
         <div className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Current plan</span>
@@ -74,16 +201,18 @@ function SettingsPage() {
         </div>
         {profile.plan !== "studio" && (
           <Button asChild className="mt-4">
-            <Link to="/pricing">{profile.plan === "free" ? "Upgrade plan" : "Upgrade to Studio"}</Link>
+            <Link to="/pricing">{profile.plan === "free" ? "Upgrade plan" : "Upgrade plan"}</Link>
           </Button>
         )}
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Session</h2>
-        <Button variant="outline" className="mt-4" onClick={() => signOut()}>
-          Sign out
-        </Button>
+        <h2 className="font-semibold">Account</h2>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button variant="outline" onClick={handleSignOut}>
+            Log out
+          </Button>
+        </div>
       </section>
     </div>
   );

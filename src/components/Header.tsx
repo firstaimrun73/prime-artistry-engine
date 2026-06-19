@@ -1,12 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
-import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Coins, Moon, Sun } from "lucide-react";
+import { Sparkles, Coins } from "lucide-react";
 
 export function Header() {
-  const { user, profile, signOut } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -45,14 +43,6 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Toggle theme"
-            onClick={toggleTheme}
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
           {user ? (
             <>
               {profile && (
@@ -66,9 +56,6 @@ export function Header() {
               )}
               <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/dashboard" })}>
                 Account
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => signOut()}>
-                Sign out
               </Button>
             </>
           ) : (
