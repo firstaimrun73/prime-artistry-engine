@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { CREDIT_COST, PLAN_CREDITS, type PlanId } from "@/lib/plans";
 
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
