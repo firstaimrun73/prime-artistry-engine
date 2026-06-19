@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import {
@@ -157,6 +158,7 @@ function FAQ() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }
