@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Image, Video, Download, Zap, Wand2, ShieldCheck } from "lucide-react";
 
@@ -69,6 +70,8 @@ function Index() {
           </Button>
         </div>
       </section>
+
+      <Footer />
     </div>
   );
 }

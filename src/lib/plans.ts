@@ -62,10 +62,10 @@ export const PLANS: Plan[] = [
     priority: false,
     price: { USD: 0, EUR: 0, INR: 0 },
     features: [
-      "50 starter credits (~4 images)",
+      "Limited credits (50 starter credits)",
+      "Standard AI models",
+      "Basic export quality",
       "Image generation only",
-      "Standard processing",
-      "Download outputs",
     ],
   },
   {
@@ -76,11 +76,10 @@ export const PLANS: Plan[] = [
     priority: false,
     price: { USD: 9.99, EUR: 9.99, INR: 799 },
     features: [
-      "600 monthly credits",
-      "HD exports, watermark removed",
-      "Faster processing & priority queue",
-      "Commercial usage",
-      "Basic support",
+      "More monthly credits (600)",
+      "Faster processing",
+      "HD exports",
+      "Advanced AI tools",
     ],
   },
   {
@@ -91,11 +90,12 @@ export const PLANS: Plan[] = [
     priority: true,
     price: { USD: 29.99, EUR: 29.99, INR: 2400 },
     features: [
-      "2,000 monthly credits",
-      "4K exports & advanced AI models",
-      "Image + Video generation",
-      "Priority processing & larger cloud storage",
-      "Commercial license + priority support",
+      "Highest credit limit (2,000)",
+      "Premium AI models",
+      "Fastest processing queue",
+      "4K export support",
+      "Commercial usage",
+      "Advanced editing features",
     ],
   },
   {
@@ -110,8 +110,8 @@ export const PLANS: Plan[] = [
       "8,000 monthly credits",
       "Premium AI models + studio workflow",
       "Image + Video generation",
-      "Fastest priority queue + team support",
-      "Enterprise-grade exports & commercial rights",
+      "Fastest priority queue",
+      "Enterprise-grade 4K exports & commercial rights",
     ],
   },
 ];

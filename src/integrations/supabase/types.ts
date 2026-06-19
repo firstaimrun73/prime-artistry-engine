@@ -82,30 +82,36 @@ export type Database = {
       }
       support_tickets: {
         Row: {
+          attachment_url: string | null
           category: Database["public"]["Enums"]["ticket_category"]
           created_at: string
           id: string
           message: string
+          priority: string
           status: Database["public"]["Enums"]["ticket_status"]
           subject: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          attachment_url?: string | null
           category: Database["public"]["Enums"]["ticket_category"]
           created_at?: string
           id?: string
           message: string
+          priority?: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subject: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          attachment_url?: string | null
           category?: Database["public"]["Enums"]["ticket_category"]
           created_at?: string
           id?: string
           message?: string
+          priority?: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subject?: string
           updated_at?: string
