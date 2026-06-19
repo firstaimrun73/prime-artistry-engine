@@ -110,8 +110,8 @@ export const PLANS: Plan[] = [
       "8,000 monthly credits",
       "Premium AI models + studio workflow",
       "Image + Video generation",
-      "Fastest priority queue + team support",
-      "Enterprise-grade exports & commercial rights",
+      "Fastest priority queue",
+      "Enterprise-grade 4K exports & commercial rights",
     ],
   },
 ];
