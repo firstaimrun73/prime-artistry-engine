@@ -24,12 +24,15 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Could not load your account.");
     }
 
-    if (data.type === "video" && profile.plan !== "pro") {
+    if (data.type === "video" && profile.plan === "free") {
       throw new Error("Video generation requires a paid plan.");
     }
 
-    if (profile.credits <= 0) {
-      throw new Error("You are out of credits.");
+    const cost = CREDIT_COST[data.type];
+    if (profile.credits < cost) {
+      throw new Error(
+        `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
+      );
     }
 
     const apiKey = process.env.LOVABLE_API_KEY;
