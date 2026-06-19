@@ -20,7 +20,14 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
   INR: "₹",
 };
 
-export type PlanId = "free" | "pro" | "studio";
+export type PlanId = "free" | "plus" | "pro" | "studio";
+
+/** Flat per-transaction processing fee added to every paid checkout. */
+export const TRANSACTION_FEE: Record<Currency, number> = {
+  USD: 1,
+  EUR: 1,
+  INR: 85,
+};
 
 // ── Credit economics ──────────────────────────────────────────────
 // Costs are tuned so each generation comfortably covers fal.ai/API cost
