@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TicketsRouteImport } from './routes/tickets'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SuccessRouteImport } from './routes/success'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -26,6 +27,11 @@ import { Route as AuthenticatedEditorRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
 
+const TicketsRoute = TicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
+  '/tickets': typeof TicketsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/editor': typeof AuthenticatedEditorRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
+  '/tickets': typeof TicketsRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/editor': typeof AuthenticatedEditorRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
+  '/tickets': typeof TicketsRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/editor': typeof AuthenticatedEditorRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/success'
     | '/support'
+    | '/tickets'
     | '/chat'
     | '/dashboard'
     | '/editor'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/success'
     | '/support'
+    | '/tickets'
     | '/chat'
     | '/dashboard'
     | '/editor'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/success'
     | '/support'
+    | '/tickets'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/editor'
@@ -227,10 +239,18 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SuccessRoute: typeof SuccessRoute
   SupportRoute: typeof SupportRoute
+  TicketsRoute: typeof TicketsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tickets': {
+      id: '/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof TicketsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support': {
       id: '/support'
       path: '/support'
@@ -377,6 +397,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SuccessRoute: SuccessRoute,
   SupportRoute: SupportRoute,
+  TicketsRoute: TicketsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
