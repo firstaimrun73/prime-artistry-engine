@@ -85,6 +85,7 @@ function Security() {
           <Link to="/trust" className="text-primary hover:underline">Trust &amp; Security</Link> page.
         </p>
       </div>
+      <Footer />
     </div>
   );
 }
