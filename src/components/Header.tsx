@@ -26,7 +26,10 @@ export function Header() {
             Pricing
           </Link>
           <Link to="/faq" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
-            FAQ
+            FAQs
+          </Link>
+          <Link to="/security" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
+            Security
           </Link>
           <Link to="/support" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
             Support
