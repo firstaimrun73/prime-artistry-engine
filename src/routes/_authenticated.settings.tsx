@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,8 @@ import { getPlan } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -32,6 +34,15 @@ const LANGUAGES = [
 ];
 
 const LANG_KEY = "motio2edit-language";
+const NOTIF_KEY = "motio2edit-notifications";
+
+type NotifPrefs = {
+  product: boolean;
+  marketing: boolean;
+  security: boolean;
+};
+
+const DEFAULT_NOTIFS: NotifPrefs = { product: true, marketing: false, security: true };
 
 function SettingsPage() {
   const { profile, user, refreshProfile, signOut } = useAuth();
