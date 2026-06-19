@@ -27,8 +27,14 @@ export function Header() {
           <Link to="/faq" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
             FAQ
           </Link>
+          <Link to="/security" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
+            Security
+          </Link>
           <Link to="/support" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
             Support
+          </Link>
+          <Link to="/tickets" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
+            Tickets
           </Link>
           {user && (
             <>
