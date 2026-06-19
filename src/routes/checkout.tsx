@@ -12,7 +12,7 @@ import type { PaymentMethod } from "@/lib/plans";
 
 export const Route = createFileRoute("/checkout")({
   validateSearch: (s: Record<string, unknown>) => ({
-    plan: (["free", "pro", "studio"].includes(s.plan as string) ? s.plan : "free") as PlanId,
+    plan: (["free", "plus", "pro", "studio"].includes(s.plan as string) ? s.plan : "free") as PlanId,
     currency: ["USD", "EUR", "INR"].includes(s.currency as string) ? (s.currency as Currency) : "USD",
   }),
   component: Checkout,

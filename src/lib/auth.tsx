@@ -12,7 +12,7 @@ export type Profile = {
   id: string;
   email: string | null;
   display_name: string | null;
-  plan: "free" | "pro" | "studio";
+  plan: "free" | "plus" | "pro" | "studio";
   credits: number;
   currency: string;
 };
