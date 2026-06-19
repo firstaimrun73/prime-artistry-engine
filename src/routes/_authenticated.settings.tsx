@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,8 @@ import { getPlan } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -32,6 +34,15 @@ const LANGUAGES = [
 ];
 
 const LANG_KEY = "motio2edit-language";
+const NOTIF_KEY = "motio2edit-notifications";
+
+type NotifPrefs = {
+  product: boolean;
+  marketing: boolean;
+  security: boolean;
+};
+
+const DEFAULT_NOTIFS: NotifPrefs = { product: true, marketing: false, security: true };
 
 function SettingsPage() {
   const { profile, user, refreshProfile, signOut } = useAuth();
@@ -42,11 +53,16 @@ function SettingsPage() {
   const [pw, setPw] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [language, setLanguage] = useState("en");
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [notifs, setNotifs] = useState<NotifPrefs>(DEFAULT_NOTIFS);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(LANG_KEY);
       if (stored) setLanguage(stored);
+      const n = localStorage.getItem(NOTIF_KEY);
+      if (n) setNotifs({ ...DEFAULT_NOTIFS, ...JSON.parse(n) });
     } catch {
       // ignore
     }
@@ -96,16 +112,99 @@ function SettingsPage() {
     navigate({ to: "/auth" });
   };
 
+  const uploadAvatar = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    setAvatarBusy(true);
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${profile.id}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (upErr) {
+      setAvatarBusy(false);
+      toast.error(upErr.message);
+      return;
+    }
+    if (profile.avatar_url) {
+      await supabase.storage.from("avatars").remove([profile.avatar_url]);
+    }
+    const { error } = await supabase.from("profiles").update({ avatar_url: path }).eq("id", profile.id);
+    setAvatarBusy(false);
+    if (error) toast.error(error.message);
+    else {
+      await refreshProfile();
+      toast.success("Profile picture updated.");
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (!profile.avatar_url) return;
+    setAvatarBusy(true);
+    await supabase.storage.from("avatars").remove([profile.avatar_url]);
+    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", profile.id);
+    setAvatarBusy(false);
+    if (error) toast.error(error.message);
+    else {
+      await refreshProfile();
+      toast.success("Profile picture removed.");
+    }
+  };
+
+  const toggleNotif = (key: keyof NotifPrefs, value: boolean) => {
+    const next = { ...notifs, [key]: value };
+    setNotifs(next);
+    try {
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
       <h1 className="text-2xl font-bold">Settings</h1>
 
       <section className="mt-8 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">Profile picture</h2>
+        <div className="mt-4 flex items-center gap-4">
+          <Avatar className="h-16 w-16">
+            <AvatarImage src={profile.avatar_signed_url ?? undefined} alt={profile.display_name ?? "Avatar"} />
+            <AvatarFallback className="text-lg">
+              {(profile.display_name || profile.email || "U").slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={avatarBusy} onClick={() => fileRef.current?.click()}>
+              {profile.avatar_url ? "Change" : "Upload"}
+            </Button>
+            {profile.avatar_url && (
+              <Button size="sm" variant="ghost" disabled={avatarBusy} onClick={removeAvatar}>
+                Remove
+              </Button>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadAvatar(f);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">Profile</h2>
         <div className="mt-4 space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
             <Input id="email" value={user?.email ?? ""} disabled className="mt-1.5" />
+
           </div>
           <div>
             <Label htmlFor="name">Username / display name</Label>
@@ -178,6 +277,35 @@ function SettingsPage() {
           </Select>
         </div>
       </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">Notification preferences</h2>
+        <div className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Product updates</p>
+              <p className="text-xs text-muted-foreground">New features and improvements.</p>
+            </div>
+            <Switch checked={notifs.product} onCheckedChange={(v) => toggleNotif("product", v)} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Marketing & offers</p>
+              <p className="text-xs text-muted-foreground">Promotions and tips.</p>
+            </div>
+            <Switch checked={notifs.marketing} onCheckedChange={(v) => toggleNotif("marketing", v)} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Security alerts</p>
+              <p className="text-xs text-muted-foreground">Important account and security notices.</p>
+            </div>
+            <Switch checked={notifs.security} onCheckedChange={(v) => toggleNotif("security", v)} />
+          </div>
+        </div>
+      </section>
+
+
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">Subscription &amp; billing</h2>

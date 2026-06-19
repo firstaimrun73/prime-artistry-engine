@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { getPlan, PLAN_CREDITS } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Coins, Crown, Image as ImageIcon, Settings, Zap, History, FolderOpen } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -46,8 +47,18 @@ function Dashboard() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
-      <h1 className="text-2xl font-bold">Hi, {profile.display_name || "creator"} 👋</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Here's your account at a glance.</p>
+      <div className="flex items-center gap-4">
+        <Avatar className="h-12 w-12">
+          <AvatarImage src={profile.avatar_signed_url ?? undefined} alt={profile.display_name ?? "Avatar"} />
+          <AvatarFallback>
+            {(profile.display_name || profile.email || "U").slice(0, 1).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <h1 className="text-2xl font-bold">Hi, {profile.display_name || "creator"} 👋</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Here's your account at a glance.</p>
+        </div>
+      </div>
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-6">

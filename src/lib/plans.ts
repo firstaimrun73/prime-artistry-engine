@@ -78,9 +78,9 @@ export const PLANS: Plan[] = [
     features: [
       "600 monthly credits",
       "HD exports, watermark removed",
-      "Faster processing & priority queue",
-      "Commercial usage",
-      "Basic support",
+      "Faster rendering & priority queue",
+      "Commercial usage license",
+      "Download all outputs",
     ],
   },
   {
@@ -94,8 +94,8 @@ export const PLANS: Plan[] = [
       "2,000 monthly credits",
       "4K exports & advanced AI models",
       "Image + Video generation",
-      "Priority processing & larger cloud storage",
-      "Commercial license + priority support",
+      "Higher-resolution export & larger cloud storage",
+      "Commercial license",
     ],
   },
   {
@@ -110,8 +110,8 @@ export const PLANS: Plan[] = [
       "8,000 monthly credits",
       "Premium AI models + studio workflow",
       "Image + Video generation",
-      "Fastest priority queue + team support",
-      "Enterprise-grade exports & commercial rights",
+      "Fastest rendering & team features",
+      "Enterprise-grade exports + API access",
     ],
   },
 ];

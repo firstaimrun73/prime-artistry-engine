@@ -15,6 +15,10 @@ export type Profile = {
   plan: "free" | "plus" | "pro" | "studio";
   credits: number;
   currency: string;
+  /** Raw storage path of the avatar (in the private "avatars" bucket). */
+  avatar_url: string | null;
+  /** Resolved signed URL for display, derived from avatar_url. */
+  avatar_signed_url?: string | null;
 };
 
 type AuthContextValue = {
@@ -37,10 +41,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = async (uid: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, email, display_name, plan, credits, currency")
+      .select("id, email, display_name, plan, credits, currency, avatar_url")
       .eq("id", uid)
       .maybeSingle();
-    if (data) setProfile(data as Profile);
+    if (data) {
+      const p = data as Profile;
+      if (p.avatar_url) {
+        const { data: signed } = await supabase.storage
+          .from("avatars")
+          .createSignedUrl(p.avatar_url, 60 * 60);
+        p.avatar_signed_url = signed?.signedUrl ?? null;
+      } else {
+        p.avatar_signed_url = null;
+      }
+      setProfile(p);
+    }
   };
 
   const refreshProfile = async () => {

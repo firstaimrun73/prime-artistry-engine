@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sparkles, Coins } from "lucide-react";
 
 export function Header() {
@@ -25,7 +26,10 @@ export function Header() {
             Pricing
           </Link>
           <Link to="/faq" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
-            FAQ
+            FAQs
+          </Link>
+          <Link to="/security" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
+            Security
           </Link>
           <Link to="/support" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
             Support
@@ -54,9 +58,14 @@ export function Header() {
                   {profile.credits} credits
                 </Link>
               )}
-              <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/dashboard" })}>
-                Account
-              </Button>
+              <Link to="/dashboard" aria-label="Account" className="transition-opacity hover:opacity-80">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile?.avatar_signed_url ?? undefined} alt={profile?.display_name ?? "Account"} />
+                  <AvatarFallback className="text-xs">
+                    {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
             </>
           ) : (
             <>
