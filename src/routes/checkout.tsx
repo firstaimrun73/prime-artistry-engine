@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { getPlan, CURRENCY_SYMBOL, CURRENCY_METHODS, ALL_METHODS, type Currency } from "@/lib/plans";
+import { getPlan, CURRENCY_SYMBOL, CURRENCY_METHODS, ALL_METHODS, type Currency, type PlanId } from "@/lib/plans";
 import { completeCheckout } from "@/lib/generate.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import type { PaymentMethod } from "@/lib/plans";
 
 export const Route = createFileRoute("/checkout")({
   validateSearch: (s: Record<string, unknown>) => ({
-    plan: s.plan === "pro" ? "pro" : "free",
+    plan: (["free", "pro", "studio"].includes(s.plan as string) ? s.plan : "free") as PlanId,
     currency: ["USD", "EUR", "INR"].includes(s.currency as string) ? (s.currency as Currency) : "USD",
   }),
   component: Checkout,
