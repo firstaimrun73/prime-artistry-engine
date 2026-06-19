@@ -42,9 +42,9 @@ function Dashboard() {
         <Button asChild>
           <Link to="/editor">Open editor</Link>
         </Button>
-        {profile.plan === "free" && (
+        {profile.plan !== "studio" && (
           <Button asChild variant="outline">
-            <Link to="/pricing">Upgrade to Pro</Link>
+            <Link to="/pricing">{profile.plan === "free" ? "Upgrade plan" : "Upgrade to Studio"}</Link>
           </Button>
         )}
         <Button asChild variant="ghost">
