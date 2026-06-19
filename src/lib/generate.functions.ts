@@ -78,7 +78,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Video rendering is queued — try image generation meanwhile.");
     }
 
-    const newCredits = profile.credits - 1;
+    const newCredits = profile.credits - cost;
     await supabase.from("profiles").update({ credits: newCredits }).eq("id", userId);
     await supabase.from("generations").insert({
       user_id: userId,
