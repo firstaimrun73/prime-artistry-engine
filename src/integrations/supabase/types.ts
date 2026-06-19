@@ -49,6 +49,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           credits: number
           currency: string
@@ -59,6 +60,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           credits?: number
           currency?: string
@@ -69,6 +71,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           credits?: number
           currency?: string
@@ -130,8 +133,21 @@ export type Database = {
       gen_status: "pending" | "processing" | "success" | "failed"
       gen_type: "image" | "video"
       plan_type: "free" | "plus" | "pro" | "studio"
-      ticket_category: "payment" | "credits" | "generation" | "account"
-      ticket_status: "open" | "in_progress" | "resolved"
+      ticket_category:
+        | "payment"
+        | "credits"
+        | "generation"
+        | "account"
+        | "technical"
+        | "feature_request"
+        | "bug_report"
+        | "other"
+      ticket_status:
+        | "open"
+        | "in_progress"
+        | "resolved"
+        | "waiting_user"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -262,8 +278,23 @@ export const Constants = {
       gen_status: ["pending", "processing", "success", "failed"],
       gen_type: ["image", "video"],
       plan_type: ["free", "plus", "pro", "studio"],
-      ticket_category: ["payment", "credits", "generation", "account"],
-      ticket_status: ["open", "in_progress", "resolved"],
+      ticket_category: [
+        "payment",
+        "credits",
+        "generation",
+        "account",
+        "technical",
+        "feature_request",
+        "bug_report",
+        "other",
+      ],
+      ticket_status: [
+        "open",
+        "in_progress",
+        "resolved",
+        "waiting_user",
+        "closed",
+      ],
     },
   },
 } as const
