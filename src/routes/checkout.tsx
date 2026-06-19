@@ -26,7 +26,7 @@ const METHOD_ICON: Record<PaymentMethod, typeof CreditCard> = {
 
 function Checkout() {
   const { plan: planId, currency } = useSearch({ from: "/checkout" });
-  const plan = getPlan(planId as "free" | "pro");
+  const plan = getPlan(planId as PlanId);
   const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const checkout = useServerFn(completeCheckout);
