@@ -279,6 +279,35 @@ function SettingsPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">Notification preferences</h2>
+        <div className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Product updates</p>
+              <p className="text-xs text-muted-foreground">New features and improvements.</p>
+            </div>
+            <Switch checked={notifs.product} onCheckedChange={(v) => toggleNotif("product", v)} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Marketing & offers</p>
+              <p className="text-xs text-muted-foreground">Promotions and tips.</p>
+            </div>
+            <Switch checked={notifs.marketing} onCheckedChange={(v) => toggleNotif("marketing", v)} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Security alerts</p>
+              <p className="text-xs text-muted-foreground">Important account and security notices.</p>
+            </div>
+            <Switch checked={notifs.security} onCheckedChange={(v) => toggleNotif("security", v)} />
+          </div>
+        </div>
+      </section>
+
+
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">Subscription &amp; billing</h2>
         <div className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between">
