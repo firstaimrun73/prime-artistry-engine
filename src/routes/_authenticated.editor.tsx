@@ -27,7 +27,8 @@ function Editor() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
-  const noCredits = profile.credits <= 0;
+  const cost = CREDIT_COST[mediaType];
+  const noCredits = profile.credits < cost;
   const videoLocked = mediaType === "video" && !plan.video;
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
