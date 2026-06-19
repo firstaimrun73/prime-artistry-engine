@@ -1,10 +1,12 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Coins } from "lucide-react";
+import { Sparkles, Coins, Moon, Sun } from "lucide-react";
 
 export function Header() {
   const { user, profile, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   return (
@@ -24,6 +26,12 @@ export function Header() {
           <Link to="/pricing" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
             Pricing
           </Link>
+          <Link to="/faq" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
+            FAQ
+          </Link>
+          <Link to="/support" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
+            Support
+          </Link>
           {user && (
             <>
               <Link to="/editor" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
@@ -37,6 +45,14 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle theme"
+            onClick={toggleTheme}
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
           {user ? (
             <>
               {profile && (

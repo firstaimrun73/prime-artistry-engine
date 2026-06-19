@@ -80,6 +80,39 @@ export type Database = {
         }
         Relationships: []
       }
+      support_tickets: {
+        Row: {
+          category: Database["public"]["Enums"]["ticket_category"]
+          created_at: string
+          id: string
+          message: string
+          status: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["ticket_category"]
+          created_at?: string
+          id?: string
+          message: string
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["ticket_category"]
+          created_at?: string
+          id?: string
+          message?: string
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -90,7 +123,9 @@ export type Database = {
     Enums: {
       gen_status: "pending" | "processing" | "success" | "failed"
       gen_type: "image" | "video"
-      plan_type: "free" | "pro"
+      plan_type: "free" | "pro" | "studio"
+      ticket_category: "payment" | "credits" | "generation" | "account"
+      ticket_status: "open" | "in_progress" | "resolved"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -220,7 +255,9 @@ export const Constants = {
     Enums: {
       gen_status: ["pending", "processing", "success", "failed"],
       gen_type: ["image", "video"],
-      plan_type: ["free", "pro"],
+      plan_type: ["free", "pro", "studio"],
+      ticket_category: ["payment", "credits", "generation", "account"],
+      ticket_status: ["open", "in_progress", "resolved"],
     },
   },
 } as const

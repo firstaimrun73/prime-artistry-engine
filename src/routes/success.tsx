@@ -1,19 +1,19 @@
 import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
-import { getPlan } from "@/lib/plans";
+import { getPlan, type PlanId } from "@/lib/plans";
 import { CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/success")({
   validateSearch: (s: Record<string, unknown>) => ({
-    plan: s.plan === "pro" ? "pro" : "free",
+    plan: (["free", "pro", "studio"].includes(s.plan as string) ? s.plan : "free") as PlanId,
   }),
   component: Success,
 });
 
 function Success() {
   const { plan: planId } = useSearch({ from: "/success" });
-  const plan = getPlan(planId as "free" | "pro");
+  const plan = getPlan(planId as PlanId);
   const navigate = useNavigate();
 
   return (

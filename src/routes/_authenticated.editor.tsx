@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { getPlan } from "@/lib/plans";
+import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,8 @@ function Editor() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
-  const noCredits = profile.credits <= 0;
+  const cost = CREDIT_COST[mediaType];
+  const noCredits = profile.credits < cost;
   const videoLocked = mediaType === "video" && !plan.video;
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,7 +46,7 @@ function Editor() {
     }
     if (noCredits) {
       setState("blocked");
-      return toast.error("You're out of credits.");
+      return toast.error(`Not enough credits. This costs ${cost} credits.`);
     }
     setState("loading");
     setOutput(null);

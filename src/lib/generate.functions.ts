@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { CREDIT_COST, PLAN_CREDITS, type PlanId } from "@/lib/plans";
 
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
@@ -23,12 +24,15 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Could not load your account.");
     }
 
-    if (data.type === "video" && profile.plan !== "pro") {
+    if (data.type === "video" && profile.plan === "free") {
       throw new Error("Video generation requires a paid plan.");
     }
 
-    if (profile.credits <= 0) {
-      throw new Error("You are out of credits.");
+    const cost = CREDIT_COST[data.type];
+    if (profile.credits < cost) {
+      throw new Error(
+        `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
+      );
     }
 
     const apiKey = process.env.LOVABLE_API_KEY;
@@ -74,7 +78,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Video rendering is queued — try image generation meanwhile.");
     }
 
-    const newCredits = profile.credits - 1;
+    const newCredits = profile.credits - cost;
     await supabase.from("profiles").update({ credits: newCredits }).eq("id", userId);
     await supabase.from("generations").insert({
       user_id: userId,
@@ -88,7 +92,7 @@ export const generateMedia = createServerFn({ method: "POST" })
   });
 
 const checkoutSchema = z.object({
-  plan: z.enum(["free", "pro"]),
+  plan: z.enum(["free", "pro", "studio"]),
   currency: z.string().min(1).max(8),
 });
 
@@ -97,7 +101,7 @@ export const completeCheckout = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => checkoutSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const credits = data.plan === "pro" ? 500 : 15;
+    const credits = PLAN_CREDITS[data.plan as PlanId];
     const { error } = await supabase
       .from("profiles")
       .update({ plan: data.plan, credits, currency: data.currency })
