@@ -75,7 +75,7 @@ export function Header() {
               <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/auth" })}>
                 Sign in
               </Button>
-              <Button size="sm" onClick={() => navigate({ to: "/pricing" })}>
+              <Button size="sm" onClick={() => navigate({ to: "/auth" })}>
                 Get started
               </Button>
             </>
