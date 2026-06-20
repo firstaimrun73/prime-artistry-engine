@@ -120,44 +120,86 @@ function AuthPage() {
       <Header />
       <div className="mx-auto flex max-w-md flex-col px-4 py-16">
         <h1 className="text-2xl font-bold">
-          {mode === "signin" ? "Welcome back" : "Create your account"}
+          {mode === "otp" ? "Sign in with a code" : mode === "signin" ? "Welcome back" : "Create your account"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {mode === "signin" ? "Sign in to continue." : "Start with free credits."}
+          {mode === "otp"
+            ? "We'll email you a one-time code."
+            : mode === "signin"
+              ? "Sign in to continue."
+              : "Start with free credits."}
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1.5" />
-          </div>
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="mt-1.5" />
-          </div>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Sign up"}
-          </Button>
-        </form>
+        {mode === "otp" ? (
+          otpSent ? (
+            <form onSubmit={handleVerifyOtp} className="mt-8 space-y-4">
+              <div>
+                <Label htmlFor="otp">Enter the 6-digit code</Label>
+                <Input id="otp" inputMode="numeric" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} required className="mt-1.5 tracking-widest" />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Verifying…" : "Verify & sign in"}
+              </Button>
+              <button type="button" onClick={() => { setOtpSent(false); setOtpCode(""); }} className="w-full text-center text-sm text-muted-foreground hover:text-foreground">
+                Use a different email
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleSendOtp} className="mt-8 space-y-4">
+              <div>
+                <Label htmlFor="otp-email">Email</Label>
+                <Input id="otp-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1.5" />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Sending…" : "Email me a code"}
+              </Button>
+            </form>
+          )
+        ) : (
+          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1.5" />
+            </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="mt-1.5" />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Sign up"}
+            </Button>
+          </form>
+        )}
 
         <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
           <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
         </div>
 
-        <Button variant="outline" className="w-full" onClick={handleGoogle}>
-          Continue with Google
-        </Button>
-
-        <div className="mt-6 flex items-center justify-between text-sm">
-          <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="text-primary hover:underline">
-            {mode === "signin" ? "Create account" : "Have an account? Sign in"}
-          </button>
-          {mode === "signin" && (
-            <button onClick={handleReset} className="text-muted-foreground hover:text-foreground">
-              Forgot password?
-            </button>
-          )}
+        <div className="space-y-2">
+          <Button variant="outline" className="w-full" onClick={handleGoogle}>
+            Continue with Google
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full"
+            onClick={() => { setMode(mode === "otp" ? "signin" : "otp"); setOtpSent(false); setOtpCode(""); }}
+          >
+            {mode === "otp" ? "Use email & password" : "Email me a one-time code"}
+          </Button>
         </div>
+
+        {mode !== "otp" && (
+          <div className="mt-6 flex items-center justify-between text-sm">
+            <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="text-primary hover:underline">
+              {mode === "signin" ? "Create account" : "Have an account? Sign in"}
+            </button>
+            {mode === "signin" && (
+              <button onClick={handleReset} className="text-muted-foreground hover:text-foreground">
+                Forgot password?
+              </button>
+            )}
+          </div>
+        )}
 
         <Link to="/" className="mt-8 text-center text-xs text-muted-foreground hover:text-foreground">
           ← Back home
