@@ -20,9 +20,11 @@ function AuthPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { redirect } = useSearch({ from: "/auth" });
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "otp">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
 
   const dest = redirect || "/dashboard";
@@ -50,6 +52,43 @@ function AuthPage() {
       navigate({ to: dest });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Authentication failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return toast.error("Enter your email first.");
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      setOtpSent(true);
+      toast.success("We emailed you a 6-digit code.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send code.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otpCode,
+        type: "email",
+      });
+      if (error) throw error;
+      navigate({ to: dest });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Invalid or expired code.");
     } finally {
       setLoading(false);
     }
