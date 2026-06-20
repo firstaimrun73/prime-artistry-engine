@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      generation_history: {
+        Row: {
+          created_at: string
+          id: string
+          input_path: string | null
+          output_path: string | null
+          prompt: string | null
+          status: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input_path?: string | null
+          output_path?: string | null
+          prompt?: string | null
+          status?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input_path?: string | null
+          output_path?: string | null
+          prompt?: string | null
+          status?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       generations: {
         Row: {
           created_at: string
@@ -117,6 +150,30 @@ export type Database = {
           priority?: string
           status?: Database["public"]["Enums"]["ticket_status"]
           subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_credits: {
+        Row: {
+          created_at: string
+          credits: number
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          id?: string
           updated_at?: string
           user_id?: string
         }
