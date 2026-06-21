@@ -29,18 +29,6 @@ function Pricing() {
   const navigate = useNavigate();
   const [currency, setCurrency] = useState<Currency>("USD");
 
-  // Global access: auto-detect a sensible default currency from the user's locale.
-  useEffect(() => {
-    try {
-      const locale = navigator.language || "";
-      const region = (locale.split("-")[1] || "").toUpperCase();
-      const EUR_REGIONS = ["DE", "FR", "ES", "IT", "NL", "IE", "PT", "AT", "BE", "FI", "GR"];
-      if (region === "IN") setCurrency("INR");
-      else if (EUR_REGIONS.includes(region)) setCurrency("EUR");
-    } catch {
-      // keep default
-    }
-  }, []);
 
   const selectPlan = (planId: PlanId) => {
     navigate({ to: "/checkout", search: { plan: planId, currency } });
