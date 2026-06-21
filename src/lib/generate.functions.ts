@@ -58,9 +58,18 @@ export const generateMedia = createServerFn({ method: "POST" })
       if (!res.ok) {
         const txt = await res.text();
         console.error("[generate] fal.ai error", res.status, txt);
+        const detail = (() => {
+          try {
+            return (JSON.parse(txt) as { detail?: string }).detail ?? "";
+          } catch {
+            return "";
+          }
+        })();
         if (res.status === 429) throw new Error("Rate limit reached, try again shortly.");
+        if (/balance|locked|billing|top up/i.test(detail))
+          throw new Error("AI image service is out of credits. Top up the fal.ai account balance to continue.");
         if (res.status === 401 || res.status === 403)
-          throw new Error("AI service authentication failed.");
+          throw new Error("AI service authentication failed (invalid API key).");
         throw new Error("Generation failed, please try again.");
       }
 
