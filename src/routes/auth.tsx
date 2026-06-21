@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -23,6 +24,8 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup" | "otp">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,25 +36,53 @@ function AuthPage() {
     if (user) navigate({ to: dest });
   }, [user, navigate, dest]);
 
+  const friendlyError = (err: unknown) => {
+    const msg = err instanceof Error ? err.message : "Authentication failed.";
+    if (/invalid login credentials/i.test(msg)) return "Incorrect email or password.";
+    if (/email not confirmed/i.test(msg)) return "Please verify your email before signing in. Check your inbox.";
+    if (/already registered|already exists/i.test(msg)) return "An account with this email already exists. Try signing in.";
+    if (/rate limit|too many/i.test(msg)) return "Too many attempts. Please wait a moment and try again.";
+    return msg;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!email.trim()) return toast.error("Please enter your email.");
+    if (password.length < 6) return toast.error("Password must be at least 6 characters.");
+
+    if (mode === "signup") {
+      if (password !== confirmPassword) {
+        return toast.error("Passwords do not match.");
+      }
+    }
+
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
+        // When email confirmation is required, no session is returned yet.
+        if (!data.session) {
+          toast.success("Account created! Check your email to verify your account before signing in.");
+          setMode("signin");
+          setPassword("");
+          setConfirmPassword("");
+          return;
+        }
         toast.success("Account created!");
+        navigate({ to: dest });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        navigate({ to: dest });
       }
-      navigate({ to: dest });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Authentication failed.");
+      toast.error(friendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -70,7 +101,7 @@ function AuthPage() {
       setOtpSent(true);
       toast.success("We emailed you a 6-digit code.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not send code.");
+      toast.error(friendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -88,7 +119,7 @@ function AuthPage() {
       if (error) throw error;
       navigate({ to: dest });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Invalid or expired code.");
+      toast.error(friendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -112,7 +143,7 @@ function AuthPage() {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) toast.error(error.message);
-    else toast.success("Password reset email sent.");
+    else toast.success("Password reset email sent. Check your inbox.");
   };
 
   return (
@@ -127,7 +158,7 @@ function AuthPage() {
             ? "We'll email you a one-time code."
             : mode === "signin"
               ? "Sign in to continue."
-              : "Start with free credits."}
+              : "Start with free credits. You'll verify your email after signing up."}
         </p>
 
         {mode === "otp" ? (
@@ -163,8 +194,47 @@ function AuthPage() {
             </div>
             <div>
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="mt-1.5" />
+              <div className="relative mt-1.5">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="pr-10"
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
+            {mode === "signup" && (
+              <div>
+                <Label htmlFor="confirm-password">Confirm password</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    id="confirm-password"
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="pr-10"
+                    autoComplete="new-password"
+                  />
+                </div>
+                {confirmPassword.length > 0 && confirmPassword !== password && (
+                  <p className="mt-1.5 text-xs text-destructive">Passwords do not match.</p>
+                )}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Sign up"}
             </Button>
@@ -190,7 +260,7 @@ function AuthPage() {
 
         {mode !== "otp" && (
           <div className="mt-6 flex items-center justify-between text-sm">
-            <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="text-primary hover:underline">
+            <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setConfirmPassword(""); }} className="text-primary hover:underline">
               {mode === "signin" ? "Create account" : "Have an account? Sign in"}
             </button>
             {mode === "signin" && (

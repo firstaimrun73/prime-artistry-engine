@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -29,18 +29,6 @@ function Pricing() {
   const navigate = useNavigate();
   const [currency, setCurrency] = useState<Currency>("USD");
 
-  // Global access: auto-detect a sensible default currency from the user's locale.
-  useEffect(() => {
-    try {
-      const locale = navigator.language || "";
-      const region = (locale.split("-")[1] || "").toUpperCase();
-      const EUR_REGIONS = ["DE", "FR", "ES", "IT", "NL", "IE", "PT", "AT", "BE", "FI", "GR"];
-      if (region === "IN") setCurrency("INR");
-      else if (EUR_REGIONS.includes(region)) setCurrency("EUR");
-    } catch {
-      // keep default
-    }
-  }, []);
 
   const selectPlan = (planId: PlanId) => {
     navigate({ to: "/checkout", search: { plan: planId, currency } });
@@ -67,24 +55,26 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => (
             <div
               key={plan.id}
-              className={`rounded-2xl border bg-card p-8 ${
+              className={`flex h-full flex-col rounded-2xl border bg-card p-8 ${
                 plan.id === "pro" ? "border-primary" : "border-border"
               }`}
             >
-              {plan.id === "pro" && (
-                <span className="mb-3 inline-block rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                  Most popular
-                </span>
-              )}
-              {plan.id === "studio" && (
-                <span className="mb-3 inline-block rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
-                  Best value
-                </span>
-              )}
+              <div className="mb-3 h-6">
+                {plan.id === "pro" && (
+                  <span className="inline-block rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                    Most popular
+                  </span>
+                )}
+                {plan.id === "studio" && (
+                  <span className="inline-block rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+                    Best value
+                  </span>
+                )}
+              </div>
               <h2 className="text-xl font-bold">{plan.name}</h2>
               <div className="mt-3 flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold">
@@ -96,7 +86,7 @@ function Pricing() {
               <ul className="mt-6 space-y-3">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm">
-                    <Check className="h-4 w-4 text-primary" /> {f}
+                    <Check className="h-4 w-4 shrink-0 text-primary" /> {f}
                   </li>
                 ))}
               </ul>
@@ -104,12 +94,14 @@ function Pricing() {
                 className="mt-8 w-full"
                 variant={plan.id === "pro" ? "default" : "outline"}
                 onClick={() => selectPlan(plan.id)}
+                style={{ marginTop: "auto" }}
               >
                 {plan.id === "free" ? "Start free" : `Choose ${plan.name}`}
               </Button>
             </div>
           ))}
         </div>
+
       </div>
       <Footer />
     </div>
