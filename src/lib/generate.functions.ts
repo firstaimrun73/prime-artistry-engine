@@ -9,6 +9,8 @@ const inputSchema = z.object({
   type: z.enum(["image", "video"]),
   // Optional source image (data URI) — enables the image-to-image workflow.
   imageUrl: z.string().min(1).max(15_000_000).optional(),
+  // Edit strength for image-to-image (0.1 – 1). Higher = more visible edits.
+  strength: z.number().min(0.1).max(1).optional(),
 });
 
 export const generateMedia = createServerFn({ method: "POST" })
