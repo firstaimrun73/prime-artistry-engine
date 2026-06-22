@@ -45,6 +45,9 @@ export function Header() {
               <Link to="/editor" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
                 Editor
               </Link>
+              <Link to="/history" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
+                History
+              </Link>
               <Link to="/chat" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
                 Chat
               </Link>
