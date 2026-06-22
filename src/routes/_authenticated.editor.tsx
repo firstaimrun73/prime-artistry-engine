@@ -122,7 +122,8 @@ function Editor() {
         data: {
           prompt,
           type: mediaType,
-          imageUrl: mediaType === "image" ? inputDataUrl ?? undefined : undefined,
+          // Send the uploaded media for BOTH image edits and video enhancement.
+          imageUrl: inputDataUrl ?? undefined,
           strength: mediaType === "image" && inputDataUrl ? strength : undefined,
         },
       });

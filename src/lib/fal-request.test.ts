@@ -59,3 +59,27 @@ describe("image generation workflows", () => {
     expect(step.body.video_url).toBe("https://example.com/v.mp4");
   });
 });
+
+import { isEnhancementOnly, buildImageEdit, IMAGE_EDIT_MODEL } from "@/lib/fal-request";
+
+describe("edit vs enhancement routing", () => {
+  it("treats semantic edit prompts as edits (not enhancement)", () => {
+    expect(isEnhancementOnly("add a boat to the lake")).toBe(false);
+    expect(isEnhancementOnly("change the color palette to warm tones")).toBe(false);
+    expect(isEnhancementOnly("remove the background")).toBe(false);
+    expect(isEnhancementOnly("turn this into an anime style")).toBe(false);
+  });
+
+  it("treats pure quality prompts as enhancement", () => {
+    expect(isEnhancementOnly("sharpen and enhance to HD quality")).toBe(true);
+    expect(isEnhancementOnly("deblur and increase resolution")).toBe(true);
+  });
+
+  it("buildImageEdit targets the instruction-edit model and sends the source image", () => {
+    const step = buildImageEdit({ prompt: "add a red boat", imageUrl: "data:image/png;base64,AAAA" });
+    expect(step.model).toBe(IMAGE_EDIT_MODEL);
+    expect(step.endpoint).toBe(`https://fal.run/${IMAGE_EDIT_MODEL}`);
+    expect(step.body.prompt).toBe("add a red boat");
+    expect(step.body.image_url).toBe("data:image/png;base64,AAAA");
+  });
+});
