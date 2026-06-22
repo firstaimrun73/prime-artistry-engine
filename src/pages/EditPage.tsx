@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-import { expandPrompt, INITIAL_EDIT_SESSION, type EditSessionState, type EditMode, CREDIT_COSTS } from "@/lib/aiEngine";
+import { INITIAL_EDIT_SESSION, type EditSessionState, type EditMode, CREDIT_COSTS } from "@/lib/edit-session";
+import { expandPrompt } from "@/lib/expand-prompt.functions";
 
 
 
@@ -282,7 +283,7 @@ export default function EditPage() {
 
     try {
 
-      const intent = await expandPrompt(session.userPrompt, session.mode);
+      const intent = await expandPrompt({ data: { userPrompt: session.userPrompt, mode: session.mode } });
 
       setPreviewIntent(intent);
 
@@ -320,7 +321,7 @@ export default function EditPage() {
 
       setProgress(25);
 
-      const intent = await expandPrompt(session.userPrompt, session.mode);
+      const intent = await expandPrompt({ data: { userPrompt: session.userPrompt, mode: session.mode } });
 
       setPreviewIntent(intent);
 
