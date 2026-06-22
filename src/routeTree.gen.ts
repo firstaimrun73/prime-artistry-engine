@@ -25,6 +25,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
+import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated.history'
 import { Route as AuthenticatedEditorRouteImport } from './routes/_authenticated.editor'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
@@ -108,6 +109,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedEditorRoute = AuthenticatedEditorRouteImport.update({
   id: '/editor',
   path: '/editor',
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/editor': typeof AuthenticatedEditorRoute
+  '/history': typeof AuthenticatedHistoryRoute
   '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesByTo {
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/editor': typeof AuthenticatedEditorRoute
+  '/history': typeof AuthenticatedHistoryRoute
   '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesById {
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/editor': typeof AuthenticatedEditorRoute
+  '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRouteTypes {
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/dashboard'
     | '/editor'
+    | '/history'
     | '/settings'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/dashboard'
     | '/editor'
+    | '/history'
     | '/settings'
   id:
     | '__root__'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/editor'
+    | '/_authenticated/history'
     | '/_authenticated/settings'
   fileRoutesById: FileRoutesById
 }
@@ -382,6 +394,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/history': {
+      id: '/_authenticated/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/editor': {
       id: '/_authenticated/editor'
       path: '/editor'
@@ -410,6 +429,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEditorRoute: typeof AuthenticatedEditorRoute
+  AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
@@ -417,6 +437,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEditorRoute: AuthenticatedEditorRoute,
+  AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 
