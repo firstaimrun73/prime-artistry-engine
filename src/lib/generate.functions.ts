@@ -47,7 +47,7 @@ export const generateMedia = createServerFn({ method: "POST" })
 
     if (data.type === "image") {
       // Choose workflow + model based on whether a source image was provided.
-      const req = buildFalRequest({ prompt: data.prompt, imageUrl: data.imageUrl });
+      const req = buildFalRequest({ prompt: data.prompt, imageUrl: data.imageUrl, strength: data.strength });
 
       // ── Debug logs ────────────────────────────────────────────────
       console.log("[generate] workflow:", req.workflow);
