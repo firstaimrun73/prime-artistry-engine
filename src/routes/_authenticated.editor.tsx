@@ -216,9 +216,10 @@ function Editor() {
   };
 
   const handleUseResultAsInput = () => {
-    if (!output) return;
+    if (!output || outputIsVideo) return;
     setInputPreview(output);
     setInputDataUrl(output);
+    setInputKind("image");
     setOutput(null);
     setState("idle");
     setDownloaded(false);
@@ -229,7 +230,7 @@ function Editor() {
     if (!output) return;
     const a = document.createElement("a");
     a.href = output;
-    a.download = `motio2edit-${Date.now()}.png`;
+    a.download = `motio2edit-${Date.now()}.${outputIsVideo ? "mp4" : "png"}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
