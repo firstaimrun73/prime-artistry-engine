@@ -44,18 +44,39 @@ export const generateMedia = createServerFn({ method: "POST" })
     let outputUrl: string | null = null;
 
     if (data.type === "image") {
-      // fal.ai FLUX dev — runs server-side only; key is never sent to the client.
-      const res = await fetch("https://fal.run/fal-ai/flux/dev", {
+      // Choose workflow + model based on whether a source image was provided.
+      const req = buildFalRequest({ prompt: data.prompt, imageUrl: data.imageUrl });
+
+      // ── Debug logs ────────────────────────────────────────────────
+      console.log("[generate] workflow:", req.workflow);
+      console.log("[generate] model:", req.model);
+      console.log(
+        "[generate] uploaded image url:",
+        data.imageUrl ? `${data.imageUrl.slice(0, 64)}… (${data.imageUrl.length} chars)` : "none",
+      );
+      console.log("[generate] endpoint:", req.endpoint);
+      console.log(
+        "[generate] payload:",
+        JSON.stringify(
+          // Truncate the data URI so logs stay readable.
+          {
+            ...req.body,
+            image_url:
+              typeof req.body.image_url === "string"
+                ? `${(req.body.image_url as string).slice(0, 48)}…`
+                : req.body.image_url,
+          },
+        ),
+      );
+
+      // fal.ai — runs server-side only; key is never sent to the client.
+      const res = await fetch(req.endpoint, {
         method: "POST",
         headers: {
           Authorization: `Key ${falKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          prompt: data.prompt,
-          image_size: "square_hd",
-          num_images: 1,
-        }),
+        body: JSON.stringify(req.body),
       });
 
       if (!res.ok) {
@@ -80,6 +101,7 @@ export const generateMedia = createServerFn({ method: "POST" })
         images?: { url?: string }[];
       };
       outputUrl = json.images?.[0]?.url ?? null;
+      console.log("[generate] result url:", outputUrl ?? "none");
       if (!outputUrl) throw new Error("Generation returned no image.");
     } else {
       // Video pipeline (paid only). Marks job processed.
@@ -92,6 +114,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       user_id: userId,
       type: data.type,
       prompt: data.prompt,
+      input_url: data.imageUrl ? "uploaded" : null,
       output_url: outputUrl,
       status: "success",
     });
