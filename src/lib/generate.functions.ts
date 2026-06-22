@@ -2,7 +2,72 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST, PLAN_CREDITS, type PlanId } from "@/lib/plans";
-import { buildFalRequest } from "@/lib/fal-request";
+import {
+  buildFalRequest,
+  buildImageEnhancementPipeline,
+  buildVideoEnhancement,
+  type FalStep,
+} from "@/lib/fal-request";
+
+// Run one fal.ai model call and return its output URL.
+async function runFalStep(
+  step: FalStep,
+  falKey: string,
+): Promise<string> {
+  console.log("[generate] step:", step.label, "model:", step.model);
+  console.log(
+    "[generate] payload:",
+    JSON.stringify({
+      ...step.body,
+      image_url:
+        typeof step.body.image_url === "string"
+          ? `${(step.body.image_url as string).slice(0, 48)}…`
+          : step.body.image_url,
+      video_url:
+        typeof step.body.video_url === "string"
+          ? `${(step.body.video_url as string).slice(0, 48)}…`
+          : step.body.video_url,
+    }),
+  );
+
+  const res = await fetch(step.endpoint, {
+    method: "POST",
+    headers: { Authorization: `Key ${falKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(step.body),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    console.error("[generate] fal.ai error", step.label, res.status, txt);
+    const detail = (() => {
+      try {
+        return (JSON.parse(txt) as { detail?: string }).detail ?? "";
+      } catch {
+        return "";
+      }
+    })();
+    if (res.status === 429) throw new Error("Rate limit reached, try again shortly.");
+    if (/balance|locked|billing|top up/i.test(detail))
+      throw new Error("AI service is out of credits. Top up the fal.ai account balance to continue.");
+    if (res.status === 401 || res.status === 403)
+      throw new Error("AI service authentication failed (invalid API key).");
+    throw new Error("Enhancement failed, please try again.");
+  }
+
+  const json = (await res.json()) as {
+    image?: { url?: string };
+    images?: { url?: string }[];
+    video?: { url?: string };
+  };
+  const url =
+    json.image?.url ??
+    json.images?.[0]?.url ??
+    json.video?.url ??
+    null;
+  console.log("[generate] step result url:", url ?? "none");
+  if (!url) throw new Error("Enhancement returned no output.");
+  return url;
+}
 
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
