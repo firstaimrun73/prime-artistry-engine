@@ -2,7 +2,72 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST, PLAN_CREDITS, type PlanId } from "@/lib/plans";
-import { buildFalRequest } from "@/lib/fal-request";
+import {
+  buildFalRequest,
+  buildImageEnhancementPipeline,
+  buildVideoEnhancement,
+  type FalStep,
+} from "@/lib/fal-request";
+
+// Run one fal.ai model call and return its output URL.
+async function runFalStep(
+  step: FalStep,
+  falKey: string,
+): Promise<string> {
+  console.log("[generate] step:", step.label, "model:", step.model);
+  console.log(
+    "[generate] payload:",
+    JSON.stringify({
+      ...step.body,
+      image_url:
+        typeof step.body.image_url === "string"
+          ? `${(step.body.image_url as string).slice(0, 48)}…`
+          : step.body.image_url,
+      video_url:
+        typeof step.body.video_url === "string"
+          ? `${(step.body.video_url as string).slice(0, 48)}…`
+          : step.body.video_url,
+    }),
+  );
+
+  const res = await fetch(step.endpoint, {
+    method: "POST",
+    headers: { Authorization: `Key ${falKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(step.body),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    console.error("[generate] fal.ai error", step.label, res.status, txt);
+    const detail = (() => {
+      try {
+        return (JSON.parse(txt) as { detail?: string }).detail ?? "";
+      } catch {
+        return "";
+      }
+    })();
+    if (res.status === 429) throw new Error("Rate limit reached, try again shortly.");
+    if (/balance|locked|billing|top up/i.test(detail))
+      throw new Error("AI service is out of credits. Top up the fal.ai account balance to continue.");
+    if (res.status === 401 || res.status === 403)
+      throw new Error("AI service authentication failed (invalid API key).");
+    throw new Error("Enhancement failed, please try again.");
+  }
+
+  const json = (await res.json()) as {
+    image?: { url?: string };
+    images?: { url?: string }[];
+    video?: { url?: string };
+  };
+  const url =
+    json.image?.url ??
+    json.images?.[0]?.url ??
+    json.video?.url ??
+    null;
+  console.log("[generate] step result url:", url ?? "none");
+  if (!url) throw new Error("Enhancement returned no output.");
+  return url;
+}
 
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
@@ -46,80 +111,54 @@ export const generateMedia = createServerFn({ method: "POST" })
     let outputUrl: string | null = null;
 
     if (data.type === "image") {
-      // ── Prompt Intelligence Layer ─────────────────────────────────
-      // Never send the raw prompt blindly: deeply expand it into detailed,
-      // model-ready instructions first (always auto-enhance).
-      const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
-      const enhancedPrompt = await enhancePrompt({
-        prompt: data.prompt,
-        isEdit: Boolean(data.imageUrl),
-      });
       console.log("[generate] user prompt:", data.prompt);
-      console.log("[generate] enhanced prompt:", enhancedPrompt);
-
-      // Choose workflow + model based on whether a source image was provided.
-      const req = buildFalRequest({ prompt: enhancedPrompt, imageUrl: data.imageUrl, strength: data.strength });
-
-      // ── Debug logs ────────────────────────────────────────────────
-      console.log("[generate] workflow:", req.workflow);
-      console.log("[generate] model:", req.model);
       console.log(
         "[generate] uploaded image url:",
         data.imageUrl ? `${data.imageUrl.slice(0, 64)}… (${data.imageUrl.length} chars)` : "none",
       );
-      console.log("[generate] endpoint:", req.endpoint);
-      console.log(
-        "[generate] payload:",
-        JSON.stringify(
-          // Truncate the data URI so logs stay readable.
-          {
-            ...req.body,
-            image_url:
-              typeof req.body.image_url === "string"
-                ? `${(req.body.image_url as string).slice(0, 48)}…`
-                : req.body.image_url,
-          },
-        ),
-      );
 
-      // fal.ai — runs server-side only; key is never sent to the client.
-      const res = await fetch(req.endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Key ${falKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(req.body),
-      });
+      if (data.imageUrl) {
+        // ── Enhancement path ──────────────────────────────────────────
+        // Deterministic detail-preserving pipeline (deblur → smart sharpen
+        // → optional Topaz upscale). No generative regeneration, so the
+        // composition/colors/framing stay identical — only sharpness and
+        // fine detail improve dramatically.
+        const pipeline = buildImageEnhancementPipeline({
+          prompt: data.prompt,
+          imageUrl: data.imageUrl,
+          strength: data.strength,
+        });
+        console.log("[generate] enhancement steps:", pipeline.map((s) => s.label).join(" → "));
 
-      if (!res.ok) {
-        const txt = await res.text();
-        console.error("[generate] fal.ai error", res.status, txt);
-        const detail = (() => {
-          try {
-            return (JSON.parse(txt) as { detail?: string }).detail ?? "";
-          } catch {
-            return "";
-          }
-        })();
-        if (res.status === 429) throw new Error("Rate limit reached, try again shortly.");
-        if (/balance|locked|billing|top up/i.test(detail))
-          throw new Error("AI image service is out of credits. Top up the fal.ai account balance to continue.");
-        if (res.status === 401 || res.status === 403)
-          throw new Error("AI service authentication failed (invalid API key).");
-        throw new Error("Generation failed, please try again.");
+        let current = data.imageUrl;
+        for (const step of pipeline) {
+          step.body.image_url = current;
+          current = await runFalStep(step, falKey);
+        }
+        outputUrl = current;
+      } else {
+        // ── Text → Image path ─────────────────────────────────────────
+        // Expand the prompt then generate with FLUX1.1 [pro].
+        const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
+        const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: false });
+        console.log("[generate] enhanced prompt:", enhancedPrompt);
+
+        const req = buildFalRequest({ prompt: enhancedPrompt });
+        outputUrl = await runFalStep(
+          { label: req.workflow, model: req.model, endpoint: req.endpoint, body: req.body, outputKind: "image" },
+          falKey,
+        );
       }
-
-      const json = (await res.json()) as {
-        images?: { url?: string }[];
-      };
-      outputUrl = json.images?.[0]?.url ?? null;
-      console.log("[generate] result url:", outputUrl ?? "none");
       if (!outputUrl) throw new Error("Generation returned no image.");
     } else {
-      // Video pipeline (paid only). Marks job processed.
-      throw new Error("Video rendering is queued — try image generation meanwhile.");
+      // ── Video enhancement path (paid only) ──────────────────────────
+      if (!data.imageUrl) throw new Error("Upload a video to enhance.");
+      const step = buildVideoEnhancement({ videoUrl: data.imageUrl });
+      console.log("[generate] video enhancement:", step.label);
+      outputUrl = await runFalStep(step, falKey);
+      if (!outputUrl) throw new Error("Video enhancement returned no output.");
     }
+
 
     const newCredits = profile.credits - cost;
     await supabase.from("profiles").update({ credits: newCredits }).eq("id", userId);
