@@ -253,9 +253,17 @@ export const generateMedia = createServerFn({ method: "POST" })
     }
 
 
+    // ── Persist + deduct credits ────────────────────────────────────────
+    console.log("[generate] output ready:", outputUrl.slice(0, 80));
     const newCredits = profile.credits - cost;
-    await supabase.from("profiles").update({ credits: newCredits }).eq("id", userId);
-    await supabase.from("generations").insert({
+    const { error: credErr } = await supabase
+      .from("profiles")
+      .update({ credits: newCredits })
+      .eq("id", userId);
+    if (credErr) console.error("[generate] credit deduction failed:", credErr.message);
+    else console.log("[generate] credits deducted:", cost, "→ remaining", newCredits);
+
+    const { error: histErr } = await supabase.from("generations").insert({
       user_id: userId,
       type: data.type,
       prompt: data.prompt,
@@ -263,6 +271,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       output_url: outputUrl,
       status: "success",
     });
+    if (histErr) console.error("[generate] history insert failed:", histErr.message);
 
     return { outputUrl, credits: newCredits, plan: profile.plan };
   });
