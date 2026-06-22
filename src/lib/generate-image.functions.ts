@@ -16,7 +16,7 @@ const inputSchema = z.object({
  */
 export const generateImage = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
-  .handler(async ({ data }): Promise<{ imageUrl: string }> => {
+  .handler(async ({ data }): Promise<{ outputUrl: string }> => {
     const apiKey = process.env.FAL_KEY;
     if (!apiKey) throw new Error("FAL_KEY is not configured.");
 
@@ -48,7 +48,7 @@ export const generateImage = createServerFn({ method: "POST" })
       images?: { url?: string }[];
       image?: { url?: string };
     };
-    const imageUrl = json.images?.[0]?.url ?? json.image?.url;
-    if (!imageUrl) throw new Error("No output image returned.");
-    return { imageUrl };
+    const outputUrl = json.images?.[0]?.url ?? json.image?.url;
+    if (!outputUrl) throw new Error("No output image returned.");
+    return { outputUrl };
   });

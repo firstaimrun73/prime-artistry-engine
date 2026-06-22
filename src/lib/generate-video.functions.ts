@@ -13,7 +13,7 @@ const inputSchema = z.object({
  */
 export const generateVideo = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
-  .handler(async ({ data }): Promise<{ videoUrl: string }> => {
+  .handler(async ({ data }): Promise<{ outputUrl: string }> => {
     const apiKey = process.env.FAL_KEY;
     if (!apiKey) throw new Error("FAL_KEY is not configured.");
 
@@ -26,7 +26,7 @@ export const generateVideo = createServerFn({ method: "POST" })
       body: JSON.stringify({
         image_url: data.sourceImageUrl,
         prompt: data.prompt,
-        num_frames: Math.round((data.durationSeconds ?? 5) * 16),
+        duration: data.durationSeconds ?? 5,
       }),
     });
 
@@ -39,7 +39,7 @@ export const generateVideo = createServerFn({ method: "POST" })
       video?: { url?: string };
       videos?: { url?: string }[];
     };
-    const videoUrl = json.video?.url ?? json.videos?.[0]?.url;
-    if (!videoUrl) throw new Error("No output video returned.");
-    return { videoUrl };
+    const outputUrl = json.video?.url ?? json.videos?.[0]?.url;
+    if (!outputUrl) throw new Error("No output video returned.");
+    return { outputUrl };
   });
