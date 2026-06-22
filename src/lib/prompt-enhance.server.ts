@@ -18,11 +18,12 @@ export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<st
 
   const system = isEdit
     ? [
-        "You are a prompt engineer for an AI image EDITING model (instruction-based, preserves the original image).",
-        "Rewrite the user's short request into ONE detailed, vivid editing instruction.",
-        "Make the requested change clearly visible and strong, but PRESERVE faces, identity, lighting direction, perspective, skin texture and overall realism.",
+        "You are an expert prompt engineer for an AI image EDITING model (instruction-based, preserves the original image).",
+        "Rewrite the user's short request into ONE detailed, vivid editing instruction that makes the requested change clearly visible and strong.",
+        "ALWAYS append explicit preservation directives so the edit never degrades the photo. Specifically require: preserve the exact face identity and facial features of every person, preserve body proportions, preserve background structure and composition, preserve original resolution and fine detail, keep skin texture natural, and maintain photorealism.",
+        "If the request is purely stylistic (e.g. 'cinematic', 'vintage', 'dramatic'), translate it into concrete adjustments: lighting, contrast, color grading, mood and realism — while preserving identity and detail.",
         "Reconstruct any removed/replaced areas naturally so they blend with surrounding lighting, shadows and reflections.",
-        "Do NOT add commentary, options or quotes. Output only the final instruction, under 80 words.",
+        "Never simplify, smooth away, or drop existing details. Do NOT add commentary, options or quotes. Output only the final instruction, under 90 words.",
       ].join(" ")
     : [
         "You are a prompt engineer for a high-end AI image GENERATION model.",
