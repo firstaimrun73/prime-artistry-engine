@@ -99,13 +99,32 @@ function Editor() {
     setDownloaded(false);
     setState("idle");
     setInputPreview(URL.createObjectURL(file));
-    if (mediaType === "image") {
+    setInputFile(file);
+    const kind: "image" | "video" = file.type.startsWith("video") ? "video" : "image";
+    setInputKind(kind);
+    // Read images as a data URI (sent inline). Videos upload at generate time.
+    if (kind === "image") {
       const reader = new FileReader();
       reader.onload = () => setInputDataUrl(typeof reader.result === "string" ? reader.result : null);
       reader.readAsDataURL(file);
     } else {
       setInputDataUrl(null);
     }
+  };
+
+  // Upload a (video) file to private storage and return a signed URL fal can fetch.
+  const uploadToStorage = async (file: File): Promise<string> => {
+    const uid = profile?.id ?? "anon";
+    const ext = file.name.split(".").pop() || "bin";
+    const path = `${uid}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("uploads").upload(path, file, {
+      contentType: file.type,
+      upsert: true,
+    });
+    if (upErr) throw new Error("Upload failed. Try a smaller file.");
+    const { data, error } = await supabase.storage.from("uploads").createSignedUrl(path, 60 * 60);
+    if (error || !data?.signedUrl) throw new Error("Could not prepare your upload.");
+    return data.signedUrl;
   };
 
   const runGenerate = async () => {
@@ -123,19 +142,34 @@ function Editor() {
 
     setState("loading");
     try {
+      // Resolve the source media URL to send to the AI.
+      let mediaUrl: string | undefined;
+      let sourceKind: "image" | "video" | undefined;
+      if (inputKind === "image" && inputDataUrl) {
+        mediaUrl = inputDataUrl;
+        sourceKind = "image";
+      } else if (inputKind === "video" && inputFile) {
+        mediaUrl = await uploadToStorage(inputFile);
+        sourceKind = "video";
+      }
+      if (runId !== runIdRef.current) return;
+
       const res = await generate({
         data: {
           prompt,
           type: mediaType,
-          // Send the uploaded media for BOTH image edits and video enhancement.
-          imageUrl: inputDataUrl ?? undefined,
-          strength: mediaType === "image" && inputDataUrl ? strength : undefined,
+          imageUrl: mediaUrl,
+          sourceKind,
+          strength: mediaType === "image" && sourceKind === "image" ? strength : undefined,
         },
       });
       if (runId !== runIdRef.current) return;
       let url = res.outputUrl;
-      // Watermark for FREE users only.
-      if (isFree && url) {
+      const isVideoOut = mediaType === "video";
+      setOutputIsVideo(isVideoOut);
+      // Watermark images for FREE users (always) and paid users who keep it on.
+      // Video watermarking is applied server-side where supported.
+      if (!isVideoOut && url && (isFree || keepWatermark)) {
         try { url = await watermarkImage(url); } catch { /* keep original */ }
       }
       if (runId !== runIdRef.current) return;
@@ -165,7 +199,10 @@ function Editor() {
     setPrompt("");
     setInputPreview(null);
     setInputDataUrl(null);
+    setInputFile(null);
+    setInputKind(null);
     setOutput(null);
+    setOutputIsVideo(false);
     setState("idle");
     setDownloaded(false);
     setProgress(0);
