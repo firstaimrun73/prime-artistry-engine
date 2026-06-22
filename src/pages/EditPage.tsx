@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-import { INITIAL_EDIT_SESSION, type EditSessionState, type EditMode, type ExpandedIntent, CREDIT_COSTS } from "@/lib/edit-session";
+import { INITIAL_EDIT_SESSION, type EditSessionState, type EditMode, CREDIT_COSTS } from "@/lib/edit-session";
 import { expandPrompt } from "@/lib/expand-prompt.functions";
 
 
