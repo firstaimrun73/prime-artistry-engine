@@ -2,10 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST, PLAN_CREDITS, type PlanId } from "@/lib/plans";
+import { buildFalRequest } from "@/lib/fal-request";
 
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
   type: z.enum(["image", "video"]),
+  // Optional source image (data URI) — enables the image-to-image workflow.
+  imageUrl: z.string().min(1).max(15_000_000).optional(),
 });
 
 export const generateMedia = createServerFn({ method: "POST" })
