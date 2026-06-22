@@ -4,8 +4,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST, PLAN_CREDITS, type PlanId } from "@/lib/plans";
 import {
   buildFalRequest,
+  buildImageEdit,
   buildImageEnhancementPipeline,
   buildVideoEnhancement,
+  isEnhancementOnly,
   type FalStep,
 } from "@/lib/fal-request";
 
