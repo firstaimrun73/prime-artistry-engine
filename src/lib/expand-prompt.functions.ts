@@ -66,26 +66,27 @@ export const expandPrompt = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data }): Promise<ExpandedIntent> => {
     const { userPrompt, mode, imageDescription } = data;
-    const apiKey = process.env.LOVABLE_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return getDefaultIntent(userPrompt, mode);
 
     try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          response_format: { type: "json_object" },
+          model: "claude-sonnet-4-5",
+          max_tokens: 1024,
+          system: SYSTEM_PROMPT,
           messages: [
-            { role: "system", content: SYSTEM_PROMPT },
             {
               role: "user",
               content: `Mode: ${mode}\nUser prompt: "${userPrompt}"\n${
                 imageDescription ? `Image content: ${imageDescription}` : ""
-              }\n\nExpand this into a professional ${mode} editing directive.`,
+              }\n\nExpand this into a professional ${mode} editing directive. Return ONLY the JSON object.`,
             },
           ],
         }),
@@ -94,9 +95,9 @@ export const expandPrompt = createServerFn({ method: "POST" })
       if (!res.ok) return getDefaultIntent(userPrompt, mode);
 
       const json = (await res.json()) as {
-        choices?: { message?: { content?: string } }[];
+        content?: { type?: string; text?: string }[];
       };
-      const text = json.choices?.[0]?.message?.content ?? "";
+      const text = json.content?.find((c) => c.type === "text")?.text ?? "";
       const clean = text.replace(/```json|```/g, "").trim();
 
       const parsed = JSON.parse(clean) as ExpandedIntent;

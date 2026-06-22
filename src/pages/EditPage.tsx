@@ -2,6 +2,17 @@ import { useState, useRef, useCallback, useEffect } from "react";
 
 import { INITIAL_EDIT_SESSION, type EditSessionState, type EditMode, CREDIT_COSTS } from "@/lib/edit-session";
 import { expandPrompt } from "@/lib/expand-prompt.functions";
+import { generateImage } from "@/lib/generate-image.functions";
+import { generateVideo } from "@/lib/generate-video.functions";
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Failed to read file."));
+    reader.readAsDataURL(file);
+  });
+}
 
 
 
@@ -331,7 +342,7 @@ export default function EditPage() {
 
       setProgress(45);
 
-      await new Promise((r) => setTimeout(r, 500));
+      const sourceImageUrl = await fileToDataUrl(session.sourceFile);
 
 
 
@@ -339,7 +350,36 @@ export default function EditPage() {
 
       setProgress(70);
 
-      await new Promise((r) => setTimeout(r, 1200));
+      let outputUrl: string;
+
+      if (session.mode === "image") {
+
+        const result = await generateImage({
+          data: {
+            sourceImageUrl,
+            professionalPrompt: intent.professionalPrompt,
+            negativePrompt: intent.negativePrompt,
+            strength: intent.strength,
+            guidanceScale: intent.guidanceScale,
+            steps: intent.steps,
+          },
+        });
+
+        outputUrl = result.imageUrl;
+
+      } else {
+
+        const result = await generateVideo({
+          data: {
+            sourceImageUrl,
+            prompt: intent.professionalPrompt,
+            durationSeconds: intent.durationSeconds,
+          },
+        });
+
+        outputUrl = result.videoUrl;
+
+      }
 
 
 
@@ -347,17 +387,15 @@ export default function EditPage() {
 
       setProgress(90);
 
-      await new Promise((r) => setTimeout(r, 400));
-
 
 
       setProgress(100);
 
       setProgressLabel("Complete!");
 
-      setResultUrl(session.sourcePreviewUrl!);
+      setResultUrl(outputUrl);
 
-      update({ status: "done", outputUrl: session.sourcePreviewUrl! });
+      update({ status: "done", outputUrl });
 
     } catch (err) {
 
