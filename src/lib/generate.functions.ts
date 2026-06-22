@@ -26,6 +26,16 @@ function safePayload(body: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+// Detect model "image too large" failures (e.g. fal post-processing rejects
+// images above 4095×4095). Used to trigger a silent, quality-preserving
+// fallback instead of showing users a technical pixel-limit error.
+function isPixelLimitError(msg: string): boolean {
+  return /4095|4096|maximum should be|too large|max(imum)?\s*(image\s*)?(size|dimension|pixels)|exceeds|resolution too high/i.test(
+    msg || "",
+  );
+}
+
+
 // Map a raw fal.ai error response to a specific, user-readable reason.
 function falErrorMessage(label: string, status: number, txt: string): string {
   let detail = "";
