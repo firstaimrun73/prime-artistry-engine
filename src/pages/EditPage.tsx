@@ -321,7 +321,7 @@ export default function EditPage() {
 
       setProgress(25);
 
-      const intent = await expandPrompt(session.userPrompt, session.mode);
+      const intent = await expandPrompt({ data: { userPrompt: session.userPrompt, mode: session.mode } });
 
       setPreviewIntent(intent);
 
