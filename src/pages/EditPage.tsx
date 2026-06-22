@@ -365,7 +365,7 @@ export default function EditPage() {
           },
         });
 
-        outputUrl = result.imageUrl;
+        outputUrl = result.outputUrl;
 
       } else {
 
@@ -373,11 +373,11 @@ export default function EditPage() {
           data: {
             sourceImageUrl,
             prompt: intent.professionalPrompt,
-            durationSeconds: intent.durationSeconds,
+            durationSeconds: session.videoDurationSeconds,
           },
         });
 
-        outputUrl = result.videoUrl;
+        outputUrl = result.outputUrl;
 
       }
 
