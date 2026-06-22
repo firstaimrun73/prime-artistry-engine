@@ -64,6 +64,30 @@ function Editor() {
     ? ["Understanding your prompt", "Analyzing image details", "Planning AI edits", "Applying advanced enhancements", "Creating final masterpiece"]
     : ["Understanding your prompt", "Building enhanced prompt", "Composing the scene", "Applying advanced enhancements", "Creating final masterpiece"];
 
+  // Preload media handed over from the History page ("Edit Again").
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("motio2edit-reuse");
+      if (!raw) return;
+      sessionStorage.removeItem("motio2edit-reuse");
+      const { url, kind } = JSON.parse(raw) as { url: string; kind: "image" | "video" };
+      if (!url) return;
+      if (kind === "video") {
+        setMediaType("video");
+        setInputPreview(url);
+        setInputKind("video");
+      } else {
+        setMediaType("image");
+        setInputPreview(url);
+        setInputDataUrl(url);
+        setInputKind("image");
+      }
+      toast.success("Loaded from your history — keep editing.");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // Auto-resize the prompt box.
   useEffect(() => {
     const ta = taRef.current;
