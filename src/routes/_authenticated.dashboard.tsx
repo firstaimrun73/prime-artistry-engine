@@ -137,9 +137,14 @@ function Dashboard() {
       </section>
 
       <section className="mt-10">
-        <div className="flex items-center gap-2">
-          <History className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-bold">Recent projects</h2>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-bold">Recent projects</h2>
+          </div>
+          <Link to="/history" className="text-sm font-medium text-primary hover:underline">
+            View all
+          </Link>
         </div>
 
         {loading ? (
