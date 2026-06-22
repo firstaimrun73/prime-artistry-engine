@@ -58,7 +58,13 @@ function Editor() {
     setState("loading");
     setOutput(null);
     try {
-      const res = await generate({ data: { prompt, type: mediaType } });
+      const res = await generate({
+        data: {
+          prompt,
+          type: mediaType,
+          imageUrl: mediaType === "image" ? inputDataUrl ?? undefined : undefined,
+        },
+      });
       setOutput(res.outputUrl);
       setState("success");
       await refreshProfile();
