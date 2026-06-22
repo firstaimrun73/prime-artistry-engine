@@ -90,6 +90,11 @@ function Dashboard() {
         <Button asChild>
           <Link to="/editor">Open editor</Link>
         </Button>
+        <Button asChild variant="outline">
+          <Link to="/history">
+            <History className="mr-1.5 h-4 w-4" /> My workspace
+          </Link>
+        </Button>
         {profile.plan !== "studio" && (
           <Button asChild variant="outline">
             <Link to="/pricing">Upgrade plan</Link>
