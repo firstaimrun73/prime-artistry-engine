@@ -143,10 +143,17 @@ function Editor() {
     setState("loading");
     try {
       // Resolve the source media URL to send to the AI.
+      // Uploaded files (image OR video) go to private storage and we pass a
+      // signed URL fal can fetch. This avoids sending huge base64 bodies that
+      // fail for large phone photos. A reused result (already an https URL)
+      // is passed through directly.
       let mediaUrl: string | undefined;
       let sourceKind: "image" | "video" | undefined;
-      if (inputKind === "image" && inputDataUrl) {
-        mediaUrl = inputDataUrl;
+      if (inputKind === "image" && inputFile) {
+        mediaUrl = await uploadToStorage(inputFile);
+        sourceKind = "image";
+      } else if (inputKind === "image" && inputDataUrl) {
+        mediaUrl = inputDataUrl; // reused result URL or small data URI
         sourceKind = "image";
       } else if (inputKind === "video" && inputFile) {
         mediaUrl = await uploadToStorage(inputFile);
