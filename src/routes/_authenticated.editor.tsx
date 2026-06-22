@@ -42,9 +42,13 @@ function Editor() {
   const [prompt, setPrompt] = useState("");
   const [inputPreview, setInputPreview] = useState<string | null>(null);
   const [inputDataUrl, setInputDataUrl] = useState<string | null>(null);
+  const [inputFile, setInputFile] = useState<File | null>(null);
+  const [inputKind, setInputKind] = useState<"image" | "video" | null>(null);
   const [output, setOutput] = useState<string | null>(null);
+  const [outputIsVideo, setOutputIsVideo] = useState(false);
   const [state, setState] = useState<GenState>("idle");
   const [strength, setStrength] = useState(0.7);
+  const [keepWatermark, setKeepWatermark] = useState(true);
   const [downloaded, setDownloaded] = useState(false);
 
   const [msgIdx, setMsgIdx] = useState(0);
