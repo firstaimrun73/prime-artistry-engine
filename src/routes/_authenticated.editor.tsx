@@ -6,6 +6,7 @@ import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
 import { watermarkImage } from "@/lib/watermark";
 import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
@@ -41,9 +42,13 @@ function Editor() {
   const [prompt, setPrompt] = useState("");
   const [inputPreview, setInputPreview] = useState<string | null>(null);
   const [inputDataUrl, setInputDataUrl] = useState<string | null>(null);
+  const [inputFile, setInputFile] = useState<File | null>(null);
+  const [inputKind, setInputKind] = useState<"image" | "video" | null>(null);
   const [output, setOutput] = useState<string | null>(null);
+  const [outputIsVideo, setOutputIsVideo] = useState(false);
   const [state, setState] = useState<GenState>("idle");
   const [strength, setStrength] = useState(0.7);
+  const [keepWatermark, setKeepWatermark] = useState(true);
   const [downloaded, setDownloaded] = useState(false);
 
   const [msgIdx, setMsgIdx] = useState(0);
@@ -94,13 +99,32 @@ function Editor() {
     setDownloaded(false);
     setState("idle");
     setInputPreview(URL.createObjectURL(file));
-    if (mediaType === "image") {
+    setInputFile(file);
+    const kind: "image" | "video" = file.type.startsWith("video") ? "video" : "image";
+    setInputKind(kind);
+    // Read images as a data URI (sent inline). Videos upload at generate time.
+    if (kind === "image") {
       const reader = new FileReader();
       reader.onload = () => setInputDataUrl(typeof reader.result === "string" ? reader.result : null);
       reader.readAsDataURL(file);
     } else {
       setInputDataUrl(null);
     }
+  };
+
+  // Upload a (video) file to private storage and return a signed URL fal can fetch.
+  const uploadToStorage = async (file: File): Promise<string> => {
+    const uid = profile?.id ?? "anon";
+    const ext = file.name.split(".").pop() || "bin";
+    const path = `${uid}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("uploads").upload(path, file, {
+      contentType: file.type,
+      upsert: true,
+    });
+    if (upErr) throw new Error("Upload failed. Try a smaller file.");
+    const { data, error } = await supabase.storage.from("uploads").createSignedUrl(path, 60 * 60);
+    if (error || !data?.signedUrl) throw new Error("Could not prepare your upload.");
+    return data.signedUrl;
   };
 
   const runGenerate = async () => {
@@ -118,19 +142,34 @@ function Editor() {
 
     setState("loading");
     try {
+      // Resolve the source media URL to send to the AI.
+      let mediaUrl: string | undefined;
+      let sourceKind: "image" | "video" | undefined;
+      if (inputKind === "image" && inputDataUrl) {
+        mediaUrl = inputDataUrl;
+        sourceKind = "image";
+      } else if (inputKind === "video" && inputFile) {
+        mediaUrl = await uploadToStorage(inputFile);
+        sourceKind = "video";
+      }
+      if (runId !== runIdRef.current) return;
+
       const res = await generate({
         data: {
           prompt,
           type: mediaType,
-          // Send the uploaded media for BOTH image edits and video enhancement.
-          imageUrl: inputDataUrl ?? undefined,
-          strength: mediaType === "image" && inputDataUrl ? strength : undefined,
+          imageUrl: mediaUrl,
+          sourceKind,
+          strength: mediaType === "image" && sourceKind === "image" ? strength : undefined,
         },
       });
       if (runId !== runIdRef.current) return;
       let url = res.outputUrl;
-      // Watermark for FREE users only.
-      if (isFree && url) {
+      const isVideoOut = mediaType === "video";
+      setOutputIsVideo(isVideoOut);
+      // Watermark images for FREE users (always) and paid users who keep it on.
+      // Video watermarking is applied server-side where supported.
+      if (!isVideoOut && url && (isFree || keepWatermark)) {
         try { url = await watermarkImage(url); } catch { /* keep original */ }
       }
       if (runId !== runIdRef.current) return;
@@ -160,7 +199,10 @@ function Editor() {
     setPrompt("");
     setInputPreview(null);
     setInputDataUrl(null);
+    setInputFile(null);
+    setInputKind(null);
     setOutput(null);
+    setOutputIsVideo(false);
     setState("idle");
     setDownloaded(false);
     setProgress(0);
@@ -174,9 +216,10 @@ function Editor() {
   };
 
   const handleUseResultAsInput = () => {
-    if (!output) return;
+    if (!output || outputIsVideo) return;
     setInputPreview(output);
     setInputDataUrl(output);
+    setInputKind("image");
     setOutput(null);
     setState("idle");
     setDownloaded(false);
@@ -187,7 +230,7 @@ function Editor() {
     if (!output) return;
     const a = document.createElement("a");
     a.href = output;
-    a.download = `motio2edit-${Date.now()}.png`;
+    a.download = `motio2edit-${Date.now()}.${outputIsVideo ? "mp4" : "png"}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -252,7 +295,7 @@ function Editor() {
           <input
             ref={fileRef}
             type="file"
-            accept={mediaType === "image" ? "image/*" : "video/*"}
+            accept={mediaType === "image" ? "image/*" : "image/*,video/*"}
             onChange={onFile}
             className="hidden"
           />
@@ -262,8 +305,21 @@ function Editor() {
             className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50"
           >
             <Upload className="h-6 w-6" />
-            {inputPreview ? "Replace image" : `Upload ${mediaType} (optional)`}
+            {inputPreview
+              ? `Replace ${inputKind ?? "media"}`
+              : mediaType === "video"
+                ? "Upload image or video (optional)"
+                : "Upload image (optional)"}
           </button>
+          {mediaType === "video" && (
+            <p className="-mt-2 text-[11px] text-muted-foreground">
+              {inputKind === "video"
+                ? "Video → Video: your clip will be enhanced/transformed."
+                : inputKind === "image"
+                  ? "Image → Video: motion will be generated from your image."
+                  : "No upload = Text → Video. Upload an image for Image → Video, or a video for Video → Video."}
+            </p>
+          )}
 
           <div className="relative">
             <Textarea
@@ -340,6 +396,27 @@ function Editor() {
             </div>
           )}
 
+          {/* Watermark control — free users are locked on; paid users choose. */}
+          <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
+            <span className="text-muted-foreground">MOTIO2EDIT watermark</span>
+            {isFree ? (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Lock className="h-3 w-3" /> On (Free)
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setKeepWatermark((v) => !v)}
+                disabled={loading}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  keepWatermark ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
+                }`}
+              >
+                {keepWatermark ? "Keep watermark" : "Remove watermark"}
+              </button>
+            )}
+          </div>
+
           {loading ? (
             <Button variant="destructive" className="w-full" onClick={handleStop}>
               <Square className="mr-1.5 h-4 w-4 fill-current" /> Stop Generation
@@ -390,7 +467,7 @@ function Editor() {
                 ))}
               </ul>
             </div>
-          ) : output && mediaType === "image" && inputPreview ? (
+          ) : output && !outputIsVideo && mediaType === "image" && inputPreview ? (
             <div className="animate-scale-in">
               <CompareSlider before={inputPreview} after={output} />
             </div>
@@ -400,10 +477,10 @@ function Editor() {
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Before</p>
                 <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {inputPreview ? (
-                    mediaType === "image" ? (
-                      <img src={inputPreview} alt="input" className="h-full w-full object-contain" />
-                    ) : (
+                    inputKind === "video" ? (
                       <video src={inputPreview} className="h-full w-full object-cover" controls />
+                    ) : (
+                      <img src={inputPreview} alt="input" className="h-full w-full object-contain" />
                     )
                   ) : (
                     <span className="text-xs text-muted-foreground">No upload</span>
@@ -414,7 +491,11 @@ function Editor() {
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">After</p>
                 <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {output ? (
-                    <img src={output} alt="output" className="h-full w-full object-contain animate-scale-in" />
+                    outputIsVideo ? (
+                      <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
+                    ) : (
+                      <img src={output} alt="output" className="h-full w-full object-contain animate-scale-in" />
+                    )
                   ) : (
                     <span className="text-xs text-muted-foreground">Output appears here</span>
                   )}

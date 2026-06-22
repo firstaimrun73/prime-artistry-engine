@@ -60,6 +60,30 @@ describe("image generation workflows", () => {
   });
 });
 
+import {
+  buildTextToVideo,
+  buildImageToVideo,
+  TEXT_TO_VIDEO_MODEL,
+  IMAGE_TO_VIDEO_MODEL,
+} from "@/lib/fal-request";
+
+describe("video generation workflows", () => {
+  it("Text → Video uses Kling t2v and sends no source media", () => {
+    const step = buildTextToVideo({ prompt: "a dog running on a beach at sunset" });
+    expect(step.model).toBe(TEXT_TO_VIDEO_MODEL);
+    expect(step.outputKind).toBe("video");
+    expect(step.body).not.toHaveProperty("image_url");
+    expect(step.body.prompt).toContain("dog");
+  });
+
+  it("Image → Video uses Kling i2v and sends the source image", () => {
+    const step = buildImageToVideo({ prompt: "slow zoom in", imageUrl: "https://example.com/i.png" });
+    expect(step.model).toBe(IMAGE_TO_VIDEO_MODEL);
+    expect(step.outputKind).toBe("video");
+    expect(step.body.image_url).toBe("https://example.com/i.png");
+  });
+});
+
 import { isEnhancementOnly, buildImageEdit, IMAGE_EDIT_MODEL } from "@/lib/fal-request";
 
 describe("edit vs enhancement routing", () => {
