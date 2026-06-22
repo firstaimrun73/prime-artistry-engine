@@ -13,63 +13,117 @@ import {
   type FalStep,
 } from "@/lib/fal-request";
 
-// Run one fal.ai model call and return its output URL.
-async function runFalStep(
-  step: FalStep,
-  falKey: string,
-): Promise<string> {
-  console.log("[generate] step:", step.label, "model:", step.model);
-  console.log(
-    "[generate] payload:",
-    JSON.stringify({
-      ...step.body,
-      image_url:
-        typeof step.body.image_url === "string"
-          ? `${(step.body.image_url as string).slice(0, 48)}…`
-          : step.body.image_url,
-      video_url:
-        typeof step.body.video_url === "string"
-          ? `${(step.body.video_url as string).slice(0, 48)}…`
-          : step.body.video_url,
-    }),
-  );
+const FAL_QUEUE = "https://queue.fal.run/";
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  const res = await fetch(step.endpoint, {
+// Truncate any base64/data-URI fields so logs never blow the 256KB log limit.
+function safePayload(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) {
+    out[k] =
+      typeof v === "string" && v.length > 80 ? `${v.slice(0, 64)}… (${v.length} chars)` : v;
+  }
+  return out;
+}
+
+// Map a raw fal.ai error response to a specific, user-readable reason.
+function falErrorMessage(label: string, status: number, txt: string): string {
+  let detail = "";
+  try {
+    const parsed = JSON.parse(txt) as { detail?: unknown };
+    if (typeof parsed.detail === "string") detail = parsed.detail;
+    else if (Array.isArray(parsed.detail))
+      detail = (parsed.detail as { msg?: string }[]).map((d) => d?.msg).filter(Boolean).join("; ");
+  } catch {
+    detail = txt.slice(0, 200);
+  }
+  if (status === 429) return "AI service is rate-limited right now. Please retry in a moment.";
+  if (status === 401 || status === 403)
+    return "AI service authentication failed (invalid or expired API key).";
+  if (/balance|locked|billing|top up|exhausted/i.test(detail))
+    return "AI service is out of credits. Top up the fal.ai account balance to continue.";
+  if (/file_download_error|download the file/i.test(detail))
+    return "The uploaded media could not be fetched by the AI. Please re-upload and try again.";
+  if (/image_load_error|corrupted|supported format/i.test(detail))
+    return "The uploaded image is invalid or in an unsupported format. Try a JPG or PNG.";
+  if (/nsfw|safety/i.test(detail))
+    return "The request was blocked by the safety filter. Try a different prompt or image.";
+  if (detail) return `${label} failed: ${detail.slice(0, 160)}`;
+  return `${label} failed (status ${status}). Please try again.`;
+}
+
+// Run one fal.ai model call via the async QUEUE API and return its output URL.
+// The queue API submits the job, then polls for completion — this is what makes
+// long-running video models (Kling, Topaz) reliable instead of timing out on a
+// single held-open synchronous connection.
+async function runFalStep(step: FalStep, falKey: string): Promise<string> {
+  const headers = { Authorization: `Key ${falKey}`, "Content-Type": "application/json" };
+  console.log("[fal] ▶ submit:", step.label, "| model:", step.model);
+  console.log("[fal]   payload:", JSON.stringify(safePayload(step.body)));
+
+  // 1) Submit to the queue.
+  const submit = await fetch(`${FAL_QUEUE}${step.model}`, {
     method: "POST",
-    headers: { Authorization: `Key ${falKey}`, "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(step.body),
   });
+  if (!submit.ok) {
+    const txt = await submit.text();
+    console.error("[fal] ✖ submit failed", step.label, submit.status, txt.slice(0, 500));
+    throw new Error(falErrorMessage(step.label, submit.status, txt));
+  }
+  const { request_id, status_url, response_url } = (await submit.json()) as {
+    request_id: string;
+    status_url: string;
+    response_url: string;
+  };
+  console.log("[fal]   queued request_id:", request_id);
 
-  if (!res.ok) {
-    const txt = await res.text();
-    console.error("[generate] fal.ai error", step.label, res.status, txt);
-    const detail = (() => {
-      try {
-        return (JSON.parse(txt) as { detail?: string }).detail ?? "";
-      } catch {
-        return "";
-      }
-    })();
-    if (res.status === 429) throw new Error("Rate limit reached, try again shortly.");
-    if (/balance|locked|billing|top up/i.test(detail))
-      throw new Error("AI service is out of credits. Top up the fal.ai account balance to continue.");
-    if (res.status === 401 || res.status === 403)
-      throw new Error("AI service authentication failed (invalid API key).");
-    throw new Error("Enhancement failed, please try again.");
+  // 2) Poll until the job completes (or fails / times out).
+  const deadline = Date.now() + 290_000; // ~4.8 min hard cap
+  let delay = 1500;
+  let lastStatus = "";
+  while (Date.now() < deadline) {
+    await sleep(delay);
+    const st = await fetch(status_url, { headers });
+    if (!st.ok) {
+      console.warn("[fal]   status poll non-OK", st.status);
+      delay = Math.min(delay * 1.3, 5000);
+      continue;
+    }
+    const sj = (await st.json()) as { status?: string };
+    if (sj.status && sj.status !== lastStatus) {
+      lastStatus = sj.status;
+      console.log("[fal]   status:", sj.status);
+    }
+    if (sj.status === "COMPLETED") break;
+    if (sj.status === "FAILED" || sj.status === "ERROR") {
+      const body = await fetch(response_url, { headers }).then((r) => r.text()).catch(() => "");
+      console.error("[fal] ✖ job failed", step.label, body.slice(0, 500));
+      throw new Error(falErrorMessage(step.label, 500, body));
+    }
+    delay = Math.min(delay * 1.3, 5000);
+  }
+  if (lastStatus !== "COMPLETED") {
+    console.error("[fal] ✖ timed out waiting for", step.label);
+    throw new Error(`${step.label} took too long and timed out. Please try again.`);
   }
 
+  // 3) Fetch the result.
+  const res = await fetch(response_url, { headers });
+  if (!res.ok) {
+    const txt = await res.text();
+    console.error("[fal] ✖ result fetch failed", step.label, res.status, txt.slice(0, 500));
+    throw new Error(falErrorMessage(step.label, res.status, txt));
+  }
   const json = (await res.json()) as {
     image?: { url?: string };
     images?: { url?: string }[];
     video?: { url?: string };
   };
-  const url =
-    json.image?.url ??
-    json.images?.[0]?.url ??
-    json.video?.url ??
-    null;
-  console.log("[generate] step result url:", url ?? "none");
-  if (!url) throw new Error("Enhancement returned no output.");
+  const url = json.image?.url ?? json.images?.[0]?.url ?? json.video?.url ?? null;
+  console.log("[fal] ✔ done:", step.label, "→", url ?? "none");
+  if (!url) throw new Error(`${step.label} returned no output. Please try again.`);
   return url;
 }
 
