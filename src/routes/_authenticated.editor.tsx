@@ -22,6 +22,7 @@ function Editor() {
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [prompt, setPrompt] = useState("");
   const [inputPreview, setInputPreview] = useState<string | null>(null);
+  const [inputDataUrl, setInputDataUrl] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [state, setState] = useState<GenState>("idle");
 
@@ -34,8 +35,14 @@ function Editor() {
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setInputPreview(url);
+    setInputPreview(URL.createObjectURL(file));
+    if (mediaType === "image") {
+      const reader = new FileReader();
+      reader.onload = () => setInputDataUrl(typeof reader.result === "string" ? reader.result : null);
+      reader.readAsDataURL(file);
+    } else {
+      setInputDataUrl(null);
+    }
   };
 
   const handleGenerate = async () => {
