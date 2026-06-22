@@ -199,7 +199,50 @@ export function buildImageEnhancementPipeline({
   return steps;
 }
 
-// ── Video enhancement ───────────────────────────────────────────────────
+// ── Video models ────────────────────────────────────────────────────────
+// Text → Video and Image → Video use Kling (strong motion + prompt following).
+// Video → Video (enhancement) uses Topaz upscale for frame-consistent detail.
+export const TEXT_TO_VIDEO_MODEL = "fal-ai/kling-video/v1.6/standard/text-to-video";
+export const IMAGE_TO_VIDEO_MODEL = "fal-ai/kling-video/v1.6/standard/image-to-video";
+
+// ── Text → Video ─────────────────────────────────────────────────────────
+export function buildTextToVideo({ prompt }: { prompt: string }): FalStep {
+  return {
+    label: "text-to-video (kling)",
+    model: TEXT_TO_VIDEO_MODEL,
+    endpoint: ep(TEXT_TO_VIDEO_MODEL),
+    outputKind: "video",
+    body: {
+      prompt,
+      duration: "5",
+      aspect_ratio: "16:9",
+    },
+  };
+}
+
+// ── Image → Video ─────────────────────────────────────────────────────────
+export function buildImageToVideo({
+  prompt,
+  imageUrl,
+}: {
+  prompt: string;
+  imageUrl: string;
+}): FalStep {
+  return {
+    label: "image-to-video (kling)",
+    model: IMAGE_TO_VIDEO_MODEL,
+    endpoint: ep(IMAGE_TO_VIDEO_MODEL),
+    outputKind: "video",
+    body: {
+      prompt,
+      image_url: imageUrl,
+      duration: "5",
+      aspect_ratio: "16:9",
+    },
+  };
+}
+
+// ── Video → Video (enhancement) ──────────────────────────────────────────
 export function buildVideoEnhancement({ videoUrl }: { videoUrl: string }): FalStep {
   return {
     label: "upscale (topaz video)",
