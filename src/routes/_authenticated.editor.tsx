@@ -295,7 +295,7 @@ function Editor() {
           <input
             ref={fileRef}
             type="file"
-            accept={mediaType === "image" ? "image/*" : "video/*"}
+            accept={mediaType === "image" ? "image/*" : "image/*,video/*"}
             onChange={onFile}
             className="hidden"
           />
@@ -305,8 +305,21 @@ function Editor() {
             className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50"
           >
             <Upload className="h-6 w-6" />
-            {inputPreview ? "Replace image" : `Upload ${mediaType} (optional)`}
+            {inputPreview
+              ? `Replace ${inputKind ?? "media"}`
+              : mediaType === "video"
+                ? "Upload image or video (optional)"
+                : "Upload image (optional)"}
           </button>
+          {mediaType === "video" && (
+            <p className="-mt-2 text-[11px] text-muted-foreground">
+              {inputKind === "video"
+                ? "Video → Video: your clip will be enhanced/transformed."
+                : inputKind === "image"
+                  ? "Image → Video: motion will be generated from your image."
+                  : "No upload = Text → Video. Upload an image for Image → Video, or a video for Video → Video."}
+            </p>
+          )}
 
           <div className="relative">
             <Textarea
