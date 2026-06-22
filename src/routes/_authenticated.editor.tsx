@@ -6,6 +6,7 @@ import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
 import { watermarkImage } from "@/lib/watermark";
 import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
