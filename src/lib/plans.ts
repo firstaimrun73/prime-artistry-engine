@@ -30,14 +30,22 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
 };
 
 // ── Credit economics ──────────────────────────────────────────────
-// Costs are tuned so each generation comfortably covers fal.ai/API cost
-// and stays profitable as the user base scales (100 → 10,000+).
-//   • 1 image  = 12 credits  → Free (50 credits) ≈ 4 images total
-//   • 1 video  = 60 credits  → far higher API cost, gated to paid plans
+// Fixed, predictable pricing. Tuned to comfortably cover fal.ai API cost
+// (image edit/generation + video generation) and stay profitable at scale.
+//   • 1 image generation / edit = 30 credits
+//   • 1 video generation / edit = 100 credits
 export const CREDIT_COST = {
-  image: 12,
-  video: 60,
+  image: 30,
+  video: 100,
 } as const;
+
+/** Rough number of generations a credit balance buys (for plan display). */
+export function estimatedGenerations(credits: number) {
+  return {
+    images: Math.floor(credits / CREDIT_COST.image),
+    videos: Math.floor(credits / CREDIT_COST.video),
+  };
+}
 
 export type GenerationType = keyof typeof CREDIT_COST;
 
