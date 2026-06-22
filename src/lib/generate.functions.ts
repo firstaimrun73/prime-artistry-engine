@@ -120,24 +120,33 @@ export const generateMedia = createServerFn({ method: "POST" })
       );
 
       if (data.imageUrl) {
-        // ── Enhancement path ──────────────────────────────────────────
-        // Deterministic detail-preserving pipeline (deblur → smart sharpen
-        // → optional Topaz upscale). No generative regeneration, so the
-        // composition/colors/framing stay identical — only sharpness and
-        // fine detail improve dramatically.
-        const pipeline = buildImageEnhancementPipeline({
-          prompt: data.prompt,
-          imageUrl: data.imageUrl,
-          strength: data.strength,
-        });
-        console.log("[generate] enhancement steps:", pipeline.map((s) => s.label).join(" → "));
+        if (isEnhancementOnly(data.prompt)) {
+          // ── Pure enhancement path ───────────────────────────────────
+          // Deterministic detail-preserving pipeline (deblur → smart
+          // sharpen → optional Topaz upscale). Composition/colors stay
+          // identical — only sharpness and fine detail improve.
+          const pipeline = buildImageEnhancementPipeline({
+            prompt: data.prompt,
+            imageUrl: data.imageUrl,
+            strength: data.strength,
+          });
+          console.log("[generate] mode: enhance | steps:", pipeline.map((s) => s.label).join(" → "));
 
-        let current = data.imageUrl;
-        for (const step of pipeline) {
-          step.body.image_url = current;
-          current = await runFalStep(step, falKey);
+          let current = data.imageUrl;
+          for (const step of pipeline) {
+            step.body.image_url = current;
+            current = await runFalStep(step, falKey);
+          }
+          outputUrl = current;
+        } else {
+          // ── Instruction edit path ───────────────────────────────────
+          // The prompt asks for a real change (add/remove/recolor/etc.).
+          // Use the instruction-edit model so the edit is actually applied
+          // while preserving the rest of the original image.
+          console.log("[generate] mode: edit (flux kontext)");
+          const step = buildImageEdit({ prompt: data.prompt, imageUrl: data.imageUrl });
+          outputUrl = await runFalStep(step, falKey);
         }
-        outputUrl = current;
       } else {
         // ── Text → Image path ─────────────────────────────────────────
         // Expand the prompt then generate with FLUX1.1 [pro].
