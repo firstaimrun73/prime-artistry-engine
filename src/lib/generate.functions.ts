@@ -191,12 +191,33 @@ export const generateMedia = createServerFn({ method: "POST" })
           });
           console.log("[generate] mode: enhance | steps:", pipeline.map((s) => s.label).join(" → "));
 
-          let current = data.imageUrl;
-          for (const step of pipeline) {
-            step.body.image_url = current;
-            current = await runFalStep(step, falKey);
+          try {
+            let current = data.imageUrl;
+            for (const step of pipeline) {
+              step.body.image_url = current;
+              current = await runFalStep(step, falKey);
+            }
+            outputUrl = current;
+          } catch (err) {
+            // Some enhancement models reject very large photos (e.g. the
+            // "maximum should be 4095×4095" limit common on mobile/DSLR
+            // shots). Never surface that to the user — fall back to the
+            // instruction-edit model, which downscales internally, with an
+            // enhancement-only instruction so the result is still a sharper,
+            // more detailed version of the SAME image.
+            const msg = err instanceof Error ? err.message : "";
+            if (isPixelLimitError(msg)) {
+              console.warn("[generate] enhance hit a size limit — falling back to kontext enhance");
+              const step = buildImageEdit({
+                prompt:
+                  "Enhance this exact photo: increase sharpness, clarity and fine detail, reduce noise and blur, improve overall quality. Keep the composition, subject, colors and framing identical — do not add, remove or change any content.",
+                imageUrl: data.imageUrl,
+              });
+              outputUrl = await runFalStep(step, falKey);
+            } else {
+              throw err;
+            }
           }
-          outputUrl = current;
         } else {
           // ── Instruction edit path ───────────────────────────────────
           // The prompt asks for a real change (add/remove/recolor/etc.).
