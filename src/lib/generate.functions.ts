@@ -146,10 +146,15 @@ export const generateMedia = createServerFn({ method: "POST" })
         } else {
           // ── Instruction edit path ───────────────────────────────────
           // The prompt asks for a real change (add/remove/recolor/etc.).
-          // Use the instruction-edit model so the edit is actually applied
-          // while preserving the rest of the original image.
-          console.log("[generate] mode: edit (flux kontext)");
-          const step = buildImageEdit({ prompt: data.prompt, imageUrl: data.imageUrl });
+          // Expand the short prompt into a rich, vivid editing instruction
+          // first (e.g. "cinematic" → cinematic lighting, dramatic contrast,
+          // premium color grading…) so small prompts create big, meaningful
+          // changes while preserving the main subject. Then apply with the
+          // instruction-edit model.
+          const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
+          const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: true });
+          console.log("[generate] mode: edit (flux kontext) | enhanced:", enhancedPrompt);
+          const step = buildImageEdit({ prompt: enhancedPrompt, imageUrl: data.imageUrl });
           outputUrl = await runFalStep(step, falKey);
         }
       } else {
@@ -167,12 +172,30 @@ export const generateMedia = createServerFn({ method: "POST" })
       }
       if (!outputUrl) throw new Error("Generation returned no image.");
     } else {
-      // ── Video enhancement path (paid only) ──────────────────────────
-      if (!data.imageUrl) throw new Error("Upload a video to enhance.");
-      const step = buildVideoEnhancement({ videoUrl: data.imageUrl });
-      console.log("[generate] video enhancement:", step.label);
+      // ── Video workflows (paid only) ─────────────────────────────────
+      console.log("[generate] video | sourceKind:", data.sourceKind ?? "none");
+      const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
+
+      let step: FalStep;
+      if (!data.imageUrl) {
+        // A. Text → Video
+        const enhanced = await enhancePrompt({ prompt: data.prompt, isEdit: false });
+        console.log("[generate] mode: text-to-video | enhanced:", enhanced);
+        step = buildTextToVideo({ prompt: enhanced });
+      } else if (data.sourceKind === "video") {
+        // C. Video → Video (enhancement / transformation)
+        console.log("[generate] mode: video-to-video (enhance)");
+        step = buildVideoEnhancement({ videoUrl: data.imageUrl });
+      } else {
+        // B. Image → Video (motion from a still)
+        const enhanced = await enhancePrompt({ prompt: data.prompt, isEdit: false });
+        console.log("[generate] mode: image-to-video | enhanced:", enhanced);
+        step = buildImageToVideo({ prompt: enhanced, imageUrl: data.imageUrl });
+      }
+
+      console.log("[generate] video step:", step.label);
       outputUrl = await runFalStep(step, falKey);
-      if (!outputUrl) throw new Error("Video enhancement returned no output.");
+      if (!outputUrl) throw new Error("Video generation returned no output.");
     }
 
 
