@@ -132,7 +132,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       status: "success",
     });
 
-    return { outputUrl, credits: newCredits };
+    return { outputUrl, credits: newCredits, plan: profile.plan };
   });
 
 const checkoutSchema = z.object({
