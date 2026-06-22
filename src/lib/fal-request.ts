@@ -44,6 +44,10 @@ export type FalStep = {
 
 // ── Models ──────────────────────────────────────────────────────────────
 export const TEXT_TO_IMAGE_MODEL = "fal-ai/flux-pro/v1.1";
+// Instruction-based image EDITING (add/remove/replace/recolor/background…).
+// Preserves the original composition while applying the requested change —
+// this is what makes edits visibly take effect instead of "identical output".
+export const IMAGE_EDIT_MODEL = "fal-ai/flux-pro/kontext";
 // Kept exported for back-compat with callers/tests that reference it.
 export const IMAGE_TO_IMAGE_MODEL = "fal-ai/post-processing";
 
@@ -54,6 +58,46 @@ export const UPSCALE_VIDEO_MODEL = "fal-ai/topaz/upscale/video";
 
 const FAL_BASE = "https://fal.run/";
 const ep = (m: string) => `${FAL_BASE}${m}`;
+
+// Prompts that are PURELY about output quality (sharpness/resolution/clarity)
+// route to the deterministic enhancement pipeline. Everything else is treated
+// as a semantic edit and routed to the instruction-edit model so the change is
+// actually applied.
+export function isEnhancementOnly(prompt: string): boolean {
+  const p = (prompt || "").toLowerCase().trim();
+  if (!p) return true;
+  // If it mentions any editing verb/target, it's an edit, not pure enhancement.
+  const editSignals =
+    /\b(add|remove|delete|replace|change|swap|turn|make it|recolor|color|colour|background|sky|paint|draw|insert|put|place|erase|move|rotate|crop|zoom|style|cartoon|anime|sketch|painting|outfit|clothes|hair|face|text|logo|object|boat|car|person|animal)\b/;
+  if (editSignals.test(p)) return false;
+  const enhanceSignals =
+    /\b(enhance|sharpen|sharper|clarity|clear|clean|hd|4k|8k|upscale|resolution|detail|quality|deblur|denoise|noise|crisp|professional|restore|fix)\b/;
+  return enhanceSignals.test(p);
+}
+
+// ── Instruction-based image edit ─────────────────────────────────────────
+export function buildImageEdit({
+  prompt,
+  imageUrl,
+}: {
+  prompt: string;
+  imageUrl: string;
+}): FalStep {
+  return {
+    label: "edit (flux kontext)",
+    model: IMAGE_EDIT_MODEL,
+    endpoint: ep(IMAGE_EDIT_MODEL),
+    outputKind: "image",
+    body: {
+      prompt,
+      image_url: imageUrl,
+      guidance_scale: 3.5,
+      num_images: 1,
+      output_format: "png",
+      safety_tolerance: "2",
+    },
+  };
+}
 
 // ── Text → Image ────────────────────────────────────────────────────────
 export function buildFalRequest({ prompt, imageUrl, strength = 0.7 }: BuildFalRequestInput): FalRequest {
