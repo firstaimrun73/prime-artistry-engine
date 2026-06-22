@@ -74,8 +74,11 @@ async function runFalStep(
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
   type: z.enum(["image", "video"]),
-  // Optional source image (data URI) — enables the image-to-image workflow.
+  // Optional source media (data URI for images, or a signed URL for uploads).
+  // Enables image-to-image, image-to-video and video-to-video workflows.
   imageUrl: z.string().min(1).max(15_000_000).optional(),
+  // Tells the server what the uploaded media actually is so it routes correctly.
+  sourceKind: z.enum(["image", "video"]).optional(),
   // Edit strength for image-to-image (0.1 – 1). Higher = more visible edits.
   strength: z.number().min(0.1).max(1).optional(),
 });
