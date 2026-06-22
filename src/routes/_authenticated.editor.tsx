@@ -396,6 +396,27 @@ function Editor() {
             </div>
           )}
 
+          {/* Watermark control — free users are locked on; paid users choose. */}
+          <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
+            <span className="text-muted-foreground">MOTIO2EDIT watermark</span>
+            {isFree ? (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Lock className="h-3 w-3" /> On (Free)
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setKeepWatermark((v) => !v)}
+                disabled={loading}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  keepWatermark ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
+                }`}
+              >
+                {keepWatermark ? "Keep watermark" : "Remove watermark"}
+              </button>
+            )}
+          </div>
+
           {loading ? (
             <Button variant="destructive" className="w-full" onClick={handleStop}>
               <Square className="mr-1.5 h-4 w-4 fill-current" /> Stop Generation
