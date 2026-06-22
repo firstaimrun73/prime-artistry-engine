@@ -2,6 +2,17 @@ import { useState, useRef, useCallback, useEffect } from "react";
 
 import { INITIAL_EDIT_SESSION, type EditSessionState, type EditMode, CREDIT_COSTS } from "@/lib/edit-session";
 import { expandPrompt } from "@/lib/expand-prompt.functions";
+import { generateImage } from "@/lib/generate-image.functions";
+import { generateVideo } from "@/lib/generate-video.functions";
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Failed to read file."));
+    reader.readAsDataURL(file);
+  });
+}
 
 
 
