@@ -446,7 +446,7 @@ function Editor() {
                 ))}
               </ul>
             </div>
-          ) : output && mediaType === "image" && inputPreview ? (
+          ) : output && !outputIsVideo && mediaType === "image" && inputPreview ? (
             <div className="animate-scale-in">
               <CompareSlider before={inputPreview} after={output} />
             </div>
@@ -456,10 +456,10 @@ function Editor() {
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Before</p>
                 <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {inputPreview ? (
-                    mediaType === "image" ? (
-                      <img src={inputPreview} alt="input" className="h-full w-full object-contain" />
-                    ) : (
+                    inputKind === "video" ? (
                       <video src={inputPreview} className="h-full w-full object-cover" controls />
+                    ) : (
+                      <img src={inputPreview} alt="input" className="h-full w-full object-contain" />
                     )
                   ) : (
                     <span className="text-xs text-muted-foreground">No upload</span>
@@ -470,7 +470,11 @@ function Editor() {
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">After</p>
                 <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {output ? (
-                    <img src={output} alt="output" className="h-full w-full object-contain animate-scale-in" />
+                    outputIsVideo ? (
+                      <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
+                    ) : (
+                      <img src={output} alt="output" className="h-full w-full object-contain animate-scale-in" />
+                    )
                   ) : (
                     <span className="text-xs text-muted-foreground">Output appears here</span>
                   )}
