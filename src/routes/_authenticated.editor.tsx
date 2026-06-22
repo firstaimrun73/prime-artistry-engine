@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
+import { getSmartSuggestions, EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
+import { watermarkImage } from "@/lib/watermark";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,38 +13,29 @@ import { CompareSlider } from "@/components/CompareSlider";
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
-  Square, RotateCcw, Pencil, Recycle, Check,
+  Square, RotateCcw, Pencil, Recycle, Check, RefreshCw, Share2, Wand2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/editor")({
   component: Editor,
 });
 
-type GenState = "idle" | "loading" | "success" | "blocked";
+type GenState = "idle" | "analyzing" | "loading" | "success" | "blocked";
 
 const LOADING_MESSAGES = [
-  "Enhancing your vision…",
-  "Motion AI is editing…",
-  "Refining every detail…",
+  "Creating your masterpiece…",
+  "Enhancing with AI…",
+  "Generating cinematic results…",
+  "Applying advanced AI edits…",
   "Perfecting every pixel…",
-  "Creating premium quality…",
   "Bringing your idea to life…",
-  "Enhancing with Motion AI…",
-  "Transforming imagination into reality…",
 ];
-
-const STAGES = [
-  "Upload Complete",
-  "Prompt Analyzed",
-  "AI Processing",
-  "Finalizing Output",
-  "Ready to Download",
-] as const;
 
 function Editor() {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
   const fileRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [prompt, setPrompt] = useState("");
@@ -57,32 +50,49 @@ function Editor() {
   const [stage, setStage] = useState(0);
   const [progress, setProgress] = useState(0);
 
-  // Client-side cancellation: a run is identified by an id; if it changes
-  // (Stop / Clear / new run) the in-flight result is ignored.
   const runIdRef = useRef(0);
 
-  // Rotating loading messages, stage progression + progress bar.
+  const isFree = profile?.plan === "free";
+
+  // Stages depend on whether an image is being edited.
+  const stages = inputDataUrl
+    ? ["Understanding your prompt", "Analyzing image details", "Planning AI edits", "Applying advanced enhancements", "Creating final masterpiece"]
+    : ["Understanding your prompt", "Building enhanced prompt", "Composing the scene", "Applying advanced enhancements", "Creating final masterpiece"];
+
+  // Auto-resize the prompt box.
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 280)}px`;
+  }, [prompt]);
+
+  // Rotating messages, stage progression + progress bar while loading.
   useEffect(() => {
     if (state !== "loading") return;
     setMsgIdx(0);
-    setStage(inputDataUrl ? 1 : 1);
-    setProgress(8);
-    const msg = setInterval(() => setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length), 2000);
-    const stg = setInterval(() => setStage((s) => Math.min(STAGES.length - 2, s + 1)), 2500);
-    const prg = setInterval(() => setProgress((p) => Math.min(92, p + Math.random() * 9)), 700);
+    setStage(1);
+    setProgress(12);
+    const msg = setInterval(() => setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length), 1800);
+    const stg = setInterval(() => setStage((s) => Math.min(stages.length - 1, s + 1)), 2200);
+    const prg = setInterval(() => setProgress((p) => Math.min(92, p + Math.random() * 9)), 650);
     return () => { clearInterval(msg); clearInterval(stg); clearInterval(prg); };
-  }, [state, inputDataUrl]);
+  }, [state, stages.length]);
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
   const cost = CREDIT_COST[mediaType];
   const noCredits = profile.credits < cost;
   const videoLocked = mediaType === "video" && !plan.video;
-  const loading = state === "loading";
+  const loading = state === "loading" || state === "analyzing";
+  const suggestions = getSmartSuggestions(prompt);
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setOutput(null);
+    setDownloaded(false);
+    setState("idle");
     setInputPreview(URL.createObjectURL(file));
     if (mediaType === "image") {
       const reader = new FileReader();
@@ -93,15 +103,20 @@ function Editor() {
     }
   };
 
-  const handleGenerate = async () => {
+  const runGenerate = async () => {
     if (!prompt.trim()) return toast.error("Enter a prompt first.");
     if (videoLocked) { setState("blocked"); return toast.error("Video generation requires a paid plan."); }
     if (noCredits) { setState("blocked"); return toast.error(`Not enough credits. This costs ${cost} credits.`); }
 
     const runId = ++runIdRef.current;
-    setState("loading");
+    // 1) "Analyzing your request…" beat so the AI feels intelligent.
+    setState("analyzing");
     setOutput(null);
     setDownloaded(false);
+    await new Promise((r) => setTimeout(r, 1500));
+    if (runId !== runIdRef.current) return;
+
+    setState("loading");
     try {
       const res = await generate({
         data: {
@@ -111,22 +126,28 @@ function Editor() {
           strength: mediaType === "image" && inputDataUrl ? strength : undefined,
         },
       });
-      if (runId !== runIdRef.current) return; // cancelled
+      if (runId !== runIdRef.current) return;
+      let url = res.outputUrl;
+      // Watermark for FREE users only.
+      if (isFree && url) {
+        try { url = await watermarkImage(url); } catch { /* keep original */ }
+      }
+      if (runId !== runIdRef.current) return;
       setProgress(100);
-      setStage(STAGES.length - 1);
-      setOutput(res.outputUrl);
+      setStage(stages.length);
+      setOutput(url);
       setState("success");
       await refreshProfile();
       toast.success("Done!");
     } catch (err) {
-      if (runId !== runIdRef.current) return; // cancelled
+      if (runId !== runIdRef.current) return;
       setState("idle");
       toast.error(err instanceof Error ? err.message : "Generation failed.");
     }
   };
 
   const handleStop = () => {
-    runIdRef.current++; // invalidate any in-flight result
+    runIdRef.current++;
     setState("idle");
     setProgress(0);
     setStage(0);
@@ -172,9 +193,21 @@ function Editor() {
     setDownloaded(true);
   };
 
+  const handleShare = async () => {
+    if (!output) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Made with Motio2Edit", url: output });
+      } else {
+        await navigator.clipboard.writeText(output);
+        toast.success("Link copied to clipboard.");
+      }
+    } catch { /* user cancelled */ }
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
         <h1 className="text-2xl font-bold">Editor</h1>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold">
@@ -189,7 +222,7 @@ function Editor() {
       <div className="mt-6 inline-flex rounded-lg border border-border bg-card p-1">
         <button
           onClick={() => { setMediaType("image"); setState("idle"); }}
-          className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+          className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-all ${
             mediaType === "image" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
           }`}
         >
@@ -197,7 +230,7 @@ function Editor() {
         </button>
         <button
           onClick={() => { setMediaType("video"); setState("idle"); }}
-          className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+          className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-all ${
             mediaType === "video" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
           }`}
         >
@@ -207,7 +240,7 @@ function Editor() {
       </div>
 
       {videoLocked && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm animate-fade-in">
           <span className="text-destructive-foreground">Video generation is a paid feature.</span>
           <Button asChild size="sm"><Link to="/pricing">Upgrade</Link></Button>
         </div>
@@ -225,23 +258,66 @@ function Editor() {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={videoLocked || loading}
-            className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card text-sm text-muted-foreground transition-colors hover:border-primary disabled:opacity-50"
+            className="flex h-36 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50"
           >
             <Upload className="h-6 w-6" />
             {inputPreview ? "Replace image" : `Upload ${mediaType} (optional)`}
           </button>
 
-          <Textarea
-            placeholder={
-              inputDataUrl
-                ? "Describe the edit… e.g. enhance lighting, remove background, watercolor style"
-                : `Describe the ${mediaType} you want…`
-            }
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={4}
-            disabled={loading}
-          />
+          <div className="relative">
+            <Textarea
+              ref={taRef}
+              placeholder={
+                inputDataUrl
+                  ? "Describe the edit… e.g. remove background, make cinematic, enhance quality"
+                  : `Describe the ${mediaType} you want…`
+              }
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
+              rows={4}
+              disabled={loading}
+              className="resize-none pr-2"
+            />
+            <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1 text-primary">
+                <Wand2 className="h-3 w-3" /> Auto-enhanced before generating
+              </span>
+              <span>{prompt.length}/2000</span>
+            </div>
+          </div>
+
+          {/* Smart, keyword-triggered suggestions */}
+          {!loading && suggestions.length > 0 && (
+            <div className="flex flex-wrap gap-2 animate-fade-in">
+              {suggestions.map((s) => (
+                <button
+                  key={s.label}
+                  onClick={() => setPrompt(s.prompt)}
+                  className="rounded-full border border-primary/40 bg-primary/5 px-3 py-1 text-xs font-medium text-primary transition-all hover:bg-primary/10 hover:scale-105"
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Example prompts when the box is empty */}
+          {!loading && !prompt.trim() && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Try an example</p>
+              <div className="flex flex-wrap gap-2">
+                {EXAMPLE_PROMPTS.map((s) => (
+                  <button
+                    key={s.label}
+                    onClick={() => setPrompt(s.prompt)}
+                    className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground transition-all hover:border-primary hover:text-foreground hover:scale-105"
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {mediaType === "image" && inputDataUrl && (
             <div className="space-y-2">
@@ -268,7 +344,7 @@ function Editor() {
               <Square className="mr-1.5 h-4 w-4 fill-current" /> Stop Generation
             </Button>
           ) : (
-            <Button className="w-full" onClick={handleGenerate} disabled={videoLocked || noCredits}>
+            <Button className="w-full hover-scale" onClick={runGenerate} disabled={videoLocked || noCredits}>
               <Sparkles className="mr-1.5 h-4 w-4" /> Generate
             </Button>
           )}
@@ -281,8 +357,14 @@ function Editor() {
         </div>
 
         <div className="space-y-4">
-          {loading ? (
-            <div className="rounded-xl border border-border bg-card p-5">
+          {state === "analyzing" ? (
+            <div className="flex h-full min-h-56 flex-col items-center justify-center rounded-xl border border-border bg-card p-6 text-center animate-scale-in">
+              <Wand2 className="h-8 w-8 animate-pulse text-primary" />
+              <p className="mt-3 text-sm font-semibold text-primary">Analyzing your request…</p>
+              <p className="mt-1 text-xs text-muted-foreground">Understanding exactly what you mean</p>
+            </div>
+          ) : state === "loading" ? (
+            <div className="rounded-xl border border-border bg-card p-5 animate-scale-in">
               <p className="text-sm font-semibold text-primary">{LOADING_MESSAGES[msgIdx]}</p>
               <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-secondary">
                 <div
@@ -291,12 +373,12 @@ function Editor() {
                 />
               </div>
               <ul className="mt-4 space-y-2">
-                {STAGES.map((s, i) => (
+                {stages.map((s, i) => (
                   <li key={s} className="flex items-center gap-2 text-sm">
                     <span
-                      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] ${
+                      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] transition-all ${
                         i < stage ? "bg-primary text-primary-foreground"
-                        : i === stage ? "bg-primary/20 text-primary"
+                        : i === stage ? "bg-primary/20 text-primary animate-pulse"
                         : "bg-secondary text-muted-foreground"
                       }`}
                     >
@@ -308,7 +390,9 @@ function Editor() {
               </ul>
             </div>
           ) : output && mediaType === "image" && inputPreview ? (
-            <CompareSlider before={inputPreview} after={output} />
+            <div className="animate-scale-in">
+              <CompareSlider before={inputPreview} after={output} />
+            </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -329,7 +413,7 @@ function Editor() {
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">After</p>
                 <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {output ? (
-                    <img src={output} alt="output" className="h-full w-full object-contain" />
+                    <img src={output} alt="output" className="h-full w-full object-contain animate-scale-in" />
                   ) : (
                     <span className="text-xs text-muted-foreground">Output appears here</span>
                   )}
@@ -339,27 +423,37 @@ function Editor() {
           )}
 
           {output && !loading && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="flex-1" onClick={handleDownload}>
-                <Download className="mr-1.5 h-4 w-4" /> Download
+            <div className="space-y-2 animate-fade-in">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Button variant="default" onClick={handleDownload}>
+                  <Download className="mr-1.5 h-4 w-4" /> Download
+                </Button>
+                <Button variant="outline" onClick={runGenerate}>
+                  <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerate
+                </Button>
+                <Button variant="outline" onClick={handleUseResultAsInput}>
+                  <Recycle className="mr-1.5 h-4 w-4" /> Edit Again
+                </Button>
+                <Button variant="outline" onClick={handleShare}>
+                  <Share2 className="mr-1.5 h-4 w-4" /> Share
+                </Button>
+              </div>
+              <Button variant="ghost" className="w-full" onClick={handleClear}>
+                <RotateCcw className="mr-1.5 h-4 w-4" /> New Edit
               </Button>
-              <Button variant="outline" className="flex-1" onClick={handleEditAgain}>
-                <Pencil className="mr-1.5 h-4 w-4" /> Edit Again
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={handleUseResultAsInput}>
-                <Recycle className="mr-1.5 h-4 w-4" /> Use as Input
-              </Button>
+              {isFree && (
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Free images include a small watermark. <Link to="/pricing" className="underline">Upgrade</Link> to remove it.
+                </p>
+              )}
             </div>
           )}
 
           {downloaded && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm animate-fade-in">
               <span className="text-muted-foreground">Saved! What next?</span>
-              <Button size="sm" variant="secondary" onClick={handleEditAgain}>
-                <Pencil className="mr-1.5 h-4 w-4" /> Edit Again
-              </Button>
               <Button size="sm" variant="secondary" onClick={handleClear}>
-                <RotateCcw className="mr-1.5 h-4 w-4" /> New Project
+                <RotateCcw className="mr-1.5 h-4 w-4" /> New Edit
               </Button>
             </div>
           )}

@@ -46,8 +46,19 @@ export const generateMedia = createServerFn({ method: "POST" })
     let outputUrl: string | null = null;
 
     if (data.type === "image") {
+      // ── Prompt Intelligence Layer ─────────────────────────────────
+      // Never send the raw prompt blindly: deeply expand it into detailed,
+      // model-ready instructions first (always auto-enhance).
+      const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
+      const enhancedPrompt = await enhancePrompt({
+        prompt: data.prompt,
+        isEdit: Boolean(data.imageUrl),
+      });
+      console.log("[generate] user prompt:", data.prompt);
+      console.log("[generate] enhanced prompt:", enhancedPrompt);
+
       // Choose workflow + model based on whether a source image was provided.
-      const req = buildFalRequest({ prompt: data.prompt, imageUrl: data.imageUrl, strength: data.strength });
+      const req = buildFalRequest({ prompt: enhancedPrompt, imageUrl: data.imageUrl, strength: data.strength });
 
       // ── Debug logs ────────────────────────────────────────────────
       console.log("[generate] workflow:", req.workflow);
@@ -121,7 +132,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       status: "success",
     });
 
-    return { outputUrl, credits: newCredits };
+    return { outputUrl, credits: newCredits, plan: profile.plan };
   });
 
 const checkoutSchema = z.object({
