@@ -36,13 +36,16 @@ function Slider({ before, after, zoom }: Props & { zoom: number }) {
         className="absolute inset-0 h-full w-full object-contain transition-transform"
         style={{ transform: `scale(${zoom})` }}
       />
-      <div className="absolute inset-0 overflow-hidden" style={{ width: `${pos}%` }}>
+      <div
+        className="absolute inset-0"
+        style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+      >
         <img
           src={before}
           alt="Before"
           draggable={false}
           className="absolute inset-0 h-full w-full object-contain transition-transform"
-          style={{ transform: `scale(${zoom})`, width: ref.current?.clientWidth }}
+          style={{ transform: `scale(${zoom})` }}
         />
       </div>
       <span className="absolute left-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
