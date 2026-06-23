@@ -116,6 +116,8 @@ function Editor() {
   const cost = CREDIT_COST[mediaType];
   const noCredits = profile.credits < cost;
   const videoLocked = mediaType === "video" && !plan.video;
+  const planLimits = getPlanLimits(profile.plan);
+  const canAddRefImages = mediaType === "image" && !!inputDataUrl && planLimits.maxImages > 1;
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
 
