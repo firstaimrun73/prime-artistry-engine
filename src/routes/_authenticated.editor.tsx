@@ -46,6 +46,7 @@ function Editor() {
   const [inputDataUrl, setInputDataUrl] = useState<string | null>(null);
   const [inputFile, setInputFile] = useState<File | null>(null);
   const [inputKind, setInputKind] = useState<"image" | "video" | null>(null);
+  const [refImages, setRefImages] = useState<string[]>([]);
   const [output, setOutput] = useState<string | null>(null);
   const [outputIsVideo, setOutputIsVideo] = useState(false);
   const [state, setState] = useState<GenState>("idle");
