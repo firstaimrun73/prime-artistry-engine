@@ -197,6 +197,10 @@ function Editor() {
           imageUrl: mediaUrl,
           sourceKind,
           strength: mediaType === "image" && sourceKind === "image" ? strength : undefined,
+          referenceImageUrls:
+            canAddRefImages && refImages.length > 0
+              ? refImages.slice(0, planLimits.maxImages - 1)
+              : undefined,
         },
       });
       if (runId !== runIdRef.current) return;
