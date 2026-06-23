@@ -79,10 +79,17 @@ export function isEnhancementOnly(prompt: string): boolean {
 export function buildImageEdit({
   prompt,
   imageUrl,
+  strength = 0.72,
+  referenceImageUrls,
 }: {
   prompt: string;
   imageUrl: string;
+  /** Edit strength 0.6–0.8 sweet spot; lower = preserve more. */
+  strength?: number;
+  /** Extra reference images (FLUX Kontext multi-image), plan-gated by caller. */
+  referenceImageUrls?: string[];
 }): FalStep {
+  const s = Math.min(1, Math.max(0.1, strength));
   return {
     label: "edit (flux kontext)",
     model: IMAGE_EDIT_MODEL,
@@ -91,9 +98,15 @@ export function buildImageEdit({
     body: {
       prompt,
       image_url: imageUrl,
+      ...(referenceImageUrls && referenceImageUrls.length > 0
+        ? { reference_image_urls: referenceImageUrls }
+        : {}),
+      strength: s,
       guidance_scale: 3.5,
+      num_inference_steps: 28,
       num_images: 1,
-      output_format: "png",
+      output_format: "jpeg",
+      output_quality: 95,
       safety_tolerance: "2",
     },
   };
