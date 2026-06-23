@@ -241,6 +241,7 @@ function Editor() {
     setInputDataUrl(null);
     setInputFile(null);
     setInputKind(null);
+    setRefImages([]);
     setOutput(null);
     setOutputIsVideo(false);
     setState("idle");
