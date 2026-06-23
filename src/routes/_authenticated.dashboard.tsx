@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { getPlan, PLAN_CREDITS } from "@/lib/plans";
+import { getPlan, PLAN_CREDITS, CREDIT_COST } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Coins, Crown, Image as ImageIcon, Settings, Zap, History, FolderOpen, LifeBuoy, Ticket, HelpCircle, Mail } from "lucide-react";
