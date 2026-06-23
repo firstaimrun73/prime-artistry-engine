@@ -288,6 +288,9 @@ function Editor() {
           <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold">
             {profile.credits} credits
           </span>
+          <span className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits
+          </span>
           <Button size="sm" variant="ghost" onClick={handleClear}>
             <RotateCcw className="mr-1.5 h-4 w-4" /> New Project
           </Button>

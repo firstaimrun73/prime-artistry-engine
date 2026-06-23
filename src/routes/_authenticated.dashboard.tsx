@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { getPlan, PLAN_CREDITS } from "@/lib/plans";
+import { getPlan, PLAN_CREDITS, CREDIT_COST } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Coins, Crown, Image as ImageIcon, Settings, Zap, History, FolderOpen, LifeBuoy, Ticket, HelpCircle, Mail } from "lucide-react";
@@ -65,6 +65,9 @@ function Dashboard() {
           <Coins className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Credits remaining</p>
           <p className="mt-1 text-3xl font-extrabold">{profile.credits}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits each
+          </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-6">
           <Zap className="h-6 w-6 text-primary" />

@@ -179,7 +179,32 @@ export const generateMedia = createServerFn({ method: "POST" })
     const falKey = process.env.FAL_API_KEY;
     if (!falKey) throw new Error("AI service unavailable.");
 
+    // Atomically reserve (deduct) credits BEFORE generation. The DB function
+    // checks the balance and decrements in a single statement, so it prevents
+    // negative balances, double-spend from concurrent requests, and any
+    // frontend bypass. Credits are refunded automatically if generation fails.
+    const { data: deduction, error: dErr } = await supabase.rpc("deduct_credits", {
+      _amount: cost,
+      _gen_type: data.type,
+    });
+    if (dErr || !deduction) {
+      if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
+        throw new Error(
+          `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
+        );
+      }
+      console.error("[generate] credit deduction failed:", dErr?.message);
+      throw new Error("Could not reserve credits. Please try again.");
+    }
+    const { transaction_id: txId, credits: newCredits } = deduction as {
+      transaction_id: string;
+      credits: number;
+    };
+    console.log("[generate] reserved", cost, "credits → remaining", newCredits, "tx", txId);
+
     let outputUrl: string | null = null;
+
+    try {
 
     if (data.type === "image") {
       console.log("[generate] user prompt:", data.prompt);
@@ -282,17 +307,24 @@ export const generateMedia = createServerFn({ method: "POST" })
       outputUrl = await runFalStep(step, falKey);
       if (!outputUrl) throw new Error("Video generation returned no output.");
     }
+    } catch (err) {
+      // Generation failed after credits were reserved — refund them so the
+      // user is never charged for a failed generation.
+      const { error: refundErr } = await supabase.rpc("refund_credits", {
+        _transaction_id: txId,
+      });
+      if (refundErr) console.error("[generate] refund failed:", refundErr.message);
+      else console.log("[generate] refunded", cost, "credits for failed generation, tx", txId);
+      throw err;
+    }
 
+    if (!outputUrl) {
+      await supabase.rpc("refund_credits", { _transaction_id: txId });
+      throw new Error("Generation returned no output.");
+    }
 
-    // ── Persist + deduct credits ────────────────────────────────────────
+    // ── Persist history ─────────────────────────────────────────────────
     console.log("[generate] output ready:", outputUrl.slice(0, 80));
-    const newCredits = profile.credits - cost;
-    const { error: credErr } = await supabase
-      .from("profiles")
-      .update({ credits: newCredits })
-      .eq("id", userId);
-    if (credErr) console.error("[generate] credit deduction failed:", credErr.message);
-    else console.log("[generate] credits deducted:", cost, "→ remaining", newCredits);
 
     const { error: histErr } = await supabase.from("generations").insert({
       user_id: userId,
@@ -316,12 +348,13 @@ export const completeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => checkoutSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
     const credits = PLAN_CREDITS[data.plan as PlanId];
-    const { error } = await supabase
-      .from("profiles")
-      .update({ plan: data.plan, credits, currency: data.currency })
-      .eq("id", userId);
+    const { error } = await supabase.rpc("set_plan_credits", {
+      _plan: data.plan,
+      _credits: credits,
+      _currency: data.currency,
+    });
     if (error) throw new Error("Could not update your plan.");
     return { ok: true, plan: data.plan, credits };
   });

@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      credit_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          generation_type: string | null
+          id: string
+          kind: string
+          refunded: boolean
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          generation_type?: string | null
+          id?: string
+          kind: string
+          refunded?: boolean
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          generation_type?: string | null
+          id?: string
+          kind?: string
+          refunded?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       generation_history: {
         Row: {
           created_at: string
@@ -319,7 +352,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      deduct_credits: {
+        Args: { _amount: number; _gen_type: string }
+        Returns: Json
+      }
+      refund_credits: { Args: { _transaction_id: string }; Returns: Json }
+      set_plan_credits: {
+        Args: {
+          _credits: number
+          _currency: string
+          _plan: Database["public"]["Enums"]["plan_type"]
+        }
+        Returns: number
+      }
     }
     Enums: {
       gen_status: "pending" | "processing" | "success" | "failed"
