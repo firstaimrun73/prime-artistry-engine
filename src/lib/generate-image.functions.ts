@@ -17,8 +17,8 @@ const inputSchema = z.object({
 export const generateImage = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data }): Promise<{ outputUrl: string }> => {
-    const apiKey = process.env.FAL_KEY;
-    if (!apiKey) throw new Error("FAL_KEY is not configured.");
+    const apiKey = process.env.FAL_API_KEY;
+    if (!apiKey) throw new Error("FAL_API_KEY is not configured.");
 
     const res = await fetch("https://fal.run/fal-ai/flux/dev/image-to-image", {
       method: "POST",
@@ -30,11 +30,12 @@ export const generateImage = createServerFn({ method: "POST" })
         image_url: data.sourceImageUrl,
         prompt: data.professionalPrompt,
         ...(data.negativePrompt ? { negative_prompt: data.negativePrompt } : {}),
-        strength: data.strength ?? 0.85,
-        guidance_scale: data.guidanceScale ?? 11,
-        num_inference_steps: data.steps ?? 45,
+        strength: data.strength ?? 0.72,
+        guidance_scale: data.guidanceScale ?? 7.5,
+        num_inference_steps: data.steps ?? 28,
         num_images: 1,
-        output_format: "png",
+        output_format: "jpeg",
+        output_quality: 95,
         enable_safety_checker: true,
       }),
     });
