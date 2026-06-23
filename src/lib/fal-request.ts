@@ -79,10 +79,17 @@ export function isEnhancementOnly(prompt: string): boolean {
 export function buildImageEdit({
   prompt,
   imageUrl,
+  strength = 0.72,
+  referenceImageUrls,
 }: {
   prompt: string;
   imageUrl: string;
+  /** Edit strength 0.6–0.8 sweet spot; lower = preserve more. */
+  strength?: number;
+  /** Extra reference images (FLUX Kontext multi-image), plan-gated by caller. */
+  referenceImageUrls?: string[];
 }): FalStep {
+  const s = Math.min(1, Math.max(0.1, strength));
   return {
     label: "edit (flux kontext)",
     model: IMAGE_EDIT_MODEL,
@@ -91,9 +98,15 @@ export function buildImageEdit({
     body: {
       prompt,
       image_url: imageUrl,
+      ...(referenceImageUrls && referenceImageUrls.length > 0
+        ? { reference_image_urls: referenceImageUrls }
+        : {}),
+      strength: s,
       guidance_scale: 3.5,
+      num_inference_steps: 28,
       num_images: 1,
-      output_format: "png",
+      output_format: "jpeg",
+      output_quality: 95,
       safety_tolerance: "2",
     },
   };
@@ -205,6 +218,10 @@ export function buildImageEnhancementPipeline({
 export const TEXT_TO_VIDEO_MODEL = "fal-ai/kling-video/v1.6/standard/text-to-video";
 export const IMAGE_TO_VIDEO_MODEL = "fal-ai/kling-video/v1.6/standard/image-to-video";
 
+// Shared negative prompt for cleaner, artifact-free motion.
+export const VIDEO_NEGATIVE_PROMPT =
+  "blur, distort, low quality, watermark, ugly, deformed, flickering";
+
 // ── Text → Video ─────────────────────────────────────────────────────────
 export function buildTextToVideo({ prompt }: { prompt: string }): FalStep {
   return {
@@ -214,6 +231,7 @@ export function buildTextToVideo({ prompt }: { prompt: string }): FalStep {
     outputKind: "video",
     body: {
       prompt,
+      negative_prompt: VIDEO_NEGATIVE_PROMPT,
       duration: "5",
       aspect_ratio: "16:9",
     },
@@ -236,6 +254,7 @@ export function buildImageToVideo({
     body: {
       prompt,
       image_url: imageUrl,
+      negative_prompt: VIDEO_NEGATIVE_PROMPT,
       duration: "5",
       aspect_ratio: "16:9",
     },

@@ -147,6 +147,8 @@ const inputSchema = z.object({
   sourceKind: z.enum(["image", "video"]).optional(),
   // Edit strength for image-to-image (0.1 – 1). Higher = more visible edits.
   strength: z.number().min(0.1).max(1).optional(),
+  // Extra reference images for FLUX Kontext multi-image edits (plan-gated).
+  referenceImageUrls: z.array(z.string().min(1).max(15_000_000)).max(9).optional(),
 });
 
 export const generateMedia = createServerFn({ method: "POST" })
@@ -264,7 +266,16 @@ export const generateMedia = createServerFn({ method: "POST" })
           const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
           const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: true });
           console.log("[generate] mode: edit (flux kontext) | enhanced:", enhancedPrompt);
-          const step = buildImageEdit({ prompt: enhancedPrompt, imageUrl: data.imageUrl });
+          // Gate extra reference images by the user's plan limit.
+          const { getPlanLimits } = await import("@/utils/planLimits");
+          const maxImages = getPlanLimits(profile.plan).maxImages;
+          const refs = (data.referenceImageUrls ?? []).slice(0, Math.max(0, maxImages - 1));
+          const step = buildImageEdit({
+            prompt: enhancedPrompt,
+            imageUrl: data.imageUrl,
+            strength: data.strength,
+            referenceImageUrls: refs.length > 0 ? refs : undefined,
+          });
           outputUrl = await runFalStep(step, falKey);
         }
       } else {

@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { CompareSlider } from "@/components/CompareSlider";
+import { MultiImageInput } from "@/components/MultiImageInput";
+import { getPlanLimits } from "@/utils/planLimits";
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
@@ -44,6 +46,7 @@ function Editor() {
   const [inputDataUrl, setInputDataUrl] = useState<string | null>(null);
   const [inputFile, setInputFile] = useState<File | null>(null);
   const [inputKind, setInputKind] = useState<"image" | "video" | null>(null);
+  const [refImages, setRefImages] = useState<string[]>([]);
   const [output, setOutput] = useState<string | null>(null);
   const [outputIsVideo, setOutputIsVideo] = useState(false);
   const [state, setState] = useState<GenState>("idle");
@@ -113,6 +116,8 @@ function Editor() {
   const cost = CREDIT_COST[mediaType];
   const noCredits = profile.credits < cost;
   const videoLocked = mediaType === "video" && !plan.video;
+  const planLimits = getPlanLimits(profile.plan);
+  const canAddRefImages = mediaType === "image" && !!inputDataUrl && planLimits.maxImages > 1;
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
 
@@ -192,6 +197,10 @@ function Editor() {
           imageUrl: mediaUrl,
           sourceKind,
           strength: mediaType === "image" && sourceKind === "image" ? strength : undefined,
+          referenceImageUrls:
+            canAddRefImages && refImages.length > 0
+              ? refImages.slice(0, planLimits.maxImages - 1)
+              : undefined,
         },
       });
       if (runId !== runIdRef.current) return;
@@ -232,6 +241,7 @@ function Editor() {
     setInputDataUrl(null);
     setInputFile(null);
     setInputKind(null);
+    setRefImages([]);
     setOutput(null);
     setOutputIsVideo(false);
     setState("idle");
@@ -427,6 +437,21 @@ function Editor() {
               <p className="text-[11px] text-muted-foreground">
                 Higher = more visible changes. Lower preserves the original more.
               </p>
+            </div>
+          )}
+
+          {/* Plan-based reference images for richer multi-image edits. */}
+          {canAddRefImages && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Reference images (optional)
+              </p>
+              <MultiImageInput
+                userPlan={profile.plan}
+                images={refImages}
+                onChange={setRefImages}
+                disabled={loading}
+              />
             </div>
           )}
 
