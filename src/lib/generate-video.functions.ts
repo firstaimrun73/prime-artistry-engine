@@ -14,8 +14,8 @@ const inputSchema = z.object({
 export const generateVideo = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data }): Promise<{ outputUrl: string }> => {
-    const apiKey = process.env.FAL_KEY;
-    if (!apiKey) throw new Error("FAL_KEY is not configured.");
+    const apiKey = process.env.FAL_API_KEY;
+    if (!apiKey) throw new Error("FAL_API_KEY is not configured.");
 
     const res = await fetch("https://fal.run/fal-ai/wan/v2.1/image-to-video", {
       method: "POST",
@@ -26,7 +26,13 @@ export const generateVideo = createServerFn({ method: "POST" })
       body: JSON.stringify({
         image_url: data.sourceImageUrl,
         prompt: data.prompt,
-        duration: data.durationSeconds ?? 5,
+        negative_prompt: "blur, distort, low quality, watermark, ugly, deformed",
+        num_frames: 81,
+        frames_per_second: 16,
+        motion_bucket_id: 127,
+        cond_aug: 0.02,
+        resolution: "480p",
+        num_inference_steps: 25,
       }),
     });
 
