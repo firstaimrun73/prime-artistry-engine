@@ -307,17 +307,24 @@ export const generateMedia = createServerFn({ method: "POST" })
       outputUrl = await runFalStep(step, falKey);
       if (!outputUrl) throw new Error("Video generation returned no output.");
     }
+    } catch (err) {
+      // Generation failed after credits were reserved — refund them so the
+      // user is never charged for a failed generation.
+      const { error: refundErr } = await supabase.rpc("refund_credits", {
+        _transaction_id: txId,
+      });
+      if (refundErr) console.error("[generate] refund failed:", refundErr.message);
+      else console.log("[generate] refunded", cost, "credits for failed generation, tx", txId);
+      throw err;
+    }
 
+    if (!outputUrl) {
+      await supabase.rpc("refund_credits", { _transaction_id: txId });
+      throw new Error("Generation returned no output.");
+    }
 
-    // ── Persist + deduct credits ────────────────────────────────────────
+    // ── Persist history ─────────────────────────────────────────────────
     console.log("[generate] output ready:", outputUrl.slice(0, 80));
-    const newCredits = profile.credits - cost;
-    const { error: credErr } = await supabase
-      .from("profiles")
-      .update({ credits: newCredits })
-      .eq("id", userId);
-    if (credErr) console.error("[generate] credit deduction failed:", credErr.message);
-    else console.log("[generate] credits deducted:", cost, "→ remaining", newCredits);
 
     const { error: histErr } = await supabase.from("generations").insert({
       user_id: userId,
