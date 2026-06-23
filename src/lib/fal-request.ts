@@ -218,6 +218,10 @@ export function buildImageEnhancementPipeline({
 export const TEXT_TO_VIDEO_MODEL = "fal-ai/kling-video/v1.6/standard/text-to-video";
 export const IMAGE_TO_VIDEO_MODEL = "fal-ai/kling-video/v1.6/standard/image-to-video";
 
+// Shared negative prompt for cleaner, artifact-free motion.
+export const VIDEO_NEGATIVE_PROMPT =
+  "blur, distort, low quality, watermark, ugly, deformed, flickering";
+
 // ── Text → Video ─────────────────────────────────────────────────────────
 export function buildTextToVideo({ prompt }: { prompt: string }): FalStep {
   return {
@@ -227,6 +231,7 @@ export function buildTextToVideo({ prompt }: { prompt: string }): FalStep {
     outputKind: "video",
     body: {
       prompt,
+      negative_prompt: VIDEO_NEGATIVE_PROMPT,
       duration: "5",
       aspect_ratio: "16:9",
     },
@@ -249,6 +254,7 @@ export function buildImageToVideo({
     body: {
       prompt,
       image_url: imageUrl,
+      negative_prompt: VIDEO_NEGATIVE_PROMPT,
       duration: "5",
       aspect_ratio: "16:9",
     },
