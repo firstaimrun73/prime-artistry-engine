@@ -65,6 +65,9 @@ function Dashboard() {
           <Coins className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Credits remaining</p>
           <p className="mt-1 text-3xl font-extrabold">{profile.credits}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits each
+          </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-6">
           <Zap className="h-6 w-6 text-primary" />
