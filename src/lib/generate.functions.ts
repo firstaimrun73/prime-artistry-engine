@@ -179,7 +179,32 @@ export const generateMedia = createServerFn({ method: "POST" })
     const falKey = process.env.FAL_API_KEY;
     if (!falKey) throw new Error("AI service unavailable.");
 
+    // Atomically reserve (deduct) credits BEFORE generation. The DB function
+    // checks the balance and decrements in a single statement, so it prevents
+    // negative balances, double-spend from concurrent requests, and any
+    // frontend bypass. Credits are refunded automatically if generation fails.
+    const { data: deduction, error: dErr } = await supabase.rpc("deduct_credits", {
+      _amount: cost,
+      _gen_type: data.type,
+    });
+    if (dErr || !deduction) {
+      if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
+        throw new Error(
+          `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
+        );
+      }
+      console.error("[generate] credit deduction failed:", dErr?.message);
+      throw new Error("Could not reserve credits. Please try again.");
+    }
+    const { transaction_id: txId, credits: newCredits } = deduction as {
+      transaction_id: string;
+      credits: number;
+    };
+    console.log("[generate] reserved", cost, "credits → remaining", newCredits, "tx", txId);
+
     let outputUrl: string | null = null;
+
+    try {
 
     if (data.type === "image") {
       console.log("[generate] user prompt:", data.prompt);
