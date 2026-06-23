@@ -348,12 +348,13 @@ export const completeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => checkoutSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { supabase } = context;
     const credits = PLAN_CREDITS[data.plan as PlanId];
-    const { error } = await supabase
-      .from("profiles")
-      .update({ plan: data.plan, credits, currency: data.currency })
-      .eq("id", userId);
+    const { error } = await supabase.rpc("set_plan_credits", {
+      _plan: data.plan,
+      _credits: credits,
+      _currency: data.currency,
+    });
     if (error) throw new Error("Could not update your plan.");
     return { ok: true, plan: data.plan, credits };
   });
