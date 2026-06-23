@@ -440,6 +440,21 @@ function Editor() {
             </div>
           )}
 
+          {/* Plan-based reference images for richer multi-image edits. */}
+          {canAddRefImages && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Reference images (optional)
+              </p>
+              <MultiImageInput
+                userPlan={profile.plan}
+                images={refImages}
+                onChange={setRefImages}
+                disabled={loading}
+              />
+            </div>
+          )}
+
           {/* Watermark control — free users are locked on; paid users choose. */}
           <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
             <span className="text-muted-foreground">MOTIO2EDIT watermark</span>
