@@ -147,6 +147,8 @@ const inputSchema = z.object({
   sourceKind: z.enum(["image", "video"]).optional(),
   // Edit strength for image-to-image (0.1 – 1). Higher = more visible edits.
   strength: z.number().min(0.1).max(1).optional(),
+  // Extra reference images for FLUX Kontext multi-image edits (plan-gated).
+  referenceImageUrls: z.array(z.string().min(1).max(15_000_000)).max(9).optional(),
 });
 
 export const generateMedia = createServerFn({ method: "POST" })
