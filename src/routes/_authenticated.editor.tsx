@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { CompareSlider } from "@/components/CompareSlider";
+import { MultiImageInput } from "@/components/MultiImageInput";
+import { getPlanLimits } from "@/utils/planLimits";
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
