@@ -32,11 +32,11 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
 // ── Credit economics ──────────────────────────────────────────────
 // Fixed, predictable pricing. Tuned to comfortably cover fal.ai API cost
 // (image edit/generation + video generation) and stay profitable at scale.
-//   • 1 image generation / edit = 30 credits
-//   • 1 video generation / edit = 100 credits
+//   • 1 image generation / edit = 25 credits
+//   • 1 video generation / edit = 125 credits
 export const CREDIT_COST = {
-  image: 30,
-  video: 100,
+  image: 25,
+  video: 125,
 } as const;
 
 /** Rough number of generations a credit balance buys (for plan display). */
