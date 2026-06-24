@@ -32,6 +32,7 @@ import { Route as AuthenticatedEditorRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
+import { Route as ApiPublicWebhooksNowpaymentsRouteImport } from './routes/api/public/webhooks/nowpayments'
 
 const TrustRoute = TrustRouteImport.update({
   id: '/trust',
@@ -148,6 +149,12 @@ const ApiPublicWebhooksRazorpayRoute =
     path: '/api/public/webhooks/razorpay',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWebhooksNowpaymentsRoute =
+  ApiPublicWebhooksNowpaymentsRouteImport.update({
+    id: '/api/public/webhooks/nowpayments',
+    path: '/api/public/webhooks/nowpayments',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -171,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/editor': typeof AuthenticatedEditorRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
 }
 export interface FileRoutesByTo {
@@ -195,6 +203,7 @@ export interface FileRoutesByTo {
   '/editor': typeof AuthenticatedEditorRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
 }
 export interface FileRoutesById {
@@ -221,6 +230,7 @@ export interface FileRoutesById {
   '/_authenticated/editor': typeof AuthenticatedEditorRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
 }
 export interface FileRouteTypes {
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/editor'
     | '/history'
     | '/settings'
+    | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/razorpay'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/editor'
     | '/history'
     | '/settings'
+    | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/razorpay'
   id:
     | '__root__'
@@ -296,6 +308,7 @@ export interface FileRouteTypes {
     | '/_authenticated/editor'
     | '/_authenticated/history'
     | '/_authenticated/settings'
+    | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/razorpay'
   fileRoutesById: FileRoutesById
 }
@@ -317,6 +330,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TicketsRoute: typeof TicketsRoute
   TrustRoute: typeof TrustRoute
+  ApiPublicWebhooksNowpaymentsRoute: typeof ApiPublicWebhooksNowpaymentsRoute
   ApiPublicWebhooksRazorpayRoute: typeof ApiPublicWebhooksRazorpayRoute
 }
 
@@ -483,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWebhooksRazorpayRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/webhooks/nowpayments': {
+      id: '/api/public/webhooks/nowpayments'
+      path: '/api/public/webhooks/nowpayments'
+      fullPath: '/api/public/webhooks/nowpayments'
+      preLoaderRoute: typeof ApiPublicWebhooksNowpaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -524,6 +545,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TicketsRoute: TicketsRoute,
   TrustRoute: TrustRoute,
+  ApiPublicWebhooksNowpaymentsRoute: ApiPublicWebhooksNowpaymentsRoute,
   ApiPublicWebhooksRazorpayRoute: ApiPublicWebhooksRazorpayRoute,
 }
 export const routeTree = rootRouteImport
