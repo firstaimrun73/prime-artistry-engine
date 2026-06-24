@@ -7,7 +7,7 @@ import { getPlan, CURRENCY_SYMBOL, CURRENCY_METHODS, ALL_METHODS, TRANSACTION_FE
 import { completeCheckout } from "@/lib/generate.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CreditCard, Smartphone, Bitcoin, Lock } from "lucide-react";
+import { CreditCard, Bitcoin, Lock } from "lucide-react";
 import type { PaymentMethod } from "@/lib/plans";
 
 export const Route = createFileRoute("/checkout")({
