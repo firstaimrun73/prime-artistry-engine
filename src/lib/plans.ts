@@ -1,17 +1,16 @@
 // Payment methods available per currency. Visibility-only logic — methods are never removed.
 export type Currency = "USD" | "EUR" | "INR";
-export type PaymentMethod = "card" | "upi" | "crypto";
+export type PaymentMethod = "card" | "crypto";
 
 export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "card", label: "Card (Stripe)" },
-  { id: "upi", label: "UPI" },
   { id: "crypto", label: "Crypto" },
 ];
 
 export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
   USD: ["card", "crypto"],
   EUR: ["card"],
-  INR: ["card", "upi", "crypto"],
+  INR: ["card", "crypto"],
 };
 
 export const CURRENCY_SYMBOL: Record<Currency, string> = {
