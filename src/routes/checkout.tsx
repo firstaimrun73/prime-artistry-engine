@@ -20,7 +20,6 @@ export const Route = createFileRoute("/checkout")({
 
 const METHOD_ICON: Record<PaymentMethod, typeof CreditCard> = {
   card: CreditCard,
-  upi: Smartphone,
   crypto: Bitcoin,
 };
 
