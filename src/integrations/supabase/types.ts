@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      credit_ledger: {
+        Row: {
+          created_at: string
+          credits_added: number
+          id: string
+          reason: string
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_added: number
+          id?: string
+          reason?: string
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_added?: number
+          id?: string
+          reason?: string
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_ledger_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["transaction_id"]
+          },
+        ]
+      }
       credit_transactions: {
         Row: {
           amount: number
@@ -109,6 +144,51 @@ export type Database = {
           prompt?: string | null
           status?: Database["public"]["Enums"]["gen_status"]
           type?: Database["public"]["Enums"]["gen_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          credits_purchased: number
+          currency: string
+          gateway_order_id: string | null
+          gateway_response: Json | null
+          id: string
+          payment_method: string
+          payment_status: string
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          credits_purchased?: number
+          currency: string
+          gateway_order_id?: string | null
+          gateway_response?: Json | null
+          id?: string
+          payment_method: string
+          payment_status?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credits_purchased?: number
+          currency?: string
+          gateway_order_id?: string | null
+          gateway_response?: Json | null
+          id?: string
+          payment_method?: string
+          payment_status?: string
+          transaction_id?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -347,11 +427,53 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_events: {
+        Row: {
+          created_at: string
+          event_id: string
+          event_type: string
+          gateway: string
+          id: string
+          payload: Json
+          processed: boolean
+          processed_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          event_type: string
+          gateway: string
+          id?: string
+          payload: Json
+          processed?: boolean
+          processed_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          event_type?: string
+          gateway?: string
+          id?: string
+          payload?: Json
+          processed?: boolean
+          processed_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      apply_payment_credits: {
+        Args: {
+          _credits: number
+          _reason?: string
+          _transaction_id: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       deduct_credits: {
         Args: { _amount: number; _gen_type: string }
         Returns: Json
