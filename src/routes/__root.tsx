@@ -104,6 +104,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
     ],
+    scripts: [{ src: "https://checkout.razorpay.com/v1/checkout.js", defer: true }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
