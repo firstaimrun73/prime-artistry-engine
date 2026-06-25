@@ -104,7 +104,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
     ],
-    scripts: [{ src: "https://checkout.razorpay.com/v1/checkout.js", defer: true }],
+    scripts: [
+      { src: "https://checkout.razorpay.com/v1/checkout.js", defer: true },
+      { src: "https://www.googletagmanager.com/gtag/js?id=G-3NCVLG63JR", async: true },
+      {
+        children:
+          "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3NCVLG63JR');",
+      },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,

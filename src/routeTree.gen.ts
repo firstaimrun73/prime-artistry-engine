@@ -33,6 +33,7 @@ import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedEditorRouteImport } from './routes/_authenticated.editor'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
 import { Route as ApiPublicWebhooksRazorpayRouteImport } from './routes/api/public/webhooks/razorpay'
 import { Route as ApiPublicWebhooksNowpaymentsRouteImport } from './routes/api/public/webhooks/nowpayments'
 
@@ -155,6 +156,11 @@ const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const ApiPublicWebhooksRazorpayRoute =
   ApiPublicWebhooksRazorpayRouteImport.update({
     id: '/api/public/webhooks/razorpay',
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/editor': typeof AuthenticatedEditorRoute
@@ -214,6 +221,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/chat': typeof AuthenticatedChatRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/editor': typeof AuthenticatedEditorRoute
@@ -243,6 +251,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/tickets': typeof TicketsRoute
   '/trust': typeof TrustRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/editor': typeof AuthenticatedEditorRoute
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/tickets'
     | '/trust'
+    | '/admin'
     | '/chat'
     | '/dashboard'
     | '/editor'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/tickets'
     | '/trust'
+    | '/admin'
     | '/chat'
     | '/dashboard'
     | '/editor'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/tickets'
     | '/trust'
+    | '/_authenticated/admin'
     | '/_authenticated/chat'
     | '/_authenticated/dashboard'
     | '/_authenticated/editor'
@@ -530,6 +542,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChatRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/api/public/webhooks/razorpay': {
       id: '/api/public/webhooks/razorpay'
       path: '/api/public/webhooks/razorpay'
@@ -548,6 +567,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEditorRoute: typeof AuthenticatedEditorRoute
@@ -556,6 +576,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEditorRoute: AuthenticatedEditorRoute,
