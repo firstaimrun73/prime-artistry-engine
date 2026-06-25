@@ -2,7 +2,9 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Sparkles, Coins } from "lucide-react";
+import { CrownBadge } from "@/components/CrownBadge";
+import { isAdminEmail } from "@/lib/admin-config";
+import { Sparkles, Coins, ShieldCheck } from "lucide-react";
 
 export function Header() {
   const { user, profile } = useAuth();
@@ -51,6 +53,11 @@ export function Header() {
               <Link to="/chat" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
                 Chat
               </Link>
+              {isAdminEmail(profile?.email) && (
+                <Link to="/admin" activeProps={{ className: "text-foreground" }} className="inline-flex items-center gap-1 text-primary transition-colors hover:text-foreground">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Admin
+                </Link>
+              )}
             </>
           )}
         </nav>
@@ -67,6 +74,7 @@ export function Header() {
                   {profile.credits} credits
                 </Link>
               )}
+              {profile && <CrownBadge plan={profile.plan} className="hidden sm:inline-flex" />}
               <Link to="/dashboard" aria-label="Account" className="transition-opacity hover:opacity-80">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={profile?.avatar_signed_url ?? undefined} alt={profile?.display_name ?? "Account"} />

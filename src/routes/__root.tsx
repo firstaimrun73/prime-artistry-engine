@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth";
 import { ThemeProvider } from "../lib/theme";
 import { Toaster } from "../components/ui/sonner";
+import { trackPageView } from "../lib/analytics";
 
 function NotFoundComponent() {
   return (
@@ -104,7 +105,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
     ],
-    scripts: [{ src: "https://checkout.razorpay.com/v1/checkout.js", defer: true }],
+    scripts: [
+      { src: "https://checkout.razorpay.com/v1/checkout.js", defer: true },
+      { src: "https://www.googletagmanager.com/gtag/js?id=G-3NCVLG63JR", async: true },
+      {
+        children:
+          "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3NCVLG63JR');",
+      },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -126,6 +134,18 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function PageViewTracker() {
+  const router = useRouter();
+  useEffect(() => {
+    trackPageView(router.state.location.pathname);
+    const unsub = router.subscribe("onResolved", () => {
+      trackPageView(router.state.location.pathname);
+    });
+    return unsub;
+  }, [router]);
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -133,6 +153,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
+          <PageViewTracker />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <Toaster richColors position="top-center" />
