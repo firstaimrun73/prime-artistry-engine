@@ -121,6 +121,7 @@ function Checkout() {
       return;
     }
     setProcessing(true);
+    setCardRetry(null);
     try {
       const order = await createOrder({ data: { plan: planId } });
       const rzp = new window.Razorpay({
@@ -153,19 +154,34 @@ function Checkout() {
           }
         },
         modal: {
-          ondismiss: () => setProcessing(false),
+          // Popup closed by the user — keep them here and offer instant retry.
+          ondismiss: () => {
+            setProcessing(false);
+            setCardRetry("Payment window closed. Click to try again.");
+          },
         },
       });
-      rzp.on("payment.failed", () => {
+      rzp.on("payment.failed", (resp: { error?: { reason?: string; description?: string } }) => {
         setProcessing(false);
-        navigate({ to: "/payment-failed" });
+        const reason = resp?.error?.reason || "";
+        let msg = "Payment failed. Please try again.";
+        if (/declin|card/i.test(reason) || /declin/i.test(resp?.error?.description || "")) {
+          msg = "Card declined. Try another card.";
+        } else if (/network|gateway|timeout/i.test(reason)) {
+          msg = "Network error. Please try again.";
+        }
+        setCardRetry(msg);
+        toast.error(msg);
       });
       rzp.open();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not start payment.");
       setProcessing(false);
+      const msg = err instanceof Error ? err.message : "Could not start payment.";
+      setCardRetry(msg);
+      toast.error(msg);
     }
   };
+
 
   const startPolling = (paymentId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
