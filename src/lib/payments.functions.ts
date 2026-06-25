@@ -36,6 +36,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { RAZORPAY_PACKAGES, createRazorpayOrder: createOrder } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "razorpay");
     const pkg = RAZORPAY_PACKAGES[data.packageId as keyof typeof RAZORPAY_PACKAGES];
     const internalOrderId = `M2E-RZP-${crypto.randomUUID()}`;
 
