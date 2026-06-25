@@ -17,6 +17,21 @@ export const CRYPTO_PACKAGES = {
 
 export type PackageId = keyof typeof RAZORPAY_PACKAGES;
 
+// ── Plan-based purchases (matches src/lib/plans.ts pricing) ──
+export const PLAN_PURCHASE = {
+  plus: { credits: 900, amountINR: 799, amountUSD: 9.99 },
+  pro: { credits: 3000, amountINR: 2400, amountUSD: 29.99 },
+  studio: { credits: 9000, amountINR: 8200, amountUSD: 99 },
+} as const;
+
+export type PurchasablePlan = keyof typeof PLAN_PURCHASE;
+
+// Reverse-map a recorded credit amount back to its plan id (each plan has a unique credit count).
+export function planFromCredits(credits: number): PurchasablePlan | null {
+  const entry = Object.entries(PLAN_PURCHASE).find(([, p]) => p.credits === credits);
+  return (entry?.[0] as PurchasablePlan) ?? null;
+}
+
 export const ACCEPTED_COINS = ["usdtbsc", "btc", "eth"] as const;
 export type AcceptedCoin = (typeof ACCEPTED_COINS)[number];
 
