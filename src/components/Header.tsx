@@ -53,6 +53,11 @@ export function Header() {
               <Link to="/chat" activeProps={{ className: "text-foreground" }} className="transition-colors hover:text-foreground">
                 Chat
               </Link>
+              {isAdminEmail(profile?.email) && (
+                <Link to="/admin" activeProps={{ className: "text-foreground" }} className="inline-flex items-center gap-1 text-primary transition-colors hover:text-foreground">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Admin
+                </Link>
+              )}
             </>
           )}
         </nav>
