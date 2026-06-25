@@ -104,6 +104,7 @@ function TicketCard({ t }: { t: Ticket }) {
 
 function Tickets() {
   const { user, profile } = useAuth();
+  const createTicket = useServerFn(submitTicket);
   const [category, setCategory] = useState<string>("payment");
   const [priority, setPriority] = useState<string>("normal");
   const [subject, setSubject] = useState("");
