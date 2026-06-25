@@ -269,6 +269,8 @@ function Checkout() {
                       onClick={() => {
                         setMethod(m.id);
                         setInvoice(null);
+                        setCardRetry(null);
+                        setCryptoCancelled(false);
                       }}
                       className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
                         method === m.id ? "border-primary bg-accent" : "border-border bg-card hover:border-muted-foreground"
