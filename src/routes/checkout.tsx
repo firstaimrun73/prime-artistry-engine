@@ -346,10 +346,58 @@ function Checkout() {
                   <p className="mt-3 text-xs text-muted-foreground">
                     Credits are added automatically once the payment is confirmed on-chain.
                   </p>
+                  <Button variant="outline" className="mt-4 w-full" onClick={cancelPayment}>
+                    Cancel Payment
+                  </Button>
+                </div>
+              )}
+
+              {/* Crypto cancelled — instant retry options, no cooldown. */}
+              {method === "crypto" && !invoice && cryptoCancelled && (
+                <div className="mt-6 rounded-xl border border-border bg-card p-4">
+                  <p className="text-sm text-muted-foreground">Try again anytime.</p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Button className="flex-1" onClick={handleCrypto} disabled={processing}>
+                      Try Crypto Again
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setCryptoCancelled(false);
+                        setMethod("card");
+                      }}
+                    >
+                      Pay with Card Instead
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Card popup closed / failed — instant retry options, no cooldown. */}
+              {method === "card" && cardRetry && (
+                <div className="mt-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+                  <p className="text-sm font-medium text-foreground">{cardRetry}</p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Button className="flex-1" onClick={handleCard} disabled={processing}>
+                      Try Card Payment Again
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setCardRetry(null);
+                        setMethod("crypto");
+                      }}
+                    >
+                      Switch to Crypto Instead
+                    </Button>
+                  </div>
                 </div>
               )}
             </>
           )}
+
 
           <p className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5" /> Secured payments. Card payments are processed in INR via Razorpay.
