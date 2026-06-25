@@ -2,7 +2,9 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Sparkles, Coins } from "lucide-react";
+import { CrownBadge } from "@/components/CrownBadge";
+import { ADMIN_EMAIL } from "@/lib/admin-config";
+import { Sparkles, Coins, ShieldCheck } from "lucide-react";
 
 export function Header() {
   const { user, profile } = useAuth();
