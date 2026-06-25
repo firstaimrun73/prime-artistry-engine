@@ -74,6 +74,7 @@ export function Header() {
                   {profile.credits} credits
                 </Link>
               )}
+              {profile && <CrownBadge plan={profile.plan} className="hidden sm:inline-flex" />}
               <Link to="/dashboard" aria-label="Account" className="transition-opacity hover:opacity-80">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={profile?.avatar_signed_url ?? undefined} alt={profile?.display_name ?? "Account"} />
