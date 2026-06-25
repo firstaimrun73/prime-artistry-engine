@@ -4,8 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const planSchema = z.enum(["plus", "pro", "studio"]);
 
-// SECURITY: max 3 payment attempts per user per hour. Logs the attempt and
-// throws if the user is over the limit. Uses the service-role client.
+// SECURITY: generous limit of 10 payment attempts per user per hour (abuse guard
+// only — never blocks legitimate retries). Logs the attempt via the service client.
+const MAX_PAYMENT_ATTEMPTS_PER_HOUR = 10;
 async function enforcePaymentRateLimit(db: any, userId: string, method: string) {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { count } = await db
@@ -13,7 +14,7 @@ async function enforcePaymentRateLimit(db: any, userId: string, method: string) 
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .gte("created_at", since);
-  if ((count ?? 0) >= 3) {
+  if ((count ?? 0) >= MAX_PAYMENT_ATTEMPTS_PER_HOUR) {
     throw new Error("Too many payment attempts. Please try again in an hour.");
   }
   await db.from("payment_attempts").insert({ user_id: userId, payment_method: method });
@@ -28,7 +29,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "razorpay");
     const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
-    const internalOrderId = `M2E-RZP-${crypto.randomUUID()}`;
+    // FIX: Razorpay receipt must be < 40 chars. Keep it short to avoid BAD_REQUEST_ERROR.
+    const internalOrderId = `rzp_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
     const order = await createOrder({
       amountPaise: pkg.amountINR * 100,

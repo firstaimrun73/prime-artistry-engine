@@ -71,6 +71,8 @@ function Checkout() {
   const [secondsLeft, setSecondsLeft] = useState(20 * 60);
   const [cryptoState, setCryptoState] = useState<"waiting" | "confirming" | "confirmed">("waiting");
   const [copied, setCopied] = useState(false);
+  const [cardRetry, setCardRetry] = useState<string | null>(null);
+  const [cryptoCancelled, setCryptoCancelled] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const symbol = CURRENCY_SYMBOL[currency as Currency];
@@ -119,6 +121,7 @@ function Checkout() {
       return;
     }
     setProcessing(true);
+    setCardRetry(null);
     try {
       const order = await createOrder({ data: { plan: planId } });
       const rzp = new window.Razorpay({
@@ -151,19 +154,34 @@ function Checkout() {
           }
         },
         modal: {
-          ondismiss: () => setProcessing(false),
+          // Popup closed by the user — keep them here and offer instant retry.
+          ondismiss: () => {
+            setProcessing(false);
+            setCardRetry("Payment window closed. Click to try again.");
+          },
         },
       });
-      rzp.on("payment.failed", () => {
+      rzp.on("payment.failed", (resp: { error?: { reason?: string; description?: string } }) => {
         setProcessing(false);
-        navigate({ to: "/payment-failed" });
+        const reason = resp?.error?.reason || "";
+        let msg = "Payment failed. Please try again.";
+        if (/declin|card/i.test(reason) || /declin/i.test(resp?.error?.description || "")) {
+          msg = "Card declined. Try another card.";
+        } else if (/network|gateway|timeout/i.test(reason)) {
+          msg = "Network error. Please try again.";
+        }
+        setCardRetry(msg);
+        toast.error(msg);
       });
       rzp.open();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not start payment.");
       setProcessing(false);
+      const msg = err instanceof Error ? err.message : "Could not start payment.";
+      setCardRetry(msg);
+      toast.error(msg);
     }
   };
+
 
   const startPolling = (paymentId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -189,6 +207,7 @@ function Checkout() {
   const handleCrypto = async () => {
     if (!requireAuth()) return;
     setProcessing(true);
+    setCryptoCancelled(false);
     try {
       const inv = await createCrypto({ data: { plan: planId, payCurrency: coin } });
       setInvoice(inv as CryptoInvoice);
@@ -201,6 +220,18 @@ function Checkout() {
       setProcessing(false);
     }
   };
+
+  // Cancel an in-progress crypto payment: clear the address, stop polling,
+  // return to selection, and let the user retry instantly.
+  const cancelPayment = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    setInvoice(null);
+    setCryptoState("waiting");
+    setSecondsLeft(20 * 60);
+    setCryptoCancelled(true);
+    toast.info("Payment cancelled. Try again anytime.");
+  };
+
 
   const copyAddress = async () => {
     if (!invoice) return;
@@ -238,6 +269,8 @@ function Checkout() {
                       onClick={() => {
                         setMethod(m.id);
                         setInvoice(null);
+                        setCardRetry(null);
+                        setCryptoCancelled(false);
                       }}
                       className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
                         method === m.id ? "border-primary bg-accent" : "border-border bg-card hover:border-muted-foreground"
@@ -315,10 +348,58 @@ function Checkout() {
                   <p className="mt-3 text-xs text-muted-foreground">
                     Credits are added automatically once the payment is confirmed on-chain.
                   </p>
+                  <Button variant="outline" className="mt-4 w-full" onClick={cancelPayment}>
+                    Cancel Payment
+                  </Button>
+                </div>
+              )}
+
+              {/* Crypto cancelled — instant retry options, no cooldown. */}
+              {method === "crypto" && !invoice && cryptoCancelled && (
+                <div className="mt-6 rounded-xl border border-border bg-card p-4">
+                  <p className="text-sm text-muted-foreground">Try again anytime.</p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Button className="flex-1" onClick={handleCrypto} disabled={processing}>
+                      Try Crypto Again
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setCryptoCancelled(false);
+                        setMethod("card");
+                      }}
+                    >
+                      Pay with Card Instead
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Card popup closed / failed — instant retry options, no cooldown. */}
+              {method === "card" && cardRetry && (
+                <div className="mt-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+                  <p className="text-sm font-medium text-foreground">{cardRetry}</p>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Button className="flex-1" onClick={handleCard} disabled={processing}>
+                      Try Card Payment Again
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setCardRetry(null);
+                        setMethod("crypto");
+                      }}
+                    >
+                      Switch to Crypto Instead
+                    </Button>
+                  </div>
                 </div>
               )}
             </>
           )}
+
 
           <p className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5" /> Secured payments. Card payments are processed in INR via Razorpay.

@@ -75,15 +75,7 @@ export type Database = {
           transaction_id?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "credit_ledger_transaction_id_fkey"
-            columns: ["transaction_id"]
-            isOneToOne: true
-            referencedRelation: "payment_transactions"
-            referencedColumns: ["transaction_id"]
-          },
-        ]
+        Relationships: []
       }
       credit_transactions: {
         Row: {
