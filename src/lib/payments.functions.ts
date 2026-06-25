@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const planSchema = z.enum(["plus", "pro", "studio"]);
+const planSchema = z.enum(["plus", "pro", "studio", "business"]);
 
 // SECURITY: generous limit of 10 payment attempts per user per hour (abuse guard
 // only — never blocks legitimate retries). Logs the attempt via the service client.

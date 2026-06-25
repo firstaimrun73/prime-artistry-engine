@@ -108,7 +108,7 @@ function Dashboard() {
             <History className="mr-1.5 h-4 w-4" /> My workspace
           </Link>
         </Button>
-        {profile.plan !== "studio" && (
+        {profile.plan !== "business" && (
           <Button asChild variant="outline">
             <Link to="/pricing">Upgrade plan</Link>
           </Button>

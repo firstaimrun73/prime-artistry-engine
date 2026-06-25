@@ -15,8 +15,9 @@ export type PlanLimits = {
 export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   free: { maxImages: 1, videoEnabled: false, hd: false }, // Free
   plus: { maxImages: 3, videoEnabled: true, hd: false }, // Starter
-  pro: { maxImages: 5, videoEnabled: true, hd: true }, // Pro
-  studio: { maxImages: 10, videoEnabled: true, hd: true }, // Business
+  pro: { maxImages: 5, videoEnabled: true, hd: true }, // Plus
+  studio: { maxImages: 8, videoEnabled: true, hd: true }, // Pro
+  business: { maxImages: 10, videoEnabled: true, hd: true }, // Business
 };
 
 export function getPlanLimits(plan: string): PlanLimits {
