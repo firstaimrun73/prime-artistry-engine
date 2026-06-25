@@ -71,6 +71,8 @@ function Checkout() {
   const [secondsLeft, setSecondsLeft] = useState(20 * 60);
   const [cryptoState, setCryptoState] = useState<"waiting" | "confirming" | "confirmed">("waiting");
   const [copied, setCopied] = useState(false);
+  const [cardRetry, setCardRetry] = useState<string | null>(null);
+  const [cryptoCancelled, setCryptoCancelled] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const symbol = CURRENCY_SYMBOL[currency as Currency];
