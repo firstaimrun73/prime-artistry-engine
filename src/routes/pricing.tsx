@@ -3,8 +3,9 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
 import { PLANS, CURRENCY_SYMBOL, type Currency, type PlanId } from "@/lib/plans";
-import { Check } from "lucide-react";
+import { Check, CheckCircle2 } from "lucide-react";
 import {
   Select,
   SelectContent,
