@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { CREDIT_COST, PLAN_CREDITS, type PlanId } from "@/lib/plans";
+import { CREDIT_COST, type PlanId } from "@/lib/plans";
 import {
   buildFalRequest,
   buildImageEdit,
@@ -355,17 +355,22 @@ const checkoutSchema = z.object({
   currency: z.string().min(1).max(8),
 });
 
+// SECURITY: This path NEVER grants paid credits. Paid plans are credited only
+// after a verified Razorpay/NOWPayments webhook (see payments.functions.ts and
+// the /api/public/webhooks/* routes). Here we only allow activating the free
+// plan, which carries no credits.
 export const completeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => checkoutSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const credits = PLAN_CREDITS[data.plan as PlanId];
-    const { error } = await supabase.rpc("set_plan_credits", {
-      _plan: data.plan,
-      _credits: credits,
-      _currency: data.currency,
-    });
+    const { supabase, userId } = context;
+    if (data.plan !== "free") {
+      throw new Error("Paid plans must be purchased through the secure payment checkout.");
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ plan: "free", currency: data.currency, updated_at: new Date().toISOString() })
+      .eq("id", userId);
     if (error) throw new Error("Could not update your plan.");
-    return { ok: true, plan: data.plan, credits };
+    return { ok: true, plan: "free" as PlanId, credits: 0 };
   });

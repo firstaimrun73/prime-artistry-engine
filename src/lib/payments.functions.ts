@@ -2,6 +2,21 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+// SECURITY: FIX 5 — max 3 payment attempts per user per hour. Logs the attempt
+// and throws if the user is over the limit. Uses the service-role client.
+async function enforcePaymentRateLimit(db: any, userId: string, method: string) {
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await db
+    .from("payment_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", since);
+  if ((count ?? 0) >= 3) {
+    throw new Error("Too many payment attempts. Please try again in an hour.");
+  }
+  await db.from("payment_attempts").insert({ user_id: userId, payment_method: method });
+}
+
 // Public credit-package catalogue (safe to expose).
 export const getCreditPackages = createServerFn({ method: "GET" }).handler(async () => {
   const { RAZORPAY_PACKAGES, CRYPTO_PACKAGES, ACCEPTED_COINS } = await import("@/lib/payments.server");
@@ -21,6 +36,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { RAZORPAY_PACKAGES, createRazorpayOrder: createOrder } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "razorpay");
     const pkg = RAZORPAY_PACKAGES[data.packageId as keyof typeof RAZORPAY_PACKAGES];
     const internalOrderId = `M2E-RZP-${crypto.randomUUID()}`;
 
@@ -138,6 +154,7 @@ export const createCryptoInvoice = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { CRYPTO_PACKAGES, createNowPaymentsInvoice } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "nowpayments");
     const pkg = CRYPTO_PACKAGES[data.packageId as keyof typeof CRYPTO_PACKAGES];
     const internalOrderId = `M2E-CRYPTO-${crypto.randomUUID()}`;
     const frontend = process.env.FRONTEND_URL || "";
