@@ -42,6 +42,7 @@ function Dashboard() {
   if (!profile) return null;
   const plan = getPlan(profile.plan);
   const allocation = PLAN_CREDITS[profile.plan];
+  const unlimited = profile.plan === "business";
   const used = Math.max(0, allocation - profile.credits);
   const images = gens.filter((g) => g.type === "image").length;
   const videos = gens.filter((g) => g.type === "video").length;
