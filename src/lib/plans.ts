@@ -9,10 +9,10 @@ export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
 ];
 
 // Payment method by checkout currency.
-//   India (INR) → Razorpay card only.
+//   India (INR) → Razorpay card (primary) + NOWPayments crypto.
 //   Everyone else → NOWPayments crypto only.
 export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
-  INR: ["card"],
+  INR: ["card", "crypto"],
   USD: ["crypto"],
   EUR: ["crypto"],
 };
