@@ -122,7 +122,7 @@ export const getAdminStats = createServerFn({ method: "GET" })
     const purchases: AdminPurchase[] = payments.slice(0, 200).map((p) => {
       const prof = profileById.get(p.user_id);
       return {
-        transactionId: p.transaction_id,
+        transactionId: p.transaction_id ?? "—",
         name: prof?.display_name ?? "—",
         email: prof?.email ?? "—",
         plan: prof?.plan ?? "—",
