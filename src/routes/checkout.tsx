@@ -459,12 +459,6 @@ function Checkout() {
               </Button>
               <p className="mt-2 text-center text-xs text-muted-foreground">USDT / BTC / ETH</p>
             </>
-          ) : invoice ? (
-            <p className="mt-6 text-center text-xs text-muted-foreground">Waiting for your crypto payment…</p>
-          ) : (
-            <Button className="mt-6 w-full" onClick={handleCrypto} disabled={processing}>
-              {processing ? "Processing…" : "Pay with Crypto"}
-            </Button>
           )}
 
           <Link to="/pricing" className="mt-4 block text-center text-xs text-muted-foreground hover:text-foreground">
