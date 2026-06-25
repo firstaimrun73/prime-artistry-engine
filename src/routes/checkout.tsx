@@ -207,6 +207,7 @@ function Checkout() {
   const handleCrypto = async () => {
     if (!requireAuth()) return;
     setProcessing(true);
+    setCryptoCancelled(false);
     try {
       const inv = await createCrypto({ data: { plan: planId, payCurrency: coin } });
       setInvoice(inv as CryptoInvoice);
@@ -219,6 +220,18 @@ function Checkout() {
       setProcessing(false);
     }
   };
+
+  // Cancel an in-progress crypto payment: clear the address, stop polling,
+  // return to selection, and let the user retry instantly.
+  const cancelPayment = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    setInvoice(null);
+    setCryptoState("waiting");
+    setSecondsLeft(20 * 60);
+    setCryptoCancelled(true);
+    toast.info("Payment cancelled. Try again anytime.");
+  };
+
 
   const copyAddress = async () => {
     if (!invoice) return;
