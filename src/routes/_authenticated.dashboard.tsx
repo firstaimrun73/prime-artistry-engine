@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPlan, PLAN_CREDITS, CREDIT_COST } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Coins, Crown, Image as ImageIcon, Settings, Zap, History, FolderOpen, LifeBuoy, Ticket, HelpCircle, Mail } from "lucide-react";
+import { Coins, Crown, Image as ImageIcon, Settings, Zap, History, FolderOpen, LifeBuoy, Ticket, HelpCircle, Mail, CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
