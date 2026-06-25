@@ -19,6 +19,8 @@ import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PaymentSuccessRouteImport } from './routes/payment-success'
+import { Route as PaymentFailedRouteImport } from './routes/payment-failed'
 import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as EditRouteImport } from './routes/edit'
@@ -82,6 +84,16 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
+  id: '/payment-success',
+  path: '/payment-success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentFailedRoute = PaymentFailedRouteImport.update({
+  id: '/payment-failed',
+  path: '/payment-failed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FeaturesRoute = FeaturesRouteImport.update({
@@ -163,6 +175,8 @@ export interface FileRoutesByFullPath {
   '/edit': typeof EditRoute
   '/faq': typeof FaqRoute
   '/features': typeof FeaturesRoute
+  '/payment-failed': typeof PaymentFailedRoute
+  '/payment-success': typeof PaymentSuccessRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -188,6 +202,8 @@ export interface FileRoutesByTo {
   '/edit': typeof EditRoute
   '/faq': typeof FaqRoute
   '/features': typeof FeaturesRoute
+  '/payment-failed': typeof PaymentFailedRoute
+  '/payment-success': typeof PaymentSuccessRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -215,6 +231,8 @@ export interface FileRoutesById {
   '/edit': typeof EditRoute
   '/faq': typeof FaqRoute
   '/features': typeof FeaturesRoute
+  '/payment-failed': typeof PaymentFailedRoute
+  '/payment-success': typeof PaymentSuccessRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -242,6 +260,8 @@ export interface FileRouteTypes {
     | '/edit'
     | '/faq'
     | '/features'
+    | '/payment-failed'
+    | '/payment-success'
     | '/pricing'
     | '/privacy'
     | '/reset-password'
@@ -267,6 +287,8 @@ export interface FileRouteTypes {
     | '/edit'
     | '/faq'
     | '/features'
+    | '/payment-failed'
+    | '/payment-success'
     | '/pricing'
     | '/privacy'
     | '/reset-password'
@@ -293,6 +315,8 @@ export interface FileRouteTypes {
     | '/edit'
     | '/faq'
     | '/features'
+    | '/payment-failed'
+    | '/payment-success'
     | '/pricing'
     | '/privacy'
     | '/reset-password'
@@ -320,6 +344,8 @@ export interface RootRouteChildren {
   EditRoute: typeof EditRoute
   FaqRoute: typeof FaqRoute
   FeaturesRoute: typeof FeaturesRoute
+  PaymentFailedRoute: typeof PaymentFailedRoute
+  PaymentSuccessRoute: typeof PaymentSuccessRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -404,6 +430,20 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment-success': {
+      id: '/payment-success'
+      path: '/payment-success'
+      fullPath: '/payment-success'
+      preLoaderRoute: typeof PaymentSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment-failed': {
+      id: '/payment-failed'
+      path: '/payment-failed'
+      fullPath: '/payment-failed'
+      preLoaderRoute: typeof PaymentFailedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/features': {
@@ -535,6 +575,8 @@ const rootRouteChildren: RootRouteChildren = {
   EditRoute: EditRoute,
   FaqRoute: FaqRoute,
   FeaturesRoute: FeaturesRoute,
+  PaymentFailedRoute: PaymentFailedRoute,
+  PaymentSuccessRoute: PaymentSuccessRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
