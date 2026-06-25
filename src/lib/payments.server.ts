@@ -101,6 +101,20 @@ export async function createNowPaymentsInvoice(body: Record<string, unknown>) {
   return res.json();
 }
 
+// Create a direct crypto payment (returns the wallet address + exact pay amount to display).
+export async function createNowPaymentsPayment(body: Record<string, unknown>) {
+  const res = await fetch(`${NP_API}/payment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...npHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`NOWPayments payment failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
 export async function getNowPaymentsPayment(invoiceId: string) {
   const res = await fetch(`${NP_API}/payment/${invoiceId}`, { headers: npHeaders() });
   if (!res.ok) {
