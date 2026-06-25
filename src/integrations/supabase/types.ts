@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      credit_audit_log: {
+        Row: {
+          amount_paid: number | null
+          created_at: string
+          credits_added: number
+          currency: string | null
+          id: string
+          payment_method: string | null
+          reason: string
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          amount_paid?: number | null
+          created_at?: string
+          credits_added: number
+          currency?: string | null
+          id?: string
+          payment_method?: string | null
+          reason?: string
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          amount_paid?: number | null
+          created_at?: string
+          credits_added?: number
+          currency?: string | null
+          id?: string
+          payment_method?: string | null
+          reason?: string
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_ledger: {
         Row: {
           created_at: string
@@ -144,6 +180,27 @@ export type Database = {
           prompt?: string | null
           status?: Database["public"]["Enums"]["gen_status"]
           type?: Database["public"]["Enums"]["gen_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payment_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          payment_method: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payment_method: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payment_method?: string
           user_id?: string
         }
         Relationships: []
@@ -479,14 +536,6 @@ export type Database = {
         Returns: Json
       }
       refund_credits: { Args: { _transaction_id: string }; Returns: Json }
-      set_plan_credits: {
-        Args: {
-          _credits: number
-          _currency: string
-          _plan: Database["public"]["Enums"]["plan_type"]
-        }
-        Returns: number
-      }
     }
     Enums: {
       gen_status: "pending" | "processing" | "success" | "failed"
