@@ -41,7 +41,7 @@ const CATEGORIES: Category[] = [
       { q: "How do credits work?", a: "Every generation spends credits. Image generation costs 12 credits and video generation costs 60 credits. Your balance is shown in the header and on your dashboard." },
       { q: "Do credits expire?", a: "Monthly plan credits refresh with each billing cycle. Starter credits on the Free plan do not expire until used." },
       { q: "Can I buy additional credits?", a: "Yes — upgrade to a higher plan for a larger monthly allowance. Additional one-off credit top-ups can be requested through Support." },
-      { q: "What payment methods are supported?", a: "Card (Stripe) everywhere, plus Crypto in supported regions. Switch currency on the pricing page to see local options." },
+      { q: "What payment methods are supported?", a: "Credit / Debit Card (processed securely via Razorpay) and Crypto (USDT, BTC, ETH). Card payments are charged in INR." },
     ],
   },
   {
@@ -65,7 +65,7 @@ const CATEGORIES: Category[] = [
   {
     title: "Payments",
     items: [
-      { q: "What payment methods are accepted?", a: "Card payments (via Stripe) are available everywhere, with Crypto in supported regions. Switch currency on the pricing page to see local options." },
+      { q: "What payment methods are accepted?", a: "Credit / Debit Card (processed securely via Razorpay) and Crypto (USDT, BTC, ETH). Card payments are charged in INR." },
       { q: "Is my payment information secure?", a: "Yes. Payments are handled by PCI-DSS compliant processors. We never see or store your full card details." },
       { q: "When am I charged?", a: "Paid plans are billed at the start of each billing cycle. You can view your plan and billing details in Settings." },
       { q: "Will my subscription renew automatically?", a: "Yes — plans renew automatically until you cancel. You keep access until the end of the current period after cancelling." },

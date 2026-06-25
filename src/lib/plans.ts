@@ -3,13 +3,13 @@ export type Currency = "USD" | "EUR" | "INR";
 export type PaymentMethod = "card" | "crypto";
 
 export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
-  { id: "card", label: "Card (Stripe)" },
+  { id: "card", label: "Credit / Debit Card" },
   { id: "crypto", label: "Crypto" },
 ];
 
 export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
   USD: ["card", "crypto"],
-  EUR: ["card"],
+  EUR: ["card", "crypto"],
   INR: ["card", "crypto"],
 };
 

@@ -3,8 +3,9 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
 import { PLANS, CURRENCY_SYMBOL, type Currency, type PlanId } from "@/lib/plans";
-import { Check } from "lucide-react";
+import { Check, CheckCircle2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -27,12 +28,16 @@ export const Route = createFileRoute("/pricing")({
 
 function Pricing() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [currency, setCurrency] = useState<Currency>("USD");
 
+  const currentPlan = profile?.plan ?? null;
 
   const selectPlan = (planId: PlanId) => {
     navigate({ to: "/checkout", search: { plan: planId, currency } });
   };
+
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -56,20 +61,27 @@ function Pricing() {
         </div>
 
         <div className="mt-12 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {PLANS.map((plan) => (
+          {PLANS.map((plan) => {
+            const isCurrent = currentPlan === plan.id;
+            return (
             <div
               key={plan.id}
               className={`flex h-full flex-col rounded-2xl border bg-card p-8 ${
-                plan.id === "pro" ? "border-primary" : "border-border"
+                isCurrent ? "border-primary ring-2 ring-primary" : plan.id === "pro" ? "border-primary" : "border-border"
               }`}
             >
               <div className="mb-3 h-6">
-                {plan.id === "pro" && (
+                {isCurrent && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Current plan
+                  </span>
+                )}
+                {!isCurrent && plan.id === "pro" && (
                   <span className="inline-block rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
                     Most popular
                   </span>
                 )}
-                {plan.id === "studio" && (
+                {!isCurrent && plan.id === "studio" && (
                   <span className="inline-block rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
                     Best value
                   </span>
@@ -90,17 +102,30 @@ function Pricing() {
                   </li>
                 ))}
               </ul>
-              <Button
-                className="mt-8 w-full"
-                variant={plan.id === "pro" ? "default" : "outline"}
-                onClick={() => selectPlan(plan.id)}
-                style={{ marginTop: "auto" }}
-              >
-                {plan.id === "free" ? "Start free" : `Choose ${plan.name}`}
-              </Button>
+              {isCurrent ? (
+                <Button
+                  className="mt-8 w-full"
+                  variant="outline"
+                  disabled
+                  style={{ marginTop: "auto" }}
+                >
+                  ✅ Activated
+                </Button>
+              ) : (
+                <Button
+                  className="mt-8 w-full"
+                  variant={plan.id === "pro" ? "default" : "outline"}
+                  onClick={() => selectPlan(plan.id)}
+                  style={{ marginTop: "auto" }}
+                >
+                  {plan.id === "free" ? "Start free" : profile ? `Upgrade to ${plan.name}` : `Choose ${plan.name}`}
+                </Button>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
+
 
       </div>
       <Footer />
