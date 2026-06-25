@@ -55,7 +55,10 @@ function Dashboard() {
           </AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-2xl font-bold">Hi, {profile.display_name || "creator"} 👋</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">Hi, {profile.display_name || "creator"} 👋</h1>
+            <CrownBadge plan={profile.plan} showLabel />
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">Here's your account at a glance.</p>
         </div>
       </div>
