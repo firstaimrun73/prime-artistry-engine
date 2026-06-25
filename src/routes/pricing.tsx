@@ -28,12 +28,16 @@ export const Route = createFileRoute("/pricing")({
 
 function Pricing() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [currency, setCurrency] = useState<Currency>("USD");
 
+  const currentPlan = profile?.plan ?? null;
 
   const selectPlan = (planId: PlanId) => {
     navigate({ to: "/checkout", search: { plan: planId, currency } });
   };
+
+
 
   return (
     <div className="min-h-screen bg-background">
