@@ -133,6 +133,18 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function PageViewTracker() {
+  const router = useRouter();
+  useEffect(() => {
+    trackPageView(router.state.location.pathname);
+    const unsub = router.subscribe("onResolved", () => {
+      trackPageView(router.state.location.pathname);
+    });
+    return unsub;
+  }, [router]);
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -140,6 +152,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
+          <PageViewTracker />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <Toaster richColors position="top-center" />
