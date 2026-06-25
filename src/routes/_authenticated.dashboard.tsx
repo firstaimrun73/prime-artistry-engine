@@ -74,11 +74,17 @@ function Dashboard() {
           <p className="mt-4 text-sm text-muted-foreground">Credits used</p>
           <p className="mt-1 text-3xl font-extrabold">{used}</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-6">
+        <Link to="/pricing" className="rounded-xl border border-border bg-card p-6 text-left transition-colors hover:border-primary">
           <Crown className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Subscription</p>
-          <p className="mt-1 text-3xl font-extrabold capitalize">{plan.name}</p>
-        </div>
+          <p className="mt-1 text-2xl font-extrabold capitalize">{plan.name}</p>
+          <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {profile.plan === "free" ? "Free Plan — Activated" : `${plan.name} Plan — Activated`}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground underline">Manage / upgrade plan →</p>
+        </Link>
+
         <div className="rounded-xl border border-border bg-card p-6">
           <ImageIcon className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Generations</p>
