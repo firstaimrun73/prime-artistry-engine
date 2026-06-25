@@ -132,6 +132,12 @@ function Checkout() {
         description: "Credits Purchase",
         order_id: order.orderId,
         theme: { color: "#6c63ff" },
+        method: {
+          upi: false,
+          wallet: false,
+          netbanking: false,
+          card: true,
+        },
         handler: async (response: {
           razorpay_order_id: string;
           razorpay_payment_id: string;
