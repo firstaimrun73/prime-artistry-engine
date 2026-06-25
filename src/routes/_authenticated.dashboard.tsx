@@ -77,7 +77,7 @@ function Dashboard() {
         <div className="rounded-xl border border-border bg-card p-6">
           <Zap className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Credits used</p>
-          <p className="mt-1 text-3xl font-extrabold">{used}</p>
+          <p className="mt-1 text-3xl font-extrabold">{unlimited ? "—" : used}</p>
         </div>
         <Link to="/pricing" className="rounded-xl border border-border bg-card p-6 text-left transition-colors hover:border-primary">
           <Crown className="h-6 w-6 text-primary" />
