@@ -154,6 +154,7 @@ export const createCryptoInvoice = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { CRYPTO_PACKAGES, createNowPaymentsInvoice } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "nowpayments");
     const pkg = CRYPTO_PACKAGES[data.packageId as keyof typeof CRYPTO_PACKAGES];
     const internalOrderId = `M2E-CRYPTO-${crypto.randomUUID()}`;
     const frontend = process.env.FRONTEND_URL || "";
