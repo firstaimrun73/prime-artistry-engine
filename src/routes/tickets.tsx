@@ -19,6 +19,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Paperclip } from "lucide-react";
 import { z } from "zod";
+import { useServerFn } from "@tanstack/react-start";
+import { submitTicket } from "@/lib/tickets.functions";
 
 export const Route = createFileRoute("/tickets")({
   head: () => ({
@@ -101,7 +103,8 @@ function TicketCard({ t }: { t: Ticket }) {
 }
 
 function Tickets() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const createTicket = useServerFn(submitTicket);
   const [category, setCategory] = useState<string>("payment");
   const [priority, setPriority] = useState<string>("normal");
   const [subject, setSubject] = useState("");
@@ -153,29 +156,30 @@ function Tickets() {
       attachment_url = path;
     }
 
-    const fromLine = `From: ${profile?.display_name ?? "User"} <${profile?.email ?? user.email ?? ""}>`;
-    const { data, error } = await supabase
-      .from("support_tickets")
-      .insert({
-        user_id: user.id,
-        category: parsed.data.category,
-        priority: parsed.data.priority,
-        subject: parsed.data.subject,
-        message: `${fromLine}\n\n${parsed.data.message}`,
-        attachment_url,
-      })
-      .select("id")
-      .single();
-    setSubmitting(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const result = await createTicket({
+        data: {
+          category: parsed.data.category,
+          priority: parsed.data.priority,
+          subject: parsed.data.subject,
+          message: parsed.data.message,
+          attachment_url,
+        },
+      });
+      if (result.emailError) {
+        toast.success(`Ticket ${result.code} created. (Email notification pending.)`);
+      } else {
+        toast.success(`Ticket ${result.code} received. A confirmation email is on its way.`);
+      }
+      clearForm();
+      loadTickets();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not submit ticket. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    const ticketNo = data?.id ? `#${data.id.slice(0, 8).toUpperCase()}` : "";
-    toast.success(`Ticket ${ticketNo} created. We'll get back to you soon.`);
-    clearForm();
-    loadTickets();
   };
+
 
   const openTickets = tickets.filter((t) => !CLOSED_STATUSES.has(t.status));
   const closedTickets = tickets.filter((t) => CLOSED_STATUSES.has(t.status));
