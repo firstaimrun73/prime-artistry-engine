@@ -15,6 +15,7 @@ import { AuthProvider } from "../lib/auth";
 import { ThemeProvider } from "../lib/theme";
 import { Toaster } from "../components/ui/sonner";
 import { trackPageView } from "../lib/analytics";
+import { TranslateWidget } from "../components/TranslateWidget";
 
 function NotFoundComponent() {
   return (
@@ -156,6 +157,7 @@ function RootComponent() {
           <PageViewTracker />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
+          <TranslateWidget />
           <Toaster richColors position="top-center" />
         </AuthProvider>
       </ThemeProvider>

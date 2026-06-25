@@ -42,6 +42,7 @@ function Dashboard() {
   if (!profile) return null;
   const plan = getPlan(profile.plan);
   const allocation = PLAN_CREDITS[profile.plan];
+  const unlimited = profile.plan === "business";
   const used = Math.max(0, allocation - profile.credits);
   const images = gens.filter((g) => g.type === "image").length;
   const videos = gens.filter((g) => g.type === "video").length;
@@ -68,7 +69,7 @@ function Dashboard() {
         <div className="rounded-xl border border-border bg-card p-6">
           <Coins className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Credits remaining</p>
-          <p className="mt-1 text-3xl font-extrabold">{profile.credits}</p>
+          <p className="mt-1 text-3xl font-extrabold">{unlimited ? "Unlimited" : profile.credits}</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits each
           </p>
@@ -76,7 +77,7 @@ function Dashboard() {
         <div className="rounded-xl border border-border bg-card p-6">
           <Zap className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Credits used</p>
-          <p className="mt-1 text-3xl font-extrabold">{used}</p>
+          <p className="mt-1 text-3xl font-extrabold">{unlimited ? "—" : used}</p>
         </div>
         <Link to="/pricing" className="rounded-xl border border-border bg-card p-6 text-left transition-colors hover:border-primary">
           <Crown className="h-6 w-6 text-primary" />
@@ -108,7 +109,7 @@ function Dashboard() {
             <History className="mr-1.5 h-4 w-4" /> My workspace
           </Link>
         </Button>
-        {profile.plan !== "studio" && (
+        {profile.plan !== "business" && (
           <Button asChild variant="outline">
             <Link to="/pricing">Upgrade plan</Link>
           </Button>

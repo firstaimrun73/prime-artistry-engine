@@ -351,7 +351,7 @@ export const generateMedia = createServerFn({ method: "POST" })
   });
 
 const checkoutSchema = z.object({
-  plan: z.enum(["free", "plus", "pro", "studio"]),
+  plan: z.enum(["free", "plus", "pro", "studio", "business"]),
   currency: z.string().min(1).max(8),
 });
 

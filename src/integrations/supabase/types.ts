@@ -532,7 +532,7 @@ export type Database = {
     Enums: {
       gen_status: "pending" | "processing" | "success" | "failed"
       gen_type: "image" | "video"
-      plan_type: "free" | "plus" | "pro" | "studio"
+      plan_type: "free" | "plus" | "pro" | "studio" | "business"
       ticket_category:
         | "payment"
         | "credits"
@@ -677,7 +677,7 @@ export const Constants = {
     Enums: {
       gen_status: ["pending", "processing", "success", "failed"],
       gen_type: ["image", "video"],
-      plan_type: ["free", "plus", "pro", "studio"],
+      plan_type: ["free", "plus", "pro", "studio", "business"],
       ticket_category: [
         "payment",
         "credits",

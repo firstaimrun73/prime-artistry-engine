@@ -50,7 +50,7 @@ export const TIERS: Record<PlanId, TierConfig> = {
     badgeColor: "#9CA3AF",
     watermark: "large-center",
     watermarkOpacity: 0.5,
-    maxDimension: 1280, // ~720p
+    maxDimension: 1280, // 720p
     qualityLabel: "720p",
     formats: ["jpg"],
     videoEnabled: false,
@@ -60,7 +60,7 @@ export const TIERS: Record<PlanId, TierConfig> = {
     canUploadAvatar: false,
   },
   plus: {
-    memberLabel: "Basic Member",
+    memberLabel: "Starter Member",
     crown: "bronze",
     crownColor: "#CD7F32",
     badgeColor: "#CD7F32",
@@ -76,7 +76,7 @@ export const TIERS: Record<PlanId, TierConfig> = {
     canUploadAvatar: true,
   },
   pro: {
-    memberLabel: "Pro Member",
+    memberLabel: "Plus Member",
     crown: "silver",
     crownColor: "#C0C0C0",
     badgeColor: "#C0C0C0",
@@ -92,19 +92,35 @@ export const TIERS: Record<PlanId, TierConfig> = {
     canUploadAvatar: true,
   },
   studio: {
-    memberLabel: "Business Member",
+    memberLabel: "Pro Member",
     crown: "gold",
     crownColor: "#FFD700",
     badgeColor: "#FFD700",
-    watermark: "none",
-    watermarkOpacity: 0,
+    watermark: "tiny-corner",
+    watermarkOpacity: 0.12,
     maxDimension: 3840, // 4K
     qualityLabel: "4K",
     formats: ["jpg", "png", "webp"],
     videoEnabled: true,
     videoMaxSeconds: 60,
     videoQualityLabel: "4K",
-    videoMonthlyQuota: 100,
+    videoMonthlyQuota: 50,
+    canUploadAvatar: true,
+  },
+  business: {
+    memberLabel: "Business Member",
+    crown: "diamond",
+    crownColor: "#B9F2FF",
+    badgeColor: "#B9F2FF",
+    watermark: "none",
+    watermarkOpacity: 0,
+    maxDimension: 3840, // 4K Ultra
+    qualityLabel: "4K Ultra",
+    formats: ["jpg", "png", "webp"],
+    videoEnabled: true,
+    videoMaxSeconds: 120,
+    videoQualityLabel: "4K Ultra",
+    videoMonthlyQuota: Infinity,
     canUploadAvatar: true,
   },
 };

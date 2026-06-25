@@ -4,6 +4,9 @@ import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { supabase } from "@/integrations/supabase/client";
 import { getPlan } from "@/lib/plans";
+import { getTier } from "@/lib/plan-tier";
+import { CrownBadge } from "@/components/CrownBadge";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +73,8 @@ function SettingsPage() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
+  const tier = getTier(profile.plan);
+  const canUploadAvatar = tier.canUploadAvatar;
 
   const save = async () => {
     setSaving(true);
@@ -113,8 +118,16 @@ function SettingsPage() {
   };
 
   const uploadAvatar = async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file.");
+    if (!canUploadAvatar) {
+      toast.error("Upgrade to Starter or above to change your profile picture.");
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Please choose a JPG, PNG or WebP image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be 5MB or smaller.");
       return;
     }
     setAvatarBusy(true);
@@ -163,7 +176,10 @@ function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold">Settings</h1>
+        <CrownBadge plan={profile.plan} showLabel size="md" />
+      </div>
 
       <section className="mt-8 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">Profile picture</h2>
@@ -174,20 +190,31 @@ function SettingsPage() {
               {(profile.display_name || profile.email || "U").slice(0, 1).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" disabled={avatarBusy} onClick={() => fileRef.current?.click()}>
-              {profile.avatar_url ? "Change" : "Upload"}
-            </Button>
-            {profile.avatar_url && (
-              <Button size="sm" variant="ghost" disabled={avatarBusy} onClick={removeAvatar}>
-                Remove
+          {canUploadAvatar ? (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled={avatarBusy} onClick={() => fileRef.current?.click()}>
+                {profile.avatar_url ? "Change" : "Upload"}
               </Button>
-            )}
-          </div>
+              {profile.avatar_url && (
+                <Button size="sm" variant="ghost" disabled={avatarBusy} onClick={removeAvatar}>
+                  Remove
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <Button size="sm" variant="outline" disabled className="gap-1.5">
+                <Lock className="h-3.5 w-3.5" /> Locked
+              </Button>
+              <a href="/pricing" className="text-xs text-primary hover:underline">
+                Upgrade to change photo
+              </a>
+            </div>
+          )}
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp"
             className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -196,7 +223,11 @@ function SettingsPage() {
             }}
           />
         </div>
+        {canUploadAvatar && (
+          <p className="mt-3 text-xs text-muted-foreground">JPG, PNG or WebP · Max 5MB.</p>
+        )}
       </section>
+
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">Profile</h2>
@@ -327,7 +358,7 @@ function SettingsPage() {
             <span className="font-medium">{plan.video ? "Enabled" : "Disabled"}</span>
           </div>
         </div>
-        {profile.plan !== "studio" && (
+        {profile.plan !== "business" && (
           <Button asChild className="mt-4">
             <Link to="/pricing">{profile.plan === "free" ? "Upgrade plan" : "Upgrade plan"}</Link>
           </Button>

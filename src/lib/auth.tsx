@@ -12,7 +12,7 @@ export type Profile = {
   id: string;
   email: string | null;
   display_name: string | null;
-  plan: "free" | "plus" | "pro" | "studio";
+  plan: "free" | "plus" | "pro" | "studio" | "business";
   credits: number;
   currency: string;
   /** Raw storage path of the avatar (in the private "avatars" bucket). */
