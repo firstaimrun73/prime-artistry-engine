@@ -2,8 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-// SECURITY: FIX 5 — max 3 payment attempts per user per hour. Logs the attempt
-// and throws if the user is over the limit. Uses the service-role client.
+const planSchema = z.enum(["plus", "pro", "studio"]);
+
+// SECURITY: max 3 payment attempts per user per hour. Logs the attempt and
+// throws if the user is over the limit. Uses the service-role client.
 async function enforcePaymentRateLimit(db: any, userId: string, method: string) {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { count } = await db
@@ -17,33 +19,21 @@ async function enforcePaymentRateLimit(db: any, userId: string, method: string) 
   await db.from("payment_attempts").insert({ user_id: userId, payment_method: method });
 }
 
-// Public credit-package catalogue (safe to expose).
-export const getCreditPackages = createServerFn({ method: "GET" }).handler(async () => {
-  const { RAZORPAY_PACKAGES, CRYPTO_PACKAGES, ACCEPTED_COINS } = await import("@/lib/payments.server");
-  return {
-    razorpay: Object.entries(RAZORPAY_PACKAGES).map(([id, p]) => ({ id, ...p })),
-    crypto: Object.entries(CRYPTO_PACKAGES).map(([id, p]) => ({ id, ...p })),
-    acceptedCoins: ACCEPTED_COINS,
-  };
-});
-
-// ── Razorpay: create order ──
+// ── Razorpay: create order for a plan ──
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { packageId: string }) =>
-    z.object({ packageId: z.enum(["starter", "basic", "pro", "enterprise"]) }).parse(d),
-  )
+  .inputValidator((d: { plan: string }) => z.object({ plan: planSchema }).parse(d))
   .handler(async ({ data, context }) => {
-    const { RAZORPAY_PACKAGES, createRazorpayOrder: createOrder } = await import("@/lib/payments.server");
+    const { PLAN_PURCHASE, createRazorpayOrder: createOrder } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "razorpay");
-    const pkg = RAZORPAY_PACKAGES[data.packageId as keyof typeof RAZORPAY_PACKAGES];
+    const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
     const internalOrderId = `M2E-RZP-${crypto.randomUUID()}`;
 
     const order = await createOrder({
       amountPaise: pkg.amountINR * 100,
       receipt: internalOrderId,
-      notes: { user_id: context.userId, package_id: data.packageId, credits: pkg.credits },
+      notes: { user_id: context.userId, plan: data.plan, credits: pkg.credits },
     });
 
     const { error } = await (supabaseAdmin as any).from("payment_transactions").insert({
@@ -87,7 +77,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { verifyRazorpaySignature } = await import("@/lib/payments.server");
+    const { verifyRazorpaySignature, planFromCredits } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { sendPaymentErrorReport } = await import("@/lib/email.server");
 
@@ -137,38 +127,41 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       throw new Error("Payment received but credit allocation failed. Support has been notified.");
     }
 
+    // Activate the purchased plan on the profile.
+    const plan = planFromCredits(tx.credits_purchased);
+    if (plan) {
+      await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
+    }
+
     return { success: true, credits: tx.credits_purchased, transactionId: tx.transaction_id };
   });
 
-// ── NOWPayments: create crypto invoice ──
+// ── NOWPayments: create a direct crypto payment for a plan ──
 export const createCryptoInvoice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { packageId: string; payCurrency: string }) =>
+  .inputValidator((d: { plan: string; payCurrency: string }) =>
     z
       .object({
-        packageId: z.enum(["starter", "basic", "pro", "enterprise"]),
-        payCurrency: z.enum(["usdtbsc", "btc", "eth"]),
+        plan: planSchema,
+        payCurrency: z.enum(["usdttrc20", "btc", "eth"]),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { CRYPTO_PACKAGES, createNowPaymentsInvoice } = await import("@/lib/payments.server");
+    const { PLAN_PURCHASE, createNowPaymentsPayment } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "nowpayments");
-    const pkg = CRYPTO_PACKAGES[data.packageId as keyof typeof CRYPTO_PACKAGES];
+    const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
     const internalOrderId = `M2E-CRYPTO-${crypto.randomUUID()}`;
-    const frontend = process.env.FRONTEND_URL || "";
-    const backend = process.env.BACKEND_URL || "";
+    const backend = process.env.BACKEND_URL || process.env.FRONTEND_URL || "";
 
-    const invoice = await createNowPaymentsInvoice({
+    const payment = await createNowPaymentsPayment({
       price_amount: pkg.amountUSD,
       price_currency: "usd",
       pay_currency: data.payCurrency,
       order_id: internalOrderId,
       order_description: `Motio2Edit ${pkg.credits} Credits`,
       ipn_callback_url: `${backend}/api/public/webhooks/nowpayments`,
-      success_url: `${frontend}/success`,
-      cancel_url: `${frontend}/pricing`,
     });
 
     const { error } = await (supabaseAdmin as any).from("payment_transactions").insert({
@@ -178,15 +171,17 @@ export const createCryptoInvoice = createServerFn({ method: "POST" })
       currency: "USD",
       credits_purchased: pkg.credits,
       transaction_id: internalOrderId,
-      gateway_order_id: invoice.id?.toString(),
+      gateway_order_id: payment.payment_id?.toString(),
       payment_status: "pending",
-      gateway_response: invoice,
+      gateway_response: payment,
     });
     if (error) throw new Error(error.message);
 
     return {
-      invoiceId: invoice.id,
-      invoiceUrl: invoice.invoice_url,
+      paymentId: payment.payment_id?.toString(),
+      payAddress: payment.pay_address,
+      payAmount: payment.pay_amount,
+      payCurrency: payment.pay_currency,
       priceAmount: pkg.amountUSD,
       credits: pkg.credits,
       internalOrderId,
@@ -198,7 +193,7 @@ export const getCryptoStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { invoiceId: string }) => z.object({ invoiceId: z.string().min(1) }).parse(d))
   .handler(async ({ data, context }) => {
-    const { getNowPaymentsPayment, NP_STATUS_MAP } = await import("@/lib/payments.server");
+    const { getNowPaymentsPayment, NP_STATUS_MAP, planFromCredits } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
 
@@ -222,6 +217,10 @@ export const getCryptoStatus = createServerFn({ method: "POST" })
           _credits: tx.credits_purchased,
           _reason: "nowpayments_polling",
         });
+        const plan = planFromCredits(tx.credits_purchased);
+        if (plan) {
+          await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
+        }
       }
     }
 
