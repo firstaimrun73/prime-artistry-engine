@@ -19,6 +19,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Paperclip } from "lucide-react";
 import { z } from "zod";
+import { useServerFn } from "@tanstack/react-start";
+import { submitTicket } from "@/lib/tickets.functions";
 
 export const Route = createFileRoute("/tickets")({
   head: () => ({
