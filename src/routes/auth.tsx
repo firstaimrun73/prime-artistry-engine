@@ -137,6 +137,18 @@ function AuthPage() {
     navigate({ to: dest });
   };
 
+  const handleApple = async () => {
+    const result = await lovable.auth.signInWithOAuth("apple", {
+      redirect_uri: window.location.origin,
+    });
+    if (result.error) {
+      toast.error("Apple sign-in failed.");
+      return;
+    }
+    if (result.redirected) return;
+    navigate({ to: dest });
+  };
+
   const handleReset = async () => {
     if (!email) return toast.error("Enter your email first.");
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
