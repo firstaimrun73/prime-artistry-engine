@@ -258,6 +258,9 @@ function Checkout() {
   const mins = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
 
+  // Plan is undefined (invalid/missing param) — redirect handled by the effect above.
+  if (!plan) return null;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
