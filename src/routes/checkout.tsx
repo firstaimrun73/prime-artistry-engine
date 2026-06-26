@@ -57,7 +57,7 @@ function Checkout() {
   const { plan: planId, currency } = useSearch({ from: "/checkout" });
   const navigate = useNavigate();
   // Guard: redirect back to pricing if the plan is missing/unknown.
-  const plan = getPlan(planId as PlanId);
+  const plan = findPlan(planId as string);
   useEffect(() => {
     if (!plan) navigate({ to: "/pricing" });
   }, [plan, navigate]);
