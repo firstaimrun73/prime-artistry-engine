@@ -16,6 +16,7 @@ import { ThemeProvider } from "../lib/theme";
 import { Toaster } from "../components/ui/sonner";
 import { trackPageView } from "../lib/analytics";
 import { TranslateWidget } from "../components/TranslateWidget";
+import { DevNotice, FeedbackWidget } from "../components/FeedbackWidget";
 
 function NotFoundComponent() {
   return (
