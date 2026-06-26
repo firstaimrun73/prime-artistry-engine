@@ -156,9 +156,11 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <PageViewTracker />
+          <DevNotice />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <TranslateWidget />
+          <FeedbackWidget />
           <Toaster richColors position="top-center" />
         </AuthProvider>
       </ThemeProvider>
