@@ -4,7 +4,6 @@ import { Header } from "@/components/Header";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
-  getPlan,
   findPlan,
   CURRENCY_SYMBOL,
   CURRENCY_METHODS,
