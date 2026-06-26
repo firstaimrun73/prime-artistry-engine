@@ -17,6 +17,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { getAdminStats } from "@/lib/admin-stats.functions";
+import { listFeedbackAdmin, updateFeedbackStatus } from "@/lib/feedback.functions";
 import {
   Users,
   UserPlus,
