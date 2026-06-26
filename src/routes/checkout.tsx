@@ -272,19 +272,18 @@ function Checkout() {
             <>
               <div
                 style={{
-                  background: "#1a1a2e",
-                  border: "1px dashed #444",
+                  background: "rgba(255,107,53,0.05)",
+                  border: "1px solid rgba(255,107,53,0.3)",
                   borderRadius: "12px",
                   padding: "16px",
                   textAlign: "center",
-                  marginTop: "32px",
                   marginBottom: "16px",
                 }}
               >
-                <p style={{ color: "#888", margin: 0, fontSize: "14px" }}>💳 Credit / Debit Card</p>
-                <p style={{ color: "#6c63ff", margin: "4px 0 0", fontSize: "12px", fontWeight: 600 }}>
-                  Coming Soon — Use Crypto for now
+                <p style={{ color: "#ffffff", margin: "0 0 4px", fontSize: "15px", fontWeight: 600 }}>
+                  💳 Credit / Debit Card
                 </p>
+                <p style={{ color: "#FF6B35", margin: 0, fontSize: "12px" }}>Coming Soon</p>
               </div>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment method
