@@ -3,6 +3,10 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Image, Video, Download, Zap, Wand2, ShieldCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listPublicFeedback } from "@/lib/feedback.functions";
+import { FeedbackCard } from "@/routes/feedback";
 
 export const Route = createFileRoute("/")({
   head: () => ({
