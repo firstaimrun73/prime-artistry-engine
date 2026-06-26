@@ -3,6 +3,10 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Image, Video, Download, Zap, Wand2, ShieldCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listPublicFeedback } from "@/lib/feedback.functions";
+import { FeedbackCard } from "@/routes/feedback";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -70,7 +74,32 @@ function Index() {
           </Button>
         </div>
       </section>
+      <HomeTestimonials />
       <Footer />
     </div>
+  );
+}
+
+function HomeTestimonials() {
+  const fetchFeedback = useServerFn(listPublicFeedback);
+  const { data } = useQuery({
+    queryKey: ["public-feedback", "home"],
+    queryFn: () => fetchFeedback(),
+  });
+  if (!data || data.length === 0) return null;
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-16">
+      <h2 className="text-center text-2xl font-bold sm:text-3xl">Loved by creators worldwide 🌍</h2>
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {data.slice(0, 6).map((f) => (
+          <FeedbackCard key={f.id} f={f} />
+        ))}
+      </div>
+      <div className="mt-8 text-center">
+        <Button asChild variant="outline">
+          <Link to="/feedback">See more feedback</Link>
+        </Button>
+      </div>
+    </section>
   );
 }

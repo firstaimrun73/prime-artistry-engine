@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,6 +17,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { getAdminStats } from "@/lib/admin-stats.functions";
+import { listFeedbackAdmin, updateFeedbackStatus } from "@/lib/feedback.functions";
 import {
   Users,
   UserPlus,
@@ -206,6 +208,166 @@ function AdminPage() {
           </tbody>
         </table>
       </div>
+
+      <AdminFeedbackSection />
     </div>
+  );
+}
+
+function AdminFeedbackSection() {
+  const fn = useServerFn(listFeedbackAdmin);
+  const updateFn = useServerFn(updateFeedbackStatus);
+  const { data, refetch } = useQuery({
+    queryKey: ["admin-feedback"],
+    queryFn: () => fn(),
+    refetchInterval: 60_000,
+  });
+  const [catFilter, setCatFilter] = useState<string>("all");
+  const [ratingFilter, setRatingFilter] = useState<string>("all");
+
+  if (!data?.isAdmin) return null;
+
+  const filtered = data.latest.filter(
+    (f) =>
+      (catFilter === "all" || f.category === catFilter) &&
+      (ratingFilter === "all" || f.rating === Number(ratingFilter)),
+  );
+  const categories = [...new Set(data.latest.map((f) => f.category))];
+
+  const setStatus = async (id: string, status: "read" | "resolved") => {
+    await updateFn({ data: { id, status } });
+    refetch();
+  };
+
+  return (
+    <>
+      <h2 className="mt-10 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Feedback</h2>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard icon={Users} label="Total feedback" value={String(data.total)} />
+        <StatCard icon={TrendingUp} label="Average rating" value={`${data.averageRating} / 5`} />
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-xs text-muted-foreground">Rating breakdown</p>
+          <div className="mt-2 space-y-1 text-sm">
+            {data.ratingBreakdown
+              .slice()
+              .reverse()
+              .map((r) => (
+                <div key={r.rating} className="flex items-center justify-between">
+                  <span>{"⭐".repeat(r.rating)}</span>
+                  <span className="font-semibold">{r.count}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold">Categories</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data.categoryBreakdown} margin={{ top: 16, right: 8, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="category" fontSize={9} interval={0} angle={-20} textAnchor="end" height={50} />
+              <YAxis fontSize={11} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#6c63ff" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold">Rating distribution</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data.ratingBreakdown} margin={{ top: 16, right: 8, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="rating" fontSize={11} />
+              <YAxis fontSize={11} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill="#F97316" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-3">
+        <select
+          value={catFilter}
+          onChange={(e) => setCatFilter(e.target.value)}
+          className="rounded-lg border border-border bg-background p-2 text-sm"
+        >
+          <option value="all">All categories</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <select
+          value={ratingFilter}
+          onChange={(e) => setRatingFilter(e.target.value)}
+          className="rounded-lg border border-border bg-background p-2 text-sm"
+        >
+          <option value="all">All ratings</option>
+          {[5, 4, 3, 2, 1].map((r) => (
+            <option key={r} value={String(r)}>
+              {r} stars
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-3 space-y-3">
+        {filtered.length === 0 && <p className="text-sm text-muted-foreground">No feedback matches the filters.</p>}
+        {filtered.map((f) => (
+          <div key={f.id} className="rounded-xl border border-border bg-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span>{"⭐".repeat(f.rating)}</span>
+                <span className="rounded-full bg-accent px-2 py-0.5 text-xs">{f.category}</span>
+                <span
+                  className={
+                    f.status === "resolved"
+                      ? "rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-semibold text-green-500"
+                      : f.status === "read"
+                        ? "rounded-full bg-blue-500/15 px-2 py-0.5 text-xs font-semibold text-blue-500"
+                        : "rounded-full bg-yellow-500/15 px-2 py-0.5 text-xs font-semibold text-yellow-500"
+                  }
+                >
+                  {f.status}
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">{new Date(f.createdAt).toLocaleString()}</span>
+            </div>
+            <p className="mt-2 text-sm">{f.message}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <span>{f.userName}</span>
+              {f.userEmail && <span>· {f.userEmail}</span>}
+              {f.pageUrl && <span className="truncate">· {f.pageUrl}</span>}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => setStatus(f.id, "read")}
+                className="rounded-md border border-border px-3 py-1 text-xs font-medium"
+              >
+                Mark read
+              </button>
+              <button
+                onClick={() => setStatus(f.id, "resolved")}
+                className="rounded-md border border-border px-3 py-1 text-xs font-medium"
+              >
+                Mark resolved
+              </button>
+              {f.userEmail && (
+                <a
+                  href={`mailto:${f.userEmail}?subject=Re: your Motio2Edit feedback`}
+                  className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
+                >
+                  Reply
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

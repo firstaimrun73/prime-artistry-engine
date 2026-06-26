@@ -4,11 +4,11 @@ import { Header } from "@/components/Header";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
-  getPlan,
+  findPlan,
   CURRENCY_SYMBOL,
   CURRENCY_METHODS,
   ALL_METHODS,
-  TRANSACTION_FEE,
+  creditsLabel,
   type Currency,
   type PlanId,
   type PaymentMethod,
@@ -54,9 +54,13 @@ type CryptoInvoice = {
 
 function Checkout() {
   const { plan: planId, currency } = useSearch({ from: "/checkout" });
-  const plan = getPlan(planId as PlanId);
-  const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  // Guard: redirect back to pricing if the plan is missing/unknown.
+  const plan = findPlan(planId as string);
+  useEffect(() => {
+    if (!plan) navigate({ to: "/pricing" });
+  }, [plan, navigate]);
+  const { user, refreshProfile } = useAuth();
   const checkout = useServerFn(completeCheckout);
   const createOrder = useServerFn(createRazorpayOrder);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
@@ -253,6 +257,9 @@ function Checkout() {
   const mins = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
 
+  // Plan is undefined (invalid/missing param) — redirect handled by the effect above.
+  if (!plan) return null;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -263,7 +270,23 @@ function Checkout() {
 
           {!isFree && (
             <>
-              <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <div
+                style={{
+                  background: "#1a1a2e",
+                  border: "1px dashed #444",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  textAlign: "center",
+                  marginTop: "32px",
+                  marginBottom: "16px",
+                }}
+              >
+                <p style={{ color: "#888", margin: 0, fontSize: "14px" }}>💳 Credit / Debit Card</p>
+                <p style={{ color: "#6c63ff", margin: "4px 0 0", fontSize: "12px", fontWeight: 600 }}>
+                  Coming Soon — Use Crypto for now
+                </p>
+              </div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment method
               </h2>
               <div className="mt-3 space-y-3">
@@ -420,22 +443,14 @@ function Checkout() {
           </div>
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Credits</span>
-            <span className="font-medium">{plan.credits}</span>
+            <span className="font-medium">{creditsLabel(plan.credits)}</span>
           </div>
-          {!isFree && (
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Transaction fee</span>
-              <span className="font-medium">{symbol}{TRANSACTION_FEE[currency as Currency]}</span>
-            </div>
-          )}
           <div className="my-4 h-px bg-border" />
           <div className="flex items-center justify-between font-semibold">
             <span>Total</span>
             <span>
               {symbol}
-              {isFree
-                ? plan.price[currency as Currency]
-                : (plan.price[currency as Currency] + TRANSACTION_FEE[currency as Currency]).toFixed(2)}
+              {plan.price[currency as Currency]}
             </span>
           </div>
 

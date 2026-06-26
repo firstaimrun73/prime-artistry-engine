@@ -21,6 +21,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PaymentSuccessRouteImport } from './routes/payment-success'
 import { Route as PaymentFailedRouteImport } from './routes/payment-failed'
+import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as EditRouteImport } from './routes/edit'
@@ -95,6 +96,11 @@ const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
 const PaymentFailedRoute = PaymentFailedRouteImport.update({
   id: '/payment-failed',
   path: '/payment-failed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FeaturesRoute = FeaturesRouteImport.update({
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/edit': typeof EditRoute
   '/faq': typeof FaqRoute
   '/features': typeof FeaturesRoute
+  '/feedback': typeof FeedbackRoute
   '/payment-failed': typeof PaymentFailedRoute
   '/payment-success': typeof PaymentSuccessRoute
   '/pricing': typeof PricingRoute
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/edit': typeof EditRoute
   '/faq': typeof FaqRoute
   '/features': typeof FeaturesRoute
+  '/feedback': typeof FeedbackRoute
   '/payment-failed': typeof PaymentFailedRoute
   '/payment-success': typeof PaymentSuccessRoute
   '/pricing': typeof PricingRoute
@@ -239,6 +247,7 @@ export interface FileRoutesById {
   '/edit': typeof EditRoute
   '/faq': typeof FaqRoute
   '/features': typeof FeaturesRoute
+  '/feedback': typeof FeedbackRoute
   '/payment-failed': typeof PaymentFailedRoute
   '/payment-success': typeof PaymentSuccessRoute
   '/pricing': typeof PricingRoute
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/edit'
     | '/faq'
     | '/features'
+    | '/feedback'
     | '/payment-failed'
     | '/payment-success'
     | '/pricing'
@@ -297,6 +307,7 @@ export interface FileRouteTypes {
     | '/edit'
     | '/faq'
     | '/features'
+    | '/feedback'
     | '/payment-failed'
     | '/payment-success'
     | '/pricing'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/edit'
     | '/faq'
     | '/features'
+    | '/feedback'
     | '/payment-failed'
     | '/payment-success'
     | '/pricing'
@@ -356,6 +368,7 @@ export interface RootRouteChildren {
   EditRoute: typeof EditRoute
   FaqRoute: typeof FaqRoute
   FeaturesRoute: typeof FeaturesRoute
+  FeedbackRoute: typeof FeedbackRoute
   PaymentFailedRoute: typeof PaymentFailedRoute
   PaymentSuccessRoute: typeof PaymentSuccessRoute
   PricingRoute: typeof PricingRoute
@@ -456,6 +469,13 @@ declare module '@tanstack/react-router' {
       path: '/payment-failed'
       fullPath: '/payment-failed'
       preLoaderRoute: typeof PaymentFailedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/features': {
@@ -596,6 +616,7 @@ const rootRouteChildren: RootRouteChildren = {
   EditRoute: EditRoute,
   FaqRoute: FaqRoute,
   FeaturesRoute: FeaturesRoute,
+  FeedbackRoute: FeedbackRoute,
   PaymentFailedRoute: PaymentFailedRoute,
   PaymentSuccessRoute: PaymentSuccessRoute,
   PricingRoute: PricingRoute,
