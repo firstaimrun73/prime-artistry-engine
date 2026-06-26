@@ -29,6 +29,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "razorpay");
     const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
+    if (!pkg) throw new Error("Selected plan is not available for purchase.");
     // FIX: Razorpay receipt must be < 40 chars. Keep it short to avoid BAD_REQUEST_ERROR.
     const internalOrderId = `rzp_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
@@ -154,6 +155,7 @@ export const createCryptoInvoice = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "nowpayments");
     const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
+    if (!pkg) throw new Error("Selected plan is not available for purchase.");
     const internalOrderId = `M2E-CRYPTO-${crypto.randomUUID()}`;
     const backend = process.env.BACKEND_URL || process.env.FRONTEND_URL || "";
 

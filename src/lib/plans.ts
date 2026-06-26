@@ -9,10 +9,10 @@ export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
 ];
 
 // Payment method by checkout currency.
-//   India (INR) → Razorpay card (primary) + NOWPayments crypto.
-//   Everyone else → NOWPayments crypto only.
+// Card (Razorpay) is temporarily disabled while Paddle is being set up —
+// crypto (NOWPayments) is the only live method for everyone right now.
 export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
-  INR: ["card", "crypto"],
+  INR: ["crypto"],
   USD: ["crypto"],
   EUR: ["crypto"],
 };
@@ -42,6 +42,11 @@ export const CREDIT_COST = {
 
 /** Sentinel for "unlimited" credits (Business). */
 export const UNLIMITED_CREDITS = 9_999_999;
+
+/** Human-readable credits for display ("Unlimited" for the Business sentinel). */
+export function creditsLabel(credits: number): string {
+  return credits >= UNLIMITED_CREDITS ? "Unlimited" : credits.toLocaleString();
+}
 
 /** Rough number of generations a credit balance buys (for plan display). */
 export function estimatedGenerations(credits: number) {
