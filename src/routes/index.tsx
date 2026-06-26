@@ -70,7 +70,32 @@ function Index() {
           </Button>
         </div>
       </section>
+      <HomeTestimonials />
       <Footer />
     </div>
+  );
+}
+
+function HomeTestimonials() {
+  const fetchFeedback = useServerFn(listPublicFeedback);
+  const { data } = useQuery({
+    queryKey: ["public-feedback", "home"],
+    queryFn: () => fetchFeedback(),
+  });
+  if (!data || data.length === 0) return null;
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-16">
+      <h2 className="text-center text-2xl font-bold sm:text-3xl">Loved by creators worldwide 🌍</h2>
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {data.slice(0, 6).map((f) => (
+          <FeedbackCard key={f.id} f={f} />
+        ))}
+      </div>
+      <div className="mt-8 text-center">
+        <Button asChild variant="outline">
+          <Link to="/feedback">See more feedback</Link>
+        </Button>
+      </div>
+    </section>
   );
 }
