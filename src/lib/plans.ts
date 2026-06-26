@@ -185,6 +185,12 @@ export function getPlan(id: PlanId): Plan {
   return PLANS.find((p) => p.id === id) ?? PLANS[0];
 }
 
+/** Strict lookup — returns undefined when the id is missing/unknown. */
+export function findPlan(id: string | undefined | null): Plan | undefined {
+  if (!id) return undefined;
+  return PLANS.find((p) => p.id === id);
+}
+
 // ── Display currencies (pricing page only) ────────────────────────
 // Marketing/display prices in many currencies. Checkout normalises these
 // to the supported Currency set above.
