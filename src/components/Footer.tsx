@@ -34,6 +34,8 @@ export function Footer() {
         </nav>
       </div>
       <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">
+        Need help? <a href="mailto:support@motio2edit.com" className="hover:text-foreground">support@motio2edit.com</a>
+        <span className="mx-2">·</span>
         © {new Date().getFullYear()} MOTIO2EDIT. All rights reserved.
       </div>
     </footer>
