@@ -608,14 +608,14 @@ function Checkout() {
             <Button className="mt-6 w-full" onClick={handleFree} disabled={processing}>
               {processing ? "Processing…" : "Activate free plan"}
             </Button>
-          ) : method === "card" ? (
+          ) : method === "card" && cardProvider === "razorpay" ? (
             <>
               <Button className="mt-6 w-full" onClick={handleCard} disabled={processing}>
                 {processing ? "Processing…" : "💳 Pay with Credit / Debit Card"}
               </Button>
               <p className="mt-2 text-center text-xs text-muted-foreground">Secured by Razorpay</p>
             </>
-          ) : method === "paypal" ? (
+          ) : method === "card" && cardProvider === "paypal" ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">
               Use the PayPal button to complete your purchase.
             </p>
