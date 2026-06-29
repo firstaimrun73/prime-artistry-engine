@@ -110,7 +110,7 @@ function Checkout() {
 
   // Load the PayPal JS SDK and render the Buttons when PayPal is selected.
   useEffect(() => {
-    if (isFree || method !== "paypal" || !user) return;
+    if (isFree || method !== "card" || cardProvider !== "paypal" || !user) return;
     let cancelled = false;
     paypalRenderedRef.current = false;
     setPaypalReady(false);
