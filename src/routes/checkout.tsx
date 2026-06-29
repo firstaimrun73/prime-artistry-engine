@@ -30,6 +30,7 @@ import { CreditCard, Bitcoin, Lock, Copy, Check, Wallet } from "lucide-react";
 declare global {
   interface Window {
     Razorpay: any;
+    paypal: any;
   }
 }
 
