@@ -75,6 +75,9 @@ function Checkout() {
   const verifyPayment = useServerFn(verifyRazorpayPayment);
   const createCrypto = useServerFn(createCryptoInvoice);
   const cryptoStatus = useServerFn(getCryptoStatus);
+  const paypalClientId = useServerFn(getPaypalClientId);
+  const createPp = useServerFn(createPaypalOrder);
+  const capturePp = useServerFn(capturePaypalOrder);
 
   const methods = CURRENCY_METHODS[currency as Currency];
   const [method, setMethod] = useState<PaymentMethod>(methods[0]);
@@ -86,7 +89,11 @@ function Checkout() {
   const [copied, setCopied] = useState(false);
   const [cardRetry, setCardRetry] = useState<string | null>(null);
   const [cryptoCancelled, setCryptoCancelled] = useState(false);
+  const [paypalReady, setPaypalReady] = useState(false);
+  const [paypalError, setPaypalError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const paypalContainerRef = useRef<HTMLDivElement | null>(null);
+  const paypalRenderedRef = useRef(false);
 
   const symbol = CURRENCY_SYMBOL[currency as Currency];
   const isFree = planId === "free";
