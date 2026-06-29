@@ -193,7 +193,7 @@ function Checkout() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, user, planId, isFree]);
+  }, [method, cardProvider, user, planId, isFree]);
 
 
   // Countdown timer for crypto invoices.
