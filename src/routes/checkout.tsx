@@ -509,6 +509,25 @@ function Checkout() {
                 </div>
               )}
 
+              {/* PayPal — official PayPal Buttons rendered by the SDK. */}
+              {method === "paypal" && (
+                <div className="mt-6 rounded-2xl border border-border bg-card p-6">
+                  <h3 className="font-semibold">Pay with PayPal</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    You'll be charged ${plan.price[currency as Currency]} (USD). Credits are added instantly after payment.
+                  </p>
+                  {!paypalReady && !paypalError && (
+                    <p className="mt-4 text-sm text-muted-foreground">Loading PayPal…</p>
+                  )}
+                  {paypalError && (
+                    <p className="mt-4 text-sm text-destructive">{paypalError}</p>
+                  )}
+                  <div ref={paypalContainerRef} className="mt-4" />
+                </div>
+              )}
+
+
+
               {/* Card popup closed / failed — instant retry options, no cooldown. */}
               {method === "card" && cardRetry && (
                 <div className="mt-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
