@@ -105,6 +105,94 @@ function Checkout() {
     };
   }, []);
 
+  // Load the PayPal JS SDK and render the Buttons when PayPal is selected.
+  useEffect(() => {
+    if (isFree || method !== "paypal" || !user) return;
+    let cancelled = false;
+    paypalRenderedRef.current = false;
+    setPaypalReady(false);
+    setPaypalError(null);
+
+    const renderButtons = () => {
+      if (cancelled || paypalRenderedRef.current) return;
+      const container = paypalContainerRef.current;
+      if (!window.paypal || !container) return;
+      container.innerHTML = "";
+      paypalRenderedRef.current = true;
+      let internalOrderId: string | null = null;
+      try {
+        window.paypal
+          .Buttons({
+            style: { layout: "vertical", color: "gold", shape: "rect", label: "paypal" },
+            createOrder: async () => {
+              const res = await createPp({ data: { plan: planId } });
+              internalOrderId = res.internalOrderId;
+              return res.orderId;
+            },
+            onApprove: async (data: { orderID: string }) => {
+              setProcessing(true);
+              try {
+                await capturePp({ data: { orderId: data.orderID, internalOrderId: internalOrderId! } });
+                await refreshProfile();
+                navigate({ to: "/payment-success" });
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "PayPal payment failed.");
+                navigate({ to: "/payment-failed" });
+              } finally {
+                setProcessing(false);
+              }
+            },
+            onCancel: () => {
+              toast.info("PayPal payment cancelled. Try again anytime.");
+            },
+            onError: (err: unknown) => {
+              setPaypalError("PayPal could not process the payment. Please try again.");
+              toast.error(err instanceof Error ? err.message : "PayPal error.");
+            },
+          })
+          .render(container);
+        setPaypalReady(true);
+      } catch {
+        setPaypalError("Could not load PayPal. Please try again.");
+      }
+    };
+
+    const init = async () => {
+      try {
+        if (window.paypal) {
+          renderButtons();
+          return;
+        }
+        const { clientId } = await paypalClientId();
+        if (!clientId) {
+          setPaypalError("PayPal is not configured.");
+          return;
+        }
+        const existing = document.getElementById("paypal-sdk");
+        if (existing) {
+          existing.addEventListener("load", renderButtons, { once: true });
+          return;
+        }
+        const script = document.createElement("script");
+        script.id = "paypal-sdk";
+        script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture`;
+        script.async = true;
+        script.onload = renderButtons;
+        script.onerror = () => setPaypalError("Could not load PayPal. Please refresh and try again.");
+        document.body.appendChild(script);
+      } catch {
+        setPaypalError("Could not initialize PayPal.");
+      }
+    };
+
+    init();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, user, planId, isFree]);
+
+
   // Countdown timer for crypto invoices.
   useEffect(() => {
     if (!invoice) return;
