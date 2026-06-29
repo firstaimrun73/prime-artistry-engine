@@ -84,6 +84,7 @@ function Checkout() {
 
   const methods = CURRENCY_METHODS[currency as Currency];
   const [method, setMethod] = useState<PaymentMethod>(methods[0]);
+  const [cardProvider, setCardProvider] = useState<CardProvider>("paypal");
   const [processing, setProcessing] = useState(false);
   const [coin, setCoin] = useState<(typeof COINS)[number]["id"]>("usdttrc20");
   const [invoice, setInvoice] = useState<CryptoInvoice | null>(null);
