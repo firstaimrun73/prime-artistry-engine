@@ -378,21 +378,6 @@ function Checkout() {
 
           {!isFree && (
             <>
-              <div
-                style={{
-                  background: "rgba(255,107,53,0.05)",
-                  border: "1px solid rgba(255,107,53,0.3)",
-                  borderRadius: "12px",
-                  padding: "16px",
-                  textAlign: "center",
-                  marginBottom: "16px",
-                }}
-              >
-                <p style={{ color: "#ffffff", margin: "0 0 4px", fontSize: "15px", fontWeight: 600 }}>
-                  💳 Credit / Debit Card
-                </p>
-                <p style={{ color: "#FF6B35", margin: 0, fontSize: "12px" }}>Coming Soon</p>
-              </div>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment method
               </h2>
@@ -418,6 +403,35 @@ function Checkout() {
                   );
                 })}
               </div>
+
+              {/* Card provider chooser — PayPal or Razorpay. */}
+              {method === "card" && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Choose card provider
+                  </h3>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    {CARD_PROVIDERS.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setCardProvider(p.id);
+                          setCardRetry(null);
+                        }}
+                        className={`rounded-xl border p-4 text-left transition-colors ${
+                          cardProvider === p.id
+                            ? "border-primary bg-accent"
+                            : "border-border bg-card hover:border-muted-foreground"
+                        }`}
+                      >
+                        <span className="block font-medium">{p.label}</span>
+                        <span className="mt-1 block text-xs text-muted-foreground">{p.note}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
 
               {method === "crypto" && !invoice && (
                 <div className="mt-6">
