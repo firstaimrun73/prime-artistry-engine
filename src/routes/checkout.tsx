@@ -588,6 +588,10 @@ function Checkout() {
               </Button>
               <p className="mt-2 text-center text-xs text-muted-foreground">Secured by Razorpay</p>
             </>
+          ) : method === "paypal" ? (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              Use the PayPal button to complete your purchase.
+            </p>
           ) : invoice ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">Waiting for your crypto payment…</p>
           ) : (
