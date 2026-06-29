@@ -14,10 +14,18 @@ import {
   type PaymentMethod,
 } from "@/lib/plans";
 import { completeCheckout } from "@/lib/generate.functions";
-import { createRazorpayOrder, verifyRazorpayPayment, createCryptoInvoice, getCryptoStatus } from "@/lib/payments.functions";
+import {
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  createCryptoInvoice,
+  getCryptoStatus,
+  getPaypalClientId,
+  createPaypalOrder,
+  capturePaypalOrder,
+} from "@/lib/payments.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CreditCard, Bitcoin, Lock, Copy, Check } from "lucide-react";
+import { CreditCard, Bitcoin, Lock, Copy, Check, Wallet } from "lucide-react";
 
 declare global {
   interface Window {
