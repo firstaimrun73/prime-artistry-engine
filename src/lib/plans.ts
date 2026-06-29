@@ -1,20 +1,21 @@
 // Checkout-side currency (what the payment backends actually charge in).
 // Razorpay handles INR; NOWPayments crypto is priced in USD/EUR.
 export type Currency = "USD" | "EUR" | "INR";
-export type PaymentMethod = "card" | "crypto";
+export type PaymentMethod = "card" | "crypto" | "paypal";
 
 export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "card", label: "Credit / Debit Card" },
+  { id: "paypal", label: "PayPal" },
   { id: "crypto", label: "Crypto" },
 ];
 
 // Payment method by checkout currency.
 // Card (Razorpay) is temporarily disabled while Paddle is being set up —
-// crypto (NOWPayments) is the only live method for everyone right now.
+// crypto (NOWPayments) and PayPal are the live methods for everyone right now.
 export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
-  INR: ["crypto"],
-  USD: ["crypto"],
-  EUR: ["crypto"],
+  INR: ["crypto", "paypal"],
+  USD: ["crypto", "paypal"],
+  EUR: ["crypto", "paypal"],
 };
 
 export const CURRENCY_SYMBOL: Record<Currency, string> = {
