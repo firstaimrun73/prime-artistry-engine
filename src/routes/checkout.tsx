@@ -8,10 +8,12 @@ import {
   CURRENCY_SYMBOL,
   CURRENCY_METHODS,
   ALL_METHODS,
+  CARD_PROVIDERS,
   creditsLabel,
   type Currency,
   type PlanId,
   type PaymentMethod,
+  type CardProvider,
 } from "@/lib/plans";
 import { completeCheckout } from "@/lib/generate.functions";
 import {
