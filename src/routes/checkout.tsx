@@ -14,14 +14,23 @@ import {
   type PaymentMethod,
 } from "@/lib/plans";
 import { completeCheckout } from "@/lib/generate.functions";
-import { createRazorpayOrder, verifyRazorpayPayment, createCryptoInvoice, getCryptoStatus } from "@/lib/payments.functions";
+import {
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  createCryptoInvoice,
+  getCryptoStatus,
+  getPaypalClientId,
+  createPaypalOrder,
+  capturePaypalOrder,
+} from "@/lib/payments.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CreditCard, Bitcoin, Lock, Copy, Check } from "lucide-react";
+import { CreditCard, Bitcoin, Lock, Copy, Check, Wallet } from "lucide-react";
 
 declare global {
   interface Window {
     Razorpay: any;
+    paypal: any;
   }
 }
 
@@ -36,6 +45,7 @@ export const Route = createFileRoute("/checkout")({
 const METHOD_ICON: Record<PaymentMethod, typeof CreditCard> = {
   card: CreditCard,
   crypto: Bitcoin,
+  paypal: Wallet,
 };
 
 const COINS: { id: "usdttrc20" | "btc" | "eth"; label: string }[] = [
@@ -66,6 +76,9 @@ function Checkout() {
   const verifyPayment = useServerFn(verifyRazorpayPayment);
   const createCrypto = useServerFn(createCryptoInvoice);
   const cryptoStatus = useServerFn(getCryptoStatus);
+  const paypalClientId = useServerFn(getPaypalClientId);
+  const createPp = useServerFn(createPaypalOrder);
+  const capturePp = useServerFn(capturePaypalOrder);
 
   const methods = CURRENCY_METHODS[currency as Currency];
   const [method, setMethod] = useState<PaymentMethod>(methods[0]);
@@ -77,7 +90,11 @@ function Checkout() {
   const [copied, setCopied] = useState(false);
   const [cardRetry, setCardRetry] = useState<string | null>(null);
   const [cryptoCancelled, setCryptoCancelled] = useState(false);
+  const [paypalReady, setPaypalReady] = useState(false);
+  const [paypalError, setPaypalError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const paypalContainerRef = useRef<HTMLDivElement | null>(null);
+  const paypalRenderedRef = useRef(false);
 
   const symbol = CURRENCY_SYMBOL[currency as Currency];
   const isFree = planId === "free";
@@ -87,6 +104,94 @@ function Checkout() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  // Load the PayPal JS SDK and render the Buttons when PayPal is selected.
+  useEffect(() => {
+    if (isFree || method !== "paypal" || !user) return;
+    let cancelled = false;
+    paypalRenderedRef.current = false;
+    setPaypalReady(false);
+    setPaypalError(null);
+
+    const renderButtons = () => {
+      if (cancelled || paypalRenderedRef.current) return;
+      const container = paypalContainerRef.current;
+      if (!window.paypal || !container) return;
+      container.innerHTML = "";
+      paypalRenderedRef.current = true;
+      let internalOrderId: string | null = null;
+      try {
+        window.paypal
+          .Buttons({
+            style: { layout: "vertical", color: "gold", shape: "rect", label: "paypal" },
+            createOrder: async () => {
+              const res = await createPp({ data: { plan: planId } });
+              internalOrderId = res.internalOrderId;
+              return res.orderId;
+            },
+            onApprove: async (data: { orderID: string }) => {
+              setProcessing(true);
+              try {
+                await capturePp({ data: { orderId: data.orderID, internalOrderId: internalOrderId! } });
+                await refreshProfile();
+                navigate({ to: "/payment-success" });
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "PayPal payment failed.");
+                navigate({ to: "/payment-failed" });
+              } finally {
+                setProcessing(false);
+              }
+            },
+            onCancel: () => {
+              toast.info("PayPal payment cancelled. Try again anytime.");
+            },
+            onError: (err: unknown) => {
+              setPaypalError("PayPal could not process the payment. Please try again.");
+              toast.error(err instanceof Error ? err.message : "PayPal error.");
+            },
+          })
+          .render(container);
+        setPaypalReady(true);
+      } catch {
+        setPaypalError("Could not load PayPal. Please try again.");
+      }
+    };
+
+    const init = async () => {
+      try {
+        if (window.paypal) {
+          renderButtons();
+          return;
+        }
+        const { clientId } = await paypalClientId();
+        if (!clientId) {
+          setPaypalError("PayPal is not configured.");
+          return;
+        }
+        const existing = document.getElementById("paypal-sdk");
+        if (existing) {
+          existing.addEventListener("load", renderButtons, { once: true });
+          return;
+        }
+        const script = document.createElement("script");
+        script.id = "paypal-sdk";
+        script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture`;
+        script.async = true;
+        script.onload = renderButtons;
+        script.onerror = () => setPaypalError("Could not load PayPal. Please refresh and try again.");
+        document.body.appendChild(script);
+      } catch {
+        setPaypalError("Could not initialize PayPal.");
+      }
+    };
+
+    init();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, user, planId, isFree]);
+
 
   // Countdown timer for crypto invoices.
   useEffect(() => {
@@ -404,6 +509,32 @@ function Checkout() {
                 </div>
               )}
 
+              {/* PayPal — official PayPal Buttons rendered by the SDK. */}
+              {method === "paypal" && (
+                <div className="mt-6 rounded-2xl border border-border bg-card p-6">
+                  <h3 className="font-semibold">Pay with PayPal</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    You'll be charged ${plan.price[currency as Currency]} (USD). Credits are added instantly after payment.
+                  </p>
+                  {!user ? (
+                    <Button className="mt-4 w-full" onClick={requireAuth}>
+                      Sign in to pay with PayPal
+                    </Button>
+                  ) : (
+                    <>
+                      {!paypalReady && !paypalError && (
+                        <p className="mt-4 text-sm text-muted-foreground">Loading PayPal…</p>
+                      )}
+                      {paypalError && <p className="mt-4 text-sm text-destructive">{paypalError}</p>}
+                      <div ref={paypalContainerRef} className="mt-4" />
+                    </>
+                  )}
+                </div>
+              )}
+
+
+
+
               {/* Card popup closed / failed — instant retry options, no cooldown. */}
               {method === "card" && cardRetry && (
                 <div className="mt-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
@@ -464,6 +595,10 @@ function Checkout() {
               </Button>
               <p className="mt-2 text-center text-xs text-muted-foreground">Secured by Razorpay</p>
             </>
+          ) : method === "paypal" ? (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              Use the PayPal button to complete your purchase.
+            </p>
           ) : invoice ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">Waiting for your crypto payment…</p>
           ) : (
