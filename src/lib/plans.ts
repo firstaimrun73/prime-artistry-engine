@@ -5,18 +5,24 @@ export type PaymentMethod = "card" | "crypto" | "paypal";
 
 export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "card", label: "Credit / Debit Card" },
-  { id: "paypal", label: "PayPal" },
   { id: "crypto", label: "Crypto" },
 ];
 
-// Payment method by checkout currency.
-// Card (Razorpay) is temporarily disabled while Paddle is being set up —
-// crypto (NOWPayments) and PayPal are the live methods for everyone right now.
+// Top-level payment method by checkout currency.
+// "card" lets the user choose between PayPal and Razorpay as the card provider.
+// "crypto" uses NOWPayments. Both are live for everyone.
 export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
-  INR: ["crypto", "paypal"],
-  USD: ["crypto", "paypal"],
-  EUR: ["crypto", "paypal"],
+  INR: ["card", "crypto"],
+  USD: ["card", "crypto"],
+  EUR: ["card", "crypto"],
 };
+
+/** Card providers offered under the "Credit / Debit Card" option. */
+export type CardProvider = "paypal" | "razorpay";
+export const CARD_PROVIDERS: { id: CardProvider; label: string; note: string }[] = [
+  { id: "paypal", label: "PayPal", note: "Pay with PayPal or any card via PayPal (USD)" },
+  { id: "razorpay", label: "Razorpay", note: "Credit / Debit card via Razorpay (INR)" },
+];
 
 export const CURRENCY_SYMBOL: Record<Currency, string> = {
   USD: "$",
