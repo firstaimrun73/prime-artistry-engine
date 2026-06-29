@@ -44,6 +44,7 @@ export const Route = createFileRoute("/checkout")({
 const METHOD_ICON: Record<PaymentMethod, typeof CreditCard> = {
   card: CreditCard,
   crypto: Bitcoin,
+  paypal: Wallet,
 };
 
 const COINS: { id: "usdttrc20" | "btc" | "eth"; label: string }[] = [
