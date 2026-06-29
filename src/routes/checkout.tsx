@@ -527,7 +527,7 @@ function Checkout() {
               )}
 
               {/* PayPal — official PayPal Buttons rendered by the SDK. */}
-              {method === "paypal" && (
+              {method === "card" && cardProvider === "paypal" && (
                 <div className="mt-6 rounded-2xl border border-border bg-card p-6">
                   <h3 className="font-semibold">Pay with PayPal</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -549,11 +549,8 @@ function Checkout() {
                 </div>
               )}
 
-
-
-
-              {/* Card popup closed / failed — instant retry options, no cooldown. */}
-              {method === "card" && cardRetry && (
+              {/* Razorpay card popup closed / failed — instant retry options, no cooldown. */}
+              {method === "card" && cardProvider === "razorpay" && cardRetry && (
                 <div className="mt-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
                   <p className="text-sm font-medium text-foreground">{cardRetry}</p>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -578,8 +575,14 @@ function Checkout() {
 
 
           <p className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Lock className="h-3.5 w-3.5" /> Secured payments. Card payments are processed in INR via Razorpay.
+            <Lock className="h-3.5 w-3.5" />{" "}
+            {method === "card"
+              ? cardProvider === "paypal"
+                ? "Secured payments. Card payments are processed in USD via PayPal."
+                : "Secured payments. Card payments are processed in INR via Razorpay."
+              : "Secured payments. Crypto payments are processed via NOWPayments."}
           </p>
+
         </div>
 
         <aside className="h-fit rounded-2xl border border-border bg-card p-6">
