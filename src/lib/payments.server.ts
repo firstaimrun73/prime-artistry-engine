@@ -175,3 +175,106 @@ function safeEqualHex(a: string, b: string): boolean {
     return false;
   }
 }
+
+// ── PayPal REST helpers (no SDK — Workers-compatible) ──
+function paypalApiBase() {
+  return process.env.PAYPAL_API_URL || "https://api-m.paypal.com";
+}
+
+async function paypalAccessToken(): Promise<string> {
+  const id = process.env.PAYPAL_CLIENT_ID;
+  const secret = process.env.PAYPAL_CLIENT_SECRET;
+  if (!id || !secret) throw new Error("PayPal credentials are not configured");
+  const res = await fetch(`${paypalApiBase()}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + Buffer.from(`${id}:${secret}`).toString("base64"),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`PayPal auth failed (${res.status}): ${text}`);
+  }
+  const json = await res.json();
+  return json.access_token as string;
+}
+
+export async function createPaypalOrder(args: {
+  amountUSD: number;
+  referenceId: string;
+  description: string;
+}): Promise<{ id: string; status: string }> {
+  const token = await paypalAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v2/checkout/orders`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          reference_id: args.referenceId,
+          custom_id: args.referenceId,
+          description: args.description,
+          amount: { currency_code: "USD", value: args.amountUSD.toFixed(2) },
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`PayPal order failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
+export async function capturePaypalOrder(orderId: string): Promise<any> {
+  const token = await paypalAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v2/checkout/orders/${orderId}/capture`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`PayPal capture failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
+// Verify a PayPal webhook by calling PayPal's verify-webhook-signature API.
+export async function verifyPaypalWebhook(
+  headers: Record<string, string | null>,
+  rawBody: string,
+): Promise<boolean> {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  if (!webhookId) return false;
+  let event: unknown;
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    return false;
+  }
+  try {
+    const token = await paypalAccessToken();
+    const res = await fetch(`${paypalApiBase()}/v1/notifications/verify-webhook-signature`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        auth_algo: headers["paypal-auth-algo"],
+        cert_url: headers["paypal-cert-url"],
+        transmission_id: headers["paypal-transmission-id"],
+        transmission_sig: headers["paypal-transmission-sig"],
+        transmission_time: headers["paypal-transmission-time"],
+        webhook_id: webhookId,
+        webhook_event: event,
+      }),
+    });
+    if (!res.ok) return false;
+    const json = await res.json();
+    return json.verification_status === "SUCCESS";
+  } catch {
+    return false;
+  }
+}
+
