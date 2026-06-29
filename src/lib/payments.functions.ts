@@ -239,3 +239,107 @@ export const getCryptoStatus = createServerFn({ method: "POST" })
             : "pending",
     };
   });
+
+// ── PayPal: expose the publishable client id for the JS SDK ──
+export const getPaypalClientId = createServerFn({ method: "GET" }).handler(async () => {
+  return { clientId: process.env.PAYPAL_CLIENT_ID || "" };
+});
+
+// ── PayPal: create an order for a plan ──
+export const createPaypalOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { plan: string }) => z.object({ plan: planSchema }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { PLAN_PURCHASE, createPaypalOrder: createOrder } = await import("@/lib/payments.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "paypal");
+    const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
+    if (!pkg) throw new Error("Selected plan is not available for purchase.");
+    const internalOrderId = `M2E-PP-${crypto.randomUUID()}`;
+
+    const order = await createOrder({
+      amountUSD: pkg.amountUSD,
+      referenceId: internalOrderId,
+      description: `Motio2Edit ${pkg.credits} Credits`,
+    });
+
+    const { error } = await (supabaseAdmin as any).from("payment_transactions").insert({
+      user_id: context.userId,
+      payment_method: "paypal",
+      amount: pkg.amountUSD,
+      currency: "USD",
+      credits_purchased: pkg.credits,
+      transaction_id: internalOrderId,
+      gateway_order_id: order.id,
+      payment_status: "pending",
+    });
+    if (error) throw new Error(error.message);
+
+    return { orderId: order.id, internalOrderId, credits: pkg.credits };
+  });
+
+// ── PayPal: capture the order after buyer approval ──
+export const capturePaypalOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orderId: string; internalOrderId: string }) =>
+    z
+      .object({
+        orderId: z.string().min(1),
+        internalOrderId: z.string().min(1),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { capturePaypalOrder: capture, planFromCredits } = await import("@/lib/payments.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { sendPaymentErrorReport } = await import("@/lib/email.server");
+    const db = supabaseAdmin as any;
+
+    const { data: tx } = await db
+      .from("payment_transactions")
+      .select("*")
+      .eq("transaction_id", data.internalOrderId)
+      .eq("user_id", context.userId)
+      .eq("payment_method", "paypal")
+      .maybeSingle();
+    if (!tx) throw new Error("Transaction not found");
+    if (tx.payment_status === "completed") {
+      return { success: true, alreadyProcessed: true, credits: tx.credits_purchased };
+    }
+
+    const result = await capture(data.orderId);
+    if (result?.status !== "COMPLETED") {
+      throw new Error("PayPal payment was not completed. Please try again.");
+    }
+
+    await db
+      .from("payment_transactions")
+      .update({ payment_status: "processing", gateway_response: result })
+      .eq("transaction_id", data.internalOrderId);
+
+    const { error: applyErr } = await db.rpc("apply_payment_credits", {
+      _user_id: context.userId,
+      _transaction_id: tx.transaction_id,
+      _credits: tx.credits_purchased,
+      _reason: "paypal_payment",
+    });
+    if (applyErr) {
+      await sendPaymentErrorReport({
+        userId: context.userId,
+        transactionId: data.orderId,
+        paymentMethod: "PayPal",
+        error: applyErr.message,
+        amount: tx.amount,
+        currency: "USD",
+      });
+      throw new Error("Payment received but credit allocation failed. Support has been notified.");
+    }
+
+    const plan = planFromCredits(tx.credits_purchased);
+    if (plan) {
+      await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
+    }
+
+    return { success: true, credits: tx.credits_purchased, transactionId: tx.transaction_id };
+  });
+
