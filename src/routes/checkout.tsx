@@ -516,15 +516,22 @@ function Checkout() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     You'll be charged ${plan.price[currency as Currency]} (USD). Credits are added instantly after payment.
                   </p>
-                  {!paypalReady && !paypalError && (
-                    <p className="mt-4 text-sm text-muted-foreground">Loading PayPal…</p>
+                  {!user ? (
+                    <Button className="mt-4 w-full" onClick={requireAuth}>
+                      Sign in to pay with PayPal
+                    </Button>
+                  ) : (
+                    <>
+                      {!paypalReady && !paypalError && (
+                        <p className="mt-4 text-sm text-muted-foreground">Loading PayPal…</p>
+                      )}
+                      {paypalError && <p className="mt-4 text-sm text-destructive">{paypalError}</p>}
+                      <div ref={paypalContainerRef} className="mt-4" />
+                    </>
                   )}
-                  {paypalError && (
-                    <p className="mt-4 text-sm text-destructive">{paypalError}</p>
-                  )}
-                  <div ref={paypalContainerRef} className="mt-4" />
                 </div>
               )}
+
 
 
 
