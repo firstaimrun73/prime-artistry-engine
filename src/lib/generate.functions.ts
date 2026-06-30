@@ -156,6 +156,8 @@ export const generateMedia = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Credit RPCs are SECURITY DEFINER and only callable by service_role.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: profile, error: pErr } = await supabase
       .from("profiles")
@@ -185,9 +187,10 @@ export const generateMedia = createServerFn({ method: "POST" })
     // checks the balance and decrements in a single statement, so it prevents
     // negative balances, double-spend from concurrent requests, and any
     // frontend bypass. Credits are refunded automatically if generation fails.
-    const { data: deduction, error: dErr } = await supabase.rpc("deduct_credits", {
+    const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
       _amount: cost,
       _gen_type: data.type,
+      _user_id: userId,
     });
     if (dErr || !deduction) {
       if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
@@ -321,8 +324,9 @@ export const generateMedia = createServerFn({ method: "POST" })
     } catch (err) {
       // Generation failed after credits were reserved — refund them so the
       // user is never charged for a failed generation.
-      const { error: refundErr } = await supabase.rpc("refund_credits", {
+      const { error: refundErr } = await supabaseAdmin.rpc("refund_credits", {
         _transaction_id: txId,
+        _user_id: userId,
       });
       if (refundErr) console.error("[generate] refund failed:", refundErr.message);
       else console.log("[generate] refunded", cost, "credits for failed generation, tx", txId);
@@ -330,7 +334,7 @@ export const generateMedia = createServerFn({ method: "POST" })
     }
 
     if (!outputUrl) {
-      await supabase.rpc("refund_credits", { _transaction_id: txId });
+      await supabaseAdmin.rpc("refund_credits", { _transaction_id: txId, _user_id: userId });
       throw new Error("Generation returned no output.");
     }
 
