@@ -187,9 +187,10 @@ export const generateMedia = createServerFn({ method: "POST" })
     // checks the balance and decrements in a single statement, so it prevents
     // negative balances, double-spend from concurrent requests, and any
     // frontend bypass. Credits are refunded automatically if generation fails.
-    const { data: deduction, error: dErr } = await supabase.rpc("deduct_credits", {
+    const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
       _amount: cost,
       _gen_type: data.type,
+      _user_id: userId,
     });
     if (dErr || !deduction) {
       if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
