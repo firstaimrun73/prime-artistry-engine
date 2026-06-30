@@ -156,6 +156,8 @@ export const generateMedia = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    // Credit RPCs are SECURITY DEFINER and only callable by service_role.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: profile, error: pErr } = await supabase
       .from("profiles")
