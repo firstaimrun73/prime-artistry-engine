@@ -324,8 +324,9 @@ export const generateMedia = createServerFn({ method: "POST" })
     } catch (err) {
       // Generation failed after credits were reserved — refund them so the
       // user is never charged for a failed generation.
-      const { error: refundErr } = await supabase.rpc("refund_credits", {
+      const { error: refundErr } = await supabaseAdmin.rpc("refund_credits", {
         _transaction_id: txId,
+        _user_id: userId,
       });
       if (refundErr) console.error("[generate] refund failed:", refundErr.message);
       else console.log("[generate] refunded", cost, "credits for failed generation, tx", txId);
