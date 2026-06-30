@@ -677,7 +677,7 @@ export type Database = {
         Returns: Json
       }
       deduct_credits: {
-        Args: { _amount: number; _gen_type: string }
+        Args: { _amount: number; _gen_type: string; _user_id: string }
         Returns: Json
       }
       delete_email: {
@@ -705,7 +705,10 @@ export type Database = {
           read_ct: number
         }[]
       }
-      refund_credits: { Args: { _transaction_id: string }; Returns: Json }
+      refund_credits: {
+        Args: { _transaction_id: string; _user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       gen_status: "pending" | "processing" | "success" | "failed"
