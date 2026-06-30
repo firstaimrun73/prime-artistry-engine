@@ -334,7 +334,7 @@ export const generateMedia = createServerFn({ method: "POST" })
     }
 
     if (!outputUrl) {
-      await supabase.rpc("refund_credits", { _transaction_id: txId });
+      await supabaseAdmin.rpc("refund_credits", { _transaction_id: txId, _user_id: userId });
       throw new Error("Generation returned no output.");
     }
 
