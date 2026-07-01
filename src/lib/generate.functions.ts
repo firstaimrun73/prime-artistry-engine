@@ -198,9 +198,21 @@ export const generateMedia = createServerFn({ method: "POST" })
           `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
         );
       }
-      console.error("[generate] credit deduction failed:", dErr?.message);
-      throw new Error("Could not reserve credits. Please try again.");
+      // Log the FULL backend error (message + code + details + hint) so the real
+      // cause is never masked by the generic user-facing message again.
+      console.error("[generate] credit deduction failed:", {
+        message: dErr?.message,
+        code: (dErr as { code?: string })?.code,
+        details: (dErr as { details?: string })?.details,
+        hint: (dErr as { hint?: string })?.hint,
+        userId,
+        amount: cost,
+        genType: data.type,
+      });
+      const raw = dErr?.message || "unknown error";
+      throw new Error(`Could not reserve credits: ${raw}`);
     }
+
     const { transaction_id: txId, credits: newCredits } = deduction as {
       transaction_id: string;
       credits: number;
