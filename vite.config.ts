@@ -20,6 +20,11 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Deploy target. In the Lovable sandbox this is ignored (forced to
+  // cloudflare-module). When building on Vercel (VERCEL=1 in the build env),
+  // use Nitro's `vercel` preset so SSR + deep-link routes (e.g. /auth) work
+  // instead of 404ing.
+  ...(process.env.VERCEL ? { nitro: { preset: "vercel" } } : {}),
   vite: {
     resolve: {
       alias: {
