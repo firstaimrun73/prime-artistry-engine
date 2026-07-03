@@ -132,22 +132,32 @@ export const submitFeedback = createServerFn({ method: "POST" })
 
 export const listPublicFeedback = createServerFn({ method: "GET" })
   .handler(async (): Promise<PublicFeedback[]> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await (supabaseAdmin as any)
-      .from("feedback")
-      .select("id, rating, message, user_name, category, created_at")
-      .gte("rating", 4)
-      .order("created_at", { ascending: false })
-      .limit(24);
-    return (data ?? []).map((f: any) => ({
-      id: f.id,
-      rating: f.rating,
-      message: f.message,
-      userName: f.user_name || "Anonymous",
-      category: f.category || "General Feedback",
-      createdAt: f.created_at,
-    }));
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await (supabaseAdmin as any)
+        .from("feedback")
+        .select("id, rating, message, user_name, category, created_at")
+        .gte("rating", 4)
+        .order("created_at", { ascending: false })
+        .limit(24);
+      if (error) {
+        console.error("[feedback] listPublicFeedback error:", error);
+        return [];
+      }
+      return (data ?? []).map((f: any) => ({
+        id: f.id,
+        rating: f.rating,
+        message: f.message,
+        userName: f.user_name || "Anonymous",
+        category: f.category || "General Feedback",
+        createdAt: f.created_at,
+      }));
+    } catch (err) {
+      console.error("[feedback] listPublicFeedback threw:", err);
+      return [];
+    }
   });
+
 
 export type AdminFeedback = {
   id: string;
