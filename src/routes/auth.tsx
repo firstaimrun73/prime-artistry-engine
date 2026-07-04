@@ -126,27 +126,29 @@ function AuthPage() {
   };
 
   const handleGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth${dest ? `?redirect=${encodeURIComponent(dest)}` : ""}`,
+      },
     });
-    if (result.error) {
+    if (error) {
       toast.error("Google sign-in failed.");
-      return;
     }
-    if (result.redirected) return;
-    navigate({ to: dest });
+    // On success the browser is redirected to Google by Supabase.
   };
 
   const handleApple = async () => {
-    const result = await lovable.auth.signInWithOAuth("apple", {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: {
+        redirectTo: `${window.location.origin}/auth${dest ? `?redirect=${encodeURIComponent(dest)}` : ""}`,
+      },
     });
-    if (result.error) {
+    if (error) {
       toast.error("Apple sign-in failed.");
-      return;
     }
-    if (result.redirected) return;
-    navigate({ to: dest });
+    // On success the browser is redirected to Apple by Supabase.
   };
 
   const handleReset = async () => {
