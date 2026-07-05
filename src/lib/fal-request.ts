@@ -59,20 +59,36 @@ export const UPSCALE_VIDEO_MODEL = "fal-ai/topaz/upscale/video";
 const FAL_BASE = "https://fal.run/";
 const ep = (m: string) => `${FAL_BASE}${m}`;
 
-// Prompts that are PURELY about output quality (sharpness/resolution/clarity)
-// route to the deterministic enhancement pipeline. Everything else is treated
-// as a semantic edit and routed to the instruction-edit model so the change is
-// actually applied.
+// Route to the deterministic sharpen/upscale pipeline ONLY when the prompt is
+// PURELY about output fidelity (sharpness/resolution/HD) with no other intent.
+// Everything else — including "restore", "fix", "clean up", relighting, and any
+// semantic change — goes to the instruction-edit model (FLUX Kontext) so the
+// requested change is actually applied instead of returning a near-identical
+// image. This gate previously misrouted many real edits to a sharpen-only
+// pipeline, which is why edited results looked identical to the original.
 export function isEnhancementOnly(prompt: string): boolean {
   const p = (prompt || "").toLowerCase().trim();
-  if (!p) return true;
-  // If it mentions any editing verb/target, it's an edit, not pure enhancement.
-  const editSignals =
-    /\b(add|remove|delete|replace|change|swap|turn|make it|recolor|color|colour|background|sky|paint|draw|insert|put|place|erase|move|rotate|crop|zoom|style|cartoon|anime|sketch|painting|outfit|clothes|hair|face|text|logo|object|boat|car|person|animal)\b/;
-  if (editSignals.test(p)) return false;
-  const enhanceSignals =
-    /\b(enhance|sharpen|sharper|clarity|clear|clean|hd|4k|8k|upscale|resolution|detail|quality|deblur|denoise|noise|crisp|professional|restore|fix)\b/;
-  return enhanceSignals.test(p);
+  if (!p) return false;
+
+  // Words that only describe output fidelity — safe to strip.
+  const qualityWords =
+    /\b(enhance|enhanced|enhancement|sharpen|sharpened|sharper|sharpness|clarity|hd|uhd|4k|8k|upscale|upscaled|upscaling|resolution|res|detail|details|detailed|quality|deblur|unblur|denoise|noise|crisp|crisper|super|pixel|pixels|dpi)\b/g;
+  // Generic filler that carries no editing intent.
+  const filler =
+    /\b(please|the|this|that|a|an|it|its|my|to|and|of|in|on|with|for|make|more|very|really|higher|high|increase|improve|improved|better|up|max|maximum|peak|full)\b/g;
+
+  const hadQuality = qualityWords.test(p);
+  qualityWords.lastIndex = 0;
+
+  const remaining = p
+    .replace(qualityWords, " ")
+    .replace(filler, " ")
+    .replace(/[^a-z]+/g, " ")
+    .trim();
+
+  // Pure enhancement only when a fidelity keyword was present AND nothing
+  // meaningful (no subject, object, or edit verb) is left over.
+  return hadQuality && remaining.length === 0;
 }
 
 // ── Instruction-based image edit ─────────────────────────────────────────
