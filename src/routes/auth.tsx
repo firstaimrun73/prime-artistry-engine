@@ -138,19 +138,6 @@ function AuthPage() {
     // On success the browser is redirected to Google by Supabase.
   };
 
-  const handleApple = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "apple",
-      options: {
-        redirectTo: `${window.location.origin}/auth${dest ? `?redirect=${encodeURIComponent(dest)}` : ""}`,
-      },
-    });
-    if (error) {
-      toast.error("Apple sign-in failed.");
-    }
-    // On success the browser is redirected to Apple by Supabase.
-  };
-
   const handleReset = async () => {
     if (!email) return toast.error("Enter your email first.");
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
