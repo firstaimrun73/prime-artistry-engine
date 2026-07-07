@@ -18,25 +18,28 @@ export const chatCompletion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => schema.parse(data))
   .handler(async ({ data }) => {
-    const apiKey = process.env.LOVABLE_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("AI service unavailable.");
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const systemPrompt =
+      "You are MOTIO2EDIT's helpful assistant. Help users with prompts, plans, and using the editor. Be concise and friendly.";
+
+    // Anthropic expects the system prompt as a top-level field and only
+    // user/assistant turns in `messages`.
+    const turns = data.messages.filter((m) => m.role !== "system");
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are MOTIO2EDIT's helpful assistant. Help users with prompts, plans, and using the editor. Be concise and friendly.",
-          },
-          ...data.messages,
-        ],
+        model: "claude-sonnet-4-5",
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: turns.map((m) => ({ role: m.role, content: m.content })),
       }),
     });
 
@@ -46,8 +49,10 @@ export const chatCompletion = createServerFn({ method: "POST" })
     }
 
     const json = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
+      content?: { type?: string; text?: string }[];
     };
-    const reply = json.choices?.[0]?.message?.content ?? "Sorry, I couldn't respond.";
+    const reply =
+      json.content?.find((c) => c.type === "text")?.text ?? "Sorry, I couldn't respond.";
     return { reply };
   });
+

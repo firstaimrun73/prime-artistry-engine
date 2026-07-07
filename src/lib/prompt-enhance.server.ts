@@ -10,10 +10,10 @@ type EnhanceArgs = {
   isEdit: boolean;
 };
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
+  const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return prompt;
 
   const system = isEdit
@@ -33,23 +33,26 @@ export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<st
       ].join(" ");
 
   try {
-    const res = await fetch(GATEWAY, {
+    const res = await fetch(ANTHROPIC_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
+        model: "claude-sonnet-4-5",
+        max_tokens: 400,
+        system,
+        messages: [{ role: "user", content: prompt }],
       }),
     });
     if (!res.ok) return prompt;
-    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const enhanced = json.choices?.[0]?.message?.content?.trim();
+    const json = (await res.json()) as { content?: { type?: string; text?: string }[] };
+    const enhanced = json.content?.find((c) => c.type === "text")?.text?.trim();
     return enhanced && enhanced.length > 0 ? enhanced : prompt;
   } catch {
     return prompt;
   }
 }
+

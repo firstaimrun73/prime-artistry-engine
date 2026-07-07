@@ -1,6 +1,7 @@
-// Server-only email helper for payment alerts via the Resend connector gateway.
-// SMTP/nodemailer cannot run on the Workers runtime, so we use an HTTP email API.
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/resend";
+// Server-only email helper for payment alerts via the Resend HTTP API.
+// SMTP/nodemailer cannot run on the Workers runtime, so we use Resend's REST API
+// directly with your own Resend API key (RESEND_API_KEY).
+const RESEND_URL = "https://api.resend.com/emails";
 
 export async function sendPaymentErrorReport(args: {
   userId: string;
@@ -10,13 +11,13 @@ export async function sendPaymentErrorReport(args: {
   amount: number | string;
   currency: string;
 }): Promise<void> {
-  const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   const supportEmail = process.env.SUPPORT_EMAIL;
-  if (!LOVABLE_API_KEY || !RESEND_API_KEY || !supportEmail) {
+  if (!RESEND_API_KEY || !supportEmail) {
     console.error("[payments] payment error (email not configured):", args);
     return;
   }
+
   const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
     <div style="background:#c0392b;color:#fff;padding:20px;border-radius:8px 8px 0 0">
       <h2 style="margin:0">Payment Error</h2>
@@ -31,13 +32,13 @@ export async function sendPaymentErrorReport(args: {
     </div>
   </div>`;
   try {
-    const res = await fetch(`${GATEWAY_URL}/emails`, {
+    const res = await fetch(RESEND_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": RESEND_API_KEY,
+        Authorization: `Bearer ${RESEND_API_KEY}`,
       },
+
       body: JSON.stringify({
         from: `Motio2Edit Alerts <${supportEmail}>`,
         to: [supportEmail],
