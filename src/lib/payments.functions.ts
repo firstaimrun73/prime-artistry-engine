@@ -157,7 +157,7 @@ export const createCryptoInvoice = createServerFn({ method: "POST" })
     const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
     if (!pkg) throw new Error("Selected plan is not available for purchase.");
     const internalOrderId = `M2E-CRYPTO-${crypto.randomUUID()}`;
-    const backend = process.env.BACKEND_URL || process.env.FRONTEND_URL || "";
+    const backend = (process.env.BACKEND_URL || process.env.FRONTEND_URL || "https://motio2edit.com").replace(/\/+$/, "");
 
     const payment = await createNowPaymentsPayment({
       price_amount: pkg.amountUSD,

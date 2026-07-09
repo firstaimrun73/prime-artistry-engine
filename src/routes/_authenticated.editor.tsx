@@ -121,15 +121,26 @@ function Editor() {
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
 
+  const MAX_IMAGE_MB = 25;
+  const MAX_VIDEO_MB = 200;
+
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isVideo = file.type.startsWith("video");
+    const limitMb = isVideo ? MAX_VIDEO_MB : MAX_IMAGE_MB;
+    if (file.size > limitMb * 1024 * 1024) {
+      e.target.value = "";
+      return toast.error(
+        `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${limitMb} MB for ${isVideo ? "videos" : "images"}.`,
+      );
+    }
     setOutput(null);
     setDownloaded(false);
     setState("idle");
     setInputPreview(URL.createObjectURL(file));
     setInputFile(file);
-    const kind: "image" | "video" = file.type.startsWith("video") ? "video" : "image";
+    const kind: "image" | "video" = isVideo ? "video" : "image";
     setInputKind(kind);
     // Read images as a data URI (sent inline). Videos upload at generate time.
     if (kind === "image") {
@@ -355,6 +366,9 @@ function Editor() {
                 ? "Upload image or video (optional)"
                 : "Upload image (optional)"}
           </button>
+          <p className="-mt-2 text-[11px] text-muted-foreground">
+            Max file size: {MAX_IMAGE_MB} MB for images{mediaType === "video" ? `, ${MAX_VIDEO_MB} MB for videos` : ""}.
+          </p>
           {mediaType === "video" && (
             <p className="-mt-2 text-[11px] text-muted-foreground">
               {inputKind === "video"

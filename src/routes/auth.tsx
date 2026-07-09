@@ -130,6 +130,7 @@ function AuthPage() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth${dest ? `?redirect=${encodeURIComponent(dest)}` : ""}`,
+        queryParams: { prompt: "select_account" },
       },
     });
     if (error) {
