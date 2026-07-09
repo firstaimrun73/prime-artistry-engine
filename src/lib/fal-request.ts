@@ -44,10 +44,10 @@ export type FalStep = {
 
 // ── Models ──────────────────────────────────────────────────────────────
 export const TEXT_TO_IMAGE_MODEL = "fal-ai/flux-pro/v1.1";
-// Instruction-based image EDITING (add/remove/replace/recolor/background…).
-// Preserves the original composition while applying the requested change —
-// this is what makes edits visibly take effect instead of "identical output".
-export const IMAGE_EDIT_MODEL = "fal-ai/flux-pro/kontext";
+// Image EDITING via FLUX dev image-to-image. Applies the requested change while
+// keeping the source composition. Strength is clamped to a visible minimum so
+// edits actually take effect instead of returning a near-identical image.
+export const IMAGE_EDIT_MODEL = "fal-ai/flux/dev/image-to-image";
 // Kept exported for back-compat with callers/tests that reference it.
 export const IMAGE_TO_IMAGE_MODEL = "fal-ai/post-processing";
 
