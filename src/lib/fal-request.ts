@@ -129,9 +129,26 @@ export function buildImageEdit({
 }
 
 // ── Text → Image ────────────────────────────────────────────────────────
-export function buildFalRequest({ prompt, imageUrl, strength = 0.7 }: BuildFalRequestInput): FalRequest {
+export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRequestInput): FalRequest {
   if (imageUrl) {
-    // Back-compat shape: image-to-image now means "primary sharpen step".
+    if (!isEnhancementOnly(prompt)) {
+      const s = Math.min(1, Math.max(0.7, strength));
+      return {
+        workflow: "image-to-image",
+        model: IMAGE_EDIT_MODEL,
+        endpoint: ep(IMAGE_EDIT_MODEL),
+        body: {
+          prompt,
+          image_url: imageUrl,
+          strength: s,
+          guidance_scale: 3.5,
+          num_inference_steps: 40,
+          num_images: 1,
+          output_format: "jpeg",
+          enable_safety_checker: true,
+        },
+      };
+    }
     const steps = buildImageEnhancementPipeline({ prompt, imageUrl, strength });
     const primary = steps[0];
     return {
@@ -141,7 +158,6 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.7 }: BuildFalRe
       body: primary.body,
     };
   }
-
   return {
     workflow: "text-to-image",
     model: TEXT_TO_IMAGE_MODEL,
