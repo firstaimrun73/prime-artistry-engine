@@ -44,10 +44,10 @@ export type FalStep = {
 
 // ── Models ──────────────────────────────────────────────────────────────
 export const TEXT_TO_IMAGE_MODEL = "fal-ai/flux-pro/v1.1";
-// Instruction-based image EDITING (add/remove/replace/recolor/background…).
-// Preserves the original composition while applying the requested change —
-// this is what makes edits visibly take effect instead of "identical output".
-export const IMAGE_EDIT_MODEL = "fal-ai/flux-pro/kontext";
+// Image EDITING via FLUX dev image-to-image. Applies the requested change while
+// keeping the source composition. Strength is clamped to a visible minimum so
+// edits actually take effect instead of returning a near-identical image.
+export const IMAGE_EDIT_MODEL = "fal-ai/flux/dev/image-to-image";
 // Kept exported for back-compat with callers/tests that reference it.
 export const IMAGE_TO_IMAGE_MODEL = "fal-ai/post-processing";
 
@@ -91,23 +91,24 @@ export function isEnhancementOnly(prompt: string): boolean {
   return hadQuality && remaining.length === 0;
 }
 
-// ── Instruction-based image edit ─────────────────────────────────────────
+// ── Image edit (FLUX dev image-to-image) ─────────────────────────────────
 export function buildImageEdit({
   prompt,
   imageUrl,
-  strength = 0.72,
+  strength = 0.8,
   referenceImageUrls,
 }: {
   prompt: string;
   imageUrl: string;
-  /** Edit strength 0.6–0.8 sweet spot; lower = preserve more. */
+  /** Edit strength. Clamped to a minimum of 0.7 so edits are clearly visible. */
   strength?: number;
-  /** Extra reference images (FLUX Kontext multi-image), plan-gated by caller. */
+  /** Extra reference images (multi-image), plan-gated by caller. */
   referenceImageUrls?: string[];
 }): FalStep {
-  const s = Math.min(1, Math.max(0.1, strength));
+  // Enforce a visible-edit floor: below ~0.7 flux dev returns near-identical output.
+  const s = Math.min(1, Math.max(0.7, strength ?? 0.8));
   return {
-    label: "edit (flux kontext)",
+    label: "edit (flux dev image-to-image)",
     model: IMAGE_EDIT_MODEL,
     endpoint: ep(IMAGE_EDIT_MODEL),
     outputKind: "image",
@@ -115,15 +116,14 @@ export function buildImageEdit({
       prompt,
       image_url: imageUrl,
       ...(referenceImageUrls && referenceImageUrls.length > 0
-        ? { reference_image_urls: referenceImageUrls }
+        ? { image_urls: referenceImageUrls }
         : {}),
       strength: s,
       guidance_scale: 3.5,
-      num_inference_steps: 28,
+      num_inference_steps: 40,
       num_images: 1,
       output_format: "jpeg",
-      output_quality: 95,
-      safety_tolerance: "2",
+      enable_safety_checker: true,
     },
   };
 }
