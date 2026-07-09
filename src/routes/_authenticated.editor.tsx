@@ -366,6 +366,9 @@ function Editor() {
                 ? "Upload image or video (optional)"
                 : "Upload image (optional)"}
           </button>
+          <p className="-mt-2 text-[11px] text-muted-foreground">
+            Max file size: {MAX_IMAGE_MB} MB for images{mediaType === "video" ? `, ${MAX_VIDEO_MB} MB for videos` : ""}.
+          </p>
           {mediaType === "video" && (
             <p className="-mt-2 text-[11px] text-muted-foreground">
               {inputKind === "video"
