@@ -70,6 +70,11 @@ export function isEnhancementOnly(prompt: string): boolean {
   const p = (prompt || "").toLowerCase().trim();
   if (!p) return false;
 
+  // If the prompt contains ANY real editing instruction, it is NOT a pure
+  // enhancement — route it to the instruction-edit (image-to-image) model so
+  // the requested change is actually applied to the SAME image.
+  if (hasEditIntent(p)) return false;
+
   // Words that only describe output fidelity — safe to strip.
   const qualityWords =
     /\b(enhance|enhanced|enhancement|sharpen|sharpened|sharper|sharpness|clarity|hd|uhd|4k|8k|upscale|upscaled|upscaling|resolution|res|detail|details|detailed|quality|deblur|unblur|denoise|noise|crisp|crisper|super|pixel|pixels|dpi)\b/g;
