@@ -119,7 +119,7 @@ export function buildImageEdit({
   referenceImageUrls?: string[];
 }): FalStep {
   // Enforce a visible-edit floor: below ~0.7 flux dev returns near-identical output.
-  const s = Math.min(1, Math.max(0.7, strength ?? 0.8));
+  const s = Math.min(1, Math.max(0.75, strength ?? 0.8));
   return {
     label: "edit (flux dev image-to-image)",
     model: IMAGE_EDIT_MODEL,
@@ -145,7 +145,7 @@ export function buildImageEdit({
 export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRequestInput): FalRequest {
   if (imageUrl) {
     if (!isEnhancementOnly(prompt)) {
-      const s = Math.min(1, Math.max(0.7, strength));
+      const s = Math.min(1, Math.max(0.75, strength));
       return {
         workflow: "image-to-image",
         model: IMAGE_EDIT_MODEL,
