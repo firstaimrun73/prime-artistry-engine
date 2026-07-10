@@ -9,12 +9,10 @@ import {
   PLANS,
   DISPLAY_PRICES,
   DISPLAY_CURRENCIES,
-  currencyForCountry,
   toCheckoutCurrency,
   type DisplayCurrency,
   type PlanId,
 } from "@/lib/plans";
-import { detectCountry } from "@/lib/geo";
 import { Check, CheckCircle2 } from "lucide-react";
 import {
   Select,
