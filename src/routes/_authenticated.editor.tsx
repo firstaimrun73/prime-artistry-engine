@@ -614,6 +614,9 @@ function Editor() {
           )}
         </div>
       </div>
+
+      {/* Ad banner — free plan only; renders nothing when Monetag is off. */}
+      <MonetagBanner show={isFree} />
     </div>
   );
 }
