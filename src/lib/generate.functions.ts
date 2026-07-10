@@ -302,21 +302,47 @@ export const generateMedia = createServerFn({ method: "POST" })
       if (!outputUrl) throw new Error("Video generation returned no output.");
     }
     } catch (err) {
-      // Generation failed after credits were reserved — refund them so the
-      // user is never charged for a failed generation.
-      const { error: refundErr } = await supabaseAdmin.rpc("refund_credits", {
-        _transaction_id: txId,
-        _user_id: userId,
-      });
-      if (refundErr) console.error("[generate] refund failed:", refundErr.message);
-      else console.log("[generate] refunded", cost, "credits for failed generation, tx", txId);
-      throw err;
+      // FAL.ai failed — no credits were ever deducted, so nothing to refund.
+      const raw = err instanceof Error ? err.message : "Generation failed.";
+      console.error("[generate] generation failed (no credits charged):", raw);
+      throw new Error(`${raw} — Generation failed. Credits not charged.`);
     }
 
-    if (!outputUrl) {
-      await supabaseAdmin.rpc("refund_credits", { _transaction_id: txId, _user_id: userId });
-      throw new Error("Generation returned no output.");
+    // An empty / missing output must never charge the user.
+    if (!outputUrl || outputUrl.trim().length === 0) {
+      throw new Error("Generation returned no output. Credits not charged.");
     }
+
+    // ── Charge credits AFTER a confirmed successful output ───────────────
+    // deduct_credits is atomic: it re-checks the balance and decrements in a
+    // single statement, preventing negative balances and concurrent double-spend.
+    const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
+      _amount: cost,
+      _gen_type: data.type,
+      _user_id: userId,
+    });
+    if (dErr || !deduction) {
+      if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
+        throw new Error(
+          `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
+        );
+      }
+      console.error("[generate] credit deduction failed:", {
+        message: dErr?.message,
+        code: (dErr as { code?: string })?.code,
+        details: (dErr as { details?: string })?.details,
+        hint: (dErr as { hint?: string })?.hint,
+        userId,
+        amount: cost,
+        genType: data.type,
+      });
+      throw new Error(`Could not charge credits: ${dErr?.message || "unknown error"}`);
+    }
+    const { transaction_id: txId, credits: newCredits } = deduction as {
+      transaction_id: string;
+      credits: number;
+    };
+    console.log("[generate] charged", cost, "credits → remaining", newCredits, "tx", txId);
 
     // ── Persist history ─────────────────────────────────────────────────
     console.log("[generate] output ready:", outputUrl.slice(0, 80));
