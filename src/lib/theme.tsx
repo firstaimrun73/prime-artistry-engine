@@ -25,11 +25,11 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Dark mode is the default.
-  const [theme, setThemeState] = useState<Theme>("dark");
+  // Light mode is the default; users can switch in settings.
+  const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
-    let initial: Theme = "dark";
+    let initial: Theme = "light";
     try {
       const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
       if (stored === "light" || stored === "dark") initial = stored;
