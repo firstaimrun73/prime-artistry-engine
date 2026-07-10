@@ -50,7 +50,7 @@ function Pricing() {
 
   const currentPlan = profile?.plan ?? null;
 
-  // Detect currency: localStorage choice wins, else IP country.
+  // Default currency is USD. A saved preference wins; otherwise stay on USD.
   useEffect(() => {
     let stored: string | null = null;
     try {
@@ -60,9 +60,7 @@ function Pricing() {
     }
     if (stored && DISPLAY_CURRENCIES.some((c) => c.code === stored)) {
       setCurrency(stored as DisplayCurrency);
-      return;
     }
-    detectCountry().then((country) => setCurrency(currencyForCountry(country)));
   }, []);
 
   const changeCurrency = (c: DisplayCurrency) => {
