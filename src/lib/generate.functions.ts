@@ -183,42 +183,10 @@ export const generateMedia = createServerFn({ method: "POST" })
     const falKey = process.env.FAL_API_KEY;
     if (!falKey) throw new Error("AI service unavailable.");
 
-    // Atomically reserve (deduct) credits BEFORE generation. The DB function
-    // checks the balance and decrements in a single statement, so it prevents
-    // negative balances, double-spend from concurrent requests, and any
-    // frontend bypass. Credits are refunded automatically if generation fails.
-    const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
-      _amount: cost,
-      _gen_type: data.type,
-      _user_id: userId,
-    });
-    if (dErr || !deduction) {
-      if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
-        throw new Error(
-          `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
-        );
-      }
-      // Log the FULL backend error (message + code + details + hint) so the real
-      // cause is never masked by the generic user-facing message again.
-      console.error("[generate] credit deduction failed:", {
-        message: dErr?.message,
-        code: (dErr as { code?: string })?.code,
-        details: (dErr as { details?: string })?.details,
-        hint: (dErr as { hint?: string })?.hint,
-        userId,
-        amount: cost,
-        genType: data.type,
-      });
-      const raw = dErr?.message || "unknown error";
-      throw new Error(`Could not reserve credits: ${raw}`);
-    }
-
-    const { transaction_id: txId, credits: newCredits } = deduction as {
-      transaction_id: string;
-      credits: number;
-    };
-    console.log("[generate] reserved", cost, "credits → remaining", newCredits, "tx", txId);
-
+    // Credits are deducted ONLY after generation succeeds (see below), so a
+    // failed FAL.ai call never charges the user. Balance was already checked
+    // above; the atomic deduct_credits RPC re-checks at charge time to prevent
+    // negative balances / concurrent double-spend.
     let outputUrl: string | null = null;
 
     try {
