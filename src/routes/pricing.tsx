@@ -9,12 +9,10 @@ import {
   PLANS,
   DISPLAY_PRICES,
   DISPLAY_CURRENCIES,
-  currencyForCountry,
   toCheckoutCurrency,
   type DisplayCurrency,
   type PlanId,
 } from "@/lib/plans";
-import { detectCountry } from "@/lib/geo";
 import { Check, CheckCircle2 } from "lucide-react";
 import {
   Select,
@@ -50,7 +48,7 @@ function Pricing() {
 
   const currentPlan = profile?.plan ?? null;
 
-  // Detect currency: localStorage choice wins, else IP country.
+  // Default currency is USD. A saved preference wins; otherwise stay on USD.
   useEffect(() => {
     let stored: string | null = null;
     try {
@@ -60,9 +58,7 @@ function Pricing() {
     }
     if (stored && DISPLAY_CURRENCIES.some((c) => c.code === stored)) {
       setCurrency(stored as DisplayCurrency);
-      return;
     }
-    detectCountry().then((country) => setCurrency(currencyForCountry(country)));
   }, []);
 
   const changeCurrency = (c: DisplayCurrency) => {
@@ -149,6 +145,18 @@ function Pricing() {
                     </li>
                   ))}
                 </ul>
+
+                {plan.id === "free" ? (
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Includes occasional ads to keep the free tier sustainable.
+                  </p>
+                ) : (
+                  <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
+                    <Check className="h-3.5 w-3.5" /> No Ads — Clean Experience
+                  </p>
+                )}
+
+
 
                 {isCurrent ? (
                   <Button className="mt-8 w-full" variant="outline" disabled style={{ marginTop: "auto" }}>

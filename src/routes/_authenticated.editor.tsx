@@ -13,6 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { CompareSlider } from "@/components/CompareSlider";
 import { MultiImageInput } from "@/components/MultiImageInput";
 import { getPlanLimits } from "@/utils/planLimits";
+import { MonetagBanner } from "@/components/MonetagBanner";
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
@@ -614,6 +615,9 @@ function Editor() {
           )}
         </div>
       </div>
+
+      {/* Ad banner — free plan only; renders nothing when Monetag is off. */}
+      <MonetagBanner show={isFree} />
     </div>
   );
 }

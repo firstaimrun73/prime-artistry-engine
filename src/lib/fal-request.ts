@@ -59,16 +59,29 @@ export const UPSCALE_VIDEO_MODEL = "fal-ai/topaz/upscale/video";
 const FAL_BASE = "https://fal.run/";
 const ep = (m: string) => `${FAL_BASE}${m}`;
 
+// Explicit editing verbs/nouns. If ANY of these appear, the prompt is a real
+// semantic edit and must go to fal-ai/flux/dev/image-to-image so the change is
+// applied to the SAME image (never the sharpen-only pipeline).
+const EDIT_INTENT =
+  /\b(remove|add|change|replace|keep|delete|colou?r|recolou?r|background|foreground|person|people|man|woman|face|hair|eyes|object|clothes|clothing|dress|shirt|make|makes|making|put|move|fix|clean|cleanup|restore|relight|light|lighting|bright(en)?|dark(en)?|swap|turn|convert|transform|style|cartoon|anime|paint|painting|cinematic|vintage|retro|glasses|hat|smile|remove\s+bg|blur\s+background|sky|water|car|animal|dog|cat|logo|text|watermark|shadow|reflection|scene)\b/;
+
+export function hasEditIntent(prompt: string): boolean {
+  return EDIT_INTENT.test((prompt || "").toLowerCase());
+}
+
 // Route to the deterministic sharpen/upscale pipeline ONLY when the prompt is
 // PURELY about output fidelity (sharpness/resolution/HD) with no other intent.
 // Everything else — including "restore", "fix", "clean up", relighting, and any
-// semantic change — goes to the instruction-edit model (FLUX Kontext) so the
-// requested change is actually applied instead of returning a near-identical
-// image. This gate previously misrouted many real edits to a sharpen-only
-// pipeline, which is why edited results looked identical to the original.
+// semantic change — goes to the instruction-edit model so the requested change
+// is actually applied instead of returning a near-identical image.
 export function isEnhancementOnly(prompt: string): boolean {
   const p = (prompt || "").toLowerCase().trim();
   if (!p) return false;
+
+  // If the prompt contains ANY real editing instruction, it is NOT a pure
+  // enhancement — route it to the instruction-edit (image-to-image) model so
+  // the requested change is actually applied to the SAME image.
+  if (hasEditIntent(p)) return false;
 
   // Words that only describe output fidelity — safe to strip.
   const qualityWords =
@@ -106,7 +119,7 @@ export function buildImageEdit({
   referenceImageUrls?: string[];
 }): FalStep {
   // Enforce a visible-edit floor: below ~0.7 flux dev returns near-identical output.
-  const s = Math.min(1, Math.max(0.7, strength ?? 0.8));
+  const s = Math.min(1, Math.max(0.75, strength ?? 0.8));
   return {
     label: "edit (flux dev image-to-image)",
     model: IMAGE_EDIT_MODEL,
@@ -132,7 +145,7 @@ export function buildImageEdit({
 export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRequestInput): FalRequest {
   if (imageUrl) {
     if (!isEnhancementOnly(prompt)) {
-      const s = Math.min(1, Math.max(0.7, strength));
+      const s = Math.min(1, Math.max(0.75, strength));
       return {
         workflow: "image-to-image",
         model: IMAGE_EDIT_MODEL,
