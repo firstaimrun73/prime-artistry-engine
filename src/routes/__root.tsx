@@ -85,6 +85,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "MOTIO2EDIT — AI Image & Video Editor" },
       { name: "description", content: "Transform images and videos with AI. Upload, prompt, generate, and download in seconds." },
       { name: "author", content: "MOTIO2EDIT" },
+      { name: "monetag", content: "33e021a97699ebb3967c7b1d695f16d4" },
       { property: "og:title", content: "MOTIO2EDIT — AI Image & Video Editor" },
       { property: "og:description", content: "Transform images and videos with AI. Upload, prompt, generate, and download in seconds." },
       { property: "og:type", content: "website" },
