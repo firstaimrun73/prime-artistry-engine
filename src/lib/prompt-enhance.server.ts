@@ -12,7 +12,91 @@ type EnhanceArgs = {
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
+/**
+ * Deterministic expansion for common short editing prompts. Each entry maps a
+ * set of trigger phrases to a fully detailed, FAL-ready instruction that
+ * references "this exact image" and requires preservation of everything else.
+ */
+const EDIT_EXPANSIONS: { triggers: string[]; expansion: string }[] = [
+  {
+    triggers: ["remove people", "remove person", "remove humans", "remove human"],
+    expansion:
+      "Carefully remove all people and human figures from this exact image. Fill the removed areas naturally with the surrounding background environment using inpainting. Keep ALL other elements exactly identical - colors, lighting, objects, textures, composition. Do not alter anything except removing the human figures.",
+  },
+  {
+    triggers: ["remove background"],
+    expansion:
+      "Remove the entire background from this image completely and replace it with a clean white or transparent background. Keep the main subject perfectly intact with clean, precise edges and natural lighting.",
+  },
+  {
+    triggers: ["change background", "replace background", "new background"],
+    expansion:
+      "Replace only the background of this exact image with a clean and suitable setting. Keep the main foreground subject completely intact with natural edges and perfect lighting integration. Preserve all colors, details and proportions of the subject.",
+  },
+  {
+    triggers: ["blur background", "bokeh"],
+    expansion:
+      "Apply a smooth and natural bokeh blur effect to only the background of this image. Keep the main foreground subject perfectly sharp, clear and in focus. Create a professional DSLR-like depth of field effect.",
+  },
+  {
+    triggers: ["make brighter", "brighten", "brighter"],
+    expansion:
+      "Increase the brightness and exposure of this exact image naturally. Make it look well-lit and vibrant while preserving all original colors, details, subjects and composition perfectly. Avoid overexposing any areas.",
+  },
+  {
+    triggers: ["make dark", "darken", "darker", "make darker"],
+    expansion:
+      "Reduce the brightness and increase the shadow depth of this exact image naturally. Create a moody and atmospheric look while preserving all original colors, details, subjects and composition perfectly.",
+  },
+  {
+    triggers: ["remove watermark", "remove text", "remove logo", "remove watermarks"],
+    expansion:
+      "Remove all watermarks, text overlays, logos, stamps or any superimposed elements from this exact image completely. Reconstruct the underlying image content naturally and seamlessly in those areas using the surrounding pixels as reference.",
+  },
+  {
+    triggers: ["colorize", "color this", "add color", "add colors"],
+    expansion:
+      "Add natural, realistic and visually appealing colors to this image. Choose colors that complement each other and suit the subject matter. Make it look professional and vibrant while keeping the original shapes, design and composition completely intact.",
+  },
+  {
+    triggers: ["remove object"],
+    expansion:
+      "Carefully identify and remove the specified object from this exact image completely. Fill the removed area naturally using the surrounding background as reference. Keep everything else in the image exactly the same.",
+  },
+  {
+    triggers: ["enhance", "improve quality", "improve"],
+    expansion:
+      "Enhance the overall quality of this exact image. Improve sharpness, clarity, detail and color accuracy while preserving all original subjects, composition and colors perfectly. Make it look professional.",
+  },
+  {
+    triggers: ["restore", "repair", "fix"],
+    expansion:
+      "Restore and repair this image to its best possible quality. Fix any damage, artifacts, noise, blur or imperfections while keeping all original content, colors and composition completely intact.",
+  },
+];
+
+function expandShortEditPrompt(prompt: string): string | null {
+  const normalized = prompt.trim().toLowerCase();
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  // Only expand short prompts; longer prompts are already detailed.
+  if (wordCount > 20) return null;
+  for (const { triggers, expansion } of EDIT_EXPANSIONS) {
+    if (triggers.some((t) => normalized.includes(t))) return expansion;
+  }
+  return null;
+}
+
 export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<string> {
+  // Longer prompts (>20 words) are already specific enough — send as-is.
+  const wordCount = prompt.trim().split(/\s+/).filter(Boolean).length;
+  if (wordCount > 20) return prompt;
+
+  // Deterministic expansion of common short edit instructions.
+  if (isEdit) {
+    const canned = expandShortEditPrompt(prompt);
+    if (canned) return canned;
+  }
+
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return prompt;
 
