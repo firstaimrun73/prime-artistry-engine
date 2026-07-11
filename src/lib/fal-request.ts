@@ -142,20 +142,41 @@ export function buildImageEdit({
 }
 
 // ── Text → Image ────────────────────────────────────────────────────────
+ // Detects small/additive edits that must preserve the photo exactly
+const SMALL_EDIT_INTENT =
+  /\b(add|put|wear|place|insert|give|attach|include|show|goggles|glasses|hat|cap|mask|beard|smile|earring|necklace|crown|headband|sunglasses|accessory)\b/;
+
 export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRequestInput): FalRequest {
   if (imageUrl) {
     if (!isEnhancementOnly(prompt)) {
-      const s = Math.min(1, Math.max(0.75, strength));
+      const p = (prompt || "").toLowerCase();
+      
+      // Small edits (add goggles, add hat etc.) need LOW strength
+      // to preserve the original photo and only make small changes
+      const isSmallEdit = SMALL_EDIT_INTENT.test(p);
+      
+      const s = isSmallEdit
+        ? Math.min(0.65, Math.max(0.55, strength * 0.7)) // low: 0.55-0.65
+        : Math.min(1, Math.max(0.75, strength));           // high: 0.75-1.0
+
+      const guidance = isSmallEdit ? 2.5 : 3.5;
+      const steps = isSmallEdit ? 35 : 40;
+
+      // For small edits, add strong preservation instruction to prompt
+      const finalPrompt = isSmallEdit
+        ? `${prompt}. Keep the photo completely realistic. Do NOT change art style. Do NOT make it cartoon or anime. Preserve the original photo, person, lighting, colors and background exactly. Only make this one small specific change.`
+        : prompt;
+
       return {
         workflow: "image-to-image",
         model: IMAGE_EDIT_MODEL,
         endpoint: ep(IMAGE_EDIT_MODEL),
         body: {
-          prompt,
+          prompt: finalPrompt,
           image_url: imageUrl,
           strength: s,
-          guidance_scale: 3.5,
-          num_inference_steps: 40,
+          guidance_scale: guidance,
+          num_inference_steps: steps,
           num_images: 1,
           output_format: "jpeg",
           enable_safety_checker: true,
@@ -186,7 +207,6 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRe
     },
   };
 }
-
 // ── Image enhancement pipeline ──────────────────────────────────────────
 // Strong, detail-preserving defaults. `strength` (0.1–1) nudges intensity.
 export function buildImageEnhancementPipeline({
