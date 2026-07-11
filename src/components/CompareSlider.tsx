@@ -1,11 +1,52 @@
 import { useRef, useState, useCallback } from "react";
-import { ZoomIn, ZoomOut, Maximize2, X } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, X, Columns2, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Props = {
   before: string;
   after: string;
 };
+
+type ViewMode = "side" | "slider";
+
+/**
+ * Side-by-side view: before and after live in their OWN containers, so the two
+ * images can never overlap. Stacks on mobile, sits side-by-side on desktop.
+ */
+function SideBySide({ before, after, zoom }: Props & { zoom: number }) {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card">
+        <div className="relative aspect-square w-full">
+          <img
+            src={before}
+            alt="Before"
+            draggable={false}
+            className="h-full w-full object-contain transition-transform"
+            style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
+          />
+        </div>
+        <span className="absolute left-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+          Before
+        </span>
+      </div>
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card">
+        <div className="relative aspect-square w-full">
+          <img
+            src={after}
+            alt="After"
+            draggable={false}
+            className="h-full w-full object-contain transition-transform"
+            style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
+          />
+        </div>
+        <span className="absolute right-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+          After
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function Slider({ before, after, zoom }: Props & { zoom: number }) {
   const [pos, setPos] = useState(50);
@@ -27,17 +68,20 @@ function Slider({ before, after, zoom }: Props & { zoom: number }) {
       onMouseMove={(e) => dragging.current && update(e.clientX)}
       onMouseUp={() => (dragging.current = false)}
       onMouseLeave={() => (dragging.current = false)}
-      onTouchMove={(e) => update(e.touches[0].clientX)}
+      onTouchMove={(e) => dragging.current && update(e.touches[0].clientX)}
+      onTouchEnd={() => (dragging.current = false)}
     >
+      {/* After is the base layer (z-0) */}
       <img
         src={after}
         alt="After"
         draggable={false}
-        className="absolute inset-0 h-full w-full object-contain transition-transform"
-        style={{ transform: `scale(${zoom})` }}
+        className="absolute inset-0 z-0 h-full w-full object-contain transition-transform"
+        style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
       />
+      {/* Before is clipped on top (z-10); dragging right reveals more Before, left reveals more After */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 z-10"
         style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
       >
         <img
@@ -45,17 +89,17 @@ function Slider({ before, after, zoom }: Props & { zoom: number }) {
           alt="Before"
           draggable={false}
           className="absolute inset-0 h-full w-full object-contain transition-transform"
-          style={{ transform: `scale(${zoom})` }}
+          style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
         />
       </div>
-      <span className="absolute left-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+      <span className="absolute left-2 top-2 z-20 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
         Before
       </span>
-      <span className="absolute right-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+      <span className="absolute right-2 top-2 z-20 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
         After
       </span>
       <div
-        className="absolute inset-y-0 z-10 w-1 -translate-x-1/2 cursor-ew-resize bg-primary"
+        className="absolute inset-y-0 z-30 w-1 -translate-x-1/2 cursor-ew-resize bg-primary"
         style={{ left: `${pos}%` }}
         onMouseDown={() => (dragging.current = true)}
         onTouchStart={() => (dragging.current = true)}
@@ -68,26 +112,60 @@ function Slider({ before, after, zoom }: Props & { zoom: number }) {
   );
 }
 
+function Controls({
+  zoom,
+  setZoom,
+  mode,
+  setMode,
+  onFull,
+}: {
+  zoom: number;
+  setZoom: React.Dispatch<React.SetStateAction<number>>;
+  mode: ViewMode;
+  setMode: (m: ViewMode) => void;
+  onFull?: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      <Button size="sm" variant={mode === "side" ? "default" : "outline"} onClick={() => setMode("side")}>
+        <Columns2 className="mr-1.5 h-4 w-4" /> Side by side
+      </Button>
+      <Button size="sm" variant={mode === "slider" ? "default" : "outline"} onClick={() => setMode("slider")}>
+        <SlidersHorizontal className="mr-1.5 h-4 w-4" /> Slider
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
+        <ZoomOut className="h-4 w-4" />
+      </Button>
+      <span className="min-w-12 text-center text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
+      <Button size="sm" variant="outline" onClick={() => setZoom((z) => Math.min(3, z + 0.25))}>
+        <ZoomIn className="h-4 w-4" />
+      </Button>
+      {onFull && (
+        <Button size="sm" variant="outline" onClick={onFull}>
+          <Maximize2 className="mr-1.5 h-4 w-4" /> Fullscreen
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function CompareSlider({ before, after }: Props) {
   const [zoom, setZoom] = useState(1);
   const [full, setFull] = useState(false);
+  const [mode, setMode] = useState<ViewMode>("side");
+
+  const View =
+    mode === "slider" ? (
+      <Slider before={before} after={after} zoom={zoom} />
+    ) : (
+      <SideBySide before={before} after={after} zoom={zoom} />
+    );
 
   return (
     <>
       <div className="space-y-2">
-        <Slider before={before} after={after} zoom={zoom} />
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <span className="min-w-12 text-center text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
-          <Button size="sm" variant="outline" onClick={() => setZoom((z) => Math.min(3, z + 0.25))}>
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setFull(true)}>
-            <Maximize2 className="mr-1.5 h-4 w-4" /> Fullscreen
-          </Button>
-        </div>
+        {View}
+        <Controls zoom={zoom} setZoom={setZoom} mode={mode} setMode={setMode} onFull={() => setFull(true)} />
       </div>
 
       {full && (
@@ -99,15 +177,9 @@ export function CompareSlider({ before, after }: Props) {
           </div>
           <div className="mx-auto flex w-full max-w-3xl flex-1 items-center">
             <div className="w-full">
-              <Slider before={before} after={after} zoom={zoom} />
-              <div className="mt-3 flex items-center justify-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <span className="min-w-12 text-center text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
-                <Button size="sm" variant="outline" onClick={() => setZoom((z) => Math.min(3, z + 0.25))}>
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
+              {View}
+              <div className="mt-3">
+                <Controls zoom={zoom} setZoom={setZoom} mode={mode} setMode={setMode} />
               </div>
             </div>
           </div>

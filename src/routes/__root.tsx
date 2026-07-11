@@ -108,7 +108,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
     scripts: [
-      { src: "https://checkout.razorpay.com/v1/checkout.js", defer: true },{ src: "https://quge5.com/88/tag.min.js", async: true },
+      { src: "https://checkout.razorpay.com/v1/checkout.js", defer: true },
       { src: "https://www.googletagmanager.com/gtag/js?id=G-3NCVLG63JR", async: true },
       {
         children:
@@ -127,6 +127,12 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script
+          src="https://quge5.com/88/tag.min.js"
+          data-zone="258158"
+          async={true}
+          data-cfasync="false"
+        />
       </head>
       <body>
         {children}
