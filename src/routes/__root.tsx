@@ -128,7 +128,10 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{__html: `(function(s){s.dataset.zone='11268538',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`}} />
+<script dangerouslySetInnerHTML={{__html: `(function(s){s.dataset.zone='11268548',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`}} /><HeadContent />
+<script dangerouslySetInnerHTML={{__html: `(function(s){s.dataset.zone='11268538',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`}} />
 <script dangerouslySetInnerHTML={{__html: `(function(s){s.dataset.zone='11268548',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`}} />
+<script dangerouslySetInnerHTML={{__html: `(function(s){s.dataset.zone='11270411',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`}} />
       </head>
       <body>
         {children}
