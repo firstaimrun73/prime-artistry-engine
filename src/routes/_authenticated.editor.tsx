@@ -193,10 +193,20 @@ function Editor() {
       if (inputKind === "image" && inputFile) {
         mediaUrl = await uploadToStorage(inputFile);
         sourceKind = "image";
-      } else if (inputKind === "image" && inputDataUrl) {
-        mediaUrl = inputDataUrl; // reused result URL or small data URI
-        sourceKind = "image";
-      } else if (inputKind === "video" && inputFile) {
+        } else if (inputKind === "image" && inputDataUrl) {
+  // If it's a base64 data URI, upload to Supabase first
+  if (inputDataUrl.startsWith("data:")) {
+    const base64Response = await fetch(inputDataUrl);
+    const blob = await base64Response.blob();
+    const file = new File([blob], `image-${Date.now()}.jpg`, 
+      { type: "image/jpeg" });
+    mediaUrl = await uploadToStorage(file);
+  } else {
+    // Already a real URL (reused from history)
+    mediaUrl = inputDataUrl;
+  }
+  sourceKind = "image";
+} else if (inputKind === "video" && inputFile) {
         mediaUrl = await uploadToStorage(inputFile);
         sourceKind = "video";
       }
