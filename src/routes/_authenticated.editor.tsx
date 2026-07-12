@@ -165,6 +165,7 @@ function Editor() {
     if (upErr) throw new Error("Upload failed. Try a smaller file.");
     const { data, error } = await supabase.storage.from("uploads").createSignedUrl(path, 60 * 60);
     if (error || !data?.signedUrl) throw new Error("Could not prepare your upload.");
+    if (!data.signedUrl.startsWith("https://")) throw new Error("Upload preparation failed.");
     return data.signedUrl;
   };
 
