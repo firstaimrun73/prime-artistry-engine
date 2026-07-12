@@ -192,24 +192,37 @@ function Editor() {
       let mediaUrl: string | undefined;
       let sourceKind: "image" | "video" | undefined;
       if (inputKind === "image" && inputFile) {
+        // Fresh upload → upload to Supabase
         mediaUrl = await uploadToStorage(inputFile);
         sourceKind = "image";
-        } else if (inputKind === "image" && inputDataUrl) {
-  // If it's a base64 data URI, upload to Supabase first
-  if (inputDataUrl.startsWith("data:")) {
-    const base64Response = await fetch(inputDataUrl);
-    const blob = await base64Response.blob();
-    const file = new File([blob], `image-${Date.now()}.jpg`, 
-      { type: "image/jpeg" });
-    mediaUrl = await uploadToStorage(file);
-  } else {
-    // Already a real URL (reused from history)
-    mediaUrl = inputDataUrl;
-  }
-  sourceKind = "image";
-} else if (inputKind === "video" && inputFile) {
+      } else if (inputKind === "image" && inputDataUrl) {
+        if (inputDataUrl.startsWith("data:") || inputDataUrl.startsWith("blob:")) {
+          // Convert base64/blob → File → upload to Supabase
+          const res = await fetch(inputDataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], `img-${Date.now()}.jpg`, {
+            type: blob.type || "image/jpeg",
+          });
+          mediaUrl = await uploadToStorage(file);
+        } else if (inputDataUrl.startsWith("https://")) {
+          // Already a real URL (reused from history)
+          mediaUrl = inputDataUrl;
+        } else {
+          throw new Error("Invalid image. Please re-upload your photo.");
+        }
+        sourceKind = "image";
+      } else if (inputKind === "video" && inputFile) {
         mediaUrl = await uploadToStorage(inputFile);
         sourceKind = "video";
+      }
+
+      // SAFETY CHECK: Verify URL is valid https before sending to FAL.ai
+      if (mediaUrl && !mediaUrl.startsWith("https://")) {
+        throw new Error("Image upload failed. Please re-upload and try again.");
+      }
+      // SAFETY CHECK: If image mode needs a URL
+      if (sourceKind === "image" && !mediaUrl) {
+        throw new Error("Please upload an image first.");
       }
       if (runId !== runIdRef.current) return;
 
