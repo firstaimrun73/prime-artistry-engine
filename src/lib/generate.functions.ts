@@ -254,10 +254,15 @@ export const generateMedia = createServerFn({ method: "POST" })
           const { getPlanLimits } = await import("@/utils/planLimits");
           const maxImages = getPlanLimits(profile.plan).maxImages;
           const refs = (data.referenceImageUrls ?? []).slice(0, Math.max(0, maxImages - 1));
+          // Quality presets (Fix 2) are classified from the ORIGINAL short
+          // prompt. For generic ("default") edits the user's strength slider
+          // still applies; small/large edits use their tuned presets.
+          const editSize = classifyEditSize(data.prompt);
           const step = buildImageEdit({
             prompt: enhancedPrompt,
+            rawPrompt: data.prompt,
             imageUrl: data.imageUrl,
-            strength: data.strength,
+            strength: editSize === "default" ? data.strength : undefined,
             referenceImageUrls: refs.length > 0 ? refs : undefined,
           });
           outputUrl = await runFalStep(step, falKey);
