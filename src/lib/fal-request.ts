@@ -104,24 +104,59 @@ export function isEnhancementOnly(prompt: string): boolean {
   return hadQuality && remaining.length === 0;
 }
 
+// ── Edit-size classification & quality presets ───────────────────────────
+// Classification uses the ORIGINAL short user prompt (not the enhanced one) so
+// small/large/default edits get tuned strength, guidance and steps.
+export type EditSize = "small" | "large" | "default";
+
+const SMALL_EDIT_MATCH =
+  /\b(add\s+goggles|add\s+glasses|add\s+sunglasses|make\s+brighter|straighten\s+head|fix\s+pose)\b/i;
+const LARGE_EDIT_MATCH =
+  /\b(remove\s+background|change\s+background|remove\s+watermark)\b/i;
+
+export function classifyEditSize(userPrompt: string): EditSize {
+  if (SMALL_EDIT_MATCH.test(userPrompt)) return "small";
+  if (LARGE_EDIT_MATCH.test(userPrompt)) return "large";
+  return "default";
+}
+
+export function getQualitySettings(editSize: EditSize) {
+  switch (editSize) {
+    case "small":
+      return { strength: 0.6, guidance_scale: 3.0, num_inference_steps: 50 };
+    case "large":
+      return { strength: 0.82, guidance_scale: 4.0, num_inference_steps: 50 };
+    default:
+      return { strength: 0.7, guidance_scale: 4.0, num_inference_steps: 50 };
+  }
+}
+
 // ── Image edit (FLUX dev image-to-image) ─────────────────────────────────
 export function buildImageEdit({
   prompt,
   imageUrl,
-  strength = 0.8,
+  strength,
   referenceImageUrls,
+  rawPrompt,
 }: {
   prompt: string;
   imageUrl: string;
-  /** Edit strength. Clamped to a minimum of 0.7 so edits are clearly visible. */
+  /** Optional manual strength override (0.1–1). When omitted, presets apply. */
   strength?: number;
   /** Extra reference images (multi-image), plan-gated by caller. */
   referenceImageUrls?: string[];
+  /** Original short user prompt — used to classify edit size for quality presets. */
+  rawPrompt?: string;
 }): FalStep {
-  // Enforce a visible-edit floor: below ~0.7 flux dev returns near-identical output.
-  const s = Math.min(1, Math.max(0.75, strength ?? 0.8));
+  const editSize = classifyEditSize(rawPrompt ?? prompt);
+  const quality = getQualitySettings(editSize);
+  // A manual strength override still respects a visible-edit floor of 0.55.
+  const s =
+    typeof strength === "number"
+      ? Math.min(1, Math.max(0.55, strength))
+      : quality.strength;
   return {
-    label: "edit (flux dev image-to-image)",
+    label: `edit (flux dev image-to-image, ${editSize})`,
     model: IMAGE_EDIT_MODEL,
     endpoint: ep(IMAGE_EDIT_MODEL),
     outputKind: "image",
@@ -132,10 +167,10 @@ export function buildImageEdit({
         ? { image_urls: referenceImageUrls }
         : {}),
       strength: s,
-      guidance_scale: 3.5,
-      num_inference_steps: 40,
+      guidance_scale: quality.guidance_scale,
+      num_inference_steps: quality.num_inference_steps,
       num_images: 1,
-      output_format: "jpeg",
+      output_format: "png",
       enable_safety_checker: true,
     },
   };

@@ -4,7 +4,8 @@ import { useAuth } from "@/lib/auth";
 import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
-import { watermarkImage } from "@/lib/watermark";
+import { watermarkImage, applyDownloadWatermarkGrid } from "@/lib/watermark";
+import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Slider } from "@/components/ui/slider";
 import { CompareSlider } from "@/components/CompareSlider";
 import { MultiImageInput } from "@/components/MultiImageInput";
 import { getPlanLimits } from "@/utils/planLimits";
-import { MonetagBanner } from "@/components/MonetagBanner";
+
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
@@ -61,7 +62,8 @@ function Editor() {
 
   const runIdRef = useRef(0);
 
-  const isFree = profile?.plan === "free";
+  const isAdmin = isAdminEmail(profile?.email);
+  const isFree = profile?.plan === "free" && !isAdmin;
 
   // Stages depend on whether an image is being edited.
   const stages = inputDataUrl
@@ -115,8 +117,8 @@ function Editor() {
   if (!profile) return null;
   const plan = getPlan(profile.plan);
   const cost = CREDIT_COST[mediaType];
-  const noCredits = profile.credits < cost;
-  const videoLocked = mediaType === "video" && !plan.video;
+  const noCredits = !isAdmin && profile.credits < cost;
+  const videoLocked = !isAdmin && mediaType === "video" && !plan.video;
   const planLimits = getPlanLimits(profile.plan);
   const canAddRefImages = mediaType === "image" && !!inputDataUrl && planLimits.maxImages > 1;
   const loading = state === "loading" || state === "analyzing";
@@ -245,7 +247,7 @@ function Editor() {
       setOutputIsVideo(isVideoOut);
       // Watermark images for FREE users (always) and paid users who keep it on.
       // Video watermarking is applied server-side where supported.
-      if (!isVideoOut && url && (isFree || keepWatermark)) {
+      if (!isVideoOut && url && !isAdmin && (isFree || keepWatermark)) {
         try { url = await watermarkImage(url); } catch { /* keep original */ }
       }
       if (runId !== runIdRef.current) return;
@@ -303,10 +305,15 @@ function Editor() {
     toast.success("Result moved to input — keep editing.");
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!output) return;
+    let downloadUrl = output;
+    // FREE users get an extra full-image protective watermark grid on download.
+    if (isFree && !outputIsVideo) {
+      try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* keep original */ }
+    }
     const a = document.createElement("a");
-    a.href = output;
+    a.href = downloadUrl;
     a.download = `motio2edit-${Date.now()}.${outputIsVideo ? "mp4" : "png"}`;
     document.body.appendChild(a);
     a.click();
@@ -332,7 +339,7 @@ function Editor() {
         <h1 className="text-2xl font-bold">Editor</h1>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold">
-            {profile.credits} credits
+            {isAdmin ? "∞ credits" : `${profile.credits} credits`}
           </span>
           <span className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
             Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits
@@ -639,9 +646,6 @@ function Editor() {
           )}
         </div>
       </div>
-
-      {/* Ad banner — free plan only; renders nothing when Monetag is off. */}
-      <MonetagBanner show={isFree} />
     </div>
   );
 }

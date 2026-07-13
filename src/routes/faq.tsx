@@ -38,7 +38,7 @@ const CATEGORIES: Category[] = [
   {
     title: "Credits & Billing",
     items: [
-      { q: "How do credits work?", a: "Every generation spends credits. Image generation costs 12 credits and video generation costs 60 credits. Your balance is shown in the header and on your dashboard." },
+      { q: "How do credits work?", a: "Every generation spends credits. Image generation costs 25 credits and video generation costs 125 credits. Your balance is shown in the header and on your dashboard." },
       { q: "Do credits expire?", a: "Monthly plan credits refresh with each billing cycle. Starter credits on the Free plan do not expire until used." },
       { q: "Can I buy additional credits?", a: "Yes — upgrade to a higher plan for a larger monthly allowance. Additional one-off credit top-ups can be requested through Support." },
       { q: "What payment methods are supported?", a: "Credit / Debit Card (processed securely via Razorpay) and Crypto (USDT, BTC, ETH). Card payments are charged in INR." },

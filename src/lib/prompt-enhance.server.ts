@@ -12,6 +12,16 @@ type EnhanceArgs = {
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
+// Prepended to every image-EDIT instruction so the model treats the input as a
+// real photograph and preserves identity / composition instead of regenerating.
+const BASE_PHOTO_LOCK =
+  "This is a real photograph. Treat it as a real photo edit. " +
+  "Preserve the exact person, their face, skin tone, body proportions, " +
+  "clothing and pose exactly. Preserve the exact background, lighting, " +
+  "colors and composition exactly. Only make the specific requested change. " +
+  "Do not change art style. Keep it photorealistic. Do not make it cartoon, " +
+  "anime, painting or illustration.";
+
 /**
  * Deterministic expansion for common short editing prompts. Each entry maps a
  * set of trigger phrases to a fully detailed, FAL-ready instruction that
@@ -87,18 +97,28 @@ function expandShortEditPrompt(prompt: string): string | null {
 }
 
 export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<string> {
+  // For edits, always lock the photo so identity/composition are preserved.
+  const lock = (text: string) => (isEdit ? `${BASE_PHOTO_LOCK}\n\n${text}` : text);
+
   // Longer prompts (>20 words) are already specific enough — send as-is.
   const wordCount = prompt.trim().split(/\s+/).filter(Boolean).length;
-  if (wordCount > 20) return prompt;
+  if (wordCount > 20) return lock(prompt);
 
   // Deterministic expansion of common short edit instructions.
   if (isEdit) {
     const canned = expandShortEditPrompt(prompt);
-    if (canned) return canned;
+    if (canned) return lock(canned);
   }
 
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return prompt;
+  if (!key) {
+    // No AI available — still return a locked, preservation-heavy instruction.
+    return lock(
+      `${prompt.trim()}. Keep this photo completely photorealistic. Preserve the ` +
+        `exact person, face, skin tone, clothing, background and lighting. ` +
+        `Only make the specific requested change. Do not alter anything else.`,
+    );
+  }
 
   const system = isEdit
     ? [
@@ -131,12 +151,12 @@ export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<st
         messages: [{ role: "user", content: prompt }],
       }),
     });
-    if (!res.ok) return prompt;
+    if (!res.ok) return lock(prompt);
     const json = (await res.json()) as { content?: { type?: string; text?: string }[] };
     const enhanced = json.content?.find((c) => c.type === "text")?.text?.trim();
-    return enhanced && enhanced.length > 0 ? enhanced : prompt;
+    return enhanced && enhanced.length > 0 ? lock(enhanced) : lock(prompt);
   } catch {
-    return prompt;
+    return lock(prompt);
   }
 }
 

@@ -148,11 +148,11 @@ function Pricing() {
 
                 {plan.id === "free" ? (
                   <p className="mt-4 text-xs text-muted-foreground">
-                    Includes occasional ads to keep the free tier sustainable.
+                    Free images include watermark protection. Upgrade to download without watermarks.
                   </p>
                 ) : (
                   <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
-                    <Check className="h-3.5 w-3.5" /> No Ads — Clean Experience
+                    <Check className="h-3.5 w-3.5" /> Watermark-free downloads
                   </p>
                 )}
 

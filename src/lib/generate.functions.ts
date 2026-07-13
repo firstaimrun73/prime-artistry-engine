@@ -9,6 +9,7 @@ import {
   buildVideoEnhancement,
   buildTextToVideo,
   buildImageToVideo,
+  classifyEditSize,
   isEnhancementOnly,
   type FalStep,
 } from "@/lib/fal-request";
@@ -161,7 +162,7 @@ export const generateMedia = createServerFn({ method: "POST" })
 
     const { data: profile, error: pErr } = await supabase
       .from("profiles")
-      .select("plan, credits")
+      .select("plan, credits, email")
       .eq("id", userId)
       .single();
 
@@ -169,12 +170,19 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Could not load your account.");
     }
 
-    if (data.type === "video" && profile.plan === "free") {
+    // Admin account: unlimited access — no plan gating, no credit checks/charges.
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const isAdmin =
+      !!adminEmail &&
+      !!profile.email &&
+      profile.email.toLowerCase() === adminEmail.toLowerCase();
+
+    if (!isAdmin && data.type === "video" && profile.plan === "free") {
       throw new Error("Video generation requires a paid plan.");
     }
 
     const cost = CREDIT_COST[data.type];
-    if (profile.credits < cost) {
+    if (!isAdmin && profile.credits < cost) {
       throw new Error(
         `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
       );
@@ -253,10 +261,15 @@ export const generateMedia = createServerFn({ method: "POST" })
           const { getPlanLimits } = await import("@/utils/planLimits");
           const maxImages = getPlanLimits(profile.plan).maxImages;
           const refs = (data.referenceImageUrls ?? []).slice(0, Math.max(0, maxImages - 1));
+          // Quality presets (Fix 2) are classified from the ORIGINAL short
+          // prompt. For generic ("default") edits the user's strength slider
+          // still applies; small/large edits use their tuned presets.
+          const editSize = classifyEditSize(data.prompt);
           const step = buildImageEdit({
             prompt: enhancedPrompt,
+            rawPrompt: data.prompt,
             imageUrl: data.imageUrl,
-            strength: data.strength,
+            strength: editSize === "default" ? data.strength : undefined,
             referenceImageUrls: refs.length > 0 ? refs : undefined,
           });
           outputUrl = await runFalStep(step, falKey);
@@ -314,35 +327,39 @@ export const generateMedia = createServerFn({ method: "POST" })
     }
 
     // ── Charge credits AFTER a confirmed successful output ───────────────
-    // deduct_credits is atomic: it re-checks the balance and decrements in a
-    // single statement, preventing negative balances and concurrent double-spend.
-    const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
-      _amount: cost,
-      _gen_type: data.type,
-      _user_id: userId,
-    });
-    if (dErr || !deduction) {
-      if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
-        throw new Error(
-          `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
-        );
-      }
-      console.error("[generate] credit deduction failed:", {
-        message: dErr?.message,
-        code: (dErr as { code?: string })?.code,
-        details: (dErr as { details?: string })?.details,
-        hint: (dErr as { hint?: string })?.hint,
-        userId,
-        amount: cost,
-        genType: data.type,
+    // Admin account is never charged and keeps its unlimited balance.
+    let newCredits = profile.credits;
+    if (isAdmin) {
+      console.log("[generate] admin account — skipping credit deduction");
+    } else {
+      // deduct_credits is atomic: it re-checks the balance and decrements in a
+      // single statement, preventing negative balances and concurrent double-spend.
+      const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
+        _amount: cost,
+        _gen_type: data.type,
+        _user_id: userId,
       });
-      throw new Error(`Could not charge credits: ${dErr?.message || "unknown error"}`);
+      if (dErr || !deduction) {
+        if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
+          throw new Error(
+            `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
+          );
+        }
+        console.error("[generate] credit deduction failed:", {
+          message: dErr?.message,
+          code: (dErr as { code?: string })?.code,
+          details: (dErr as { details?: string })?.details,
+          hint: (dErr as { hint?: string })?.hint,
+          userId,
+          amount: cost,
+          genType: data.type,
+        });
+        throw new Error(`Could not charge credits: ${dErr?.message || "unknown error"}`);
+      }
+      const deducted = deduction as { transaction_id: string; credits: number };
+      newCredits = deducted.credits;
+      console.log("[generate] charged", cost, "credits → remaining", newCredits, "tx", deducted.transaction_id);
     }
-    const { transaction_id: txId, credits: newCredits } = deduction as {
-      transaction_id: string;
-      credits: number;
-    };
-    console.log("[generate] charged", cost, "credits → remaining", newCredits, "tx", txId);
 
     // ── Persist history ─────────────────────────────────────────────────
     console.log("[generate] output ready:", outputUrl.slice(0, 80));

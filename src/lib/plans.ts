@@ -50,6 +50,26 @@ export const CREDIT_COST = {
 /** Sentinel for "unlimited" credits (Business). */
 export const UNLIMITED_CREDITS = 9_999_999;
 
+/** Free signup bonus credits (kept in sync with the handle_new_user DB trigger). */
+export const FREE_SIGNUP_CREDITS = 40;
+
+/** One-time credit top-up — buyable on any plan, credits never expire. */
+export const CREDIT_TOPUP = {
+  id: "credit-topup-499",
+  name: "Credit Top-up",
+  price: 4.99,
+  credits: 320,
+  type: "one_time" as const,
+  description: "320 AI credits, valid forever, works with any plan.",
+  bullets: [
+    "320 AI credits",
+    "Valid forever (no expiry)",
+    "Works with any plan",
+    "≈ 12 image edits at 25 credits each",
+    "Can be purchased multiple times",
+  ],
+} as const;
+
 /** Human-readable credits for display ("Unlimited" for the Business sentinel). */
 export function creditsLabel(credits: number): string {
   return credits >= UNLIMITED_CREDITS ? "Unlimited" : credits.toLocaleString();
@@ -82,12 +102,12 @@ export const PLANS: Plan[] = [
   {
     id: "free",
     name: "Free",
-    credits: 60,
+    credits: 40,
     video: true,
     priority: false,
     price: { USD: 0, EUR: 0, INR: 0 },
     features: [
-      "60 monthly credits",
+      "40 monthly credits",
       "AI image generation",
       "AI video generation",
       "Standard processing",
@@ -174,7 +194,7 @@ export const PLANS: Plan[] = [
 ];
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
-  free: 60,
+  free: 40,
   plus: 750,
   pro: 2500,
   studio: 5000,
