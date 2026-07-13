@@ -247,7 +247,7 @@ function Editor() {
       setOutputIsVideo(isVideoOut);
       // Watermark images for FREE users (always) and paid users who keep it on.
       // Video watermarking is applied server-side where supported.
-      if (!isVideoOut && url && (isFree || keepWatermark)) {
+      if (!isVideoOut && url && !isAdmin && (isFree || keepWatermark)) {
         try { url = await watermarkImage(url); } catch { /* keep original */ }
       }
       if (runId !== runIdRef.current) return;
@@ -305,10 +305,15 @@ function Editor() {
     toast.success("Result moved to input — keep editing.");
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!output) return;
+    let downloadUrl = output;
+    // FREE users get an extra full-image protective watermark grid on download.
+    if (isFree && !outputIsVideo) {
+      try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* keep original */ }
+    }
     const a = document.createElement("a");
-    a.href = output;
+    a.href = downloadUrl;
     a.download = `motio2edit-${Date.now()}.${outputIsVideo ? "mp4" : "png"}`;
     document.body.appendChild(a);
     a.click();
@@ -334,7 +339,7 @@ function Editor() {
         <h1 className="text-2xl font-bold">Editor</h1>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold">
-            {profile.credits} credits
+            {isAdmin ? "∞ credits" : `${profile.credits} credits`}
           </span>
           <span className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
             Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits
