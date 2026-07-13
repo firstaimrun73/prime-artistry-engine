@@ -9,6 +9,7 @@ import {
   buildVideoEnhancement,
   buildTextToVideo,
   buildImageToVideo,
+  classifyEditSize,
   isEnhancementOnly,
   type FalStep,
 } from "@/lib/fal-request";
