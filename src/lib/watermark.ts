@@ -110,3 +110,66 @@ export async function watermarkImage(src: string): Promise<string> {
     canvas.toBlob((b) => resolve(b ? URL.createObjectURL(b) : src), "image/png");
   });
 }
+
+const WATERMARK_TEXT = "MOTIO2EDIT.COM";
+
+/**
+ * Download-time protection for FREE users only. Applies a staggered grid of
+ * diagonal "MOTIO2EDIT.COM" marks across the whole image on top of the
+ * already-branded output, so saved files can't be used without attribution.
+ * Returns an object URL; falls back to the source on any failure.
+ */
+export async function applyDownloadWatermarkGrid(imageUrl: string): Promise<string> {
+  try {
+    const res = await fetch(imageUrl);
+    const blob = await res.blob();
+    const bitmap = await createImageBitmap(blob);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return imageUrl;
+    ctx.drawImage(bitmap, 0, 0);
+
+    const W = canvas.width;
+    const H = canvas.height;
+
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 1.5;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const tiles = [
+      { xr: 0.15, yr: 0.15, size: 0.045 },
+      { xr: 0.5, yr: 0.1, size: 0.06 },
+      { xr: 0.85, yr: 0.2, size: 0.04 },
+      { xr: 0.25, yr: 0.5, size: 0.055 },
+      { xr: 0.7, yr: 0.5, size: 0.05 },
+      { xr: 0.15, yr: 0.85, size: 0.045 },
+      { xr: 0.75, yr: 0.85, size: 0.06 },
+    ];
+
+    for (const t of tiles) {
+      const fontSize = Math.max(14, Math.floor(W * t.size));
+      ctx.font = `bold ${fontSize}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+      ctx.save();
+      ctx.translate(W * t.xr, H * t.yr);
+      ctx.rotate(-Math.PI / 4);
+      ctx.strokeText(WATERMARK_TEXT, 0, 0);
+      ctx.fillText(WATERMARK_TEXT, 0, 0);
+      ctx.restore();
+    }
+
+    ctx.restore();
+
+    return await new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b ? URL.createObjectURL(b) : imageUrl), "image/png");
+    });
+  } catch {
+    return imageUrl;
+  }
+}
