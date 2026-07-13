@@ -12,6 +12,16 @@ type EnhanceArgs = {
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
+// Prepended to every image-EDIT instruction so the model treats the input as a
+// real photograph and preserves identity / composition instead of regenerating.
+const BASE_PHOTO_LOCK =
+  "This is a real photograph. Treat it as a real photo edit. " +
+  "Preserve the exact person, their face, skin tone, body proportions, " +
+  "clothing and pose exactly. Preserve the exact background, lighting, " +
+  "colors and composition exactly. Only make the specific requested change. " +
+  "Do not change art style. Keep it photorealistic. Do not make it cartoon, " +
+  "anime, painting or illustration.";
+
 /**
  * Deterministic expansion for common short editing prompts. Each entry maps a
  * set of trigger phrases to a fully detailed, FAL-ready instruction that
