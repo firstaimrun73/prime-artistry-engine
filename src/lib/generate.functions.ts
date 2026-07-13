@@ -162,7 +162,7 @@ export const generateMedia = createServerFn({ method: "POST" })
 
     const { data: profile, error: pErr } = await supabase
       .from("profiles")
-      .select("plan, credits")
+      .select("plan, credits, email")
       .eq("id", userId)
       .single();
 
@@ -170,12 +170,19 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Could not load your account.");
     }
 
-    if (data.type === "video" && profile.plan === "free") {
+    // Admin account: unlimited access — no plan gating, no credit checks/charges.
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const isAdmin =
+      !!adminEmail &&
+      !!profile.email &&
+      profile.email.toLowerCase() === adminEmail.toLowerCase();
+
+    if (!isAdmin && data.type === "video" && profile.plan === "free") {
       throw new Error("Video generation requires a paid plan.");
     }
 
     const cost = CREDIT_COST[data.type];
-    if (profile.credits < cost) {
+    if (!isAdmin && profile.credits < cost) {
       throw new Error(
         `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
       );
