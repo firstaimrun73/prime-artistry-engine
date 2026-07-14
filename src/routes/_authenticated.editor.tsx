@@ -475,6 +475,26 @@ function Editor() {
             </div>
           )}
 
+          {/* Smart Remove — "Circle to Remove" tool. Only shown when an image
+              is uploaded. Costs the standard 25 image credits via the normal
+              image-to-image pipeline (no separate backend call). */}
+          {mediaType === "image" && inputDataUrl && !loading && (
+            <button
+              type="button"
+              onClick={() => setSmartRemoveOpen(true)}
+              className="flex w-full items-center justify-between rounded-lg border border-dashed border-primary/50 bg-primary/5 px-3 py-2.5 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+            >
+              <span className="flex items-center gap-2">
+                <Eraser className="h-4 w-4" />
+                Circle to Remove — paint an object to erase it
+              </span>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold">
+                {CREDIT_COST.image} credits
+              </span>
+            </button>
+          )}
+
+
           {mediaType === "image" && inputDataUrl && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
