@@ -628,7 +628,14 @@ function Editor() {
                     outputIsVideo ? (
                       <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
                     ) : (
-                      <img src={output} alt="output" className="h-full w-full object-contain animate-scale-in" />
+                      <img
+                        src={output}
+                        alt="output"
+                        className="h-full w-full object-contain animate-scale-in select-none"
+                        draggable={false}
+                        onContextMenu={(e) => e.preventDefault()}
+                        style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+                      />
                     )
                   ) : (
                     <span className="text-xs text-muted-foreground">Output appears here</span>
@@ -675,6 +682,22 @@ function Editor() {
           )}
         </div>
       </div>
+
+      {/* Smart Remove ("Circle to Remove") — plan-agnostic, gated by credits. */}
+      <SmartRemoveModal
+        open={smartRemoveOpen}
+        imageUrl={inputPreview}
+        onCancel={() => setSmartRemoveOpen(false)}
+        onApply={(masked) => {
+          setInputPreview(masked);
+          setInputDataUrl(masked);
+          setInputFile(null); // masked composite is not the original File
+          setInputKind("image");
+          setPrompt(SMART_REMOVE_PROMPT);
+          setSmartRemoveOpen(false);
+          toast.success("Selection applied — click Generate to remove.");
+        }}
+      />
     </div>
   );
 }
