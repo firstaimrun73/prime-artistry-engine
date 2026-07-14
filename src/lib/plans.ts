@@ -30,7 +30,7 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
   INR: "₹",
 };
 
-export type PlanId = "free" | "plus" | "pro" | "studio" | "business";
+export type PlanId = "free" | "lite" | "plus" | "pro" | "studio" | "business";
 
 /** Flat per-transaction processing fee added to every paid checkout. */
 export const TRANSACTION_FEE: Record<Currency, number> = {
