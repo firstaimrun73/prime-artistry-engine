@@ -48,6 +48,43 @@ export async function watermarkImage(
 
   ctx.drawImage(bitmap, 0, 0);
 
+  // Optional: burn in a full-image protective grid of "MOTIO2EDIT.COM" marks
+  // BEFORE the corner pill. Used for free users so the version in the DOM is
+  // itself watermarked — right-click / long-press / view-source cannot recover
+  // a clean image because no clean version ever reaches the browser.
+  if (opts.strong) {
+    const W0 = canvas.width;
+    const H0 = canvas.height;
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tiles = [
+      { xr: 0.15, yr: 0.15, size: 0.045, a: 0.32 },
+      { xr: 0.5, yr: 0.1, size: 0.062, a: 1.0 }, // strong primary top
+      { xr: 0.85, yr: 0.2, size: 0.04, a: 0.3 },
+      { xr: 0.25, yr: 0.5, size: 0.055, a: 0.35 },
+      { xr: 0.72, yr: 0.5, size: 0.05, a: 0.3 },
+      { xr: 0.15, yr: 0.85, size: 0.045, a: 0.32 },
+      { xr: 0.78, yr: 0.86, size: 0.055, a: 0.4 },
+    ];
+    for (const t of tiles) {
+      const fs = Math.max(14, Math.floor(W0 * t.size));
+      ctx.font = `bold ${fs}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+      ctx.save();
+      ctx.globalAlpha = t.a;
+      ctx.translate(W0 * t.xr, H0 * t.yr);
+      ctx.rotate(-Math.PI / 4);
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = "rgba(0,0,0,0.55)";
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.strokeText("MOTIO2EDIT.COM", 0, 0);
+      ctx.fillText("MOTIO2EDIT.COM", 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+
   // Scale every element off the image width so the mark stays proportional.
   const W = canvas.width;
   const fontSize = Math.max(13, Math.round(W * 0.026));
