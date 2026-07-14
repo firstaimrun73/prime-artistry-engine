@@ -5,6 +5,7 @@ import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
 import { watermarkImage, applyDownloadWatermarkGrid } from "@/lib/watermark";
+import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +19,7 @@ import { getPlanLimits } from "@/utils/planLimits";
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
-  Square, RotateCcw, Pencil, Recycle, Check, RefreshCw, Share2, Wand2,
+  Square, RotateCcw, Pencil, Recycle, Check, RefreshCw, Share2, Wand2, Eraser,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/editor")({
