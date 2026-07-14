@@ -5,6 +5,7 @@ import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
 import { watermarkImage, applyDownloadWatermarkGrid } from "@/lib/watermark";
+import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +19,7 @@ import { getPlanLimits } from "@/utils/planLimits";
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
-  Square, RotateCcw, Pencil, Recycle, Check, RefreshCw, Share2, Wand2,
+  Square, RotateCcw, Pencil, Recycle, Check, RefreshCw, Share2, Wand2, Eraser,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/editor")({
@@ -53,8 +54,9 @@ function Editor() {
   const [outputIsVideo, setOutputIsVideo] = useState(false);
   const [state, setState] = useState<GenState>("idle");
   const [strength, setStrength] = useState(0.7);
-  const [keepWatermark, setKeepWatermark] = useState(true);
+  const [keepWatermark, setKeepWatermark] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
 
   const [msgIdx, setMsgIdx] = useState(0);
   const [stage, setStage] = useState(0);
@@ -245,10 +247,17 @@ function Editor() {
       let url = res.outputUrl;
       const isVideoOut = mediaType === "video";
       setOutputIsVideo(isVideoOut);
-      // Watermark images for FREE users (always) and paid users who keep it on.
-      // Video watermarking is applied server-side where supported.
-      if (!isVideoOut && url && !isAdmin && (isFree || keepWatermark)) {
-        try { url = await watermarkImage(url); } catch { /* keep original */ }
+      // Watermarking for images. Free users get the STRONG variant (full-image
+      // grid + corner pill) burned in BEFORE the URL ever reaches the DOM —
+      // right-click / long-press / view-source cannot recover a clean image
+      // because no clean version is ever stored on the client. Paid users on
+      // "keep watermark" get only the subtle corner pill. Admins are exempt.
+      if (!isVideoOut && url && !isAdmin) {
+        if (isFree) {
+          try { url = await watermarkImage(url, { strong: true }); } catch { /* keep original */ }
+        } else if (keepWatermark) {
+          try { url = await watermarkImage(url); } catch { /* keep original */ }
+        }
       }
       if (runId !== runIdRef.current) return;
       setProgress(100);
@@ -466,6 +475,26 @@ function Editor() {
             </div>
           )}
 
+          {/* Smart Remove — "Circle to Remove" tool. Only shown when an image
+              is uploaded. Costs the standard 25 image credits via the normal
+              image-to-image pipeline (no separate backend call). */}
+          {mediaType === "image" && inputDataUrl && !loading && (
+            <button
+              type="button"
+              onClick={() => setSmartRemoveOpen(true)}
+              className="flex w-full items-center justify-between rounded-lg border border-dashed border-primary/50 bg-primary/5 px-3 py-2.5 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+            >
+              <span className="flex items-center gap-2">
+                <Eraser className="h-4 w-4" />
+                Circle to Remove — paint an object to erase it
+              </span>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold">
+                {CREDIT_COST.image} credits
+              </span>
+            </button>
+          )}
+
+
           {mediaType === "image" && inputDataUrl && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -599,7 +628,14 @@ function Editor() {
                     outputIsVideo ? (
                       <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
                     ) : (
-                      <img src={output} alt="output" className="h-full w-full object-contain animate-scale-in" />
+                      <img
+                        src={output}
+                        alt="output"
+                        className="h-full w-full object-contain animate-scale-in select-none"
+                        draggable={false}
+                        onContextMenu={(e) => e.preventDefault()}
+                        style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+                      />
                     )
                   ) : (
                     <span className="text-xs text-muted-foreground">Output appears here</span>
@@ -646,6 +682,22 @@ function Editor() {
           )}
         </div>
       </div>
+
+      {/* Smart Remove ("Circle to Remove") — plan-agnostic, gated by credits. */}
+      <SmartRemoveModal
+        open={smartRemoveOpen}
+        imageUrl={inputPreview}
+        onCancel={() => setSmartRemoveOpen(false)}
+        onApply={(masked) => {
+          setInputPreview(masked);
+          setInputDataUrl(masked);
+          setInputFile(null); // masked composite is not the original File
+          setInputKind("image");
+          setPrompt(SMART_REMOVE_PROMPT);
+          setSmartRemoveOpen(false);
+          toast.success("Selection applied — click Generate to remove.");
+        }}
+      />
     </div>
   );
 }

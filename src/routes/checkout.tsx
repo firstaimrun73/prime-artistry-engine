@@ -38,7 +38,7 @@ declare global {
 
 export const Route = createFileRoute("/checkout")({
   validateSearch: (s: Record<string, unknown>) => ({
-    plan: (["free", "plus", "pro", "studio", "business"].includes(s.plan as string) ? s.plan : "free") as PlanId,
+    plan: (["free", "lite", "plus", "pro", "studio", "business"].includes(s.plan as string) ? s.plan : "free") as PlanId,
     currency: ["USD", "EUR", "INR"].includes(s.currency as string) ? (s.currency as Currency) : "USD",
   }),
   component: Checkout,

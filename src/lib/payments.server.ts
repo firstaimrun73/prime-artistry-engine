@@ -20,6 +20,7 @@ export type PackageId = keyof typeof RAZORPAY_PACKAGES;
 // ── Plan-based purchases (credits MUST match src/lib/plans.ts) ──
 // business uses the UNLIMITED sentinel (9_999_999) as its credit count.
 export const PLAN_PURCHASE = {
+  lite: { credits: 350, amountINR: 399, amountUSD: 4.99 },
   plus: { credits: 500, amountINR: 849, amountUSD: 9.99 },
   pro: { credits: 2000, amountINR: 2499, amountUSD: 29.99 },
   studio: { credits: 5000, amountINR: 4199, amountUSD: 49.99 },

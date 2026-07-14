@@ -30,7 +30,7 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
   INR: "₹",
 };
 
-export type PlanId = "free" | "plus" | "pro" | "studio" | "business";
+export type PlanId = "free" | "lite" | "plus" | "pro" | "studio" | "business";
 
 /** Flat per-transaction processing fee added to every paid checkout. */
 export const TRANSACTION_FEE: Record<Currency, number> = {
@@ -117,6 +117,23 @@ export const PLANS: Plan[] = [
     ],
   },
   {
+    id: "lite",
+    name: "Lite",
+    credits: 350,
+    video: false,
+    priority: false,
+    price: { USD: 4.99, EUR: 4.49, INR: 399 },
+    features: [
+      "350 credits (one-time / month)",
+      "AI image generation & editing",
+      "Smart Remove (Circle to Remove) included",
+      "No watermark on downloads",
+      "Standard processing",
+      "JPG & PNG downloads",
+      "Email support",
+    ],
+  },
+  {
     id: "plus",
     name: "Starter",
     credits: 750,
@@ -195,6 +212,7 @@ export const PLANS: Plan[] = [
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
   free: 40,
+  lite: 350,
   plus: 750,
   pro: 2500,
   studio: 5000,
@@ -270,6 +288,10 @@ export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, string>> = {
   free: {
     USD: "$0", INR: "₹0", GBP: "£0", EUR: "€0", AED: "0 AED",
     AUD: "A$0", CAD: "C$0", JPY: "¥0", SGD: "S$0",
+  },
+  lite: {
+    USD: "$4.99", INR: "₹399", GBP: "£3.99", EUR: "€4.49", AED: "18 AED",
+    AUD: "A$7.49", CAD: "C$6.49", JPY: "¥749", SGD: "S$6.49",
   },
   plus: {
     USD: "$9.99", INR: "₹849", GBP: "£7.99", EUR: "€8.99", AED: "36 AED",

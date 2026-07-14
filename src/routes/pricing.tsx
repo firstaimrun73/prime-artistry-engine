@@ -37,6 +37,7 @@ export const Route = createFileRoute("/pricing")({
 const CURRENCY_KEY = "motio2edit-currency";
 
 const LABELS: Partial<Record<PlanId, { text: string; cls: string }>> = {
+  lite: { text: "New — Best Starter", cls: "bg-amber-500 text-white" },
   pro: { text: "Most Popular", cls: "bg-primary text-primary-foreground" },
   business: { text: "Best Value", cls: "bg-emerald-500 text-white" },
 };
@@ -99,7 +100,7 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="mt-12 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="mt-12 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {PLANS.map((plan) => {
             const isCurrent = currentPlan === plan.id;
             const label = LABELS[plan.id];
