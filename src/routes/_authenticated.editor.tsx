@@ -54,8 +54,9 @@ function Editor() {
   const [outputIsVideo, setOutputIsVideo] = useState(false);
   const [state, setState] = useState<GenState>("idle");
   const [strength, setStrength] = useState(0.7);
-  const [keepWatermark, setKeepWatermark] = useState(true);
+  const [keepWatermark, setKeepWatermark] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
 
   const [msgIdx, setMsgIdx] = useState(0);
   const [stage, setStage] = useState(0);
