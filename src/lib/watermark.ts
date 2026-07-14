@@ -31,7 +31,10 @@ function drawSparkle(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: n
   ctx.restore();
 }
 
-export async function watermarkImage(src: string): Promise<string> {
+export async function watermarkImage(
+  src: string,
+  opts: { strong?: boolean } = {},
+): Promise<string> {
   // Fetch as a blob first to avoid canvas cross-origin tainting on fal URLs.
   const res = await fetch(src);
   const blob = await res.blob();
