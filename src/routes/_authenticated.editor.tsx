@@ -247,10 +247,17 @@ function Editor() {
       let url = res.outputUrl;
       const isVideoOut = mediaType === "video";
       setOutputIsVideo(isVideoOut);
-      // Watermark images for FREE users (always) and paid users who keep it on.
-      // Video watermarking is applied server-side where supported.
-      if (!isVideoOut && url && !isAdmin && (isFree || keepWatermark)) {
-        try { url = await watermarkImage(url); } catch { /* keep original */ }
+      // Watermarking for images. Free users get the STRONG variant (full-image
+      // grid + corner pill) burned in BEFORE the URL ever reaches the DOM —
+      // right-click / long-press / view-source cannot recover a clean image
+      // because no clean version is ever stored on the client. Paid users on
+      // "keep watermark" get only the subtle corner pill. Admins are exempt.
+      if (!isVideoOut && url && !isAdmin) {
+        if (isFree) {
+          try { url = await watermarkImage(url, { strong: true }); } catch { /* keep original */ }
+        } else if (keepWatermark) {
+          try { url = await watermarkImage(url); } catch { /* keep original */ }
+        }
       }
       if (runId !== runIdRef.current) return;
       setProgress(100);
