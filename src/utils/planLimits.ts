@@ -14,6 +14,7 @@ export type PlanLimits = {
 
 export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   free: { maxImages: 1, videoEnabled: false, hd: false }, // Free
+  lite: { maxImages: 2, videoEnabled: false, hd: false }, // Lite ($4.99 / 350 credits)
   plus: { maxImages: 3, videoEnabled: true, hd: false }, // Starter
   pro: { maxImages: 5, videoEnabled: true, hd: true }, // Plus
   studio: { maxImages: 8, videoEnabled: true, hd: true }, // Pro

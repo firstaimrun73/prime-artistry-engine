@@ -59,6 +59,22 @@ export const TIERS: Record<PlanId, TierConfig> = {
     videoMonthlyQuota: 0,
     canUploadAvatar: false,
   },
+  lite: {
+    memberLabel: "Lite Member",
+    crown: "none",
+    crownColor: null,
+    badgeColor: "#9CA3AF",
+    watermark: "none",
+    watermarkOpacity: 0,
+    maxDimension: 1920, // 1080p
+    qualityLabel: "1080p",
+    formats: ["jpg", "png"],
+    videoEnabled: false,
+    videoMaxSeconds: 0,
+    videoQualityLabel: "—",
+    videoMonthlyQuota: 0,
+    canUploadAvatar: true,
+  },
   plus: {
     memberLabel: "Starter Member",
     crown: "bronze",
