@@ -185,17 +185,39 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRe
   if (imageUrl) {
     if (!isEnhancementOnly(prompt)) {
       const p = (prompt || "").toLowerCase();
-      
+
+      // Heavy removal edits — need high strength to actually erase subjects.
+      const isRemovePeople =
+        /\b(remove people|remove person|remove all|erase person)\b/.test(p);
+      // Facial correction edits — moderate strength preserves identity.
+      const isFaceFix =
+        /\b(fix eye|fix face|resolve face|correct face)\b/.test(p);
+
       // Small edits (add goggles, add hat etc.) need LOW strength
       // to preserve the original photo and only make small changes
       const isSmallEdit = SMALL_EDIT_INTENT.test(p);
-      
-      const s = isSmallEdit
-        ? Math.min(0.65, Math.max(0.55, strength * 0.7)) // low: 0.55-0.65
-        : Math.min(1, Math.max(0.75, strength));           // high: 0.75-1.0
 
-      const guidance = isSmallEdit ? 2.5 : 3.5;
-      const steps = isSmallEdit ? 35 : 40;
+      let s: number;
+      let guidance: number;
+      let steps: number;
+
+      if (isRemovePeople) {
+        s = 0.95;
+        guidance = 7.0;
+        steps = 50;
+      } else if (isFaceFix) {
+        s = 0.75;
+        guidance = 5.0;
+        steps = 50;
+      } else if (isSmallEdit) {
+        s = Math.min(0.65, Math.max(0.55, strength * 0.7));
+        guidance = 2.5;
+        steps = 35;
+      } else {
+        s = Math.min(1, Math.max(0.75, strength));
+        guidance = 3.5;
+        steps = 40;
+      }
 
       // For small edits, add strong preservation instruction to prompt
       const finalPrompt = isSmallEdit
