@@ -105,31 +105,73 @@ export function isEnhancementOnly(prompt: string): boolean {
 }
 
 // ── Edit-size classification & quality presets ───────────────────────────
-// Classification uses the ORIGINAL short user prompt (not the enhanced one) so
-// small/large/default edits get tuned strength, guidance and steps.
-export type EditSize = "small" | "large" | "default";
+// Classification uses the ORIGINAL short user prompt (not the enhanced one).
+// The active image-to-image path (generate.functions.ts → buildImageEdit)
+// routes every edit through these presets. Getting them right is what makes
+// edits look surgical instead of either "nothing changed" or "whole image
+// replaced with a different scene".
+export type EditSize =
+  | "small_add"       // add/wear/put a small accessory — must preserve photo
+  | "remove_people"   // remove person/people — needs high strength
+  | "face_fix"        // fix/correct eyes/face — moderate, identity-preserving
+  | "background"      // remove/change/blur background or watermark
+  | "small"           // legacy small preset (brightness / minor tweaks)
+  | "large"           // legacy large preset (heavy transforms)
+  | "default";        // everything else
 
+const SMALL_ADD_MATCH =
+  /\b(add|put|wear|place|insert|give|attach|include|show)\b[^.]{0,40}\b(goggles|glasses|sunglasses|hat|cap|mask|beard|mustache|smile|earring|necklace|crown|headband|scarf|tie|bowtie|accessory|piercing|tattoo|freckles|makeup|lipstick|eyeliner|bracelet|watch|ring|badge|pin|flower|helmet)\b/i;
+const REMOVE_PEOPLE_MATCH =
+  /\b(remove\s+(people|person|humans?|all\s+people)|erase\s+(person|people)|delete\s+person)\b/i;
+const FACE_FIX_MATCH =
+  /\b(fix\s+(eye|eyes|face|mouth|nose|teeth)|resolve\s+face|correct\s+face|repair\s+face)\b/i;
+const BACKGROUND_MATCH =
+  /\b(remove\s+background|change\s+background|replace\s+background|new\s+background|blur\s+background|remove\s+watermark|remove\s+logo|remove\s+text)\b/i;
 const SMALL_EDIT_MATCH =
-  /\b(add\s+goggles|add\s+glasses|add\s+sunglasses|make\s+brighter|straighten\s+head|fix\s+pose)\b/i;
+  /\b(make\s+brighter|brighten|straighten\s+head|fix\s+pose|slightly|subtle)\b/i;
 const LARGE_EDIT_MATCH =
-  /\b(remove\s+background|change\s+background|remove\s+watermark)\b/i;
+  /\b(transform|convert\s+to|turn\s+into|make\s+it\s+(a|an)\s+\w+\s+scene)\b/i;
 
 export function classifyEditSize(userPrompt: string): EditSize {
-  if (SMALL_EDIT_MATCH.test(userPrompt)) return "small";
-  if (LARGE_EDIT_MATCH.test(userPrompt)) return "large";
+  const p = userPrompt || "";
+  if (REMOVE_PEOPLE_MATCH.test(p)) return "remove_people";
+  if (FACE_FIX_MATCH.test(p)) return "face_fix";
+  if (BACKGROUND_MATCH.test(p)) return "background";
+  if (SMALL_ADD_MATCH.test(p)) return "small_add";
+  if (SMALL_EDIT_MATCH.test(p)) return "small";
+  if (LARGE_EDIT_MATCH.test(p)) return "large";
   return "default";
 }
 
 export function getQualitySettings(editSize: EditSize) {
   switch (editSize) {
+    case "small_add":
+      // Very low strength + low guidance so every pixel of the photo is kept
+      // and only the requested small object is added.
+      return { strength: 0.55, guidance_scale: 2.5, num_inference_steps: 40 };
+    case "remove_people":
+      // High strength so the person is actually erased and the background
+      // inpainted, not left as a ghost.
+      return { strength: 0.95, guidance_scale: 7.0, num_inference_steps: 50 };
+    case "face_fix":
+      return { strength: 0.75, guidance_scale: 5.0, num_inference_steps: 50 };
+    case "background":
+      return { strength: 0.85, guidance_scale: 4.5, num_inference_steps: 50 };
     case "small":
-      return { strength: 0.6, guidance_scale: 3.0, num_inference_steps: 50 };
+      return { strength: 0.6, guidance_scale: 3.0, num_inference_steps: 45 };
     case "large":
-      return { strength: 0.82, guidance_scale: 4.0, num_inference_steps: 50 };
+      return { strength: 0.85, guidance_scale: 4.5, num_inference_steps: 50 };
     default:
-      return { strength: 0.7, guidance_scale: 4.0, num_inference_steps: 50 };
+      // Balanced default: strong enough to apply the edit, gentle enough to
+      // keep the subject and composition recognisable.
+      return { strength: 0.7, guidance_scale: 3.5, num_inference_steps: 45 };
   }
 }
+
+// Preservation clause appended to small additive edits so the model does not
+// re-stylise or regenerate the whole scene when adding a small object.
+const PRESERVATION_CLAUSE =
+  " Keep the photo completely realistic and photographic. Do NOT change the art style. Do NOT make it cartoon, anime or painting. Preserve the original person, face, skin tone, pose, clothing, lighting, colors and background exactly. Only make this one specific requested change.";
 
 // ── Image edit (FLUX dev image-to-image) ─────────────────────────────────
 export function buildImageEdit({
@@ -150,18 +192,35 @@ export function buildImageEdit({
 }): FalStep {
   const editSize = classifyEditSize(rawPrompt ?? prompt);
   const quality = getQualitySettings(editSize);
-  // A manual strength override still respects a visible-edit floor of 0.55.
-  const s =
-    typeof strength === "number"
-      ? Math.min(1, Math.max(0.55, strength))
-      : quality.strength;
+
+  // Manual strength override is respected but clamped to a preset-appropriate
+  // range so the slider can't accidentally destroy identity on small edits or
+  // under-power a full removal.
+  let s = quality.strength;
+  if (typeof strength === "number") {
+    if (editSize === "small_add") {
+      s = Math.min(0.65, Math.max(0.5, strength));
+    } else if (editSize === "remove_people") {
+      s = Math.min(1, Math.max(0.9, strength));
+    } else if (editSize === "face_fix") {
+      s = Math.min(0.85, Math.max(0.65, strength));
+    } else {
+      s = Math.min(1, Math.max(0.55, strength));
+    }
+  }
+
+  // For small additive edits, tack on a strong preservation instruction so the
+  // model doesn't drift the art style or regenerate the subject.
+  const finalPrompt =
+    editSize === "small_add" ? `${prompt}.${PRESERVATION_CLAUSE}` : prompt;
+
   return {
     label: `edit (flux dev image-to-image, ${editSize})`,
     model: IMAGE_EDIT_MODEL,
     endpoint: ep(IMAGE_EDIT_MODEL),
     outputKind: "image",
     body: {
-      prompt,
+      prompt: finalPrompt,
       image_url: imageUrl,
       ...(referenceImageUrls && referenceImageUrls.length > 0
         ? { image_urls: referenceImageUrls }
