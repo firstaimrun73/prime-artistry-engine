@@ -6,6 +6,7 @@ import {
   buildFalRequest,
   buildImageEdit,
   buildImageEnhancementPipeline,
+  buildImageInpaint,
   buildVideoEnhancement,
   buildTextToVideo,
   buildImageToVideo,
@@ -150,6 +151,8 @@ const inputSchema = z.object({
   strength: z.number().min(0.1).max(1).optional(),
   // Extra reference images for FLUX Kontext multi-image edits (plan-gated).
   referenceImageUrls: z.array(z.string().min(1).max(15_000_000)).max(9).optional(),
+  // Optional black/white mask URL from Circle to Remove. White pixels are edited.
+  maskImageUrl: z.string().min(1).max(15_000_000).optional(),
 });
 
 export const generateMedia = createServerFn({ method: "POST" })
@@ -207,7 +210,15 @@ export const generateMedia = createServerFn({ method: "POST" })
       );
 
       if (data.imageUrl) {
-        if (isEnhancementOnly(data.prompt)) {
+        if (data.maskImageUrl) {
+          console.log("[generate] mode: masked inpaint | mask url:", data.maskImageUrl.slice(0, 64));
+          const step = buildImageInpaint({
+            prompt: data.prompt,
+            imageUrl: data.imageUrl,
+            maskUrl: data.maskImageUrl,
+          });
+          outputUrl = await runFalStep(step, falKey);
+        } else if (isEnhancementOnly(data.prompt)) {
           // ── Pure enhancement path ───────────────────────────────────
           // Deterministic detail-preserving pipeline (deblur → smart
           // sharpen → optional Topaz upscale). Composition/colors stay

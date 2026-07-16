@@ -44,10 +44,11 @@ export type FalStep = {
 
 // ── Models ──────────────────────────────────────────────────────────────
 export const TEXT_TO_IMAGE_MODEL = "fal-ai/flux-pro/v1.1";
-// Image EDITING via FLUX dev image-to-image. Applies the requested change while
-// keeping the source composition. Strength is clamped to a visible minimum so
-// edits actually take effect instead of returning a near-identical image.
-export const IMAGE_EDIT_MODEL = "fal-ai/flux/dev/image-to-image";
+// Image EDITING via FLUX Kontext. Unlike generic FLUX img2img, Kontext is built
+// for prompt-following edits on the SAME source image instead of regenerating a
+// loosely-related new scene.
+export const IMAGE_EDIT_MODEL = "fal-ai/flux-pro/kontext";
+export const IMAGE_INPAINT_MODEL = "fal-ai/flux-general/inpainting";
 // Kept exported for back-compat with callers/tests that reference it.
 export const IMAGE_TO_IMAGE_MODEL = "fal-ai/post-processing";
 
@@ -60,7 +61,7 @@ const FAL_BASE = "https://fal.run/";
 const ep = (m: string) => `${FAL_BASE}${m}`;
 
 // Explicit editing verbs/nouns. If ANY of these appear, the prompt is a real
-// semantic edit and must go to fal-ai/flux/dev/image-to-image so the change is
+// semantic edit and must go to the instruction-edit model so the change is
 // applied to the SAME image (never the sharpen-only pipeline).
 const EDIT_INTENT =
   /\b(remove|add|change|replace|keep|delete|colou?r|recolou?r|background|foreground|person|people|man|woman|face|hair|eyes|object|clothes|clothing|dress|shirt|make|makes|making|put|move|fix|clean|cleanup|restore|relight|light|lighting|bright(en)?|dark(en)?|swap|turn|convert|transform|style|cartoon|anime|paint|painting|cinematic|vintage|retro|glasses|hat|smile|remove\s+bg|blur\s+background|sky|water|car|animal|dog|cat|logo|text|watermark|shadow|reflection|scene)\b/;
@@ -152,19 +153,19 @@ export function getQualitySettings(editSize: EditSize) {
     case "remove_people":
       // High strength so the person is actually erased and the background
       // inpainted, not left as a ghost.
-      return { strength: 0.95, guidance_scale: 7.0, num_inference_steps: 50 };
+      return { strength: 0.95, guidance_scale: 4.0, num_inference_steps: 50 };
     case "face_fix":
-      return { strength: 0.75, guidance_scale: 5.0, num_inference_steps: 50 };
+      return { strength: 0.75, guidance_scale: 3.5, num_inference_steps: 50 };
     case "background":
-      return { strength: 0.85, guidance_scale: 4.5, num_inference_steps: 50 };
+      return { strength: 0.85, guidance_scale: 3.5, num_inference_steps: 50 };
     case "small":
       return { strength: 0.6, guidance_scale: 3.0, num_inference_steps: 45 };
     case "large":
-      return { strength: 0.85, guidance_scale: 4.5, num_inference_steps: 50 };
+      return { strength: 0.85, guidance_scale: 3.5, num_inference_steps: 50 };
     default:
       // Balanced default: strong enough to apply the edit, gentle enough to
       // keep the subject and composition recognisable.
-      return { strength: 0.7, guidance_scale: 3.5, num_inference_steps: 45 };
+      return { strength: 0.7, guidance_scale: 3.0, num_inference_steps: 45 };
   }
 }
 
@@ -176,7 +177,7 @@ const PRESERVATION_CLAUSE =
 const PEOPLE_REMOVAL_PROMPT_CLAUSE =
   " Completely remove the target person or all visible people from the original photo. Do not preserve any removed humans. Erase faces, bodies, clothing, hair, limbs, shadows, reflections and ghost silhouettes. Seamlessly reconstruct the background where they were using matching texture, perspective, lighting, depth, colors and noise. Preserve every non-human pixel, object, edge, background structure, camera angle and composition as much as possible. Do not add new people. Keep the result photorealistic.";
 
-// ── Image edit (FLUX dev image-to-image) ─────────────────────────────────
+// ── Image edit (FLUX Kontext) ─────────────────────────────────────────────
 export function buildImageEdit({
   prompt,
   imageUrl,
@@ -196,21 +197,12 @@ export function buildImageEdit({
   const editSize = classifyEditSize(rawPrompt ?? prompt);
   const quality = getQualitySettings(editSize);
 
-  // Manual strength override is respected but clamped to a preset-appropriate
-  // range so the slider can't accidentally destroy identity on small edits or
-  // under-power a full removal.
-  let s = quality.strength;
-  if (typeof strength === "number") {
-    if (editSize === "small_add") {
-      s = Math.min(0.65, Math.max(0.5, strength));
-    } else if (editSize === "remove_people") {
-      s = Math.min(1, Math.max(0.9, strength));
-    } else if (editSize === "face_fix") {
-      s = Math.min(0.85, Math.max(0.65, strength));
-    } else {
-      s = Math.min(1, Math.max(0.55, strength));
-    }
-  }
+  // Kontext does not use the generic img2img `strength` field. We still keep
+  // the classification above for prompt shaping + guidance, but intentionally do
+  // not send unsupported strength/steps params that can make FAL ignore the edit
+  // contract or behave like text-to-image.
+  void strength;
+  void referenceImageUrls;
 
   // For people-removal edits, avoid the normal identity lock and make the
   // removal target explicit so FAL doesn't interpret "person" as something to
@@ -223,22 +215,51 @@ export function buildImageEdit({
         : prompt;
 
   return {
-    label: `edit (flux dev image-to-image, ${editSize})`,
+    label: `edit (flux kontext, ${editSize})`,
     model: IMAGE_EDIT_MODEL,
     endpoint: ep(IMAGE_EDIT_MODEL),
     outputKind: "image",
     body: {
       prompt: finalPrompt,
       image_url: imageUrl,
-      ...(referenceImageUrls && referenceImageUrls.length > 0
-        ? { image_urls: referenceImageUrls }
-        : {}),
-      strength: s,
       guidance_scale: quality.guidance_scale,
-      num_inference_steps: quality.num_inference_steps,
       num_images: 1,
       output_format: "png",
+      safety_tolerance: "2",
+      enhance_prompt: false,
+    },
+  };
+}
+
+// ── Masked inpainting (Circle to Remove) ──────────────────────────────────
+export function buildImageInpaint({
+  prompt,
+  imageUrl,
+  maskUrl,
+}: {
+  prompt: string;
+  imageUrl: string;
+  maskUrl: string;
+}): FalStep {
+  return {
+    label: "masked inpaint (flux general)",
+    model: IMAGE_INPAINT_MODEL,
+    endpoint: ep(IMAGE_INPAINT_MODEL),
+    outputKind: "image",
+    body: {
+      prompt:
+        `${prompt}. Edit ONLY the white masked area. Remove the selected content completely and fill it with natural background matching the surrounding pixels. Preserve every unmasked pixel, face, object, edge, lighting, color, camera angle and composition exactly. Do not change unmasked areas. Do not add new objects or people.`,
+      image_url: imageUrl,
+      mask_url: maskUrl,
+      strength: 0.86,
+      guidance_scale: 3.5,
+      num_inference_steps: 40,
+      num_images: 1,
       enable_safety_checker: true,
+      output_format: "png",
+      scheduler: "euler",
+      negative_prompt:
+        "changed unmasked area, new subject, new person, distorted background, different face, different clothing, altered composition, artifacts, blur",
     },
   };
 }
@@ -249,6 +270,7 @@ const SMALL_EDIT_INTENT =
   /\b(add|put|wear|place|insert|give|attach|include|show|goggles|glasses|hat|cap|mask|beard|smile|earring|necklace|crown|headband|sunglasses|accessory)\b/;
 
 export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRequestInput): FalRequest {
+  void strength;
   if (imageUrl) {
     if (!isEnhancementOnly(prompt)) {
       const p = (prompt || "").toLowerCase();
@@ -264,26 +286,16 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRe
       // to preserve the original photo and only make small changes
       const isSmallEdit = SMALL_EDIT_INTENT.test(p);
 
-      let s: number;
       let guidance: number;
-      let steps: number;
 
       if (isRemovePeople) {
-        s = 0.95;
-        guidance = 7.0;
-        steps = 50;
+        guidance = 4.0;
       } else if (isFaceFix) {
-        s = 0.75;
-        guidance = 5.0;
-        steps = 50;
-      } else if (isSmallEdit) {
-        s = Math.min(0.65, Math.max(0.55, strength * 0.7));
-        guidance = 2.5;
-        steps = 35;
-      } else {
-        s = Math.min(1, Math.max(0.75, strength));
         guidance = 3.5;
-        steps = 40;
+      } else if (isSmallEdit) {
+        guidance = 2.5;
+      } else {
+        guidance = 3.0;
       }
 
       // For small edits, add strong preservation instruction to prompt
@@ -298,12 +310,11 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRe
         body: {
           prompt: finalPrompt,
           image_url: imageUrl,
-          strength: s,
           guidance_scale: guidance,
-          num_inference_steps: steps,
           num_images: 1,
-          output_format: "jpeg",
-          enable_safety_checker: true,
+          output_format: "png",
+          safety_tolerance: "2",
+          enhance_prompt: false,
         },
       };
     }
