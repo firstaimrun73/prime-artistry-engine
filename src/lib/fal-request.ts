@@ -44,10 +44,10 @@ export type FalStep = {
 
 // ── Models ──────────────────────────────────────────────────────────────
 export const TEXT_TO_IMAGE_MODEL = "fal-ai/flux-pro/v1.1";
-// Image EDITING via FLUX dev image-to-image. Applies the requested change while
-// keeping the source composition. Strength is clamped to a visible minimum so
-// edits actually take effect instead of returning a near-identical image.
-export const IMAGE_EDIT_MODEL = "fal-ai/flux/dev/image-to-image";
+// Image EDITING via FLUX Kontext. Unlike generic FLUX img2img, Kontext is built
+// for prompt-following edits on the SAME source image instead of regenerating a
+// loosely-related new scene.
+export const IMAGE_EDIT_MODEL = "fal-ai/flux-pro/kontext";
 // Kept exported for back-compat with callers/tests that reference it.
 export const IMAGE_TO_IMAGE_MODEL = "fal-ai/post-processing";
 
@@ -152,19 +152,19 @@ export function getQualitySettings(editSize: EditSize) {
     case "remove_people":
       // High strength so the person is actually erased and the background
       // inpainted, not left as a ghost.
-      return { strength: 0.95, guidance_scale: 7.0, num_inference_steps: 50 };
+      return { strength: 0.95, guidance_scale: 4.0, num_inference_steps: 50 };
     case "face_fix":
-      return { strength: 0.75, guidance_scale: 5.0, num_inference_steps: 50 };
+      return { strength: 0.75, guidance_scale: 3.5, num_inference_steps: 50 };
     case "background":
-      return { strength: 0.85, guidance_scale: 4.5, num_inference_steps: 50 };
+      return { strength: 0.85, guidance_scale: 3.5, num_inference_steps: 50 };
     case "small":
       return { strength: 0.6, guidance_scale: 3.0, num_inference_steps: 45 };
     case "large":
-      return { strength: 0.85, guidance_scale: 4.5, num_inference_steps: 50 };
+      return { strength: 0.85, guidance_scale: 3.5, num_inference_steps: 50 };
     default:
       // Balanced default: strong enough to apply the edit, gentle enough to
       // keep the subject and composition recognisable.
-      return { strength: 0.7, guidance_scale: 3.5, num_inference_steps: 45 };
+      return { strength: 0.7, guidance_scale: 3.0, num_inference_steps: 45 };
   }
 }
 
@@ -196,21 +196,11 @@ export function buildImageEdit({
   const editSize = classifyEditSize(rawPrompt ?? prompt);
   const quality = getQualitySettings(editSize);
 
-  // Manual strength override is respected but clamped to a preset-appropriate
-  // range so the slider can't accidentally destroy identity on small edits or
-  // under-power a full removal.
-  let s = quality.strength;
-  if (typeof strength === "number") {
-    if (editSize === "small_add") {
-      s = Math.min(0.65, Math.max(0.5, strength));
-    } else if (editSize === "remove_people") {
-      s = Math.min(1, Math.max(0.9, strength));
-    } else if (editSize === "face_fix") {
-      s = Math.min(0.85, Math.max(0.65, strength));
-    } else {
-      s = Math.min(1, Math.max(0.55, strength));
-    }
-  }
+  // Kontext does not use the generic img2img `strength` field. We still keep
+  // the classification above for prompt shaping + guidance, but intentionally do
+  // not send unsupported strength/steps params that can make FAL ignore the edit
+  // contract or behave like text-to-image.
+  void strength;
 
   // For people-removal edits, avoid the normal identity lock and make the
   // removal target explicit so FAL doesn't interpret "person" as something to
@@ -233,12 +223,11 @@ export function buildImageEdit({
       ...(referenceImageUrls && referenceImageUrls.length > 0
         ? { image_urls: referenceImageUrls }
         : {}),
-      strength: s,
       guidance_scale: quality.guidance_scale,
-      num_inference_steps: quality.num_inference_steps,
       num_images: 1,
       output_format: "png",
-      enable_safety_checker: true,
+      safety_tolerance: "2",
+      enhance_prompt: false,
     },
   };
 }
