@@ -1,8 +1,7 @@
 // Smart Remove ("Circle to Remove") tool.
 //
-// Paints a translucent red mask over the region the user wants removed and
-// composites it onto the source image so the image-to-image model can see
-// exactly what to erase. Works with mouse, pen, and touch on mobile.
+// Paints a translucent red selection and returns a real black/white mask for
+// the inpainting model. Works with mouse, pen, and touch on mobile.
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -13,11 +12,11 @@ type Props = {
   open: boolean;
   imageUrl: string | null;
   onCancel: () => void;
-  onApply: (maskedDataUrl: string) => void;
+  onApply: (maskDataUrl: string) => void;
 };
 
 export const SMART_REMOVE_PROMPT =
-  "Remove the object marked with the red highlighted overlay completely. Fill the removed area naturally to match surrounding textures, lighting, shadows and perspective. Do not add any new objects. Keep the rest of the image identical.";
+  "Remove only the circled area completely. Fill it naturally to match surrounding textures, lighting, shadows and perspective. Keep every unselected area identical.";
 
 export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const imgRef = useRef<HTMLImageElement>(null);
@@ -212,9 +211,20 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       out.width = img.naturalWidth;
       out.height = img.naturalHeight;
       const octx = out.getContext("2d");
-      if (!octx) return;
-      octx.drawImage(img, 0, 0);
-      octx.drawImage(c, 0, 0);
+      const maskCtx = c.getContext("2d");
+      if (!octx || !maskCtx) return;
+      octx.fillStyle = "black";
+      octx.fillRect(0, 0, out.width, out.height);
+      const mask = maskCtx.getImageData(0, 0, c.width, c.height);
+      const bw = octx.createImageData(out.width, out.height);
+      for (let i = 0; i < mask.data.length; i += 4) {
+        const on = mask.data[i + 3] > 0 ? 255 : 0;
+        bw.data[i] = on;
+        bw.data[i + 1] = on;
+        bw.data[i + 2] = on;
+        bw.data[i + 3] = 255;
+      }
+      octx.putImageData(bw, 0, 0);
       const dataUrl = out.toDataURL("image/png");
       console.log("[SmartRemove] apply", {
         maskW: c.width,

@@ -272,6 +272,7 @@ const SMALL_EDIT_INTENT =
   /\b(add|put|wear|place|insert|give|attach|include|show|goggles|glasses|hat|cap|mask|beard|smile|earring|necklace|crown|headband|sunglasses|accessory)\b/;
 
 export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRequestInput): FalRequest {
+  void strength;
   if (imageUrl) {
     if (!isEnhancementOnly(prompt)) {
       const p = (prompt || "").toLowerCase();
@@ -287,26 +288,16 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRe
       // to preserve the original photo and only make small changes
       const isSmallEdit = SMALL_EDIT_INTENT.test(p);
 
-      let s: number;
       let guidance: number;
-      let steps: number;
 
       if (isRemovePeople) {
-        s = 0.95;
-        guidance = 7.0;
-        steps = 50;
+        guidance = 4.0;
       } else if (isFaceFix) {
-        s = 0.75;
-        guidance = 5.0;
-        steps = 50;
-      } else if (isSmallEdit) {
-        s = Math.min(0.65, Math.max(0.55, strength * 0.7));
-        guidance = 2.5;
-        steps = 35;
-      } else {
-        s = Math.min(1, Math.max(0.75, strength));
         guidance = 3.5;
-        steps = 40;
+      } else if (isSmallEdit) {
+        guidance = 2.5;
+      } else {
+        guidance = 3.0;
       }
 
       // For small edits, add strong preservation instruction to prompt
