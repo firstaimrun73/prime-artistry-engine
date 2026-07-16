@@ -48,6 +48,7 @@ export const TEXT_TO_IMAGE_MODEL = "fal-ai/flux-pro/v1.1";
 // for prompt-following edits on the SAME source image instead of regenerating a
 // loosely-related new scene.
 export const IMAGE_EDIT_MODEL = "fal-ai/flux-pro/kontext";
+export const IMAGE_INPAINT_MODEL = "fal-ai/flux-general/inpainting";
 // Kept exported for back-compat with callers/tests that reference it.
 export const IMAGE_TO_IMAGE_MODEL = "fal-ai/post-processing";
 
@@ -60,7 +61,7 @@ const FAL_BASE = "https://fal.run/";
 const ep = (m: string) => `${FAL_BASE}${m}`;
 
 // Explicit editing verbs/nouns. If ANY of these appear, the prompt is a real
-// semantic edit and must go to fal-ai/flux/dev/image-to-image so the change is
+// semantic edit and must go to the instruction-edit model so the change is
 // applied to the SAME image (never the sharpen-only pipeline).
 const EDIT_INTENT =
   /\b(remove|add|change|replace|keep|delete|colou?r|recolou?r|background|foreground|person|people|man|woman|face|hair|eyes|object|clothes|clothing|dress|shirt|make|makes|making|put|move|fix|clean|cleanup|restore|relight|light|lighting|bright(en)?|dark(en)?|swap|turn|convert|transform|style|cartoon|anime|paint|painting|cinematic|vintage|retro|glasses|hat|smile|remove\s+bg|blur\s+background|sky|water|car|animal|dog|cat|logo|text|watermark|shadow|reflection|scene)\b/;
@@ -176,7 +177,7 @@ const PRESERVATION_CLAUSE =
 const PEOPLE_REMOVAL_PROMPT_CLAUSE =
   " Completely remove the target person or all visible people from the original photo. Do not preserve any removed humans. Erase faces, bodies, clothing, hair, limbs, shadows, reflections and ghost silhouettes. Seamlessly reconstruct the background where they were using matching texture, perspective, lighting, depth, colors and noise. Preserve every non-human pixel, object, edge, background structure, camera angle and composition as much as possible. Do not add new people. Keep the result photorealistic.";
 
-// ── Image edit (FLUX dev image-to-image) ─────────────────────────────────
+// ── Image edit (FLUX Kontext) ─────────────────────────────────────────────
 export function buildImageEdit({
   prompt,
   imageUrl,
@@ -213,7 +214,7 @@ export function buildImageEdit({
         : prompt;
 
   return {
-    label: `edit (flux dev image-to-image, ${editSize})`,
+    label: `edit (flux kontext, ${editSize})`,
     model: IMAGE_EDIT_MODEL,
     endpoint: ep(IMAGE_EDIT_MODEL),
     outputKind: "image",
@@ -228,6 +229,39 @@ export function buildImageEdit({
       output_format: "png",
       safety_tolerance: "2",
       enhance_prompt: false,
+    },
+  };
+}
+
+// ── Masked inpainting (Circle to Remove) ──────────────────────────────────
+export function buildImageInpaint({
+  prompt,
+  imageUrl,
+  maskUrl,
+}: {
+  prompt: string;
+  imageUrl: string;
+  maskUrl: string;
+}): FalStep {
+  return {
+    label: "masked inpaint (flux general)",
+    model: IMAGE_INPAINT_MODEL,
+    endpoint: ep(IMAGE_INPAINT_MODEL),
+    outputKind: "image",
+    body: {
+      prompt:
+        `${prompt}. Edit ONLY the white masked area. Remove the selected content completely and fill it with natural background matching the surrounding pixels. Preserve every unmasked pixel, face, object, edge, lighting, color, camera angle and composition exactly. Do not change unmasked areas. Do not add new objects or people.`,
+      image_url: imageUrl,
+      mask_url: maskUrl,
+      strength: 0.86,
+      guidance_scale: 3.5,
+      num_inference_steps: 40,
+      num_images: 1,
+      enable_safety_checker: true,
+      output_format: "png",
+      scheduler: "euler",
+      negative_prompt:
+        "changed unmasked area, new subject, new person, distorted background, different face, different clothing, altered composition, artifacts, blur",
     },
   };
 }
@@ -287,12 +321,11 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRe
         body: {
           prompt: finalPrompt,
           image_url: imageUrl,
-          strength: s,
           guidance_scale: guidance,
-          num_inference_steps: steps,
           num_images: 1,
-          output_format: "jpeg",
-          enable_safety_checker: true,
+          output_format: "png",
+          safety_tolerance: "2",
+          enhance_prompt: false,
         },
       };
     }
