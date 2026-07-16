@@ -57,6 +57,7 @@ function Editor() {
   const [keepWatermark, setKeepWatermark] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
+  const [removeMaskDataUrl, setRemoveMaskDataUrl] = useState<string | null>(null);
 
   const [msgIdx, setMsgIdx] = useState(0);
   const [stage, setStage] = useState(0);
@@ -194,6 +195,7 @@ function Editor() {
       // fail for large phone photos. A reused result (already an https URL)
       // is passed through directly.
       let mediaUrl: string | undefined;
+      let maskImageUrl: string | undefined;
       let sourceKind: "image" | "video" | undefined;
       if (inputKind === "image" && inputFile) {
         // Fresh upload → upload to Supabase
@@ -228,6 +230,14 @@ function Editor() {
       if (sourceKind === "image" && !mediaUrl) {
         throw new Error("Please upload an image first.");
       }
+      if (removeMaskDataUrl && sourceKind === "image") {
+        const maskRes = await fetch(removeMaskDataUrl);
+        const maskBlob = await maskRes.blob();
+        const maskFile = new File([maskBlob], `remove-mask-${Date.now()}.png`, {
+          type: "image/png",
+        });
+        maskImageUrl = await uploadToStorage(maskFile);
+      }
       if (runId !== runIdRef.current) return;
 
       const res = await generate({
@@ -237,6 +247,7 @@ function Editor() {
           imageUrl: mediaUrl,
           sourceKind,
           strength: mediaType === "image" && sourceKind === "image" ? strength : undefined,
+          maskImageUrl,
           referenceImageUrls:
             canAddRefImages && refImages.length > 0
               ? refImages.slice(0, planLimits.maxImages - 1)
@@ -289,6 +300,7 @@ function Editor() {
     setInputFile(null);
     setInputKind(null);
     setRefImages([]);
+    setRemoveMaskDataUrl(null);
     setOutput(null);
     setOutputIsVideo(false);
     setState("idle");
@@ -689,13 +701,10 @@ function Editor() {
         imageUrl={inputPreview}
         onCancel={() => setSmartRemoveOpen(false)}
         onApply={(masked) => {
-          setInputPreview(masked);
-          setInputDataUrl(masked);
-          setInputFile(null); // masked composite is not the original File
-          setInputKind("image");
+          setRemoveMaskDataUrl(masked);
           setPrompt(SMART_REMOVE_PROMPT);
           setSmartRemoveOpen(false);
-          toast.success("Selection applied — click Generate to remove.");
+          toast.success("Selection saved — click Generate to remove.");
         }}
       />
     </div>
