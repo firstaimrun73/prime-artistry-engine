@@ -202,6 +202,7 @@ export function buildImageEdit({
   // not send unsupported strength/steps params that can make FAL ignore the edit
   // contract or behave like text-to-image.
   void strength;
+  void referenceImageUrls;
 
   // For people-removal edits, avoid the normal identity lock and make the
   // removal target explicit so FAL doesn't interpret "person" as something to
@@ -221,9 +222,6 @@ export function buildImageEdit({
     body: {
       prompt: finalPrompt,
       image_url: imageUrl,
-      ...(referenceImageUrls && referenceImageUrls.length > 0
-        ? { image_urls: referenceImageUrls }
-        : {}),
       guidance_scale: quality.guidance_scale,
       num_images: 1,
       output_format: "png",
