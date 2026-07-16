@@ -122,7 +122,7 @@ export type EditSize =
 const SMALL_ADD_MATCH =
   /\b(add|put|wear|place|insert|give|attach|include|show)\b[^.]{0,40}\b(goggles|glasses|sunglasses|hat|cap|mask|beard|mustache|smile|earring|necklace|crown|headband|scarf|tie|bowtie|accessory|piercing|tattoo|freckles|makeup|lipstick|eyeliner|bracelet|watch|ring|badge|pin|flower|helmet)\b/i;
 const REMOVE_PEOPLE_MATCH =
-  /\b(remove\s+(people|person|humans?|all\s+people)|erase\s+(person|people)|delete\s+person)\b/i;
+  /\b(remove\s+(people|person|persons|humans?|human|everyone|all|all\s+people|all\s+persons|all\s+humans?)|erase\s+(person|people|humans?|human)|delete\s+(person|people|humans?|human))\b/i;
 const FACE_FIX_MATCH =
   /\b(fix\s+(eye|eyes|face|mouth|nose|teeth)|resolve\s+face|correct\s+face|repair\s+face)\b/i;
 const BACKGROUND_MATCH =
@@ -173,6 +173,9 @@ export function getQualitySettings(editSize: EditSize) {
 const PRESERVATION_CLAUSE =
   " Keep the photo completely realistic and photographic. Do NOT change the art style. Do NOT make it cartoon, anime or painting. Preserve the original person, face, skin tone, pose, clothing, lighting, colors and background exactly. Only make this one specific requested change.";
 
+const PEOPLE_REMOVAL_PROMPT_CLAUSE =
+  " Completely remove the target person or all visible people from the original photo. Do not preserve any removed humans. Erase faces, bodies, clothing, hair, limbs, shadows, reflections and ghost silhouettes. Seamlessly reconstruct the background where they were using matching texture, perspective, lighting, depth, colors and noise. Preserve every non-human pixel, object, edge, background structure, camera angle and composition as much as possible. Do not add new people. Keep the result photorealistic.";
+
 // ── Image edit (FLUX dev image-to-image) ─────────────────────────────────
 export function buildImageEdit({
   prompt,
@@ -209,10 +212,15 @@ export function buildImageEdit({
     }
   }
 
-  // For small additive edits, tack on a strong preservation instruction so the
-  // model doesn't drift the art style or regenerate the subject.
+  // For people-removal edits, avoid the normal identity lock and make the
+  // removal target explicit so FAL doesn't interpret "person" as something to
+  // preserve. For small additive edits, preserve the source photo tightly.
   const finalPrompt =
-    editSize === "small_add" ? `${prompt}.${PRESERVATION_CLAUSE}` : prompt;
+    editSize === "remove_people"
+      ? `${prompt}.${PEOPLE_REMOVAL_PROMPT_CLAUSE}`
+      : editSize === "small_add"
+        ? `${prompt}.${PRESERVATION_CLAUSE}`
+        : prompt;
 
   return {
     label: `edit (flux dev image-to-image, ${editSize})`,

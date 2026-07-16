@@ -22,6 +22,21 @@ const BASE_PHOTO_LOCK =
   "Do not change art style. Keep it photorealistic. Do not make it cartoon, " +
   "anime, painting or illustration.";
 
+const PEOPLE_REMOVAL_LOCK =
+  "This is a real photograph. Treat it as a real photo object-removal edit. " +
+  "The requested person, people, humans or human figures are the removal target, " +
+  "so do NOT preserve them. Remove the target humans completely, including faces, " +
+  "bodies, clothing, hair, limbs, shadows, reflections and silhouettes. Preserve " +
+  "every non-human part of the image exactly: background structure, objects, " +
+  "lighting, colors, camera angle, textures and composition. Keep it photorealistic. " +
+  "Do not change art style. Do not add replacement people.";
+
+function isPeopleRemovalPrompt(prompt: string): boolean {
+  return /\b(remove\s+(people|person|persons|humans?|human|everyone|all)|remove\s+all\s+(people|persons|humans?)?|erase\s+(person|people|humans?|human)|delete\s+(person|people|humans?|human))\b/i.test(
+    prompt || "",
+  );
+}
+
 /**
  * Deterministic expansion for common short editing prompts. Each entry maps a
  * set of trigger phrases to a fully detailed, FAL-ready instruction that
@@ -29,9 +44,20 @@ const BASE_PHOTO_LOCK =
  */
 const EDIT_EXPANSIONS: { triggers: string[]; expansion: string }[] = [
   {
-    triggers: ["remove people", "remove person", "remove humans", "remove human"],
+    triggers: [
+      "remove people",
+      "remove person",
+      "remove humans",
+      "remove human",
+      "remove all",
+      "remove everyone",
+      "erase person",
+      "erase people",
+      "delete person",
+      "delete people",
+    ],
     expansion:
-      "Carefully remove all people and human figures from this exact image. Fill the removed areas naturally with the surrounding background environment using inpainting. Keep ALL other elements exactly identical - colors, lighting, objects, textures, composition. Do not alter anything except removing the human figures.",
+      "Completely remove every visible person and human figure from this exact image. Do not leave faces, bodies, clothing, hair, limbs, ghost silhouettes, shadows, reflections or partial human traces. Seamlessly inpaint each removed area with realistic background content matching the surrounding texture, lighting, perspective and depth. Keep all non-human objects, colors, lighting, framing and composition unchanged.",
   },
   {
     triggers: ["remove background"],
@@ -98,7 +124,11 @@ function expandShortEditPrompt(prompt: string): string | null {
 
 export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<string> {
   // For edits, always lock the photo so identity/composition are preserved.
-  const lock = (text: string) => (isEdit ? `${BASE_PHOTO_LOCK}\n\n${text}` : text);
+  const lock = (text: string) => {
+    if (!isEdit) return text;
+    const lockText = isPeopleRemovalPrompt(prompt) || isPeopleRemovalPrompt(text) ? PEOPLE_REMOVAL_LOCK : BASE_PHOTO_LOCK;
+    return `${lockText}\n\n${text}`;
+  };
 
   // Longer prompts (>20 words) are already specific enough — send as-is.
   const wordCount = prompt.trim().split(/\s+/).filter(Boolean).length;
