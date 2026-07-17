@@ -474,6 +474,35 @@ function Editor() {
             </div>
           )}
 
+          {/* Aspect ratio chips — text-to-image only, matches existing chip style */}
+          {!loading && mediaType === "image" && !inputDataUrl && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Aspect ratio
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {ASPECT_RATIOS.map((a) => {
+                  const active = aspectRatio === a.id;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setAspectRatio(a.id)}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition-all hover:scale-105 ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+
           {/* Example prompts when the box is empty */}
           {!loading && !prompt.trim() && (
             <div className="space-y-2">
