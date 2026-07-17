@@ -272,7 +272,7 @@ export function buildImageInpaint({
 const SMALL_EDIT_INTENT =
   /\b(add|put|wear|place|insert|give|attach|include|show|goggles|glasses|hat|cap|mask|beard|smile|earring|necklace|crown|headband|sunglasses|accessory)\b/;
 
-export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRequestInput): FalRequest {
+export function buildFalRequest({ prompt, imageUrl, strength = 0.8, imageSize }: BuildFalRequestInput): FalRequest {
   void strength;
   if (imageUrl) {
     if (!isEnhancementOnly(prompt)) {
