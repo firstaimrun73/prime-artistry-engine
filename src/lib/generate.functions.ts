@@ -153,7 +153,10 @@ const inputSchema = z.object({
   referenceImageUrls: z.array(z.string().min(1).max(15_000_000)).max(9).optional(),
   // Optional black/white mask URL from Circle to Remove. White pixels are edited.
   maskImageUrl: z.string().min(1).max(15_000_000).optional(),
+  // Text-to-image only. Aspect ratio chip selection.
+  aspectRatio: z.enum(["1:1", "4:3", "16:9", "9:16", "3:4"]).optional(),
 });
+
 
 export const generateMedia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
