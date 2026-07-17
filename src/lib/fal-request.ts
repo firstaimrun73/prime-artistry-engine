@@ -336,7 +336,7 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.8, imageSize }:
     endpoint: ep(TEXT_TO_IMAGE_MODEL),
     body: {
       prompt,
-      image_size: "square_hd",
+      image_size: imageSize ?? "square_hd",
       num_images: 1,
       num_inference_steps: 40,
       guidance_scale: 4.5,
