@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
-import { getSmartSuggestions, EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
+import { getSmartSuggestions, EXAMPLE_PROMPTS, ASPECT_RATIOS, type AspectRatio } from "@/lib/prompt-suggestions";
 import { watermarkImage, applyDownloadWatermarkGrid } from "@/lib/watermark";
 import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { isAdminEmail } from "@/lib/admin-config";
