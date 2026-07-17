@@ -254,8 +254,11 @@ function Editor() {
             canAddRefImages && refImages.length > 0
               ? refImages.slice(0, planLimits.maxImages - 1)
               : undefined,
+          aspectRatio:
+            mediaType === "image" && !mediaUrl ? aspectRatio : undefined,
         },
       });
+
       if (runId !== runIdRef.current) return;
       let url = res.outputUrl;
       const isVideoOut = mediaType === "video";
