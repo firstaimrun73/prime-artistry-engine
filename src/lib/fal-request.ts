@@ -19,7 +19,10 @@ export type BuildFalRequestInput = {
   imageUrl?: string | null;
   /** Edit strength 0.1–1. Scales sharpen/detail intensity. */
   strength?: number;
+  /** Text-to-image only. Maps to fal `image_size` enum. */
+  imageSize?: string;
 };
+
 
 export type FalRequest = {
   workflow: ImageWorkflow;
