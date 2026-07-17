@@ -58,6 +58,8 @@ function Editor() {
   const [downloaded, setDownloaded] = useState(false);
   const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
   const [removeMaskDataUrl, setRemoveMaskDataUrl] = useState<string | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+
 
   const [msgIdx, setMsgIdx] = useState(0);
   const [stage, setStage] = useState(0);
