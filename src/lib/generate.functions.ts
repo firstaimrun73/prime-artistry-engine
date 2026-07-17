@@ -295,7 +295,12 @@ export const generateMedia = createServerFn({ method: "POST" })
         const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: false });
         console.log("[generate] enhanced prompt:", enhancedPrompt);
 
-        const req = buildFalRequest({ prompt: enhancedPrompt });
+        const { aspectToImageSize } = await import("@/lib/prompt-suggestions");
+        const req = buildFalRequest({
+          prompt: enhancedPrompt,
+          imageSize: aspectToImageSize(data.aspectRatio),
+        });
+
         outputUrl = await runFalStep(
           { label: req.workflow, model: req.model, endpoint: req.endpoint, body: req.body, outputKind: "image" },
           falKey,
