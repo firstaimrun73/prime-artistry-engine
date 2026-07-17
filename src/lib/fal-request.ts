@@ -19,7 +19,10 @@ export type BuildFalRequestInput = {
   imageUrl?: string | null;
   /** Edit strength 0.1–1. Scales sharpen/detail intensity. */
   strength?: number;
+  /** Text-to-image only. Maps to fal `image_size` enum. */
+  imageSize?: string;
 };
+
 
 export type FalRequest = {
   workflow: ImageWorkflow;
@@ -269,7 +272,7 @@ export function buildImageInpaint({
 const SMALL_EDIT_INTENT =
   /\b(add|put|wear|place|insert|give|attach|include|show|goggles|glasses|hat|cap|mask|beard|smile|earring|necklace|crown|headband|sunglasses|accessory)\b/;
 
-export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRequestInput): FalRequest {
+export function buildFalRequest({ prompt, imageUrl, strength = 0.8, imageSize }: BuildFalRequestInput): FalRequest {
   void strength;
   if (imageUrl) {
     if (!isEnhancementOnly(prompt)) {
@@ -333,7 +336,7 @@ export function buildFalRequest({ prompt, imageUrl, strength = 0.8 }: BuildFalRe
     endpoint: ep(TEXT_TO_IMAGE_MODEL),
     body: {
       prompt,
-      image_size: "square_hd",
+      image_size: imageSize ?? "square_hd",
       num_images: 1,
       num_inference_steps: 40,
       guidance_scale: 4.5,
