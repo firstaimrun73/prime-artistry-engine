@@ -14,6 +14,7 @@ import { Route as TicketsRouteImport } from './routes/tickets'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as SuccessRouteImport } from './routes/success'
+import { Route as StudioRouteImport } from './routes/studio'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -30,6 +31,9 @@ import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StudioVideoRouteImport } from './routes/studio.video'
+import { Route as StudioMusicRouteImport } from './routes/studio.music'
+import { Route as StudioImageRouteImport } from './routes/studio.image'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated.history'
 import { Route as AuthenticatedEditorRouteImport } from './routes/_authenticated.editor'
@@ -66,6 +70,11 @@ const SupportRoute = SupportRouteImport.update({
 const SuccessRoute = SuccessRouteImport.update({
   id: '/success',
   path: '/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudioRoute = StudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -147,6 +156,21 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioVideoRoute = StudioVideoRouteImport.update({
+  id: '/video',
+  path: '/video',
+  getParentRoute: () => StudioRoute,
+} as any)
+const StudioMusicRoute = StudioMusicRouteImport.update({
+  id: '/music',
+  path: '/music',
+  getParentRoute: () => StudioRoute,
+} as any)
+const StudioImageRoute = StudioImageRouteImport.update({
+  id: '/image',
+  path: '/image',
+  getParentRoute: () => StudioRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -227,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/studio': typeof StudioRouteWithChildren
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -238,6 +263,9 @@ export interface FileRoutesByFullPath {
   '/editor': typeof AuthenticatedEditorRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/studio/image': typeof StudioImageRoute
+  '/studio/music': typeof StudioMusicRoute
+  '/studio/video': typeof StudioVideoRoute
   '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/paypal': typeof ApiPublicWebhooksPaypalRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -261,6 +289,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/studio': typeof StudioRouteWithChildren
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -272,6 +301,9 @@ export interface FileRoutesByTo {
   '/editor': typeof AuthenticatedEditorRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/studio/image': typeof StudioImageRoute
+  '/studio/music': typeof StudioMusicRoute
+  '/studio/video': typeof StudioVideoRoute
   '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/paypal': typeof ApiPublicWebhooksPaypalRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -297,6 +329,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/studio': typeof StudioRouteWithChildren
   '/success': typeof SuccessRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -308,6 +341,9 @@ export interface FileRoutesById {
   '/_authenticated/editor': typeof AuthenticatedEditorRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/studio/image': typeof StudioImageRoute
+  '/studio/music': typeof StudioMusicRoute
+  '/studio/video': typeof StudioVideoRoute
   '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/paypal': typeof ApiPublicWebhooksPaypalRoute
   '/api/public/webhooks/razorpay': typeof ApiPublicWebhooksRazorpayRoute
@@ -333,6 +369,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/security'
     | '/sitemap.xml'
+    | '/studio'
     | '/success'
     | '/support'
     | '/terms'
@@ -344,6 +381,9 @@ export interface FileRouteTypes {
     | '/editor'
     | '/history'
     | '/settings'
+    | '/studio/image'
+    | '/studio/music'
+    | '/studio/video'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
     | '/api/public/webhooks/razorpay'
@@ -367,6 +407,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/security'
     | '/sitemap.xml'
+    | '/studio'
     | '/success'
     | '/support'
     | '/terms'
@@ -378,6 +419,9 @@ export interface FileRouteTypes {
     | '/editor'
     | '/history'
     | '/settings'
+    | '/studio/image'
+    | '/studio/music'
+    | '/studio/video'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
     | '/api/public/webhooks/razorpay'
@@ -402,6 +446,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/security'
     | '/sitemap.xml'
+    | '/studio'
     | '/success'
     | '/support'
     | '/terms'
@@ -413,6 +458,9 @@ export interface FileRouteTypes {
     | '/_authenticated/editor'
     | '/_authenticated/history'
     | '/_authenticated/settings'
+    | '/studio/image'
+    | '/studio/music'
+    | '/studio/video'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
     | '/api/public/webhooks/razorpay'
@@ -438,6 +486,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityRoute: typeof SecurityRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  StudioRoute: typeof StudioRouteWithChildren
   SuccessRoute: typeof SuccessRoute
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
@@ -486,6 +535,13 @@ declare module '@tanstack/react-router' {
       path: '/success'
       fullPath: '/success'
       preLoaderRoute: typeof SuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/studio': {
+      id: '/studio'
+      path: '/studio'
+      fullPath: '/studio'
+      preLoaderRoute: typeof StudioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -600,6 +656,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/video': {
+      id: '/studio/video'
+      path: '/video'
+      fullPath: '/studio/video'
+      preLoaderRoute: typeof StudioVideoRouteImport
+      parentRoute: typeof StudioRoute
+    }
+    '/studio/music': {
+      id: '/studio/music'
+      path: '/music'
+      fullPath: '/studio/music'
+      preLoaderRoute: typeof StudioMusicRouteImport
+      parentRoute: typeof StudioRoute
+    }
+    '/studio/image': {
+      id: '/studio/image'
+      path: '/image'
+      fullPath: '/studio/image'
+      preLoaderRoute: typeof StudioImageRouteImport
+      parentRoute: typeof StudioRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -709,6 +786,21 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface StudioRouteChildren {
+  StudioImageRoute: typeof StudioImageRoute
+  StudioMusicRoute: typeof StudioMusicRoute
+  StudioVideoRoute: typeof StudioVideoRoute
+}
+
+const StudioRouteChildren: StudioRouteChildren = {
+  StudioImageRoute: StudioImageRoute,
+  StudioMusicRoute: StudioMusicRoute,
+  StudioVideoRoute: StudioVideoRoute,
+}
+
+const StudioRouteWithChildren =
+  StudioRoute._addFileChildren(StudioRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
@@ -726,6 +818,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityRoute: SecurityRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  StudioRoute: StudioRouteWithChildren,
   SuccessRoute: SuccessRoute,
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,
@@ -741,13 +834,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

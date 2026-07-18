@@ -99,6 +99,20 @@ function Editor() {
     }
   }, []);
 
+  // Preload a starting prompt/mode from a Studio preset click.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("motio2edit-preset");
+      if (!raw) return;
+      sessionStorage.removeItem("motio2edit-preset");
+      const { prompt: p, mode } = JSON.parse(raw) as { prompt?: string; mode?: "image" | "video" };
+      if (mode === "image" || mode === "video") setMediaType(mode);
+      if (typeof p === "string" && p.length > 0) setPrompt(p);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   // Auto-resize the prompt box.
   useEffect(() => {
     const ta = taRef.current;
