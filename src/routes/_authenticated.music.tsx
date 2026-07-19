@@ -244,7 +244,6 @@ function MusicPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <Header />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
         {/* Header block with orange→purple gradient accent — music section only */}
         <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 md:p-8">
