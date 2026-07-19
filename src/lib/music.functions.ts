@@ -18,7 +18,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST } from "@/lib/plans";
 
 const FAL_QUEUE = "https://queue.fal.run/";
-const MUSIC_MODEL = "fal-ai/stable-audio";
+const MUSIC_MODEL = "cassetteai/music-generator";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const GENRES = [
