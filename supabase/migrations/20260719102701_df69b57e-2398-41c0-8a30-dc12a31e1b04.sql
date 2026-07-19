@@ -1,0 +1,1 @@
+ALTER TYPE public.gen_type ADD VALUE IF NOT EXISTS 'music';

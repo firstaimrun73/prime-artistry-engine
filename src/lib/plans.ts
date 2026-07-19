@@ -42,9 +42,11 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
 // ── Credit economics ──────────────────────────────────────────────
 //   • 1 image generation / edit = 25 credits
 //   • 1 video generation / edit = 125 credits
+//   • 1 music generation        = 15 credits
 export const CREDIT_COST = {
   image: 25,
   video: 125,
+  music: 15,
 } as const;
 
 /** Sentinel for "unlimited" credits (Business). */
