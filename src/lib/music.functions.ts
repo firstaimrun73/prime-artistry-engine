@@ -176,10 +176,14 @@ export const generateMusic = createServerFn({ method: "POST" })
       .single();
     if (pErr || !profile) throw new Error("Could not load your account.");
 
-    // Credit rule: music generation costs 100 credits for EVERY user (no
-    // free tier, no admin bypass). Enforced pre-check + post-success deduct.
+    // Credit rule: 100 credits per generation. Admin (ADMIN_EMAIL) bypasses.
     const cost = CREDIT_COST.music;
-    if (profile.credits < cost) {
+    const adminEmail = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+    const isAdmin =
+      !!adminEmail &&
+      !!profile.email &&
+      profile.email.toLowerCase() === adminEmail;
+    if (!isAdmin && profile.credits < cost) {
       throw new Error(
         `Not enough credits. Music generation costs ${cost} credits. Buy credits or upgrade your plan.`,
       );
