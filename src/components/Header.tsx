@@ -77,7 +77,7 @@ export function Header() {
                   className="hidden items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold sm:flex"
                 >
                   <Coins className="h-3.5 w-3.5 text-primary" />
-                  {profile.credits} credits
+                  {isAdminEmail(profile.email) ? "∞ credits" : `${profile.credits} credits`}
                 </Link>
               )}
               {profile && <CrownBadge plan={profile.plan} className="hidden sm:inline-flex" />}
