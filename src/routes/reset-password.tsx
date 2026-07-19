@@ -58,7 +58,7 @@ function ResetPassword() {
           </form>
         ) : (
           <p className="mt-4 text-sm text-muted-foreground">
-            Open this page from the reset link in your email. <Link to="/auth" className="text-primary hover:underline">Back to sign in</Link>
+            Open this page from the reset link in your email. <Link to="/auth" search={{}} className="text-primary hover:underline">Back to sign in</Link>
           </p>
         )}
       </div>
