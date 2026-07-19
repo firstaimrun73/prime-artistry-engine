@@ -46,7 +46,7 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
 export const CREDIT_COST = {
   image: 25,
   video: 125,
-  music: 15,
+  music: 100,
 } as const;
 
 /** Sentinel for "unlimited" credits (Business). */
