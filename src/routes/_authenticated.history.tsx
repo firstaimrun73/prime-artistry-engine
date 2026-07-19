@@ -127,6 +127,11 @@ function HistoryPage() {
                 {g.output_url ? (
                   g.type === "video" ? (
                     <video src={g.output_url} className="h-full w-full object-cover" muted />
+                  ) : g.type === "music" ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/25 to-purple-500/5">
+                      <Music className="h-8 w-8 text-primary" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Audio track</span>
+                    </div>
                   ) : (
                     <img src={g.output_url} alt={g.prompt ?? "Generated"} loading="lazy" className="h-full w-full object-cover" />
                   )
@@ -136,7 +141,7 @@ function HistoryPage() {
                   </div>
                 )}
                 <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-semibold capitalize backdrop-blur">
-                  {g.type === "video" ? <Video className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                  {g.type === "video" ? <Video className="h-3 w-3" /> : g.type === "music" ? <Music className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
                   {g.type}
                 </span>
               </div>
@@ -163,6 +168,13 @@ function HistoryPage() {
                 {active.output_url ? (
                   active.type === "video" ? (
                     <video src={active.output_url} className="max-h-[60vh] w-full" controls autoPlay />
+                  ) : active.type === "music" ? (
+                    <div className="flex w-full flex-col items-center gap-4 p-8">
+                      <div className="rounded-full border border-border bg-background/60 p-4">
+                        <Music className="h-8 w-8 text-primary" />
+                      </div>
+                      <audio src={active.output_url} controls autoPlay className="w-full max-w-md" />
+                    </div>
                   ) : (
                     <img
                       src={active.output_url}
@@ -187,15 +199,17 @@ function HistoryPage() {
                 <Button size="sm" onClick={() => download(active)} disabled={!active.output_url}>
                   <Download className="mr-1.5 h-4 w-4" /> Download
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => editAgain(active)} disabled={!active.output_url}>
-                  <Pencil className="mr-1.5 h-4 w-4" /> Edit Again
-                </Button>
+                {active.type !== "music" && (
+                  <Button variant="outline" size="sm" onClick={() => editAgain(active)} disabled={!active.output_url}>
+                    <Pencil className="mr-1.5 h-4 w-4" /> Edit Again
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" onClick={() => remove(active)}>
                   <Trash2 className="mr-1.5 h-4 w-4" /> Delete
                 </Button>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {new Date(active.created_at).toLocaleString()} · {CREDIT_COST[active.type as "image" | "video"]} credits
+                {new Date(active.created_at).toLocaleString()} · {CREDIT_COST[active.type as keyof typeof CREDIT_COST]} credits
               </p>
             </>
           )}
