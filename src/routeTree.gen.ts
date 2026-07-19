@@ -35,6 +35,7 @@ import { Route as StudioVideoRouteImport } from './routes/studio.video'
 import { Route as StudioMusicRouteImport } from './routes/studio.music'
 import { Route as StudioImageRouteImport } from './routes/studio.image'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
+import { Route as AuthenticatedMusicRouteImport } from './routes/_authenticated.music'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated.history'
 import { Route as AuthenticatedEditorRouteImport } from './routes/_authenticated.editor'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
@@ -176,6 +177,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMusicRoute = AuthenticatedMusicRouteImport.update({
+  id: '/music',
+  path: '/music',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
   id: '/history',
   path: '/history',
@@ -262,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/editor': typeof AuthenticatedEditorRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/music': typeof AuthenticatedMusicRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
@@ -300,6 +307,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/editor': typeof AuthenticatedEditorRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/music': typeof AuthenticatedMusicRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
@@ -340,6 +348,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/editor': typeof AuthenticatedEditorRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
+  '/_authenticated/music': typeof AuthenticatedMusicRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
@@ -380,6 +389,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/editor'
     | '/history'
+    | '/music'
     | '/settings'
     | '/studio/image'
     | '/studio/music'
@@ -418,6 +428,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/editor'
     | '/history'
+    | '/music'
     | '/settings'
     | '/studio/image'
     | '/studio/music'
@@ -457,6 +468,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/editor'
     | '/_authenticated/history'
+    | '/_authenticated/music'
     | '/_authenticated/settings'
     | '/studio/image'
     | '/studio/music'
@@ -684,6 +696,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/music': {
+      id: '/_authenticated/music'
+      path: '/music'
+      fullPath: '/music'
+      preLoaderRoute: typeof AuthenticatedMusicRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/history': {
       id: '/_authenticated/history'
       path: '/history'
@@ -770,6 +789,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEditorRoute: typeof AuthenticatedEditorRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
+  AuthenticatedMusicRoute: typeof AuthenticatedMusicRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
@@ -779,6 +799,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEditorRoute: AuthenticatedEditorRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
+  AuthenticatedMusicRoute: AuthenticatedMusicRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 

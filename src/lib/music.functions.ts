@@ -18,7 +18,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST } from "@/lib/plans";
 
 const FAL_QUEUE = "https://queue.fal.run/";
-const MUSIC_MODEL = "fal-ai/stable-audio";
+const MUSIC_MODEL = "cassetteai/music-generator";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const GENRES = [
@@ -37,8 +37,8 @@ const inputSchema = z.object({
   prompt: z.string().trim().min(1, "Describe the music you want.").max(1000),
   genre: z.enum(GENRES).optional(),
   mood: z.enum(MOODS).optional(),
-  // Stable Audio supports up to ~47 seconds per generation.
-  durationSeconds: z.number().int().min(5).max(47),
+  // CassetteAI supports up to 3 minutes (180s) per generation.
+  durationSeconds: z.number().int().min(5).max(180),
 });
 
 // Compose the descriptive prompt Stable Audio responds to best. It benefits
@@ -176,15 +176,13 @@ export const generateMusic = createServerFn({ method: "POST" })
       .single();
     if (pErr || !profile) throw new Error("Could not load your account.");
 
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const isAdmin =
-      !!adminEmail &&
-      !!profile.email &&
-      profile.email.toLowerCase() === adminEmail.toLowerCase();
-
+    // Credit rule: music generation costs 100 credits for EVERY user (no
+    // free tier, no admin bypass). Enforced pre-check + post-success deduct.
     const cost = CREDIT_COST.music;
-    if (!isAdmin && profile.credits < cost) {
-      throw new Error(`Not enough credits. Music generation costs ${cost} credits.`);
+    if (profile.credits < cost) {
+      throw new Error(
+        `Not enough credits. Music generation costs ${cost} credits. Buy credits or upgrade your plan.`,
+      );
     }
 
     const falKey = process.env.FAL_API_KEY;
@@ -202,8 +200,7 @@ export const generateMusic = createServerFn({ method: "POST" })
       outputUrl = await runStableAudio(
         {
           prompt: composed,
-          seconds_total: data.durationSeconds,
-          steps: 100,
+          duration: data.durationSeconds,
         },
         falKey,
       );
@@ -219,7 +216,7 @@ export const generateMusic = createServerFn({ method: "POST" })
 
     // Charge credits only after a confirmed successful output.
     let newCredits = profile.credits;
-    if (!isAdmin) {
+    {
       const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
         _amount: cost,
         _gen_type: "music",
