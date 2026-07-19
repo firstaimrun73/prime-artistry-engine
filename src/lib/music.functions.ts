@@ -176,10 +176,14 @@ export const generateMusic = createServerFn({ method: "POST" })
       .single();
     if (pErr || !profile) throw new Error("Could not load your account.");
 
-    // Credit rule: music generation costs 100 credits for EVERY user (no
-    // free tier, no admin bypass). Enforced pre-check + post-success deduct.
+    // Credit rule: 100 credits per generation. Admin (ADMIN_EMAIL) bypasses.
     const cost = CREDIT_COST.music;
-    if (profile.credits < cost) {
+    const adminEmail = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+    const isAdmin =
+      !!adminEmail &&
+      !!profile.email &&
+      profile.email.toLowerCase() === adminEmail;
+    if (!isAdmin && profile.credits < cost) {
       throw new Error(
         `Not enough credits. Music generation costs ${cost} credits. Buy credits or upgrade your plan.`,
       );
@@ -214,9 +218,9 @@ export const generateMusic = createServerFn({ method: "POST" })
       throw new Error("Music generation returned no output. Credits not charged.");
     }
 
-    // Charge credits only after a confirmed successful output.
+    // Charge credits only after a confirmed successful output. Admin bypass: no charge.
     let newCredits = profile.credits;
-    {
+    if (!isAdmin) {
       const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
         _amount: cost,
         _gen_type: "music",
@@ -232,6 +236,8 @@ export const generateMusic = createServerFn({ method: "POST" })
       const deducted = deduction as { transaction_id: string; credits: number };
       newCredits = deducted.credits;
       console.log("[music] charged", cost, "credits → remaining", newCredits);
+    } else {
+      console.log("[music] admin bypass — no credits charged");
     }
 
     // Save to history so it shows up in /history alongside images and videos.

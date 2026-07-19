@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { isAdminEmail } from "@/lib/admin-config";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
@@ -148,8 +148,9 @@ function MusicPage() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cost = CREDIT_COST.music;
+  const isAdmin = isAdminEmail(profile?.email);
   const credits = profile?.credits ?? 0;
-  const insufficient = credits < cost;
+  const insufficient = !isAdmin && credits < cost;
 
   useEffect(() => {
     if (!loading) return;
@@ -244,7 +245,6 @@ function MusicPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <Header />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
         {/* Header block with orange→purple gradient accent — music section only */}
         <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 md:p-8">
@@ -273,7 +273,7 @@ function MusicPage() {
             </div>
             <div className="flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-1.5 text-xs font-semibold backdrop-blur">
               <Coins className="h-3.5 w-3.5 text-primary" />
-              {credits} credits
+              {isAdmin ? "∞ credits" : `${credits} credits`}
             </div>
           </div>
         </div>
