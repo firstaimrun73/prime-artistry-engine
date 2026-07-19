@@ -148,8 +148,9 @@ function MusicPage() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cost = CREDIT_COST.music;
+  const isAdmin = isAdminEmail(profile?.email);
   const credits = profile?.credits ?? 0;
-  const insufficient = credits < cost;
+  const insufficient = !isAdmin && credits < cost;
 
   useEffect(() => {
     if (!loading) return;
