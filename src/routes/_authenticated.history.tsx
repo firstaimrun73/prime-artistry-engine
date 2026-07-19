@@ -13,7 +13,7 @@ import { CREDIT_COST } from "@/lib/plans";
 import { toast } from "sonner";
 import {
   Download, Pencil, Trash2, ZoomIn, ZoomOut, Image as ImageIcon,
-  Video, History as HistoryIcon, FolderOpen,
+  Video, History as HistoryIcon, FolderOpen, Music,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/history")({

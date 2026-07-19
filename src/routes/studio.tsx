@@ -47,13 +47,12 @@ const CARDS: Card[] = [
   },
   {
     name: "Music Studio",
-    desc: "AI-generated music, moods, loops, and sound design.",
+    desc: "AI-generated instrumental music from a prompt — pick genre, mood and duration.",
     href: "/studio/music",
     icon: Music,
     accent: "from-purple-500/25 to-purple-500/5",
-    tools: ["Text to Music", "Cinematic", "Lo-fi", "EDM", "Ambient", "Loops"],
-    cta: "Coming soon",
-    disabled: true,
+    tools: ["Text to Music", "Cinematic", "Lo-fi", "EDM", "Ambient", "Synthwave"],
+    cta: "Open Music Studio",
   },
 ];
 
