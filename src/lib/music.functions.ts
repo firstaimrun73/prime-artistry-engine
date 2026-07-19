@@ -37,8 +37,8 @@ const inputSchema = z.object({
   prompt: z.string().trim().min(1, "Describe the music you want.").max(1000),
   genre: z.enum(GENRES).optional(),
   mood: z.enum(MOODS).optional(),
-  // Stable Audio supports up to ~47 seconds per generation.
-  durationSeconds: z.number().int().min(5).max(47),
+  // CassetteAI supports up to 3 minutes (180s) per generation.
+  durationSeconds: z.number().int().min(5).max(180),
 });
 
 // Compose the descriptive prompt Stable Audio responds to best. It benefits
