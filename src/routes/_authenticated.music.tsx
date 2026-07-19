@@ -273,7 +273,7 @@ function MusicPage() {
             </div>
             <div className="flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-1.5 text-xs font-semibold backdrop-blur">
               <Coins className="h-3.5 w-3.5 text-primary" />
-              {credits} credits
+              {isAdmin ? "∞ credits" : `${credits} credits`}
             </div>
           </div>
         </div>
