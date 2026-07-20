@@ -47,6 +47,7 @@ export const CREDIT_COST = {
   image: 25,
   video: 125,
   music: 100,
+  music_lite: 50,
 } as const;
 
 /** Sentinel for "unlimited" credits (Business). */
