@@ -102,11 +102,12 @@ function friendlyError(status: number, txt: string): string {
 async function runStableAudio(
   body: Record<string, unknown>,
   falKey: string,
+  model: string,
 ): Promise<string> {
   const headers = { Authorization: `Key ${falKey}`, "Content-Type": "application/json" };
-  console.log("[music] ▶ submit", JSON.stringify(safePayload(body)));
+  console.log("[music] ▶ submit", model, JSON.stringify(safePayload(body)));
 
-  const submit = await fetch(`${FAL_QUEUE}${MUSIC_MODEL}`, {
+  const submit = await fetch(`${FAL_QUEUE}${model}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
