@@ -457,15 +457,21 @@ function Editor() {
               ref={taRef}
               placeholder={
                 inputDataUrl
-                  ? "Describe the edit… e.g. remove background, make cinematic, enhance quality"
-                  : `Describe the ${mediaType} you want…`
+                  ? "Describe the edit… e.g. remove background, make cinematic, enhance quality (any language)"
+                  : `Describe the ${mediaType} you want… (any language supported)`
               }
               value={prompt}
               onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
               rows={4}
               disabled={loading}
-              className="resize-none pr-2"
+              className="resize-none pr-12"
             />
+            <div className="absolute right-2 top-2">
+              <VoiceInputButton
+                disabled={loading}
+                onTranscript={(t) => setPrompt((p) => (p ? `${p} ${t}` : t).slice(0, 2000))}
+              />
+            </div>
             <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1 text-primary">
                 <Wand2 className="h-3 w-3" /> Auto-enhanced before generating
