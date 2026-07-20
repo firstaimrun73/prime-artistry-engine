@@ -39,6 +39,9 @@ const inputSchema = z.object({
   mood: z.enum(MOODS).optional(),
   // CassetteAI supports up to 3 minutes (180s) per generation.
   durationSeconds: z.number().int().min(5).max(180),
+  // Model tier — "lite" is faster/cheaper (Stable Audio, 50 credits),
+  // "pro" is the higher-quality CassetteAI generator (100 credits).
+  tier: z.enum(["lite", "pro"]).optional().default("pro"),
 });
 
 // Compose the descriptive prompt Stable Audio responds to best. It benefits
