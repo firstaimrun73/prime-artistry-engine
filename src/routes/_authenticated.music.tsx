@@ -143,6 +143,7 @@ function MusicPage() {
   const [instrument, setInstrument] = useState<Chip | null>(null);
   const [mood, setMood] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(30);
+  const [tier, setTier] = useState<"lite" | "pro">("pro");
 
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -150,7 +151,7 @@ function MusicPage() {
   const [playing, setPlaying] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const cost = CREDIT_COST.music;
+  const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
   const isAdmin = isAdminEmail(profile?.email);
   const credits = profile?.credits ?? 0;
   const insufficient = !isAdmin && credits < cost;
