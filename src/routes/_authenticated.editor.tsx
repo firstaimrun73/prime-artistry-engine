@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { CompareSlider } from "@/components/CompareSlider";
 import { MultiImageInput } from "@/components/MultiImageInput";
+import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { getPlanLimits } from "@/utils/planLimits";
 
 import { toast } from "sonner";
