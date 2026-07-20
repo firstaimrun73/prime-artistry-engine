@@ -181,8 +181,10 @@ export const generateMusic = createServerFn({ method: "POST" })
       .single();
     if (pErr || !profile) throw new Error("Could not load your account.");
 
-    // Credit rule: 100 credits per generation. Admin (ADMIN_EMAIL) bypasses.
-    const cost = CREDIT_COST.music;
+    // Credit rule: Pro = 100 credits, Lite = 50 credits. Admin (ADMIN_EMAIL) bypasses.
+    const tier = data.tier ?? "pro";
+    const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
+    const model = tier === "lite" ? MUSIC_MODEL_LITE : MUSIC_MODEL_PRO;
     const adminEmail = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
     const isAdmin =
       !!adminEmail &&
@@ -202,7 +204,7 @@ export const generateMusic = createServerFn({ method: "POST" })
       genre: data.genre,
       mood: data.mood,
     });
-    console.log("[music] prompt:", composed);
+    console.log("[music] prompt:", composed, "tier:", tier);
 
     let outputUrl: string;
     try {
@@ -210,8 +212,10 @@ export const generateMusic = createServerFn({ method: "POST" })
         {
           prompt: composed,
           duration: data.durationSeconds,
+          seconds_total: data.durationSeconds,
         },
         falKey,
+        model,
       );
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Generation failed.";
