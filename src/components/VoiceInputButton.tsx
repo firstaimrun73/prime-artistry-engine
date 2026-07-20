@@ -35,7 +35,7 @@ export function VoiceInputButton({
 }) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(true);
-  const recRef = useRef<ReturnType<SpeechRecognitionCtor> | null>(null);
+  const recRef = useRef<InstanceType<SpeechRecognitionCtor> | null>(null);
 
   useEffect(() => {
     setSupported(!!getRecognitionCtor());
