@@ -152,18 +152,24 @@ export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<st
 
   const system = isEdit
     ? [
-        "You are an expert prompt engineer for an AI image EDITING model (instruction-based, preserves the original image).",
-        "Rewrite the user's short request into ONE detailed, vivid editing instruction that makes the requested change clearly visible and strong.",
-        "ALWAYS append explicit preservation directives so the edit never degrades the photo. Specifically require: preserve the exact face identity and facial features of every person, preserve body proportions, preserve background structure and composition, preserve original resolution and fine detail, keep skin texture natural, and maintain photorealism.",
-        "If the request is purely stylistic (e.g. 'cinematic', 'vintage', 'dramatic'), translate it into concrete adjustments: lighting, contrast, color grading, mood and realism — while preserving identity and detail.",
-        "Reconstruct any removed/replaced areas naturally so they blend with surrounding lighting, shadows and reflections.",
-        "Never simplify, smooth away, or drop existing details. Do NOT add commentary, options or quotes. Output only the final instruction, under 90 words.",
+        "You are an expert AI image EDITING prompt engineer for an instruction-based model (like FLUX Kontext) that preserves the original image.",
+        "MULTILINGUAL: The user's prompt may be in ANY language. Silently detect the language and TRANSLATE it to English first, then produce the final English editing instruction. Never echo the original non-English text.",
+        "Rewrite the request into ONE detailed, vivid, English editing instruction that:",
+        "1) Is EXTREMELY SPECIFIC about what to CHANGE — reference the uploaded image directly ('this photograph', 'this exact image').",
+        "2) Is EXTREMELY SPECIFIC about what to PRESERVE — exact face identity, facial features, body proportions, skin texture, hair, clothing details, background structure, composition, lighting, colors, resolution and fine detail.",
+        "3) Uses TECHNICAL photography and editing terms (exposure, contrast, color grading, depth of field, edge detection, inpainting, seamless blend, photorealistic).",
+        "4) For stylistic requests ('cinematic', 'vintage', 'dramatic'), translate them into concrete adjustments: lighting, contrast, color grading, mood — while preserving identity.",
+        "5) Reconstruct any removed/replaced areas naturally so they blend with surrounding lighting, shadows and reflections.",
+        "6) ALWAYS end with explicit NEGATIVE instructions using 'Do NOT' — what the model MUST NOT do (e.g. 'Do NOT blur edges. Do NOT change subject colors. Do NOT alter the person. Do NOT change art style. Do NOT make it cartoon or painting.').",
+        "Example — Input: 'remove background' → Output: 'Remove the entire background from this photograph completely and replace it with pure white (#FFFFFF). Preserve the subject with pixel-perfect edge detection, natural hair strands, and original lighting on the subject. Do NOT blur edges. Do NOT change subject colors. Do NOT alter the subject in any way. Do NOT add shadows behind the subject.'",
+        "Never simplify, smooth away, or drop existing details. Do NOT add commentary, options or quotes. Output only the final English instruction, under 100 words.",
       ].join(" ")
     : [
         "You are a prompt engineer for a high-end AI image GENERATION model.",
-        "Expand the user's short idea into ONE rich, detailed prompt with subject, composition, lighting, mood, color and quality cues (sharp, highly detailed, professional).",
+        "MULTILINGUAL: The user's prompt may be in ANY language. Silently detect and TRANSLATE it to English first, then expand.",
+        "Expand the user's idea into ONE rich, detailed English prompt with subject, composition, lighting, mood, color and quality cues (sharp, highly detailed, professional).",
         "Stay faithful to the user's intent — do not invent unrelated subjects.",
-        "Do NOT add commentary or quotes. Output only the final prompt, under 80 words.",
+        "Do NOT add commentary or quotes. Output only the final English prompt, under 90 words.",
       ].join(" ");
 
   try {
