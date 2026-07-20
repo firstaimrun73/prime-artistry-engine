@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { isAdminEmail } from "@/lib/admin-config";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { useAuth } from "@/lib/auth";
 import { CREDIT_COST } from "@/lib/plans";
 import { generateMusic, MUSIC_GENRES, MUSIC_MOODS } from "@/lib/music.functions";
@@ -19,6 +20,8 @@ import {
   Share2,
   RotateCcw,
   Coins,
+  Zap,
+  Crown,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/music")({
