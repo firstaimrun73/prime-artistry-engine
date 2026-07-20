@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { isAdminEmail } from "@/lib/admin-config";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { useAuth } from "@/lib/auth";
 import { CREDIT_COST } from "@/lib/plans";
 import { generateMusic, MUSIC_GENRES, MUSIC_MOODS } from "@/lib/music.functions";
@@ -19,6 +20,8 @@ import {
   Share2,
   RotateCcw,
   Coins,
+  Zap,
+  Crown,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/music")({
@@ -140,6 +143,7 @@ function MusicPage() {
   const [instrument, setInstrument] = useState<Chip | null>(null);
   const [mood, setMood] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(30);
+  const [tier, setTier] = useState<"lite" | "pro">("pro");
 
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -147,7 +151,7 @@ function MusicPage() {
   const [playing, setPlaying] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const cost = CREDIT_COST.music;
+  const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
   const isAdmin = isAdminEmail(profile?.email);
   const credits = profile?.credits ?? 0;
   const insufficient = !isAdmin && credits < cost;
@@ -185,6 +189,7 @@ function MusicPage() {
         data: {
           prompt: enhanced,
           durationSeconds: duration,
+          tier,
           ...(backendGenre ? { genre: backendGenre } : {}),
           ...(backendMood ? { mood: backendMood } : {}),
         },
@@ -280,14 +285,51 @@ function MusicPage() {
 
         {/* Prompt input */}
         <section className="mt-6 rounded-2xl border border-border bg-card p-5">
-          <label className="mb-2 block text-sm font-semibold">Describe your track</label>
-          <Textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder='e.g. "Energetic guitar music for wedding" · "Sad piano melody 30 seconds" · "Epic trailer music with drums"'
-            rows={3}
-            className="resize-none"
-          />
+          {/* Tier toggle: Lite (Stable Audio, 50cr) vs Pro (CassetteAI, 100cr) */}
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <label className="block text-sm font-semibold">Describe your track</label>
+            <div className="inline-flex rounded-full border border-border bg-background/60 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setTier("lite")}
+                className={
+                  "flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition " +
+                  (tier === "lite"
+                    ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
+                    : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                <Zap className="h-3 w-3" /> Lite · {CREDIT_COST.music_lite}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTier("pro")}
+                className={
+                  "flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition " +
+                  (tier === "pro"
+                    ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
+                    : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                <Crown className="h-3 w-3" /> Pro · {CREDIT_COST.music}
+              </button>
+            </div>
+          </div>
+          <div className="relative">
+            <Textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder='e.g. "Energetic guitar music for wedding" · "Sad piano melody 30 seconds" · "Epic trailer music with drums" · Any language supported'
+              rows={3}
+              className="resize-none pr-12"
+            />
+            <div className="absolute right-2 top-2">
+              <VoiceInputButton
+                disabled={loading}
+                onTranscript={(t) => setPrompt((p) => (p ? `${p} ${t}` : t))}
+              />
+            </div>
+          </div>
 
           {/* Instrument / genre chips */}
           <div className="mt-5">
