@@ -189,6 +189,7 @@ function MusicPage() {
         data: {
           prompt: enhanced,
           durationSeconds: duration,
+          tier,
           ...(backendGenre ? { genre: backendGenre } : {}),
           ...(backendMood ? { mood: backendMood } : {}),
         },
