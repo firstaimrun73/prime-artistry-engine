@@ -91,7 +91,7 @@ function StudioCard({ card }: { card: Card }) {
 
   const go = () => {
     if (card.disabled) return;
-    navigate({ to: card.href });
+    navigate({ to: card.href as never });
   };
 
   const inner = (
@@ -114,7 +114,7 @@ function StudioCard({ card }: { card: Card }) {
               try {
                 sessionStorage.setItem("prefill-prompt", toolToPrompt(card.name, t));
               } catch { /* ignore */ }
-              navigate({ to: card.href });
+              navigate({ to: card.href as never });
             }}
             className="rounded-full border border-border bg-secondary/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
           >
