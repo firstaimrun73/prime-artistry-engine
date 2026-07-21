@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ImageIcon, Video, Music, ArrowRight, Sparkles } from "lucide-react";
@@ -87,6 +87,13 @@ function StudioHub() {
 
 function StudioCard({ card }: { card: Card }) {
   const Icon = card.icon;
+  const navigate = useNavigate();
+
+  const go = () => {
+    if (card.disabled) return;
+    navigate({ to: card.href as never });
+  };
+
   const inner = (
     <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg">
       <div className={`pointer-events-none absolute inset-x-0 -top-24 h-48 bg-gradient-to-b ${card.accent} blur-2xl`} />
@@ -99,9 +106,20 @@ function StudioCard({ card }: { card: Card }) {
       <p className="relative mt-3 text-sm text-muted-foreground">{card.desc}</p>
       <div className="relative mt-4 flex flex-wrap gap-1.5">
         {card.tools.map((t) => (
-          <span key={t} className="rounded-full border border-border bg-secondary/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+          <button
+            key={t}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              try {
+                sessionStorage.setItem("prefill-prompt", toolToPrompt(card.name, t));
+              } catch { /* ignore */ }
+              navigate({ to: card.href as never });
+            }}
+            className="rounded-full border border-border bg-secondary/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+          >
             {t}
-          </span>
+          </button>
         ))}
       </div>
       <div className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
@@ -111,12 +129,25 @@ function StudioCard({ card }: { card: Card }) {
     </div>
   );
 
-  if (card.disabled) {
-    return <div className="cursor-not-allowed opacity-70">{inner}</div>;
-  }
   return (
-    <Link to={card.href} className="block">
+    <button
+      type="button"
+      onClick={go}
+      disabled={card.disabled}
+      className={"block w-full text-left " + (card.disabled ? "cursor-not-allowed opacity-70" : "")}
+    >
       {inner}
-    </Link>
+    </button>
   );
+}
+
+// Turn a tool chip into a starter prompt for the destination editor.
+function toolToPrompt(studio: string, tool: string): string {
+  if (studio === "Music Studio") {
+    return `${tool} instrumental track, professional production, clean mix, high fidelity.`;
+  }
+  if (studio === "Video Studio") {
+    return `${tool}: cinematic motion, smooth camera, natural lighting.`;
+  }
+  return `${tool}: apply this edit to the uploaded image while preserving identity and composition.`;
 }

@@ -35,7 +35,7 @@ const MOODS = [
 ] as const;
 
 const inputSchema = z.object({
-  prompt: z.string().trim().min(1, "Describe the music you want.").max(1000),
+  prompt: z.string().trim().min(1, "Describe the music you want.").transform((s) => s.slice(0, 900)),
   genre: z.enum(GENRES).optional(),
   mood: z.enum(MOODS).optional(),
   // CassetteAI supports up to 3 minutes (180s) per generation.
@@ -62,7 +62,9 @@ function composeMusicPrompt({
   if (genre) parts.push(`${genre} genre`);
   if (mood) parts.push(`${mood} mood`);
   parts.push("professional production", "clean mix", "high fidelity", "instrumental");
-  return parts.filter(Boolean).join(", ");
+  const composed = parts.filter(Boolean).join(", ");
+  // FAL music models cap prompts at 1000 chars — trim to 900 to leave headroom.
+  return composed.length > 900 ? composed.slice(0, 900) : composed;
 }
 
 function safePayload(body: Record<string, unknown>): Record<string, unknown> {
