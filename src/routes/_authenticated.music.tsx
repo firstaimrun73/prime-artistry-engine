@@ -164,6 +164,17 @@ function MusicPage() {
     return () => clearInterval(id);
   }, [loading]);
 
+  // Pre-fill prompt from Studio sample clicks (sessionStorage bridge).
+  useEffect(() => {
+    try {
+      const pre = sessionStorage.getItem("prefill-prompt");
+      if (pre) {
+        setPrompt(pre);
+        sessionStorage.removeItem("prefill-prompt");
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const isFree = (profile?.plan ?? "free") === "free";
   const filename = (() => {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -329,6 +340,16 @@ function MusicPage() {
                 onTranscript={(t) => setPrompt((p) => (p ? `${p} ${t}` : t))}
               />
             </div>
+          </div>
+          <div
+            className={
+              "mt-1.5 text-right text-xs " +
+              (prompt.length > 900 ? "font-semibold text-destructive" : "text-muted-foreground")
+            }
+          >
+            {prompt.length > 900
+              ? `Prompt too long, will be trimmed to 900 · ${prompt.length}/900`
+              : `${prompt.length}/900 characters`}
           </div>
 
           {/* Instrument / genre chips */}
