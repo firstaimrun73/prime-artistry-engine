@@ -42,6 +42,11 @@ function VideoStudio() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const openBlank = () => {
+    try { sessionStorage.setItem("motio2edit-mode", "video"); } catch { /* ignore */ }
+    navigate({ to: user ? "/editor" : "/auth" });
+  };
+
   const applyPreset = (p: Preset) => {
     try {
       sessionStorage.setItem(
@@ -51,6 +56,7 @@ function VideoStudio() {
     } catch { /* ignore */ }
     navigate({ to: user ? "/editor" : "/auth" });
   };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,7 +69,7 @@ function VideoStudio() {
             <p className="mt-1 text-sm text-muted-foreground">Cinematic AI motion presets — open a blank editor or pick a starting point.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: user ? "/editor" : "/auth" })}>Open blank editor</Button>
+            <Button variant="outline" onClick={openBlank}>Open blank editor</Button>
           </div>
         </div>
 

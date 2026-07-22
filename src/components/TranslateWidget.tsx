@@ -1,8 +1,10 @@
 // Floating Google Translate widget + first-visit language suggestion popup.
 // Mounted globally from the root layout. Client-only.
 import { useEffect, useRef, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { Languages, X } from "lucide-react";
 import { detectCountry } from "@/lib/geo";
+
 
 const SUPPORTED = "hi,es,fr,de,ar,zh-CN,ja,ko,pt,ru,bn,ta,ur";
 const POPUP_KEY = "motio2edit-lang-popup-shown";
@@ -34,9 +36,14 @@ function setGoogleLang(lang: string) {
 }
 
 export function TranslateWidget() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const injected = useRef(false);
+
+  // FIX 4: only show on home + settings; hide on chat/editor/studio pages.
+  const allowed = pathname === "/" || pathname.startsWith("/settings");
+
 
   // Inject the Google Translate script once.
   useEffect(() => {
@@ -78,8 +85,11 @@ export function TranslateWidget() {
     });
   }, []);
 
+  if (!allowed) return null;
+
   return (
     <>
+
       {/* Suggestion popup */}
       {suggestion && (
         <div className="fixed bottom-24 right-5 z-[60] w-72 rounded-xl border border-border bg-card p-4 shadow-xl">

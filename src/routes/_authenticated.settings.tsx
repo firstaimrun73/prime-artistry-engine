@@ -7,6 +7,8 @@ import { getPlan } from "@/lib/plans";
 import { getTier } from "@/lib/plan-tier";
 import { CrownBadge } from "@/components/CrownBadge";
 import { Lock } from "lucide-react";
+import { isAdminEmail } from "@/lib/admin-config";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -347,7 +349,7 @@ function SettingsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Credits remaining</span>
-            <span className="font-medium">{profile.credits}</span>
+            <span className="font-medium">{isAdminEmail(profile.email) ? "∞" : profile.credits}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Currency</span>

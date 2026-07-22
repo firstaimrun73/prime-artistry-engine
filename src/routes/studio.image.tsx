@@ -73,6 +73,11 @@ function ImageStudio() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const openBlank = () => {
+    try { sessionStorage.setItem("motio2edit-mode", "image"); } catch { /* ignore */ }
+    navigate({ to: user ? "/editor" : "/auth" });
+  };
+
   const applyPreset = (p: Preset) => {
     try {
       sessionStorage.setItem(
@@ -82,6 +87,7 @@ function ImageStudio() {
     } catch { /* ignore */ }
     navigate({ to: user ? "/editor" : "/auth" });
   };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,7 +100,7 @@ function ImageStudio() {
             <p className="mt-1 text-sm text-muted-foreground">Pick a preset or open a blank editor.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: user ? "/editor" : "/auth" })}>Open blank editor</Button>
+            <Button variant="outline" onClick={openBlank}>Open blank editor</Button>
           </div>
         </div>
 

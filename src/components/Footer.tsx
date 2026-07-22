@@ -18,7 +18,7 @@ export function Footer() {
         <Link to="/" className="flex items-center gap-2 font-extrabold tracking-tight">
           <Sparkles className="h-5 w-5 text-primary" />
           <span className="flex items-baseline gap-1.5 text-lg">
-            Mot<span className="text-primary">2</span>Edit
+            MOTI<span className="text-primary">O2</span>EDIT
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               by Motion2AI
             </span>
@@ -39,7 +39,7 @@ export function Footer() {
       <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">
         Need help? <a href="mailto:support@motio2edit.com" className="hover:text-foreground">support@motio2edit.com</a>
         <span className="mx-2">·</span>
-        © {new Date().getFullYear()} Mot2Edit by Motion2AI. All rights reserved.
+        © {new Date().getFullYear()} MOTIO2EDIT by Motion2AI. All rights reserved.
       </div>
     </footer>
   );

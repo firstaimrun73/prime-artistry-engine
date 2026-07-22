@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -43,8 +43,10 @@ const LOADING_MESSAGES = [
 function Editor() {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
+  const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
 
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [prompt, setPrompt] = useState("");
@@ -103,18 +105,34 @@ function Editor() {
   }, []);
 
   // Preload a starting prompt/mode from a Studio preset click.
+  // FIX 2: Direct visits to /editor with no preset/reuse redirect to /studio/image.
   useEffect(() => {
+    let hasContext = false;
     try {
       const raw = sessionStorage.getItem("motio2edit-preset");
-      if (!raw) return;
-      sessionStorage.removeItem("motio2edit-preset");
-      const { prompt: p, mode } = JSON.parse(raw) as { prompt?: string; mode?: "image" | "video" };
-      if (mode === "image" || mode === "video") setMediaType(mode);
-      if (typeof p === "string" && p.length > 0) setPrompt(p);
+      const reuse = sessionStorage.getItem("motio2edit-reuse");
+      const mode = sessionStorage.getItem("motio2edit-mode");
+      hasContext = !!(raw || reuse || mode);
+      if (raw) {
+        sessionStorage.removeItem("motio2edit-preset");
+        const { prompt: p, mode: m } = JSON.parse(raw) as { prompt?: string; mode?: "image" | "video" };
+        if (m === "image" || m === "video") setMediaType(m);
+        if (typeof p === "string" && p.length > 0) setPrompt(p);
+      }
+      if (mode === "image" || mode === "video") {
+        setMediaType(mode);
+        sessionStorage.removeItem("motio2edit-mode");
+      }
     } catch {
       /* ignore */
     }
+    if (!hasContext) {
+      navigate({ to: "/studio/image" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
 
   // Auto-resize the prompt box.
   useEffect(() => {
@@ -397,25 +415,8 @@ function Editor() {
         </div>
       </div>
 
-      <div className="mt-6 inline-flex rounded-lg border border-border bg-card p-1">
-        <button
-          onClick={() => { setMediaType("image"); setState("idle"); }}
-          className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-            mediaType === "image" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-          }`}
-        >
-          <ImageIcon className="h-4 w-4" /> Image
-        </button>
-        <button
-          onClick={() => { setMediaType("video"); setState("idle"); }}
-          className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-            mediaType === "video" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-          }`}
-        >
-          <Video className="h-4 w-4" /> Video
-          {!plan.video && <Lock className="h-3 w-3" />}
-        </button>
-      </div>
+      {/* FIX 2: Image/Video toggle removed. Mode is fixed by the studio entry point. */}
+
 
       {videoLocked && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm animate-fade-in">

@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
 import { CREDIT_COST } from "@/lib/plans";
+
 import {
   generateMusic,
   MUSIC_GENRES,
@@ -94,7 +96,8 @@ function MusicStudio() {
 
   const cost = CREDIT_COST.music;
   const canAfford =
-    !!profile && (profile.credits >= cost || profile.plan === "business");
+    !!profile && (isAdminEmail(profile.email) || profile.credits >= cost || profile.plan === "business");
+
   const hasPrompt = prompt.trim().length > 0;
 
   const applyExample = (e: (typeof EXAMPLES)[number]) => {
@@ -331,9 +334,10 @@ function MusicStudio() {
               </Button>
               {profile && (
                 <div className="text-xs text-muted-foreground sm:text-right">
-                  Balance: <span className="font-semibold text-foreground">{profile.credits.toLocaleString()}</span> credits
+                  Balance: <span className="font-semibold text-foreground">{isAdminEmail(profile.email) ? "∞" : profile.credits.toLocaleString()}</span> credits
                 </div>
               )}
+
             </div>
             {!user && (
               <p className="mt-2 text-[11px] text-muted-foreground">
