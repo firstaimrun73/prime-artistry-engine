@@ -333,9 +333,10 @@ function MusicStudio() {
               </Button>
               {profile && (
                 <div className="text-xs text-muted-foreground sm:text-right">
-                  Balance: <span className="font-semibold text-foreground">{profile.credits.toLocaleString()}</span> credits
+                  Balance: <span className="font-semibold text-foreground">{isAdminEmail(profile.email) ? "∞" : profile.credits.toLocaleString()}</span> credits
                 </div>
               )}
+
             </div>
             {!user && (
               <p className="mt-2 text-[11px] text-muted-foreground">
