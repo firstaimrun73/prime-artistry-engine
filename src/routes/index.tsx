@@ -1,12 +1,14 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Image, Video, Download, Zap, Wand2, ShieldCheck } from "lucide-react";
+import { Image as ImageIcon, Video, Music, Download, Zap, Wand2, ShieldCheck, Lock, ArrowRight, Check } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/routes/feedback";
+import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
 
 export const Route = createFileRoute("/")({
   head: () => ({
