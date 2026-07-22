@@ -16,6 +16,7 @@ import { ThemeProvider } from "../lib/theme";
 import { Toaster } from "../components/ui/sonner";
 import { trackPageView } from "../lib/analytics";
 import { TranslateWidget } from "../components/TranslateWidget";
+import { BottomTabBar } from "../components/BottomTabBar";
 
 function NotFoundComponent() {
   return (
@@ -128,7 +129,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body className="pb-16 md:pb-0">
         {children}
         <Scripts />
       </body>
@@ -158,6 +159,7 @@ function RootComponent() {
           <PageViewTracker />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
+          <BottomTabBar />
           <TranslateWidget />
           <Toaster richColors position="top-center" />
         </AuthProvider>
