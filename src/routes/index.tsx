@@ -177,7 +177,7 @@ function StudioShowcase() {
               onClick={onClick}
               className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-xl hover:border-primary/40"
             >
-              <div className={`pointer-events-none absolute inset-x-0 -top-24 h-48 bg-gradient-to-b ${c.accent} blur-2xl`} />
+              <div className={`pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full ${c.accent} opacity-30 blur-3xl`} />
               <div className="relative flex items-center gap-3">
                 <div className="rounded-xl border border-border bg-background/60 p-2.5">
                   <Icon className="h-5 w-5 text-primary" />
