@@ -105,7 +105,7 @@ export function TranslateWidget() {
 
       {/* Floating translate panel */}
       <div
-        className="fixed right-5 z-[60] flex flex-col items-end gap-2 md:bottom-5"
+        className="fixed right-5 z-[60] flex flex-col items-end gap-2"
         style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
       >
         <div
