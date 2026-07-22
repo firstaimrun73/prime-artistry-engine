@@ -17,6 +17,7 @@ import { Toaster } from "../components/ui/sonner";
 import { trackPageView } from "../lib/analytics";
 import { TranslateWidget } from "../components/TranslateWidget";
 import { BottomTabBar } from "../components/BottomTabBar";
+import { GenerationStatusBar } from "../components/GenerationStatusBar";
 
 function NotFoundComponent() {
   return (
@@ -159,6 +160,7 @@ function RootComponent() {
           <PageViewTracker />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
+          <GenerationStatusBar />
           <BottomTabBar />
           <TranslateWidget />
           <Toaster richColors position="top-center" />
