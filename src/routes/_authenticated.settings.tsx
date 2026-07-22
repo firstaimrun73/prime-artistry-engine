@@ -7,6 +7,8 @@ import { getPlan } from "@/lib/plans";
 import { getTier } from "@/lib/plan-tier";
 import { CrownBadge } from "@/components/CrownBadge";
 import { Lock } from "lucide-react";
+import { isAdminEmail } from "@/lib/admin-config";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
