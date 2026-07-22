@@ -85,8 +85,11 @@ export function TranslateWidget() {
     });
   }, []);
 
+  if (!allowed) return null;
+
   return (
     <>
+
       {/* Suggestion popup */}
       {suggestion && (
         <div className="fixed bottom-24 right-5 z-[60] w-72 rounded-xl border border-border bg-card p-4 shadow-xl">
