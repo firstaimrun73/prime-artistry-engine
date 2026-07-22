@@ -416,6 +416,21 @@ function MusicPage() {
             </div>
           </div>
 
+          {/* BPM */}
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span>Tempo</span>
+              <span className="tabular-nums text-foreground">{bpm} BPM</span>
+            </div>
+            <Slider
+              min={60}
+              max={180}
+              step={1}
+              value={[bpm]}
+              onValueChange={(v) => setBpm(v[0] ?? 120)}
+            />
+          </div>
+
           {/* Duration */}
           <div className="mt-5">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
