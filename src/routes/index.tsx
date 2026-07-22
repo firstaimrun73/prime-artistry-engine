@@ -48,7 +48,9 @@ function Index() {
         </div>
       </section>
 
+      <StudioLoopingShowcase />
       <StudioShowcase />
+
 
       <section className="mx-auto max-w-6xl px-4 pb-20">
         <div className="grid gap-5 sm:grid-cols-3">
