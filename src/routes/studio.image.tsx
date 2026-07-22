@@ -100,7 +100,7 @@ function ImageStudio() {
             <p className="mt-1 text-sm text-muted-foreground">Pick a preset or open a blank editor.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: user ? "/editor" : "/auth" })}>Open blank editor</Button>
+            <Button variant="outline" onClick={openBlank}>Open blank editor</Button>
           </div>
         </div>
 
