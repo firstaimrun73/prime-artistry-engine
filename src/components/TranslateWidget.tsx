@@ -36,9 +36,14 @@ function setGoogleLang(lang: string) {
 }
 
 export function TranslateWidget() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const injected = useRef(false);
+
+  // FIX 4: only show on home + settings; hide on chat/editor/studio pages.
+  const allowed = pathname === "/" || pathname.startsWith("/settings");
+
 
   // Inject the Google Translate script once.
   useEffect(() => {
