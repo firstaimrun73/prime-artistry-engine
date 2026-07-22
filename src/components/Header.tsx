@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
 import { isAdminEmail } from "@/lib/admin-config";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sparkles, Coins, ShieldCheck } from "lucide-react";
 
 export function Header() {
