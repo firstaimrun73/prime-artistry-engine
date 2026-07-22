@@ -312,6 +312,7 @@ function Editor() {
   const handleStop = () => {
     runIdRef.current++;
     setState("idle");
+    endGeneration();
     setProgress(0);
     setStage(0);
     toast("Generation stopped.");
