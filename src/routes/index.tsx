@@ -48,24 +48,30 @@ function Index() {
         </div>
       </section>
 
+      <StudioShowcase />
+
       <section className="mx-auto max-w-6xl px-4 pb-20">
         <div className="grid gap-5 sm:grid-cols-3">
           {[
-            { icon: Image, title: "Image generation", desc: "Available on every plan, including free credits." },
+            { icon: ImageIcon, title: "Image generation", desc: "Available on every plan, including free credits." },
             { icon: Video, title: "Video generation", desc: "Unlock high-quality video on paid plans." },
             { icon: Download, title: "Instant download", desc: "Grab your output the moment it's ready." },
             { icon: Wand2, title: "Prompt-driven", desc: "Describe what you want — no complex tools." },
             { icon: Zap, title: "Priority processing", desc: "Paid plans skip the queue for faster results." },
             { icon: ShieldCheck, title: "Credit-based", desc: "Pay only for what you generate. No surprises." },
-          ].map((f) => (
-            <div key={f.title} className="rounded-xl border border-border bg-card p-6">
-              <f.icon className="h-6 w-6 text-primary" />
-              <h3 className="mt-4 font-semibold">{f.title}</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
-            </div>
-          ))}
+          ].map((f) => {
+            const Icon = f.icon;
+            return (
+              <div key={f.title} className="rounded-xl border border-border bg-card p-6">
+                <Icon className="h-6 w-6 text-primary" />
+                <h3 className="mt-4 font-semibold">{f.title}</h3>
+                <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
+              </div>
+            );
+          })}
         </div>
       </section>
+
 
       <section className="mx-auto max-w-6xl px-4 pb-24 text-center">
         <div className="rounded-2xl border border-border bg-card p-10">
