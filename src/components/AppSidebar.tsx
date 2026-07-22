@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
  * Desktop vertical sidebar for authenticated routes.
  * Hidden on mobile (< md) — BottomTabBar handles mobile.
  */
-const ITEMS = [
+const ITEMS: { to: string; label: string; icon: typeof Home; exact?: boolean }[] = [
   { to: "/", label: "Home", icon: Home, exact: true },
   { to: "/studio", label: "Studio", icon: Sparkles },
   { to: "/studio/image", label: "Image", icon: ImageIcon },
@@ -15,7 +15,8 @@ const ITEMS = [
   { to: "/studio/music", label: "Music", icon: Music },
   { to: "/history", label: "History", icon: History },
   { to: "/chat", label: "Chat", icon: MessageSquare },
-] as const;
+];
+
 
 export function AppSidebar() {
   const { user } = useAuth();
