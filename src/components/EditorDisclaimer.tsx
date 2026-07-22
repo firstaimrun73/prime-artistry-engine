@@ -1,6 +1,6 @@
 /**
  * Small unobtrusive disclaimer shown at the bottom of every editor
- * (Image / Video / Music). Mot2Edit is the product; Motion2AI is the
+ * (Image / Video / Music). MOTIO2EDIT is the product; Motion2AI is the
  * underlying engine credit.
  */
 export function EditorDisclaimer({ className = "" }: { className?: string }) {
@@ -9,7 +9,7 @@ export function EditorDisclaimer({ className = "" }: { className?: string }) {
       className={`mt-6 text-center text-[11px] leading-relaxed text-muted-foreground/80 ${className}`}
       aria-label="AI disclaimer"
     >
-      Mot2Edit is powered by{" "}
+      MOTIO2EDIT is powered by{" "}
       <span className="font-semibold text-muted-foreground">Motion2AI</span> and
       can make mistakes — please double-check responses.
     </p>

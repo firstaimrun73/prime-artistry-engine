@@ -8,9 +8,9 @@ import { isAdminEmail } from "@/lib/admin-config";
 export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
-      { title: "Editor Hub — Mot2Edit by Motion2AI" },
+      { title: "Editor Hub — MOTIO2EDIT by Motion2AI" },
       { name: "description", content: "Pick a studio: Image, Video, or Music. All Motion2AI editors in one hub." },
-      { property: "og:title", content: "Editor Hub — Mot2Edit by Motion2AI" },
+      { property: "og:title", content: "Editor Hub — MOTIO2EDIT by Motion2AI" },
       { property: "og:description", content: "Pick a studio: Image, Video, or Music. All Motion2AI editors in one hub." },
     ],
   }),

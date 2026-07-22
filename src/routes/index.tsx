@@ -13,9 +13,9 @@ import { isAdminEmail } from "@/lib/admin-config";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Mot2Edit — AI Image, Video & Music Studio by Motion2AI" },
-      { name: "description", content: "Mot2Edit, powered by Motion2AI. Upload, prompt, generate and download AI-powered images, videos and music in seconds." },
-      { property: "og:title", content: "Mot2Edit — AI Image, Video & Music Studio by Motion2AI" },
+      { title: "MOTIO2EDIT — AI Image, Video & Music Studio by Motion2AI" },
+      { name: "description", content: "MOTIO2EDIT, powered by Motion2AI. Upload, prompt, generate and download AI-powered images, videos and music in seconds." },
+      { property: "og:title", content: "MOTIO2EDIT — AI Image, Video & Music Studio by Motion2AI" },
       { property: "og:description", content: "Upload, prompt, generate and download AI-powered images, videos and music in seconds." },
     ],
   }),
