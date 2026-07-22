@@ -144,6 +144,7 @@ function MusicPage() {
   const [instrument, setInstrument] = useState<Chip | null>(null);
   const [mood, setMood] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(30);
+  const [bpm, setBpm] = useState<number>(120);
   const [tier, setTier] = useState<"lite" | "pro">("pro");
 
   const [loading, setLoading] = useState(false);
@@ -283,8 +284,11 @@ function MusicPage() {
                   AI Music
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Text-to-music powered by fal.ai. Every generation costs{" "}
+                  Powered by Motion2AI. Every generation costs{" "}
                   <span className="font-semibold text-foreground">{cost} credits</span>.
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground/80">
+                  Motion2AI can make mistakes.
                 </p>
               </div>
             </div>
