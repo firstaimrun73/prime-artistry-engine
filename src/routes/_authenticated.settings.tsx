@@ -349,7 +349,7 @@ function SettingsPage() {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Credits remaining</span>
-            <span className="font-medium">{profile.credits}</span>
+            <span className="font-medium">{isAdminEmail(profile.email) ? "∞" : profile.credits}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Currency</span>
