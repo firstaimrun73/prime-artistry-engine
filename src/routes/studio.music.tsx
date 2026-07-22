@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
 import { CREDIT_COST } from "@/lib/plans";
+
 import {
   generateMusic,
   MUSIC_GENRES,
