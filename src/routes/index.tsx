@@ -222,3 +222,47 @@ function StudioShowcase() {
   );
 }
 
+const LOOP_SLIDES: { label: string; tagline: string; gradient: string; icon: typeof ImageIcon }[] = [
+  { label: "Image Studio", tagline: "Remove, restore, restyle", gradient: "gradient-image", icon: ImageIcon },
+  { label: "Video Studio", tagline: "Cinematic motion, on demand", gradient: "gradient-video", icon: Video },
+  { label: "Music Studio", tagline: "Sunset aura soundtracks", gradient: "gradient-music", icon: Music },
+];
+
+function StudioLoopingShowcase() {
+  return (
+    <section className="mx-auto max-w-6xl px-4 pb-12">
+      <div className="glass-panel relative mx-auto overflow-hidden rounded-3xl p-1">
+        <div className="relative h-64 sm:h-80">
+          {LOOP_SLIDES.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <div
+                key={s.label}
+                className={`absolute inset-0 flex items-center justify-center rounded-3xl ${s.gradient}`}
+                style={{
+                  animation: `studio-cycle 12s ease-in-out ${i * 4}s infinite`,
+                  opacity: 0,
+                }}
+              >
+                <div className="flex flex-col items-center gap-3 text-center text-white drop-shadow-lg">
+                  <Icon className="h-14 w-14" strokeWidth={1.5} />
+                  <div className="text-2xl font-extrabold tracking-tight sm:text-4xl">{s.label}</div>
+                  <div className="text-sm opacity-90 sm:text-base">{s.tagline}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <p className="mt-3 text-center text-xs text-muted-foreground">
+        A single hub for image, video, and music — powered by Motion2AI.
+      </p>
+    </section>
+  );
+}
+
+import type { ComponentType } from "react";
+// silence unused-import warning if any
+void (undefined as unknown as ComponentType);
+
+
