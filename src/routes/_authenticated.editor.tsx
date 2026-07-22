@@ -105,18 +105,34 @@ function Editor() {
   }, []);
 
   // Preload a starting prompt/mode from a Studio preset click.
+  // FIX 2: Direct visits to /editor with no preset/reuse redirect to /studio/image.
   useEffect(() => {
+    let hasContext = false;
     try {
       const raw = sessionStorage.getItem("motio2edit-preset");
-      if (!raw) return;
-      sessionStorage.removeItem("motio2edit-preset");
-      const { prompt: p, mode } = JSON.parse(raw) as { prompt?: string; mode?: "image" | "video" };
-      if (mode === "image" || mode === "video") setMediaType(mode);
-      if (typeof p === "string" && p.length > 0) setPrompt(p);
+      const reuse = sessionStorage.getItem("motio2edit-reuse");
+      const mode = sessionStorage.getItem("motio2edit-mode");
+      hasContext = !!(raw || reuse || mode);
+      if (raw) {
+        sessionStorage.removeItem("motio2edit-preset");
+        const { prompt: p, mode: m } = JSON.parse(raw) as { prompt?: string; mode?: "image" | "video" };
+        if (m === "image" || m === "video") setMediaType(m);
+        if (typeof p === "string" && p.length > 0) setPrompt(p);
+      }
+      if (mode === "image" || mode === "video") {
+        setMediaType(mode);
+        sessionStorage.removeItem("motio2edit-mode");
+      }
     } catch {
       /* ignore */
     }
+    if (!hasContext) {
+      navigate({ to: "/studio/image" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
 
   // Auto-resize the prompt box.
   useEffect(() => {
