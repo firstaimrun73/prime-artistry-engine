@@ -96,7 +96,8 @@ function MusicStudio() {
 
   const cost = CREDIT_COST.music;
   const canAfford =
-    !!profile && (profile.credits >= cost || profile.plan === "business");
+    !!profile && (isAdminEmail(profile.email) || profile.credits >= cost || profile.plan === "business");
+
   const hasPrompt = prompt.trim().length > 0;
 
   const applyExample = (e: (typeof EXAMPLES)[number]) => {
