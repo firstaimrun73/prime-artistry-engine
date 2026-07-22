@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getPlan, CREDIT_COST } from "@/lib/plans";
@@ -748,6 +749,7 @@ function Editor() {
             </div>
           )}
         </div>
+        <EditorDisclaimer />
       </div>
 
       {/* Smart Remove ("Circle to Remove") — plan-agnostic, gated by credits. */}

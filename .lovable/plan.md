@@ -1,39 +1,62 @@
-# Scope check before I start
+# Mot2Edit / Motion2AI — Phased Build Plan
 
-You sent three large batches (16 features across UI, editors, music, i18n, animations). Building all of it in one shot would take a lot of credits and risk regressions. I want to confirm priority order before I touch code.
+This spec touches ~40 files across brand, routing, editors, generation UX, i18n, and design system. Shipping it in one turn would burn credits and risk breakage. I'll ship it in 6 phases, each independently verifiable. You approve, I execute phase-by-phase (or ask me to run all sequentially).
 
-Here's what I propose, grouped so each phase is independently shippable and typechecked:
+---
 
-## Phase 1 — Structural (highest impact, lowest risk)
-1. **Separate editor routes**: `/studio/image`, `/studio/video`, `/studio/music` as dedicated pages. Wire Studio hub cards.
-2. **Homepage Studio section**: 3 cards (Image free, Video/Music locked with upgrade overlay for free users), hover scale.
-3. **Mobile bottom tab bar**: Home / Studio / History / Chat / Profile (desktop navbar unchanged).
-4. **Dark/Light toggle in navbar** (already exists in settings via `theme.tsx`), default = system preference, orange accent both modes.
+## Phase 1 — Structural & Brand (Sections 1, 3, 9, 13)
+Foundational — unblocks the rest.
 
-## Phase 2 — Music studio polish
-5. BPM slider (60–180), 900-char counter (server already truncates).
-6. Rotating vinyl loader + elapsed timer during generation.
-7. Sunset/aurora gradient (#4B0082 → #8B008B → #FF69B4) on music page only.
-8. Image/video mood-match upload (metadata only — real cross-modal conditioning isn't supported by the current music models; I'll pass a descriptive hint into the prompt).
-9. Instrument image chips — I'll generate small PNGs for ~8 instruments (Guitar, Piano, Drums, Trumpet, Violin, Synth, Bass, Sax) with orange glow on selected.
+- **Rebrand copy**: rename product surface to "Mot2Edit, powered by Motion2AI". Update `Header`, `Footer`, FAQ, `__root` metadata, index `<title>`. Strip any "AI SaaS / third-party AI" phrasing.
+- **Split Image vs Video editors**: `/studio/image` and `/studio/video` become real, distinct routes with their own layouts. Retire the dual-mode `_authenticated.editor.tsx` shell; move its image logic into `studio.image.tsx` and video logic into `studio.video.tsx`. `/editor` becomes a redirect based on `sessionStorage` mode.
+- **Nav split**: desktop → vertical left sidebar (Home, Editor Hub, Plans, Support, Settings). Mobile → keep current `BottomTabBar`. Header becomes a slim top bar only. Content pushes, never overlaps.
+- **Settings additions**: dark/light toggle, language override, nav-side override.
+- **Global disclaimer line** shown on every editor bottom toolbar.
 
-## Phase 3 — Floating progress + mic
-10. Global floating generation bar with countdown + progress, survives navigation (context + portal).
-11. Mic button already exists (`VoiceInputButton`) — add a "Listening…" animated wave overlay.
+## Phase 2 — Editor Hub & Homepage (Sections 2, 6, 7 partial)
+- Homepage becomes entry-only. Remove `StudioShowcase` cards and add an auto-rotating PPT-style carousel (Image → Video → Music) with 3–4 bullets each, gradient identity per slide, and a "Learn more" CTA.
+- Add `/studio` Editor Hub as the single click-through: Image unlocked, Video + Music show frosted-glass lock overlay with feature summary for free users.
+- Introduce per-editor gradient tokens in `styles.css`: Image (orange), Video (red), Music (sunset-aura violet-magenta). Light + dark variants each. Subtle animated gradient (breathing).
 
-## Phase 4 — i18n + homepage animations + polish
-12. Language selector in navbar (browser detect, 22 Indian langs + English, searchable). **UI translation**: I'll wire the existing Google Translate widget rather than migrating the whole app to i18next (that would be a multi-day refactor). Prompt translation already happens in `prompt-enhance.server.ts`.
-13. Homepage looping showcase (3 gradient slides, auto-advance 4s, disclaimer text).
-14. Glass morphism styling on editor/music/studio/pricing cards.
-15. Pricing: enlarge most-popular card with subtle pulse; music line already added last turn.
-16. FAQs: strip "AI SaaS" wording, add search, prettier cards.
-17. Admin ∞ audit pass (already done in `Header.tsx`, `music.functions.ts`, `generate.functions.ts` — I'll grep for any leftover call sites).
+## Phase 3 — Floating Generation Bar (Section 8)
+- New `GenerationStatusProvider` context in `src/lib/generation-status.tsx` holding {editor, startedAt, status, cancel}.
+- New `FloatingStatusBar` component: draggable (pointer events), persistent across routes (mounted in `__root`), live timer, per-editor animation (image reveal, video build, music stick-figure playing selected instrument), cancel button, completion toast + `Notification` API.
+- Wire image/video/music server-fn callers to publish start/progress/completion into the provider.
 
-## What I need from you
+## Phase 4 — Editor Fixes & Mic (Sections 4, 5)
+- **Music prompt accuracy fix**: audit `src/lib/music.functions.ts` prompt composition; strengthen instruction framing and reduce filler descriptors that dilute intent.
+- **Image-to-image fix**: verify mediaUrl reaches FAL for the current model; if broken, restore signed-URL upload + strength floor.
+- **Image-to-Music + Video-to-Music**: add upload inputs in music editor, extend `generateMusic` server fn with `mediaUrl` + `mediaType`, pass to model.
+- **BPM control** (slider + numeric).
+- **Instrument tiles**: generate AI illustration per instrument (guitar, piano, drums, violin, synth, sax, flute, bass) via `imagegen`, store under `src/assets/instruments/`, replace text/emoji chips.
+- **Mic input** on all three editors via existing `VoiceInputButton`, plus a floating "Say something…" overlay with wave-bar animation while active.
+- **Lite vs Pro** music tier already exists — surface it clearly and gate Pro-only features (BPM, longer duration, multi-instrument).
 
-- **Confirm phase order** above, or reorder.
-- **Should I do all 4 phases in this session, or stop after Phase 1–2 so you can review?** All-in-one will consume significant credits and one bad typecheck can hold up shipping.
-- **Full app UI translation**: OK to use the existing Google Translate widget approach, or do you want a real i18next migration (much larger job, separate task)?
-- **Mood-match music from image/video**: confirm "descriptive hint fed into prompt" is acceptable — no music model on fal currently accepts image/video conditioning input.
+## Phase 5 — Localization (Section 10)
+- IP → country via existing `src/lib/geo.ts`.
+- Add `src/lib/i18n.tsx` with a language map (all 22 Indian scheduled languages + English + major regional defaults). Country → default language table.
+- Navbar language picker with search box; manual override persists to localStorage.
+- Wrap key UI strings in `t()` (header, nav, hub, editor labels, buttons, pricing headings). Full-site translation is a marathon — Phase 5 delivers infra + top ~150 strings; long-tail strings translate progressively.
 
-Reply with phase order + answers to the two questions and I'll start building.
+## Phase 6 — Polish (Sections 11, 12, 7 finish)
+- Pricing page: asymmetric card sizing, recommended plan visually dominant, glass finish, subtle motion.
+- FAQ + Support redesigned to match glass + gradient system; FAQ copy rewritten vendor-neutral.
+- Global motion pass: button hover/press micro-interactions, glass surfaces on cards/nav/modals.
+- Motion2AI credit badge inside each editor's loading animation.
+
+---
+
+## Technical notes
+
+- Framework: TanStack Start v1 file routes. New routes live under `src/routes/`. Provider mounts in `__root.tsx`.
+- Music image/video input requires FAL model support — if the current CassetteAI/Stable Audio models don't accept media conditioning, I'll fall back to: extract mood/tempo from the media via a vision chat call, feed those into the existing prompt pipeline. I'll confirm which route once I test.
+- Notifications use `window.Notification` with permission request on first generation start.
+- Draggable bar: pointer events + `transform`, position saved to localStorage.
+- Instrument art: 8 images via `imagegen` (fast tier) — ~8 image credits total.
+- No DB migrations expected in phases 1–3; phase 4 may need a `music_input_url` column on `generations` (small migration).
+
+---
+
+## Ask
+
+Reply **"go phase 1"** (or "go all") and I'll start. If you want to reorder or cut any phase, tell me now — this is the cheapest moment to change scope.
