@@ -17,6 +17,7 @@ import { CompareSlider } from "@/components/CompareSlider";
 import { MultiImageInput } from "@/components/MultiImageInput";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { getPlanLimits } from "@/utils/planLimits";
+import { startGeneration, endGeneration } from "@/lib/generation-status";
 
 import { toast } from "sonner";
 import {
@@ -206,6 +207,7 @@ function Editor() {
     if (runId !== runIdRef.current) return;
 
     setState("loading");
+    startGeneration(mediaType === "video" ? "video" : "image", "/editor");
     try {
       // Resolve the source media URL to send to the AI.
       // Uploaded files (image OR video) go to private storage and we pass a
@@ -298,9 +300,11 @@ function Editor() {
       setState("success");
       await refreshProfile();
       toast.success("Done!");
+      endGeneration();
     } catch (err) {
       if (runId !== runIdRef.current) return;
       setState("idle");
+      endGeneration();
       toast.error(err instanceof Error ? err.message : "Generation failed.");
     }
   };
@@ -308,6 +312,7 @@ function Editor() {
   const handleStop = () => {
     runIdRef.current++;
     setState("idle");
+    endGeneration();
     setProgress(0);
     setStage(0);
     toast("Generation stopped.");

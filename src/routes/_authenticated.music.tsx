@@ -6,7 +6,9 @@ import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { isAdminEmail } from "@/lib/admin-config";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
+import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { useAuth } from "@/lib/auth";
 import { CREDIT_COST } from "@/lib/plans";
 import { generateMusic, MUSIC_GENRES, MUSIC_MOODS } from "@/lib/music.functions";
@@ -144,6 +146,7 @@ function MusicPage() {
   const [instrument, setInstrument] = useState<Chip | null>(null);
   const [mood, setMood] = useState<string | null>(null);
   const [duration, setDuration] = useState<number>(30);
+  const [bpm, setBpm] = useState<number>(120);
   const [tier, setTier] = useState<"lite" | "pro">("pro");
 
   const [loading, setLoading] = useState(false);
@@ -193,8 +196,9 @@ function MusicPage() {
     setLoadingStep(0);
     setAudioUrl(null);
     setPlaying(false);
+    startGeneration("music", "/music");
     try {
-      const enhanced = enhancePrompt({ prompt, instrument, mood, duration });
+      const enhanced = `${enhancePrompt({ prompt, instrument, mood, duration })} Tempo around ${bpm} BPM.`;
       const backendMood = mapMoodToBackend(mood);
       const backendGenre = mapInstrumentToGenre(instrument?.key ?? null);
       const res = await generate({
@@ -213,6 +217,7 @@ function MusicPage() {
       toast.error(msg);
     } finally {
       setLoading(false);
+      endGeneration();
     }
   }
 
@@ -283,8 +288,11 @@ function MusicPage() {
                   AI Music
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Text-to-music powered by fal.ai. Every generation costs{" "}
+                  Powered by Motion2AI. Every generation costs{" "}
                   <span className="font-semibold text-foreground">{cost} credits</span>.
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground/80">
+                  Motion2AI can make mistakes.
                 </p>
               </div>
             </div>
@@ -406,6 +414,21 @@ function MusicPage() {
                 );
               })}
             </div>
+          </div>
+
+          {/* BPM */}
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span>Tempo</span>
+              <span className="tabular-nums text-foreground">{bpm} BPM</span>
+            </div>
+            <Slider
+              min={60}
+              max={180}
+              step={1}
+              value={[bpm]}
+              onValueChange={(v) => setBpm(v[0] ?? 120)}
+            />
           </div>
 
           {/* Duration */}

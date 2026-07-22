@@ -104,7 +104,10 @@ export function TranslateWidget() {
       )}
 
       {/* Floating translate panel */}
-      <div className="fixed bottom-5 right-5 z-[60] flex flex-col items-end gap-2">
+      <div
+        className="fixed right-5 z-[60] flex flex-col items-end gap-2"
+        style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
+      >
         <div
           className={`rounded-xl border border-border bg-card p-3 shadow-xl transition-all ${
             open ? "opacity-100" : "pointer-events-none h-0 overflow-hidden opacity-0"
