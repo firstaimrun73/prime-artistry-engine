@@ -196,8 +196,9 @@ function MusicPage() {
     setLoadingStep(0);
     setAudioUrl(null);
     setPlaying(false);
+    startGeneration("music", "/music");
     try {
-      const enhanced = enhancePrompt({ prompt, instrument, mood, duration });
+      const enhanced = `${enhancePrompt({ prompt, instrument, mood, duration })} Tempo around ${bpm} BPM.`;
       const backendMood = mapMoodToBackend(mood);
       const backendGenre = mapInstrumentToGenre(instrument?.key ?? null);
       const res = await generate({
@@ -216,6 +217,7 @@ function MusicPage() {
       toast.error(msg);
     } finally {
       setLoading(false);
+      endGeneration();
     }
   }
 
