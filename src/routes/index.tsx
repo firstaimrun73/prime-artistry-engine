@@ -23,6 +23,13 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { user, profile } = useAuth();
+  if (user && profile) return <SignedInHome />;
+  return <SignedOutHome />;
+}
+
+function SignedOutHome() {
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
