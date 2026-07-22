@@ -415,25 +415,8 @@ function Editor() {
         </div>
       </div>
 
-      <div className="mt-6 inline-flex rounded-lg border border-border bg-card p-1">
-        <button
-          onClick={() => { setMediaType("image"); setState("idle"); }}
-          className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-            mediaType === "image" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-          }`}
-        >
-          <ImageIcon className="h-4 w-4" /> Image
-        </button>
-        <button
-          onClick={() => { setMediaType("video"); setState("idle"); }}
-          className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-            mediaType === "video" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-          }`}
-        >
-          <Video className="h-4 w-4" /> Video
-          {!plan.video && <Lock className="h-3 w-3" />}
-        </button>
-      </div>
+      {/* FIX 2: Image/Video toggle removed. Mode is fixed by the studio entry point. */}
+
 
       {videoLocked && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm animate-fade-in">
