@@ -17,8 +17,11 @@ export function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between">
         <Link to="/" className="flex items-center gap-2 font-extrabold tracking-tight">
           <Sparkles className="h-5 w-5 text-primary" />
-          <span className="text-lg">
-            MOTIO<span className="text-primary">2</span>EDIT
+          <span className="flex items-baseline gap-1.5 text-lg">
+            Mot<span className="text-primary">2</span>Edit
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              by Motion2AI
+            </span>
           </span>
         </Link>
         <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
@@ -36,7 +39,7 @@ export function Footer() {
       <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">
         Need help? <a href="mailto:support@motio2edit.com" className="hover:text-foreground">support@motio2edit.com</a>
         <span className="mx-2">·</span>
-        © {new Date().getFullYear()} MOTIO2EDIT. All rights reserved.
+        © {new Date().getFullYear()} Mot2Edit by Motion2AI. All rights reserved.
       </div>
     </footer>
   );
