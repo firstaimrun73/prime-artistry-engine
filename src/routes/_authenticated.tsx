@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
+import { AppSidebar } from "@/components/AppSidebar";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -32,8 +33,14 @@ function AuthenticatedLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <Outlet />
+      <AppSidebar />
+      <div className="md:pl-56">
+        <div className="md:hidden">
+          <Header />
+        </div>
+        <Outlet />
+      </div>
     </div>
   );
 }
+
