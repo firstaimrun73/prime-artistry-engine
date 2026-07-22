@@ -1,8 +1,10 @@
 // Floating Google Translate widget + first-visit language suggestion popup.
 // Mounted globally from the root layout. Client-only.
 import { useEffect, useRef, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { Languages, X } from "lucide-react";
 import { detectCountry } from "@/lib/geo";
+
 
 const SUPPORTED = "hi,es,fr,de,ar,zh-CN,ja,ko,pt,ru,bn,ta,ur";
 const POPUP_KEY = "motio2edit-lang-popup-shown";
