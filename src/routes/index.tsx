@@ -48,7 +48,9 @@ function Index() {
         </div>
       </section>
 
+      <StudioLoopingShowcase />
       <StudioShowcase />
+
 
       <section className="mx-auto max-w-6xl px-4 pb-20">
         <div className="grid gap-5 sm:grid-cols-3">
@@ -126,7 +128,7 @@ const STUDIO_CARDS: StudioCardSpec[] = [
     name: "Image Studio",
     href: "/studio/image",
     icon: ImageIcon,
-    accent: "from-primary/30 via-primary/10 to-transparent",
+    accent: "gradient-image",
     bullets: ["Remove objects & backgrounds", "Upscale, restore & colorize", "AI headshot & style transfer"],
     freeAllowed: true,
   },
@@ -134,7 +136,7 @@ const STUDIO_CARDS: StudioCardSpec[] = [
     name: "Video Studio",
     href: "/studio/video",
     icon: Video,
-    accent: "from-red-500/30 via-red-500/10 to-transparent",
+    accent: "gradient-video",
     bullets: ["Text-to-video & image-to-video", "Cinematic camera moves", "Reels & shorts presets"],
     freeAllowed: false,
   },
@@ -142,11 +144,12 @@ const STUDIO_CARDS: StudioCardSpec[] = [
     name: "Music Studio",
     href: "/studio/music",
     icon: Music,
-    accent: "from-purple-500/30 via-fuchsia-500/10 to-transparent",
+    accent: "gradient-music",
     bullets: ["Prompt-to-music tracks", "Genre + mood chips", "Up to 3-minute exports"],
     freeAllowed: false,
   },
 ];
+
 
 function StudioShowcase() {
   const { user, profile } = useAuth();
@@ -176,7 +179,7 @@ function StudioShowcase() {
               onClick={onClick}
               className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-xl hover:border-primary/40"
             >
-              <div className={`pointer-events-none absolute inset-x-0 -top-24 h-48 bg-gradient-to-b ${c.accent} blur-2xl`} />
+              <div className={`pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full ${c.accent} opacity-30 blur-3xl`} />
               <div className="relative flex items-center gap-3">
                 <div className="rounded-xl border border-border bg-background/60 p-2.5">
                   <Icon className="h-5 w-5 text-primary" />
@@ -218,4 +221,46 @@ function StudioShowcase() {
     </section>
   );
 }
+
+const LOOP_SLIDES: { label: string; tagline: string; gradient: string; icon: typeof ImageIcon }[] = [
+  { label: "Image Studio", tagline: "Remove, restore, restyle", gradient: "gradient-image", icon: ImageIcon },
+  { label: "Video Studio", tagline: "Cinematic motion, on demand", gradient: "gradient-video", icon: Video },
+  { label: "Music Studio", tagline: "Sunset aura soundtracks", gradient: "gradient-music", icon: Music },
+];
+
+function StudioLoopingShowcase() {
+  return (
+    <section className="mx-auto max-w-6xl px-4 pb-12">
+      <div className="glass-panel relative mx-auto overflow-hidden rounded-3xl p-1">
+        <div className="relative h-64 sm:h-80">
+          {LOOP_SLIDES.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <div
+                key={s.label}
+                className={`absolute inset-0 flex items-center justify-center rounded-3xl ${s.gradient}`}
+                style={{
+                  animation: `studio-cycle 12s ease-in-out ${i * 4}s infinite`,
+                  opacity: 0,
+                }}
+              >
+                <div className="flex flex-col items-center gap-3 text-center text-white drop-shadow-lg">
+                  <Icon className="h-14 w-14" strokeWidth={1.5} />
+                  <div className="text-2xl font-extrabold tracking-tight sm:text-4xl">{s.label}</div>
+                  <div className="text-sm opacity-90 sm:text-base">{s.tagline}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <p className="mt-3 text-center text-xs text-muted-foreground">
+        A single hub for image, video, and music — powered by Motion2AI.
+      </p>
+    </section>
+  );
+}
+
+
+
 

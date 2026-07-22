@@ -45,7 +45,31 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Motion2AI per-studio gradient tokens */
+  --gradient-image: linear-gradient(135deg, oklch(0.72 0.19 45), oklch(0.62 0.22 25));
+  --gradient-video: linear-gradient(135deg, oklch(0.62 0.24 27), oklch(0.42 0.22 15));
+  --gradient-music: linear-gradient(135deg, oklch(0.62 0.24 320), oklch(0.55 0.24 290));
+  --gradient-hero: linear-gradient(135deg, oklch(0.7 0.19 45), oklch(0.6 0.24 320));
 }
+
+@utility gradient-image { background-image: var(--gradient-image); }
+@utility gradient-video { background-image: var(--gradient-video); }
+@utility gradient-music { background-image: var(--gradient-music); }
+@utility gradient-hero  { background-image: var(--gradient-hero); }
+
+@utility glass-panel {
+  background-color: color-mix(in oklab, var(--card) 72%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+}
+
+@keyframes studio-cycle {
+  0%, 28% { opacity: 1; transform: translateY(0) scale(1); }
+  33%, 95% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 
 /* MOTIO2EDIT — Light theme (default :root). Dark theme lives in .dark. */
 :root {

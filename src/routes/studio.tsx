@@ -1,153 +1,142 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { ImageIcon, Video, Music, ArrowRight, Sparkles } from "lucide-react";
+import { Image as ImageIcon, Video, Music, ArrowRight, Lock } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
-      { title: "Studio — MOTIO2EDIT" },
-      { name: "description", content: "Three dedicated AI creative workspaces: Image Studio, Video Studio, and Music Studio." },
-      { property: "og:title", content: "Studio — MOTIO2EDIT" },
-      { property: "og:description", content: "Three dedicated AI creative workspaces: Image Studio, Video Studio, and Music Studio." },
+      { title: "Editor Hub — Mot2Edit by Motion2AI" },
+      { name: "description", content: "Pick a studio: Image, Video, or Music. All Motion2AI editors in one hub." },
+      { property: "og:title", content: "Editor Hub — Mot2Edit by Motion2AI" },
+      { property: "og:description", content: "Pick a studio: Image, Video, or Music. All Motion2AI editors in one hub." },
     ],
   }),
-  component: StudioHub,
+  component: StudioLayout,
 });
 
-type Card = {
+function StudioLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Nested routes (/studio/image, /studio/video, /studio/music) render their own shells.
+  if (pathname !== "/studio") return <Outlet />;
+  return <StudioHub />;
+}
+
+type HubCard = {
   name: string;
-  desc: string;
-  href: string;
+  tagline: string;
+  href: "/studio/image" | "/studio/video" | "/studio/music";
   icon: typeof ImageIcon;
-  accent: string;
-  tools: string[];
-  cta: string;
-  disabled?: boolean;
+  gradient: string;
+  bullets: string[];
+  freeAllowed: boolean;
 };
 
-const CARDS: Card[] = [
+const CARDS: HubCard[] = [
   {
     name: "Image Studio",
-    desc: "Everything from remove-object and background-swap to upscaling, restoration, and AI generation.",
+    tagline: "Edit, restore, restyle",
     href: "/studio/image",
     icon: ImageIcon,
-    accent: "from-primary/25 to-primary/5",
-    tools: ["Remove Object", "Circle to Remove", "Background Swap", "Upscale", "Restore", "Generate", "AI Headshot", "Colorize"],
-    cta: "Open Image Studio",
+    gradient: "gradient-image",
+    bullets: ["Circle to Remove", "Upscale & restore", "Style transfer & headshots"],
+    freeAllowed: true,
   },
   {
     name: "Video Studio",
-    desc: "Text-to-video, image-to-video, and cinematic AI video effects.",
+    tagline: "Cinematic motion",
     href: "/studio/video",
     icon: Video,
-    accent: "from-red-500/25 to-red-500/5",
-    tools: ["Text to Video", "Image to Video", "Slow Motion", "Cinematic FX", "Reels", "Shorts"],
-    cta: "Open Video Studio",
+    gradient: "gradient-video",
+    bullets: ["Image-to-video", "Camera moves & presets", "Reels & shorts ready"],
+    freeAllowed: false,
   },
   {
     name: "Music Studio",
-    desc: "AI-generated instrumental music from a prompt — pick genre, mood and duration.",
+    tagline: "Sunset aura sound",
     href: "/studio/music",
     icon: Music,
-    accent: "from-purple-500/25 to-purple-500/5",
-    tools: ["Text to Music", "Cinematic", "Lo-fi", "EDM", "Ambient", "Synthwave"],
-    cta: "Open Music Studio",
+    gradient: "gradient-music",
+    bullets: ["Prompt-to-music", "Genre & mood chips", "Up to 3-minute tracks"],
+    freeAllowed: false,
   },
 ];
 
 function StudioHub() {
+  const { user, profile } = useAuth();
+  const isAdmin = isAdminEmail(profile?.email);
+  const isPaid = isAdmin || (profile?.plan && profile.plan !== "free" && !!user);
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-6xl px-4 py-12">
+      <main className="mx-auto max-w-6xl px-4 py-14">
         <div className="mb-10 text-center">
-          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Three dedicated workspaces
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Choose your <span className="text-primary">Studio</span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
+            Editor Hub
+          </span>
+          <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-5xl">
+            Three studios. One creative flow.
           </h1>
-          <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
-            Purpose-built AI workspaces for images, video, and music — each with its own tools and models.
+          <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
+            Pick a studio to jump straight into the right tools — each with its own visual identity.
           </p>
         </div>
-
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-          {CARDS.map((c) => (
-            <StudioCard key={c.name} card={c} />
-          ))}
+        <div className="grid gap-6 md:grid-cols-3">
+          {CARDS.map((c) => {
+            const locked = !c.freeAllowed && !isPaid;
+            const Icon = c.icon;
+            const Card = (
+              <div
+                className="group glass-panel relative flex h-full flex-col overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+              >
+                <div className={`pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full ${c.gradient} opacity-30 blur-3xl`} />
+                <div className="relative flex items-center gap-3">
+                  <div className={`rounded-xl ${c.gradient} p-2.5 text-white shadow-lg`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold">{c.name}</h3>
+                    <p className="text-xs text-muted-foreground">{c.tagline}</p>
+                  </div>
+                </div>
+                <ul className="relative mt-5 space-y-2 text-sm text-muted-foreground">
+                  {c.bullets.map((b) => (
+                    <li key={b} className="flex items-start gap-2">
+                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+                  {locked ? "Upgrade to unlock" : "Open studio"}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </div>
+                {locked && (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl bg-background/70 backdrop-blur-sm">
+                    <div className="rounded-full border border-border bg-card p-2.5">
+                      <Lock className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="text-sm font-semibold">Locked on Free plan</div>
+                    <div className="text-xs text-muted-foreground">Upgrade to unlock {c.name}</div>
+                  </div>
+                )}
+              </div>
+            );
+            return locked ? (
+              <Link key={c.name} to="/pricing" className="block h-full">
+                {Card}
+              </Link>
+            ) : (
+              <Link key={c.name} to={c.href} className="block h-full">
+                {Card}
+              </Link>
+            );
+          })}
         </div>
       </main>
       <Footer />
     </div>
   );
-}
-
-function StudioCard({ card }: { card: Card }) {
-  const Icon = card.icon;
-  const navigate = useNavigate();
-
-  const go = () => {
-    if (card.disabled) return;
-    navigate({ to: card.href as never });
-  };
-
-  const inner = (
-    <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:shadow-lg">
-      <div className={`pointer-events-none absolute inset-x-0 -top-24 h-48 bg-gradient-to-b ${card.accent} blur-2xl`} />
-      <div className="relative flex items-center gap-3">
-        <div className="rounded-xl border border-border bg-background/60 p-2.5">
-          <Icon className="h-5 w-5 text-primary" />
-        </div>
-        <h2 className="text-lg font-bold">{card.name}</h2>
-      </div>
-      <p className="relative mt-3 text-sm text-muted-foreground">{card.desc}</p>
-      <div className="relative mt-4 flex flex-wrap gap-1.5">
-        {card.tools.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              try {
-                sessionStorage.setItem("prefill-prompt", toolToPrompt(card.name, t));
-              } catch { /* ignore */ }
-              navigate({ to: card.href as never });
-            }}
-            className="rounded-full border border-border bg-secondary/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-      <div className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-        {card.cta}
-        {!card.disabled && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}
-      </div>
-    </div>
-  );
-
-  return (
-    <button
-      type="button"
-      onClick={go}
-      disabled={card.disabled}
-      className={"block w-full text-left " + (card.disabled ? "cursor-not-allowed opacity-70" : "")}
-    >
-      {inner}
-    </button>
-  );
-}
-
-// Turn a tool chip into a starter prompt for the destination editor.
-function toolToPrompt(studio: string, tool: string): string {
-  if (studio === "Music Studio") {
-    return `${tool} instrumental track, professional production, clean mix, high fidelity.`;
-  }
-  if (studio === "Video Studio") {
-    return `${tool}: cinematic motion, smooth camera, natural lighting.`;
-  }
-  return `${tool}: apply this edit to the uploaded image while preserving identity and composition.`;
 }
