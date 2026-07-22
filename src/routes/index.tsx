@@ -268,6 +268,125 @@ function StudioLoopingShowcase() {
   );
 }
 
+// FIX 7: Logged-in landing — welcome, quick studio access, credits, recent history.
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { History as HistoryIcon } from "lucide-react";
+
+type RecentGen = {
+  id: string;
+  type: string;
+  prompt: string | null;
+  output_url: string | null;
+  created_at: string;
+};
+
+function SignedInHome() {
+  const { user, profile } = useAuth();
+  const isAdmin = isAdminEmail(profile?.email);
+  const [recent, setRecent] = useState<RecentGen[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("generations")
+      .select("id, type, prompt, output_url, created_at")
+      .order("created_at", { ascending: false })
+      .limit(6)
+      .then(({ data }) => {
+        if (data) setRecent(data as RecentGen[]);
+      });
+  }, [user]);
+
+  const studios: { name: string; to: "/studio/image" | "/studio/video" | "/studio/music"; icon: typeof ImageIcon; gradient: string }[] = [
+    { name: "Image Studio", to: "/studio/image", icon: ImageIcon, gradient: "gradient-image" },
+    { name: "Video Studio", to: "/studio/video", icon: Video, gradient: "gradient-video" },
+    { name: "Music Studio", to: "/studio/music", icon: Music, gradient: "gradient-music" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="mx-auto max-w-6xl px-4 pt-10 pb-16">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}.
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">Pick a studio and keep creating.</p>
+          </div>
+          <div className="rounded-xl border border-border bg-card px-4 py-3 text-right">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Credits</div>
+            <div className="text-2xl font-extrabold text-primary">
+              {isAdmin ? "∞" : (profile?.credits ?? 0).toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        <section className="mt-8 grid gap-4 md:grid-cols-3">
+          {studios.map((s) => {
+            const Icon = s.icon;
+            return (
+              <Link
+                key={s.name}
+                to={s.to}
+                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg"
+              >
+                <div className={`pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full ${s.gradient} opacity-25 blur-2xl`} />
+                <div className={`relative inline-flex rounded-xl ${s.gradient} p-2.5 text-white shadow-md`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="relative mt-4 text-lg font-bold">{s.name}</div>
+                <div className="relative mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+                  Open <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </Link>
+            );
+          })}
+        </section>
+
+        <section className="mt-10">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <HistoryIcon className="h-4 w-4" /> Recent history
+            </h2>
+            <Link to="/history" className="text-xs font-medium text-primary hover:underline">View all →</Link>
+          </div>
+          {recent.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
+              No generations yet — pick a studio above to start.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+              {recent.map((g) => (
+                <Link
+                  key={g.id}
+                  to="/history"
+                  className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-card"
+                >
+                  {g.output_url && g.type !== "music" ? (
+                    g.type === "video" ? (
+                      <video src={g.output_url} className="h-full w-full object-cover" muted />
+                    ) : (
+                      <img src={g.output_url} alt={g.prompt ?? ""} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                    )
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-muted">
+                      <Music className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+
 
 
 
