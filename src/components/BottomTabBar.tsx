@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/auth";
  */
 export function BottomTabBar() {
   const { user } = useAuth();
-  const profileHref = user ? "/dashboard" : "/auth";
+  // FIX 5: only render for signed-in users.
+  if (!user) return null;
 
   const items: {
     to: string;
@@ -20,8 +21,9 @@ export function BottomTabBar() {
     { to: "/studio", label: "Studio", icon: Sparkles },
     { to: "/history", label: "History", icon: History },
     { to: "/chat", label: "Chat", icon: MessageSquare },
-    { to: profileHref, label: "Profile", icon: User },
+    { to: "/dashboard", label: "Profile", icon: User },
   ];
+
 
   return (
     <nav
