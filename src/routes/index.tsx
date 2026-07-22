@@ -311,7 +311,7 @@ function SignedInHome() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-              Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}.
+              Welcome back{profile?.display_name ? `, ${profile.display_name.split(" ")[0]}` : ""}.
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">Pick a studio and keep creating.</p>
           </div>
