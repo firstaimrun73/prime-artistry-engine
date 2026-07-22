@@ -43,8 +43,10 @@ const LOADING_MESSAGES = [
 function Editor() {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
+  const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
 
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [prompt, setPrompt] = useState("");
