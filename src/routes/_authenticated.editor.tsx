@@ -748,6 +748,7 @@ function Editor() {
             </div>
           )}
         </div>
+        <EditorDisclaimer />
       </div>
 
       {/* Smart Remove ("Circle to Remove") — plan-agnostic, gated by credits. */}

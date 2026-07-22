@@ -542,6 +542,7 @@ function MusicPage() {
             </div>
           </section>
         )}
+        <EditorDisclaimer />
       </main>
       <Footer />
     </div>
