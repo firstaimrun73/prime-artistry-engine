@@ -126,7 +126,7 @@ const STUDIO_CARDS: StudioCardSpec[] = [
     name: "Image Studio",
     href: "/studio/image",
     icon: ImageIcon,
-    accent: "from-primary/30 via-primary/10 to-transparent",
+    accent: "gradient-image",
     bullets: ["Remove objects & backgrounds", "Upscale, restore & colorize", "AI headshot & style transfer"],
     freeAllowed: true,
   },
@@ -134,7 +134,7 @@ const STUDIO_CARDS: StudioCardSpec[] = [
     name: "Video Studio",
     href: "/studio/video",
     icon: Video,
-    accent: "from-red-500/30 via-red-500/10 to-transparent",
+    accent: "gradient-video",
     bullets: ["Text-to-video & image-to-video", "Cinematic camera moves", "Reels & shorts presets"],
     freeAllowed: false,
   },
@@ -142,11 +142,12 @@ const STUDIO_CARDS: StudioCardSpec[] = [
     name: "Music Studio",
     href: "/studio/music",
     icon: Music,
-    accent: "from-purple-500/30 via-fuchsia-500/10 to-transparent",
+    accent: "gradient-music",
     bullets: ["Prompt-to-music tracks", "Genre + mood chips", "Up to 3-minute exports"],
     freeAllowed: false,
   },
 ];
+
 
 function StudioShowcase() {
   const { user, profile } = useAuth();
