@@ -42,6 +42,11 @@ function VideoStudio() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const openBlank = () => {
+    try { sessionStorage.setItem("motio2edit-mode", "video"); } catch { /* ignore */ }
+    navigate({ to: user ? "/editor" : "/auth" });
+  };
+
   const applyPreset = (p: Preset) => {
     try {
       sessionStorage.setItem(
@@ -51,6 +56,7 @@ function VideoStudio() {
     } catch { /* ignore */ }
     navigate({ to: user ? "/editor" : "/auth" });
   };
+
 
   return (
     <div className="min-h-screen bg-background">
