@@ -261,8 +261,6 @@ function StudioLoopingShowcase() {
   );
 }
 
-import type { ComponentType } from "react";
-// silence unused-import warning if any
-void (undefined as unknown as ComponentType);
+
 
 
