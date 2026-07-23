@@ -176,10 +176,10 @@ export async function applyDownloadWatermarkGrid(imageUrl: string): Promise<stri
     const H = canvas.height;
 
     ctx.save();
-    ctx.globalAlpha = 0.25;
+    ctx.globalAlpha = 0.65;
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.8;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
