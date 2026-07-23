@@ -42,9 +42,9 @@ export function GenerationStatusBar() {
         if (!onCurrent) router.navigate({ to: status.editorPath });
       }}
       aria-label={`Return to ${noun} editor`}
-      className="fixed inset-x-0 z-40 mx-auto flex max-w-6xl items-center gap-3 border border-border bg-background/95 px-4 py-2.5 text-left shadow-lg backdrop-blur transition md:bottom-4 md:rounded-full"
+      className="fixed inset-x-0 z-40 mx-auto flex w-[90%] max-w-[400px] items-center gap-3 rounded-full border border-border bg-background/95 px-4 py-2.5 text-left shadow-lg backdrop-blur transition animate-pulse md:bottom-4"
       style={{
-        bottom: "calc(64px + env(safe-area-inset-bottom))",
+        bottom: "calc(72px + env(safe-area-inset-bottom))",
       }}
     >
       <span className="text-lg leading-none">{emoji}</span>
@@ -52,7 +52,7 @@ export function GenerationStatusBar() {
         <div className="truncate text-sm font-semibold">
           Generating your {noun}... <span className="tabular-nums text-muted-foreground">{elapsed}</span>
         </div>
-        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-secondary">
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
           <div className="h-full w-1/3 animate-[genbar_1.4s_ease-in-out_infinite] rounded-full bg-primary" />
         </div>
       </div>

@@ -29,7 +29,7 @@ export function AppSidebar() {
     >
       <Link to="/" className="flex items-center gap-2 px-5 py-4 font-extrabold tracking-tight">
         <Sparkles className="h-5 w-5 text-primary" />
-        <span className="flex items-baseline gap-1.5 text-lg">
+        <span className="text-lg leading-none whitespace-nowrap">
           MOTI<span className="text-primary">O2</span>EDIT
         </span>
       </Link>

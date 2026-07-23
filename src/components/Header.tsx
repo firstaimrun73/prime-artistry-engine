@@ -16,11 +16,11 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <Link to="/" className="flex items-center gap-2 font-extrabold tracking-tight">
           <Sparkles className="h-5 w-5 text-primary" />
-          <span className="flex items-baseline gap-1.5 text-lg">
+          <span className="text-lg leading-none whitespace-nowrap">
             MOTI<span className="text-primary">O2</span>EDIT
-            <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:inline">
-              by Motion2AI
-            </span>
+          </span>
+          <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:inline">
+            by Motion2AI
           </span>
         </Link>
 

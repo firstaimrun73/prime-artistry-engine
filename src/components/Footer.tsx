@@ -17,11 +17,11 @@ export function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between">
         <Link to="/" className="flex items-center gap-2 font-extrabold tracking-tight">
           <Sparkles className="h-5 w-5 text-primary" />
-          <span className="flex items-baseline gap-1.5 text-lg">
+          <span className="text-lg leading-none whitespace-nowrap">
             MOTI<span className="text-primary">O2</span>EDIT
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              by Motion2AI
-            </span>
+          </span>
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            by Motion2AI
           </span>
         </Link>
         <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
