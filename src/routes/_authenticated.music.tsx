@@ -245,6 +245,8 @@ function MusicPage() {
     }
     setLoading(true);
     setLoadingStep(0);
+    setLoadingStart(Date.now());
+    setNow(Date.now());
     setAudioUrl(null);
     setPlaying(false);
     startGeneration("music", "/music");
