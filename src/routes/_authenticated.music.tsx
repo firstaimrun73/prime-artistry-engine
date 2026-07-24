@@ -75,17 +75,16 @@ const MOODS: { key: string; label: string }[] = [
 ];
 
 const DURATIONS = [
-  { s: 15, label: "15 sec" },
-  { s: 30, label: "30 sec" },
-  { s: 60, label: "60 sec" },
+  { s: 30, label: "30s" },
+  { s: 60, label: "60s" },
   { s: 120, label: "2 min" },
 ];
 
 const LOADING_STEPS = [
-  "🎵 Composing your music...",
-  "🎸 Adding instruments...",
-  "🎹 Perfecting the melody...",
-  "✨ Finalizing your track...",
+  "Composing your melody...",
+  "Adding instruments...",
+  "Mixing your track...",
+  "Finalizing your music...",
 ];
 
 // Map a UI mood to the backend MUSIC_MOODS enum (best-effort match).
