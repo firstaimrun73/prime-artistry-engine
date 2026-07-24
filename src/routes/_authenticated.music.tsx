@@ -573,18 +573,62 @@ function MusicPage() {
           )}
         </section>
 
-        {/* Loading / result */}
-        {loading && (
-          <section className="mt-6 rounded-2xl border border-border bg-card p-6 text-center">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-orange-500 to-purple-600 text-white">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-            <div className="mt-3 text-base font-semibold">{LOADING_STEPS[loadingStep]}</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              This usually takes 10–30 seconds.
+        {/* Loading: progress bar + spinning vinyl + rotating messages + timer */}
+        {loading && (() => {
+          const elapsedMs = Math.max(0, now - loadingStart);
+          const elapsedS = Math.floor(elapsedMs / 1000);
+          const mm = Math.floor(elapsedS / 60).toString().padStart(2, "0");
+          const ss = (elapsedS % 60).toString().padStart(2, "0");
+          // Estimate: lite ~15s, pro ~30s baseline; asymptote to 95% until real completion.
+          const estimate = tier === "lite" ? 20 : 35;
+          const pct = Math.min(95, (elapsedS / estimate) * 95);
+          return (
+            <section className="mt-6 rounded-2xl border border-border bg-card p-6 text-center">
+              <div className="mx-auto grid h-24 w-24 place-items-center">
+                <div
+                  className="relative h-24 w-24 rounded-full bg-gradient-to-br from-neutral-900 to-neutral-700 shadow-inner"
+                  style={{ animation: "vinyl-spin 2s linear infinite" }}
+                >
+                  <div className="absolute inset-2 rounded-full border border-neutral-600" />
+                  <div className="absolute inset-4 rounded-full border border-neutral-600" />
+                  <div className="absolute inset-6 rounded-full border border-neutral-600" />
+                  <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-orange-500 to-purple-600" />
+                </div>
+              </div>
+              <div className="mt-4 text-base font-semibold">{LOADING_STEPS[loadingStep]}</div>
+              <div className="mt-3 mx-auto h-2 w-full max-w-[400px] overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-purple-600 transition-[width] duration-1000 ease-out animate-pulse"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between px-1 text-xs text-muted-foreground mx-auto max-w-[400px]">
+                <span className="tabular-nums">{mm}:{ss}</span>
+                <span>~{estimate} seconds</span>
+              </div>
+              <style>{`@keyframes vinyl-spin { to { transform: rotate(360deg); } }`}</style>
+            </section>
+          );
+        })()}
+
+        {/* Restore-previous-session prompt */}
+        {showRestore && (
+          <section className="mt-6 rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold">Restore previous session?</div>
+                <div className="text-xs text-muted-foreground">
+                  We saved your last prompt, settings{showRestore.audioUrl ? " and generated track" : ""}.
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={dismissRestore}>No, start fresh</Button>
+                <Button size="sm" onClick={applyRestore} className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">Yes, restore</Button>
+              </div>
             </div>
           </section>
         )}
+
 
         {audioUrl && !loading && (
           <section className="mt-6 rounded-2xl border border-border bg-card p-6">
