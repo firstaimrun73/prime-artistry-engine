@@ -160,6 +160,7 @@ const WATERMARK_TEXT = "MOTIO2EDIT.COM";
  * Returns an object URL; falls back to the source on any failure.
  */
 export async function applyDownloadWatermarkGrid(imageUrl: string): Promise<string> {
+  console.log("[watermark] Applying watermark grid for free-user download…");
   try {
     const res = await fetch(imageUrl);
     const blob = await res.blob();

@@ -75,17 +75,16 @@ const MOODS: { key: string; label: string }[] = [
 ];
 
 const DURATIONS = [
-  { s: 15, label: "15 sec" },
-  { s: 30, label: "30 sec" },
-  { s: 60, label: "60 sec" },
+  { s: 30, label: "30s" },
+  { s: 60, label: "60s" },
   { s: 120, label: "2 min" },
 ];
 
 const LOADING_STEPS = [
-  "🎵 Composing your music...",
-  "🎸 Adding instruments...",
-  "🎹 Perfecting the melody...",
-  "✨ Finalizing your track...",
+  "Composing your melody...",
+  "Adding instruments...",
+  "Mixing your track...",
+  "Finalizing your music...",
 ];
 
 // Map a UI mood to the backend MUSIC_MOODS enum (best-effort match).
@@ -148,11 +147,15 @@ function MusicPage() {
   const [duration, setDuration] = useState<number>(30);
   const [bpm, setBpm] = useState<number>(120);
   const [tier, setTier] = useState<"lite" | "pro">("pro");
+  const [customDuration, setCustomDuration] = useState<boolean>(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
+  const [loadingStart, setLoadingStart] = useState<number>(0);
+  const [now, setNow] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [showRestore, setShowRestore] = useState<null | { prompt?: string; instrument?: Chip | null; mood?: string | null; duration?: number; bpm?: number; tier?: "lite" | "pro"; audioUrl?: string | null; customDuration?: boolean }>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
@@ -162,15 +165,22 @@ function MusicPage() {
 
   useEffect(() => {
     if (!loading) return;
+    setNow(Date.now());
     const id = setInterval(() => {
       setLoadingStep((s) => (s + 1) % LOADING_STEPS.length);
+      setNow(Date.now());
+    }, 1000);
+    const stepId = setInterval(() => {
+      setLoadingStep((s) => (s + 1) % LOADING_STEPS.length);
     }, 2000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      clearInterval(stepId);
+    };
   }, [loading]);
 
   // Pre-fill prompt from Studio sample clicks (sessionStorage bridge).
-  // FIX 6: Restore last session (prompt, instrument, mood, duration, bpm, tier, audio)
-  // from localStorage so returning to /music preserves the previous workspace.
+  // Restore session: read localStorage but ASK before applying so users can start fresh.
   useEffect(() => {
     try {
       const pre = sessionStorage.getItem("prefill-prompt");
@@ -180,35 +190,44 @@ function MusicPage() {
       }
       const raw = localStorage.getItem("motio2edit-music-session");
       if (raw) {
-        const s = JSON.parse(raw) as {
-          prompt?: string;
-          instrument?: Chip | null;
-          mood?: string | null;
-          duration?: number;
-          bpm?: number;
-          tier?: "lite" | "pro";
-          audioUrl?: string | null;
-        };
-        if (!pre && typeof s.prompt === "string") setPrompt(s.prompt);
-        if (s.instrument) setInstrument(s.instrument);
-        if (typeof s.mood === "string") setMood(s.mood);
-        if (typeof s.duration === "number") setDuration(s.duration);
-        if (typeof s.bpm === "number") setBpm(s.bpm);
-        if (s.tier === "lite" || s.tier === "pro") setTier(s.tier);
-        if (typeof s.audioUrl === "string") setAudioUrl(s.audioUrl);
+        const s = JSON.parse(raw);
+        const hasSomething =
+          (typeof s.prompt === "string" && s.prompt.length > 0) ||
+          s.instrument || s.mood || s.audioUrl;
+        if (!pre && hasSomething) setShowRestore(s);
       }
     } catch { /* ignore */ }
   }, []);
 
-  // FIX 6: persist every change so the workspace is restored on next visit.
+  function applyRestore() {
+    const s = showRestore;
+    if (!s) return;
+    if (typeof s.prompt === "string") setPrompt(s.prompt);
+    if (s.instrument) setInstrument(s.instrument);
+    if (typeof s.mood === "string") setMood(s.mood);
+    if (typeof s.duration === "number") setDuration(s.duration);
+    if (typeof s.bpm === "number") setBpm(s.bpm);
+    if (s.tier === "lite" || s.tier === "pro") setTier(s.tier);
+    if (typeof s.audioUrl === "string") setAudioUrl(s.audioUrl);
+    if (typeof s.customDuration === "boolean") setCustomDuration(s.customDuration);
+    setShowRestore(null);
+  }
+  function dismissRestore() {
+    setShowRestore(null);
+    try { localStorage.removeItem("motio2edit-music-session"); } catch { /* ignore */ }
+  }
+
+  // Persist every change so the workspace is restored on next visit.
   useEffect(() => {
     try {
       localStorage.setItem(
         "motio2edit-music-session",
-        JSON.stringify({ prompt, instrument, mood, duration, bpm, tier, audioUrl }),
+        JSON.stringify({ prompt, instrument, mood, duration, bpm, tier, audioUrl, customDuration }),
       );
     } catch { /* ignore */ }
-  }, [prompt, instrument, mood, duration, bpm, tier, audioUrl]);
+  }, [prompt, instrument, mood, duration, bpm, tier, audioUrl, customDuration]);
+
+
 
 
   const isFree = (profile?.plan ?? "free") === "free";
@@ -226,6 +245,8 @@ function MusicPage() {
     }
     setLoading(true);
     setLoadingStep(0);
+    setLoadingStart(Date.now());
+    setNow(Date.now());
     setAudioUrl(null);
     setPlaying(false);
     startGeneration("music", "/music");
@@ -463,19 +484,19 @@ function MusicPage() {
             />
           </div>
 
-          {/* Duration */}
+          {/* Duration — presets + Custom */}
           <div className="mt-5">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Duration
             </div>
             <div className="flex flex-wrap gap-2">
               {DURATIONS.map((d) => {
-                const active = duration === d.s;
+                const active = !customDuration && duration === d.s;
                 return (
                   <button
                     key={d.s}
                     type="button"
-                    onClick={() => setDuration(d.s)}
+                    onClick={() => { setCustomDuration(false); setDuration(d.s); }}
                     className={
                       "rounded-full border px-4 py-1.5 text-xs font-medium transition " +
                       (active
@@ -487,8 +508,35 @@ function MusicPage() {
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={() => setCustomDuration(true)}
+                className={
+                  "rounded-full border px-4 py-1.5 text-xs font-medium transition " +
+                  (customDuration
+                    ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
+                    : "border-border bg-background hover:border-primary/40")
+                }
+              >
+                Custom
+              </button>
+              {customDuration && (
+                <input
+                  type="number"
+                  min={5}
+                  max={180}
+                  value={duration}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isFinite(v)) setDuration(Math.max(5, Math.min(180, v)));
+                  }}
+                  placeholder="Enter seconds"
+                  className="w-32 rounded-full border border-border bg-background px-3 py-1.5 text-xs"
+                />
+              )}
             </div>
           </div>
+
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground">
@@ -525,18 +573,62 @@ function MusicPage() {
           )}
         </section>
 
-        {/* Loading / result */}
-        {loading && (
-          <section className="mt-6 rounded-2xl border border-border bg-card p-6 text-center">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-orange-500 to-purple-600 text-white">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-            <div className="mt-3 text-base font-semibold">{LOADING_STEPS[loadingStep]}</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              This usually takes 10–30 seconds.
+        {/* Loading: progress bar + spinning vinyl + rotating messages + timer */}
+        {loading && (() => {
+          const elapsedMs = Math.max(0, now - loadingStart);
+          const elapsedS = Math.floor(elapsedMs / 1000);
+          const mm = Math.floor(elapsedS / 60).toString().padStart(2, "0");
+          const ss = (elapsedS % 60).toString().padStart(2, "0");
+          // Estimate: lite ~15s, pro ~30s baseline; asymptote to 95% until real completion.
+          const estimate = tier === "lite" ? 20 : 35;
+          const pct = Math.min(95, (elapsedS / estimate) * 95);
+          return (
+            <section className="mt-6 rounded-2xl border border-border bg-card p-6 text-center">
+              <div className="mx-auto grid h-24 w-24 place-items-center">
+                <div
+                  className="relative h-24 w-24 rounded-full bg-gradient-to-br from-neutral-900 to-neutral-700 shadow-inner"
+                  style={{ animation: "vinyl-spin 2s linear infinite" }}
+                >
+                  <div className="absolute inset-2 rounded-full border border-neutral-600" />
+                  <div className="absolute inset-4 rounded-full border border-neutral-600" />
+                  <div className="absolute inset-6 rounded-full border border-neutral-600" />
+                  <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-orange-500 to-purple-600" />
+                </div>
+              </div>
+              <div className="mt-4 text-base font-semibold">{LOADING_STEPS[loadingStep]}</div>
+              <div className="mt-3 mx-auto h-2 w-full max-w-[400px] overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-purple-600 transition-[width] duration-1000 ease-out animate-pulse"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between px-1 text-xs text-muted-foreground mx-auto max-w-[400px]">
+                <span className="tabular-nums">{mm}:{ss}</span>
+                <span>~{estimate} seconds</span>
+              </div>
+              <style>{`@keyframes vinyl-spin { to { transform: rotate(360deg); } }`}</style>
+            </section>
+          );
+        })()}
+
+        {/* Restore-previous-session prompt */}
+        {showRestore && (
+          <section className="mt-6 rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-semibold">Restore previous session?</div>
+                <div className="text-xs text-muted-foreground">
+                  We saved your last prompt, settings{showRestore.audioUrl ? " and generated track" : ""}.
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={dismissRestore}>No, start fresh</Button>
+                <Button size="sm" onClick={applyRestore} className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">Yes, restore</Button>
+              </div>
             </div>
           </section>
         )}
+
 
         {audioUrl && !loading && (
           <section className="mt-6 rounded-2xl border border-border bg-card p-6">

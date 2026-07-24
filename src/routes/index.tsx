@@ -229,36 +229,116 @@ function StudioShowcase() {
   );
 }
 
-const LOOP_SLIDES: { label: string; tagline: string; gradient: string; icon: typeof ImageIcon }[] = [
-  { label: "Image Studio", tagline: "Remove, restore, restyle", gradient: "gradient-image", icon: ImageIcon },
-  { label: "Video Studio", tagline: "Cinematic motion, on demand", gradient: "gradient-video", icon: Video },
-  { label: "Music Studio", tagline: "Sunset aura soundtracks", gradient: "gradient-music", icon: Music },
+type LoopSlide = {
+  label: string;
+  tagline: string;
+  icon: typeof ImageIcon;
+  bg: string; // inline background CSS
+};
+
+const LOOP_SLIDES: LoopSlide[] = [
+  {
+    label: "Image Studio",
+    tagline: "Remove, restore, restyle",
+    icon: ImageIcon,
+    bg: "linear-gradient(135deg,#fff7ed 0%,#fdba74 45%,#f97316 100%)",
+  },
+  {
+    label: "Video Studio",
+    tagline: "Cinematic motion, on demand",
+    icon: Video,
+    bg: "linear-gradient(135deg,#fee2e2 0%,#f87171 45%,#dc2626 100%)",
+  },
+  {
+    label: "Music Studio",
+    tagline: "Sunset aura soundtracks",
+    icon: Music,
+    bg: "linear-gradient(135deg,#4B0082 0%,#8B008B 50%,#FF69B4 100%)",
+  },
 ];
 
 function StudioLoopingShowcase() {
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused) return;
+    const id = setInterval(() => setIdx((i) => (i + 1) % LOOP_SLIDES.length), 4000);
+    return () => clearInterval(id);
+  }, [paused]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowRight") setIdx((i) => (i + 1) % LOOP_SLIDES.length);
+      if (e.key === "ArrowLeft") setIdx((i) => (i - 1 + LOOP_SLIDES.length) % LOOP_SLIDES.length);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const touchX = useRef<number | null>(null);
+  function onTouchStart(e: React.TouchEvent) {
+    touchX.current = e.touches[0]?.clientX ?? null;
+    setPaused(true);
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const start = touchX.current;
+    const end = e.changedTouches[0]?.clientX ?? null;
+    if (start != null && end != null) {
+      const dx = end - start;
+      if (Math.abs(dx) > 40) {
+        setIdx((i) => (i + (dx < 0 ? 1 : -1) + LOOP_SLIDES.length) % LOOP_SLIDES.length);
+      }
+    }
+    touchX.current = null;
+    setTimeout(() => setPaused(false), 500);
+  }
+
   return (
     <section className="mx-auto max-w-6xl px-4 pb-12">
-      <div className="glass-panel relative mx-auto overflow-hidden rounded-3xl p-1">
+      <div
+        className="glass-panel relative mx-auto overflow-hidden rounded-3xl p-1"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         <div className="relative h-64 sm:h-80">
           {LOOP_SLIDES.map((s, i) => {
             const Icon = s.icon;
+            const active = i === idx;
             return (
               <div
                 key={s.label}
-                className={`absolute inset-0 flex items-center justify-center rounded-3xl ${s.gradient}`}
-                style={{
-                  animation: `studio-cycle 12s ease-in-out ${i * 4}s infinite`,
-                  opacity: 0,
-                }}
+                aria-hidden={!active}
+                className="absolute inset-0 flex items-center justify-center rounded-3xl transition-opacity duration-700 ease-in-out"
+                style={{ background: s.bg, opacity: active ? 1 : 0 }}
               >
                 <div className="flex flex-col items-center gap-3 text-center text-white drop-shadow-lg">
                   <Icon className="h-14 w-14" strokeWidth={1.5} />
                   <div className="text-2xl font-extrabold tracking-tight sm:text-4xl">{s.label}</div>
                   <div className="text-sm opacity-90 sm:text-base">{s.tagline}</div>
+                  <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] opacity-80">
+                    Powered by Motion2AI
+                  </div>
                 </div>
               </div>
             );
           })}
+        </div>
+        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
+          {LOOP_SLIDES.map((s, i) => (
+            <button
+              key={s.label}
+              type="button"
+              aria-label={`Show ${s.label}`}
+              onClick={() => setIdx(i)}
+              className={
+                "h-2 rounded-full transition-all " +
+                (i === idx ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80")
+              }
+            />
+          ))}
         </div>
       </div>
       <p className="mt-3 text-center text-xs text-muted-foreground">
@@ -268,8 +348,9 @@ function StudioLoopingShowcase() {
   );
 }
 
+
 // FIX 7: Logged-in landing — welcome, quick studio access, credits, recent history.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { History as HistoryIcon } from "lucide-react";
 
