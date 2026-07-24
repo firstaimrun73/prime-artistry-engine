@@ -484,19 +484,19 @@ function MusicPage() {
             />
           </div>
 
-          {/* Duration */}
+          {/* Duration — presets + Custom */}
           <div className="mt-5">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Duration
             </div>
             <div className="flex flex-wrap gap-2">
               {DURATIONS.map((d) => {
-                const active = duration === d.s;
+                const active = !customDuration && duration === d.s;
                 return (
                   <button
                     key={d.s}
                     type="button"
-                    onClick={() => setDuration(d.s)}
+                    onClick={() => { setCustomDuration(false); setDuration(d.s); }}
                     className={
                       "rounded-full border px-4 py-1.5 text-xs font-medium transition " +
                       (active
@@ -508,8 +508,35 @@ function MusicPage() {
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={() => setCustomDuration(true)}
+                className={
+                  "rounded-full border px-4 py-1.5 text-xs font-medium transition " +
+                  (customDuration
+                    ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
+                    : "border-border bg-background hover:border-primary/40")
+                }
+              >
+                Custom
+              </button>
+              {customDuration && (
+                <input
+                  type="number"
+                  min={5}
+                  max={180}
+                  value={duration}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isFinite(v)) setDuration(Math.max(5, Math.min(180, v)));
+                  }}
+                  placeholder="Enter seconds"
+                  className="w-32 rounded-full border border-border bg-background px-3 py-1.5 text-xs"
+                />
+              )}
             </div>
           </div>
+
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground">
