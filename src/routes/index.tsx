@@ -350,7 +350,7 @@ function StudioLoopingShowcase() {
 
 
 // FIX 7: Logged-in landing — welcome, quick studio access, credits, recent history.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { History as HistoryIcon } from "lucide-react";
 
