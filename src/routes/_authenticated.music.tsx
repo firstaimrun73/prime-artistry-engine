@@ -147,11 +147,15 @@ function MusicPage() {
   const [duration, setDuration] = useState<number>(30);
   const [bpm, setBpm] = useState<number>(120);
   const [tier, setTier] = useState<"lite" | "pro">("pro");
+  const [customDuration, setCustomDuration] = useState<boolean>(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
+  const [loadingStart, setLoadingStart] = useState<number>(0);
+  const [now, setNow] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [showRestore, setShowRestore] = useState<null | { prompt?: string; instrument?: Chip | null; mood?: string | null; duration?: number; bpm?: number; tier?: "lite" | "pro"; audioUrl?: string | null; customDuration?: boolean }>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
