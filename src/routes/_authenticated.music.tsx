@@ -165,15 +165,22 @@ function MusicPage() {
 
   useEffect(() => {
     if (!loading) return;
+    setNow(Date.now());
     const id = setInterval(() => {
       setLoadingStep((s) => (s + 1) % LOADING_STEPS.length);
+      setNow(Date.now());
+    }, 1000);
+    const stepId = setInterval(() => {
+      setLoadingStep((s) => (s + 1) % LOADING_STEPS.length);
     }, 2000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      clearInterval(stepId);
+    };
   }, [loading]);
 
   // Pre-fill prompt from Studio sample clicks (sessionStorage bridge).
-  // FIX 6: Restore last session (prompt, instrument, mood, duration, bpm, tier, audio)
-  // from localStorage so returning to /music preserves the previous workspace.
+  // Restore session: read localStorage but ASK before applying so users can start fresh.
   useEffect(() => {
     try {
       const pre = sessionStorage.getItem("prefill-prompt");
@@ -183,35 +190,44 @@ function MusicPage() {
       }
       const raw = localStorage.getItem("motio2edit-music-session");
       if (raw) {
-        const s = JSON.parse(raw) as {
-          prompt?: string;
-          instrument?: Chip | null;
-          mood?: string | null;
-          duration?: number;
-          bpm?: number;
-          tier?: "lite" | "pro";
-          audioUrl?: string | null;
-        };
-        if (!pre && typeof s.prompt === "string") setPrompt(s.prompt);
-        if (s.instrument) setInstrument(s.instrument);
-        if (typeof s.mood === "string") setMood(s.mood);
-        if (typeof s.duration === "number") setDuration(s.duration);
-        if (typeof s.bpm === "number") setBpm(s.bpm);
-        if (s.tier === "lite" || s.tier === "pro") setTier(s.tier);
-        if (typeof s.audioUrl === "string") setAudioUrl(s.audioUrl);
+        const s = JSON.parse(raw);
+        const hasSomething =
+          (typeof s.prompt === "string" && s.prompt.length > 0) ||
+          s.instrument || s.mood || s.audioUrl;
+        if (!pre && hasSomething) setShowRestore(s);
       }
     } catch { /* ignore */ }
   }, []);
 
-  // FIX 6: persist every change so the workspace is restored on next visit.
+  function applyRestore() {
+    const s = showRestore;
+    if (!s) return;
+    if (typeof s.prompt === "string") setPrompt(s.prompt);
+    if (s.instrument) setInstrument(s.instrument);
+    if (typeof s.mood === "string") setMood(s.mood);
+    if (typeof s.duration === "number") setDuration(s.duration);
+    if (typeof s.bpm === "number") setBpm(s.bpm);
+    if (s.tier === "lite" || s.tier === "pro") setTier(s.tier);
+    if (typeof s.audioUrl === "string") setAudioUrl(s.audioUrl);
+    if (typeof s.customDuration === "boolean") setCustomDuration(s.customDuration);
+    setShowRestore(null);
+  }
+  function dismissRestore() {
+    setShowRestore(null);
+    try { localStorage.removeItem("motio2edit-music-session"); } catch { /* ignore */ }
+  }
+
+  // Persist every change so the workspace is restored on next visit.
   useEffect(() => {
     try {
       localStorage.setItem(
         "motio2edit-music-session",
-        JSON.stringify({ prompt, instrument, mood, duration, bpm, tier, audioUrl }),
+        JSON.stringify({ prompt, instrument, mood, duration, bpm, tier, audioUrl, customDuration }),
       );
     } catch { /* ignore */ }
-  }, [prompt, instrument, mood, duration, bpm, tier, audioUrl]);
+  }, [prompt, instrument, mood, duration, bpm, tier, audioUrl, customDuration]);
+
+
 
 
   const isFree = (profile?.plan ?? "free") === "free";
