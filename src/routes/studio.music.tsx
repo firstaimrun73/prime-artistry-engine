@@ -108,7 +108,7 @@ function MusicStudio() {
 
   const handleGenerate = async () => {
     if (!user) {
-      navigate({ to: "/auth", search: {} });
+      navigate({ to: "/auth", search: { redirect: undefined } });
       return;
     }
     if (!hasPrompt) {
@@ -341,7 +341,7 @@ function MusicStudio() {
             </div>
             {!user && (
               <p className="mt-2 text-[11px] text-muted-foreground">
-                <Link to="/auth" search={{}} className="text-primary hover:underline">Sign in</Link> to generate — new accounts get 40 free credits.
+                <Link to="/auth" search={{ redirect: undefined }} className="text-primary hover:underline">Sign in</Link> to generate — new accounts get 40 free credits.
               </p>
             )}
           </section>

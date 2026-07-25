@@ -116,7 +116,7 @@ function SettingsPage() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate({ to: "/auth", search: {} });
+    navigate({ to: "/auth", search: { redirect: undefined } });
   };
 
   const uploadAvatar = async (file: File) => {
