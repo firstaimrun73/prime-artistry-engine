@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Image as ImageIcon, Video, Music, Download, Zap, Wand2, ShieldCheck, Lock, ArrowRight, Check } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/routes/feedback";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
+import { History as HistoryIcon } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -348,11 +351,6 @@ function StudioLoopingShowcase() {
   );
 }
 
-
-// FIX 7: Logged-in landing — welcome, quick studio access, credits, recent history.
-import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { History as HistoryIcon } from "lucide-react";
 
 type RecentGen = {
   id: string;
