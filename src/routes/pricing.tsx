@@ -167,7 +167,7 @@ function Pricing() {
                   <Button
                     className="mt-8 w-full"
                     variant={highlight ? "default" : "outline"}
-                    onClick={() => (plan.id === "free" ? navigate({ to: "/auth", search: {} }) : selectPlan(plan.id))}
+                    onClick={() => (plan.id === "free" ? navigate({ to: "/auth", search: { redirect: undefined } }) : selectPlan(plan.id))}
                     style={{ marginTop: "auto" }}
                   >
                     {plan.id === "free"

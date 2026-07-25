@@ -97,10 +97,10 @@ export function Header() {
             </>
           ) : (
             <>
-              <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/auth", search: {} })}>
+              <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}>
                 Sign in
               </Button>
-              <Button size="sm" onClick={() => navigate({ to: "/auth", search: {} })}>
+              <Button size="sm" onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}>
                 Get started
               </Button>
             </>

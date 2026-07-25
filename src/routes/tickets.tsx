@@ -195,7 +195,7 @@ function Tickets() {
           <div className="mt-10 rounded-xl border border-border bg-card p-8 text-center">
             <p className="text-sm text-muted-foreground">Sign in to create and track your tickets.</p>
             <Button asChild className="mt-4">
-              <Link to="/auth" search={{}}>Sign in</Link>
+              <Link to="/auth" search={{ redirect: undefined }}>Sign in</Link>
             </Button>
           </div>
         ) : (
