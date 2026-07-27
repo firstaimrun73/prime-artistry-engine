@@ -531,13 +531,35 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <SliderRow label="Overlay" value={overlayOpacity} min={10} max={100} onChange={setOverlayOpacity} suffix="%" />
           <div className="flex items-center justify-end gap-2">
-            <Button variant="outline" onClick={onCancel} disabled={applying}>Cancel</Button>
-            <Button onClick={apply} disabled={!hasMark || applying}>
-              <Check className="mr-1.5 h-4 w-4" />
-              {applying ? "Applying…" : hasMark ? "Apply mask" : "Paint an area to remove"}
-            </Button>
+            <Button variant="ghost" onClick={onCancel} disabled={applying}>Cancel</Button>
           </div>
         </div>
+
+        {/* Primary action: large full-width button under the canvas. */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+          <Button
+            onClick={apply}
+            disabled={!hasMark || applying}
+            className="btn-animate h-12 w-full bg-orange-500 text-base font-semibold text-white shadow-lg hover:bg-orange-600 disabled:opacity-60"
+          >
+            {applying ? (
+              <><Check className="mr-1.5 h-4 w-4 animate-pulse" /> Removing…</>
+            ) : hasMark ? (
+              <>✨ Remove Selected Area</>
+            ) : (
+              <>Paint an area to remove</>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={clearMask}
+            disabled={!hasMark || applying}
+            className="btn-animate h-12 whitespace-nowrap"
+          >
+            <RotateCcw className="mr-1.5 h-4 w-4" /> Clear &amp; Try Again
+          </Button>
+        </div>
+
       </div>
     </div>
   );

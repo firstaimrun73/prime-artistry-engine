@@ -177,3 +177,16 @@ body {
   pointer-events: none;
 }
 
+/* Reusable button animation utility used across main CTAs and chips. */
+.btn-animate {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.btn-animate:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.25);
+}
+.btn-animate:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+

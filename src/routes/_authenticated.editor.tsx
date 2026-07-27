@@ -40,6 +40,31 @@ const LOADING_MESSAGES = [
   "Bringing your idea to life…",
 ];
 
+type QuickStyle = { emoji: string; label: string; prompt: string };
+
+const IMAGE_QUICK_STYLES: QuickStyle[] = [
+  { emoji: "🎭", label: "Cartoon Style", prompt: "Convert to a vibrant hand-drawn cartoon illustration with bold outlines, cel shading, expressive features and saturated colors while keeping the subject's identity, pose and framing." },
+  { emoji: "🎨", label: "Oil Painting", prompt: "Repaint as a classical oil painting with visible brush strokes, rich impasto texture, warm palette and dramatic lighting; preserve the subject and composition." },
+  { emoji: "✏️", label: "Pencil Sketch", prompt: "Convert to a detailed graphite pencil sketch on textured paper with cross-hatching, soft shading and clean outlines; keep facial identity and composition intact." },
+  { emoji: "🌅", label: "Cinematic Look", prompt: "Apply a cinematic color grade with teal-and-orange tones, filmic contrast, subtle grain, anamorphic lens feel and 2.39:1 mood while keeping the original subject unchanged." },
+  { emoji: "👤", label: "Remove Person", prompt: "Completely remove the unwanted person and reconstruct the background naturally using surrounding textures, lighting and perspective so it looks like they were never there. Keep the main subject and every other pixel identical." },
+  { emoji: "🏠", label: "Remove Background", prompt: "Remove the background cleanly and replace it with a soft neutral studio backdrop while keeping the main subject's edges, hair detail and identity perfectly intact." },
+  { emoji: "⭐", label: "Enhance Face", prompt: "Enhance facial detail with natural skin texture, sharp eyes, balanced lighting and studio-grade retouching. Do NOT change identity, expression or age." },
+  { emoji: "🌟", label: "HDR Effect", prompt: "Apply a high-dynamic-range look with expanded highlights and shadows, punchy micro-contrast, vivid but natural colors and crystal-clear detail across the whole frame." },
+  { emoji: "🎬", label: "Movie Poster", prompt: "Restyle as a dramatic movie poster: cinematic key lighting, bold color grade, subtle vignette and space for a title. Preserve the subject and composition." },
+  { emoji: "🖼️", label: "Vintage Filter", prompt: "Apply a vintage 1970s film look with warm tones, soft grain, mild fading, gentle vignette and analog color response while keeping the subject sharp and recognizable." },
+];
+
+const VIDEO_QUICK_STYLES: QuickStyle[] = [
+  { emoji: "🎬", label: "Slow Motion", prompt: "Animate as smooth cinematic slow motion, ~0.5x speed, buttery frame interpolation, subtle motion blur and stable camera. Keep the subject's identity and scene unchanged." },
+  { emoji: "💫", label: "Cinematic FX", prompt: "Add cinematic camera motion with a slow dolly-in, shallow depth of field, atmospheric particles and filmic color grading while preserving the original subject and composition." },
+  { emoji: "🎵", label: "Music Video Vibe", prompt: "Turn into a stylish music-video shot with rhythmic camera moves, bold color grading, punchy lighting and dynamic energy; keep the subject centered." },
+  { emoji: "🌊", label: "Smooth Motion", prompt: "Generate very smooth, natural motion with a gentle parallax pan and subtle environmental movement (hair, fabric, background). No warping or identity drift." },
+  { emoji: "⚡", label: "Action Scene", prompt: "Turn into a high-energy action sequence with a fast tracking camera, dynamic angles, motion blur and dramatic lighting while keeping the subject sharp and recognizable." },
+  { emoji: "🎭", label: "Scene Continue", prompt: "Naturally continue the scene as if the camera keeps rolling: consistent lighting, consistent subject identity, coherent environment motion and no cuts." },
+];
+
+
 function Editor() {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
@@ -305,9 +330,10 @@ function Editor() {
       // because no clean version is ever stored on the client. Paid users on
       // "keep watermark" get only the subtle corner pill. Admins are exempt.
       if (!isVideoOut && url && !isAdmin) {
-        if (isFree) {
-          try { url = await watermarkImage(url, { strong: true }); } catch { /* keep original */ }
-        } else if (keepWatermark) {
+        // Preview shows ONLY the subtle corner pill for both free and
+        // "keep watermark" paid users. The full-image protective grid is
+        // applied at download time (see handleDownload) for free users.
+        if (isFree || keepWatermark) {
           try { url = await watermarkImage(url); } catch { /* keep original */ }
         }
       }
@@ -501,6 +527,28 @@ function Editor() {
               ))}
             </div>
           )}
+
+          {/* Quick style chips — one-click prompt presets per media type. */}
+          {!loading && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Quick styles
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(mediaType === "image" ? IMAGE_QUICK_STYLES : VIDEO_QUICK_STYLES).map((q) => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() => setPrompt(q.prompt)}
+                    className="btn-animate rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground"
+                  >
+                    <span className="mr-1">{q.emoji}</span>{q.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
 
           {/* Aspect ratio chips — text-to-image only, matches existing chip style */}
           {!loading && mediaType === "image" && !inputDataUrl && (
