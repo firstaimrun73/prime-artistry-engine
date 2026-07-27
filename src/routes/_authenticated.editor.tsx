@@ -305,9 +305,10 @@ function Editor() {
       // because no clean version is ever stored on the client. Paid users on
       // "keep watermark" get only the subtle corner pill. Admins are exempt.
       if (!isVideoOut && url && !isAdmin) {
-        if (isFree) {
-          try { url = await watermarkImage(url, { strong: true }); } catch { /* keep original */ }
-        } else if (keepWatermark) {
+        // Preview shows ONLY the subtle corner pill for both free and
+        // "keep watermark" paid users. The full-image protective grid is
+        // applied at download time (see handleDownload) for free users.
+        if (isFree || keepWatermark) {
           try { url = await watermarkImage(url); } catch { /* keep original */ }
         }
       }
