@@ -503,6 +503,28 @@ function Editor() {
             </div>
           )}
 
+          {/* Quick style chips — one-click prompt presets per media type. */}
+          {!loading && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Quick styles
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(mediaType === "image" ? IMAGE_QUICK_STYLES : VIDEO_QUICK_STYLES).map((q) => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() => setPrompt(q.prompt)}
+                    className="btn-animate rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground"
+                  >
+                    <span className="mr-1">{q.emoji}</span>{q.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+
           {/* Aspect ratio chips — text-to-image only, matches existing chip style */}
           {!loading && mediaType === "image" && !inputDataUrl && (
             <div className="space-y-2">
