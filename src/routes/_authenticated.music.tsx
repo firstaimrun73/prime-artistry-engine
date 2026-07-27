@@ -75,9 +75,19 @@ const MOODS: { key: string; label: string }[] = [
 ];
 
 const DURATIONS = [
+  { s: 15, label: "15s" },
   { s: 30, label: "30s" },
   { s: 60, label: "60s" },
   { s: 120, label: "2 min" },
+];
+
+const MUSIC_EXAMPLES = [
+  "Wedding ceremony music",
+  "Epic movie trailer",
+  "Lo-fi study beats",
+  "Gaming background music",
+  "Meditation and calm",
+  "Birthday celebration",
 ];
 
 const LOADING_STEPS = [
