@@ -424,6 +424,26 @@ function MusicPage() {
               : `${prompt.length}/900 characters`}
           </div>
 
+          {/* Example prompts */}
+          <div className="mt-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Try an example
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {MUSIC_EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  type="button"
+                  onClick={() => setPrompt(ex)}
+                  className="btn-animate rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+          </div>
+
+
           {/* Instrument / genre chips */}
           <div className="mt-5">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
