@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FooterAd } from "@/components/ads";
 import { useMemo, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -158,6 +159,7 @@ function FAQ() {
           </div>
         )}
       </div>
+      <FooterAd />
       <Footer />
     </div>
   );

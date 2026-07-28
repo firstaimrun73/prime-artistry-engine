@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { FooterAd } from "@/components/ads";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,7 @@ function SignedOutHome() {
         </div>
       </section>
       <HomeTestimonials />
+      <FooterAd />
       <Footer />
     </div>
   );
@@ -460,6 +462,7 @@ function SignedInHome() {
           )}
         </section>
       </main>
+      <FooterAd />
       <Footer />
     </div>
   );
