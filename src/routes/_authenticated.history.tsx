@@ -106,6 +106,10 @@ function HistoryPage() {
         Every creation lives here. Open any item to view full size, download, edit again or delete — no need to re-upload.
       </p>
 
+      <InContentAd />
+
+
+
       {loading ? (
         <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
       ) : gens.length === 0 ? (
