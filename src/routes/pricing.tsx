@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { FooterAd } from "@/components/ads";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -186,6 +187,7 @@ function Pricing() {
           India is billed in INR via secure card payment. International plans are paid with crypto (USDT / BTC / ETH).
         </p>
       </div>
+      <FooterAd />
       <Footer />
     </div>
   );

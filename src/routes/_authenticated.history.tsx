@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { InContentAd } from "@/components/ads";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,6 +105,10 @@ function HistoryPage() {
       <p className="mt-1 text-sm text-muted-foreground">
         Every creation lives here. Open any item to view full size, download, edit again or delete — no need to re-upload.
       </p>
+
+      <InContentAd />
+
+
 
       {loading ? (
         <p className="mt-8 text-sm text-muted-foreground">Loading…</p>

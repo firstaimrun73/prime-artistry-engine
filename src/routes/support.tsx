@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { FooterAd } from "@/components/ads";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import {
@@ -101,6 +102,7 @@ function Support() {
           </section>
         </div>
       </div>
+      <FooterAd />
       <Footer />
     </div>
   );
