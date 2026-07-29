@@ -368,6 +368,7 @@ function Editor() {
     if (runId !== runIdRef.current) return;
 
     setState("loading");
+    toast(mediaType === "video" ? "🎬 Generating your video..." : "🎨 Generating your image...");
     startGeneration(mediaType === "video" ? "video" : "image", "/editor");
     try {
       // Resolve the source media URL to send to the AI.
@@ -435,6 +436,8 @@ function Editor() {
               : undefined,
           aspectRatio:
             mediaType === "image" && !mediaUrl ? aspectRatio : undefined,
+          videoDurationSeconds: mediaType === "video" ? videoDuration : undefined,
+          videoAspectRatio: mediaType === "video" ? videoAspect : undefined,
         },
       });
 
@@ -461,13 +464,17 @@ function Editor() {
       setOutput(url);
       setState("success");
       await refreshProfile();
-      toast.success("Done!");
+      toast.success(isVideoOut ? "✅ Video ready!" : "✅ Image ready!");
       endGeneration();
     } catch (err) {
       if (runId !== runIdRef.current) return;
       setState("idle");
       endGeneration();
-      toast.error(err instanceof Error ? err.message : "Generation failed.");
+      toast.error(
+        err instanceof Error
+          ? `❌ ${err.message}`
+          : "❌ Failed. Credits not charged.",
+      );
     }
   };
 
@@ -517,9 +524,15 @@ function Editor() {
   const handleDownload = async () => {
     if (!output) return;
     let downloadUrl = output;
-    // FREE users get an extra full-image protective watermark grid on download.
-    if (isFree && !outputIsVideo) {
-      try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* keep original */ }
+    // FREE users always get the full-image protective watermark grid on
+    // download. Paid users only get a watermark when they opted in. Admin
+    // downloads are always clean.
+    if (!outputIsVideo && !isAdmin) {
+      if (isFree) {
+        try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* keep original */ }
+      } else if (keepWatermark) {
+        try { downloadUrl = await watermarkImage(output); } catch { /* keep original */ }
+      }
     }
     const a = document.createElement("a");
     a.href = downloadUrl;
@@ -528,6 +541,7 @@ function Editor() {
     a.click();
     a.remove();
     setDownloaded(true);
+    toast.success("⬇️ Download started!");
   };
 
   const handleShare = async () => {
@@ -780,13 +794,19 @@ function Editor() {
             ) : (
               <button
                 type="button"
-                onClick={() => setKeepWatermark((v) => !v)}
+                onClick={() =>
+                  setKeepWatermark((v) => {
+                    const next = !v;
+                    try { localStorage.setItem(WATERMARK_PREF_KEY, next ? "on" : "off"); } catch { /* ignore */ }
+                    return next;
+                  })
+                }
                 disabled={loading}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                   keepWatermark ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
                 }`}
               >
-                {keepWatermark ? "Keep watermark" : "Remove watermark"}
+                {keepWatermark ? "Watermark ON" : "No Watermark"}
               </button>
             )}
           </div>
