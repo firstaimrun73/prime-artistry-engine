@@ -386,7 +386,18 @@ function Editor() {
     setState("loading");
     toast(mediaType === "video" ? "🎬 Generating your video..." : "🎨 Generating your image...");
     startGeneration(mediaType === "video" ? "video" : "image", "/editor");
+    // Long-run progress messages so the user knows we're still working while
+    // the server retries a slow or failed AI attempt.
+    const progressTimers = [
+      setTimeout(() => {
+        if (runId === runIdRef.current) toast("⏳ Still working — high quality takes a moment...");
+      }, 30_000),
+      setTimeout(() => {
+        if (runId === runIdRef.current) toast("🔁 Taking longer than usual — retrying automatically...");
+      }, 75_000),
+    ];
     try {
+
       // Resolve the source media URL to send to the AI.
       // Uploaded files (image OR video) go to private storage and we pass a
       // signed URL fal can fetch. This avoids sending huge base64 bodies that
