@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      billing_audit_log: {
+        Row: {
+          action: string
+          actor: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          target_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          target_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          target_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       credit_audit_log: {
         Row: {
           amount_paid: number | null
@@ -337,6 +367,10 @@ export type Database = {
           id: string
           payment_method: string
           payment_status: string
+          paypal_capture_id: string | null
+          paypal_refund_id: string | null
+          refunded_amount: number | null
+          refunded_at: string | null
           transaction_id: string | null
           updated_at: string
           user_id: string
@@ -351,6 +385,10 @@ export type Database = {
           id?: string
           payment_method: string
           payment_status?: string
+          paypal_capture_id?: string | null
+          paypal_refund_id?: string | null
+          refunded_amount?: number | null
+          refunded_at?: string | null
           transaction_id?: string | null
           updated_at?: string
           user_id: string
@@ -365,6 +403,10 @@ export type Database = {
           id?: string
           payment_method?: string
           payment_status?: string
+          paypal_capture_id?: string | null
+          paypal_refund_id?: string | null
+          refunded_amount?: number | null
+          refunded_at?: string | null
           transaction_id?: string | null
           updated_at?: string
           user_id?: string
@@ -446,8 +488,76 @@ export type Database = {
         }
         Relationships: []
       }
+      refund_requests: {
+        Row: {
+          admin_note: string | null
+          created_at: string
+          currency: string | null
+          details: string | null
+          id: string
+          payment_transaction_id: string | null
+          paypal_refund_id: string | null
+          reason: string
+          refund_amount: number | null
+          refunded_at: string | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string
+          currency?: string | null
+          details?: string | null
+          id?: string
+          payment_transaction_id?: string | null
+          paypal_refund_id?: string | null
+          reason: string
+          refund_amount?: number | null
+          refunded_at?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string
+          currency?: string | null
+          details?: string | null
+          id?: string
+          payment_transaction_id?: string | null
+          paypal_refund_id?: string | null
+          reason?: string
+          refund_amount?: number | null
+          refunded_at?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_requests_payment_transaction_id_fkey"
+            columns: ["payment_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
+          auto_renew: boolean
+          cancel_reason: string | null
+          cancelled_at: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
@@ -460,6 +570,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          auto_renew?: boolean
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
@@ -472,6 +585,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          auto_renew?: boolean
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
