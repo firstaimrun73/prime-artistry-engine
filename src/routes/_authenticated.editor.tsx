@@ -232,32 +232,110 @@ function Editor() {
   const MAX_IMAGE_MB = 25;
   const MAX_VIDEO_MB = 200;
 
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const isVideo = file.type.startsWith("video");
-    const limitMb = isVideo ? MAX_VIDEO_MB : MAX_IMAGE_MB;
-    if (file.size > limitMb * 1024 * 1024) {
-      e.target.value = "";
-      return toast.error(
-        `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${limitMb} MB for ${isVideo ? "videos" : "images"}.`,
-      );
-    }
+  const readAsDataUrl = (file: File) =>
+    new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+
+  /** Load a gallery slot into the active editing state. */
+  const activateSlot = (items: GalleryItem[], idx: number) => {
+    const item = items[idx];
+    if (!item) return;
+    setActiveImage(idx);
+    setInputPreview(item.preview);
+    setInputDataUrl(item.dataUrl);
+    setInputFile(item.file);
+    setInputKind("image");
     setOutput(null);
     setDownloaded(false);
+    setRemoveMaskDataUrl(null);
     setState("idle");
-    setInputPreview(URL.createObjectURL(file));
-    setInputFile(file);
-    const kind: "image" | "video" = isVideo ? "video" : "image";
-    setInputKind(kind);
-    // Read images as a data URI (sent inline). Videos upload at generate time.
-    if (kind === "image") {
-      const reader = new FileReader();
-      reader.onload = () => setInputDataUrl(typeof reader.result === "string" ? reader.result : null);
-      reader.readAsDataURL(file);
-    } else {
+  };
+
+  const switchImage = (idx: number) => {
+    if (loading) return;
+    activateSlot(gallery, idx);
+  };
+
+  const removeImage = (idx: number) => {
+    if (loading) return;
+    const next = gallery.filter((_, i) => i !== idx);
+    setGallery(next);
+    if (next.length === 0) {
+      setActiveImage(0);
+      setInputPreview(null);
       setInputDataUrl(null);
+      setInputFile(null);
+      setInputKind(null);
+      setOutput(null);
+      return;
     }
+    activateSlot(next, Math.min(idx, next.length - 1));
+  };
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    e.target.value = "";
+
+    const first = files[0];
+    const isVideo = first.type.startsWith("video");
+
+    // Video keeps the existing single-file flow untouched.
+    if (isVideo) {
+      if (first.size > MAX_VIDEO_MB * 1024 * 1024) {
+        return toast.error(
+          `File is too large (${(first.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_VIDEO_MB} MB for videos.`,
+        );
+      }
+      setGallery([]);
+      setActiveImage(0);
+      setOutput(null);
+      setDownloaded(false);
+      setState("idle");
+      setInputPreview(URL.createObjectURL(first));
+      setInputFile(first);
+      setInputKind("video");
+      setInputDataUrl(null);
+      toast.success("📁 Upload complete!");
+      return;
+    }
+
+    // Images: append to the multi-image strip (max 10 per session).
+    const room = MAX_GALLERY_IMAGES - gallery.length;
+    if (room <= 0) return toast.error(`You can work with up to ${MAX_GALLERY_IMAGES} images at a time.`);
+
+    const accepted: File[] = [];
+    for (const f of files.slice(0, room)) {
+      if (!f.type.startsWith("image")) continue;
+      if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+        toast.error(
+          `${f.name} is too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_IMAGE_MB} MB.`,
+        );
+        continue;
+      }
+      accepted.push(f);
+    }
+    if (accepted.length === 0) return;
+
+    const items: GalleryItem[] = await Promise.all(
+      accepted.map(async (f) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        preview: URL.createObjectURL(f),
+        dataUrl: await readAsDataUrl(f),
+        file: f,
+      })),
+    );
+
+    const next = [...gallery, ...items];
+    setGallery(next);
+    activateSlot(next, gallery.length);
+    toast.success(
+      items.length > 1 ? `📁 ${items.length} images uploaded!` : "📁 Upload complete!",
+    );
   };
 
   // Upload a (video) file to private storage and return a signed URL fal can fetch.
