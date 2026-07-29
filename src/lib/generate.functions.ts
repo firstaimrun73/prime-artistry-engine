@@ -140,6 +140,56 @@ async function runFalStep(step: FalStep, falKey: string): Promise<string> {
   return url;
 }
 
+// Errors that will never succeed on a retry (bad input, safety, auth, credits).
+function isPermanentError(msg: string): boolean {
+  return /authentication|out of credits|safety filter|unsupported format|invalid or in an unsupported|Not enough credits/i.test(
+    msg || "",
+  );
+}
+
+/**
+ * Run a fal step with automatic retries (2 retries → 3 attempts total) and a
+ * hard per-attempt timeout. Never charges credits — the caller only deducts
+ * after a confirmed output URL.
+ */
+async function runFalStepResilient(
+  step: FalStep,
+  falKey: string,
+  opts: { timeoutMs?: number; maxRetries?: number } = {},
+): Promise<string> {
+  const timeoutMs = opts.timeoutMs ?? (step.outputKind === "video" ? 300_000 : 120_000);
+  const maxRetries = opts.maxRetries ?? 2;
+  let attempt = 0;
+  let lastErr: unknown;
+
+  while (attempt <= maxRetries) {
+    try {
+      if (attempt > 0) console.log(`[fal] retry attempt ${attempt} for ${step.label}…`);
+      const url = await Promise.race([
+        runFalStep(step, falKey),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Generation timed out. Please retry.")),
+            timeoutMs,
+          ),
+        ),
+      ]);
+      if (url && url.trim().length > 0) return url;
+      throw new Error("No output received");
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isPermanentError(msg)) throw err;
+      attempt++;
+      if (attempt > maxRetries) break;
+      await sleep(2000 * attempt);
+    }
+  }
+  const finalMsg = lastErr instanceof Error ? lastErr.message : "Generation failed.";
+  throw new Error(`${finalMsg} (failed after ${maxRetries + 1} attempts)`);
+}
+
+
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
   type: z.enum(["image", "video"]),
