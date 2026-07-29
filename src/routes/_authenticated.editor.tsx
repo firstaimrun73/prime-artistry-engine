@@ -530,7 +530,10 @@ function Editor() {
           ? `❌ ${err.message}`
           : "❌ Failed. Credits not charged.",
       );
+    } finally {
+      progressTimers.forEach(clearTimeout);
     }
+
   };
 
   const handleStop = () => {
