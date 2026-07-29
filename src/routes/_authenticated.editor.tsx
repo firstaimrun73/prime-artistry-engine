@@ -436,6 +436,36 @@ function Editor() {
         });
         maskImageUrl = await uploadToStorage(maskFile);
       }
+
+      // Reference images (2-5) come from the picker as data URIs. FAL cannot
+      // fetch data:/blob: URLs, so every one of them is uploaded to storage
+      // first and sent as a real https URL alongside the primary image.
+      let referenceImageUrls: string[] | undefined;
+      if (canAddRefImages && refImages.length > 0) {
+        const wanted = refImages.slice(0, Math.max(0, planLimits.maxImages - 1));
+        toast(`📤 Uploading ${wanted.length} reference image${wanted.length > 1 ? "s" : ""}...`);
+        const uploaded: string[] = [];
+        for (const src of wanted) {
+          if (src.startsWith("https://")) {
+            uploaded.push(src);
+            continue;
+          }
+          const refRes = await fetch(src);
+          const refBlob = await refRes.blob();
+          const refFile = new File([refBlob], `ref-${Date.now()}-${uploaded.length}.jpg`, {
+            type: refBlob.type || "image/jpeg",
+          });
+          uploaded.push(await uploadToStorage(refFile));
+        }
+        const valid = uploaded.filter((u) => u.startsWith("https://"));
+        if (valid.length !== wanted.length) {
+          toast.error("Some reference images could not be uploaded and were skipped.");
+        }
+        referenceImageUrls = valid.length > 0 ? valid : undefined;
+        if (referenceImageUrls) {
+          toast.success(`✅ Sending ${referenceImageUrls.length + 1} images to the AI`);
+        }
+      }
       if (runId !== runIdRef.current) return;
 
       const res = await generate({
@@ -446,10 +476,8 @@ function Editor() {
           sourceKind,
           strength: mediaType === "image" && sourceKind === "image" ? strength : undefined,
           maskImageUrl,
-          referenceImageUrls:
-            canAddRefImages && refImages.length > 0
-              ? refImages.slice(0, planLimits.maxImages - 1)
-              : undefined,
+          referenceImageUrls,
+
           aspectRatio:
             mediaType === "image" && !mediaUrl ? aspectRatio : undefined,
           videoDurationSeconds: mediaType === "video" ? videoDuration : undefined,
