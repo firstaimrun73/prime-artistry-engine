@@ -145,6 +145,22 @@ function Editor() {
     }
   }, []);
 
+  // One-time low-credit warning toast per session.
+  const creditsNow = profile?.credits ?? 0;
+  const adminNow = isAdminEmail(profile?.email);
+  useEffect(() => {
+    if (adminNow || !profile) return;
+    try {
+      if (sessionStorage.getItem(LOW_CREDIT_TOAST_KEY) === "1") return;
+      if (creditsNow <= 0) toast.error("🚨 No credits left. Upgrade now.");
+      else if (creditsNow < 30) toast.warning(`⚠️ Low credits: ${creditsNow} remaining`);
+      else return;
+      sessionStorage.setItem(LOW_CREDIT_TOAST_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  }, [creditsNow, adminNow, profile]);
+
   // Preload media handed over from the History page ("Edit Again").
   useEffect(() => {
     try {
@@ -565,12 +581,18 @@ function Editor() {
             {isAdmin ? "∞ credits" : `${profile.credits} credits`}
           </span>
           <span className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits
+            {mediaType === "video"
+              ? `Video ${cost} credits (${videoDuration}s)`
+              : `Image ${CREDIT_COST.image} credits`}
           </span>
           <Button size="sm" variant="ghost" onClick={handleClear}>
             <RotateCcw className="mr-1.5 h-4 w-4" /> New Project
           </Button>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
       </div>
 
       {/* FIX 2: Image/Video toggle removed. Mode is fixed by the studio entry point. */}
@@ -589,6 +611,7 @@ function Editor() {
             ref={fileRef}
             type="file"
             accept={mediaType === "image" ? "image/*" : "image/*,video/*"}
+            multiple={mediaType === "image"}
             onChange={onFile}
             className="hidden"
           />
@@ -615,6 +638,50 @@ function Editor() {
                   ? "Image → Video: motion will be generated from your image."
                   : "No upload = Text → Video. Upload an image for Image → Video, or a video for Video → Video."}
             </p>
+          )}
+
+          {/* Multi-image strip — switch between uploads, each edits separately. */}
+          {gallery.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Image {activeImage + 1} of {gallery.length}</span>
+                <span>{gallery.length}/{MAX_GALLERY_IMAGES}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {gallery.map((item, i) => (
+                  <div key={item.id} className="relative h-16 w-16">
+                    <button
+                      type="button"
+                      onClick={() => switchImage(i)}
+                      className={`h-full w-full overflow-hidden rounded-lg border-2 transition-colors ${
+                        i === activeImage ? "border-primary" : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <img src={item.preview} alt={`Upload ${i + 1}`} className="h-full w-full object-cover protected-image" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Remove image ${i + 1}`}
+                      onClick={() => removeImage(i)}
+                      className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-destructive text-destructive-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                {gallery.length < MAX_GALLERY_IMAGES && (
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={loading}
+                    className="grid h-16 w-16 place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+                    aria-label="Add more images"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
           )}
 
           <div className="relative">
@@ -781,6 +848,90 @@ function Editor() {
                 onChange={setRefImages}
                 disabled={loading}
               />
+            </div>
+          )}
+
+          {mediaType === "video" && (
+            <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration</span>
+                  <span
+                    title={MODEL_TIER_DESCRIPTION[modelTierForDuration(videoDuration)]}
+                    className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
+                  >
+                    {MODEL_TIER_LABEL[modelTierForDuration(videoDuration)]}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {VIDEO_DURATIONS.map((d) => {
+                    const allowed = isDurationAllowed(profile.plan, d, isAdmin);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={loading}
+                        title={allowed ? `${videoCreditCost(d)} credits` : `Upgrade to ${planRequiredForDuration(d)} to unlock ${d}s videos`}
+                        onClick={() => {
+                          if (!allowed) {
+                            toast.error(`Upgrade to ${planRequiredForDuration(d)} to unlock ${d}s videos`);
+                            return;
+                          }
+                          setVideoDuration(d);
+                        }}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                          videoDuration === d
+                            ? "bg-primary text-primary-foreground"
+                            : allowed
+                              ? "bg-secondary text-foreground hover:bg-secondary/70"
+                              : "bg-secondary/50 text-muted-foreground"
+                        }`}
+                      >
+                        {allowed ? "" : "🔒"}{d}s
+                      </button>
+                    );
+                  })}
+                </div>
+                {!isAdmin && !isDurationAllowed(profile.plan, 30) && (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Longer clips need a higher plan.{" "}
+                    <Link to="/pricing" className="font-medium text-primary hover:underline">View plans</Link>
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aspect ratio</span>
+                <div className="flex flex-wrap gap-2">
+                  {VIDEO_ASPECT_RATIOS.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setVideoAspect(r.id)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        videoAspect === r.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-foreground hover:bg-secondary/70"
+                      }`}
+                    >
+                      {r.icon} {r.id} {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-background/60 p-3 text-xs">
+                <div className="mb-1 flex items-center gap-1.5 font-semibold">
+                  <Coins className="h-3.5 w-3.5 text-primary" /> Estimated cost: {cost} credits
+                </div>
+                <div className="text-muted-foreground">
+                  Your balance: {isAdmin ? "∞" : profile.credits} credits
+                </div>
+                <div className="text-muted-foreground">
+                  After generation: {isAdmin ? "∞" : Math.max(0, profile.credits - cost)} credits remaining
+                </div>
+              </div>
             </div>
           )}
 
