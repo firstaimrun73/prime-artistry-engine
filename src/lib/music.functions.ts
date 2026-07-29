@@ -210,24 +210,44 @@ export const generateMusic = createServerFn({ method: "POST" })
 
     let outputUrl: string;
     try {
-      outputUrl = await runStableAudio(
-        {
-          prompt: composed,
-          duration: data.durationSeconds,
-          seconds_total: data.durationSeconds,
-        },
-        falKey,
-        model,
-      );
+      // Two automatic retries on transient failures (timeouts / 5xx), matching
+      // the image + video pipelines. Credits are only charged after success.
+      let lastErr: unknown;
+      let url = "";
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        try {
+          if (attempt > 0) console.log(`[music] retry attempt ${attempt}…`);
+          url = await runStableAudio(
+            {
+              prompt: composed,
+              duration: data.durationSeconds,
+              seconds_total: data.durationSeconds,
+            },
+            falKey,
+            model,
+          );
+          if (url) break;
+        } catch (e) {
+          lastErr = e;
+          const msg = e instanceof Error ? e.message : "";
+          if (/authentication|safety filter/i.test(msg)) throw e;
+          if (attempt === 2) throw e;
+          await sleep(2000 * (attempt + 1));
+        }
+      }
+      if (!url) throw lastErr ?? new Error("Music generation returned no audio.");
+      outputUrl = url;
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Generation failed.";
       console.error("[music] failed (no credits charged):", raw);
       throw new Error(`${raw} — Credits not charged.`);
     }
 
-    if (!outputUrl || outputUrl.trim().length === 0) {
-      throw new Error("Music generation returned no output. Credits not charged.");
+    // Only a real, fetchable audio URL counts as a success.
+    if (!outputUrl || !outputUrl.startsWith("http")) {
+      throw new Error("Music generation returned no playable audio. Credits not charged.");
     }
+
 
     // Charge credits only after a confirmed successful output. Admin bypass: no charge.
     let newCredits = profile.credits;
