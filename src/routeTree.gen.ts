@@ -42,6 +42,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
 import { Route as AuthenticatedProfileSubscriptionRouteImport } from './routes/_authenticated.profile.subscription'
+import { Route as AuthenticatedAdminRefundsRouteImport } from './routes/_authenticated.admin_.refunds'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
@@ -214,6 +215,12 @@ const AuthenticatedProfileSubscriptionRoute =
     path: '/profile/subscription',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminRefundsRoute =
+  AuthenticatedAdminRefundsRouteImport.update({
+    id: '/admin_/refunds',
+    path: '/admin/refunds',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const LovableEmailQueueProcessRoute =
   LovableEmailQueueProcessRouteImport.update({
     id: '/lovable/email/queue/process',
@@ -280,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
   '/studio/video': typeof StudioVideoRoute
+  '/admin/refunds': typeof AuthenticatedAdminRefundsRoute
   '/profile/subscription': typeof AuthenticatedProfileSubscriptionRoute
   '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/paypal': typeof ApiPublicWebhooksPaypalRoute
@@ -320,6 +328,7 @@ export interface FileRoutesByTo {
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
   '/studio/video': typeof StudioVideoRoute
+  '/admin/refunds': typeof AuthenticatedAdminRefundsRoute
   '/profile/subscription': typeof AuthenticatedProfileSubscriptionRoute
   '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/paypal': typeof ApiPublicWebhooksPaypalRoute
@@ -362,6 +371,7 @@ export interface FileRoutesById {
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
   '/studio/video': typeof StudioVideoRoute
+  '/_authenticated/admin_/refunds': typeof AuthenticatedAdminRefundsRoute
   '/_authenticated/profile/subscription': typeof AuthenticatedProfileSubscriptionRoute
   '/api/public/webhooks/nowpayments': typeof ApiPublicWebhooksNowpaymentsRoute
   '/api/public/webhooks/paypal': typeof ApiPublicWebhooksPaypalRoute
@@ -404,6 +414,7 @@ export interface FileRouteTypes {
     | '/studio/image'
     | '/studio/music'
     | '/studio/video'
+    | '/admin/refunds'
     | '/profile/subscription'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
@@ -444,6 +455,7 @@ export interface FileRouteTypes {
     | '/studio/image'
     | '/studio/music'
     | '/studio/video'
+    | '/admin/refunds'
     | '/profile/subscription'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
@@ -485,6 +497,7 @@ export interface FileRouteTypes {
     | '/studio/image'
     | '/studio/music'
     | '/studio/video'
+    | '/_authenticated/admin_/refunds'
     | '/_authenticated/profile/subscription'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
@@ -758,6 +771,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileSubscriptionRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin_/refunds': {
+      id: '/_authenticated/admin_/refunds'
+      path: '/admin/refunds'
+      fullPath: '/admin/refunds'
+      preLoaderRoute: typeof AuthenticatedAdminRefundsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/lovable/email/queue/process': {
       id: '/lovable/email/queue/process'
       path: '/lovable/email/queue/process'
@@ -811,6 +831,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedMusicRoute: typeof AuthenticatedMusicRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedAdminRefundsRoute: typeof AuthenticatedAdminRefundsRoute
   AuthenticatedProfileSubscriptionRoute: typeof AuthenticatedProfileSubscriptionRoute
 }
 
@@ -822,6 +843,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedMusicRoute: AuthenticatedMusicRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedAdminRefundsRoute: AuthenticatedAdminRefundsRoute,
   AuthenticatedProfileSubscriptionRoute: AuthenticatedProfileSubscriptionRoute,
 }
 
