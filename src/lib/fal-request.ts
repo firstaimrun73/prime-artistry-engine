@@ -57,6 +57,8 @@ export const TEXT_TO_IMAGE_MODEL = "fal-ai/flux-pro/v1.1";
 // for prompt-following edits on the SAME source image instead of regenerating a
 // loosely-related new scene.
 export const IMAGE_EDIT_MODEL = "fal-ai/flux-pro/kontext";
+// Multi-image edits (base photo + up to 9 reference images).
+export const IMAGE_EDIT_MULTI_MODEL = "fal-ai/flux-pro/kontext/max/multi";
 export const IMAGE_INPAINT_MODEL = "fal-ai/flux-general/inpainting";
 // Kept exported for back-compat with callers/tests that reference it.
 export const IMAGE_TO_IMAGE_MODEL = "fal-ai/post-processing";
@@ -211,34 +213,57 @@ export function buildImageEdit({
   // not send unsupported strength/steps params that can make FAL ignore the edit
   // contract or behave like text-to-image.
   void strength;
-  void referenceImageUrls;
+
+  // Multi-image: when the user supplies extra reference images we must switch
+  // to the Kontext MULTI endpoint, which accepts `image_urls`. The single-image
+  // endpoint silently ignores every image after the first — that was the cause
+  // of "I uploaded 5 images but only 1 reached the AI".
+  const refs = (referenceImageUrls ?? []).filter(
+    (u) => typeof u === "string" && u.startsWith("https://"),
+  );
+  const isMulti = refs.length > 0;
+  const model = isMulti ? IMAGE_EDIT_MULTI_MODEL : IMAGE_EDIT_MODEL;
 
   // For people-removal edits, avoid the normal identity lock and make the
   // removal target explicit so FAL doesn't interpret "person" as something to
   // preserve. For small additive edits, preserve the source photo tightly.
-  const finalPrompt =
+  const basePrompt =
     editSize === "remove_people"
       ? `${prompt}.${PEOPLE_REMOVAL_PROMPT_CLAUSE}`
       : editSize === "small_add"
         ? `${prompt}.${PRESERVATION_CLAUSE}`
         : prompt;
 
+  const finalPrompt = isMulti
+    ? `${basePrompt} Use image 1 as the base photo and images 2-${refs.length + 1} as additional references for the requested change.`
+    : basePrompt;
+
+  const body: Record<string, unknown> = {
+    prompt: finalPrompt,
+    guidance_scale: quality.guidance_scale,
+    num_images: 1,
+    output_format: "png",
+    safety_tolerance: "2",
+    enhance_prompt: false,
+  };
+  if (isMulti) {
+    // Kontext multi takes the whole set (primary first) in `image_urls`.
+    body.image_urls = [imageUrl, ...refs];
+    // Kept for models/back-compat that still read a single primary.
+    body.image_url = imageUrl;
+  } else {
+    body.image_url = imageUrl;
+  }
+
   return {
-    label: `edit (flux kontext, ${editSize})`,
-    model: IMAGE_EDIT_MODEL,
-    endpoint: ep(IMAGE_EDIT_MODEL),
+    label: `edit (flux kontext${isMulti ? ` multi ×${refs.length + 1}` : ""}, ${editSize})`,
+    model,
+    endpoint: ep(model),
     outputKind: "image",
-    body: {
-      prompt: finalPrompt,
-      image_url: imageUrl,
-      guidance_scale: quality.guidance_scale,
-      num_images: 1,
-      output_format: "png",
-      safety_tolerance: "2",
-      enhance_prompt: false,
-    },
+    body,
   };
 }
+
 
 // ── Masked inpainting (Circle to Remove) ──────────────────────────────────
 export function buildImageInpaint({

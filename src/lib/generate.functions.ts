@@ -140,6 +140,56 @@ async function runFalStep(step: FalStep, falKey: string): Promise<string> {
   return url;
 }
 
+// Errors that will never succeed on a retry (bad input, safety, auth, credits).
+function isPermanentError(msg: string): boolean {
+  return /authentication|out of credits|safety filter|unsupported format|invalid or in an unsupported|Not enough credits/i.test(
+    msg || "",
+  );
+}
+
+/**
+ * Run a fal step with automatic retries (2 retries → 3 attempts total) and a
+ * hard per-attempt timeout. Never charges credits — the caller only deducts
+ * after a confirmed output URL.
+ */
+async function runFalStepResilient(
+  step: FalStep,
+  falKey: string,
+  opts: { timeoutMs?: number; maxRetries?: number } = {},
+): Promise<string> {
+  const timeoutMs = opts.timeoutMs ?? (step.outputKind === "video" ? 300_000 : 120_000);
+  const maxRetries = opts.maxRetries ?? 2;
+  let attempt = 0;
+  let lastErr: unknown;
+
+  while (attempt <= maxRetries) {
+    try {
+      if (attempt > 0) console.log(`[fal] retry attempt ${attempt} for ${step.label}…`);
+      const url = await Promise.race([
+        runFalStep(step, falKey),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Generation timed out. Please retry.")),
+            timeoutMs,
+          ),
+        ),
+      ]);
+      if (url && url.trim().length > 0) return url;
+      throw new Error("No output received");
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isPermanentError(msg)) throw err;
+      attempt++;
+      if (attempt > maxRetries) break;
+      await sleep(2000 * attempt);
+    }
+  }
+  const finalMsg = lastErr instanceof Error ? lastErr.message : "Generation failed.";
+  throw new Error(`${finalMsg} (failed after ${maxRetries + 1} attempts)`);
+}
+
+
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
   type: z.enum(["image", "video"]),
@@ -234,7 +284,7 @@ export const generateMedia = createServerFn({ method: "POST" })
             imageUrl: data.imageUrl,
             maskUrl: data.maskImageUrl,
           });
-          outputUrl = await runFalStep(step, falKey);
+          outputUrl = await runFalStepResilient(step, falKey);
         } else if (isEnhancementOnly(data.prompt)) {
           // ── Pure enhancement path ───────────────────────────────────
           // Deterministic detail-preserving pipeline (deblur → smart
@@ -251,7 +301,7 @@ export const generateMedia = createServerFn({ method: "POST" })
             let current = data.imageUrl;
             for (const step of pipeline) {
               step.body.image_url = current;
-              current = await runFalStep(step, falKey);
+              current = await runFalStepResilient(step, falKey);
             }
             outputUrl = current;
           } catch (err) {
@@ -269,7 +319,7 @@ export const generateMedia = createServerFn({ method: "POST" })
                   "Enhance this exact photo: increase sharpness, clarity and fine detail, reduce noise and blur, improve overall quality. Keep the composition, subject, colors and framing identical — do not add, remove or change any content.",
                 imageUrl: data.imageUrl,
               });
-              outputUrl = await runFalStep(step, falKey);
+              outputUrl = await runFalStepResilient(step, falKey);
             } else {
               throw err;
             }
@@ -285,10 +335,23 @@ export const generateMedia = createServerFn({ method: "POST" })
           const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
           const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: true });
           console.log("[generate] mode: edit (flux kontext) | enhanced:", enhancedPrompt);
-          // Gate extra reference images by the user's plan limit.
+          // Gate extra reference images by the user's plan limit. Only real
+          // https URLs are usable by fal — anything else (data:/blob:) is
+          // dropped here and logged so the failure is visible.
           const { getPlanLimits } = await import("@/utils/planLimits");
           const maxImages = getPlanLimits(profile.plan).maxImages;
-          const refs = (data.referenceImageUrls ?? []).slice(0, Math.max(0, maxImages - 1));
+          const rawRefs = data.referenceImageUrls ?? [];
+          const validRefs = rawRefs.filter((u) => u.startsWith("https://"));
+          if (validRefs.length !== rawRefs.length) {
+            console.warn(
+              `[generate] dropped ${rawRefs.length - validRefs.length} reference image(s) that were not https URLs`,
+            );
+          }
+          const refs = validRefs.slice(0, Math.max(0, maxImages - 1));
+          console.log(
+            `[generate] images sent to FAL: 1 primary + ${refs.length} reference(s)`,
+          );
+
           // Quality presets (Fix 2) are classified from the ORIGINAL short
           // prompt. For generic ("default") edits the user's strength slider
           // still applies; small/large edits use their tuned presets.
@@ -300,7 +363,7 @@ export const generateMedia = createServerFn({ method: "POST" })
             strength: editSize === "default" ? data.strength : undefined,
             referenceImageUrls: refs.length > 0 ? refs : undefined,
           });
-          outputUrl = await runFalStep(step, falKey);
+          outputUrl = await runFalStepResilient(step, falKey);
         }
       } else {
         // ── Text → Image path ─────────────────────────────────────────
@@ -315,7 +378,7 @@ export const generateMedia = createServerFn({ method: "POST" })
           imageSize: aspectToImageSize(data.aspectRatio),
         });
 
-        outputUrl = await runFalStep(
+        outputUrl = await runFalStepResilient(
           { label: req.workflow, model: req.model, endpoint: req.endpoint, body: req.body, outputKind: "image" },
           falKey,
         );
@@ -353,7 +416,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       }
 
       console.log("[generate] video step:", step.label);
-      outputUrl = await runFalStep(step, falKey);
+      outputUrl = await runFalStepResilient(step, falKey);
       if (!outputUrl) throw new Error("Video generation returned no output.");
     }
     } catch (err) {
