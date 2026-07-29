@@ -284,7 +284,7 @@ export const generateMedia = createServerFn({ method: "POST" })
             imageUrl: data.imageUrl,
             maskUrl: data.maskImageUrl,
           });
-          outputUrl = await runFalStep(step, falKey);
+          outputUrl = await runFalStepResilient(step, falKey);
         } else if (isEnhancementOnly(data.prompt)) {
           // ── Pure enhancement path ───────────────────────────────────
           // Deterministic detail-preserving pipeline (deblur → smart
@@ -301,7 +301,7 @@ export const generateMedia = createServerFn({ method: "POST" })
             let current = data.imageUrl;
             for (const step of pipeline) {
               step.body.image_url = current;
-              current = await runFalStep(step, falKey);
+              current = await runFalStepResilient(step, falKey);
             }
             outputUrl = current;
           } catch (err) {
@@ -319,7 +319,7 @@ export const generateMedia = createServerFn({ method: "POST" })
                   "Enhance this exact photo: increase sharpness, clarity and fine detail, reduce noise and blur, improve overall quality. Keep the composition, subject, colors and framing identical — do not add, remove or change any content.",
                 imageUrl: data.imageUrl,
               });
-              outputUrl = await runFalStep(step, falKey);
+              outputUrl = await runFalStepResilient(step, falKey);
             } else {
               throw err;
             }
@@ -350,7 +350,7 @@ export const generateMedia = createServerFn({ method: "POST" })
             strength: editSize === "default" ? data.strength : undefined,
             referenceImageUrls: refs.length > 0 ? refs : undefined,
           });
-          outputUrl = await runFalStep(step, falKey);
+          outputUrl = await runFalStepResilient(step, falKey);
         }
       } else {
         // ── Text → Image path ─────────────────────────────────────────
@@ -365,7 +365,7 @@ export const generateMedia = createServerFn({ method: "POST" })
           imageSize: aspectToImageSize(data.aspectRatio),
         });
 
-        outputUrl = await runFalStep(
+        outputUrl = await runFalStepResilient(
           { label: req.workflow, model: req.model, endpoint: req.endpoint, body: req.body, outputKind: "image" },
           falKey,
         );
@@ -403,7 +403,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       }
 
       console.log("[generate] video step:", step.label);
-      outputUrl = await runFalStep(step, falKey);
+      outputUrl = await runFalStepResilient(step, falKey);
       if (!outputUrl) throw new Error("Video generation returned no output.");
     }
     } catch (err) {
