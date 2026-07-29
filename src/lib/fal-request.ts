@@ -11,6 +11,12 @@
 //    and only sharpen / deblur / recover detail.
 //  • Video:          Topaz video upscale for frame-consistent sharpen+denoise.
 
+import {
+  modelTierForDuration,
+  type VideoAspectRatio,
+  type VideoModelTier,
+} from "./video-options";
+
 export type ImageWorkflow = "text-to-image" | "image-to-image";
 
 export type BuildFalRequestInput = {
@@ -422,12 +428,6 @@ export function buildImageEnhancementPipeline({
 //   Pro (10s)       → Kling 1.6 pro
 //   Master (15s+)   → Kling 2.1 master
 // Video → Video (enhancement) uses Topaz upscale for frame-consistent detail.
-import {
-  modelTierForDuration,
-  type VideoAspectRatio,
-  type VideoModelTier,
-} from "./video-options";
-
 export const TEXT_TO_VIDEO_MODELS: Record<VideoModelTier, string> = {
   standard: "fal-ai/kling-video/v1.6/standard/text-to-video",
   pro: "fal-ai/kling-video/v1.6/pro/text-to-video",
