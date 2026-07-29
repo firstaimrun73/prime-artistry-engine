@@ -57,6 +57,8 @@ export const TEXT_TO_IMAGE_MODEL = "fal-ai/flux-pro/v1.1";
 // for prompt-following edits on the SAME source image instead of regenerating a
 // loosely-related new scene.
 export const IMAGE_EDIT_MODEL = "fal-ai/flux-pro/kontext";
+// Multi-image edits (base photo + up to 9 reference images).
+export const IMAGE_EDIT_MULTI_MODEL = "fal-ai/flux-pro/kontext/max/multi";
 export const IMAGE_INPAINT_MODEL = "fal-ai/flux-general/inpainting";
 // Kept exported for back-compat with callers/tests that reference it.
 export const IMAGE_TO_IMAGE_MODEL = "fal-ai/post-processing";
