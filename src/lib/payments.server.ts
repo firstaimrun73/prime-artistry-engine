@@ -279,3 +279,52 @@ export async function verifyPaypalWebhook(
   }
 }
 
+
+// ── PayPal: refunds & subscription cancellation (server-only) ──
+
+/** Extract the capture id from a PayPal capture/order response payload. */
+export function extractPaypalCaptureId(gatewayResponse: any): string | null {
+  try {
+    const pu = gatewayResponse?.purchase_units?.[0];
+    const cap = pu?.payments?.captures?.[0];
+    return cap?.id ?? gatewayResponse?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function refundPaypalCapture(args: {
+  captureId: string;
+  amount: number;
+  currency: string;
+  note?: string;
+}): Promise<{ id: string; status: string }> {
+  const token = await paypalAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v2/payments/captures/${args.captureId}/refund`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount: { value: args.amount.toFixed(2), currency_code: args.currency || "USD" },
+      note_to_payer: args.note || "MOTIO2EDIT Refund",
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`PayPal refund failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
+export async function cancelPaypalSubscription(subscriptionId: string, reason: string): Promise<void> {
+  const token = await paypalAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v1/billing/subscriptions/${subscriptionId}/cancel`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ reason: reason.slice(0, 120) }),
+  });
+  // 204 = cancelled. 422 usually means it is already cancelled — treat as success.
+  if (!res.ok && res.status !== 422) {
+    const text = await res.text();
+    throw new Error(`PayPal subscription cancel failed (${res.status}): ${text}`);
+  }
+}

@@ -360,11 +360,17 @@ function SettingsPage() {
             <span className="font-medium">{plan.video ? "Enabled" : "Disabled"}</span>
           </div>
         </div>
-        {profile.plan !== "business" && (
-          <Button asChild className="mt-4">
-            <Link to="/pricing">{profile.plan === "free" ? "Upgrade plan" : "Upgrade plan"}</Link>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {profile.plan !== "business" && (
+            <Button asChild>
+              <Link to="/pricing">Upgrade plan</Link>
+            </Button>
+          )}
+          <Button asChild variant="outline">
+            <Link to="/profile/subscription">Subscription & billing</Link>
           </Button>
-        )}
+        </div>
+
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
