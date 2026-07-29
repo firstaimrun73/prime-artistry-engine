@@ -54,8 +54,8 @@ export const listRefundRequests = createServerFn({ method: "GET" })
         : Promise.resolve({ data: [] }),
     ]);
 
-    const profileById = new Map((profiles ?? []).map((p: any) => [p.id, p]));
-    const txById = new Map((txs ?? []).map((t: any) => [t.id, t]));
+    const profileById = new Map<string, any>((profiles ?? []).map((p: any) => [p.id, p]));
+    const txById = new Map<string, any>((txs ?? []).map((t: any) => [t.id, t]));
 
     const rows: AdminRefundRow[] = [];
     for (const r of requests) {
