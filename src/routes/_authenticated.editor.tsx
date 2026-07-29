@@ -18,11 +18,25 @@ import { MultiImageInput } from "@/components/MultiImageInput";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { getPlanLimits } from "@/utils/planLimits";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
+import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
+import {
+  VIDEO_DURATIONS,
+  VIDEO_ASPECT_RATIOS,
+  videoCreditCost,
+  isDurationAllowed,
+  planRequiredForDuration,
+  modelTierForDuration,
+  MODEL_TIER_LABEL,
+  MODEL_TIER_DESCRIPTION,
+  type VideoDuration,
+  type VideoAspectRatio,
+} from "@/lib/video-options";
 
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
   Square, RotateCcw, Pencil, Recycle, Check, RefreshCw, Share2, Wand2, Eraser,
+  Plus, X, Coins,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/editor")({
@@ -30,6 +44,17 @@ export const Route = createFileRoute("/_authenticated/editor")({
 });
 
 type GenState = "idle" | "analyzing" | "loading" | "success" | "blocked";
+
+/** One uploaded image slot in the multi-image strip. */
+type GalleryItem = {
+  id: string;
+  preview: string;
+  dataUrl: string | null;
+  file: File | null;
+};
+
+const MAX_GALLERY_IMAGES = 10;
+const WATERMARK_PREF_KEY = "motio2edit-watermark-pref";
 
 const LOADING_MESSAGES = [
   "Creating your masterpiece…",
@@ -89,6 +114,10 @@ function Editor() {
   const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
   const [removeMaskDataUrl, setRemoveMaskDataUrl] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [activeImage, setActiveImage] = useState(0);
+  const [videoDuration, setVideoDuration] = useState<VideoDuration>(5);
+  const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>("16:9");
 
 
   const [msgIdx, setMsgIdx] = useState(0);
@@ -104,6 +133,17 @@ function Editor() {
   const stages = inputDataUrl
     ? ["Understanding your prompt", "Analyzing image details", "Planning AI edits", "Applying advanced enhancements", "Creating final masterpiece"]
     : ["Understanding your prompt", "Building enhanced prompt", "Composing the scene", "Applying advanced enhancements", "Creating final masterpiece"];
+
+  // Watermark preference (paid users only) — persisted across sessions.
+  useEffect(() => {
+    try {
+      const pref = localStorage.getItem(WATERMARK_PREF_KEY);
+      if (pref === "on") setKeepWatermark(true);
+      if (pref === "off") setKeepWatermark(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Preload media handed over from the History page ("Edit Again").
   useEffect(() => {
@@ -181,7 +221,7 @@ function Editor() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
-  const cost = CREDIT_COST[mediaType];
+  const cost = mediaType === "video" ? videoCreditCost(videoDuration) : CREDIT_COST.image;
   const noCredits = !isAdmin && profile.credits < cost;
   const videoLocked = !isAdmin && mediaType === "video" && !plan.video;
   const planLimits = getPlanLimits(profile.plan);
