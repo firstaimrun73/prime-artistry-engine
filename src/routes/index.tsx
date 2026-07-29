@@ -86,6 +86,8 @@ function SignedOutHome() {
       </section>
 
 
+      <MusicHomeSection />
+
       <section className="mx-auto max-w-6xl px-4 pb-24 text-center">
         <div className="rounded-2xl border border-border bg-card p-10">
           <h2 className="text-2xl font-bold sm:text-3xl">Ready to create?</h2>
@@ -120,6 +122,41 @@ function HomeTestimonials() {
       <div className="mt-8 text-center">
         <Button asChild variant="outline">
           <Link to="/feedback">See more feedback</Link>
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function MusicHomeSection() {
+  const items = [
+    { icon: Music, title: "AI Music Generation", desc: "Create original tracks from text prompts" },
+    { icon: Video, title: "Cinematic Soundtracks", desc: "Epic music for videos and presentations" },
+    { icon: Zap, title: "Background Music", desc: "Perfect ambient music for any project" },
+    { icon: Wand2, title: "Any Genre & Mood", desc: "Hip-hop, classical, lo-fi, electronic and more" },
+    { icon: Download, title: "Instant Generation", desc: "Your custom track ready in under a minute" },
+  ];
+  return (
+    <section className="mx-auto max-w-6xl px-4 pb-20">
+      <div className="mb-8 text-center">
+        <h2 className="text-2xl font-bold sm:text-3xl">AI Music Studio</h2>
+        <p className="mt-2 text-muted-foreground">Generate original music in seconds</p>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-3">
+        {items.map((f) => {
+          const Icon = f.icon;
+          return (
+            <div key={f.title} className="rounded-xl border border-border bg-card p-6">
+              <Icon className="h-6 w-6 text-primary" />
+              <h3 className="mt-4 font-semibold">{f.title}</h3>
+              <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-8 text-center">
+        <Button asChild size="lg">
+          <Link to="/studio/music">Open Music Studio</Link>
         </Button>
       </div>
     </section>
