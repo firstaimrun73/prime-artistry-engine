@@ -335,10 +335,23 @@ export const generateMedia = createServerFn({ method: "POST" })
           const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
           const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: true });
           console.log("[generate] mode: edit (flux kontext) | enhanced:", enhancedPrompt);
-          // Gate extra reference images by the user's plan limit.
+          // Gate extra reference images by the user's plan limit. Only real
+          // https URLs are usable by fal — anything else (data:/blob:) is
+          // dropped here and logged so the failure is visible.
           const { getPlanLimits } = await import("@/utils/planLimits");
           const maxImages = getPlanLimits(profile.plan).maxImages;
-          const refs = (data.referenceImageUrls ?? []).slice(0, Math.max(0, maxImages - 1));
+          const rawRefs = data.referenceImageUrls ?? [];
+          const validRefs = rawRefs.filter((u) => u.startsWith("https://"));
+          if (validRefs.length !== rawRefs.length) {
+            console.warn(
+              `[generate] dropped ${rawRefs.length - validRefs.length} reference image(s) that were not https URLs`,
+            );
+          }
+          const refs = validRefs.slice(0, Math.max(0, maxImages - 1));
+          console.log(
+            `[generate] images sent to FAL: 1 primary + ${refs.length} reference(s)`,
+          );
+
           // Quality presets (Fix 2) are classified from the ORIGINAL short
           // prompt. For generic ("default") edits the user's strength slider
           // still applies; small/large edits use their tuned presets.
