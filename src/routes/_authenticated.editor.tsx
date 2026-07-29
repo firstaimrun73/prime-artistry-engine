@@ -18,11 +18,25 @@ import { MultiImageInput } from "@/components/MultiImageInput";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { getPlanLimits } from "@/utils/planLimits";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
+import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
+import {
+  VIDEO_DURATIONS,
+  VIDEO_ASPECT_RATIOS,
+  videoCreditCost,
+  isDurationAllowed,
+  planRequiredForDuration,
+  modelTierForDuration,
+  MODEL_TIER_LABEL,
+  MODEL_TIER_DESCRIPTION,
+  type VideoDuration,
+  type VideoAspectRatio,
+} from "@/lib/video-options";
 
 import { toast } from "sonner";
 import {
   Upload, Sparkles, Download, Lock, Image as ImageIcon, Video,
   Square, RotateCcw, Pencil, Recycle, Check, RefreshCw, Share2, Wand2, Eraser,
+  Plus, X, Coins,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/editor")({
@@ -30,6 +44,17 @@ export const Route = createFileRoute("/_authenticated/editor")({
 });
 
 type GenState = "idle" | "analyzing" | "loading" | "success" | "blocked";
+
+/** One uploaded image slot in the multi-image strip. */
+type GalleryItem = {
+  id: string;
+  preview: string;
+  dataUrl: string | null;
+  file: File | null;
+};
+
+const MAX_GALLERY_IMAGES = 10;
+const WATERMARK_PREF_KEY = "motio2edit-watermark-pref";
 
 const LOADING_MESSAGES = [
   "Creating your masterpiece…",
@@ -89,6 +114,10 @@ function Editor() {
   const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
   const [removeMaskDataUrl, setRemoveMaskDataUrl] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [activeImage, setActiveImage] = useState(0);
+  const [videoDuration, setVideoDuration] = useState<VideoDuration>(5);
+  const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>("16:9");
 
 
   const [msgIdx, setMsgIdx] = useState(0);
@@ -104,6 +133,33 @@ function Editor() {
   const stages = inputDataUrl
     ? ["Understanding your prompt", "Analyzing image details", "Planning AI edits", "Applying advanced enhancements", "Creating final masterpiece"]
     : ["Understanding your prompt", "Building enhanced prompt", "Composing the scene", "Applying advanced enhancements", "Creating final masterpiece"];
+
+  // Watermark preference (paid users only) — persisted across sessions.
+  useEffect(() => {
+    try {
+      const pref = localStorage.getItem(WATERMARK_PREF_KEY);
+      if (pref === "on") setKeepWatermark(true);
+      if (pref === "off") setKeepWatermark(false);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // One-time low-credit warning toast per session.
+  const creditsNow = profile?.credits ?? 0;
+  const adminNow = isAdminEmail(profile?.email);
+  useEffect(() => {
+    if (adminNow || !profile) return;
+    try {
+      if (sessionStorage.getItem(LOW_CREDIT_TOAST_KEY) === "1") return;
+      if (creditsNow <= 0) toast.error("🚨 No credits left. Upgrade now.");
+      else if (creditsNow < 30) toast.warning(`⚠️ Low credits: ${creditsNow} remaining`);
+      else return;
+      sessionStorage.setItem(LOW_CREDIT_TOAST_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  }, [creditsNow, adminNow, profile]);
 
   // Preload media handed over from the History page ("Edit Again").
   useEffect(() => {
@@ -181,7 +237,7 @@ function Editor() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
-  const cost = CREDIT_COST[mediaType];
+  const cost = mediaType === "video" ? videoCreditCost(videoDuration) : CREDIT_COST.image;
   const noCredits = !isAdmin && profile.credits < cost;
   const videoLocked = !isAdmin && mediaType === "video" && !plan.video;
   const planLimits = getPlanLimits(profile.plan);
@@ -192,32 +248,110 @@ function Editor() {
   const MAX_IMAGE_MB = 25;
   const MAX_VIDEO_MB = 200;
 
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const isVideo = file.type.startsWith("video");
-    const limitMb = isVideo ? MAX_VIDEO_MB : MAX_IMAGE_MB;
-    if (file.size > limitMb * 1024 * 1024) {
-      e.target.value = "";
-      return toast.error(
-        `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${limitMb} MB for ${isVideo ? "videos" : "images"}.`,
-      );
-    }
+  const readAsDataUrl = (file: File) =>
+    new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+
+  /** Load a gallery slot into the active editing state. */
+  const activateSlot = (items: GalleryItem[], idx: number) => {
+    const item = items[idx];
+    if (!item) return;
+    setActiveImage(idx);
+    setInputPreview(item.preview);
+    setInputDataUrl(item.dataUrl);
+    setInputFile(item.file);
+    setInputKind("image");
     setOutput(null);
     setDownloaded(false);
+    setRemoveMaskDataUrl(null);
     setState("idle");
-    setInputPreview(URL.createObjectURL(file));
-    setInputFile(file);
-    const kind: "image" | "video" = isVideo ? "video" : "image";
-    setInputKind(kind);
-    // Read images as a data URI (sent inline). Videos upload at generate time.
-    if (kind === "image") {
-      const reader = new FileReader();
-      reader.onload = () => setInputDataUrl(typeof reader.result === "string" ? reader.result : null);
-      reader.readAsDataURL(file);
-    } else {
+  };
+
+  const switchImage = (idx: number) => {
+    if (loading) return;
+    activateSlot(gallery, idx);
+  };
+
+  const removeImage = (idx: number) => {
+    if (loading) return;
+    const next = gallery.filter((_, i) => i !== idx);
+    setGallery(next);
+    if (next.length === 0) {
+      setActiveImage(0);
+      setInputPreview(null);
       setInputDataUrl(null);
+      setInputFile(null);
+      setInputKind(null);
+      setOutput(null);
+      return;
     }
+    activateSlot(next, Math.min(idx, next.length - 1));
+  };
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    e.target.value = "";
+
+    const first = files[0];
+    const isVideo = first.type.startsWith("video");
+
+    // Video keeps the existing single-file flow untouched.
+    if (isVideo) {
+      if (first.size > MAX_VIDEO_MB * 1024 * 1024) {
+        return toast.error(
+          `File is too large (${(first.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_VIDEO_MB} MB for videos.`,
+        );
+      }
+      setGallery([]);
+      setActiveImage(0);
+      setOutput(null);
+      setDownloaded(false);
+      setState("idle");
+      setInputPreview(URL.createObjectURL(first));
+      setInputFile(first);
+      setInputKind("video");
+      setInputDataUrl(null);
+      toast.success("📁 Upload complete!");
+      return;
+    }
+
+    // Images: append to the multi-image strip (max 10 per session).
+    const room = MAX_GALLERY_IMAGES - gallery.length;
+    if (room <= 0) return toast.error(`You can work with up to ${MAX_GALLERY_IMAGES} images at a time.`);
+
+    const accepted: File[] = [];
+    for (const f of files.slice(0, room)) {
+      if (!f.type.startsWith("image")) continue;
+      if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+        toast.error(
+          `${f.name} is too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_IMAGE_MB} MB.`,
+        );
+        continue;
+      }
+      accepted.push(f);
+    }
+    if (accepted.length === 0) return;
+
+    const items: GalleryItem[] = await Promise.all(
+      accepted.map(async (f) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        preview: URL.createObjectURL(f),
+        dataUrl: await readAsDataUrl(f),
+        file: f,
+      })),
+    );
+
+    const next = [...gallery, ...items];
+    setGallery(next);
+    activateSlot(next, gallery.length);
+    toast.success(
+      items.length > 1 ? `📁 ${items.length} images uploaded!` : "📁 Upload complete!",
+    );
   };
 
   // Upload a (video) file to private storage and return a signed URL fal can fetch.
@@ -250,6 +384,7 @@ function Editor() {
     if (runId !== runIdRef.current) return;
 
     setState("loading");
+    toast(mediaType === "video" ? "🎬 Generating your video..." : "🎨 Generating your image...");
     startGeneration(mediaType === "video" ? "video" : "image", "/editor");
     try {
       // Resolve the source media URL to send to the AI.
@@ -317,6 +452,8 @@ function Editor() {
               : undefined,
           aspectRatio:
             mediaType === "image" && !mediaUrl ? aspectRatio : undefined,
+          videoDurationSeconds: mediaType === "video" ? videoDuration : undefined,
+          videoAspectRatio: mediaType === "video" ? videoAspect : undefined,
         },
       });
 
@@ -343,13 +480,17 @@ function Editor() {
       setOutput(url);
       setState("success");
       await refreshProfile();
-      toast.success("Done!");
+      toast.success(isVideoOut ? "✅ Video ready!" : "✅ Image ready!");
       endGeneration();
     } catch (err) {
       if (runId !== runIdRef.current) return;
       setState("idle");
       endGeneration();
-      toast.error(err instanceof Error ? err.message : "Generation failed.");
+      toast.error(
+        err instanceof Error
+          ? `❌ ${err.message}`
+          : "❌ Failed. Credits not charged.",
+      );
     }
   };
 
@@ -399,9 +540,15 @@ function Editor() {
   const handleDownload = async () => {
     if (!output) return;
     let downloadUrl = output;
-    // FREE users get an extra full-image protective watermark grid on download.
-    if (isFree && !outputIsVideo) {
-      try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* keep original */ }
+    // FREE users always get the full-image protective watermark grid on
+    // download. Paid users only get a watermark when they opted in. Admin
+    // downloads are always clean.
+    if (!outputIsVideo && !isAdmin) {
+      if (isFree) {
+        try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* keep original */ }
+      } else if (keepWatermark) {
+        try { downloadUrl = await watermarkImage(output); } catch { /* keep original */ }
+      }
     }
     const a = document.createElement("a");
     a.href = downloadUrl;
@@ -410,6 +557,7 @@ function Editor() {
     a.click();
     a.remove();
     setDownloaded(true);
+    toast.success("⬇️ Download started!");
   };
 
   const handleShare = async () => {
@@ -433,12 +581,18 @@ function Editor() {
             {isAdmin ? "∞ credits" : `${profile.credits} credits`}
           </span>
           <span className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits
+            {mediaType === "video"
+              ? `Video ${cost} credits (${videoDuration}s)`
+              : `Image ${CREDIT_COST.image} credits`}
           </span>
           <Button size="sm" variant="ghost" onClick={handleClear}>
             <RotateCcw className="mr-1.5 h-4 w-4" /> New Project
           </Button>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
       </div>
 
       {/* FIX 2: Image/Video toggle removed. Mode is fixed by the studio entry point. */}
@@ -457,6 +611,7 @@ function Editor() {
             ref={fileRef}
             type="file"
             accept={mediaType === "image" ? "image/*" : "image/*,video/*"}
+            multiple={mediaType === "image"}
             onChange={onFile}
             className="hidden"
           />
@@ -483,6 +638,50 @@ function Editor() {
                   ? "Image → Video: motion will be generated from your image."
                   : "No upload = Text → Video. Upload an image for Image → Video, or a video for Video → Video."}
             </p>
+          )}
+
+          {/* Multi-image strip — switch between uploads, each edits separately. */}
+          {gallery.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Image {activeImage + 1} of {gallery.length}</span>
+                <span>{gallery.length}/{MAX_GALLERY_IMAGES}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {gallery.map((item, i) => (
+                  <div key={item.id} className="relative h-16 w-16">
+                    <button
+                      type="button"
+                      onClick={() => switchImage(i)}
+                      className={`h-full w-full overflow-hidden rounded-lg border-2 transition-colors ${
+                        i === activeImage ? "border-primary" : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <img src={item.preview} alt={`Upload ${i + 1}`} className="h-full w-full object-cover protected-image" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Remove image ${i + 1}`}
+                      onClick={() => removeImage(i)}
+                      className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-destructive text-destructive-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                {gallery.length < MAX_GALLERY_IMAGES && (
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={loading}
+                    className="grid h-16 w-16 place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+                    aria-label="Add more images"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
           )}
 
           <div className="relative">
@@ -652,6 +851,90 @@ function Editor() {
             </div>
           )}
 
+          {mediaType === "video" && (
+            <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration</span>
+                  <span
+                    title={MODEL_TIER_DESCRIPTION[modelTierForDuration(videoDuration)]}
+                    className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
+                  >
+                    {MODEL_TIER_LABEL[modelTierForDuration(videoDuration)]}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {VIDEO_DURATIONS.map((d) => {
+                    const allowed = isDurationAllowed(profile.plan, d, isAdmin);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={loading}
+                        title={allowed ? `${videoCreditCost(d)} credits` : `Upgrade to ${planRequiredForDuration(d)} to unlock ${d}s videos`}
+                        onClick={() => {
+                          if (!allowed) {
+                            toast.error(`Upgrade to ${planRequiredForDuration(d)} to unlock ${d}s videos`);
+                            return;
+                          }
+                          setVideoDuration(d);
+                        }}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                          videoDuration === d
+                            ? "bg-primary text-primary-foreground"
+                            : allowed
+                              ? "bg-secondary text-foreground hover:bg-secondary/70"
+                              : "bg-secondary/50 text-muted-foreground"
+                        }`}
+                      >
+                        {allowed ? "" : "🔒"}{d}s
+                      </button>
+                    );
+                  })}
+                </div>
+                {!isAdmin && !isDurationAllowed(profile.plan, 30) && (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Longer clips need a higher plan.{" "}
+                    <Link to="/pricing" className="font-medium text-primary hover:underline">View plans</Link>
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aspect ratio</span>
+                <div className="flex flex-wrap gap-2">
+                  {VIDEO_ASPECT_RATIOS.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setVideoAspect(r.id)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        videoAspect === r.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-foreground hover:bg-secondary/70"
+                      }`}
+                    >
+                      {r.icon} {r.id} {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-background/60 p-3 text-xs">
+                <div className="mb-1 flex items-center gap-1.5 font-semibold">
+                  <Coins className="h-3.5 w-3.5 text-primary" /> Estimated cost: {cost} credits
+                </div>
+                <div className="text-muted-foreground">
+                  Your balance: {isAdmin ? "∞" : profile.credits} credits
+                </div>
+                <div className="text-muted-foreground">
+                  After generation: {isAdmin ? "∞" : Math.max(0, profile.credits - cost)} credits remaining
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Watermark control — free users are locked on; paid users choose. */}
           <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
             <span className="text-muted-foreground">MOTIO2EDIT watermark</span>
@@ -662,13 +945,19 @@ function Editor() {
             ) : (
               <button
                 type="button"
-                onClick={() => setKeepWatermark((v) => !v)}
+                onClick={() =>
+                  setKeepWatermark((v) => {
+                    const next = !v;
+                    try { localStorage.setItem(WATERMARK_PREF_KEY, next ? "on" : "off"); } catch { /* ignore */ }
+                    return next;
+                  })
+                }
                 disabled={loading}
                 className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                   keepWatermark ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
                 }`}
               >
-                {keepWatermark ? "Keep watermark" : "Remove watermark"}
+                {keepWatermark ? "Watermark ON" : "No Watermark"}
               </button>
             )}
           </div>

@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
 import { isAdminEmail } from "@/lib/admin-config";
 
-import { Sparkles, Coins, ShieldCheck } from "lucide-react";
+import { Sparkles, Coins, ShieldCheck, AlertTriangle } from "lucide-react";
 
 export function Header() {
   const { user, profile } = useAuth();
@@ -76,15 +76,33 @@ export function Header() {
 
           {user ? (
             <>
-              {profile && (
-                <Link
-                  to="/dashboard"
-                  className="hidden items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold sm:flex"
-                >
-                  <Coins className="h-3.5 w-3.5 text-primary" />
-                  {isAdminEmail(profile.email) ? "∞ credits" : `${profile.credits} credits`}
-                </Link>
-              )}
+              {profile && (() => {
+                const admin = isAdminEmail(profile.email);
+                const c = profile.credits;
+                const tone = admin
+                  ? ""
+                  : c <= 0
+                    ? "text-destructive font-bold animate-pulse"
+                    : c < 10
+                      ? "text-destructive animate-pulse"
+                      : c <= 30
+                        ? "text-amber-500"
+                        : "";
+                return (
+                  <Link
+                    to="/dashboard"
+                    className={`hidden items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold sm:flex ${tone}`}
+                  >
+                    {!admin && c <= 0 ? (
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                    ) : (
+                      <Coins className={`h-3.5 w-3.5 ${tone ? "" : "text-primary"}`} />
+                    )}
+                    {admin ? "∞ credits" : `${c} credits`}
+                  </Link>
+                );
+              })()}
+
               {profile && <CrownBadge plan={profile.plan} className="hidden sm:inline-flex" />}
               <Link to="/dashboard" aria-label="Account" className="transition-opacity hover:opacity-80">
                 <Avatar className="h-8 w-8">

@@ -259,6 +259,7 @@ function MusicPage() {
     setNow(Date.now());
     setAudioUrl(null);
     setPlaying(false);
+    toast("🎵 Composing your music...");
     startGeneration("music", "/music");
     try {
       const enhanced = `${enhancePrompt({ prompt, instrument, mood, duration })} Tempo around ${bpm} BPM.`;
@@ -274,9 +275,9 @@ function MusicPage() {
         },
       });
       setAudioUrl(res.outputUrl);
-      toast.success("Track ready — press play to preview.");
+      toast.success("✅ Music ready!");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Music generation failed. Please try again.";
+      const msg = err instanceof Error ? `❌ ${err.message}` : "❌ Failed. Credits not charged.";
       toast.error(msg);
     } finally {
       setLoading(false);

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST, type PlanId } from "@/lib/plans";
+import { maxVideoDurationForPlan, videoCreditCost } from "@/lib/video-options";
 import {
   buildFalRequest,
   buildImageEdit,
@@ -155,6 +156,12 @@ const inputSchema = z.object({
   maskImageUrl: z.string().min(1).max(15_000_000).optional(),
   // Text-to-image only. Aspect ratio chip selection.
   aspectRatio: z.enum(["1:1", "4:3", "16:9", "9:16", "3:4"]).optional(),
+  // Video only. Requested clip length in seconds (plan-gated) + frame ratio.
+  videoDurationSeconds: z.union([
+    z.literal(5), z.literal(10), z.literal(15),
+    z.literal(20), z.literal(25), z.literal(30),
+  ]).optional(),
+  videoAspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3"]).optional(),
 });
 
 
@@ -187,7 +194,14 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Video generation requires a paid plan.");
     }
 
-    const cost = CREDIT_COST[data.type];
+    // Video cost scales with the requested duration; image cost is flat.
+    const requestedDuration = data.videoDurationSeconds ?? 5;
+    const maxDuration = maxVideoDurationForPlan(profile.plan);
+    const videoDuration = isAdmin
+      ? requestedDuration
+      : (Math.min(requestedDuration, maxDuration) as typeof requestedDuration);
+    const cost =
+      data.type === "video" ? videoCreditCost(videoDuration) : CREDIT_COST[data.type];
     if (!isAdmin && profile.credits < cost) {
       throw new Error(
         `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
@@ -317,7 +331,11 @@ export const generateMedia = createServerFn({ method: "POST" })
         // A. Text → Video
         const enhanced = await enhancePrompt({ prompt: data.prompt, isEdit: false });
         console.log("[generate] mode: text-to-video | enhanced:", enhanced);
-        step = buildTextToVideo({ prompt: enhanced });
+        step = buildTextToVideo({
+          prompt: enhanced,
+          durationSeconds: videoDuration,
+          aspectRatio: data.videoAspectRatio ?? "16:9",
+        });
       } else if (data.sourceKind === "video") {
         // C. Video → Video (enhancement / transformation)
         console.log("[generate] mode: video-to-video (enhance)");
@@ -326,7 +344,12 @@ export const generateMedia = createServerFn({ method: "POST" })
         // B. Image → Video (motion from a still)
         const enhanced = await enhancePrompt({ prompt: data.prompt, isEdit: false });
         console.log("[generate] mode: image-to-video | enhanced:", enhanced);
-        step = buildImageToVideo({ prompt: enhanced, imageUrl: data.imageUrl });
+        step = buildImageToVideo({
+          prompt: enhanced,
+          imageUrl: data.imageUrl,
+          durationSeconds: videoDuration,
+          aspectRatio: data.videoAspectRatio ?? "16:9",
+        });
       }
 
       console.log("[generate] video step:", step.label);

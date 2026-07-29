@@ -11,6 +11,12 @@
 //    and only sharpen / deblur / recover detail.
 //  • Video:          Topaz video upscale for frame-consistent sharpen+denoise.
 
+import {
+  modelTierForDuration,
+  type VideoAspectRatio,
+  type VideoModelTier,
+} from "./video-options";
+
 export type ImageWorkflow = "text-to-image" | "image-to-image";
 
 export type BuildFalRequestInput = {
@@ -416,27 +422,54 @@ export function buildImageEnhancementPipeline({
 }
 
 // ── Video models ────────────────────────────────────────────────────────
-// Text → Video and Image → Video use Kling (strong motion + prompt following).
+// Text → Video and Image → Video use Kling (strong motion + prompt following),
+// routed by duration/plan tier:
+//   Standard (5s)   → Kling 1.6 standard
+//   Pro (10s)       → Kling 1.6 pro
+//   Master (15s+)   → Kling 2.1 master
 // Video → Video (enhancement) uses Topaz upscale for frame-consistent detail.
-export const TEXT_TO_VIDEO_MODEL = "fal-ai/kling-video/v1.6/standard/text-to-video";
-export const IMAGE_TO_VIDEO_MODEL = "fal-ai/kling-video/v1.6/standard/image-to-video";
+export const TEXT_TO_VIDEO_MODELS: Record<VideoModelTier, string> = {
+  standard: "fal-ai/kling-video/v1.6/standard/text-to-video",
+  pro: "fal-ai/kling-video/v1.6/pro/text-to-video",
+  master: "fal-ai/kling-video/v2.1/master/text-to-video",
+};
+
+export const IMAGE_TO_VIDEO_MODELS: Record<VideoModelTier, string> = {
+  standard: "fal-ai/kling-video/v1.6/standard/image-to-video",
+  pro: "fal-ai/kling-video/v1.6/pro/image-to-video",
+  master: "fal-ai/kling-video/v2.1/master/image-to-video",
+};
+
+// Back-compat default exports (5s standard tier).
+export const TEXT_TO_VIDEO_MODEL = TEXT_TO_VIDEO_MODELS.standard;
+export const IMAGE_TO_VIDEO_MODEL = IMAGE_TO_VIDEO_MODELS.standard;
 
 // Shared negative prompt for cleaner, artifact-free motion.
 export const VIDEO_NEGATIVE_PROMPT =
   "blur, distort, low quality, watermark, ugly, deformed, flickering";
 
 // ── Text → Video ─────────────────────────────────────────────────────────
-export function buildTextToVideo({ prompt }: { prompt: string }): FalStep {
+export function buildTextToVideo({
+  prompt,
+  durationSeconds = 5,
+  aspectRatio = "16:9",
+}: {
+  prompt: string;
+  durationSeconds?: number;
+  aspectRatio?: VideoAspectRatio;
+}): FalStep {
+  const tier = modelTierForDuration(durationSeconds);
+  const model = TEXT_TO_VIDEO_MODELS[tier];
   return {
-    label: "text-to-video (kling)",
-    model: TEXT_TO_VIDEO_MODEL,
-    endpoint: ep(TEXT_TO_VIDEO_MODEL),
+    label: `text-to-video (kling ${tier})`,
+    model,
+    endpoint: ep(model),
     outputKind: "video",
     body: {
       prompt,
       negative_prompt: VIDEO_NEGATIVE_PROMPT,
-      duration: "5",
-      aspect_ratio: "16:9",
+      duration: String(durationSeconds),
+      aspect_ratio: aspectRatio,
     },
   };
 }
@@ -445,21 +478,27 @@ export function buildTextToVideo({ prompt }: { prompt: string }): FalStep {
 export function buildImageToVideo({
   prompt,
   imageUrl,
+  durationSeconds = 5,
+  aspectRatio = "16:9",
 }: {
   prompt: string;
   imageUrl: string;
+  durationSeconds?: number;
+  aspectRatio?: VideoAspectRatio;
 }): FalStep {
+  const tier = modelTierForDuration(durationSeconds);
+  const model = IMAGE_TO_VIDEO_MODELS[tier];
   return {
-    label: "image-to-video (kling)",
-    model: IMAGE_TO_VIDEO_MODEL,
-    endpoint: ep(IMAGE_TO_VIDEO_MODEL),
+    label: `image-to-video (kling ${tier})`,
+    model,
+    endpoint: ep(model),
     outputKind: "video",
     body: {
       prompt,
       image_url: imageUrl,
       negative_prompt: VIDEO_NEGATIVE_PROMPT,
-      duration: "5",
-      aspect_ratio: "16:9",
+      duration: String(durationSeconds),
+      aspect_ratio: aspectRatio,
     },
   };
 }
