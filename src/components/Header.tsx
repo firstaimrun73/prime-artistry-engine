@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
 import { isAdminEmail } from "@/lib/admin-config";
 
-import { Sparkles, Coins, ShieldCheck } from "lucide-react";
+import { Sparkles, Coins, ShieldCheck, AlertTriangle } from "lucide-react";
 
 export function Header() {
   const { user, profile } = useAuth();
