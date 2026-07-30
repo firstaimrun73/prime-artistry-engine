@@ -76,21 +76,21 @@ const VIDEO_SAMPLES = [
   {
     title: "Cinematic Landscape",
     badge: "Text to Video",
-    thumb: "https://images.unsplash.com/photo-1536240478700-b869ad10e2ab?w=500&h=500&fit=crop&q=90",
+    thumb: "/demo/video/poster-landscape.jpg",
     prompt:
       "A cinematic drone shot flying over misty mountains at golden hour with dramatic lighting",
   },
   {
     title: "Tech Visualization",
     badge: "Text to Video",
-    thumb: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&h=500&fit=crop&q=90",
+    thumb: "/demo/video/poster-tech.jpg",
     prompt:
       "Futuristic AI robot assembling itself from particles of light in a dark laboratory with blue glow",
   },
   {
     title: "Fitness Motivation",
     badge: "Image to Video",
-    thumb: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=500&h=500&fit=crop&q=90",
+    thumb: "/demo/video/poster-portrait.jpg",
     prompt:
       "Athletic person running through city streets at sunset with motion blur and cinematic color grading",
   },
@@ -220,12 +220,12 @@ export function SampleShowcase() {
   const active = IMAGE_SAMPLES[index];
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16">
+    <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
       <div className="text-center">
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5 text-primary" /> Real results
         </span>
-        <h2 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">
+        <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">
           See what MOTIO2EDIT can do
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
@@ -234,7 +234,7 @@ export function SampleShowcase() {
       </div>
 
       <div
-        className="mt-8 overflow-hidden rounded-3xl border border-border bg-card p-4 sm:p-6"
+        className="mt-6 overflow-hidden rounded-3xl border border-border bg-card p-3 sm:mt-8 sm:p-6"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         onTouchStart={(e) => {
@@ -259,7 +259,7 @@ export function SampleShowcase() {
               }`}
               aria-hidden={i !== index}
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4">
                 {[
                   { src: s.before, tag: "Before" },
                   { src: s.after, tag: "After" },
@@ -271,7 +271,7 @@ export function SampleShowcase() {
                       loading="lazy"
                       width={500}
                       height={500}
-                      className="protected-image aspect-square w-full object-cover"
+                      className="protected-image aspect-square w-full bg-secondary object-cover"
                       draggable={false}
                     />
                     <figcaption
@@ -290,12 +290,12 @@ export function SampleShowcase() {
           ))}
         </div>
 
-        <div className="mt-5 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+        <div className="mt-5 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">{active.label}</p>
-            <h3 className="mt-1 font-bold">{active.title}</h3>
+            <h3 className="mt-1 break-words font-bold">{active.title}</h3>
           </div>
-          <Button onClick={() => tryEdit(active)} className="btn-animate">
+          <Button onClick={() => tryEdit(active)} className="btn-animate w-full shrink-0 sm:w-auto">
             {active.smartRemove ? (
               <>
                 <Eraser className="mr-1.5 h-4 w-4" /> Try Circle Remove
@@ -307,7 +307,7 @@ export function SampleShowcase() {
           </Button>
         </div>
 
-        <div className="mt-5 flex justify-center gap-2">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {IMAGE_SAMPLES.map((s, i) => (
             <button
               key={s.label}
@@ -324,16 +324,16 @@ export function SampleShowcase() {
       </div>
 
       {/* Video examples */}
-      <div className="mt-12">
+      <div className="mt-10 sm:mt-12">
         <div className="flex items-center gap-2">
           <Film className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-bold">Video ideas to start with</h3>
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {VIDEO_SAMPLES.map((v) => (
             <div
               key={v.title}
-              className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-primary"
+              className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-primary"
             >
               <button
                 type="button"
@@ -347,7 +347,9 @@ export function SampleShowcase() {
                   loading="lazy"
                   width={500}
                   height={500}
-                  className="protected-image aspect-video w-full object-cover"
+                  width={1024}
+                  height={576}
+                  className="protected-image aspect-video w-full bg-secondary object-cover"
                   draggable={false}
                 />
                 <span className="absolute inset-0 flex items-center justify-center bg-background/20 transition-colors group-hover:bg-background/40">
@@ -363,8 +365,8 @@ export function SampleShowcase() {
                   <span className="rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">1080p</span>
                 </span>
               </button>
-              <div className="flex flex-1 flex-col p-5">
-                <p className="font-bold">{v.title}</p>
+              <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+                <p className="truncate font-bold">{v.title}</p>
                 <p className="mt-2 line-clamp-3 flex-1 text-sm text-muted-foreground">{v.prompt}</p>
                 <Button variant="outline" size="sm" className="btn-animate mt-4" onClick={() => tryVideo(v.prompt)}>
                   Generate similar
@@ -376,18 +378,18 @@ export function SampleShowcase() {
       </div>
 
       {/* Music examples */}
-      <div className="mt-12">
+      <div className="mt-10 sm:mt-12">
         <div className="flex items-center gap-2">
           <Music className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-bold">Music prompts to start with</h3>
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {MUSIC_SAMPLES.map((m) => {
             const isPlaying = playing === m.audio;
             return (
               <div
                 key={m.title}
-                className="flex flex-col rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary"
+                className="flex h-full min-w-0 flex-col rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary sm:p-5"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-2xl" aria-hidden>
@@ -397,7 +399,7 @@ export function SampleShowcase() {
                     {m.duration}
                   </span>
                 </div>
-                <p className="mt-3 font-bold">{m.title}</p>
+                <p className="mt-3 break-words font-bold">{m.title}</p>
                 <p className="mt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {m.genre} · {m.mood}
                 </p>
