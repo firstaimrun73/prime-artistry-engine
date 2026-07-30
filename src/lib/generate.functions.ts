@@ -4,6 +4,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST, type PlanId } from "@/lib/plans";
 import { maxVideoDurationForPlan, videoCreditCost } from "@/lib/video-options";
 import {
+  imageQualityCost,
+  imageUpscaleFactor,
+  videoResolutionMultiplier,
+  videoResolutionUpscales,
+} from "@/lib/quality-options";
+import {
   buildFalRequest,
   buildImageEdit,
   buildImageEnhancementPipeline,
