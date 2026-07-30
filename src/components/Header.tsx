@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -9,7 +9,8 @@ import { isAdminEmail } from "@/lib/admin-config";
 
 import { Sparkles, Coins, ShieldCheck, AlertTriangle, Menu } from "lucide-react";
 
-type NavItem = { to: string; label: string };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type NavItem = { to: any; label: string };
 
 const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
@@ -31,7 +32,6 @@ const AUTH_LINKS: NavItem[] = [
 export function Header() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [menuOpen, setMenuOpen] = useState(false);
   const admin = isAdminEmail(profile?.email);
 
@@ -192,7 +192,6 @@ export function Header() {
           </Sheet>
         </div>
       </div>
-      {pathname === "" && null}
     </header>
   );
 }
