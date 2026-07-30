@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Wand2, Sparkles, ArrowUpRightSquare, Replace, Smile, Eraser,
   Type, Image as ImageIcon, Film, Clapperboard, Wind, GitBranch,
+  Music, Headphones, Radio, SlidersHorizontal, Zap, Gauge,
 } from "lucide-react";
 
 export const Route = createFileRoute("/features")({
@@ -37,6 +38,16 @@ const VIDEO_FEATURES = [
   { icon: Wind, title: "Motion Effects", desc: "Add dynamic motion and camera movement for a premium feel." },
   { icon: GitBranch, title: "Scene Continuation", desc: "Generate connected follow-up scenes that flow from your existing footage." },
 ];
+
+const MUSIC_FEATURES = [
+  { icon: Music, title: "AI Music Generation", desc: "Create original, royalty-free tracks from a single text prompt in seconds." },
+  { icon: Film, title: "Cinematic Soundtracks", desc: "Epic, trailer-grade scores built for videos, reels and presentations." },
+  { icon: Headphones, title: "Background Music", desc: "Subtle ambient beds that sit perfectly under voiceovers and vlogs." },
+  { icon: Radio, title: "Genre & Mood Control", desc: "Lo-fi, EDM, orchestral, hip hop and more — paired with any mood you pick." },
+  { icon: Zap, title: "Instant Generation", desc: "Your custom track is previewable and downloadable in under a minute." },
+  { icon: Gauge, title: "BPM & Tempo Control", desc: "Dial in the exact tempo from 60 to 180 BPM so the track fits your edit." },
+];
+
 
 function Card({ icon: Icon, title, desc }: { icon: typeof Wand2; title: string; desc: string }) {
   return (
@@ -86,7 +97,32 @@ function Features() {
             ))}
           </div>
         </section>
+
+        <section className="mt-14">
+          <div className="flex items-center gap-2">
+            <Music className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-bold">Music features</h2>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The AI Music Studio turns a prompt into a finished, downloadable track.
+          </p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {MUSIC_FEATURES.map((f) => (
+              <Card key={f.title} {...f} />
+            ))}
+          </div>
+          <div className="mt-6 flex items-center gap-3">
+            <Button asChild variant="outline">
+              <Link to="/studio/music">Open Music Studio</Link>
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              <SlidersHorizontal className="mr-1 inline h-3 w-3" />
+              Standard and High Quality models available
+            </span>
+          </div>
+        </section>
       </div>
+
       <FooterAd />
       <Footer />
     </div>

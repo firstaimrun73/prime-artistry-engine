@@ -542,3 +542,29 @@ export function buildVideoEnhancement({ videoUrl }: { videoUrl: string }): FalSt
     },
   };
 }
+
+// ── Output quality upscale (2K / 4K image tiers) ─────────────────────────
+// Runs as an extra pass AFTER the edit/generation step so the creative result
+// is untouched — only resolution and fine detail improve.
+export function buildImageUpscale({
+  imageUrl,
+  factor,
+}: {
+  imageUrl: string;
+  factor: number;
+}): FalStep {
+  return {
+    label: `quality upscale ${factor}x (topaz)`,
+    model: UPSCALE_IMAGE_MODEL,
+    endpoint: ep(UPSCALE_IMAGE_MODEL),
+    outputKind: "image",
+    body: {
+      image_url: imageUrl,
+      model: "High Fidelity V2",
+      upscale_factor: factor,
+      sharpen: 0.85,
+      output_format: "png",
+    },
+  };
+}
+

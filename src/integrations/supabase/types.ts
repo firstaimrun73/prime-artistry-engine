@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_popups: {
+        Row: {
+          button_text: string
+          created_at: string
+          enabled: boolean
+          id: string
+          message: string
+          target: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          button_text?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          message?: string
+          target?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          button_text?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          message?: string
+          target?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       billing_audit_log: {
         Row: {
           action: string

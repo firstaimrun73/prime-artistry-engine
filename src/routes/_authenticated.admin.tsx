@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getAdminPopup, saveAdminPopup, type PopupTarget } from "@/lib/popup.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -28,6 +29,7 @@ import {
   Video,
   HardDrive,
   ShieldAlert,
+  Megaphone,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -84,6 +86,8 @@ function AdminPage() {
       >
         Manage refund requests →
       </Link>
+
+      <PopupControl />
 
 
       {/* Realtime */}
@@ -378,3 +382,104 @@ function AdminFeedbackSection() {
     </>
   );
 }
+
+/** Admin-controlled site popup: enable, edit copy and pick the audience. */
+function PopupControl() {
+  const load = useServerFn(getAdminPopup);
+  const save = useServerFn(saveAdminPopup);
+  const { data, refetch } = useQuery({ queryKey: ["admin-popup", "admin"], queryFn: () => load() });
+
+  const [enabled, setEnabled] = useState(false);
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [buttonText, setButtonText] = useState("");
+  const [target, setTarget] = useState<PopupTarget>("all");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!data || hydrated) return;
+    setEnabled(data.enabled);
+    setTitle(data.title);
+    setMessage(data.message);
+    setButtonText(data.buttonText);
+    setTarget(data.target);
+    setHydrated(true);
+  }, [data, hydrated]);
+
+  const submit = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await save({ data: { enabled, title, message, buttonText, target } });
+      setSaved(true);
+      await refetch();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="mt-8 rounded-xl border border-border bg-card p-5">
+      <div className="flex items-center gap-2">
+        <Megaphone className="h-5 w-5 text-primary" />
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Popup control</h2>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Shows a one-per-hour popup to matching users. Admin accounts never see it.
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          Popup enabled
+        </label>
+        <select
+          value={target}
+          onChange={(e) => setTarget(e.target.value as PopupTarget)}
+          className="rounded-lg border border-border bg-background p-2 text-sm"
+        >
+          <option value="all">All users</option>
+          <option value="free">Free plan users</option>
+          <option value="paid">Paid plan users</option>
+          <option value="low_credits">Users with low credits (&lt; 25)</option>
+        </select>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Popup title"
+          maxLength={120}
+          className="rounded-lg border border-border bg-background p-2 text-sm sm:col-span-2"
+        />
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Popup message"
+          rows={3}
+          maxLength={600}
+          className="rounded-lg border border-border bg-background p-2 text-sm sm:col-span-2"
+        />
+        <input
+          value={buttonText}
+          onChange={(e) => setButtonText(e.target.value)}
+          placeholder="Button text"
+          maxLength={40}
+          className="rounded-lg border border-border bg-background p-2 text-sm"
+        />
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          onClick={submit}
+          disabled={saving || !title.trim() || !message.trim() || !buttonText.trim()}
+          className="rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save popup"}
+        </button>
+        {saved && <span className="text-xs font-medium text-green-500">Saved</span>}
+      </div>
+    </section>
+  );
+}
+

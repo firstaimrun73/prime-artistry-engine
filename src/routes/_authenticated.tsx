@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AdminPopupModal } from "@/components/AdminPopupModal";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -39,6 +40,8 @@ function AuthenticatedLayout() {
           <Header />
         </div>
         <Outlet />
+        <AdminPopupModal />
+
       </div>
     </div>
   );

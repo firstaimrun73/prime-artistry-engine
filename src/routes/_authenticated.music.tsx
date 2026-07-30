@@ -369,13 +369,14 @@ function MusicPage() {
 
         {/* Prompt input */}
         <section className="mt-6 rounded-2xl border border-border bg-card p-5">
-          {/* Tier toggle: Lite (Stable Audio, 50cr) vs Pro (CassetteAI, 100cr) */}
-          <div className="mb-4 flex items-center justify-between gap-3">
+          {/* Audio quality: Standard (Stable Audio, 50cr) vs High Quality (100cr) */}
+          <div className="mb-1 flex items-center justify-between gap-3">
             <label className="block text-sm font-semibold">Describe your track</label>
             <div className="inline-flex rounded-full border border-border bg-background/60 p-1 text-xs">
               <button
                 type="button"
                 onClick={() => setTier("lite")}
+                title="Stable Audio — faster, lower cost"
                 className={
                   "flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition " +
                   (tier === "lite"
@@ -383,11 +384,12 @@ function MusicPage() {
                     : "text-muted-foreground hover:text-foreground")
                 }
               >
-                <Zap className="h-3 w-3" /> Lite · {CREDIT_COST.music_lite}
+                <Zap className="h-3 w-3" /> Standard · {CREDIT_COST.music_lite}
               </button>
               <button
                 type="button"
                 onClick={() => setTier("pro")}
+                title="Studio-grade model — richest detail and mix"
                 className={
                   "flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition " +
                   (tier === "pro"
@@ -395,10 +397,16 @@ function MusicPage() {
                     : "text-muted-foreground hover:text-foreground")
                 }
               >
-                <Crown className="h-3 w-3" /> Pro · {CREDIT_COST.music}
+                <Crown className="h-3 w-3" /> High Quality · {CREDIT_COST.music}
               </button>
             </div>
           </div>
+          <p className="mb-4 text-[11px] text-muted-foreground">
+            {tier === "lite"
+              ? "Standard — fast generation, MP3 44.1 kHz."
+              : "High Quality — studio-grade detail and mix, MP3 44.1 kHz."}
+          </p>
+
           <div className="relative">
             <Textarea
               value={prompt}

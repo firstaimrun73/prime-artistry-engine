@@ -5,6 +5,14 @@ import { useAuth } from "@/lib/auth";
 import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, EXAMPLE_PROMPTS, ASPECT_RATIOS, type AspectRatio } from "@/lib/prompt-suggestions";
+import {
+  IMAGE_QUALITY_OPTIONS,
+  VIDEO_RESOLUTION_OPTIONS,
+  imageQualityCost,
+  videoResolutionMultiplier,
+  type ImageQuality,
+  type VideoResolution,
+} from "@/lib/quality-options";
 import { watermarkImage, applyDownloadWatermarkGrid } from "@/lib/watermark";
 import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -118,6 +126,8 @@ function Editor() {
   const [activeImage, setActiveImage] = useState(0);
   const [videoDuration, setVideoDuration] = useState<VideoDuration>(5);
   const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>("16:9");
+  const [imageQuality, setImageQuality] = useState<ImageQuality>("hd");
+  const [videoResolution, setVideoResolution] = useState<VideoResolution>("1080p");
 
 
   const [msgIdx, setMsgIdx] = useState(0);
@@ -237,7 +247,10 @@ function Editor() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
-  const cost = mediaType === "video" ? videoCreditCost(videoDuration) : CREDIT_COST.image;
+  const cost =
+    mediaType === "video"
+      ? Math.round(videoCreditCost(videoDuration) * videoResolutionMultiplier(videoResolution))
+      : imageQualityCost(imageQuality);
   const noCredits = !isAdmin && profile.credits < cost;
   const videoLocked = !isAdmin && mediaType === "video" && !plan.video;
   const planLimits = getPlanLimits(profile.plan);
@@ -493,6 +506,8 @@ function Editor() {
             mediaType === "image" && !mediaUrl ? aspectRatio : undefined,
           videoDurationSeconds: mediaType === "video" ? videoDuration : undefined,
           videoAspectRatio: mediaType === "video" ? videoAspect : undefined,
+          imageQuality: mediaType === "image" ? imageQuality : undefined,
+          videoResolution: mediaType === "video" ? videoResolution : undefined,
         },
       });
 
@@ -820,7 +835,40 @@ function Editor() {
           )}
 
 
+          {/* Output quality — image only (HD / 2K / 4K) */}
+          {!loading && mediaType === "image" && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Output quality
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {IMAGE_QUALITY_OPTIONS.map((q) => {
+                  const active = imageQuality === q.id;
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      title={q.hint}
+                      onClick={() => setImageQuality(q.id)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all hover:scale-105 ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
+                      }`}
+                    >
+                      {q.label} · {q.credits}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.hint}
+              </p>
+            </div>
+          )}
+
           {/* Example prompts when the box is empty */}
+
           {!loading && !prompt.trim() && (
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Try an example</p>
@@ -962,6 +1010,34 @@ function Editor() {
                   ))}
                 </div>
               </div>
+
+              <div>
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Output resolution
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {VIDEO_RESOLUTION_OPTIONS.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      title={r.hint}
+                      disabled={loading}
+                      onClick={() => setVideoResolution(r.id)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        videoResolution === r.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-foreground hover:bg-secondary/70"
+                      }`}
+                    >
+                      {r.label} · {Math.round(videoCreditCost(videoDuration) * r.multiplier)}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {VIDEO_RESOLUTION_OPTIONS.find((r) => r.id === videoResolution)?.hint}
+                </p>
+              </div>
+
 
               <div className="rounded-lg border border-border bg-background/60 p-3 text-xs">
                 <div className="mb-1 flex items-center gap-1.5 font-semibold">

@@ -4,11 +4,18 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST, type PlanId } from "@/lib/plans";
 import { maxVideoDurationForPlan, videoCreditCost } from "@/lib/video-options";
 import {
+  imageQualityCost,
+  imageUpscaleFactor,
+  videoResolutionMultiplier,
+  videoResolutionUpscales,
+} from "@/lib/quality-options";
+import {
   buildFalRequest,
   buildImageEdit,
   buildImageEnhancementPipeline,
   buildImageInpaint,
   buildVideoEnhancement,
+  buildImageUpscale,
   buildTextToVideo,
   buildImageToVideo,
   classifyEditSize,
@@ -212,7 +219,11 @@ const inputSchema = z.object({
     z.literal(20), z.literal(25), z.literal(30),
   ]).optional(),
   videoAspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3"]).optional(),
+  // Output quality tiers. Images: HD / 2K / 4K. Video: 720p / 1080p / 4K.
+  imageQuality: z.enum(["hd", "2k", "4k"]).optional(),
+  videoResolution: z.enum(["720p", "1080p", "4k"]).optional(),
 });
+
 
 
 export const generateMedia = createServerFn({ method: "POST" })
@@ -251,7 +262,12 @@ export const generateMedia = createServerFn({ method: "POST" })
       ? requestedDuration
       : (Math.min(requestedDuration, maxDuration) as typeof requestedDuration);
     const cost =
-      data.type === "video" ? videoCreditCost(videoDuration) : CREDIT_COST[data.type];
+      data.type === "video"
+        ? Math.round(
+            videoCreditCost(videoDuration) * videoResolutionMultiplier(data.videoResolution),
+          )
+        : imageQualityCost(data.imageQuality);
+
     if (!isAdmin && profile.credits < cost) {
       throw new Error(
         `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
@@ -384,6 +400,25 @@ export const generateMedia = createServerFn({ method: "POST" })
         );
       }
       if (!outputUrl) throw new Error("Generation returned no image.");
+
+      // ── Output quality tier (HD / 2K / 4K) ──────────────────────────
+      // Extra Topaz pass; the creative result is untouched, only resolution
+      // and fine detail improve. Failure here is non-fatal — we keep the
+      // base-resolution image rather than failing the whole generation.
+      const upFactor = imageUpscaleFactor(data.imageQuality);
+      if (upFactor > 1) {
+        try {
+          console.log("[generate] quality tier:", data.imageQuality, "→ upscale", upFactor, "x");
+          const up = await runFalStepResilient(
+            buildImageUpscale({ imageUrl: outputUrl, factor: upFactor }),
+            falKey,
+          );
+          if (up) outputUrl = up;
+        } catch (e) {
+          console.error("[generate] quality upscale failed, keeping base output:", e);
+        }
+      }
+
     } else {
       // ── Video workflows (paid only) ─────────────────────────────────
       console.log("[generate] video | sourceKind:", data.sourceKind ?? "none");
@@ -418,6 +453,21 @@ export const generateMedia = createServerFn({ method: "POST" })
       console.log("[generate] video step:", step.label);
       outputUrl = await runFalStepResilient(step, falKey);
       if (!outputUrl) throw new Error("Video generation returned no output.");
+
+      // 4K tier: extra Topaz video upscale pass. Non-fatal on failure.
+      if (data.sourceKind !== "video" && videoResolutionUpscales(data.videoResolution)) {
+        try {
+          console.log("[generate] video quality tier 4k → topaz upscale pass");
+          const up = await runFalStepResilient(
+            buildVideoEnhancement({ videoUrl: outputUrl }),
+            falKey,
+          );
+          if (up) outputUrl = up;
+        } catch (e) {
+          console.error("[generate] video quality upscale failed, keeping base output:", e);
+        }
+      }
+
     }
     } catch (err) {
       // FAL.ai failed — no credits were ever deducted, so nothing to refund.

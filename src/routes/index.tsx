@@ -13,6 +13,7 @@ import { FeedbackCard } from "@/routes/feedback";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { History as HistoryIcon } from "lucide-react";
+import { SampleShowcase } from "@/components/SampleShowcase";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -59,6 +60,7 @@ function SignedOutHome() {
         </div>
       </section>
 
+      <SampleShowcase />
       <StudioLoopingShowcase />
       <StudioShowcase />
 
