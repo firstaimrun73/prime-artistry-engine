@@ -5,6 +5,14 @@ import { useAuth } from "@/lib/auth";
 import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, EXAMPLE_PROMPTS, ASPECT_RATIOS, type AspectRatio } from "@/lib/prompt-suggestions";
+import {
+  IMAGE_QUALITY_OPTIONS,
+  VIDEO_RESOLUTION_OPTIONS,
+  imageQualityCost,
+  videoResolutionMultiplier,
+  type ImageQuality,
+  type VideoResolution,
+} from "@/lib/quality-options";
 import { watermarkImage, applyDownloadWatermarkGrid } from "@/lib/watermark";
 import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { isAdminEmail } from "@/lib/admin-config";
