@@ -120,6 +120,7 @@ function Editor() {
   const [keepWatermark, setKeepWatermark] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
+  const [pendingSmartRemove, setPendingSmartRemove] = useState(false);
   const [removeMaskDataUrl, setRemoveMaskDataUrl] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
@@ -206,9 +207,14 @@ function Editor() {
       hasContext = !!(raw || reuse || mode);
       if (raw) {
         sessionStorage.removeItem("motio2edit-preset");
-        const { prompt: p, mode: m } = JSON.parse(raw) as { prompt?: string; mode?: "image" | "video" };
+        const { prompt: p, mode: m, smartRemove } = JSON.parse(raw) as {
+          prompt?: string;
+          mode?: "image" | "video";
+          smartRemove?: boolean;
+        };
         if (m === "image" || m === "video") setMediaType(m);
         if (typeof p === "string" && p.length > 0) setPrompt(p);
+        if (smartRemove) setPendingSmartRemove(true);
       }
       if (mode === "image" || mode === "video") {
         setMediaType(mode);
@@ -223,6 +229,13 @@ function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // "Try Circle Remove" from the homepage: open the tool as soon as an image exists.
+  useEffect(() => {
+    if (pendingSmartRemove && mediaType === "image" && inputDataUrl) {
+      setPendingSmartRemove(false);
+      setSmartRemoveOpen(true);
+    }
+  }, [pendingSmartRemove, mediaType, inputDataUrl]);
 
 
   // Auto-resize the prompt box.
