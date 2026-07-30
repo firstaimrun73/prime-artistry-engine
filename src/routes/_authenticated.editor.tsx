@@ -237,7 +237,10 @@ function Editor() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
-  const cost = mediaType === "video" ? videoCreditCost(videoDuration) : CREDIT_COST.image;
+  const cost =
+    mediaType === "video"
+      ? Math.round(videoCreditCost(videoDuration) * videoResolutionMultiplier(videoResolution))
+      : imageQualityCost(imageQuality);
   const noCredits = !isAdmin && profile.credits < cost;
   const videoLocked = !isAdmin && mediaType === "video" && !plan.video;
   const planLimits = getPlanLimits(profile.plan);
