@@ -14,6 +14,9 @@ import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { History as HistoryIcon } from "lucide-react";
 import { SampleShowcase } from "@/components/SampleShowcase";
+import { SampleGallery } from "@/components/SampleGallery";
+import { MusicSamples } from "@/components/MusicSamples";
+import { VideoSamples } from "@/components/VideoSamples";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -61,6 +64,9 @@ function SignedOutHome() {
       </section>
 
       <SampleShowcase />
+      <SampleGallery />
+      <MusicSamples />
+      <VideoSamples />
       <StudioLoopingShowcase />
       <StudioShowcase />
 
