@@ -39,6 +39,16 @@ const VIDEO_FEATURES = [
   { icon: GitBranch, title: "Scene Continuation", desc: "Generate connected follow-up scenes that flow from your existing footage." },
 ];
 
+const MUSIC_FEATURES = [
+  { icon: Music, title: "AI Music Generation", desc: "Create original, royalty-free tracks from a single text prompt in seconds." },
+  { icon: Film, title: "Cinematic Soundtracks", desc: "Epic, trailer-grade scores built for videos, reels and presentations." },
+  { icon: Headphones, title: "Background Music", desc: "Subtle ambient beds that sit perfectly under voiceovers and vlogs." },
+  { icon: Radio, title: "Genre & Mood Control", desc: "Lo-fi, EDM, orchestral, hip hop and more — paired with any mood you pick." },
+  { icon: Zap, title: "Instant Generation", desc: "Your custom track is previewable and downloadable in under a minute." },
+  { icon: Gauge, title: "BPM & Tempo Control", desc: "Dial in the exact tempo from 60 to 180 BPM so the track fits your edit." },
+];
+
+
 function Card({ icon: Icon, title, desc }: { icon: typeof Wand2; title: string; desc: string }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 transition-colors hover:border-primary">
