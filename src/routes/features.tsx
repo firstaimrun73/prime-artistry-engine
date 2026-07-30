@@ -97,7 +97,32 @@ function Features() {
             ))}
           </div>
         </section>
+
+        <section className="mt-14">
+          <div className="flex items-center gap-2">
+            <Music className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-bold">Music features</h2>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The AI Music Studio turns a prompt into a finished, downloadable track.
+          </p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {MUSIC_FEATURES.map((f) => (
+              <Card key={f.title} {...f} />
+            ))}
+          </div>
+          <div className="mt-6 flex items-center gap-3">
+            <Button asChild variant="outline">
+              <Link to="/studio/music">Open Music Studio</Link>
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              <SlidersHorizontal className="mr-1 inline h-3 w-3" />
+              Standard and High Quality models available
+            </span>
+          </div>
+        </section>
       </div>
+
       <FooterAd />
       <Footer />
     </div>
