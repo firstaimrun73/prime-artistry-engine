@@ -118,6 +118,8 @@ function Editor() {
   const [activeImage, setActiveImage] = useState(0);
   const [videoDuration, setVideoDuration] = useState<VideoDuration>(5);
   const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>("16:9");
+  const [imageQuality, setImageQuality] = useState<ImageQuality>("hd");
+  const [videoResolution, setVideoResolution] = useState<VideoResolution>("1080p");
 
 
   const [msgIdx, setMsgIdx] = useState(0);
