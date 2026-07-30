@@ -61,6 +61,9 @@ function SignedOutHome() {
       </section>
 
       <SampleShowcase />
+      <SampleGallery />
+      <MusicSamples />
+      <VideoSamples />
       <StudioLoopingShowcase />
       <StudioShowcase />
 
