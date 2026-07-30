@@ -15,6 +15,7 @@ import {
   buildImageEnhancementPipeline,
   buildImageInpaint,
   buildVideoEnhancement,
+  buildImageUpscale,
   buildTextToVideo,
   buildImageToVideo,
   classifyEditSize,
