@@ -42,18 +42,18 @@ function SignedOutHome() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <section className="mx-auto max-w-6xl px-4 pt-20 pb-16 text-center">
+      <section className="mx-auto w-full max-w-6xl px-4 pb-10 pt-12 text-center sm:pb-16 sm:pt-20">
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
           <Zap className="h-3.5 w-3.5 text-primary" /> Credit-based AI editing
         </span>
-        <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-extrabold leading-tight tracking-tight sm:text-6xl">
+        <h1 className="mx-auto mt-6 max-w-3xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
           Transform your media with <span className="text-primary">AI</span>, instantly.
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
           Upload an image or video, write a prompt, and generate a polished result.
           Clean, fast, and built for creators.
         </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
           <Button asChild size="lg">
             <Link to="/pricing">View pricing</Link>
           </Button>
@@ -71,8 +71,8 @@ function SignedOutHome() {
       <StudioShowcase />
 
 
-      <section className="mx-auto max-w-6xl px-4 pb-20">
-        <div className="grid gap-5 sm:grid-cols-3">
+      <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
+        <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
           {[
             { icon: ImageIcon, title: "Image generation", desc: "Available on every plan, including free credits." },
             { icon: Video, title: "Video generation", desc: "Unlock high-quality video on paid plans." },
@@ -96,8 +96,8 @@ function SignedOutHome() {
 
       <MusicHomeSection />
 
-      <section className="mx-auto max-w-6xl px-4 pb-24 text-center">
-        <div className="rounded-2xl border border-border bg-card p-10">
+      <section className="mx-auto w-full max-w-6xl px-4 pb-16 text-center sm:pb-24">
+        <div className="rounded-2xl border border-border bg-card p-6 sm:p-10">
           <h2 className="text-2xl font-bold sm:text-3xl">Ready to create?</h2>
           <p className="mt-2 text-muted-foreground">Start free, upgrade when you need video.</p>
           <Button asChild size="lg" className="mt-6">
@@ -120,7 +120,7 @@ function HomeTestimonials() {
   });
   if (!data || data.length === 0) return null;
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16">
+    <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
       <h2 className="text-center text-2xl font-bold sm:text-3xl">Loved by creators worldwide 🌍</h2>
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {data.slice(0, 6).map((f) => (
@@ -145,12 +145,12 @@ function MusicHomeSection() {
     { icon: Download, title: "Instant Generation", desc: "Your custom track ready in under a minute" },
   ];
   return (
-    <section className="mx-auto max-w-6xl px-4 pb-20">
+    <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
       <div className="mb-8 text-center">
         <h2 className="text-2xl font-bold sm:text-3xl">AI Music Studio</h2>
         <p className="mt-2 text-muted-foreground">Generate original music in seconds</p>
       </div>
-      <div className="grid gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {items.map((f) => {
           const Icon = f.icon;
           return (
@@ -216,12 +216,12 @@ function StudioShowcase() {
   const isPaid = isAdmin || (plan !== "free" && !!user);
 
   return (
-    <section className="mx-auto max-w-6xl px-4 pb-16">
+    <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
       <div className="mb-8 text-center">
         <h2 className="text-2xl font-bold sm:text-3xl">Three studios, one workspace</h2>
         <p className="mt-2 text-sm text-muted-foreground">Pick a studio to jump straight into the right tools.</p>
       </div>
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {STUDIO_CARDS.map((c) => {
           const locked = !c.freeAllowed && !isPaid;
           const Icon = c.icon;
@@ -345,7 +345,7 @@ function StudioLoopingShowcase() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl px-4 pb-12">
+    <section className="mx-auto w-full max-w-6xl px-4 pb-10 sm:pb-12">
       <div
         className="glass-panel relative mx-auto overflow-hidden rounded-3xl p-1"
         onMouseEnter={() => setPaused(true)}
@@ -353,7 +353,7 @@ function StudioLoopingShowcase() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <div className="relative h-64 sm:h-80">
+        <div className="relative h-52 sm:h-72 lg:h-80">
           {LOOP_SLIDES.map((s, i) => {
             const Icon = s.icon;
             const active = i === idx;
