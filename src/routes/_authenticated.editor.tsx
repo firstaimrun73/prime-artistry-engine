@@ -206,9 +206,14 @@ function Editor() {
       hasContext = !!(raw || reuse || mode);
       if (raw) {
         sessionStorage.removeItem("motio2edit-preset");
-        const { prompt: p, mode: m } = JSON.parse(raw) as { prompt?: string; mode?: "image" | "video" };
+        const { prompt: p, mode: m, smartRemove } = JSON.parse(raw) as {
+          prompt?: string;
+          mode?: "image" | "video";
+          smartRemove?: boolean;
+        };
         if (m === "image" || m === "video") setMediaType(m);
         if (typeof p === "string" && p.length > 0) setPrompt(p);
+        if (smartRemove) setPendingSmartRemove(true);
       }
       if (mode === "image" || mode === "video") {
         setMediaType(mode);
