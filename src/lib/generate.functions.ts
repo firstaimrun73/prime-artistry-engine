@@ -255,7 +255,12 @@ export const generateMedia = createServerFn({ method: "POST" })
       ? requestedDuration
       : (Math.min(requestedDuration, maxDuration) as typeof requestedDuration);
     const cost =
-      data.type === "video" ? videoCreditCost(videoDuration) : CREDIT_COST[data.type];
+      data.type === "video"
+        ? Math.round(
+            videoCreditCost(videoDuration) * videoResolutionMultiplier(data.videoResolution),
+          )
+        : imageQualityCost(data.imageQuality);
+
     if (!isAdmin && profile.credits < cost) {
       throw new Error(
         `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
