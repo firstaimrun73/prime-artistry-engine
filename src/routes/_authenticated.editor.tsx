@@ -1011,6 +1011,34 @@ function Editor() {
                 </div>
               </div>
 
+              <div>
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Output resolution
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {VIDEO_RESOLUTION_OPTIONS.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      title={r.hint}
+                      disabled={loading}
+                      onClick={() => setVideoResolution(r.id)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        videoResolution === r.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-foreground hover:bg-secondary/70"
+                      }`}
+                    >
+                      {r.label} · {Math.round(videoCreditCost(videoDuration) * r.multiplier)}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {VIDEO_RESOLUTION_OPTIONS.find((r) => r.id === videoResolution)?.hint}
+                </p>
+              </div>
+
+
               <div className="rounded-lg border border-border bg-background/60 p-3 text-xs">
                 <div className="mb-1 flex items-center gap-1.5 font-semibold">
                   <Coins className="h-3.5 w-3.5 text-primary" /> Estimated cost: {cost} credits
