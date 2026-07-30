@@ -40,6 +40,8 @@ function AuthenticatedLayout() {
           <Header />
         </div>
         <Outlet />
+        <AdminPopupModal />
+
       </div>
     </div>
   );
