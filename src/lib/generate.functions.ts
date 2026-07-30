@@ -453,6 +453,21 @@ export const generateMedia = createServerFn({ method: "POST" })
       console.log("[generate] video step:", step.label);
       outputUrl = await runFalStepResilient(step, falKey);
       if (!outputUrl) throw new Error("Video generation returned no output.");
+
+      // 4K tier: extra Topaz video upscale pass. Non-fatal on failure.
+      if (data.sourceKind !== "video" && videoResolutionUpscales(data.videoResolution)) {
+        try {
+          console.log("[generate] video quality tier 4k → topaz upscale pass");
+          const up = await runFalStepResilient(
+            buildVideoEnhancement({ videoUrl: outputUrl }),
+            falKey,
+          );
+          if (up) outputUrl = up;
+        } catch (e) {
+          console.error("[generate] video quality upscale failed, keeping base output:", e);
+        }
+      }
+
     }
     } catch (err) {
       // FAL.ai failed — no credits were ever deducted, so nothing to refund.
