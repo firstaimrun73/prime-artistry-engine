@@ -229,6 +229,13 @@ function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // "Try Circle Remove" from the homepage: open the tool as soon as an image exists.
+  useEffect(() => {
+    if (pendingSmartRemove && mediaType === "image" && inputDataUrl) {
+      setPendingSmartRemove(false);
+      setSmartRemoveOpen(true);
+    }
+  }, [pendingSmartRemove, mediaType, inputDataUrl]);
 
 
   // Auto-resize the prompt box.
