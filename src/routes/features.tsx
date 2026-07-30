@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Wand2, Sparkles, ArrowUpRightSquare, Replace, Smile, Eraser,
   Type, Image as ImageIcon, Film, Clapperboard, Wind, GitBranch,
+  Music, Headphones, Radio, SlidersHorizontal, Zap, Gauge,
 } from "lucide-react";
 
 export const Route = createFileRoute("/features")({
