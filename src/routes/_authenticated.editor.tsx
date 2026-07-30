@@ -506,6 +506,8 @@ function Editor() {
             mediaType === "image" && !mediaUrl ? aspectRatio : undefined,
           videoDurationSeconds: mediaType === "video" ? videoDuration : undefined,
           videoAspectRatio: mediaType === "video" ? videoAspect : undefined,
+          imageQuality: mediaType === "image" ? imageQuality : undefined,
+          videoResolution: mediaType === "video" ? videoResolution : undefined,
         },
       });
 
