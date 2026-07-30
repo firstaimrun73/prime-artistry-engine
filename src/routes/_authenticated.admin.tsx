@@ -85,6 +85,8 @@ function AdminPage() {
         Manage refund requests →
       </Link>
 
+      <PopupControl />
+
 
       {/* Realtime */}
       <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Real-time</h2>
