@@ -212,7 +212,11 @@ const inputSchema = z.object({
     z.literal(20), z.literal(25), z.literal(30),
   ]).optional(),
   videoAspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3"]).optional(),
+  // Output quality tiers. Images: HD / 2K / 4K. Video: 720p / 1080p / 4K.
+  imageQuality: z.enum(["hd", "2k", "4k"]).optional(),
+  videoResolution: z.enum(["720p", "1080p", "4k"]).optional(),
 });
+
 
 
 export const generateMedia = createServerFn({ method: "POST" })
