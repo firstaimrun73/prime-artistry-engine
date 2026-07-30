@@ -399,6 +399,25 @@ export const generateMedia = createServerFn({ method: "POST" })
         );
       }
       if (!outputUrl) throw new Error("Generation returned no image.");
+
+      // ── Output quality tier (HD / 2K / 4K) ──────────────────────────
+      // Extra Topaz pass; the creative result is untouched, only resolution
+      // and fine detail improve. Failure here is non-fatal — we keep the
+      // base-resolution image rather than failing the whole generation.
+      const upFactor = imageUpscaleFactor(data.imageQuality);
+      if (upFactor > 1) {
+        try {
+          console.log("[generate] quality tier:", data.imageQuality, "→ upscale", upFactor, "x");
+          const up = await runFalStepResilient(
+            buildImageUpscale({ imageUrl: outputUrl, factor: upFactor }),
+            falKey,
+          );
+          if (up) outputUrl = up;
+        } catch (e) {
+          console.error("[generate] quality upscale failed, keeping base output:", e);
+        }
+      }
+
     } else {
       // ── Video workflows (paid only) ─────────────────────────────────
       console.log("[generate] video | sourceKind:", data.sourceKind ?? "none");
