@@ -120,6 +120,7 @@ function Editor() {
   const [keepWatermark, setKeepWatermark] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
+  const [pendingSmartRemove, setPendingSmartRemove] = useState(false);
   const [removeMaskDataUrl, setRemoveMaskDataUrl] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
