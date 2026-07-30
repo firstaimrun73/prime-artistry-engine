@@ -52,37 +52,39 @@ export function SampleGallery() {
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.body.dataset.modalOpen = "1";
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      delete document.body.dataset.modalOpen;
     };
   }, [openIndex, close, step]);
 
   const active = openIndex == null ? null : GALLERY_ITEMS[openIndex];
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16">
+    <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
       <div className="text-center">
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
           <Images className="h-3.5 w-3.5 text-primary" /> Sample Gallery
         </span>
-        <h2 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">Real edits made with MOTIO2EDIT</h2>
+        <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">Real edits made with MOTIO2EDIT</h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
           Tap any sample to view it fullscreen with zoom and navigation.
         </p>
       </div>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {GALLERY_ITEMS.map((item, i) => (
           <button
             key={item.title}
             type="button"
             onClick={() => setOpenIndex(i)}
-            className="reveal-up group relative overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-2xl"
+            className="reveal-up group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-2xl"
             style={{ animationDelay: `${i * 70}ms` }}
             aria-label={`Open ${item.title} sample`}
           >
-            <div className="relative aspect-[3/2] w-full overflow-hidden">
+            <div className="relative aspect-[3/2] w-full overflow-hidden bg-secondary">
               {!loaded[i] && <Skeleton />}
               <img
                 src={item.url}
@@ -91,7 +93,7 @@ export function SampleGallery() {
                 decoding="async"
                 draggable={false}
                 onLoad={() => setLoaded((s) => ({ ...s, [i]: true }))}
-                className={`protected-image h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${
+                className={`protected-image absolute inset-0 h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${
                   loaded[i] ? "opacity-100" : "opacity-0"
                 }`}
               />
@@ -104,8 +106,8 @@ export function SampleGallery() {
                 <ZoomIn className="h-4 w-4 text-primary" />
               </span>
             </div>
-            <div className="p-4">
-              <p className="font-bold">{item.title}</p>
+            <div className="min-w-0 flex-1 p-4">
+              <p className="truncate font-bold">{item.title}</p>
               <p className="mt-1 text-sm text-muted-foreground">{item.caption}</p>
             </div>
           </button>
@@ -114,7 +116,7 @@ export function SampleGallery() {
 
       {active && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 p-4 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 p-3 backdrop-blur-md sm:p-6 animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
           aria-label={`${active.title} fullscreen preview`}

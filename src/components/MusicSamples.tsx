@@ -3,16 +3,18 @@ import { Music, Pause, Play, Volume2 } from "lucide-react";
 import track1 from "@/assets/samples/track-1.mp3.asset.json";
 import track2 from "@/assets/samples/track-2.mp3.asset.json";
 import track3 from "@/assets/samples/track-3.mp3.asset.json";
-import styleTransfer from "@/assets/samples/style-transfer.png.asset.json";
-import aiUpscaling from "@/assets/samples/ai-upscaling.png.asset.json";
-import photoRestoration from "@/assets/samples/photo-restoration.webp.asset.json";
+
+// Music covers are dedicated music-only demo art (never user photos/generations).
+const COVER_VINYL = "/demo/music/cover-vinyl.jpg";
+const COVER_WAVEFORM = "/demo/music/cover-waveform.jpg";
+const COVER_STUDIO = "/demo/music/cover-studio.jpg";
 
 type Track = { id: string; title: string; genre: string; src: string; cover: string };
 
 const TRACKS: Track[] = [
-  { id: "t1", title: "Neon Skyline", genre: "Cinematic Electronic", src: track1.url, cover: styleTransfer.url },
-  { id: "t2", title: "Golden Hour Drift", genre: "Lo-fi Chill", src: track2.url, cover: aiUpscaling.url },
-  { id: "t3", title: "Heritage Strings", genre: "Orchestral", src: track3.url, cover: photoRestoration.url },
+  { id: "t1", title: "Neon Skyline", genre: "Cinematic Electronic", src: track1.url, cover: COVER_VINYL },
+  { id: "t2", title: "Golden Hour Drift", genre: "Lo-fi Chill", src: track2.url, cover: COVER_WAVEFORM },
+  { id: "t3", title: "Heritage Strings", genre: "Orchestral", src: track3.url, cover: COVER_STUDIO },
 ];
 
 function fmt(s: number) {
@@ -88,19 +90,21 @@ function TrackCard({
 
   return (
     <div
-      className="reveal-up group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-2xl"
+      className="reveal-up group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-2xl"
       style={{ animationDelay: `${index * 80}ms` }}
     >
-      <div className="relative aspect-video w-full overflow-hidden">
+      <div className="relative aspect-video w-full overflow-hidden bg-secondary">
         {!ready && <div className="absolute inset-0 animate-pulse bg-secondary" />}
         <img
           src={track.cover}
+          width={1024}
+          height={576}
           alt={`${track.title} cover art`}
           loading="lazy"
           decoding="async"
           draggable={false}
           onLoad={() => setReady(true)}
-          className={`protected-image h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+          className={`protected-image absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
             ready ? "opacity-100" : "opacity-0"
           }`}
         />
@@ -111,8 +115,8 @@ function TrackCard({
           aria-label={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
           className="absolute inset-0 flex items-center justify-center"
         >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300 group-hover:scale-110">
-            {isPlaying ? <Pause className="h-7 w-7" /> : <Play className="ml-1 h-7 w-7" />}
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform duration-300 group-hover:scale-110 sm:h-16 sm:w-16">
+            {isPlaying ? <Pause className="h-6 w-6 sm:h-7 sm:w-7" /> : <Play className="ml-1 h-6 w-6 sm:h-7 sm:w-7" />}
           </span>
         </button>
         <span className="absolute bottom-3 right-3 rounded-full bg-background/85 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
@@ -120,13 +124,13 @@ function TrackCard({
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col p-5">
-        <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+        <div className="flex min-w-0 items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate font-bold">{track.title}</p>
-            <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{track.genre}</p>
+            <p className="mt-0.5 truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{track.genre}</p>
           </div>
-          <Equalizer active={isPlaying} />
+          <span className="shrink-0"><Equalizer active={isPlaying} /></span>
         </div>
 
         <input
@@ -186,18 +190,18 @@ export function MusicSamples() {
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-16">
+    <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
       <div className="text-center">
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
           <Music className="h-3.5 w-3.5 text-primary" /> AI Music Samples
         </span>
-        <h2 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">Tracks made in Music Studio</h2>
+        <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">Tracks made in Music Studio</h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
           Full playback with seek, volume, and live equalizer — one track at a time.
         </p>
       </div>
 
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {TRACKS.map((t, i) => (
           <TrackCard key={t.id} track={t} index={i} playingId={playingId} setPlayingId={setPlayingId} />
         ))}

@@ -40,6 +40,17 @@ export function TranslateWidget() {
   const [open, setOpen] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const injected = useRef(false);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Hide the floating button whenever a fullscreen modal/lightbox is open.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const sync = () => setModalOpen(document.body.dataset.modalOpen === "1");
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(document.body, { attributes: true, attributeFilter: ["data-modal-open"] });
+    return () => obs.disconnect();
+  }, []);
 
   // FIX 4: only show on home + settings; hide on chat/editor/studio pages.
   const allowed = pathname === "/" || pathname.startsWith("/settings");
@@ -85,14 +96,14 @@ export function TranslateWidget() {
     });
   }, []);
 
-  if (!allowed) return null;
+  if (!allowed || modalOpen) return null;
 
   return (
     <>
 
       {/* Suggestion popup */}
       {suggestion && (
-        <div className="fixed bottom-24 right-5 z-[60] w-72 rounded-xl border border-border bg-card p-4 shadow-xl">
+        <div className="fixed bottom-28 right-3 z-[60] w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-card p-4 shadow-xl">
           <p className="text-sm font-medium" dir="auto">
             {suggestion.text}
           </p>
@@ -115,8 +126,8 @@ export function TranslateWidget() {
 
       {/* Floating translate panel */}
       <div
-        className="fixed right-5 z-[60] flex flex-col items-end gap-2"
-        style={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
+        className="fixed right-3 z-[60] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:right-5"
+        style={{ bottom: "calc(88px + env(safe-area-inset-bottom))" }}
       >
         <div
           className={`rounded-xl border border-border bg-card p-3 shadow-xl transition-all ${
@@ -134,7 +145,7 @@ export function TranslateWidget() {
         <button
           onClick={() => setOpen((o) => !o)}
           aria-label="Translate this page"
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105"
         >
           <Languages className="h-5 w-5" />
         </button>
