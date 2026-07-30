@@ -29,6 +29,7 @@ import {
   Video,
   HardDrive,
   ShieldAlert,
+  Megaphone,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
