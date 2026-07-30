@@ -835,7 +835,40 @@ function Editor() {
           )}
 
 
+          {/* Output quality — image only (HD / 2K / 4K) */}
+          {!loading && mediaType === "image" && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Output quality
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {IMAGE_QUALITY_OPTIONS.map((q) => {
+                  const active = imageQuality === q.id;
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      title={q.hint}
+                      onClick={() => setImageQuality(q.id)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all hover:scale-105 ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
+                      }`}
+                    >
+                      {q.label} · {q.credits}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.hint}
+              </p>
+            </div>
+          )}
+
           {/* Example prompts when the box is empty */}
+
           {!loading && !prompt.trim() && (
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Try an example</p>
