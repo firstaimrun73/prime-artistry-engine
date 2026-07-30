@@ -222,7 +222,11 @@ export const generateMusic = createServerFn({ method: "POST" })
               prompt: composed,
               duration: data.durationSeconds,
               seconds_total: data.durationSeconds,
+              // Default deliverable: MP3 at CD sample rate.
+              output_format: "mp3",
+              sample_rate: 44100,
             },
+
             falKey,
             model,
           );
