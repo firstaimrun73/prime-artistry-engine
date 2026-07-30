@@ -345,8 +345,6 @@ export function SampleShowcase() {
                   src={v.thumb}
                   alt={v.title}
                   loading="lazy"
-                  width={500}
-                  height={500}
                   width={1024}
                   height={576}
                   className="protected-image aspect-video w-full bg-secondary object-cover"
