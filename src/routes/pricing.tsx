@@ -15,6 +15,7 @@ import {
   type PlanId,
 } from "@/lib/plans";
 import { Check, CheckCircle2 } from "lucide-react";
+import { usePlanVisible } from "@/lib/site-settings";
 import {
   Select,
   SelectContent,
@@ -47,6 +48,7 @@ function Pricing() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [currency, setCurrency] = useState<DisplayCurrency>("USD");
+  const planVisible = usePlanVisible();
 
   const currentPlan = profile?.plan ?? null;
 
