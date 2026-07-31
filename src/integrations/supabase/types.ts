@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_access_log: {
+        Row: {
+          allowed: boolean
+          created_at: string
+          email: string | null
+          id: string
+          path: string | null
+          user_id: string | null
+        }
+        Insert: {
+          allowed?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          path?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          allowed?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          path?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       admin_popups: {
         Row: {
           button_text: string
@@ -47,6 +74,30 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          ad_settings: Json
+          created_at: string
+          id: number
+          plan_visibility: Json
+          updated_at: string
+        }
+        Insert: {
+          ad_settings?: Json
+          created_at?: string
+          id?: number
+          plan_visibility?: Json
+          updated_at?: string
+        }
+        Update: {
+          ad_settings?: Json
+          created_at?: string
+          id?: number
+          plan_visibility?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       billing_audit_log: {
         Row: {
           action: string
@@ -74,6 +125,39 @@ export type Database = {
           metadata?: Json | null
           target_id?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      broadcasts: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          kind: string
+          message: string
+          target: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          kind?: string
+          message: string
+          target?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          kind?: string
+          message?: string
+          target?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -340,9 +424,11 @@ export type Database = {
           created_at: string
           id: string
           input_url: string | null
+          metadata: Json | null
           output_url: string | null
           prompt: string | null
           status: Database["public"]["Enums"]["gen_status"]
+          title: string | null
           type: Database["public"]["Enums"]["gen_type"]
           user_id: string
         }
@@ -350,9 +436,11 @@ export type Database = {
           created_at?: string
           id?: string
           input_url?: string | null
+          metadata?: Json | null
           output_url?: string | null
           prompt?: string | null
           status?: Database["public"]["Enums"]["gen_status"]
+          title?: string | null
           type: Database["public"]["Enums"]["gen_type"]
           user_id: string
         }
@@ -360,9 +448,11 @@ export type Database = {
           created_at?: string
           id?: string
           input_url?: string | null
+          metadata?: Json | null
           output_url?: string | null
           prompt?: string | null
           status?: Database["public"]["Enums"]["gen_status"]
+          title?: string | null
           type?: Database["public"]["Enums"]["gen_type"]
           user_id?: string
         }
@@ -488,6 +578,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          blocked: boolean
           created_at: string
           credits: number
           currency: string
@@ -499,6 +590,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          blocked?: boolean
           created_at?: string
           credits?: number
           currency?: string
@@ -510,6 +602,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          blocked?: boolean
           created_at?: string
           credits?: number
           currency?: string
