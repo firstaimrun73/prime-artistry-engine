@@ -4,21 +4,20 @@
 // unknown paths to index.html. This server route guarantees a plain-text
 // response with the correct content type on every deployment target.
 
-import { createFileRoute } from "@tanstack/react-router";
-import type {} from "@tanstack/react-start";
+ import { createServerFileRoute } from '@tanstack/react-start/server'
 
-const ADS_TXT = "google.com, pub-7901147042865442, DIRECT, f08c47fec0942fa0\n";
-
-export const Route = createFileRoute("/ads.txt")({
-  server: {
-    handlers: {
-      GET: async () =>
-        new Response(ADS_TXT, {
-          headers: {
-            "Content-Type": "text/plain; charset=utf-8",
-            "Cache-Control": "public, max-age=86400",
-          },
-        }),
-    },
+export const ServerRoute = createServerFileRoute(
+  '/ads.txt'
+).methods({
+  GET: () => {
+    return new Response(
+      'google.com, pub-7901147042865442, DIRECT, f08c47fec0942fa0\n',
+      {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
+        },
+      }
+    )
   },
-});
+})
