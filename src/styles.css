@@ -232,3 +232,33 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .reveal-up { animation: none; }
 }
+
+/* ── Spinning vinyl disc (music playback) ─────────────────────────────── */
+.vinyl-disc {
+  border-radius: 50%;
+  background: conic-gradient(
+    #1a1a1a 0deg, #333 45deg, #1a1a1a 90deg, #333 135deg,
+    #1a1a1a 180deg, #333 225deg, #1a1a1a 270deg, #333 315deg, #1a1a1a 360deg
+  );
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+}
+.vinyl-disc.is-playing {
+  animation: vinyl-spin 2s linear infinite;
+}
+.vinyl-center {
+  position: absolute;
+  width: 25%;
+  height: 25%;
+  background: #f97316;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+@keyframes vinyl-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vinyl-disc.is-playing { animation: none; }
+}

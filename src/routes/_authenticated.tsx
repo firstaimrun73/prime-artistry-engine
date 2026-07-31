@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AdminPopupModal } from "@/components/AdminPopupModal";
+import { FirstGenerationFeedback } from "@/components/FirstGenerationFeedback";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -41,6 +42,7 @@ function AuthenticatedLayout() {
         </div>
         <Outlet />
         <AdminPopupModal />
+        <FirstGenerationFeedback />
 
       </div>
     </div>

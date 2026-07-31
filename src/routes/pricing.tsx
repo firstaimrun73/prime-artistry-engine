@@ -15,6 +15,7 @@ import {
   type PlanId,
 } from "@/lib/plans";
 import { Check, CheckCircle2 } from "lucide-react";
+import { usePlanVisible } from "@/lib/site-settings";
 import {
   Select,
   SelectContent,
@@ -47,6 +48,7 @@ function Pricing() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [currency, setCurrency] = useState<DisplayCurrency>("USD");
+  const planVisible = usePlanVisible();
 
   const currentPlan = profile?.plan ?? null;
 
@@ -102,7 +104,7 @@ function Pricing() {
         </div>
 
         <div className="mt-12 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {PLANS.map((plan) => {
+          {PLANS.filter((p) => planVisible(p.id)).map((plan) => {
             const isCurrent = currentPlan === plan.id;
             const label = LABELS[plan.id];
             const highlight = plan.id === "pro";
