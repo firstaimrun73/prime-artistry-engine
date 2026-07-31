@@ -19,6 +19,8 @@ import {
 } from "recharts";
 import { getAdminStats } from "@/lib/admin-stats.functions";
 import { listFeedbackAdmin, updateFeedbackStatus } from "@/lib/feedback.functions";
+import { AdminGate } from "@/components/admin/AdminGate";
+import { AdminControlPanel } from "@/components/admin/AdminControlPanel";
 import {
   Users,
   UserPlus,
@@ -33,8 +35,18 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  component: AdminPage,
+  component: AdminRoute,
 });
+
+// Client-side lock: only the configured admin account renders the dashboard.
+// The server functions behind it enforce the same rule authoritatively.
+function AdminRoute() {
+  return (
+    <AdminGate>
+      <AdminPage />
+    </AdminGate>
+  );
+}
 
 const PIE_COLORS = ["#F97316", "#CD7F32", "#C0C0C0", "#FFD700", "#60A5FA"];
 
@@ -220,6 +232,7 @@ function AdminPage() {
         </table>
       </div>
 
+      <AdminControlPanel />
       <AdminFeedbackSection />
     </div>
   );
