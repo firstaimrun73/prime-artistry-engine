@@ -15,9 +15,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2, ShieldAlert, ArrowLeft } from "lucide-react";
+import { AdminGate } from "@/components/admin/AdminGate";
 
 export const Route = createFileRoute("/_authenticated/admin_/refunds")({
-  component: AdminRefundsPage,
+  component: AdminRefundsRoute,
   head: () => ({
     meta: [
       { title: "Refund Requests — MOTIO2EDIT Admin" },
@@ -216,5 +217,14 @@ function AdminRefundsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Client-side lock: only the configured admin account renders this page.
+function AdminRefundsRoute() {
+  return (
+    <AdminGate>
+      <AdminRefundsPage />
+    </AdminGate>
   );
 }
