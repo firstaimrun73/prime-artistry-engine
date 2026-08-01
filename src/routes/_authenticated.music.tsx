@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 import { CREDIT_COST } from "@/lib/plans";
 import { generateMusic, MUSIC_GENRES, MUSIC_MOODS } from "@/lib/music.functions";
 import { toast } from "sonner";
