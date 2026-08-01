@@ -38,6 +38,7 @@ function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Generation | null>(null);
   const [zoomed, setZoomed] = useState(false);
+  const [tab, setTab] = useState<"media" | "music">("media");
 
   const load = () => {
     if (!user) return;
