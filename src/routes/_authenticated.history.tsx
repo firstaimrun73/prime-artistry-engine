@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { InContentAd } from "@/components/ads";
+import { MusicHistoryList } from "@/components/MusicHistoryList";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +38,7 @@ function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Generation | null>(null);
   const [zoomed, setZoomed] = useState(false);
+  const [tab, setTab] = useState<"media" | "music">("media");
 
   const load = () => {
     if (!user) return;
@@ -108,9 +110,26 @@ function HistoryPage() {
 
       <InContentAd />
 
+      <div className="mt-6 flex gap-2">
+        {(["media", "music"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`rounded-full border px-4 py-1.5 text-xs font-semibold capitalize transition-colors ${
+              tab === t
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border text-muted-foreground hover:border-primary"
+            }`}
+          >
+            {t === "media" ? "Images & Videos" : "Music"}
+          </button>
+        ))}
+      </div>
 
+      {tab === "music" ? (
+        <MusicHistoryList userId={user?.id} />
+      ) : loading ? (
 
-      {loading ? (
         <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
       ) : gens.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-border p-10 text-center">

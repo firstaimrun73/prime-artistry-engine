@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 import { CREDIT_COST } from "@/lib/plans";
 import { generateMusic, MUSIC_GENRES, MUSIC_MOODS } from "@/lib/music.functions";
 import { toast } from "sonner";
@@ -276,6 +277,25 @@ function MusicPage() {
       });
       setAudioUrl(res.outputUrl);
       toast.success("✅ Music ready!");
+
+      // Save the finished track to the user's music history.
+      if (profile?.id && res.outputUrl) {
+        const { error: saveErr } = await supabase.from("music_history").insert({
+          user_id: profile.id,
+          track_title: `Track ${new Date().toLocaleDateString("en-IN")}`,
+          prompt,
+          genre: backendGenre ?? null,
+          mood: backendMood ?? null,
+          bpm,
+          duration,
+          audio_url: res.outputUrl,
+        });
+        if (saveErr) {
+          console.error("[music] history save failed:", saveErr.message);
+        } else {
+          toast.success("🎵 Track saved to history!");
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? `❌ ${err.message}` : "❌ Failed. Credits not charged.";
       toast.error(msg);
