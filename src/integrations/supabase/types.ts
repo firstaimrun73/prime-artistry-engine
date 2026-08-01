@@ -458,6 +458,48 @@ export type Database = {
         }
         Relationships: []
       }
+      music_history: {
+        Row: {
+          audio_url: string
+          bpm: number | null
+          created_at: string
+          duration: number | null
+          genre: string | null
+          id: string
+          mood: string | null
+          prompt: string | null
+          track_title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audio_url: string
+          bpm?: number | null
+          created_at?: string
+          duration?: number | null
+          genre?: string | null
+          id?: string
+          mood?: string | null
+          prompt?: string | null
+          track_title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audio_url?: string
+          bpm?: number | null
+          created_at?: string
+          duration?: number | null
+          genre?: string | null
+          id?: string
+          mood?: string | null
+          prompt?: string | null
+          track_title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_attempts: {
         Row: {
           created_at: string
