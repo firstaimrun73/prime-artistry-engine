@@ -29,7 +29,6 @@ import { Route as FaqRouteImport } from './routes/faq'
 import { Route as EditRouteImport } from './routes/edit'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AdsDottxtRouteImport } from './routes/ads[.]txt'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudioVideoRouteImport } from './routes/studio.video'
@@ -151,11 +150,6 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdsDottxtRoute = AdsDottxtRouteImport.update({
-  id: '/ads.txt',
-  path: '/ads.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -263,7 +257,6 @@ const ApiPublicWebhooksNowpaymentsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/ads.txt': typeof AdsDottxtRoute
   '/auth': typeof AuthRoute
   '/checkout': typeof CheckoutRoute
   '/edit': typeof EditRoute
@@ -305,7 +298,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/ads.txt': typeof AdsDottxtRoute
   '/auth': typeof AuthRoute
   '/checkout': typeof CheckoutRoute
   '/edit': typeof EditRoute
@@ -349,7 +341,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/ads.txt': typeof AdsDottxtRoute
   '/auth': typeof AuthRoute
   '/checkout': typeof CheckoutRoute
   '/edit': typeof EditRoute
@@ -393,7 +384,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/ads.txt'
     | '/auth'
     | '/checkout'
     | '/edit'
@@ -435,7 +425,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/ads.txt'
     | '/auth'
     | '/checkout'
     | '/edit'
@@ -478,7 +467,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
-    | '/ads.txt'
     | '/auth'
     | '/checkout'
     | '/edit'
@@ -522,7 +510,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  AdsDottxtRoute: typeof AdsDottxtRoute
   AuthRoute: typeof AuthRoute
   CheckoutRoute: typeof CheckoutRoute
   EditRoute: typeof EditRoute
@@ -691,13 +678,6 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ads.txt': {
-      id: '/ads.txt'
-      path: '/ads.txt'
-      fullPath: '/ads.txt'
-      preLoaderRoute: typeof AdsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -889,7 +869,6 @@ const StudioRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  AdsDottxtRoute: AdsDottxtRoute,
   AuthRoute: AuthRoute,
   CheckoutRoute: CheckoutRoute,
   EditRoute: EditRoute,
@@ -920,3 +899,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
