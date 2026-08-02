@@ -244,7 +244,9 @@ export function buildImageEdit({
         ? `${prompt}.${PRESERVATION_CLAUSE}`
         : editSize === "large"
           ? `${prompt}.${STYLE_TRANSFORM_CLAUSE}`
-          : `${prompt}.${OBJECT_MODIFY_CLAUSE}`;
+          : editSize === "default" || editSize === "small"
+            ? `${prompt}.${OBJECT_MODIFY_CLAUSE}`
+            : prompt;
 
   const finalPrompt = isMulti
     ? `${basePrompt} Use image 1 as the base photo and images 2-${refs.length + 1} as additional references for the requested change.`
