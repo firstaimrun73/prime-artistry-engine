@@ -69,7 +69,7 @@ function Slider({ before, after, zoom }: Props & { zoom: number }) {
         src={after}
         alt="After"
         draggable={false}
-        className="absolute inset-0 z-0 h-full w-full object-contain transition-transform"
+        className="absolute inset-0 z-0 h-full w-full object-cover object-center transition-transform"
         style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
       />
       {/* Before is clipped on top (z-10); dragging right reveals more Before, left reveals more After */}
@@ -81,7 +81,7 @@ function Slider({ before, after, zoom }: Props & { zoom: number }) {
           src={before}
           alt="Before"
           draggable={false}
-          className="absolute inset-0 h-full w-full object-contain transition-transform"
+          className="absolute inset-0 h-full w-full object-cover object-center transition-transform"
           style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
         />
       </div>
