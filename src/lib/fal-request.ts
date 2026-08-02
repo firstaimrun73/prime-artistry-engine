@@ -242,7 +242,9 @@ export function buildImageEdit({
       ? `${prompt}.${PEOPLE_REMOVAL_PROMPT_CLAUSE}`
       : editSize === "small_add"
         ? `${prompt}.${PRESERVATION_CLAUSE}`
-        : prompt;
+        : editSize === "large"
+          ? `${prompt}.${STYLE_TRANSFORM_CLAUSE}`
+          : `${prompt}.${OBJECT_MODIFY_CLAUSE}`;
 
   const finalPrompt = isMulti
     ? `${basePrompt} Use image 1 as the base photo and images 2-${refs.length + 1} as additional references for the requested change.`
