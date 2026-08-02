@@ -172,11 +172,11 @@ export function getQualitySettings(editSize: EditSize) {
     case "small":
       return { strength: 0.6, guidance_scale: 3.0, num_inference_steps: 45 };
     case "large":
-      return { strength: 0.85, guidance_scale: 3.5, num_inference_steps: 50 };
+      return { strength: 0.85, guidance_scale: 4.5, num_inference_steps: 50 };
     default:
       // Balanced default: strong enough to apply the edit, gentle enough to
       // keep the subject and composition recognisable.
-      return { strength: 0.7, guidance_scale: 3.0, num_inference_steps: 45 };
+      return { strength: 0.7, guidance_scale: 4.5, num_inference_steps: 50 };
   }
 }
 
