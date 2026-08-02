@@ -526,6 +526,14 @@ export const generateMedia = createServerFn({ method: "POST" })
       input_url: data.imageUrl ? "uploaded" : null,
       output_url: outputUrl,
       status: "success",
+      metadata:
+        data.type === "video"
+          ? {
+              duration: data.videoDurationSeconds ?? 5,
+              resolution: data.videoResolution ?? null,
+              aspect_ratio: data.videoAspectRatio ?? null,
+            }
+          : null,
     });
     if (histErr) console.error("[generate] history insert failed:", histErr.message);
 

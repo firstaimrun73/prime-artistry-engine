@@ -15,38 +15,31 @@ type ViewMode = "side" | "slider";
  */
 function SideBySide({ before, after, zoom }: Props & { zoom: number }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <div className="relative overflow-hidden rounded-xl border border-border bg-card">
-        <div className="relative aspect-square w-full">
+    <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+      {[
+        { src: before, label: "Before" },
+        { src: after, label: "After" },
+      ].map((item) => (
+        <div
+          key={item.label}
+          className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-card"
+        >
           <img
-            src={before}
-            alt="Before"
+            src={item.src}
+            alt={item.label}
             draggable={false}
-            className="h-full w-full object-contain transition-transform"
-            style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
+            className="absolute inset-0 h-full w-full object-cover object-center transition-transform"
+            style={{ transform: `scale(${zoom})` }}
           />
+          <span className="absolute left-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+            {item.label}
+          </span>
         </div>
-        <span className="absolute left-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-          Before
-        </span>
-      </div>
-      <div className="relative overflow-hidden rounded-xl border border-border bg-card">
-        <div className="relative aspect-square w-full">
-          <img
-            src={after}
-            alt="After"
-            draggable={false}
-            className="h-full w-full object-contain transition-transform"
-            style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
-          />
-        </div>
-        <span className="absolute right-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-          After
-        </span>
-      </div>
+      ))}
     </div>
   );
 }
+
 
 function Slider({ before, after, zoom }: Props & { zoom: number }) {
   const [pos, setPos] = useState(50);
@@ -76,7 +69,7 @@ function Slider({ before, after, zoom }: Props & { zoom: number }) {
         src={after}
         alt="After"
         draggable={false}
-        className="absolute inset-0 z-0 h-full w-full object-contain transition-transform"
+        className="absolute inset-0 z-0 h-full w-full object-cover object-center transition-transform"
         style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
       />
       {/* Before is clipped on top (z-10); dragging right reveals more Before, left reveals more After */}
@@ -88,7 +81,7 @@ function Slider({ before, after, zoom }: Props & { zoom: number }) {
           src={before}
           alt="Before"
           draggable={false}
-          className="absolute inset-0 h-full w-full object-contain transition-transform"
+          className="absolute inset-0 h-full w-full object-cover object-center transition-transform"
           style={{ transform: `scale(${zoom})`, maxWidth: "100%" }}
         />
       </div>
