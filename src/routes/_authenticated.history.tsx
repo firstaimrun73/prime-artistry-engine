@@ -168,6 +168,19 @@ function HistoryPage() {
                   {g.type === "video" ? <Video className="h-3 w-3" /> : g.type === "music" ? <Music className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
                   {g.type}
                 </span>
+                {g.type === "video" && (() => {
+                  const meta = (g as { metadata?: Record<string, unknown> | null }).metadata ?? null;
+                  const dur = meta && typeof meta === "object" ? (meta as Record<string, unknown>).duration : null;
+                  const res = meta && typeof meta === "object" ? (meta as Record<string, unknown>).resolution : null;
+                  if (!dur && !res) return null;
+                  return (
+                    <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-semibold backdrop-blur">
+                      {dur ? `${String(dur)}s` : null}
+                      {dur && res ? " · " : null}
+                      {res ? String(res) : null}
+                    </span>
+                  );
+                })()}
               </div>
               <div className="p-3">
                 <p className="truncate text-xs font-medium">{g.prompt ?? "Untitled"}</p>
