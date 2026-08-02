@@ -188,6 +188,16 @@ const PRESERVATION_CLAUSE =
 const PEOPLE_REMOVAL_PROMPT_CLAUSE =
   " Completely remove the target person or all visible people from the original photo. Do not preserve any removed humans. Erase faces, bodies, clothing, hair, limbs, shadows, reflections and ghost silhouettes. Seamlessly reconstruct the background where they were using matching texture, perspective, lighting, depth, colors and noise. Preserve every non-human pixel, object, edge, background structure, camera angle and composition as much as possible. Do not add new people. Keep the result photorealistic.";
 
+// Style / transformation edits ("make this bike look like the Batman bike"):
+// the geometry of the uploaded photo must survive; only appearance changes.
+const STYLE_TRANSFORM_CLAUSE =
+  " Apply this transformation to the EXACT uploaded image only. Keep all original proportions, angles, perspective and composition identical. Only change the visual style and appearance as requested. Do not change the shape or structure. Keep it photorealistic unless a style is specifically requested. High quality output with maximum detail.";
+
+// Object modification edits: change one object, leave the scene alone.
+const OBJECT_MODIFY_CLAUSE =
+  " Modify only the specified object in this exact photo. Keep the background, lighting, shadows and surroundings completely unchanged. The modification must look natural and realistic as if it was always there. Maintain the original camera angle and perspective.";
+
+
 // ── Image edit (FLUX Kontext) ─────────────────────────────────────────────
 export function buildImageEdit({
   prompt,
