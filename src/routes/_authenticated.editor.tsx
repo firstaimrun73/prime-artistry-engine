@@ -1025,6 +1025,11 @@ function Editor() {
                     );
                   })}
                 </div>
+                {videoDuration >= 15 && (
+                  <p className="mt-1.5 text-[11px] font-medium text-primary">
+                    {videoDuration}s videos take ~3–5 minutes. Please don't close this page.
+                  </p>
+                )}
                 {!isAdmin && !isDurationAllowed(profile.plan, 30) && (
                   <p className="mt-1.5 text-[11px] text-muted-foreground">
                     Longer clips need a higher plan.{" "}
