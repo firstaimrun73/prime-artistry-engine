@@ -17,6 +17,12 @@ import { SampleShowcase } from "@/components/SampleShowcase";
 import { SampleGallery } from "@/components/SampleGallery";
 import { MusicSamples } from "@/components/MusicSamples";
 import { VideoSamples } from "@/components/VideoSamples";
+import { HomeHero } from "@/components/home/HomeHero";
+import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
+import { TrustSection } from "@/components/home/TrustSection";
+import { WhyChoose } from "@/components/home/WhyChoose";
+import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
+import { FinalCTA } from "@/components/home/FinalCTA";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -42,27 +48,9 @@ function SignedOutHome() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <section className="mx-auto w-full max-w-6xl px-4 pb-10 pt-12 text-center sm:pb-16 sm:pt-20">
-        <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
-          <Zap className="h-3.5 w-3.5 text-primary" /> Credit-based AI editing
-        </span>
-        <h1 className="mx-auto mt-6 max-w-3xl text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-          Transform your media with <span className="text-primary">AI</span>, instantly.
-        </h1>
-        <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
-          Upload an image or video, write a prompt, and generate a polished result.
-          Clean, fast, and built for creators.
-        </p>
-        <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-          <Button asChild size="lg">
-            <Link to="/pricing">View pricing</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link to="/editor">Open editor</Link>
-          </Button>
-        </div>
-      </section>
+      <HomeHero />
 
+      <BeforeAfterShowcase />
       <SampleShowcase />
       <SampleGallery />
       <MusicSamples />
@@ -70,47 +58,20 @@ function SignedOutHome() {
       <StudioLoopingShowcase />
       <StudioShowcase />
 
-
-      <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
-        <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-          {[
-            { icon: ImageIcon, title: "Image generation", desc: "Available on every plan, including free credits." },
-            { icon: Video, title: "Video generation", desc: "Unlock high-quality video on paid plans." },
-            { icon: Download, title: "Instant download", desc: "Grab your output the moment it's ready." },
-            { icon: Wand2, title: "Prompt-driven", desc: "Describe what you want — no complex tools." },
-            { icon: Zap, title: "Priority processing", desc: "Paid plans skip the queue for faster results." },
-            { icon: ShieldCheck, title: "Credit-based", desc: "Pay only for what you generate. No surprises." },
-          ].map((f) => {
-            const Icon = f.icon;
-            return (
-              <div key={f.title} className="rounded-xl border border-border bg-card p-6">
-                <Icon className="h-6 w-6 text-primary" />
-                <h3 className="mt-4 font-semibold">{f.title}</h3>
-                <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
+      <TrustSection />
+      <WhyChoose />
 
       <MusicHomeSection />
 
-      <section className="mx-auto w-full max-w-6xl px-4 pb-16 text-center sm:pb-24">
-        <div className="rounded-2xl border border-border bg-card p-6 sm:p-10">
-          <h2 className="text-2xl font-bold sm:text-3xl">Ready to create?</h2>
-          <p className="mt-2 text-muted-foreground">Start free, upgrade when you need video.</p>
-          <Button asChild size="lg" className="mt-6">
-            <Link to="/pricing">Choose a plan</Link>
-          </Button>
-        </div>
-      </section>
+      <TestimonialsCarousel />
       <HomeTestimonials />
+      <FinalCTA />
       <FooterAd />
       <Footer />
     </div>
   );
 }
+
 
 function HomeTestimonials() {
   const fetchFeedback = useServerFn(listPublicFeedback);

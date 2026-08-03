@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { X, ChevronLeft, ChevronRight, ZoomIn, Images } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { X, ChevronLeft, ChevronRight, ZoomIn, Images, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import bgRemoval from "@/assets/samples/bg-removal.png.asset.json";
 import objectRemoval from "@/assets/samples/object-removal.png.asset.json";
 import photoRestoration from "@/assets/samples/photo-restoration.webp.asset.json";
@@ -12,25 +14,40 @@ type GalleryItem = {
   caption: string;
   url: string;
   beforeAfter?: boolean;
+  category: string;
+  time: string;
+  prompt: string;
 };
 
 export const GALLERY_ITEMS: GalleryItem[] = [
-  { title: "Background Removal", caption: "Clean cut-outs with crisp edges", url: bgRemoval.url, beforeAfter: true },
-  { title: "Object Removal", caption: "Erase people and objects seamlessly", url: objectRemoval.url, beforeAfter: true },
-  { title: "Photo Restoration", caption: "Repair and colorise old memories", url: photoRestoration.url, beforeAfter: true },
-  { title: "Face Enhancement", caption: "Studio-grade portrait retouching", url: faceEnhance.url, beforeAfter: true },
-  { title: "AI Upscaling", caption: "Low-res to razor sharp 4K", url: aiUpscaling.url, beforeAfter: true },
-  { title: "Style Transfer", caption: "Reimagine any shot as fine art", url: styleTransfer.url, beforeAfter: true },
+  { title: "Background Removal", caption: "Clean cut-outs with crisp edges", url: bgRemoval.url, beforeAfter: true, category: "Image", time: "~8s", prompt: "Remove the background completely and keep clean edges" },
+  { title: "Object Removal", caption: "Erase people and objects seamlessly", url: objectRemoval.url, beforeAfter: true, category: "Image", time: "~15s", prompt: "Remove all people from the scene and rebuild the background naturally" },
+  { title: "Photo Restoration", caption: "Repair and colorise old memories", url: photoRestoration.url, beforeAfter: true, category: "Image", time: "~20s", prompt: "Restore this old damaged photo and colorise it naturally" },
+  { title: "Face Enhancement", caption: "Studio-grade portrait retouching", url: faceEnhance.url, beforeAfter: true, category: "Portrait", time: "~12s", prompt: "Enhance the face, skin and lighting while keeping the identity identical" },
+  { title: "AI Upscaling", caption: "Low-res to razor sharp 4K", url: aiUpscaling.url, beforeAfter: true, category: "Enhance", time: "~25s", prompt: "Upscale this image to 4K with maximum detail" },
+  { title: "Style Transfer", caption: "Reimagine any shot as fine art", url: styleTransfer.url, beforeAfter: true, category: "Style", time: "~18s", prompt: "Repaint this photo as a detailed oil painting while keeping the composition identical" },
 ];
+
 
 function Skeleton() {
   return <div className="absolute inset-0 animate-pulse bg-secondary" />;
 }
 
 export function SampleGallery() {
+  const navigate = useNavigate();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [zoomed, setZoomed] = useState(false);
   const [loaded, setLoaded] = useState<Record<number, boolean>>({});
+
+  const tryEffect = (prompt: string) => {
+    try {
+      sessionStorage.setItem("motio2edit-preset", JSON.stringify({ prompt, mode: "image" }));
+    } catch {
+      /* ignore */
+    }
+    navigate({ to: "/editor" });
+  };
+
 
   const close = useCallback(() => {
     setOpenIndex(null);
@@ -76,15 +93,17 @@ export function SampleGallery() {
 
       <div className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {GALLERY_ITEMS.map((item, i) => (
-          <button
+          <article
             key={item.title}
-            type="button"
-            onClick={() => setOpenIndex(i)}
             className="reveal-up group relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-2xl"
             style={{ animationDelay: `${i * 70}ms` }}
-            aria-label={`Open ${item.title} sample`}
           >
-            <div className="relative aspect-[3/2] w-full overflow-hidden bg-secondary">
+            <button
+              type="button"
+              onClick={() => setOpenIndex(i)}
+              aria-label={`Open ${item.title} sample`}
+              className="relative aspect-[3/2] w-full overflow-hidden bg-secondary"
+            >
               {!loaded[i] && <Skeleton />}
               <img
                 src={item.url}
@@ -105,13 +124,25 @@ export function SampleGallery() {
               <span className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 opacity-0 backdrop-blur transition-opacity group-hover:opacity-100">
                 <ZoomIn className="h-4 w-4 text-primary" />
               </span>
-            </div>
-            <div className="min-w-0 flex-1 p-4">
+            </button>
+            <div className="flex min-w-0 flex-1 flex-col p-4">
               <p className="truncate font-bold">{item.title}</p>
               <p className="mt-1 text-sm text-muted-foreground">{item.caption}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                  {item.category}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-secondary px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                  <Clock className="h-3 w-3 text-primary" /> {item.time}
+                </span>
+              </div>
+              <Button size="sm" className="btn-animate mt-4 w-full" onClick={() => tryEffect(item.prompt)}>
+                Try This Effect
+              </Button>
             </div>
-          </button>
+          </article>
         ))}
+
       </div>
 
       {active && (
