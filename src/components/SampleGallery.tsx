@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { X, ChevronLeft, ChevronRight, ZoomIn, Images } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { X, ChevronLeft, ChevronRight, ZoomIn, Images, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import bgRemoval from "@/assets/samples/bg-removal.png.asset.json";
 import objectRemoval from "@/assets/samples/object-removal.png.asset.json";
 import photoRestoration from "@/assets/samples/photo-restoration.webp.asset.json";
@@ -12,16 +14,20 @@ type GalleryItem = {
   caption: string;
   url: string;
   beforeAfter?: boolean;
+  category: string;
+  time: string;
+  prompt: string;
 };
 
 export const GALLERY_ITEMS: GalleryItem[] = [
-  { title: "Background Removal", caption: "Clean cut-outs with crisp edges", url: bgRemoval.url, beforeAfter: true },
-  { title: "Object Removal", caption: "Erase people and objects seamlessly", url: objectRemoval.url, beforeAfter: true },
-  { title: "Photo Restoration", caption: "Repair and colorise old memories", url: photoRestoration.url, beforeAfter: true },
-  { title: "Face Enhancement", caption: "Studio-grade portrait retouching", url: faceEnhance.url, beforeAfter: true },
-  { title: "AI Upscaling", caption: "Low-res to razor sharp 4K", url: aiUpscaling.url, beforeAfter: true },
-  { title: "Style Transfer", caption: "Reimagine any shot as fine art", url: styleTransfer.url, beforeAfter: true },
+  { title: "Background Removal", caption: "Clean cut-outs with crisp edges", url: bgRemoval.url, beforeAfter: true, category: "Image", time: "~8s", prompt: "Remove the background completely and keep clean edges" },
+  { title: "Object Removal", caption: "Erase people and objects seamlessly", url: objectRemoval.url, beforeAfter: true, category: "Image", time: "~15s", prompt: "Remove all people from the scene and rebuild the background naturally" },
+  { title: "Photo Restoration", caption: "Repair and colorise old memories", url: photoRestoration.url, beforeAfter: true, category: "Image", time: "~20s", prompt: "Restore this old damaged photo and colorise it naturally" },
+  { title: "Face Enhancement", caption: "Studio-grade portrait retouching", url: faceEnhance.url, beforeAfter: true, category: "Portrait", time: "~12s", prompt: "Enhance the face, skin and lighting while keeping the identity identical" },
+  { title: "AI Upscaling", caption: "Low-res to razor sharp 4K", url: aiUpscaling.url, beforeAfter: true, category: "Enhance", time: "~25s", prompt: "Upscale this image to 4K with maximum detail" },
+  { title: "Style Transfer", caption: "Reimagine any shot as fine art", url: styleTransfer.url, beforeAfter: true, category: "Style", time: "~18s", prompt: "Repaint this photo as a detailed oil painting while keeping the composition identical" },
 ];
+
 
 function Skeleton() {
   return <div className="absolute inset-0 animate-pulse bg-secondary" />;
