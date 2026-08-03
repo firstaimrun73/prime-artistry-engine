@@ -17,6 +17,12 @@ import { SampleShowcase } from "@/components/SampleShowcase";
 import { SampleGallery } from "@/components/SampleGallery";
 import { MusicSamples } from "@/components/MusicSamples";
 import { VideoSamples } from "@/components/VideoSamples";
+import { HomeHero } from "@/components/home/HomeHero";
+import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
+import { TrustSection } from "@/components/home/TrustSection";
+import { WhyChoose } from "@/components/home/WhyChoose";
+import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
+import { FinalCTA } from "@/components/home/FinalCTA";
 
 export const Route = createFileRoute("/")({
   head: () => ({
