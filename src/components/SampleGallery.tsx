@@ -34,9 +34,20 @@ function Skeleton() {
 }
 
 export function SampleGallery() {
+  const navigate = useNavigate();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [zoomed, setZoomed] = useState(false);
   const [loaded, setLoaded] = useState<Record<number, boolean>>({});
+
+  const tryEffect = (prompt: string) => {
+    try {
+      sessionStorage.setItem("motio2edit-preset", JSON.stringify({ prompt, mode: "image" }));
+    } catch {
+      /* ignore */
+    }
+    navigate({ to: "/editor" });
+  };
+
 
   const close = useCallback(() => {
     setOpenIndex(null);
