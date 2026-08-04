@@ -168,6 +168,53 @@ function MusicPage() {
   const [playing, setPlaying] = useState(false);
   const [showRestore, setShowRestore] = useState<null | { prompt?: string; instrument?: Chip | null; mood?: string | null; duration?: number; bpm?: number; tier?: "lite" | "pro"; audioUrl?: string | null; customDuration?: boolean }>(null);
 
+  // Optional image → mood reference (Anthropic vision describes the mood and
+  // the description is appended to the music prompt at generation time).
+  const [moodImage, setMoodImage] = useState<string | null>(null);
+  const [detectedMood, setDetectedMood] = useState<string | null>(null);
+  const [moodLoading, setMoodLoading] = useState(false);
+  const moodFileRef = useRef<HTMLInputElement | null>(null);
+  const analyzeMood = useServerFn(analyzeImageMood);
+
+  async function onMoodImage(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image is too large. Maximum is 8 MB.");
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("Could not read that image."));
+      r.readAsDataURL(file);
+    }).catch(() => null);
+    if (!dataUrl) {
+      toast.error("Could not read that image.");
+      return;
+    }
+    setMoodImage(dataUrl);
+    setDetectedMood(null);
+    setMoodLoading(true);
+    try {
+      const res = await analyzeMood({ data: { imageUrl: dataUrl } });
+      setDetectedMood(res.mood);
+      toast.success("🎨 Mood detected from your image.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not analyze that image.");
+    } finally {
+      setMoodLoading(false);
+    }
+  }
+
+  function clearMoodImage() {
+    setMoodImage(null);
+    setDetectedMood(null);
+    setMoodLoading(false);
+  }
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
   const isAdmin = isAdminEmail(profile?.email);
