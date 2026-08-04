@@ -332,6 +332,9 @@ export const generateMusic = createServerFn({ method: "POST" })
       outputUrl,
       credits: newCredits,
       durationSeconds: data.durationSeconds,
+      // Lets the UI tell the user when a backup model produced the track.
+      model: usedModel,
+      usedFallback: usedModel !== modelChain[0],
     };
   });
 

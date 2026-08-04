@@ -326,6 +326,7 @@ function MusicPage() {
         },
       });
       setAudioUrl(res.outputUrl);
+      if (res.usedFallback) toast("Switched to backup model for a cleaner track.");
       toast.success("✅ Music ready!");
 
       // Save the finished track to the user's music history.
