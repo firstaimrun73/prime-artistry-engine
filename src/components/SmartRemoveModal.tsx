@@ -454,8 +454,11 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       }
       if (painted === 0) { setApplying(false); setHasMark(false); return; }
       octx.putImageData(bw, 0, 0);
+      // Keep the processing overlay up (and drawing disabled) until the parent
+      // closes the modal after the AI result comes back.
       onApply(out.toDataURL("image/png"));
-    } finally {
+    } catch (e) {
+      console.error("[smart-remove] apply failed:", e);
       setApplying(false);
     }
   };
