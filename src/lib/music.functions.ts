@@ -174,6 +174,27 @@ async function runStableAudio(
   return url;
 }
 
+// Reject degenerate output ("chip" sounds are almost always sub-second or
+// near-empty files). We validate reachability + payload size, which maps to
+// roughly 5 seconds of audio at any sane bitrate.
+const MIN_AUDIO_BYTES = 40_000;
+async function isPlayableAudio(url: string): Promise<boolean> {
+  if (!url || !url.startsWith("http")) return false;
+  try {
+    const head = await fetch(url, { method: "HEAD" });
+    if (!head.ok) return false;
+    const len = Number(head.headers.get("content-length") ?? "0");
+    if (len && len < MIN_AUDIO_BYTES) {
+      console.warn("[music] audio too small:", len, "bytes");
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn("[music] audio validation failed:", e);
+    return false;
+  }
+}
+
 export const generateMusic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => inputSchema.parse(data))
