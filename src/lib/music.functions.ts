@@ -18,7 +18,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST } from "@/lib/plans";
 
 const FAL_QUEUE = "https://queue.fal.run/";
-const MUSIC_MODEL_PRO = "cassetteai/music-generator";
+// High quality chain: minimax first (richest, most musical output), then the
+// CassetteAI generator, then Stable Audio as the final safety net. Chip /
+// artifact sounds in the earlier single-model setup came from returning the
+// first response even when the model produced a degenerate clip.
+const MUSIC_MODEL_PRO = "fal-ai/minimax/music-01";
+const MUSIC_MODEL_PRO_FALLBACK = "cassetteai/music-generator";
 const MUSIC_MODEL_LITE = "fal-ai/stable-audio";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
