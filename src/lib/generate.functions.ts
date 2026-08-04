@@ -222,6 +222,9 @@ const inputSchema = z.object({
   // Output quality tiers. Images: HD / 2K / 4K. Video: 720p / 1080p / 4K.
   imageQuality: z.enum(["hd", "2k", "4k"]).optional(),
   videoResolution: z.enum(["720p", "1080p", "4k"]).optional(),
+  // Video → Video only. "enhance" runs the Topaz upscale pass (flat cost);
+  // "transform" runs the normal generative pipeline.
+  videoMode: z.enum(["transform", "enhance"]).optional(),
 });
 
 
@@ -261,8 +264,10 @@ export const generateMedia = createServerFn({ method: "POST" })
     const videoDuration = isAdmin
       ? requestedDuration
       : (Math.min(requestedDuration, maxDuration) as typeof requestedDuration);
-    const cost =
-      data.type === "video"
+    const isVideoEnhance = data.type === "video" && data.sourceKind === "video";
+    const cost = isVideoEnhance
+      ? CREDIT_COST.video_enhance
+      : data.type === "video"
         ? Math.round(
             videoCreditCost(videoDuration) * videoResolutionMultiplier(data.videoResolution),
           )
