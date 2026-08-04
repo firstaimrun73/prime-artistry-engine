@@ -191,7 +191,11 @@ export const generateMusic = createServerFn({ method: "POST" })
     // Credit rule: Pro = 100 credits, Lite = 50 credits. Admin (ADMIN_EMAIL) bypasses.
     const tier = data.tier ?? "pro";
     const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
-    const model = tier === "lite" ? MUSIC_MODEL_LITE : MUSIC_MODEL_PRO;
+    // Model chain: try in order, fall through on failure or degenerate audio.
+    const modelChain =
+      tier === "lite"
+        ? [MUSIC_MODEL_LITE]
+        : [MUSIC_MODEL_PRO, MUSIC_MODEL_PRO_FALLBACK, MUSIC_MODEL_LITE];
     const adminEmail = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
     const isAdmin =
       !!adminEmail &&
