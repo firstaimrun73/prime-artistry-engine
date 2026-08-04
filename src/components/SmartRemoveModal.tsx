@@ -38,6 +38,11 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const spaceDownRef = useRef(false);
   const historyRef = useRef<ImageData[]>([]);
   const historyIndexRef = useRef(-1);
+  // Perf: paints are coalesced into one requestAnimationFrame callback and
+  // the mask canvas is capped so huge phone photos don't lock up the UI.
+  const rafRef = useRef<number | null>(null);
+  const maskScaleRef = useRef(1);
+  const hasMarkRef = useRef(false);
 
   // Settings
   const [tool, setTool] = useState<Tool>("brush");
@@ -59,6 +64,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   useEffect(() => {
     if (!open) {
       setReady(false);
+      hasMarkRef.current = false;
       setHasMark(false);
       setApplying(false);
       setZoom(1);
@@ -140,15 +146,39 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     }
   }, [displayScale, showMask, overlayOpacity]);
 
+  // Coalesce repaint requests: at most one canvas composite per frame.
+  const requestPaint = useCallback(() => {
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      paintView();
+    });
+  }, [paintView]);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    },
+    [],
+  );
+
   const onImageLoad = () => {
     const img = imgRef.current;
     const mask = maskCanvasRef.current;
     if (!img || !mask) return;
-    mask.width = img.naturalWidth;
-    mask.height = img.naturalHeight;
+    // Cap the mask working resolution — masks are resized by the inpainting
+    // model anyway, and full-resolution phone photos (12MP+) make every brush
+    // stroke allocate megabytes and freeze the device.
+    const MAX_MASK_DIM = 1400;
+    const scale = Math.min(1, MAX_MASK_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+    maskScaleRef.current = scale;
+    mask.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    mask.height = Math.max(1, Math.round(img.naturalHeight * scale));
     const ctx = mask.getContext("2d");
     if (ctx) ctx.clearRect(0, 0, mask.width, mask.height);
     setReady(true);
+    hasMarkRef.current = false;
     setHasMark(false);
     historyRef.current = [];
     historyIndexRef.current = -1;
@@ -181,32 +211,40 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     return { x, y };
   };
 
-  const drawStamp = (x: number, y: number) => {
+  const drawStamp = (px: number, py: number) => {
+    let x = px;
+    let y = py;
     const c = maskCanvasRef.current;
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    const r = brush / 2;
+    const ms = maskScaleRef.current;
+    x *= ms;
+    y *= ms;
+    const r = (brush / 2) * ms;
     const alpha = (opacity / 100) * (tool === "brush" ? 1 : 1);
 
     if (tool === "brush") {
       ctx.globalCompositeOperation = "source-over";
       const inner = Math.max(0, Math.min(1, hardness / 100));
-      const grad = ctx.createRadialGradient(x, y, r * inner, x, y, r + feather);
+      const grad = ctx.createRadialGradient(x, y, r * inner, x, y, r + feather * ms);
       grad.addColorStop(0, `rgba(255,255,255,${alpha})`);
       grad.addColorStop(1, "rgba(255,255,255,0)");
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(x, y, r + feather, 0, Math.PI * 2);
+      ctx.arc(x, y, r + feather * ms, 0, Math.PI * 2);
       ctx.fill();
     } else {
       ctx.globalCompositeOperation = "destination-out";
       ctx.fillStyle = `rgba(0,0,0,${alpha})`;
       ctx.beginPath();
-      ctx.arc(x, y, r + feather, 0, Math.PI * 2);
+      ctx.arc(x, y, r + feather * ms, 0, Math.PI * 2);
       ctx.fill();
     }
-    setHasMark(true);
+    if (!hasMarkRef.current) {
+      hasMarkRef.current = true;
+      setHasMark(true);
+    }
   };
 
   const stroke = (from: { x: number; y: number }, to: { x: number; y: number }) => {
@@ -219,14 +257,14 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       const t = i / n;
       drawStamp(from.x + dx * t, from.y + dy * t);
     }
-    paintView();
+    requestPaint();
   };
 
   const beginStroke = (clientX: number, clientY: number) => {
     const p = pointFromClient(clientX, clientY);
     lastPtRef.current = p;
     drawStamp(p.x, p.y);
-    paintView();
+    requestPaint();
   };
   const continueStroke = (clientX: number, clientY: number) => {
     if (!drawingRef.current) return;
@@ -244,6 +282,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
 
   // Pointer handlers
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (applying) return;
     if (spaceDownRef.current || e.button === 1) {
       panningRef.current = true;
       panStartRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
@@ -256,6 +295,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     beginStroke(e.clientX, e.clientY);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (applying) return;
     if (panningRef.current && panStartRef.current) {
       const dx = e.clientX - panStartRef.current.x;
       const dy = e.clientY - panStartRef.current.y;
@@ -348,6 +388,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     const ctx = c.getContext("2d");
     ctx?.clearRect(0, 0, c.width, c.height);
     paintView();
+    hasMarkRef.current = false;
     setHasMark(false);
     pushHistory();
   };
