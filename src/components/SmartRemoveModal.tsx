@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   X, Eraser, Check, Brush, ZoomIn, ZoomOut, Undo2, Redo2,
   Move, EyeOff, Eye, FlipHorizontal2, RotateCcw,
@@ -59,6 +60,12 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const [applying, setApplying] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const isMobile = useIsMobile();
+  // Large brushes stamp far more pixels per stroke; phones can't keep up.
+  const maxBrush = isMobile ? 80 : 100;
+  useEffect(() => {
+    setBrush((b) => Math.min(b, maxBrush));
+  }, [maxBrush]);
 
   // Reset on open/close
   useEffect(() => {
@@ -320,7 +327,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     if (e.ctrlKey || e.metaKey) {
       setZoom((z) => Math.max(0.25, Math.min(8, z * (e.deltaY < 0 ? 1.1 : 0.9))));
     } else {
-      setBrush((b) => Math.max(1, Math.min(100, b + (e.deltaY < 0 ? 2 : -2))));
+      setBrush((b) => Math.max(1, Math.min(maxBrush, b + (e.deltaY < 0 ? 2 : -2))));
     }
   };
 
@@ -331,7 +338,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.code === "Space") { spaceDownRef.current = true; e.preventDefault(); return; }
       if (e.key === "[") setBrush((b) => Math.max(1, b - 2));
-      if (e.key === "]") setBrush((b) => Math.min(100, b + 2));
+      if (e.key === "]") setBrush((b) => Math.min(maxBrush, b + 2));
       if (e.key.toLowerCase() === "b") setTool("brush");
       if (e.key.toLowerCase() === "e") setTool("erase");
       if (e.key.toLowerCase() === "m") setShowMask((v) => !v);
@@ -555,8 +562,15 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
               style={{
                 cursor: panningRef.current || spaceDownRef.current ? "grabbing" : tool === "erase" ? "cell" : "crosshair",
                 touchAction: "none",
+                pointerEvents: applying ? "none" : "auto",
               }}
             />
+            {applying && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-primary" />
+                <p className="text-sm font-semibold text-white">AI is removing…</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -564,7 +578,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       {/* Settings + actions */}
       <div className="space-y-3 border-t border-white/10 bg-background/95 p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-          <SliderRow label="Size" value={brush} min={1} max={100} onChange={setBrush} suffix="px" />
+          <SliderRow label="Size" value={brush} min={1} max={maxBrush} onChange={setBrush} suffix="px" />
           <SliderRow label="Opacity" value={opacity} min={10} max={100} onChange={setOpacity} suffix="%" />
           <SliderRow label="Hardness" value={hardness} min={0} max={100} onChange={setHardness} suffix="%" />
           <SliderRow label="Feather" value={feather} min={0} max={20} onChange={setFeather} suffix="px" />
