@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { CREDIT_COST } from "@/lib/plans";
 import { generateMusic, MUSIC_GENRES, MUSIC_MOODS } from "@/lib/music.functions";
+import { analyzeImageMood } from "@/lib/image-mood.functions";
 import { toast } from "sonner";
 import {
   Music as MusicIcon,
@@ -26,6 +27,7 @@ import {
   Coins,
   Zap,
   Crown,
+  ImagePlus,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/music")({
@@ -310,7 +312,8 @@ function MusicPage() {
     toast("🎵 Composing your music...");
     startGeneration("music", "/music");
     try {
-      const enhanced = `${enhancePrompt({ prompt, instrument, mood, duration })} Tempo around ${bpm} BPM.`;
+      const moodSuffix = detectedMood ? ` Mood inspired by: ${detectedMood}.` : "";
+      const enhanced = `${enhancePrompt({ prompt, instrument, mood, duration })} Tempo around ${bpm} BPM.${moodSuffix}`;
       const backendMood = mapMoodToBackend(mood);
       const backendGenre = mapInstrumentToGenre(instrument?.key ?? null);
       const res = await generate({
