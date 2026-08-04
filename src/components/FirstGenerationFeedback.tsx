@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
 import { submitFeedback } from "@/lib/feedback.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
