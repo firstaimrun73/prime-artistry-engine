@@ -218,42 +218,54 @@ export const generateMusic = createServerFn({ method: "POST" })
     console.log("[music] prompt:", composed, "tier:", tier);
 
     let outputUrl: string;
+    let usedModel = modelChain[0]!;
     try {
-      // Two automatic retries on transient failures (timeouts / 5xx), matching
-      // the image + video pipelines. Credits are only charged after success.
       let lastErr: unknown;
       let url = "";
-      for (let attempt = 0; attempt <= 2; attempt++) {
-        try {
-          if (attempt > 0) console.log(`[music] retry attempt ${attempt}…`);
-          url = await runStableAudio(
-            {
-              prompt: composed,
-              duration: data.durationSeconds,
-              seconds_total: data.durationSeconds,
-              // Default deliverable: MP3 at CD sample rate.
-              output_format: "mp3",
-              sample_rate: 44100,
-            },
-
-            falKey,
-            model,
-          );
-          if (url) break;
-        } catch (e) {
-          lastErr = e;
-          const msg = e instanceof Error ? e.message : "";
-          if (/authentication|safety filter/i.test(msg)) throw e;
-          if (attempt === 2) throw e;
-          await sleep(2000 * (attempt + 1));
+      // Each model gets up to 2 attempts; a model that errors, returns no URL,
+      // or returns audio that fails validation falls through to the next one.
+      outer: for (const candidate of modelChain) {
+        for (let attempt = 0; attempt <= 1; attempt++) {
+          try {
+            if (attempt > 0) console.log(`[music] retry attempt ${attempt} on ${candidate}…`);
+            const body: Record<string, unknown> =
+              candidate === MUSIC_MODEL_PRO
+                ? {
+                    prompt: composed.slice(0, 900),
+                    duration: data.durationSeconds,
+                    instrumental: true,
+                  }
+                : {
+                    prompt: composed,
+                    duration: data.durationSeconds,
+                    seconds_total: data.durationSeconds,
+                    output_format: "mp3",
+                    sample_rate: 44100,
+                  };
+            const candidateUrl = await runStableAudio(body, falKey, candidate);
+            if (candidateUrl && (await isPlayableAudio(candidateUrl))) {
+              url = candidateUrl;
+              usedModel = candidate;
+              break outer;
+            }
+            console.warn("[music] ✖ rejected output from", candidate, "— trying next model");
+            break; // degenerate output: don't retry the same model
+          } catch (e) {
+            lastErr = e;
+            const msg = e instanceof Error ? e.message : "";
+            if (/safety filter/i.test(msg)) throw e;
+            if (attempt === 1) break;
+            await sleep(2000 * (attempt + 1));
+          }
         }
       }
-      if (!url) throw lastErr ?? new Error("Music generation returned no audio.");
+      if (!url) throw lastErr ?? new Error("Music generation returned no usable audio.");
       outputUrl = url;
+      console.log("[music] delivered by model:", usedModel);
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Generation failed.";
       console.error("[music] failed (no credits charged):", raw);
-      throw new Error(`${raw} — Credits not charged.`);
+      throw new Error(`Music generation failed. Credits not charged. Please retry. (${raw})`);
     }
 
     // Only a real, fetchable audio URL counts as a success.
