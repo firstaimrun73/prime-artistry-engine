@@ -260,8 +260,11 @@ function Editor() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
-  const cost =
-    mediaType === "video"
+  // Video → Video enhancement is an upscale pass, not a generation: flat cost.
+  const isVideoEnhance = mediaType === "video" && inputKind === "video" && !!inputFile;
+  const cost = isVideoEnhance
+    ? CREDIT_COST.video_enhance
+    : mediaType === "video"
       ? Math.round(videoCreditCost(videoDuration) * videoResolutionMultiplier(videoResolution))
       : imageQualityCost(imageQuality);
   const noCredits = !isAdmin && profile.credits < cost;

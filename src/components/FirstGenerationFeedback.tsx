@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
 import { submitFeedback } from "@/lib/feedback.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +43,8 @@ export function FirstGenerationFeedback() {
 
   useEffect(() => {
     if (!user) return;
+    // Never prompt the admin account.
+    if (isAdminEmail(profile?.email ?? user.email ?? null)) return;
     let cancelled = false;
     try {
       if (localStorage.getItem(FLAG)) return;
@@ -49,16 +52,18 @@ export function FirstGenerationFeedback() {
       return;
     }
     (async () => {
+      // Only image generations trigger the prompt — not video or music.
       const { count } = await supabase
         .from("generations")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("type", "image");
       if (!cancelled && (count ?? 0) >= 1) setOpen(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, profile?.email]);
 
   const dismissForever = () => {
     try {

@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { CREDIT_COST } from "@/lib/plans";
 import { generateMusic, MUSIC_GENRES, MUSIC_MOODS } from "@/lib/music.functions";
+import { analyzeImageMood } from "@/lib/image-mood.functions";
 import { toast } from "sonner";
 import {
   Music as MusicIcon,
@@ -26,6 +27,7 @@ import {
   Coins,
   Zap,
   Crown,
+  ImagePlus,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/music")({
@@ -168,6 +170,53 @@ function MusicPage() {
   const [playing, setPlaying] = useState(false);
   const [showRestore, setShowRestore] = useState<null | { prompt?: string; instrument?: Chip | null; mood?: string | null; duration?: number; bpm?: number; tier?: "lite" | "pro"; audioUrl?: string | null; customDuration?: boolean }>(null);
 
+  // Optional image → mood reference (Anthropic vision describes the mood and
+  // the description is appended to the music prompt at generation time).
+  const [moodImage, setMoodImage] = useState<string | null>(null);
+  const [detectedMood, setDetectedMood] = useState<string | null>(null);
+  const [moodLoading, setMoodLoading] = useState(false);
+  const moodFileRef = useRef<HTMLInputElement | null>(null);
+  const analyzeMood = useServerFn(analyzeImageMood);
+
+  async function onMoodImage(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image is too large. Maximum is 8 MB.");
+      return;
+    }
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("Could not read that image."));
+      r.readAsDataURL(file);
+    }).catch(() => null);
+    if (!dataUrl) {
+      toast.error("Could not read that image.");
+      return;
+    }
+    setMoodImage(dataUrl);
+    setDetectedMood(null);
+    setMoodLoading(true);
+    try {
+      const res = await analyzeMood({ data: { imageUrl: dataUrl } });
+      setDetectedMood(res.mood);
+      toast.success("🎨 Mood detected from your image.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not analyze that image.");
+    } finally {
+      setMoodLoading(false);
+    }
+  }
+
+  function clearMoodImage() {
+    setMoodImage(null);
+    setDetectedMood(null);
+    setMoodLoading(false);
+  }
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
   const isAdmin = isAdminEmail(profile?.email);
@@ -263,7 +312,8 @@ function MusicPage() {
     toast("🎵 Composing your music...");
     startGeneration("music", "/music");
     try {
-      const enhanced = `${enhancePrompt({ prompt, instrument, mood, duration })} Tempo around ${bpm} BPM.`;
+      const moodSuffix = detectedMood ? ` Mood inspired by: ${detectedMood}.` : "";
+      const enhanced = `${enhancePrompt({ prompt, instrument, mood, duration })} Tempo around ${bpm} BPM.${moodSuffix}`;
       const backendMood = mapMoodToBackend(mood);
       const backendGenre = mapInstrumentToGenre(instrument?.key ?? null);
       const res = await generate({
@@ -276,6 +326,7 @@ function MusicPage() {
         },
       });
       setAudioUrl(res.outputUrl);
+      if (res.usedFallback) toast("Switched to backup model for a cleaner track.");
       toast.success("✅ Music ready!");
 
       // Save the finished track to the user's music history.
@@ -426,6 +477,69 @@ function MusicPage() {
               ? "Standard — fast generation, MP3 44.1 kHz."
               : "High Quality — studio-grade detail and mix, MP3 44.1 kHz."}
           </p>
+
+          {/* Image → mood (optional) */}
+          <div className="mb-4 rounded-xl border border-border bg-background/60 p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs font-semibold text-muted-foreground">
+                Generate from image mood (optional)
+              </span>
+              <input
+                ref={moodFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onMoodImage(f);
+                  e.target.value = "";
+                }}
+              />
+              {!moodImage && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={moodLoading || loading}
+                  onClick={() => moodFileRef.current?.click()}
+                >
+                  {moodLoading ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Reading mood…
+                    </>
+                  ) : (
+                    <>
+                      <ImagePlus className="mr-1.5 h-4 w-4" /> Upload Image 🖼️
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+            {moodImage && (
+              <div className="mt-3 flex items-center gap-3">
+                <img
+                  src={moodImage}
+                  alt="Mood reference"
+                  className="h-14 w-14 rounded-lg object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  {detectedMood ? (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">AI detected:</span>{" "}
+                      {detectedMood}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {moodLoading ? "Analyzing image mood…" : "No mood detected."}
+                    </p>
+                  )}
+                </div>
+                <Button type="button" size="sm" variant="ghost" onClick={clearMoodImage}>
+                  Remove
+                </Button>
+              </div>
+            )}
+          </div>
 
           <div className="relative">
             <Textarea

@@ -48,6 +48,8 @@ export const CREDIT_COST = {
   video: 125,
   music: 100,
   music_lite: 50,
+  /** Video → Video Topaz enhancement (upscale only, no re-generation). */
+  video_enhance: 200,
 } as const;
 
 /** Sentinel for "unlimited" credits (Business). */
