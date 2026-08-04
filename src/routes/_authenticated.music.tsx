@@ -427,6 +427,69 @@ function MusicPage() {
               : "High Quality — studio-grade detail and mix, MP3 44.1 kHz."}
           </p>
 
+          {/* Image → mood (optional) */}
+          <div className="mb-4 rounded-xl border border-border bg-background/60 p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs font-semibold text-muted-foreground">
+                Generate from image mood (optional)
+              </span>
+              <input
+                ref={moodFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onMoodImage(f);
+                  e.target.value = "";
+                }}
+              />
+              {!moodImage && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={moodLoading || loading}
+                  onClick={() => moodFileRef.current?.click()}
+                >
+                  {moodLoading ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Reading mood…
+                    </>
+                  ) : (
+                    <>
+                      <ImagePlus className="mr-1.5 h-4 w-4" /> Upload Image 🖼️
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+            {moodImage && (
+              <div className="mt-3 flex items-center gap-3">
+                <img
+                  src={moodImage}
+                  alt="Mood reference"
+                  className="h-14 w-14 rounded-lg object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  {detectedMood ? (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">AI detected:</span>{" "}
+                      {detectedMood}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {moodLoading ? "Analyzing image mood…" : "No mood detected."}
+                    </p>
+                  )}
+                </div>
+                <Button type="button" size="sm" variant="ghost" onClick={clearMoodImage}>
+                  Remove
+                </Button>
+              </div>
+            )}
+          </div>
+
           <div className="relative">
             <Textarea
               value={prompt}
