@@ -661,10 +661,11 @@ function Editor() {
     // download. Paid users only get a watermark when they opted in. Admin
     // downloads are always clean.
     if (!outputIsVideo && !isAdmin) {
+      console.log("[watermark] download — plan:", profile?.plan, "| free:", isFree, "| keep:", keepWatermark);
       if (isFree) {
-        try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* keep original */ }
+        try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch (e) { console.error("[watermark] download grid failed:", e); }
       } else if (keepWatermark) {
-        try { downloadUrl = await watermarkImage(output); } catch { /* keep original */ }
+        try { downloadUrl = await watermarkImage(output); } catch (e) { console.error("[watermark] download pill failed:", e); }
       }
     }
     const a = document.createElement("a");
