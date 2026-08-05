@@ -570,8 +570,22 @@ function Editor() {
         // Preview shows ONLY the subtle corner pill for both free and
         // "keep watermark" paid users. The full-image protective grid is
         // applied at download time (see handleDownload) for free users.
-        if (isFree || keepWatermark) {
-          try { url = await watermarkImage(url); } catch { /* keep original */ }
+        const shouldMark = isFree || keepWatermark;
+        console.log("[watermark] applying to:", url.slice(0, 80));
+        console.log("[watermark] user plan:", profile?.plan, "| free:", isFree);
+        console.log("[watermark] keep watermark:", keepWatermark, "| will apply:", shouldMark);
+        if (shouldMark) {
+          try {
+            const marked = await watermarkImage(url);
+            if (marked && marked !== url) {
+              url = marked;
+              console.log("[watermark] ✓ applied");
+            } else {
+              console.warn("[watermark] ✖ watermark returned source URL unchanged");
+            }
+          } catch (e) {
+            console.error("[watermark] ✖ failed, serving original:", e);
+          }
         }
       }
       if (runId !== runIdRef.current) return;
@@ -647,10 +661,11 @@ function Editor() {
     // download. Paid users only get a watermark when they opted in. Admin
     // downloads are always clean.
     if (!outputIsVideo && !isAdmin) {
+      console.log("[watermark] download — plan:", profile?.plan, "| free:", isFree, "| keep:", keepWatermark);
       if (isFree) {
-        try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* keep original */ }
+        try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch (e) { console.error("[watermark] download grid failed:", e); }
       } else if (keepWatermark) {
-        try { downloadUrl = await watermarkImage(output); } catch { /* keep original */ }
+        try { downloadUrl = await watermarkImage(output); } catch (e) { console.error("[watermark] download pill failed:", e); }
       }
     }
     const a = document.createElement("a");
@@ -1206,7 +1221,14 @@ function Editor() {
                 <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {output ? (
                     outputIsVideo ? (
-                      <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
+                      <div className="relative h-full w-full">
+                        <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
+                        {!isAdmin && (isFree || keepWatermark) && (
+                          <span className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/55 px-2 py-1 text-[11px] font-bold tracking-wide text-white/95">
+                            MOTIO2EDIT
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <img
                         src={output}

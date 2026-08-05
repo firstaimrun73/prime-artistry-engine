@@ -103,7 +103,8 @@ describe("edit vs enhancement routing", () => {
     const step = buildImageEdit({ prompt: "add a red boat", imageUrl: "data:image/png;base64,AAAA" });
     expect(step.model).toBe(IMAGE_EDIT_MODEL);
     expect(step.endpoint).toBe(`https://fal.run/${IMAGE_EDIT_MODEL}`);
-    expect(step.body.prompt).toBe("add a red boat");
+    expect(step.body.prompt).toContain("add a red boat");
+    expect(step.body.prompt).toContain("CRITICAL RULES");
     expect(step.body.image_url).toBe("data:image/png;base64,AAAA");
   });
 });
