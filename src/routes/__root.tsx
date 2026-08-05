@@ -134,28 +134,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7901147042865442"
           crossOrigin="anonymous"
         />
-        {/* Monetag vignette banner — loaded once per session. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (!window.__monetagVignetteLoaded) {
-                window.__monetagVignetteLoaded = true;
-                (function(s){s.dataset.zone='11504738';s.src='https://n6wxm.com/vignette.min.js';})([document.documentElement,document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
-              }
-            `,
-          }}
-        />
-        {/* Monetag in-page push — loaded once per session. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (!window.__monetagPushLoaded) {
-                window.__monetagPushLoaded = true;
-                (function(s){s.dataset.zone='11504740';s.src='https://nap5k.com/tag.min.js';})([document.documentElement,document.body].filter(Boolean).pop().appendChild(document.createElement('script')));
-              }
-            `,
-          }}
-        />
+         
+         <script
+  src="https://n6wxm.com/vignette.min.js"
+  data-zone="11504738"
+  async={true}
+/>
+<script
+  src="https://nap5k.com/tag.min.js"
+  data-zone="11504740"
+  async={true}
+/>
       </head>
       <body className="pb-16 md:pb-0">
         {children}
