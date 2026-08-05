@@ -180,6 +180,88 @@ export function getQualitySettings(editSize: EditSize) {
   }
 }
 
+// ── Edit-type classification (accuracy pass) ─────────────────────────────
+// Coarser, intent-based classification used on top of the size presets. It
+// decides BOTH the extra prompt clause and the sampler settings so an edit
+// stays local to the requested area instead of regenerating the whole photo.
+export type EditType =
+  | "removal"
+  | "background"
+  | "portrait"
+  | "style"
+  | "enhance"
+  | "color"
+  | "general";
+
+export function classifyEdit(prompt: string): EditType {
+  const p = (prompt || "").toLowerCase();
+
+  if (/remove[^.]{0,30}(person|people|man|woman|human|figure|background|object|watermark|text|logo)/.test(p))
+    return "removal";
+  if (/(background|backdrop|scene)/.test(p) && !/remove/.test(p)) return "background";
+  if (/(face|skin|eye|nose|mouth|hair|portrait|beauty|wrinkle|age)/.test(p)) return "portrait";
+  if (/(cartoon|anime|painting|sketch|watercolor|artistic|style)/.test(p)) return "style";
+  if (/(sharp|enhance|upscale|denoise|quality|hd|4k|clear|restore)/.test(p)) return "enhance";
+  if (/(bright|dark|contrast|colou?r|saturation|warm|cool|light)/.test(p)) return "color";
+  return "general";
+}
+
+/** Sampler settings per edit type (accuracy-tuned). */
+export function getEditTypeSettings(type: EditType) {
+  switch (type) {
+    case "removal":
+      return { strength: 0.95, guidance_scale: 8.0, num_inference_steps: 50 };
+    case "background":
+      return { strength: 0.85, guidance_scale: 7.0, num_inference_steps: 50 };
+    case "portrait":
+      return { strength: 0.55, guidance_scale: 3.5, num_inference_steps: 50 };
+    case "style":
+      return { strength: 0.75, guidance_scale: 5.0, num_inference_steps: 50 };
+    case "enhance":
+      return { strength: 0.6, guidance_scale: 3.5, num_inference_steps: 50 };
+    case "color":
+      return { strength: 0.45, guidance_scale: 3.0, num_inference_steps: 40 };
+    default:
+      return { strength: 0.7, guidance_scale: 4.5, num_inference_steps: 50 };
+  }
+}
+
+/** Extra, type-specific instruction appended to the user prompt. */
+export function getEditTypeClause(type: EditType): string {
+  switch (type) {
+    case "removal":
+      return " Remove ONLY the specified object/person. Fill removed area naturally with background. Do NOT change anything else in the image. Preserve all faces, colors, lighting exactly.";
+    case "background":
+      return " Modify ONLY the background. Keep the main subject pixel-perfect with clean edges. Preserve subject's exact appearance, colors and proportions.";
+    case "portrait":
+      return " Make ONLY the requested enhancement. Preserve the person's exact identity, features, skin tone, age and expression. Do NOT change their appearance.";
+    case "style":
+      return " Apply style while keeping exact same composition, proportions and subject placement. Preserve identity.";
+    case "color":
+      return " Adjust ONLY the specified color or lighting element. Keep all subjects, objects and composition identical.";
+    default:
+      return "";
+  }
+}
+
+// Global preservation contract appended to EVERY image-edit prompt.
+export const PRESERVATION_CONTRACT = `
+CRITICAL RULES - MUST FOLLOW EXACTLY:
+1. Preserve the EXACT face, skin tone, facial features, hairstyle, expression and identity of every person unchanged.
+2. Only modify the SPECIFIC area requested.
+3. Keep ALL other parts of the image IDENTICAL to the original.
+4. Preserve original lighting, shadows, colors, perspective and composition.
+5. Do NOT change art style or realism.
+6. Do NOT add or remove anything not specifically requested.
+7. Maintain original image sharpness and resolution throughout.
+`.trim();
+
+/** Validates the source image URL that will be handed to FAL. */
+export function isValidSourceImageUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== "string") return false;
+  return url.startsWith("https://");
+}
+
 // Preservation clause appended to small additive edits so the model does not
 // re-stylise or regenerate the whole scene when adding a small object.
 const PRESERVATION_CLAUSE =
@@ -196,6 +278,7 @@ const STYLE_TRANSFORM_CLAUSE =
 // Object modification edits: change one object, leave the scene alone.
 const OBJECT_MODIFY_CLAUSE =
   " Modify only the specified object in this exact photo. Keep the background, lighting, shadows and surroundings completely unchanged. The modification must look natural and realistic as if it was always there. Maintain the original camera angle and perspective.";
+
 
 
 // ── Image edit (FLUX Kontext) ─────────────────────────────────────────────
