@@ -1221,7 +1221,14 @@ function Editor() {
                 <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {output ? (
                     outputIsVideo ? (
-                      <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
+                      <div className="relative h-full w-full">
+                        <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
+                        {!isAdmin && (isFree || keepWatermark) && (
+                          <span className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/55 px-2 py-1 text-[11px] font-bold tracking-wide text-white/95">
+                            MOTIO2EDIT
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <img
                         src={output}
