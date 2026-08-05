@@ -570,8 +570,22 @@ function Editor() {
         // Preview shows ONLY the subtle corner pill for both free and
         // "keep watermark" paid users. The full-image protective grid is
         // applied at download time (see handleDownload) for free users.
-        if (isFree || keepWatermark) {
-          try { url = await watermarkImage(url); } catch { /* keep original */ }
+        const shouldMark = isFree || keepWatermark;
+        console.log("[watermark] applying to:", url.slice(0, 80));
+        console.log("[watermark] user plan:", profile?.plan, "| free:", isFree);
+        console.log("[watermark] keep watermark:", keepWatermark, "| will apply:", shouldMark);
+        if (shouldMark) {
+          try {
+            const marked = await watermarkImage(url);
+            if (marked && marked !== url) {
+              url = marked;
+              console.log("[watermark] ✓ applied");
+            } else {
+              console.warn("[watermark] ✖ watermark returned source URL unchanged");
+            }
+          } catch (e) {
+            console.error("[watermark] ✖ failed, serving original:", e);
+          }
         }
       }
       if (runId !== runIdRef.current) return;
