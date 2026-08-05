@@ -298,14 +298,23 @@ export function buildImageEdit({
   /** Original short user prompt — used to classify edit size for quality presets. */
   rawPrompt?: string;
 }): FalStep {
-  const editSize = classifyEditSize(rawPrompt ?? prompt);
-  const quality = getQualitySettings(editSize);
+  const source = rawPrompt ?? prompt;
+  const editSize = classifyEditSize(source);
+  const editType = classifyEdit(source);
+  // Type-based settings drive accuracy; size presets remain the fallback.
+  const typeSettings = getEditTypeSettings(editType);
+  const quality =
+    editType === "general" ? getQualitySettings(editSize) : typeSettings;
 
   // Kontext does not use the generic img2img `strength` field. We still keep
   // the classification above for prompt shaping + guidance, but intentionally do
   // not send unsupported strength/steps params that can make FAL ignore the edit
   // contract or behave like text-to-image.
   void strength;
+
+  if (!isValidSourceImageUrl(imageUrl)) {
+    console.warn("[fal] source image URL is not an https URL:", imageUrl?.slice(0, 60));
+  }
 
   // Multi-image: when the user supplies extra reference images we must switch
   // to the Kontext MULTI endpoint, which accepts `image_urls`. The single-image
@@ -331,9 +340,14 @@ export function buildImageEdit({
             ? `${prompt}.${OBJECT_MODIFY_CLAUSE}`
             : prompt;
 
-  const finalPrompt = isMulti
-    ? `${basePrompt} Use image 1 as the base photo and images 2-${refs.length + 1} as additional references for the requested change.`
-    : basePrompt;
+  const withType = `${basePrompt}${getEditTypeClause(editType)}`;
+
+  const multiNote = isMulti
+    ? ` Use image 1 as the base photo and images 2-${refs.length + 1} as additional references for the requested change.`
+    : "";
+
+  // Every edit prompt carries the global preservation contract.
+  const finalPrompt = `${withType}${multiNote}\n\n${PRESERVATION_CONTRACT}`;
 
   const body: Record<string, unknown> = {
     prompt: finalPrompt,
@@ -353,7 +367,7 @@ export function buildImageEdit({
   }
 
   return {
-    label: `edit (flux kontext${isMulti ? ` multi ×${refs.length + 1}` : ""}, ${editSize})`,
+    label: `edit (flux kontext${isMulti ? ` multi ×${refs.length + 1}` : ""}, ${editSize}/${editType})`,
     model,
     endpoint: ep(model),
     outputKind: "image",
