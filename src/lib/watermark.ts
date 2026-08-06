@@ -1,216 +1,138 @@
 // Client-side MOTIO2EDIT brand watermark.
 //
-// Bakes a small, premium, semi-transparent branded mark into the bottom-right
-// corner of an image. It mirrors the homepage logo: a sparkle glyph followed by
-// "MOTIO2EDIT" with the "2" rendered in the MOTIO2EDIT brand orange. The mark is
-// intentionally small (scales with image width), placed in a low-importance
-// corner so it never covers faces or key subjects, and drawn at high resolution
-// so it survives download/encoding without degrading image quality.
+// watermarkImage() bakes a small, premium corner mark ("✦ MOTIO2EDIT") into the
+// bottom-right of an image. applyDownloadWatermarkGrid() additionally stamps a
+// diagonal grid of "MOTIO2EDIT.COM" marks — used for FREE users at download.
 
-// Brand orange — matches the primary token used across the app (oklch(0.7 0.19 45)).
-const BRAND_ORANGE = "#F97316";
+const BRAND_ORANGE = "#f97316";
+const WATERMARK_TEXT = "MOTIO2EDIT.COM";
 
-// Draw a four-point sparkle (the homepage logo mark) centred at (cx, cy).
-function drawSparkle(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, color: string) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  // Two crossed 4-point stars create the sparkle silhouette.
-  const inner = r * 0.32;
-  for (let i = 0; i < 4; i++) {
-    const a = (Math.PI / 2) * i;
-    const nx = Math.cos(a), ny = Math.sin(a);
-    const px = Math.cos(a + Math.PI / 4), py = Math.sin(a + Math.PI / 4);
-    if (i === 0) ctx.moveTo(nx * r, ny * r);
-    else ctx.lineTo(nx * r, ny * r);
-    ctx.lineTo(px * inner, py * inner);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
+/** Loads an image element, working around cross-origin canvas tainting. */
+async function loadImage(url: string): Promise<HTMLImageElement> {
+  const direct = await new Promise<HTMLImageElement | null>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+  if (direct) return direct;
 
-export async function watermarkImage(
-  src: string,
-  opts: { strong?: boolean } = {},
-): Promise<string> {
-  // Fetch as a blob first to avoid canvas cross-origin tainting on fal URLs.
-  const res = await fetch(src);
+  // Fallback: fetch as a blob (handles hosts without CORS headers on <img>).
+  console.warn("[watermark] direct image load failed — retrying via fetch/blob");
+  const res = await fetch(url);
   const blob = await res.blob();
-  const bitmap = await createImageBitmap(blob);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return src;
-
-  ctx.drawImage(bitmap, 0, 0);
-
-  // Optional: burn in a full-image protective grid of "MOTIO2EDIT.COM" marks
-  // BEFORE the corner pill. Used for free users so the version in the DOM is
-  // itself watermarked — right-click / long-press / view-source cannot recover
-  // a clean image because no clean version ever reaches the browser.
-  if (opts.strong) {
-    const W0 = canvas.width;
-    const H0 = canvas.height;
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const tiles = [
-      { xr: 0.15, yr: 0.15, size: 0.045, a: 0.32 },
-      { xr: 0.5, yr: 0.1, size: 0.062, a: 1.0 }, // strong primary top
-      { xr: 0.85, yr: 0.2, size: 0.04, a: 0.3 },
-      { xr: 0.25, yr: 0.5, size: 0.055, a: 0.35 },
-      { xr: 0.72, yr: 0.5, size: 0.05, a: 0.3 },
-      { xr: 0.15, yr: 0.85, size: 0.045, a: 0.32 },
-      { xr: 0.78, yr: 0.86, size: 0.055, a: 0.4 },
-    ];
-    for (const t of tiles) {
-      const fs = Math.max(14, Math.floor(W0 * t.size));
-      ctx.font = `bold ${fs}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-      ctx.save();
-      ctx.globalAlpha = t.a;
-      ctx.translate(W0 * t.xr, H0 * t.yr);
-      ctx.rotate(-Math.PI / 4);
-      ctx.lineWidth = 1.8;
-      ctx.strokeStyle = "rgba(0,0,0,0.55)";
-      ctx.fillStyle = "rgba(255,255,255,0.95)";
-      ctx.strokeText("MOTIO2EDIT.COM", 0, 0);
-      ctx.fillText("MOTIO2EDIT.COM", 0, 0);
-      ctx.restore();
-    }
-    ctx.restore();
-  }
-
-
-  // Scale every element off the image width so the mark stays proportional.
-  const W = canvas.width;
-  const fontSize = Math.max(13, Math.round(W * 0.026));
-  const padX = Math.round(fontSize * 0.7);
-  const padY = Math.round(fontSize * 0.42);
-  const gap = Math.round(fontSize * 0.45); // sparkle ↔ text gap
-  const sparkleR = fontSize * 0.42;
-
-  ctx.font = `700 ${fontSize}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-  ctx.textBaseline = "middle";
-  ctx.textAlign = "left";
-
-  // Measure the full "MOTIO2EDIT" string to size the pill.
-  const parts = [
-    { t: "MOTIO", c: "rgba(255,255,255,0.96)" },
-    { t: "2", c: BRAND_ORANGE },
-    { t: "EDIT", c: "rgba(255,255,255,0.96)" },
-  ];
-  const textW = parts.reduce((w, p) => w + ctx.measureText(p.t).width, 0);
-  const contentW = sparkleR * 2 + gap + textW;
-  const pillW = contentW + padX * 2;
-  const pillH = fontSize + padY * 2;
-  const margin = Math.round(fontSize * 0.7);
-  const pillX = W - pillW - margin;
-  const pillY = canvas.height - pillH - margin;
-  const radius = pillH / 2;
-
-  // Semi-transparent rounded "glass" pill — premium, non-intrusive.
-  ctx.save();
-  ctx.globalAlpha = 0.85;
-  ctx.beginPath();
-  ctx.moveTo(pillX + radius, pillY);
-  ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + pillH, radius);
-  ctx.arcTo(pillX + pillW, pillY + pillH, pillX, pillY + pillH, radius);
-  ctx.arcTo(pillX, pillY + pillH, pillX, pillY, radius);
-  ctx.arcTo(pillX, pillY, pillX + pillW, pillY, radius);
-  ctx.closePath();
-  ctx.fillStyle = "rgba(15,15,18,0.55)";
-  ctx.fill();
-  ctx.lineWidth = Math.max(1, fontSize * 0.05);
-  ctx.strokeStyle = "rgba(255,255,255,0.18)";
-  ctx.stroke();
-  ctx.restore();
-
-  // Sparkle mark.
-  const midY = pillY + pillH / 2;
-  let cursor = pillX + padX;
-  ctx.save();
-  ctx.globalAlpha = 0.95;
-  drawSparkle(ctx, cursor + sparkleR, midY, sparkleR, BRAND_ORANGE);
-  cursor += sparkleR * 2 + gap;
-
-  // Wordmark with the brand "2".
-  for (const p of parts) {
-    ctx.fillStyle = p.c;
-    ctx.fillText(p.t, cursor, midY + fontSize * 0.04);
-    cursor += ctx.measureText(p.t).width;
-  }
-  ctx.restore();
-
-  return new Promise((resolve) => {
-    // PNG keeps the mark crisp and lossless; falls back to the original on failure.
-    canvas.toBlob((b) => resolve(b ? URL.createObjectURL(b) : src), "image/png");
+  const objUrl = URL.createObjectURL(blob);
+  return await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = objUrl;
   });
 }
 
-const WATERMARK_TEXT = "MOTIO2EDIT.COM";
+/** Draws the bottom-right brand pill onto a canvas context. */
+function drawCornerPill(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
+  const fontSize = Math.max(14, canvas.width * 0.025);
+  ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  const text = "✦ MOTIO2EDIT";
+  const metrics = ctx.measureText(text);
+  const pad = 10;
+  const x = canvas.width - metrics.width - pad * 2 - 16;
+  const y = canvas.height - fontSize - pad * 2 - 16;
 
-/**
- * Download-time protection for FREE users only. Applies a staggered grid of
- * diagonal "MOTIO2EDIT.COM" marks across the whole image on top of the
- * already-branded output, so saved files can't be used without attribution.
- * Returns an object URL; falls back to the source on any failure.
- */
-export async function applyDownloadWatermarkGrid(imageUrl: string): Promise<string> {
-  console.log("[watermark] Applying watermark grid for free-user download…");
-  try {
-    const res = await fetch(imageUrl);
-    const blob = await res.blob();
-    const bitmap = await createImageBitmap(blob);
+  // Dark pill background.
+  ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+  ctx.beginPath();
+  const bx = x - pad;
+  const by = y - fontSize;
+  const bw = metrics.width + pad * 2;
+  const bh = fontSize + pad * 2;
+  const r = 6;
+  ctx.moveTo(bx + r, by);
+  ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
+  ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+  ctx.arcTo(bx, by + bh, bx, by, r);
+  ctx.arcTo(bx, by, bx + bw, by, r);
+  ctx.closePath();
+  ctx.fill();
 
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return imageUrl;
-    ctx.drawImage(bitmap, 0, 0);
+  // Orange accent dot.
+  ctx.fillStyle = BRAND_ORANGE;
+  ctx.beginPath();
+  ctx.arc(x - pad + 8, y - fontSize / 2, 4, 0, Math.PI * 2);
+  ctx.fill();
 
-    const W = canvas.width;
-    const H = canvas.height;
+  // White wordmark.
+  ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.fillText(text, x, y);
+}
 
+/** Stamps 6 diagonal "MOTIO2EDIT.COM" marks across the whole canvas. */
+function applyDownloadWatermarks(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
+  const positions = [
+    { x: 0.2, y: 0.2 },
+    { x: 0.5, y: 0.2 },
+    { x: 0.8, y: 0.2 },
+    { x: 0.2, y: 0.7 },
+    { x: 0.5, y: 0.7 },
+    { x: 0.8, y: 0.7 },
+  ];
+  const fontSize = Math.max(22, Math.round(canvas.width * 0.035));
+  positions.forEach((pos) => {
     ctx.save();
-    ctx.globalAlpha = 0.65;
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 1.8;
+    ctx.globalAlpha = 0.3;
+    ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.lineWidth = 3;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-
-    const tiles = [
-      { xr: 0.15, yr: 0.15, size: 0.045 },
-      { xr: 0.5, yr: 0.1, size: 0.06 },
-      { xr: 0.85, yr: 0.2, size: 0.04 },
-      { xr: 0.25, yr: 0.5, size: 0.055 },
-      { xr: 0.7, yr: 0.5, size: 0.05 },
-      { xr: 0.15, yr: 0.85, size: 0.045 },
-      { xr: 0.75, yr: 0.85, size: 0.06 },
-    ];
-
-    for (const t of tiles) {
-      const fontSize = Math.max(14, Math.floor(W * t.size));
-      ctx.font = `bold ${fontSize}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-      ctx.save();
-      ctx.translate(W * t.xr, H * t.yr);
-      ctx.rotate(-Math.PI / 4);
-      ctx.strokeText(WATERMARK_TEXT, 0, 0);
-      ctx.fillText(WATERMARK_TEXT, 0, 0);
-      ctx.restore();
-    }
-
+    ctx.translate(canvas.width * pos.x, canvas.height * pos.y);
+    ctx.rotate(-Math.PI / 5);
+    ctx.strokeText(WATERMARK_TEXT, 0, 0);
+    ctx.fillText(WATERMARK_TEXT, 0, 0);
     ctx.restore();
+  });
+}
 
-    return await new Promise((resolve) => {
-      canvas.toBlob((b) => resolve(b ? URL.createObjectURL(b) : imageUrl), "image/png");
-    });
-  } catch {
-    return imageUrl;
+/**
+ * Applies the MOTIO2EDIT corner mark. When `opts.strong` is true, the diagonal
+ * download grid is stamped as well. Returns the original URL on any failure.
+ */
+export async function watermarkImage(url: string, opts: { strong?: boolean } = {}): Promise<string> {
+  console.log("1. watermarkImage called:", url.slice(0, 100));
+  try {
+    const img = await loadImage(url);
+    console.log("4. Image loaded", img.width, "x", img.height);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext("2d");
+    console.log("3. Canvas created", canvas.width, canvas.height);
+    if (!ctx) return url;
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    if (opts.strong) applyDownloadWatermarks(canvas, ctx);
+    drawCornerPill(canvas, ctx);
+    console.log("5. Watermark drawn");
+
+    const outputUrl = canvas.toDataURL("image/jpeg", 0.92);
+    console.log("6. Output URL:", outputUrl.slice(0, 60), `(${outputUrl.length} bytes)`);
+    return outputUrl;
+  } catch (err) {
+    console.error("[watermark] failed, serving original:", err);
+    return url;
   }
+}
+
+/**
+ * Download-time protection for FREE users: corner pill + 6 diagonal marks.
+ */
+export async function applyDownloadWatermarkGrid(imageUrl: string): Promise<string> {
+  console.log("[watermark] Applying download watermark grid for free user…");
+  return watermarkImage(imageUrl, { strong: true });
 }

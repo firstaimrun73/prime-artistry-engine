@@ -210,11 +210,11 @@ export function classifyEdit(prompt: string): EditType {
 export function getEditTypeSettings(type: EditType) {
   switch (type) {
     case "removal":
-      return { strength: 0.95, guidance_scale: 8.0, num_inference_steps: 50 };
+      return { strength: 0.92, guidance_scale: 8.0, num_inference_steps: 50 };
     case "background":
-      return { strength: 0.85, guidance_scale: 7.0, num_inference_steps: 50 };
+      return { strength: 0.82, guidance_scale: 7.0, num_inference_steps: 50 };
     case "portrait":
-      return { strength: 0.55, guidance_scale: 3.5, num_inference_steps: 50 };
+      return { strength: 0.5, guidance_scale: 3.5, num_inference_steps: 45 };
     case "style":
       return { strength: 0.75, guidance_scale: 5.0, num_inference_steps: 50 };
     case "enhance":
@@ -222,7 +222,7 @@ export function getEditTypeSettings(type: EditType) {
     case "color":
       return { strength: 0.45, guidance_scale: 3.0, num_inference_steps: 40 };
     default:
-      return { strength: 0.7, guidance_scale: 4.5, num_inference_steps: 50 };
+      return { strength: 0.78, guidance_scale: 5.0, num_inference_steps: 48 };
   }
 }
 
@@ -230,11 +230,11 @@ export function getEditTypeSettings(type: EditType) {
 export function getEditTypeClause(type: EditType): string {
   switch (type) {
     case "removal":
-      return " Remove ONLY the specified object/person. Fill removed area naturally with background. Do NOT change anything else in the image. Preserve all faces, colors, lighting exactly.";
+      return " Remove ONLY the specified element. Fill naturally with background. Zero changes to anything else. Preserve all remaining faces, colors and lighting exactly.";
     case "background":
-      return " Modify ONLY the background. Keep the main subject pixel-perfect with clean edges. Preserve subject's exact appearance, colors and proportions.";
+      return " Change ONLY the background. Subject must be pixel-perfect identical, with clean edges and unchanged colors and proportions.";
     case "portrait":
-      return " Make ONLY the requested enhancement. Preserve the person's exact identity, features, skin tone, age and expression. Do NOT change their appearance.";
+      return " Make ONLY the requested subtle change. The person must remain 100% recognizable. Preserve exact identity, features, skin tone, age and expression.";
     case "style":
       return " Apply style while keeping exact same composition, proportions and subject placement. Preserve identity.";
     case "color":
@@ -243,6 +243,18 @@ export function getEditTypeClause(type: EditType): string {
       return "";
   }
 }
+
+// Absolute preservation rules appended to EVERY image-edit prompt.
+export const STRONG_PRESERVATION = `
+ABSOLUTE RULES:
+- Preserve EVERY person's exact face, skin tone, age, hair and identity.
+- Only change what the user specifically asked.
+- Keep background identical unless asked.
+- Keep lighting and shadows identical.
+- Keep image sharpness and resolution.
+- No style changes unless requested.
+- Result must look like the same photo edited, not a new AI generated image.
+`.trim();
 
 // Global preservation contract appended to EVERY image-edit prompt.
 export const PRESERVATION_CONTRACT = `
@@ -254,6 +266,8 @@ CRITICAL RULES - MUST FOLLOW EXACTLY:
 5. Do NOT change art style or realism.
 6. Do NOT add or remove anything not specifically requested.
 7. Maintain original image sharpness and resolution throughout.
+
+${STRONG_PRESERVATION}
 `.trim();
 
 /** Validates the source image URL that will be handed to FAL. */
