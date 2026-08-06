@@ -136,17 +136,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7901147042865442"
           crossOrigin="anonymous"
         />
-         
-         <script
-  src="https://n6wxm.com/vignette.min.js"
-  data-zone="11504738"
-  async={true}
-/>
-<script
-  src="https://nap5k.com/tag.min.js"
-  data-zone="11504740"
-  async={true}
-/>
+        <script src="https://n6wxm.com/vignette.min.js" data-zone="11504738" async />
+        <script src="https://nap5k.com/tag.min.js" data-zone="11504740" async />
       </head>
       <body className="pb-16 md:pb-0">
         {children}
