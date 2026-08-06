@@ -230,11 +230,11 @@ export function getEditTypeSettings(type: EditType) {
 export function getEditTypeClause(type: EditType): string {
   switch (type) {
     case "removal":
-      return " Remove ONLY the specified object/person. Fill removed area naturally with background. Do NOT change anything else in the image. Preserve all faces, colors, lighting exactly.";
+      return " Remove ONLY the specified element. Fill naturally with background. Zero changes to anything else. Preserve all remaining faces, colors and lighting exactly.";
     case "background":
-      return " Modify ONLY the background. Keep the main subject pixel-perfect with clean edges. Preserve subject's exact appearance, colors and proportions.";
+      return " Change ONLY the background. Subject must be pixel-perfect identical, with clean edges and unchanged colors and proportions.";
     case "portrait":
-      return " Make ONLY the requested enhancement. Preserve the person's exact identity, features, skin tone, age and expression. Do NOT change their appearance.";
+      return " Make ONLY the requested subtle change. The person must remain 100% recognizable. Preserve exact identity, features, skin tone, age and expression.";
     case "style":
       return " Apply style while keeping exact same composition, proportions and subject placement. Preserve identity.";
     case "color":
