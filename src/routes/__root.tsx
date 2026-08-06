@@ -116,6 +116,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         children:
           "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3NCVLG63JR');",
       },
+      { src: "https://n6wxm.com/vignette.min.js", "data-zone": "11504738", async: true },
+      { src: "https://nap5k.com/tag.min.js", "data-zone": "11504740", async: true },
     ],
   }),
   shellComponent: RootShell,
