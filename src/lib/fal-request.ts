@@ -244,6 +244,18 @@ export function getEditTypeClause(type: EditType): string {
   }
 }
 
+// Absolute preservation rules appended to EVERY image-edit prompt.
+export const STRONG_PRESERVATION = `
+ABSOLUTE RULES:
+- Preserve EVERY person's exact face, skin tone, age, hair and identity.
+- Only change what the user specifically asked.
+- Keep background identical unless asked.
+- Keep lighting and shadows identical.
+- Keep image sharpness and resolution.
+- No style changes unless requested.
+- Result must look like the same photo edited, not a new AI generated image.
+`.trim();
+
 // Global preservation contract appended to EVERY image-edit prompt.
 export const PRESERVATION_CONTRACT = `
 CRITICAL RULES - MUST FOLLOW EXACTLY:
@@ -254,6 +266,8 @@ CRITICAL RULES - MUST FOLLOW EXACTLY:
 5. Do NOT change art style or realism.
 6. Do NOT add or remove anything not specifically requested.
 7. Maintain original image sharpness and resolution throughout.
+
+${STRONG_PRESERVATION}
 `.trim();
 
 /** Validates the source image URL that will be handed to FAL. */
