@@ -210,11 +210,11 @@ export function classifyEdit(prompt: string): EditType {
 export function getEditTypeSettings(type: EditType) {
   switch (type) {
     case "removal":
-      return { strength: 0.95, guidance_scale: 8.0, num_inference_steps: 50 };
+      return { strength: 0.92, guidance_scale: 8.0, num_inference_steps: 50 };
     case "background":
-      return { strength: 0.85, guidance_scale: 7.0, num_inference_steps: 50 };
+      return { strength: 0.82, guidance_scale: 7.0, num_inference_steps: 50 };
     case "portrait":
-      return { strength: 0.55, guidance_scale: 3.5, num_inference_steps: 50 };
+      return { strength: 0.5, guidance_scale: 3.5, num_inference_steps: 45 };
     case "style":
       return { strength: 0.75, guidance_scale: 5.0, num_inference_steps: 50 };
     case "enhance":
@@ -222,7 +222,7 @@ export function getEditTypeSettings(type: EditType) {
     case "color":
       return { strength: 0.45, guidance_scale: 3.0, num_inference_steps: 40 };
     default:
-      return { strength: 0.7, guidance_scale: 4.5, num_inference_steps: 50 };
+      return { strength: 0.78, guidance_scale: 5.0, num_inference_steps: 48 };
   }
 }
 
