@@ -28,7 +28,7 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
 
 /**
  * Internal plan ids stored in profiles.plan / payments.
- * User-facing names may differ (e.g. id "business" displays as "Studio+").
+ * User-facing names may differ (e.g. id "business" displays as "Master Studio").
  * Do not rename the "business" id without a data migration for existing subscribers.
  */
 export type PlanId = "free" | "lite" | "plus" | "pro" | "studio" | "business";
@@ -189,24 +189,25 @@ export const PLANS: Plan[] = [
   },
   {
     // Internal id remains "business" for DB + payment backward compatibility.
-    // User-facing name is Studio+.
+    // User-facing name is Master Studio.
     id: "business",
-    name: "Studio+",
+    name: "Master Studio",
     credits: 10000,
     video: true,
     priority: true,
     bestQuality: true,
     price: { USD: 99, EUR: 89.99, INR: 8299 },
     features: [
-      "10,000 monthly credits (highest pool)",
-      "Maximum access across Image, Video and Music studios",
-      "Latest AI features and editing improvements",
+      "10,000 monthly credits",
+      "Advanced Image, Video and Music studios",
+      "Latest AI features and editor improvements",
+      "Upcoming AI feature updates",
       "Priority access to new tools as they ship",
       "4K Ultra image and video generation",
       "No ads",
       "No watermark",
       "Commercial license",
-      "VIP badge and priority support",
+      "VIP Master Studio badge and priority support",
       "Server-side credit protection still applies",
     ],
   },
