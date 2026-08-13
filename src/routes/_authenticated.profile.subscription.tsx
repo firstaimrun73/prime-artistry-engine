@@ -9,6 +9,7 @@ import {
   submitRefundRequest,
   type PaymentHistoryItem,
 } from "@/lib/subscription.functions";
+import { findPlan, type PlanId } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,10 +26,10 @@ export const Route = createFileRoute("/_authenticated/profile/subscription")({
   component: SubscriptionPage,
   head: () => ({
     meta: [
-      { title: "Subscription & Billing — MOTIO2EDIT" },
-      { name: "description", content: "Manage your MOTIO2EDIT plan, credits, cancellation and refund requests." },
-      { property: "og:title", content: "Subscription & Billing — MOTIO2EDIT" },
-      { property: "og:description", content: "Manage your MOTIO2EDIT plan, credits, cancellation and refund requests." },
+      { title: "Subscription & Billing — Motio2edit" },
+      { name: "description", content: "Manage your Motio2edit plan, credits, cancellation and refund requests." },
+      { property: "og:title", content: "Subscription & Billing — Motio2edit" },
+      { property: "og:description", content: "Manage your Motio2edit plan, credits, cancellation and refund requests." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -47,6 +48,12 @@ function fmtDate(v: string | null) {
   return v ? new Date(v).toLocaleString() : "—";
 }
 
+/** User-facing plan label; internal id "business" → Master Studio. */
+function planLabel(id: string | null | undefined): string {
+  if (!id || id === "custom") return id ?? "—";
+  return findPlan(id as PlanId)?.name ?? id;
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border/60 py-2.5 text-sm last:border-0">
@@ -63,12 +70,12 @@ function downloadInvoice(item: PaymentHistoryItem, email: string | null) {
   table{width:100%;border-collapse:collapse;margin-top:24px}
   td{padding:10px 8px;border-bottom:1px solid #eee}
   .total{font-size:20px;font-weight:800}</style></head><body>
-  <div class="hd"><h1 style="margin:0">MOTIO2EDIT</h1><p style="margin:4px 0 0">by Motion2AI — Invoice</p></div>
+  <div class="hd"><h1 style="margin:0">Motio2edit</h1><p style="margin:4px 0 0">by Motion2AI — Invoice</p></div>
   <table>
     <tr><td>Invoice number</td><td>INV-${item.id.slice(0, 8).toUpperCase()}</td></tr>
     <tr><td>Date</td><td>${new Date(item.createdAt).toLocaleString()}</td></tr>
     <tr><td>Billed to</td><td>${email ?? "—"}</td></tr>
-    <tr><td>Plan</td><td>${item.plan.toUpperCase()} — ${item.credits} credits</td></tr>
+    <tr><td>Plan</td><td>${planLabel(item.plan)} — ${item.credits} credits</td></tr>
     <tr><td>Payment method</td><td>${item.method}</td></tr>
     <tr><td>Transaction ID</td><td>${item.maskedTransactionId}</td></tr>
     <tr><td>Status</td><td>${item.status}</td></tr>
@@ -167,7 +174,7 @@ function SubscriptionPage() {
         </div>
 
         <div className="mt-4">
-          <Row label="Plan" value={data.plan.toUpperCase()} />
+          <Row label="Plan" value={planLabel(data.plan)} />
           <Row label="Purchase date" value={fmtDate(data.purchaseDate)} />
           <Row label="Next billing date" value={fmtDate(data.nextBillingDate)} />
           <Row label="Transaction ID" value={data.maskedTransactionId ?? "—"} />
@@ -357,7 +364,7 @@ function PaymentTable({ items }: { items: PaymentHistoryItem[] }) {
           {items.map((p) => (
             <tr key={p.id} className="border-t border-border/60">
               <td className="py-2">{new Date(p.createdAt).toLocaleString()}</td>
-              <td className="uppercase">{p.plan}</td>
+              <td>{planLabel(p.plan)}</td>
               <td>
                 {p.currency} {p.amount.toFixed(2)}
               </td>
