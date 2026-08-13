@@ -177,10 +177,13 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
   const cat = EDITOR_TOOL_CATEGORIES.find((c) => c.id === active) ?? EDITOR_TOOL_CATEGORIES[0];
 
   return (
-    <div className="space-y-2">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Tools
-      </p>
+    <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Choose a tool
+        </p>
+        <p className="text-[11px] text-muted-foreground">Edit · Background · Enhance · Portrait · Clothing · Style</p>
+      </div>
       {/* Category tabs */}
       <div className="flex flex-wrap gap-1.5">
         {EDITOR_TOOL_CATEGORIES.map((c) => (
@@ -190,10 +193,10 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
             disabled={disabled}
             onClick={() => setActive(c.id)}
             className={cn(
-              "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+              "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
               active === c.id
                 ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground",
             )}
           >
             {c.label}
@@ -204,13 +207,14 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {cat.tools.map((t) => {
           const Icon = t.icon;
+          const needsImage = t.id !== "cartoon" && t.id !== "vintage";
           return (
             <button
               key={t.id}
               type="button"
-              disabled={disabled || (t.id !== "generate" && !hasImage && t.id !== "cartoon")}
+              disabled={disabled || (needsImage && !hasImage)}
               onClick={() => onSelectTool(t)}
-              className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+              className="flex min-h-[44px] items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50"
             >
               <Icon className="h-4 w-4 shrink-0 text-primary" />
               <span className="leading-tight">{t.label}</span>
@@ -220,7 +224,7 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
       </div>
       {!hasImage && (
         <p className="text-[11px] text-muted-foreground">
-          Upload an image to unlock edit tools. Text-to-image works without an upload.
+          Upload an image to unlock most edit tools. Style tools and text-to-image work without an upload.
         </p>
       )}
     </div>
