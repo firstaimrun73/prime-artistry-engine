@@ -18,6 +18,7 @@ import { trackPageView } from "../lib/analytics";
 import { TranslateWidget } from "../components/TranslateWidget";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
+import { AdPolicyGate } from "../components/ads/AdPolicyGate";
 
 function NotFoundComponent() {
   return (
@@ -116,8 +117,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         children:
           "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3NCVLG63JR');",
       },
-      { src: "https://n6wxm.com/vignette.min.js", "data-zone": "11504738", async: true },
-      { src: "https://nap5k.com/tag.min.js", "data-zone": "11504740", async: true },
+      // Monetag vignette/tag scripts are intentionally NOT loaded here.
+      // They are injected only for free non-admin users by <AdPolicyGate />.
     ],
   }),
   shellComponent: RootShell,
@@ -136,8 +137,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7901147042865442"
           crossOrigin="anonymous"
         />
-        <script src="https://n6wxm.com/vignette.min.js" data-zone="11504738" async />
-        <script src="https://nap5k.com/tag.min.js" data-zone="11504740" async />
+        {/* Monetag scripts removed from static shell — see AdPolicyGate */}
       </head>
       <body className="pb-16 md:pb-0">
         {children}
@@ -167,6 +167,7 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <PageViewTracker />
+          <AdPolicyGate />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <GenerationStatusBar />
