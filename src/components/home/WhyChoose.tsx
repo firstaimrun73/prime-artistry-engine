@@ -1,35 +1,50 @@
-import { Layers, Sparkles, Zap, Cpu, LayoutGrid, Smartphone } from "lucide-react";
+import { Zap, Shield, Sparkles, Layers } from "lucide-react";
 
-const ITEMS = [
-  { icon: Layers, title: "Preserve Original Structure", desc: "Edits keep your composition, angles and proportions intact." },
-  { icon: Sparkles, title: "Realistic AI Results", desc: "Natural lighting and shadows, not obvious AI artifacts." },
-  { icon: Zap, title: "Fast Cloud Rendering", desc: "Dedicated GPUs deliver most results in well under a minute." },
-  { icon: Cpu, title: "Multiple AI Models", desc: "The right model is picked automatically for each task." },
-  { icon: LayoutGrid, title: "One Platform for Image, Video & Music", desc: "Three studios, one login, one credit balance." },
-  { icon: Smartphone, title: "Mobile Friendly", desc: "Full editing power on phone, tablet and desktop." },
+const FEATURES = [
+  {
+    icon: Sparkles,
+    title: "Pro-grade AI edits",
+    desc: "Face, clothing, background and object edits that preserve identity and composition.",
+  },
+  {
+    icon: Zap,
+    title: "Fast workflow",
+    desc: "Upload, prompt, generate — results in seconds with clear credit costs.",
+  },
+  {
+    icon: Layers,
+    title: "Three studios",
+    desc: "Image, Video and Music in one Motio2edit workspace.",
+  },
+  {
+    icon: Shield,
+    title: "Secure & private",
+    desc: "Authenticated accounts, private storage and plan-based download protection.",
+  },
 ];
 
 export function WhyChoose() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
       <div className="text-center">
-        <h2 className="text-xl font-extrabold tracking-tight sm:text-3xl">Why choose MOTIO2EDIT</h2>
+        <h2 className="text-xl font-extrabold tracking-tight sm:text-3xl">
+          Why choose Motio<span className="text-primary">2</span>edit
+        </h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Built for creators who need results that actually look real.
+          Built for creators who need reliable AI edits without losing the original subject.
         </p>
       </div>
-      <div className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-        {ITEMS.map((f, i) => {
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {FEATURES.map((f) => {
           const Icon = f.icon;
           return (
             <div
               key={f.title}
-              className="reveal-up flex h-full min-w-0 flex-col rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-xl"
-              style={{ animationDelay: `${i * 60}ms` }}
+              className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/40"
             >
               <Icon className="h-6 w-6 text-primary" />
               <h3 className="mt-4 font-bold">{f.title}</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{f.desc}</p>
             </div>
           );
         })}
