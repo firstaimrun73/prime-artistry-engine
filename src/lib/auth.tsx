@@ -7,17 +7,17 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { PlanId } from "@/lib/plans";
 
 export type Profile = {
   id: string;
   email: string | null;
   display_name: string | null;
-  plan: "free" | "plus" | "pro" | "studio" | "business";
+  /** Includes lite + business (Studio+). Stored as plan_type in Supabase. */
+  plan: PlanId;
   credits: number;
   currency: string;
-  /** Raw storage path of the avatar (in the private "avatars" bucket). */
   avatar_url: string | null;
-  /** Resolved signed URL for display, derived from avatar_url. */
   avatar_signed_url?: string | null;
 };
 
