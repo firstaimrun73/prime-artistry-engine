@@ -52,13 +52,17 @@ export function maskTransactionId(id: string | null | undefined): string {
 
 const REFUND_WINDOW_HOURS = 24;
 
+/** Matches PLAN_CREDITS / PLAN_PURCHASE (including legacy credit amounts). */
 function planFromCreditsLocal(credits: number): string {
   const map: Record<number, string> = {
     350: "lite",
-    500: "plus",
-    2000: "pro",
+    750: "plus",
+    500: "plus", // legacy
+    2500: "pro",
+    2000: "pro", // legacy
     5000: "studio",
-    9_999_999: "business",
+    10000: "business", // Studio+
+    9_999_999: "business", // legacy unlimited sentinel
   };
   return map[credits] ?? "custom";
 }

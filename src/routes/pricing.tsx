@@ -12,6 +12,7 @@ import {
   DISPLAY_CURRENCIES,
   toCheckoutCurrency,
   CREDIT_COST,
+  getPlan,
   type DisplayCurrency,
   type PlanId,
 } from "@/lib/plans";
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/pricing")({
       {
         name: "description",
         content:
-          "Simple Motio2edit plans: Free, Lite, Starter, Plus, Pro and Business. Credit-based AI image, video and music generation.",
+          "Simple Motio2edit plans: Free, Lite, Plus, Pro, Studio and Studio+. Credit-based AI image, video and music generation.",
       },
       { property: "og:title", content: "Pricing — Motio2edit" },
       {
@@ -59,6 +60,7 @@ function Pricing() {
   const planVisible = usePlanVisible();
 
   const currentPlan = profile?.plan ?? null;
+  const currentPlanName = currentPlan ? getPlan(currentPlan).name : null;
 
   useEffect(() => {
     let stored: string | null = null;
@@ -98,7 +100,8 @@ function Pricing() {
           </p>
           {profile && (
             <p className="mt-2 text-sm font-medium text-primary">
-              Your balance: {profile.credits.toLocaleString()} credits · Plan: {profile.plan}
+              Your balance: {profile.credits.toLocaleString()} credits · Plan:{" "}
+              {currentPlanName ?? profile.plan}
             </p>
           )}
           <div className="mt-6 flex justify-center">
