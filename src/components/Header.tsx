@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CrownBadge } from "@/components/CrownBadge";
+import { BrandMark } from "@/components/BrandMark";
 import { isAdminEmail } from "@/lib/admin-config";
 
-import { Sparkles, Coins, ShieldCheck, AlertTriangle, Menu } from "lucide-react";
+import { Coins, ShieldCheck, AlertTriangle, Menu } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NavItem = { to: any; label: string };
@@ -40,11 +41,8 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
       <div className="mx-auto grid h-16 max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 lg:flex lg:justify-between">
-        <Link to="/" className="flex min-w-0 items-center gap-2 font-extrabold tracking-tight">
-          <Sparkles className="h-5 w-5 shrink-0 text-primary" />
-          <span className="truncate text-base leading-none whitespace-nowrap sm:text-lg">
-            MOTI<span className="text-primary">O2</span>EDIT
-          </span>
+        <Link to="/" className="flex min-w-0 items-center gap-2">
+          <BrandMark />
           <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground xl:inline">
             by Motion2AI
           </span>
@@ -139,10 +137,8 @@ export function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
-              <div className="flex items-center gap-2 border-b border-border px-5 py-4 font-extrabold">
-                <Sparkles className="h-5 w-5 text-primary" />
-                MOTI<span className="-ml-1 text-primary">O2</span>
-                <span className="-ml-1">EDIT</span>
+              <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+                <BrandMark />
               </div>
               <nav className="flex flex-col p-2">
                 {links.map((l) => (
