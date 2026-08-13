@@ -26,7 +26,6 @@ import {
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Truncate any base64/data-URI fields so logs never blow the 256KB log limit.
 function safePayload(body: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
@@ -36,17 +35,12 @@ function safePayload(body: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-// Detect model "image too large" failures (e.g. fal post-processing rejects
-// images above 4095×4095). Used to trigger a silent, quality-preserving
-// fallback instead of showing users a technical pixel-limit error.
 function isPixelLimitError(msg: string): boolean {
   return /4095|4096|maximum should be|too large|max(imum)?\s*(image\s*)?(size|dimension|pixels)|exceeds|resolution too high/i.test(
     msg || "",
   );
 }
 
-
-// Map a raw fal.ai error response to a specific, user-readable reason.
 function falErrorMessage(label: string, status: number, txt: string): string {
   let detail = "";
   try {
@@ -72,16 +66,11 @@ function falErrorMessage(label: string, status: number, txt: string): string {
   return `${label} failed (status ${status}). Please try again.`;
 }
 
-// Run one fal.ai model call via the async QUEUE API and return its output URL.
-// The queue API submits the job, then polls for completion — this is what makes
-// long-running video models (Kling, Topaz) reliable instead of timing out on a
-// single held-open synchronous connection.
 async function runFalStep(step: FalStep, falKey: string): Promise<string> {
   const headers = { Authorization: `Key ${falKey}`, "Content-Type": "application/json" };
   console.log("[fal] ▶ submit:", step.label, "| model:", step.model);
   console.log("[fal]   payload:", JSON.stringify(safePayload(step.body)));
 
-  // 1) Submit to the queue.
   const submit = await fetch(`${FAL_QUEUE}${step.model}`, {
     method: "POST",
     headers,
@@ -99,8 +88,7 @@ async function runFalStep(step: FalStep, falKey: string): Promise<string> {
   };
   console.log("[fal]   queued request_id:", request_id);
 
-  // 2) Poll until the job completes (or fails / times out).
-  const deadline = Date.now() + 290_000; // ~4.8 min hard cap
+  const deadline = Date.now() + 290_000;
   let delay = 1500;
   let lastStatus = "";
   while (Date.now() < deadline) {
@@ -129,7 +117,6 @@ async function runFalStep(step: FalStep, falKey: string): Promise<string> {
     throw new Error(`${step.label} took too long and timed out. Please try again.`);
   }
 
-  // 3) Fetch the result.
   const res = await fetch(response_url, { headers });
   if (!res.ok) {
     const txt = await res.text();
@@ -147,18 +134,12 @@ async function runFalStep(step: FalStep, falKey: string): Promise<string> {
   return url;
 }
 
-// Errors that will never succeed on a retry (bad input, safety, auth, credits).
 function isPermanentError(msg: string): boolean {
   return /authentication|out of credits|safety filter|unsupported format|invalid or in an unsupported|Not enough credits/i.test(
     msg || "",
   );
 }
 
-/**
- * Run a fal step with automatic retries (2 retries → 3 attempts total) and a
- * hard per-attempt timeout. Never charges credits — the caller only deducts
- * after a confirmed output URL.
- */
 async function runFalStepResilient(
   step: FalStep,
   falKey: string,
@@ -196,45 +177,30 @@ async function runFalStepResilient(
   throw new Error(`${finalMsg} (failed after ${maxRetries + 1} attempts)`);
 }
 
-
 const inputSchema = z.object({
   prompt: z.string().min(1).max(2000),
   type: z.enum(["image", "video"]),
-  // Optional source media (data URI for images, or a signed URL for uploads).
-  // Enables image-to-image, image-to-video and video-to-video workflows.
   imageUrl: z.string().min(1).max(15_000_000).optional(),
-  // Tells the server what the uploaded media actually is so it routes correctly.
   sourceKind: z.enum(["image", "video"]).optional(),
-  // Edit strength for image-to-image (0.1 – 1). Higher = more visible edits.
   strength: z.number().min(0.1).max(1).optional(),
-  // Extra reference images for FLUX Kontext multi-image edits (plan-gated).
   referenceImageUrls: z.array(z.string().min(1).max(15_000_000)).max(9).optional(),
-  // Optional black/white mask URL from Circle to Remove. White pixels are edited.
   maskImageUrl: z.string().min(1).max(15_000_000).optional(),
-  // Text-to-image only. Aspect ratio chip selection.
   aspectRatio: z.enum(["1:1", "4:3", "16:9", "9:16", "3:4"]).optional(),
-  // Video only. Requested clip length in seconds (plan-gated) + frame ratio.
   videoDurationSeconds: z.union([
     z.literal(5), z.literal(10), z.literal(15),
     z.literal(20), z.literal(25), z.literal(30),
   ]).optional(),
   videoAspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3"]).optional(),
-  // Output quality tiers. Images: HD / 2K / 4K. Video: 720p / 1080p / 4K.
   imageQuality: z.enum(["hd", "2k", "4k"]).optional(),
   videoResolution: z.enum(["720p", "1080p", "4k"]).optional(),
-  // Video → Video only. "enhance" runs the Topaz upscale pass (flat cost);
-  // "transform" runs the normal generative pipeline.
   videoMode: z.enum(["transform", "enhance"]).optional(),
 });
-
-
 
 export const generateMedia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    // Credit RPCs are SECURITY DEFINER and only callable by service_role.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: profile, error: pErr } = await supabase
@@ -247,7 +213,6 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Could not load your account.");
     }
 
-    // Admin account: unlimited access — no plan gating, no credit checks/charges.
     const adminEmail = process.env.ADMIN_EMAIL;
     const isAdmin =
       !!adminEmail &&
@@ -258,7 +223,6 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Video generation requires a paid plan.");
     }
 
-    // Video cost scales with the requested duration; image cost is flat.
     const requestedDuration = data.videoDurationSeconds ?? 5;
     const maxDuration = maxVideoDurationForPlan(profile.plan);
     const videoDuration = isAdmin
@@ -282,10 +246,6 @@ export const generateMedia = createServerFn({ method: "POST" })
     const falKey = process.env.FAL_API_KEY;
     if (!falKey) throw new Error("AI service unavailable.");
 
-    // Credits are deducted ONLY after generation succeeds (see below), so a
-    // failed FAL.ai call never charges the user. Balance was already checked
-    // above; the atomic deduct_credits RPC re-checks at charge time to prevent
-    // negative balances / concurrent double-spend.
     let outputUrl: string | null = null;
 
     try {
@@ -307,10 +267,6 @@ export const generateMedia = createServerFn({ method: "POST" })
           });
           outputUrl = await runFalStepResilient(step, falKey);
         } else if (isEnhancementOnly(data.prompt)) {
-          // ── Pure enhancement path ───────────────────────────────────
-          // Deterministic detail-preserving pipeline (deblur → smart
-          // sharpen → optional Topaz upscale). Composition/colors stay
-          // identical — only sharpness and fine detail improve.
           const pipeline = buildImageEnhancementPipeline({
             prompt: data.prompt,
             imageUrl: data.imageUrl,
@@ -326,12 +282,6 @@ export const generateMedia = createServerFn({ method: "POST" })
             }
             outputUrl = current;
           } catch (err) {
-            // Some enhancement models reject very large photos (e.g. the
-            // "maximum should be 4095×4095" limit common on mobile/DSLR
-            // shots). Never surface that to the user — fall back to the
-            // instruction-edit model, which downscales internally, with an
-            // enhancement-only instruction so the result is still a sharper,
-            // more detailed version of the SAME image.
             const msg = err instanceof Error ? err.message : "";
             if (isPixelLimitError(msg)) {
               console.warn("[generate] enhance hit a size limit — falling back to kontext enhance");
@@ -346,19 +296,9 @@ export const generateMedia = createServerFn({ method: "POST" })
             }
           }
         } else {
-          // ── Instruction edit path ───────────────────────────────────
-          // The prompt asks for a real change (add/remove/recolor/etc.).
-          // Expand the short prompt into a rich, vivid editing instruction
-          // first (e.g. "cinematic" → cinematic lighting, dramatic contrast,
-          // premium color grading…) so small prompts create big, meaningful
-          // changes while preserving the main subject. Then apply with the
-          // instruction-edit model.
           const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
           const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: true });
           console.log("[generate] mode: edit (flux kontext) | enhanced:", enhancedPrompt);
-          // Gate extra reference images by the user's plan limit. Only real
-          // https URLs are usable by fal — anything else (data:/blob:) is
-          // dropped here and logged so the failure is visible.
           const { getPlanLimits } = await import("@/utils/planLimits");
           const maxImages = getPlanLimits(profile.plan).maxImages;
           const rawRefs = data.referenceImageUrls ?? [];
@@ -373,9 +313,6 @@ export const generateMedia = createServerFn({ method: "POST" })
             `[generate] images sent to FAL: 1 primary + ${refs.length} reference(s)`,
           );
 
-          // Quality presets (Fix 2) are classified from the ORIGINAL short
-          // prompt. For generic ("default") edits the user's strength slider
-          // still applies; small/large edits use their tuned presets.
           const editSize = classifyEditSize(data.prompt);
           const step = buildImageEdit({
             prompt: enhancedPrompt,
@@ -387,8 +324,6 @@ export const generateMedia = createServerFn({ method: "POST" })
           outputUrl = await runFalStepResilient(step, falKey);
         }
       } else {
-        // ── Text → Image path ─────────────────────────────────────────
-        // Expand the prompt then generate with FLUX1.1 [pro].
         const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
         const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: false });
         console.log("[generate] enhanced prompt:", enhancedPrompt);
@@ -406,10 +341,6 @@ export const generateMedia = createServerFn({ method: "POST" })
       }
       if (!outputUrl) throw new Error("Generation returned no image.");
 
-      // ── Output quality tier (HD / 2K / 4K) ──────────────────────────
-      // Extra Topaz pass; the creative result is untouched, only resolution
-      // and fine detail improve. Failure here is non-fatal — we keep the
-      // base-resolution image rather than failing the whole generation.
       const upFactor = imageUpscaleFactor(data.imageQuality);
       if (upFactor > 1) {
         try {
@@ -425,13 +356,11 @@ export const generateMedia = createServerFn({ method: "POST" })
       }
 
     } else {
-      // ── Video workflows (paid only) ─────────────────────────────────
       console.log("[generate] video | sourceKind:", data.sourceKind ?? "none");
       const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
 
       let step: FalStep;
       if (!data.imageUrl) {
-        // A. Text → Video
         const enhanced = await enhancePrompt({ prompt: data.prompt, isEdit: false });
         console.log("[generate] mode: text-to-video | enhanced:", enhanced);
         step = buildTextToVideo({
@@ -440,11 +369,9 @@ export const generateMedia = createServerFn({ method: "POST" })
           aspectRatio: data.videoAspectRatio ?? "16:9",
         });
       } else if (data.sourceKind === "video") {
-        // C. Video → Video (enhancement / transformation)
         console.log("[generate] mode: video-to-video (enhance)");
         step = buildVideoEnhancement({ videoUrl: data.imageUrl });
       } else {
-        // B. Image → Video (motion from a still)
         const enhanced = await enhancePrompt({ prompt: data.prompt, isEdit: false });
         console.log("[generate] mode: image-to-video | enhanced:", enhanced);
         step = buildImageToVideo({
@@ -459,7 +386,6 @@ export const generateMedia = createServerFn({ method: "POST" })
       outputUrl = await runFalStepResilient(step, falKey);
       if (!outputUrl) throw new Error("Video generation returned no output.");
 
-      // 4K tier: extra Topaz video upscale pass. Non-fatal on failure.
       if (data.sourceKind !== "video" && videoResolutionUpscales(data.videoResolution)) {
         try {
           console.log("[generate] video quality tier 4k → topaz upscale pass");
@@ -475,25 +401,19 @@ export const generateMedia = createServerFn({ method: "POST" })
 
     }
     } catch (err) {
-      // FAL.ai failed — no credits were ever deducted, so nothing to refund.
       const raw = err instanceof Error ? err.message : "Generation failed.";
       console.error("[generate] generation failed (no credits charged):", raw);
       throw new Error(`${raw} — Generation failed. Credits not charged.`);
     }
 
-    // An empty / missing output must never charge the user.
     if (!outputUrl || outputUrl.trim().length === 0) {
       throw new Error("Generation returned no output. Credits not charged.");
     }
 
-    // ── Charge credits AFTER a confirmed successful output ───────────────
-    // Admin account is never charged and keeps its unlimited balance.
     let newCredits = profile.credits;
     if (isAdmin) {
       console.log("[generate] admin account — skipping credit deduction");
     } else {
-      // deduct_credits is atomic: it re-checks the balance and decrements in a
-      // single statement, preventing negative balances and concurrent double-spend.
       const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
         _amount: cost,
         _gen_type: data.type,
@@ -521,7 +441,39 @@ export const generateMedia = createServerFn({ method: "POST" })
       console.log("[generate] charged", cost, "credits → remaining", newCredits, "tx", deducted.transaction_id);
     }
 
-    // ── Persist history ─────────────────────────────────────────────────
+    // FREE image: stamp primary+secondary on the server BEFORE the client
+    // receives outputUrl. Network intercept of the generate response cannot
+    // yield a clean downloadable file. Download path still re-validates.
+    if (data.type === "image" && !isAdmin && profile.plan === "free") {
+      try {
+        const { applyServerWatermark, fetchImageBuffer } = await import(
+          "@/lib/watermark.server"
+        );
+        const raw = await fetchImageBuffer(outputUrl);
+        const stamped = await applyServerWatermark(raw, "primary+secondary");
+        const path = `${userId}/out-wm-${Date.now()}.jpg`;
+        const { error: upErr } = await supabaseAdmin.storage
+          .from("uploads")
+          .upload(path, stamped, { contentType: "image/jpeg", upsert: true });
+        if (!upErr) {
+          const { data: signed } = await supabaseAdmin.storage
+            .from("uploads")
+            .createSignedUrl(path, 60 * 60 * 24 * 7);
+          if (signed?.signedUrl) {
+            outputUrl = signed.signedUrl;
+            console.log("[generate] free output stamped server-side (primary+secondary)");
+          }
+        } else {
+          console.error("[generate] wm upload failed:", upErr.message);
+        }
+      } catch (e) {
+        console.error(
+          "[generate] server watermark failed; secure download still enforces branding:",
+          e,
+        );
+      }
+    }
+
     console.log("[generate] output ready:", outputUrl.slice(0, 80));
 
     const { error: histErr } = await supabase.from("generations").insert({
@@ -550,10 +502,6 @@ const checkoutSchema = z.object({
   currency: z.string().min(1).max(8),
 });
 
-// SECURITY: This path NEVER grants paid credits. Paid plans are credited only
-// after a verified Razorpay/NOWPayments webhook (see payments.functions.ts and
-// the /api/public/webhooks/* routes). Here we only allow activating the free
-// plan, which carries no credits.
 export const completeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => checkoutSchema.parse(data))
