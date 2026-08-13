@@ -42,7 +42,6 @@ function Dashboard() {
   if (!profile) return null;
   const plan = getPlan(profile.plan);
   const allocation = PLAN_CREDITS[profile.plan];
-  const unlimited = profile.plan === "business";
   const used = Math.max(0, allocation - profile.credits);
   const images = gens.filter((g) => g.type === "image").length;
   const videos = gens.filter((g) => g.type === "video").length;
@@ -58,7 +57,7 @@ function Dashboard() {
         </Avatar>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">Hi, {profile.display_name || "creator"} 👋</h1>
+            <h1 className="text-2xl font-bold">Hi, {profile.display_name || "creator"}</h1>
             <CrownBadge plan={profile.plan} showLabel />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">Here's your account at a glance.</p>
@@ -69,7 +68,7 @@ function Dashboard() {
         <div className="rounded-xl border border-border bg-card p-6">
           <Coins className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Credits remaining</p>
-          <p className="mt-1 text-3xl font-extrabold">{unlimited ? "Unlimited" : profile.credits}</p>
+          <p className="mt-1 text-3xl font-extrabold">{profile.credits.toLocaleString()}</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Image {CREDIT_COST.image} · Video {CREDIT_COST.video} credits each
           </p>
@@ -77,12 +76,12 @@ function Dashboard() {
         <div className="rounded-xl border border-border bg-card p-6">
           <Zap className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Credits used</p>
-          <p className="mt-1 text-3xl font-extrabold">{unlimited ? "—" : used}</p>
+          <p className="mt-1 text-3xl font-extrabold">{used.toLocaleString()}</p>
         </div>
         <Link to="/pricing" className="rounded-xl border border-border bg-card p-6 text-left transition-colors hover:border-primary">
           <Crown className="h-6 w-6 text-primary" />
           <p className="mt-4 text-sm text-muted-foreground">Subscription</p>
-          <p className="mt-1 text-2xl font-extrabold capitalize">{plan.name}</p>
+          <p className="mt-1 text-2xl font-extrabold">{plan.name}</p>
           <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary">
             <CheckCircle2 className="h-3.5 w-3.5" />
             {profile.plan === "free" ? "Free Plan — Activated" : `${plan.name} Plan — Activated`}

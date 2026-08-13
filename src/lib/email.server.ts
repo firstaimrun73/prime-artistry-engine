@@ -40,7 +40,7 @@ export async function sendPaymentErrorReport(args: {
       },
 
       body: JSON.stringify({
-        from: `Motio2Edit Alerts <${supportEmail}>`,
+        from: `Motio2edit Alerts <${supportEmail}>`,
         to: [supportEmail],
         subject: `[PAYMENT ERROR] ${args.paymentMethod} — ${args.transactionId}`,
         html,
@@ -67,7 +67,7 @@ export async function sendBrandedEmail(args: {
   }
   const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
     <div style="background:#F97316;color:#fff;padding:20px;border-radius:8px 8px 0 0">
-      <h2 style="margin:0">MOTIO2EDIT</h2>
+      <h2 style="margin:0">Motio2edit</h2>
     </div>
     <div style="background:#ffffff;padding:24px;border:1px solid #eee;border-radius:0 0 8px 8px">
       <h3 style="margin-top:0">${args.heading}</h3>
@@ -81,7 +81,7 @@ export async function sendBrandedEmail(args: {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
-        from: `MOTIO2EDIT <${supportEmail}>`,
+        from: `Motio2edit <${supportEmail}>`,
         to: [args.to],
         subject: args.subject,
         html,
