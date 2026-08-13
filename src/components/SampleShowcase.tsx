@@ -183,7 +183,6 @@ export function SampleShowcase() {
     void audio.play().catch(() => setPlaying(null));
     audioRef.current = audio;
     setPlaying(url);
-    // 15 second preview only
     stopTimer.current = setTimeout(stopAudio, 15000);
   };
 
@@ -226,7 +225,7 @@ export function SampleShowcase() {
           <Sparkles className="h-3.5 w-3.5 text-primary" /> Real results
         </span>
         <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">
-          See what MOTIO2EDIT can do
+          See what Motio<span className="text-primary">2</span>edit can do
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
           Swipe through before and after examples, then open the same edit in the studio.
@@ -323,7 +322,6 @@ export function SampleShowcase() {
         </div>
       </div>
 
-      {/* Video examples */}
       <div className="mt-10 sm:mt-12">
         <div className="flex items-center gap-2">
           <Film className="h-5 w-5 text-primary" />
@@ -375,7 +373,6 @@ export function SampleShowcase() {
         </div>
       </div>
 
-      {/* Music examples */}
       <div className="mt-10 sm:mt-12">
         <div className="flex items-center gap-2">
           <Music className="h-5 w-5 text-primary" />
