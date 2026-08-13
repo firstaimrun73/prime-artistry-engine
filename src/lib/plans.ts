@@ -39,10 +39,11 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
   INR: 85,
 };
 
-// ── Credit economics ──────────────────────────────────────────────
-//   • 1 image generation / edit = 25 credits
-//   • 1 video generation / edit = 125 credits
-//   • 1 music generation        = 15 credits
+// ── Credit economics (single source of truth for UI + server) ──────────────
+//   • Image generation / edit = 25 credits (HD); higher quality tiers cost more
+//   • Video generation / edit = 125 credits base (scaled by duration/resolution)
+//   • Music generation        = 50–100 credits
+// Deductions run server-side via deduct_credits AFTER successful generation only.
 export const CREDIT_COST = {
   image: 25,
   video: 125,
@@ -108,18 +109,17 @@ export const PLANS: Plan[] = [
     id: "free",
     name: "Free",
     credits: 40,
-    video: true,
+    video: false,
     priority: false,
     price: { USD: 0, EUR: 0, INR: 0 },
     features: [
-      "40 monthly credits",
-      "AI image generation",
-      "AI video generation",
-      "🔒 AI music generation — upgrade to unlock",
-      "Standard processing",
+      "40 free credits on signup",
+      "AI image generation & editing",
+      "Circle to Remove included",
+      "Single image per edit",
       "Watermark on outputs",
+      "Video & music — upgrade to unlock",
       "Community support",
-      "Email support only",
     ],
   },
   {
