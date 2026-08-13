@@ -8,16 +8,12 @@ export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "crypto", label: "Crypto" },
 ];
 
-// Top-level payment method by checkout currency.
-// "card" lets the user choose between PayPal and Razorpay as the card provider.
-// "crypto" uses NOWPayments. Both are live for everyone.
 export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
   INR: ["card", "crypto"],
   USD: ["card", "crypto"],
   EUR: ["card", "crypto"],
 };
 
-/** Card providers offered under the "Credit / Debit Card" option. */
 export type CardProvider = "paypal" | "razorpay";
 export const CARD_PROVIDERS: { id: CardProvider; label: string; note: string }[] = [
   { id: "paypal", label: "PayPal", note: "Pay with PayPal or any card via PayPal (USD)" },
@@ -30,9 +26,13 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
   INR: "₹",
 };
 
+/**
+ * Internal plan ids stored in profiles.plan / payments.
+ * User-facing names may differ (e.g. id "business" displays as "Studio+").
+ * Do not rename the "business" id without a data migration for existing subscribers.
+ */
 export type PlanId = "free" | "lite" | "plus" | "pro" | "studio" | "business";
 
-/** Flat per-transaction processing fee added to every paid checkout. */
 export const TRANSACTION_FEE: Record<Currency, number> = {
   USD: 1,
   EUR: 1,
@@ -40,26 +40,20 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
 };
 
 // ── Credit economics (single source of truth for UI + server) ──────────────
-//   • Image generation / edit = 25 credits (HD); higher quality tiers cost more
-//   • Video generation / edit = 125 credits base (scaled by duration/resolution)
-//   • Music generation        = 50–100 credits
-// Deductions run server-side via deduct_credits AFTER successful generation only.
 export const CREDIT_COST = {
   image: 25,
   video: 125,
   music: 100,
   music_lite: 50,
-  /** Video → Video Topaz enhancement (upscale only, no re-generation). */
   video_enhance: 200,
 } as const;
 
-/** Sentinel for "unlimited" credits (Business). */
+/** High-balance sentinel used only for display helpers (not an unlimited product promise). */
 export const UNLIMITED_CREDITS = 9_999_999;
 
-/** Free signup bonus credits (kept in sync with the handle_new_user DB trigger). */
+/** Free signup bonus — MUST match public.handle_new_user() in Supabase. */
 export const FREE_SIGNUP_CREDITS = 40;
 
-/** One-time credit top-up — buyable on any plan, credits never expire. */
 export const CREDIT_TOPUP = {
   id: "credit-topup-499",
   name: "Credit Top-up",
@@ -76,12 +70,10 @@ export const CREDIT_TOPUP = {
   ],
 } as const;
 
-/** Human-readable credits for display ("Unlimited" for the Business sentinel). */
 export function creditsLabel(credits: number): string {
-  return credits >= UNLIMITED_CREDITS ? "Unlimited" : credits.toLocaleString();
+  return credits >= UNLIMITED_CREDITS ? "Maximum pool" : credits.toLocaleString();
 }
 
-/** Rough number of generations a credit balance buys (for plan display). */
 export function estimatedGenerations(credits: number) {
   return {
     images: Math.floor(credits / CREDIT_COST.image),
@@ -97,9 +89,7 @@ export type Plan = {
   credits: number;
   video: boolean;
   priority: boolean;
-  /** Highest model/quality tier access. */
   bestQuality?: boolean;
-  /** Checkout price (what the payment backend charges). */
   price: Record<Currency, number>;
   features: string[];
 };
@@ -114,11 +104,11 @@ export const PLANS: Plan[] = [
     price: { USD: 0, EUR: 0, INR: 0 },
     features: [
       "40 free credits on signup",
-      "AI image generation & editing",
+      "AI image generation and editing",
       "Circle to Remove included",
       "Single image per edit",
       "Watermark on outputs",
-      "Video & music — upgrade to unlock",
+      "Video and music require upgrade",
       "Community support",
     ],
   },
@@ -130,19 +120,19 @@ export const PLANS: Plan[] = [
     priority: false,
     price: { USD: 4.99, EUR: 4.49, INR: 399 },
     features: [
-      "350 credits (one-time / month)",
-      "AI image generation & editing",
-      "🎵 50 music generations per month",
-      "Smart Remove (Circle to Remove) included",
+      "350 credits per month",
+      "AI image generation and editing",
+      "Music generation included",
+      "Circle to Remove included",
       "No watermark on downloads",
       "Standard processing",
-      "JPG & PNG downloads",
+      "JPG and PNG downloads",
       "Email support",
     ],
   },
   {
     id: "plus",
-    name: "Starter",
+    name: "Plus",
     credits: 750,
     video: true,
     priority: false,
@@ -151,17 +141,16 @@ export const PLANS: Plan[] = [
       "750 monthly credits",
       "HD AI image generation",
       "720p AI video generation",
-      "🎵 100 music generations per month",
+      "Music generation included",
       "Faster processing",
-      "Small watermark",
       "Full history (30 days)",
-      "JPG & PNG downloads",
+      "JPG and PNG downloads",
       "Basic commercial use",
     ],
   },
   {
     id: "pro",
-    name: "Plus",
+    name: "Pro",
     credits: 2500,
     video: true,
     priority: true,
@@ -170,7 +159,7 @@ export const PLANS: Plan[] = [
       "2,500 monthly credits",
       "Advanced AI image generation",
       "1080p AI video generation",
-      "🎵 300 music generations per month",
+      "Music generation included",
       "Priority processing queue",
       "No watermark",
       "Full history (90 days)",
@@ -180,7 +169,7 @@ export const PLANS: Plan[] = [
   },
   {
     id: "studio",
-    name: "Pro",
+    name: "Studio",
     credits: 5000,
     video: true,
     priority: true,
@@ -190,7 +179,7 @@ export const PLANS: Plan[] = [
       "5,000 monthly credits",
       "Professional AI image generation",
       "4K AI video generation",
-      "🎵 Unlimited music generations",
+      "Full music studio access",
       "Fastest processing queue",
       "Commercial license",
       "Full history (180 days)",
@@ -199,24 +188,26 @@ export const PLANS: Plan[] = [
     ],
   },
   {
+    // Internal id remains "business" for DB + payment backward compatibility.
+    // User-facing name is Studio+.
     id: "business",
-    name: "Business",
+    name: "Studio+",
     credits: 10000,
     video: true,
     priority: true,
     bestQuality: true,
     price: { USD: 99, EUR: 89.99, INR: 8299 },
     features: [
-      "10,000 monthly credits",
-      "Premium AI generation",
-      "4K Ultra image & video generation",
-      "🎵 Unlimited music generations",
-      "Dedicated processing",
-      "Zero watermark",
-      "API access",
-      "Team collaboration",
+      "10,000 monthly credits (highest pool)",
+      "Maximum access across Image, Video and Music studios",
+      "Latest AI features and editing improvements",
+      "Priority access to new tools as they ship",
+      "4K Ultra image and video generation",
+      "No ads",
+      "No watermark",
       "Commercial license",
-      "Priority dedicated support",
+      "VIP badge and priority support",
+      "Server-side credit protection still applies",
     ],
   },
 ];
@@ -234,15 +225,11 @@ export function getPlan(id: PlanId): Plan {
   return PLANS.find((p) => p.id === id) ?? PLANS[0];
 }
 
-/** Strict lookup — returns undefined when the id is missing/unknown. */
 export function findPlan(id: string | undefined | null): Plan | undefined {
   if (!id) return undefined;
   return PLANS.find((p) => p.id === id);
 }
 
-// ── Display currencies (pricing page only) ────────────────────────
-// Marketing/display prices in many currencies. Checkout normalises these
-// to the supported Currency set above.
 export type DisplayCurrency =
   | "USD"
   | "INR"
@@ -266,7 +253,6 @@ export const DISPLAY_CURRENCIES: { code: DisplayCurrency; label: string }[] = [
   { code: "SGD", label: "SGD (S$)" },
 ];
 
-// Country code → display currency. EU members fall back to EUR.
 const EU_COUNTRIES = [
   "AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT",
   "LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE",
@@ -286,15 +272,12 @@ export function currencyForCountry(country: string | null | undefined): DisplayC
   return "USD";
 }
 
-/** Map a display currency to a backend checkout currency. */
 export function toCheckoutCurrency(dc: DisplayCurrency): Currency {
   if (dc === "INR") return "INR";
   if (dc === "EUR") return "EUR";
   return "USD";
 }
 
-// Pre-formatted display strings per plan per currency (from product spec).
-// Keyed by PlanId. Free is always 0.
 export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, string>> = {
   free: {
     USD: "$0", INR: "₹0", GBP: "£0", EUR: "€0", AED: "0 AED",
