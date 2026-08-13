@@ -18,7 +18,7 @@ export const CRYPTO_PACKAGES = {
 export type PackageId = keyof typeof RAZORPAY_PACKAGES;
 
 // Plan-based purchases — credits MUST match src/lib/plans.ts PLAN_CREDITS.
-// Internal id "business" is the Studio+ tier (user-facing name only).
+// Internal id "business" is the Master Studio tier (user-facing name only).
 export const PLAN_PURCHASE = {
   lite: { credits: 350, amountINR: 399, amountUSD: 4.99 },
   plus: { credits: 750, amountINR: 849, amountUSD: 9.99 },
