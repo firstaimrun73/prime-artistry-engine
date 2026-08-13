@@ -765,7 +765,7 @@ export type Database = {
           provider_subscription_id?: string | null
           status?: string
           updated_at?: string
-          user_id?: string
+          user_id: string
         }
         Relationships: []
       }
@@ -998,7 +998,7 @@ export type Database = {
     Enums: {
       gen_status: "pending" | "processing" | "success" | "failed"
       gen_type: "image" | "video" | "music"
-      plan_type: "free" | "plus" | "pro" | "studio" | "business"
+      plan_type: "free" | "lite" | "plus" | "pro" | "studio" | "business"
       ticket_category:
         | "payment"
         | "credits"
@@ -1143,7 +1143,7 @@ export const Constants = {
     Enums: {
       gen_status: ["pending", "processing", "success", "failed"],
       gen_type: ["image", "video", "music"],
-      plan_type: ["free", "plus", "pro", "studio", "business"],
+      plan_type: ["free", "lite", "plus", "pro", "studio", "business"],
       ticket_category: [
         "payment",
         "credits",
