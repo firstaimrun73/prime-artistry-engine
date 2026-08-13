@@ -33,7 +33,7 @@ export const Route = createFileRoute("/pricing")({
       {
         name: "description",
         content:
-          "Simple Motio2edit plans: Free, Lite, Plus, Pro, Studio and Studio+. Credit-based AI image, video and music generation.",
+          "Simple Motio2edit plans: Free, Lite, Plus, Pro, Studio and Master Studio. Credit-based AI image, video and music generation.",
       },
       { property: "og:title", content: "Pricing — Motio2edit" },
       {
@@ -50,7 +50,7 @@ const CURRENCY_KEY = "motio2edit-currency";
 const LABELS: Partial<Record<PlanId, { text: string; cls: string }>> = {
   lite: { text: "Best Starter", cls: "bg-amber-500 text-white" },
   pro: { text: "Most Popular", cls: "bg-primary text-primary-foreground" },
-  business: { text: "Best Value", cls: "bg-emerald-500 text-white" },
+  business: { text: "Maximum Access", cls: "bg-emerald-500 text-white" },
 };
 
 function Pricing() {
@@ -204,7 +204,7 @@ function Pricing() {
 
                 {isCurrent ? (
                   <Button className="mt-8 w-full" variant="outline" disabled style={{ marginTop: "auto" }}>
-                    ✅ Activated
+                    Activated
                   </Button>
                 ) : (
                   <Button
@@ -219,7 +219,7 @@ function Pricing() {
                   >
                     {plan.id === "free"
                       ? profile
-                        ? "Free Plan ✅"
+                        ? "Free Plan"
                         : "Get Started Free"
                       : `Upgrade to ${plan.name}`}
                   </Button>
