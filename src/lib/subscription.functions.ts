@@ -61,7 +61,7 @@ function planFromCreditsLocal(credits: number): string {
     2500: "pro",
     2000: "pro", // legacy
     5000: "studio",
-    10000: "business", // Studio+
+    10000: "business", // Master Studio (internal id)
     9_999_999: "business", // legacy unlimited sentinel
   };
   return map[credits] ?? "custom";
@@ -284,7 +284,7 @@ export const cancelSubscription = createServerFn({ method: "POST" })
     if (email) {
       await sendBrandedEmail({
         to: email,
-        subject: "Your MOTIO2EDIT subscription has been cancelled",
+        subject: "Your Motio2edit subscription has been cancelled",
         heading: "Subscription cancelled",
         bodyHtml: `<p>Your subscription auto-renewal has been turned off.</p>
           <p>You keep full access to your benefits and remaining credits until <b>${expiry.toDateString()}</b>.</p>`,
