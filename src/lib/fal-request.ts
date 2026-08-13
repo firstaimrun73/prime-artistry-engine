@@ -124,6 +124,10 @@ const SMALL_EDIT_MATCH =
 const LARGE_EDIT_MATCH =
   /\b(transform|convert\s+to|turn\s+into|make\s+it\s+(a|an)\s+\w+\s+scene)\b/i;
 
+/** Detect outfit / clothing transfer requests (used for multi-image guidance). */
+const OUTFIT_MATCH =
+  /\b(outfit|clothing|clothes|dress|shirt|jacket|armor|armour|costume|suit|wear|wearing|change\s+the\s+outfit|replace\s+outfit|swap\s+outfit|put\s+on|dress\s+(him|her|them)|clothes\s+from)\b/i;
+
 export function classifyEditSize(
   userPrompt: string,
 ): EditSize {
@@ -316,7 +320,9 @@ export function getEditTypeSettings(
         num_inference_steps: 40,
       };
   }
-}export function getEditTypeClause(
+}
+
+export function getEditTypeClause(
   type: EditType,
 ): string {
   switch (type) {
@@ -428,7 +434,7 @@ export function buildImageEdit({
     );
   }
 
-     const refs = (referenceImageUrls ?? []).filter(
+  const refs = (referenceImageUrls ?? []).filter(
     (u) => typeof u === "string" && u.startsWith("https://"),
   );
 
@@ -442,6 +448,9 @@ export function buildImageEdit({
   const isFaceRelated =
     editSize === "face_fix" ||
     editType === "portrait";
+
+  const isOutfitMulti =
+    isMulti && OUTFIT_MATCH.test(source);
 
   let basePrompt: string;
 
@@ -471,9 +480,24 @@ export function buildImageEdit({
   const withType =
     `${basePrompt}${getEditTypeClause(editType)}`;
 
-   const multiNote = isMulti
-    ? ` Use image 1 as the base photo ONLY. Preserve the exact face, identity and appearance of the person in image 1 completely unchanged. Images 2-${refs.length + 1} are style/outfit references ONLY — copy the style or outfit from them but NEVER copy or replace the face, skin tone, or identity from reference images. The output must show the same person from image 1 wearing the style from reference images.`
-    : "";
+  // Strong multi-image instruction. Outfit transfer gets extra explicit wording
+  // so Kontext actually copies the garment instead of only recoloring.
+  let multiNote = "";
+  if (isMulti) {
+    if (isOutfitMulti) {
+      multiNote =
+        ` MULTI-IMAGE OUTFIT TRANSFER: Image 1 is the base person photo. Images 2-${refs.length + 1} are the OUTFIT / CLOTHING / ARMOR reference. ` +
+        `Replace the clothing on the person in image 1 with the EXACT outfit, armor, costume or clothing visible in the reference image(s). ` +
+        `Match colors, materials, patterns, armor plates, straps, and silhouette as closely as possible. ` +
+        `Keep the person's face, identity, skin tone, hair, body pose, camera angle and background from image 1 completely unchanged. ` +
+        `Do NOT copy the face or body from the reference. Only transfer the clothing/outfit.`;
+    } else {
+      multiNote =
+        ` Use image 1 as the base photo ONLY. Preserve the exact face, identity and appearance of the person in image 1 completely unchanged. ` +
+        `Images 2-${refs.length + 1} are style/outfit references ONLY — copy the style or outfit from them but NEVER copy or replace the face, skin tone, or identity from reference images. ` +
+        `The output must show the same person from image 1 wearing or styled from the reference images.`;
+    }
+  }
 
   const finalPrompt =
     `${withType}${multiNote}\n\n${PRESERVATION_CONTRACT}`;
@@ -482,11 +506,17 @@ export function buildImageEdit({
     quality.guidance_scale;
 
   if (isFaceRelated) {
-    guidance =
-      Math.min(guidance, 2.4);
+    guidance = Math.min(guidance, 2.4);
   }
 
-    const body: Record<string, unknown> = {
+  // Outfit multi needs higher CFG so the model actually follows the clothing transfer
+  if (isOutfitMulti) {
+    guidance = Math.max(guidance, 3.5);
+  } else if (isMulti) {
+    guidance = Math.max(guidance, 3.0);
+  }
+
+  const body: Record<string, unknown> = {
     prompt: finalPrompt,
     guidance_scale: guidance,
     num_images: 1,
@@ -691,7 +721,9 @@ export function buildFalRequest({
       enable_safety_checker: true,
     },
   };
-}export function buildImageEnhancementPipeline({
+}
+
+export function buildImageEnhancementPipeline({
   prompt,
   imageUrl,
   strength = 0.85,
