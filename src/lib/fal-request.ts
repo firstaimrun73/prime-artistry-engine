@@ -435,12 +435,11 @@ export function buildImageEdit({
         u.startsWith("https://"),
     );
 
-  const isMulti =
+   const isMulti =
     refs.length > 0;
 
-  const model = isMulti
-    ? IMAGE_EDIT_MULTI_MODEL
-    : IMAGE_EDIT_MODEL;
+  const model = IMAGE_EDIT_MODEL;
+
 
   const isFaceRelated =
     editSize === "face_fix" ||
@@ -474,8 +473,8 @@ export function buildImageEdit({
   const withType =
     `${basePrompt}${getEditTypeClause(editType)}`;
 
-  const multiNote = isMulti
-    ? ` Use image 1 as the base photo and images 2-${refs.length + 1} as additional references for the requested change.`
+   const multiNote = isMulti
+    ? ` Use image 1 as the base photo ONLY. Preserve the exact face, identity and appearance of the person in image 1 completely unchanged. Images 2-${refs.length + 1} are style/outfit references ONLY — copy the style or outfit from them but NEVER copy or replace the face, skin tone, or identity from reference images. The output must show the same person from image 1 wearing the style from reference images.`
     : "";
 
   const finalPrompt =
@@ -503,16 +502,7 @@ export function buildImageEdit({
       quality.num_inference_steps;
   }
 
-  if (isMulti) {
-    body.image_urls =
-      [imageUrl, ...refs];
-
-    body.image_url =
-      imageUrl;
-  } else {
-    body.image_url =
-      imageUrl;
-  }
+   body.image_url = imageUrl;
 
   return {
     label:
