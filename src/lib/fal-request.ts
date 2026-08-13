@@ -428,18 +428,16 @@ export function buildImageEdit({
     );
   }
 
-  const refs =
-    (referenceImageUrls ?? []).filter(
-      (u) =>
-        typeof u === "string" &&
-        u.startsWith("https://"),
-    );
+     const refs = (referenceImageUrls ?? []).filter(
+    (u) => typeof u === "string" && u.startsWith("https://"),
+  );
 
-   const isMulti =
-    refs.length > 0;
+  const isMulti =
+    refs.length > 0 &&
+    typeof imageUrl === "string" &&
+    imageUrl.startsWith("https://");
 
-  const model = IMAGE_EDIT_MODEL;
-
+  const model = isMulti ? IMAGE_EDIT_MULTI_MODEL : IMAGE_EDIT_MODEL;
 
   const isFaceRelated =
     editSize === "face_fix" ||
@@ -488,7 +486,7 @@ export function buildImageEdit({
       Math.min(guidance, 2.4);
   }
 
-  const body: Record<string, unknown> = {
+    const body: Record<string, unknown> = {
     prompt: finalPrompt,
     guidance_scale: guidance,
     num_images: 1,
@@ -497,12 +495,17 @@ export function buildImageEdit({
     enhance_prompt: false,
   };
 
-  if (quality.num_inference_steps) {
-    body.num_inference_steps =
-      quality.num_inference_steps;
+  // Multi schema often rejects num_inference_steps — only send on single
+  if (!isMulti && quality.num_inference_steps) {
+    body.num_inference_steps = quality.num_inference_steps;
   }
 
-   body.image_url = imageUrl;
+  if (isMulti) {
+    // Multi endpoint ONLY accepts image_urls — never image_url
+    body.image_urls = [imageUrl, ...refs];
+  } else {
+    body.image_url = imageUrl;
+  }
 
   return {
     label:
