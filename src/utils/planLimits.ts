@@ -13,7 +13,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   plus: { maxImages: 3, videoEnabled: true, hd: false },
   pro: { maxImages: 5, videoEnabled: true, hd: true },
   studio: { maxImages: 8, videoEnabled: true, hd: true },
-  business: { maxImages: 10, videoEnabled: true, hd: true }, // Studio+
+  business: { maxImages: 10, videoEnabled: true, hd: true }, // Master Studio
 };
 
 export function getPlanLimits(plan: string): PlanLimits {
