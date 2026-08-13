@@ -11,15 +11,15 @@ export function FinalCTA() {
           <Sparkles className="h-3.5 w-3.5 text-primary" /> Free credits on signup
         </span>
         <h2 className="relative mx-auto mt-4 max-w-2xl text-2xl font-extrabold tracking-tight sm:text-4xl">
-          Create Amazing AI Content in Minutes
+          Start editing with Motio<span className="text-primary">2</span>edit
         </h2>
         <p className="relative mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
-          Images, videos and music — start free and upgrade only when you need more.
+          Upload a photo, describe the change, and generate — images, video and music in one place.
         </p>
         <div className="relative mt-7 flex flex-col items-stretch justify-center gap-3 sm:flex-row">
           <Button asChild size="lg" className="btn-animate">
-            <Link to="/editor">
-              Start Creating <ArrowRight className="ml-1.5 h-4 w-4" />
+            <Link to="/studio/image">
+              Start Editing <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline" className="btn-animate">
