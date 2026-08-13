@@ -11,6 +11,7 @@ import {
   DISPLAY_PRICES,
   DISPLAY_CURRENCIES,
   toCheckoutCurrency,
+  CREDIT_COST,
   type DisplayCurrency,
   type PlanId,
 } from "@/lib/plans";
@@ -27,10 +28,17 @@ import {
 export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
-      { title: "Pricing — MOTIO2EDIT" },
-      { name: "description", content: "Five simple plans: Free, Starter, Plus, Pro and Business. Auto-detected local pricing, AI image and video generation, and crown member badges." },
-      { property: "og:title", content: "Pricing — MOTIO2EDIT" },
-      { property: "og:description", content: "Free, Starter, Plus, Pro and Business plans for AI image and video generation." },
+      { title: "Pricing — Motio2edit" },
+      {
+        name: "description",
+        content:
+          "Simple Motio2edit plans: Free, Lite, Starter, Plus, Pro and Business. Credit-based AI image, video and music generation.",
+      },
+      { property: "og:title", content: "Pricing — Motio2edit" },
+      {
+        property: "og:description",
+        content: "Free and paid plans for AI image, video and music. Clear credit costs, no surprises.",
+      },
     ],
   }),
   component: Pricing,
@@ -39,7 +47,7 @@ export const Route = createFileRoute("/pricing")({
 const CURRENCY_KEY = "motio2edit-currency";
 
 const LABELS: Partial<Record<PlanId, { text: string; cls: string }>> = {
-  lite: { text: "New — Best Starter", cls: "bg-amber-500 text-white" },
+  lite: { text: "Best Starter", cls: "bg-amber-500 text-white" },
   pro: { text: "Most Popular", cls: "bg-primary text-primary-foreground" },
   business: { text: "Best Value", cls: "bg-emerald-500 text-white" },
 };
@@ -52,7 +60,6 @@ function Pricing() {
 
   const currentPlan = profile?.plan ?? null;
 
-  // Default currency is USD. A saved preference wins; otherwise stay on USD.
   useEffect(() => {
     let stored: string | null = null;
     try {
@@ -83,10 +90,17 @@ function Pricing() {
       <Header />
       <div className="mx-auto max-w-7xl px-4 py-16">
         <div className="text-center">
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Choose your plan</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Simple pricing for Motio<span className="text-primary">2</span>edit
+          </h1>
           <p className="mt-3 text-muted-foreground">
-            Free forever to start. Upgrade anytime — prices auto-adjust to your region.
+            Start free. Upgrade when you need more credits, video, or watermark-free downloads.
           </p>
+          {profile && (
+            <p className="mt-2 text-sm font-medium text-primary">
+              Your balance: {profile.credits.toLocaleString()} credits · Plan: {profile.plan}
+            </p>
+          )}
           <div className="mt-6 flex justify-center">
             <Select value={currency} onValueChange={(v) => changeCurrency(v as DisplayCurrency)}>
               <SelectTrigger className="w-44">
@@ -101,6 +115,27 @@ function Pricing() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        {/* Credit cost reference — matches server CREDIT_COST */}
+        <div className="mx-auto mt-8 max-w-2xl rounded-2xl border border-border bg-card p-4 text-center sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            What credits buy
+          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">
+            <span className="rounded-full border border-border bg-background px-3 py-1.5">
+              Image edit · <strong>{CREDIT_COST.image}</strong> credits
+            </span>
+            <span className="rounded-full border border-border bg-background px-3 py-1.5">
+              Video · from <strong>{CREDIT_COST.video}</strong> credits
+            </span>
+            <span className="rounded-full border border-border bg-background px-3 py-1.5">
+              Music · <strong>{CREDIT_COST.music_lite}</strong>–{CREDIT_COST.music} credits
+            </span>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Higher quality tiers cost more. Failed generations do not charge credits.
+          </p>
         </div>
 
         <div className="mt-12 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -142,6 +177,10 @@ function Pricing() {
                   {plan.id !== "free" && <span className="text-sm text-muted-foreground">/mo</span>}
                 </div>
 
+                <p className="mt-2 text-sm font-semibold text-primary">
+                  {plan.credits.toLocaleString()} credits
+                </p>
+
                 <ul className="mt-6 space-y-2.5">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm">
@@ -152,15 +191,13 @@ function Pricing() {
 
                 {plan.id === "free" ? (
                   <p className="mt-4 text-xs text-muted-foreground">
-                    Free images include watermark protection. Upgrade to download without watermarks.
+                    Free images include watermark protection. Upgrade for clean downloads and video.
                   </p>
                 ) : (
                   <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
                     <Check className="h-3.5 w-3.5" /> Watermark-free downloads
                   </p>
                 )}
-
-
 
                 {isCurrent ? (
                   <Button className="mt-8 w-full" variant="outline" disabled style={{ marginTop: "auto" }}>
@@ -170,7 +207,11 @@ function Pricing() {
                   <Button
                     className="mt-8 w-full"
                     variant={highlight ? "default" : "outline"}
-                    onClick={() => (plan.id === "free" ? navigate({ to: "/auth", search: { redirect: undefined } }) : selectPlan(plan.id))}
+                    onClick={() =>
+                      plan.id === "free"
+                        ? navigate({ to: "/auth", search: { redirect: undefined } })
+                        : selectPlan(plan.id)
+                    }
                     style={{ marginTop: "auto" }}
                   >
                     {plan.id === "free"
@@ -186,7 +227,8 @@ function Pricing() {
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          India is billed in INR via secure card payment. International plans are paid with crypto (USDT / BTC / ETH).
+          Secure checkout via Razorpay, PayPal or crypto. Credits are granted only after server-side
+          payment verification.
         </p>
       </div>
       <FooterAd />
