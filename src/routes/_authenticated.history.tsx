@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { CREDIT_COST } from "@/lib/plans";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { secureDownloadImage } from "@/lib/download.functions";
 import {
   Download, Pencil, Trash2, ZoomIn, ZoomOut, Image as ImageIcon,
   Video, History as HistoryIcon, FolderOpen, Music,
@@ -32,8 +34,9 @@ type Generation = {
 };
 
 function HistoryPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const secureDownload = useServerFn(secureDownloadImage);
   const [gens, setGens] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Generation | null>(null);
@@ -63,18 +66,33 @@ function HistoryPage() {
   const download = async (g: Generation) => {
     if (!g.output_url) return;
     try {
-      const res = await fetch(g.output_url);
+      let href = g.output_url;
+      // Images: always route through server policy (free cannot bypass).
+      if (g.type === "image") {
+        const res = await secureDownload({
+          data: {
+            imageUrl: g.output_url,
+            // Paid preference is not stored in history; default OFF for paid
+            // (clean). Free is forced server-side to primary+secondary.
+            keepWatermark: false,
+          },
+        });
+        href = res.downloadUrl;
+      }
+      const res = await fetch(href);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `motio2edit-${g.id}.${g.type === "video" ? "mp4" : "png"}`;
+      a.download = `motio2edit-${g.id}.${g.type === "video" ? "mp4" : "jpg"}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch {
-      window.open(g.output_url, "_blank");
+      toast.success("⬇️ Download started!");
+    } catch (e) {
+      console.error("[history] download failed:", e);
+      toast.error("Download failed. Please try again.");
     }
   };
 
