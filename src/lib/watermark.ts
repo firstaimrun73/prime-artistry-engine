@@ -109,10 +109,50 @@ function loadImage(src: string, crossOrigin: boolean): Promise<HTMLImageElement 
  * diagonal download grid is stamped as well. Returns the original URL on
  * any failure so the user always gets an image.
  */
-export async function watermarkImage(
+ export async function watermarkImage(
   url: string,
   options?: { strong?: boolean }
 ): Promise<string> {
+  const strong = options?.strong === true;
+  try {
+    const isData = url.startsWith("data:") || url.startsWith("blob:");
+
+    let img: HTMLImageElement | null = null;
+
+    if (isData) {
+      img = await loadImage(url, false);
+    } else {
+      // Fetch → blob first so canvas is not CORS-tainted (fal CDN)
+      try {
+        const res = await fetch(url, { mode: "cors" });
+        if (res.ok) {
+          const blob = await res.blob();
+          const objUrl = URL.createObjectURL(blob);
+          img = await loadImage(objUrl, false);
+          if (img) {
+            const out = renderWatermarked(img, strong);
+            URL.revokeObjectURL(objUrl);
+            if (out) return out;
+          }
+          URL.revokeObjectURL(objUrl);
+        }
+      } catch (e) {
+        console.warn("[Watermark] fetch failed, trying Image()", e);
+      }
+      img = await loadImage(url, true);
+    }
+
+    if (!img) {
+      console.error("[Watermark] Failed to load image:", url);
+      return url;
+    }
+
+    return renderWatermarked(img, strong) ?? url;
+  } catch (err) {
+    console.error("[Watermark] Error:", err);
+    return url;
+  }
+}
   const strong = options?.strong === true;
   try {
     // data: URLs need no cache-buster and no CORS handling.
