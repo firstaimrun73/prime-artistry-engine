@@ -1,5 +1,5 @@
 // Central plan-tier capability config (client-safe).
-// Internal id "business" displays as Studio+ (VIP / diamond badge).
+// Internal id "business" displays as Master Studio (VIP / diamond badge).
 
 import type { PlanId } from "./plans";
 
@@ -106,7 +106,7 @@ export const TIERS: Record<PlanId, TierConfig> = {
     canUploadAvatar: true,
   },
   business: {
-    memberLabel: "Studio+ Member",
+    memberLabel: "Master Studio Member",
     crown: "diamond",
     crownColor: "#B9F2FF",
     badgeColor: "#B9F2FF",
