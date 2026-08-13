@@ -13,7 +13,7 @@ export type Profile = {
   id: string;
   email: string | null;
   display_name: string | null;
-  /** Includes lite + business (Studio+). Stored as plan_type in Supabase. */
+  /** Includes lite + business (Master Studio). Stored as plan_type in Supabase. */
   plan: PlanId;
   credits: number;
   currency: string;
