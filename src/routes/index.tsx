@@ -27,10 +27,18 @@ import { FinalCTA } from "@/components/home/FinalCTA";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MOTIO2EDIT — AI Image, Video & Music Studio by Motion2AI" },
-      { name: "description", content: "MOTIO2EDIT, powered by Motion2AI. Upload, prompt, generate and download AI-powered images, videos and music in seconds." },
-      { property: "og:title", content: "MOTIO2EDIT — AI Image, Video & Music Studio by Motion2AI" },
-      { property: "og:description", content: "Upload, prompt, generate and download AI-powered images, videos and music in seconds." },
+      { title: "Motio2edit — AI Image & Video Editing, Made Simple" },
+      {
+        name: "description",
+        content:
+          "Motio2edit: AI image and video editing in one workspace. Remove objects, enhance portraits, change outfits, generate video. Upload, describe, generate.",
+      },
+      { property: "og:title", content: "Motio2edit — AI Image & Video Editing, Made Simple" },
+      {
+        property: "og:description",
+        content:
+          "Edit images and videos with AI. Circle to Remove, background replace, portrait enhance, and more — powered by Motion2AI.",
+      },
     ],
   }),
   component: Index,
@@ -402,12 +410,16 @@ function SignedInHome() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">Pick a studio and keep creating.</p>
           </div>
-          <div className="rounded-xl border border-border bg-card px-4 py-3 text-right">
+          <Link
+            to="/pricing"
+            className="rounded-xl border border-border bg-card px-4 py-3 text-right transition-colors hover:border-primary/40"
+          >
             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Credits</div>
             <div className="text-2xl font-extrabold text-primary">
               {isAdmin ? "∞" : (profile?.credits ?? 0).toLocaleString()}
             </div>
-          </div>
+            <div className="mt-0.5 text-[10px] text-muted-foreground">View plans →</div>
+          </Link>
         </div>
 
         <section className="mt-8 grid gap-4 md:grid-cols-3">
@@ -473,8 +485,3 @@ function SignedInHome() {
     </div>
   );
 }
-
-
-
-
-
