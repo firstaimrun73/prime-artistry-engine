@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, Video, Music, Zap, Play, X, ArrowRight } from "lucide-react";
+import { Image as ImageIcon, Video, Music, Zap, Play, X, ArrowRight, Upload, Wand2, Download } from "lucide-react";
 
 const DEMO_VIDEO = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
 const DEMO_POSTER = "/demo/video/poster-landscape.jpg";
@@ -13,6 +13,12 @@ const VALUE_PROPS = [
   { icon: Zap, label: "Fast Cloud Processing" },
 ];
 
+const STEPS = [
+  { icon: Upload, label: "Upload" },
+  { icon: Wand2, label: "Describe" },
+  { icon: Download, label: "Generate" },
+];
+
 export function HomeHero() {
   const [demoOpen, setDemoOpen] = useState(false);
 
@@ -21,25 +27,41 @@ export function HomeHero() {
       <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
         <div className="reveal-up min-w-0 text-center lg:text-left">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
-            <Zap className="h-3.5 w-3.5 text-primary" /> Credit-based AI creative studio
+            <Zap className="h-3.5 w-3.5 text-primary" /> Motio2edit · Credit-based AI studio
           </span>
           <h1 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-            Transform your media with <span className="text-primary">AI</span>, instantly.
+            AI Image & Video Editing,{" "}
+            <span className="text-primary">Made Simple</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground sm:text-lg lg:mx-0">
-            Image, video and music — one premium workspace. Upload, prompt, generate and download
-            studio-grade results in seconds.
+            Edit images and videos with AI in one workspace. Remove objects, enhance portraits,
+            change outfits, generate video — upload, describe, and generate.
           </p>
 
           <div className="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center lg:justify-start">
             <Button asChild size="lg" className="btn-animate">
-              <Link to="/editor">
-                Try for Free <ArrowRight className="ml-1.5 h-4 w-4" />
+              <Link to="/studio/image">
+                Start Editing <ArrowRight className="ml-1.5 h-4 w-4" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="btn-animate" onClick={() => setDemoOpen(true)}>
-              <Play className="mr-1.5 h-4 w-4" /> Watch Demo
+            <Button asChild size="lg" variant="outline" className="btn-animate">
+              <Link to="/features">Explore Features</Link>
             </Button>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+            {STEPS.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <span key={s.label} className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  {i > 0 && <span className="mx-1 text-border">→</span>}
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1">
+                    <Icon className="h-3.5 w-3.5 text-primary" />
+                    {s.label}
+                  </span>
+                </span>
+              );
+            })}
           </div>
 
           <ul className="mt-7 grid grid-cols-2 gap-2 sm:gap-3">
@@ -56,6 +78,17 @@ export function HomeHero() {
               );
             })}
           </ul>
+
+          <p className="mt-4 text-xs text-muted-foreground">
+            Free credits on signup. No card required to start.{" "}
+            <button
+              type="button"
+              className="font-medium text-primary hover:underline"
+              onClick={() => setDemoOpen(true)}
+            >
+              Watch demo
+            </button>
+          </p>
         </div>
 
         <div className="reveal-up relative min-w-0" style={{ animationDelay: "120ms" }}>
@@ -70,7 +103,7 @@ export function HomeHero() {
               loop
               playsInline
               preload="none"
-              aria-label="MOTIO2EDIT product demo"
+              aria-label="Motio2edit product demo"
             />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/80 to-transparent p-4">
               <span className="rounded-full bg-primary/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-primary-foreground">
