@@ -17,19 +17,18 @@ export const CRYPTO_PACKAGES = {
 
 export type PackageId = keyof typeof RAZORPAY_PACKAGES;
 
-// ── Plan-based purchases (credits MUST match src/lib/plans.ts PLAN_CREDITS) ──
-// business uses the UNLIMITED sentinel (9_999_999) as its credit count for planFromCredits mapping.
+// Plan-based purchases — credits MUST match src/lib/plans.ts PLAN_CREDITS.
+// Internal id "business" is the Studio+ tier (user-facing name only).
 export const PLAN_PURCHASE = {
   lite: { credits: 350, amountINR: 399, amountUSD: 4.99 },
   plus: { credits: 750, amountINR: 849, amountUSD: 9.99 },
   pro: { credits: 2500, amountINR: 2499, amountUSD: 29.99 },
   studio: { credits: 5000, amountINR: 4199, amountUSD: 49.99 },
-  business: { credits: 9_999_999, amountINR: 8299, amountUSD: 99 },
+  business: { credits: 10000, amountINR: 8299, amountUSD: 99 },
 } as const;
 
 export type PurchasablePlan = keyof typeof PLAN_PURCHASE;
 
-// Reverse-map a recorded credit amount back to its plan id (each plan has a unique credit count).
 export function planFromCredits(credits: number): PurchasablePlan | null {
   const entry = Object.entries(PLAN_PURCHASE).find(([, p]) => p.credits === credits);
   return (entry?.[0] as PurchasablePlan) ?? null;
@@ -40,7 +39,6 @@ export type AcceptedCoin = (typeof ACCEPTED_COINS)[number];
 
 export const NP_API = process.env.NOWPAYMENTS_API_URL || "https://api.nowpayments.io/v1";
 
-// ── Razorpay REST helpers (no SDK — Workers-compatible) ──
 function razorpayAuthHeader() {
   const id = process.env.RAZORPAY_KEY_ID;
   const secret = process.env.RAZORPAY_KEY_SECRET;
@@ -84,7 +82,6 @@ export function verifyRazorpayWebhook(rawBody: string, signature: string | null)
   return safeEqualHex(expected, signature);
 }
 
-// ── NOWPayments helpers ──
 function npHeaders() {
   const key = process.env.NOWPAYMENTS_API_KEY;
   if (!key) throw new Error("NOWPayments API key is not configured");
@@ -104,7 +101,6 @@ export async function createNowPaymentsInvoice(body: Record<string, unknown>) {
   return res.json();
 }
 
-// Create a direct crypto payment (returns the wallet address + exact pay amount to display).
 export async function createNowPaymentsPayment(body: Record<string, unknown>) {
   const res = await fetch(`${NP_API}/payment`, {
     method: "POST",
@@ -127,7 +123,6 @@ export async function getNowPaymentsPayment(invoiceId: string) {
   return res.json();
 }
 
-// NOWPayments IPN signature: HMAC-SHA512 of the JSON body with keys sorted alphabetically.
 export function verifyNowPaymentsIpn(rawBody: string, signature: string | null): boolean {
   const secret = process.env.NOWPAYMENTS_IPN_SECRET;
   if (!secret || !signature) return false;
@@ -177,7 +172,6 @@ function safeEqualHex(a: string, b: string): boolean {
   }
 }
 
-// ── PayPal REST helpers (no SDK — Workers-compatible) ──
 function paypalApiBase() {
   return process.env.PAYPAL_API_URL || "https://api-m.paypal.com";
 }
@@ -243,7 +237,6 @@ export async function capturePaypalOrder(orderId: string): Promise<any> {
   return res.json();
 }
 
-// Verify a PayPal webhook by calling PayPal's verify-webhook-signature API.
 export async function verifyPaypalWebhook(
   headers: Record<string, string | null>,
   rawBody: string,
@@ -279,10 +272,6 @@ export async function verifyPaypalWebhook(
   }
 }
 
-
-// ── PayPal: refunds & subscription cancellation (server-only) ──
-
-/** Extract the capture id from a PayPal capture/order response payload. */
 export function extractPaypalCaptureId(gatewayResponse: any): string | null {
   try {
     const pu = gatewayResponse?.purchase_units?.[0];
@@ -322,7 +311,6 @@ export async function cancelPaypalSubscription(subscriptionId: string, reason: s
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ reason: reason.slice(0, 120) }),
   });
-  // 204 = cancelled. 422 usually means it is already cancelled — treat as success.
   if (!res.ok && res.status !== 422) {
     const text = await res.text();
     throw new Error(`PayPal subscription cancel failed (${res.status}): ${text}`);
