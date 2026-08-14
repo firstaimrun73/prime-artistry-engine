@@ -24,7 +24,7 @@ function escapeXml(s: string): string {
     .replace(/&/g, "&")
     .replace(/</g, "<")
     .replace(/>/g, ">")
-    .replace(/"/g, """);
+    .replace(/"/g, '\\"');
 }
 
 /**
