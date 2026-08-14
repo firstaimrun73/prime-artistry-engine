@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+  <rect x="935" y="1524" width="247" height="58" rx="8" ry="8" fill="rgba(0,0,0,0.78)"/>
+  <circle cx="953" cy="1553" r="6" fill="#f97316"/>
+  <text x="967" y="1564" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="34" fill="#ffffff">Motio</text>
+  <text x="1065" y="1564" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="34" fill="#f97316">2</text>
+  <text x="1085" y="1564" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="34" fill="#ffffff">edit</text>
+</svg>
