@@ -1,18 +1,23 @@
-// Server-side MOTIO2EDIT watermark compositor.
+// Server-side Motio2edit watermark compositor.
 //
-// Mirrors the client compositor (src/lib/watermark.ts):
-//   PRIMARY  = bottom-right "MOTIO2EDIT" pill
-//   SECONDARY = responsive diagonal "MOTIO2EDIT.COM" grid (~60–65% alpha)
+// Pipeline: AI returns CLEAN image → this module composites branding → export.
+// The AI provider is NEVER asked to draw Motio2edit watermarks.
 //
-// Used ONLY on the server. Free downloads must go through this path so the
-// clean fal.ai URL is never the final downloadable asset.
+// PRIMARY  = bottom-right "Motio2edit" pill (digit 2 in brand orange)
+// SECONDARY = top-left small Motio2edit icon (FREE / non-premium only)
+//
+// Policy: src/lib/policy.ts (getWatermarkMode / shouldApplySecondaryWatermark).
 
 import sharp from "sharp";
 import type { WatermarkMode } from "./policy";
-
-const BRAND_ORANGE = "#f97316";
-const PRIMARY_TEXT = "MOTIO2EDIT";
-const SECONDARY_TEXT = "MOTIO2EDIT.COM";
+import {
+  WATERMARK_BRAND_TEXT,
+  WATERMARK_BRAND_ORANGE,
+  detectWatermarkRatioKey,
+  PRIMARY_SIZE_RATIO,
+  SECONDARY_SIZE_RATIO,
+  EDGE_MARGIN_RATIO,
+} from "./watermark-config";
 
 function escapeXml(s: string): string {
   return s
@@ -22,71 +27,83 @@ function escapeXml(s: string): string {
     .replace(/"/g, """);
 }
 
-/** Build an SVG overlay sized to the image. */
+/**
+ * Build a full-frame transparent SVG overlay for the final output size.
+ * Primary: bottom-right. Secondary icon: top-left (when mode includes secondary).
+ */
 function buildOverlaySvg(
   w: number,
   h: number,
   mode: Exclude<WatermarkMode, "none">,
 ): string {
-  const fontSize = Math.max(18, Math.round(Math.min(w, h) * 0.028));
-  const pad = 12;
-  const margin = Math.max(12, Math.round(Math.min(w, h) * 0.012));
-  // Approximate text width (monospace-ish estimate for Arial bold)
-  const approxChar = fontSize * 0.62;
-  const textWidth = PRIMARY_TEXT.length * approxChar;
-  const rectW = textWidth + pad * 2 + 10;
+  const minDim = Math.min(w, h);
+  const fontSize = Math.max(16, Math.round(minDim * PRIMARY_SIZE_RATIO));
+  const pad = Math.max(8, Math.round(fontSize * 0.35));
+  const margin = Math.max(12, Math.round(minDim * EDGE_MARGIN_RATIO));
+
+  // Approximate bold Arial metrics for "Motio2edit"
+  const approxChar = fontSize * 0.58;
+  const textWidth = WATERMARK_BRAND_TEXT.length * approxChar;
+  const motioW = "Motio".length * approxChar;
+  const twoW = "2".length * approxChar;
+
+  const dotR = Math.max(4, Math.round(fontSize * 0.18));
   const rectH = fontSize + pad * 2;
-  const rectX = Math.max(0, w - textWidth - pad * 2 - margin - 10);
-  const rectY = Math.max(0, h - fontSize - pad * 2 - margin);
-  const dotCx = rectX + 12;
+  const rectW = textWidth + pad * 2 + dotR * 2 + 14;
+  const rectX = Math.max(margin, w - rectW - margin);
+  const rectY = Math.max(margin, h - rectH - margin);
+  const dotCx = rectX + pad + dotR;
   const dotCy = rectY + rectH / 2;
-  const textX = rectX + 22;
-  const textY = rectY + fontSize + 3;
+  const textX = dotCx + dotR + 8;
+  const textY = rectY + pad + fontSize * 0.82;
 
   let secondary = "";
   if (mode === "primary+secondary") {
-    const diagFont = Math.max(20, Math.round(Math.min(w, h) * 0.032));
-    const cols = w > h * 1.4 ? 4 : w < h * 0.7 ? 2 : 3;
-    const rows = h > w * 1.4 ? 4 : h < w * 0.7 ? 2 : 3;
-    const marks: string[] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = ((c + 0.5) / cols) * w + ((r % 2) * 0.04 - 0.02) * w;
-        const y = ((r + 0.5) / rows) * h + ((c % 2) * 0.03 - 0.015) * h;
-        const strokeW = Math.max(2, Math.round(diagFont * 0.12));
-        marks.push(
-          `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(-36)" opacity="0.62">` +
-            `<text x="0" y="0" text-anchor="middle" dominant-baseline="middle" ` +
-            `font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${diagFont}" ` +
-            `fill="#ffffff" stroke="rgba(0,0,0,0.5)" stroke-width="${strokeW}">${escapeXml(SECONDARY_TEXT)}</text>` +
-            `</g>`,
-        );
-      }
-    }
-    secondary = marks.join("");
+    const icon = Math.max(20, Math.round(minDim * SECONDARY_SIZE_RATIO));
+    const ix = margin;
+    const iy = margin;
+    const cx = ix + icon / 2;
+    const cy = iy + icon / 2;
+    const R = icon * 0.42;
+    const s = icon * 0.28;
+    secondary =
+      `<g opacity="0.78">` +
+      `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${R.toFixed(1)}" fill="${WATERMARK_BRAND_ORANGE}" fill-opacity="0.88"/>` +
+      `<path d="M${cx} ${cy - s} L${cx + s / 3} ${cy} L${cx} ${cy + s} L${cx - s / 3} ${cy} Z" fill="#ffffff"/>` +
+      `<path d="M${cx - s} ${cy} L${cx} ${cy - s / 3} L${cx + s} ${cy} L${cx} ${cy + s / 3} Z" fill="#ffffff"/>` +
+      `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${Math.max(2, icon * 0.06).toFixed(1)}" fill="${WATERMARK_BRAND_ORANGE}"/>` +
+      `</g>`;
   }
 
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
-    secondary +
+  const brand =
     `<rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" rx="8" ry="8" fill="rgba(0,0,0,0.78)"/>` +
-    `<circle cx="${dotCx}" cy="${dotCy}" r="5" fill="${BRAND_ORANGE}"/>` +
+    `<circle cx="${dotCx}" cy="${dotCy}" r="${dotR}" fill="${WATERMARK_BRAND_ORANGE}"/>` +
     `<text x="${textX}" y="${textY}" font-family="Arial,Helvetica,sans-serif" font-weight="700" ` +
-    `font-size="${fontSize}" fill="#ffffff">${escapeXml(PRIMARY_TEXT)}</text>` +
+    `font-size="${fontSize}" fill="#ffffff">${escapeXml("Motio")}</text>` +
+    `<text x="${textX + motioW}" y="${textY}" font-family="Arial,Helvetica,sans-serif" font-weight="700" ` +
+    `font-size="${fontSize}" fill="${WATERMARK_BRAND_ORANGE}">${escapeXml("2")}</text>` +
+    `<text x="${textX + motioW + twoW}" y="${textY}" font-family="Arial,Helvetica,sans-serif" font-weight="700" ` +
+    `font-size="${fontSize}" fill="#ffffff">${escapeXml("edit")}</text>`;
+
+  const ratioKey = detectWatermarkRatioKey(w, h);
+
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" data-ratio="${ratioKey}">` +
+    secondary +
+    brand +
     `</svg>`
   );
 }
 
 /**
  * Apply server-side watermark to an image buffer.
- * Returns JPEG buffer. Does not change aspect ratio or crop.
+ * Returns JPEG buffer. Does not crop, rotate, or change aspect ratio.
  */
 export async function applyServerWatermark(
   input: Buffer,
   mode: WatermarkMode,
 ): Promise<Buffer> {
   if (mode === "none") {
-    // Re-encode lightly so callers always get a consistent buffer type
     return sharp(input).jpeg({ quality: 92 }).toBuffer();
   }
 
