@@ -1,11 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState, useEffect } from "react";
 import { chatCompletion } from "@/lib/chat.functions";
 import { useServerFn } from "@tanstack/react-start";
+import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Send, Sparkles } from "lucide-react";
+import { Send, Sparkles, Lock } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/chat")({
   component: Chat,
@@ -14,17 +17,44 @@ export const Route = createFileRoute("/_authenticated/chat")({
 type Msg = { role: "user" | "assistant"; content: string };
 
 function Chat() {
+  const { profile } = useAuth();
+  const navigate = useNavigate();
   const send = useServerFn(chatCompletion);
   const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "Hi! I'm your MOTIO2EDIT assistant. Ask me anything." },
+    { role: "assistant", content: "Hi! I'm your Motio2edit assistant. Ask me anything." },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
+  const allowed =
+    isAdminEmail(profile?.email) || isPaidPlan(profile?.plan);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Free users: no Chat UI — redirect to pricing (do not show disabled chat).
+  useEffect(() => {
+    if (profile && !allowed) {
+      navigate({ to: "/pricing" });
+    }
+  }, [profile, allowed, navigate]);
+
+  if (!profile || !allowed) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-16 text-center">
+        <Lock className="h-8 w-8 text-primary" />
+        <h1 className="text-xl font-bold">Chat is a paid feature</h1>
+        <p className="text-sm text-muted-foreground">
+          Upgrade your plan to use the Motio2edit assistant.
+        </p>
+        <Button asChild>
+          <Link to="/pricing">View plans</Link>
+        </Button>
+      </div>
+    );
+  }
 
   const handleSend = async () => {
     const text = input.trim();

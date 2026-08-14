@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AdminPopupModal } from "@/components/AdminPopupModal";
 import { FirstGenerationFeedback } from "@/components/FirstGenerationFeedback";
+import { FreePlanNotices } from "@/components/FreePlanNotices";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -43,9 +44,8 @@ function AuthenticatedLayout() {
         <Outlet />
         <AdminPopupModal />
         <FirstGenerationFeedback />
-
+        <FreePlanNotices />
       </div>
     </div>
   );
 }
-

@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 
 const schema = z.object({
   messages: z
@@ -17,12 +19,25 @@ const schema = z.object({
 export const chatCompletion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => schema.parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("plan, email")
+      .eq("id", userId)
+      .single();
+
+    const admin = isAdminEmail(profile?.email);
+    if (!admin && !isPaidPlan(profile?.plan)) {
+      throw new Error("Chat is available on paid plans. Upgrade to continue.");
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("AI service unavailable.");
 
     const systemPrompt =
-      "You are MOTIO2EDIT's helpful assistant. Help users with prompts, plans, and using the editor. Be concise and friendly.";
+      "You are Motio2edit's helpful assistant. Help users with prompts, plans, and using the editor. Be concise and friendly.";
 
     // Anthropic expects the system prompt as a top-level field and only
     // user/assistant turns in `messages`.
@@ -55,4 +70,3 @@ export const chatCompletion = createServerFn({ method: "POST" })
       json.content?.find((c) => c.type === "text")?.text ?? "Sorry, I couldn't respond.";
     return { reply };
   });
-
