@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CrownBadge } from "@/components/CrownBadge";
 import { BrandMark } from "@/components/BrandMark";
 import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 
 import { Coins, ShieldCheck, AlertTriangle, Menu } from "lucide-react";
 
@@ -24,19 +25,24 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/tickets", label: "Tickets" },
 ];
 
-const AUTH_LINKS: NavItem[] = [
+const AUTH_LINKS_BASE: NavItem[] = [
   { to: "/editor", label: "Editor" },
   { to: "/history", label: "History" },
-  { to: "/chat", label: "Chat" },
 ];
+
+const CHAT_LINK: NavItem = { to: "/chat", label: "Chat" };
 
 export function Header() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const admin = isAdminEmail(profile?.email);
+  const showChat = admin || isPaidPlan(profile?.plan);
 
-  const links: NavItem[] = [...PUBLIC_LINKS, ...(user ? AUTH_LINKS : [])];
+  const authLinks: NavItem[] = showChat
+    ? [...AUTH_LINKS_BASE, CHAT_LINK]
+    : AUTH_LINKS_BASE;
+  const links: NavItem[] = [...PUBLIC_LINKS, ...(user ? authLinks : [])];
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">

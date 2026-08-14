@@ -1,15 +1,19 @@
 import { Link } from "@tanstack/react-router";
 import { Home, Sparkles, History, MessageSquare, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 
 /**
  * Mobile-only fixed bottom navigation. Hidden on md+ (desktop uses the top nav).
- * Renders 5 primary destinations. Profile falls back to /auth when signed out.
+ * Chat is paid-only (hidden for free plan).
  */
 export function BottomTabBar() {
-  const { user } = useAuth();
-  // FIX 5: only render for signed-in users.
+  const { user, profile } = useAuth();
   if (!user) return null;
+
+  const showChat =
+    isAdminEmail(profile?.email) || isPaidPlan(profile?.plan);
 
   const items: {
     to: string;
@@ -20,10 +24,11 @@ export function BottomTabBar() {
     { to: "/", label: "Home", icon: Home, exact: true },
     { to: "/studio", label: "Studio", icon: Sparkles },
     { to: "/history", label: "History", icon: History },
-    { to: "/chat", label: "Chat", icon: MessageSquare },
+    ...(showChat
+      ? [{ to: "/chat", label: "Chat", icon: MessageSquare }]
+      : []),
     { to: "/dashboard", label: "Profile", icon: User },
   ];
-
 
   return (
     <nav

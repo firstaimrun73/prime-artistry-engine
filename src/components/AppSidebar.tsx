@@ -2,25 +2,31 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, Sparkles, Image as ImageIcon, Video, Music, History, MessageSquare, User, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 
 /**
  * Desktop vertical sidebar for authenticated routes.
  * Hidden on mobile (< md) — BottomTabBar handles mobile.
+ * Chat is paid-only (hidden for free plan).
  */
-const ITEMS: { to: string; label: string; icon: typeof Home; exact?: boolean }[] = [
+const ITEMS_BASE: { to: string; label: string; icon: typeof Home; exact?: boolean }[] = [
   { to: "/", label: "Home", icon: Home, exact: true },
   { to: "/studio", label: "Studio", icon: Sparkles },
   { to: "/studio/image", label: "Image", icon: ImageIcon },
   { to: "/studio/video", label: "Video", icon: Video },
   { to: "/studio/music", label: "Music", icon: Music },
   { to: "/history", label: "History", icon: History },
-  { to: "/chat", label: "Chat", icon: MessageSquare },
 ];
 
+const CHAT_ITEM = { to: "/chat", label: "Chat", icon: MessageSquare };
 
 export function AppSidebar() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const showChat =
+    isAdminEmail(profile?.email) || isPaidPlan(profile?.plan);
+  const items = showChat ? [...ITEMS_BASE, CHAT_ITEM] : ITEMS_BASE;
 
   return (
     <aside
@@ -34,7 +40,7 @@ export function AppSidebar() {
         </span>
       </Link>
       <nav className="flex-1 space-y-0.5 px-3">
-        {ITEMS.map(({ to, label, icon: Icon, exact }) => {
+        {items.map(({ to, label, icon: Icon, exact }) => {
           const active = exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
           return (
             <Link
