@@ -1,16 +1,22 @@
-// Client-side MOTIO2EDIT brand watermark compositor.
+// Client-side Motio2edit brand watermark compositor.
 //
 // IMPORTANT:
 // - AI models must NEVER draw the watermark. Generation returns a clean image.
 // - This module applies a deterministic overlay AFTER generation.
-// - Primary = bottom-right pill "MOTIO2EDIT"
-// - Secondary = diagonal grid "MOTIO2EDIT.COM" (FREE plan only)
+// - Primary = bottom-right "Motio2edit" pill (digit 2 in brand orange)
+// - Secondary = top-left Motio2edit icon (FREE plan only)
 //
 // Policy lives in src/lib/policy.ts (getWatermarkMode / shouldApplySecondaryWatermark).
+// Server path (watermark.server.ts) is authoritative for downloads.
 
-const BRAND_ORANGE = "#f97316";
-const WATERMARK_TEXT = "MOTIO2EDIT";
-const DIAGONAL_TEXT = "MOTIO2EDIT.COM";
+import {
+  WATERMARK_BRAND_TEXT,
+  WATERMARK_BRAND_ORANGE,
+  detectWatermarkRatioKey,
+  PRIMARY_SIZE_RATIO,
+  SECONDARY_SIZE_RATIO,
+  EDGE_MARGIN_RATIO,
+} from "./watermark-config";
 
 /** Draws the watermark(s) onto a loaded image and returns a JPEG data URL. */
 function renderWatermarked(img: HTMLImageElement, strong: boolean): string | null {
@@ -30,21 +36,30 @@ function renderWatermarked(img: HTMLImageElement, strong: boolean): string | nul
   const h = canvas.height;
   if (w < 8 || h < 8) return null;
 
-  // PRIMARY watermark — bottom right pill (always when this function runs).
-  const fontSize = Math.max(18, Math.round(Math.min(w, h) * 0.028));
+  const minDim = Math.min(w, h);
+  const fontSize = Math.max(16, Math.round(minDim * PRIMARY_SIZE_RATIO));
+  const pad = Math.max(8, Math.round(fontSize * 0.35));
+  const margin = Math.max(12, Math.round(minDim * EDGE_MARGIN_RATIO));
+
   ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
 
-  const textWidth = ctx.measureText(WATERMARK_TEXT).width;
-  const pad = 12;
-  const margin = Math.max(12, Math.round(Math.min(w, h) * 0.012));
-
-  const rectX = w - textWidth - pad * 2 - margin - 10;
-  const rectY = h - fontSize - pad * 2 - margin;
-  const rectW = textWidth + pad * 2 + 10;
+  const motioW = ctx.measureText("Motio").width;
+  const twoW = ctx.measureText("2").width;
+  const editW = ctx.measureText("edit").width;
+  const textWidth = motioW + twoW + editW;
+  const dotR = Math.max(4, Math.round(fontSize * 0.18));
+  const rectW = textWidth + pad * 2 + dotR * 2 + 14;
   const rectH = fontSize + pad * 2;
+  const rectX = Math.max(margin, w - rectW - margin);
+  const rectY = Math.max(margin, h - rectH - margin);
+  const dotCx = rectX + pad + dotR;
+  const dotCy = rectY + rectH / 2;
+  const textX = dotCx + dotR + 8;
+  const textY = rectY + pad + fontSize * 0.82;
 
+  // PRIMARY — bottom-right Motio2edit pill
   ctx.fillStyle = "rgba(0,0,0,0.78)";
   ctx.beginPath();
   if (typeof ctx.roundRect === "function") {
@@ -54,52 +69,61 @@ function renderWatermarked(img: HTMLImageElement, strong: boolean): string | nul
   }
   ctx.fill();
 
-  ctx.fillStyle = BRAND_ORANGE;
+  ctx.fillStyle = WATERMARK_BRAND_ORANGE;
   ctx.beginPath();
-  ctx.arc(rectX + 12, rectY + rectH / 2, 5, 0, Math.PI * 2);
+  ctx.arc(dotCx, dotCy, dotR, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(WATERMARK_TEXT, rectX + 22, rectY + fontSize + 3);
+  ctx.fillText("Motio", textX, textY);
+  ctx.fillStyle = WATERMARK_BRAND_ORANGE;
+  ctx.fillText("2", textX + motioW, textY);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("edit", textX + motioW + twoW, textY);
 
-  // SECONDARY diagonal grid — FREE only (strong=true).
-  // Responsive tile density based on output dimensions (all aspect ratios).
+  // SECONDARY — top-left icon (FREE only when strong=true)
   if (strong) {
-    const diagFont = Math.max(20, Math.round(Math.min(w, h) * 0.032));
-    ctx.font = `bold ${diagFont}px Arial, Helvetica, sans-serif`;
+    const icon = Math.max(20, Math.round(minDim * SECONDARY_SIZE_RATIO));
+    const ix = margin;
+    const iy = margin;
+    const cx = ix + icon / 2;
+    const cy = iy + icon / 2;
+    const R = icon * 0.42;
+    const s = icon * 0.28;
 
-    // Dynamic grid: ~3 columns × 3 rows, adjusted for aspect ratio
-    const cols = w > h * 1.4 ? 4 : w < h * 0.7 ? 2 : 3;
-    const rows = h > w * 1.4 ? 4 : h < w * 0.7 ? 2 : 3;
-    const positions: { x: number; y: number }[] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = ((c + 0.5) / cols) * w;
-        const y = ((r + 0.5) / rows) * h;
-        // Slight offset so marks don't form a rigid lattice
-        positions.push({
-          x: x + ((r % 2) * 0.04 - 0.02) * w,
-          y: y + ((c % 2) * 0.03 - 0.015) * h,
-        });
-      }
-    }
+    ctx.save();
+    ctx.globalAlpha = 0.78;
+    ctx.fillStyle = WATERMARK_BRAND_ORANGE;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
 
-    positions.forEach((pos) => {
-      ctx.save();
-      // Target ~60–65% perceived presence without destroying the image
-      ctx.globalAlpha = 0.62;
-      ctx.translate(pos.x, pos.y);
-      ctx.rotate(-Math.PI / 5);
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = "rgba(0,0,0,0.5)";
-      ctx.lineWidth = Math.max(2, Math.round(diagFont * 0.12));
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.strokeText(DIAGONAL_TEXT, 0, 0);
-      ctx.fillText(DIAGONAL_TEXT, 0, 0);
-      ctx.restore();
-    });
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - s);
+    ctx.lineTo(cx + s / 3, cy);
+    ctx.lineTo(cx, cy + s);
+    ctx.lineTo(cx - s / 3, cy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - s, cy);
+    ctx.lineTo(cx, cy - s / 3);
+    ctx.lineTo(cx + s, cy);
+    ctx.lineTo(cx, cy + s / 3);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = WATERMARK_BRAND_ORANGE;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(2, icon * 0.06), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
+
+  // Dimension-driven ratio (for debugging / parity with server)
+  void detectWatermarkRatioKey(w, h);
+  void WATERMARK_BRAND_TEXT;
 
   return canvas.toDataURL("image/jpeg", 0.92);
 }
@@ -115,13 +139,13 @@ function loadImage(src: string, crossOrigin: boolean): Promise<HTMLImageElement 
 }
 
 /**
- * Applies the MOTIO2EDIT primary mark.
- * When options.strong === true also stamps the secondary diagonal grid (FREE).
+ * Applies the Motio2edit primary mark.
+ * When options.strong === true also stamps the secondary top-left icon (FREE).
  * Returns the original URL on failure so the user always gets an image.
  */
 export async function watermarkImage(
   url: string,
-  options?: { strong?: boolean }
+  options?: { strong?: boolean },
 ): Promise<string> {
   const strong = options?.strong === true;
   try {
@@ -163,7 +187,7 @@ export async function watermarkImage(
   }
 }
 
-/** Download-time protection for FREE users: primary + secondary grid. */
+/** Download-time protection for FREE users: primary + secondary icon. */
 export async function applyDownloadWatermarkGrid(imageUrl: string): Promise<string> {
   return watermarkImage(imageUrl, { strong: true });
 }
