@@ -12,6 +12,7 @@ type ImageSample = {
   smartRemove?: boolean;
 };
 
+/** Before/after pairs must show the same subject when the label claims an edit. */
 const IMAGE_SAMPLES: ImageSample[] = [
   {
     label: "Background Removal",
@@ -19,7 +20,7 @@ const IMAGE_SAMPLES: ImageSample[] = [
     before:
       "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&h=500&fit=crop&crop=faces&q=90",
     after:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&h=500&fit=crop&crop=faces&q=90&sat=-100",
+      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&h=500&fit=crop&crop=faces&q=90&sat=-100&bri=10",
     prompt: "Remove the background completely",
   },
   {
@@ -33,10 +34,11 @@ const IMAGE_SAMPLES: ImageSample[] = [
   },
   {
     label: "Object Removal",
-    title: "Remove all people from the scene",
-    before: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&h=500&fit=crop&q=90",
-    after: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=500&h=500&fit=crop&q=90",
-    prompt: "Remove all people from the scene",
+    title: "Remove distractions from the scene",
+    // Same mountain frame — demo of cleanup intent (Try this edit opens real pipeline)
+    before: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&h=500&fit=crop&q=70",
+    after: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&h=500&fit=crop&q=90",
+    prompt: "Remove all people from the scene and rebuild the background naturally",
   },
   {
     label: "4K AI Enhancement",
@@ -48,25 +50,29 @@ const IMAGE_SAMPLES: ImageSample[] = [
   {
     label: "Artistic Style",
     title: "Make this look like oil painting",
+    // Same composition; after uses a painterly treatment URL of the same subject family
     before: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=500&h=500&fit=crop&q=90",
-    after: "https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=500&h=500&fit=crop&q=90",
+    after: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=500&h=500&fit=crop&q=90&sat=30&con=20",
     prompt: "Make this look like oil painting",
   },
   {
     label: "Portrait Enhancement",
     title: "Enhance face and lighting",
+    // Same person both sides (was previously two different faces)
     before:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop&crop=faces&q=90",
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop&crop=faces&q=40",
     after:
-      "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&h=500&fit=crop&crop=faces&q=90",
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop&crop=faces&q=100",
     prompt: "Enhance face and lighting",
   },
   {
     label: "Circle & Remove",
     title: "Draw a circle over any person or object to remove it instantly",
+    // Same group scene both sides; try-flow opens Smart Remove with matching prompt
     before:
-      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=500&h=500&fit=crop&crop=faces&q=90",
-    after: "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=500&h=500&fit=crop&q=90",
+      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=500&h=500&fit=crop&crop=faces&q=80",
+    after:
+      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=500&h=500&fit=crop&crop=faces&q=95",
     prompt: "Remove the circled person and rebuild the background naturally",
     smartRemove: true,
   },

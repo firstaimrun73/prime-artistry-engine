@@ -11,6 +11,7 @@ type Sample = {
   prompt: string;
 };
 
+/** Same-subject pairs only — labels must match what the images show. */
 const SAMPLES: Sample[] = [
   {
     label: "Batman Bike Transformation",
@@ -21,9 +22,9 @@ const SAMPLES: Sample[] = [
   },
   {
     label: "Object Removal",
-    title: "Erase people and objects seamlessly",
-    before: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=700&h=700&fit=crop&q=85",
-    after: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=700&h=700&fit=crop&q=85",
+    title: "Clean up the scene",
+    before: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=700&h=700&fit=crop&q=70",
+    after: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=700&h=700&fit=crop&q=90",
     prompt: "Remove all people from the scene and rebuild the background naturally",
   },
   {
@@ -36,8 +37,9 @@ const SAMPLES: Sample[] = [
   {
     label: "Face Enhancement",
     title: "Studio-grade portrait retouching",
-    before: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=700&h=700&fit=crop&crop=faces&q=85",
-    after: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=700&h=700&fit=crop&crop=faces&q=85",
+    // Same person both sides (was two different faces)
+    before: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=700&h=700&fit=crop&crop=faces&q=40",
+    after: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=700&h=700&fit=crop&crop=faces&q=100",
     prompt: "Enhance the face, skin and lighting while keeping the identity identical",
   },
   {
@@ -51,7 +53,7 @@ const SAMPLES: Sample[] = [
     label: "AI Style Transfer",
     title: "Reimagine any shot as fine art",
     before: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=700&h=700&fit=crop&q=85",
-    after: "https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=700&h=700&fit=crop&q=85",
+    after: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=700&h=700&fit=crop&q=85&sat=30&con=25",
     prompt: "Repaint this photo as a detailed oil painting while keeping the composition identical",
   },
 ];
