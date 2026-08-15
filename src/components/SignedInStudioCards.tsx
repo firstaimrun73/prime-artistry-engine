@@ -1,59 +1,100 @@
 import { Link } from "@tanstack/react-router";
-import { Image as ImageIcon, Video, Music, ArrowRight } from "lucide-react";
+import { Image as ImageIcon, Video, Music, ArrowRight, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 
 /**
- * Signed-in home studio cards — filtered by existing entitlements.
- * Free: Image only (no locked Video/Music placeholders).
+ * Signed-in home studio cards.
+ * Free: Image usable; Video + Music visible but locked (premium discovery).
+ * Paid Lite+: all three open.
  */
 export function SignedInStudioCards() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
-  const showVideo = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
-  const showMusic = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
+  const videoOpen = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
+  const musicOpen = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
 
-  const studios: {
+  type Card = {
     name: string;
-    to: "/studio/image" | "/studio/video" | "/studio/music";
+    to: "/studio/image" | "/studio/video" | "/studio/music" | "/pricing";
     icon: typeof ImageIcon;
     gradient: string;
-  }[] = [
-    { name: "Image Studio", to: "/studio/image", icon: ImageIcon, gradient: "gradient-image" },
-  ];
-  if (showVideo) {
-    studios.push({ name: "Video Studio", to: "/studio/video", icon: Video, gradient: "gradient-video" });
-  }
-  if (showMusic) {
-    studios.push({ name: "Music Studio", to: "/studio/music", icon: Music, gradient: "gradient-music" });
-  }
+    locked: boolean;
+    lockLabel?: string;
+  };
 
-  const cols =
-    studios.length === 1
-      ? "md:grid-cols-1 max-w-sm"
-      : studios.length === 2
-        ? "md:grid-cols-2 max-w-2xl"
-        : "md:grid-cols-3";
+  const studios: Card[] = [
+    {
+      name: "Image Studio",
+      to: "/studio/image",
+      icon: ImageIcon,
+      gradient: "gradient-image",
+      locked: false,
+    },
+    {
+      name: "Video Studio",
+      to: videoOpen ? "/studio/video" : "/pricing",
+      icon: Video,
+      gradient: "gradient-video",
+      locked: !videoOpen,
+      lockLabel: "Available on Lite+",
+    },
+    {
+      name: "Music Studio",
+      to: musicOpen ? "/studio/music" : "/pricing",
+      icon: Music,
+      gradient: "gradient-music",
+      locked: !musicOpen,
+      lockLabel: "Available on Lite+",
+    },
+  ];
 
   return (
-    <section className={`mt-8 grid gap-4 ${cols}`}>
+    <section className="mt-8 grid gap-4 md:grid-cols-3">
       {studios.map((s) => {
         const Icon = s.icon;
         return (
           <Link
             key={s.name}
             to={s.to}
-            className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg"
+            className={
+              "group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg" +
+              (s.locked ? " ring-1 ring-primary/20" : "")
+            }
           >
-            <div className={`pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full ${s.gradient} opacity-25 blur-2xl`} />
-            <div className={`relative inline-flex rounded-xl ${s.gradient} p-2.5 text-white shadow-md`}>
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="relative mt-4 text-lg font-bold">{s.name}</div>
-            <div className="relative mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-              Open <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            <div
+              className={`pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full ${s.gradient} opacity-25 blur-2xl`}
+            />
+            {s.locked && (
+              <div className="pointer-events-none absolute inset-0 z-10 rounded-2xl bg-background/40 backdrop-blur-[2px]" />
+            )}
+            <div className="relative z-20">
+              <div className="flex items-start justify-between gap-2">
+                <div className={`inline-flex rounded-xl ${s.gradient} p-2.5 text-white shadow-md`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                {s.locked && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    <Lock className="h-3 w-3" />
+                    Premium
+                  </span>
+                )}
+              </div>
+              <div className="mt-4 text-lg font-bold">{s.name}</div>
+              {s.locked ? (
+                <>
+                  <p className="mt-1 text-xs text-muted-foreground">{s.lockLabel}</p>
+                  <div className="relative mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+                    Upgrade to unlock <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </>
+              ) : (
+                <div className="relative mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+                  Open <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </div>
+              )}
             </div>
           </Link>
         );

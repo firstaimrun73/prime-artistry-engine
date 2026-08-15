@@ -7,10 +7,17 @@ export type PlanLimits = {
   hd: boolean;
 };
 
+/**
+ * Product matrix (usage/access only — does not change AI edit quality):
+ * Free: 1 image, no video/music
+ * Lite: 2 images, video+music
+ * Plus: 4 images, video+music
+ * Pro+: higher multi-image caps per existing plan definitions
+ */
 export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   free: { maxImages: 1, videoEnabled: false, hd: false },
   lite: { maxImages: 2, videoEnabled: true, hd: false },
-  plus: { maxImages: 3, videoEnabled: true, hd: false },
+  plus: { maxImages: 4, videoEnabled: true, hd: false },
   pro: { maxImages: 5, videoEnabled: true, hd: true },
   studio: { maxImages: 8, videoEnabled: true, hd: true },
   business: { maxImages: 10, videoEnabled: true, hd: true }, // Master Studio
