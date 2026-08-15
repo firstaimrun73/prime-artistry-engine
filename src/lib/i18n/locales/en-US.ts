@@ -187,6 +187,14 @@ const dict: TranslationDict = {
   "video.preset.textToVideoDesc": "Describe the scene, we render it",
   "video.preset.imageToVideo": "Image to video",
   "video.preset.imageToVideoDesc": "Animate a still image",
+  "video.preset.slowPush": "Slow push in",
+  "video.preset.slowPushDesc": "Subtle dolly toward subject",
+  "video.preset.revealOrbit": "Reveal orbit",
+  "video.preset.revealOrbitDesc": "Smooth arc reveal",
+  "video.preset.dreamy": "Dreamy slow-mo",
+  "video.preset.dreamyDesc": "Elegant slowed motion",
+  "video.preset.productSpin": "Product spin",
+  "video.preset.productSpinDesc": "Turntable-style hero",
 };
 
 export default dict;
