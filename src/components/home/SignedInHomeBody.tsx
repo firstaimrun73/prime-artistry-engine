@@ -29,22 +29,6 @@ type RecentGen = {
   created_at: string;
 };
 
-const HOW_STEPS = [
-  { icon: Upload, title: "Upload your image", body: "Open the Image Editor and add the photo you want to improve." },
-  { icon: MessageSquareText, title: "Describe the change", body: "Write what you want — remove an object, change clothing, restore detail." },
-  { icon: Wand2, title: "Auto Edit or a tool", body: "Use Auto Edit for natural language, or pick a preset from Image Studio / Image Tools." },
-  { icon: Eye, title: "Review the result", body: "Check the output. Refine with another prompt if needed." },
-  { icon: Download, title: "Download", body: "Save your edited image. Plan rules for watermarks still apply." },
-];
-
-const AUTO_EXAMPLES = [
-  "Remove the person behind me.",
-  "Change my shirt to black.",
-  "Make the lighting brighter.",
-  "Remove the object on the table.",
-  "Restore this old photograph.",
-];
-
 /** Authenticated home — education + plan context + discovery. */
 export function SignedInHomeBody() {
   const { user, profile } = useAuth();
@@ -69,19 +53,35 @@ export function SignedInHomeBody() {
   const firstName = profile?.display_name ? profile.display_name.split(" ")[0] : "";
   const credits = isAdmin ? "∞" : (profile?.credits ?? 0).toLocaleString();
 
+  const howSteps = [
+    { icon: Upload, titleKey: "edu.step1Title", bodyKey: "edu.step1Body" },
+    { icon: MessageSquareText, titleKey: "edu.step2Title", bodyKey: "edu.step2Body" },
+    { icon: Wand2, titleKey: "edu.step3Title", bodyKey: "edu.step3Body" },
+    { icon: Eye, titleKey: "edu.step4Title", bodyKey: "edu.step4Body" },
+    { icon: Download, titleKey: "edu.step5Title", bodyKey: "edu.step5Body" },
+  ];
+
+  const autoExamples = [
+    t("edu.ex1"),
+    t("edu.ex2"),
+    t("edu.ex3"),
+    t("edu.ex4"),
+    t("edu.ex5"),
+  ];
+
   return (
     <main className="mx-auto max-w-6xl px-4 pt-8 pb-24 md:pb-16">
-      {/* Welcome */}
       <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {t("home.welcome")}
+              {firstName ? `, ${firstName}` : ""}
             </p>
-            <h1 className="mt-1 truncate text-2xl font-extrabold tracking-tight sm:text-3xl">
-              {firstName || "creator"}
+            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
+              {t("home.readyCreate")}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">Your creative workspace is ready.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t("home.workspaceReady")}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <CrownBadge plan={planId} showLabel size="md" />
               <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground">
@@ -89,28 +89,29 @@ export function SignedInHomeBody() {
               </span>
             </div>
           </div>
-          <div className="flex flex-col gap-2 sm:items-end">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
             <Button asChild className="w-full sm:w-auto">
               <Link to="/editor">
                 {t("studio.openEditor")} <ArrowRight className="ml-1.5 h-4 w-4" />
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-              <Link to="/studio/image/tools">Explore Image Tools</Link>
+              <Link to="/studio/image/tools">{t("home.exploreTools")}</Link>
             </Button>
           </div>
         </div>
       </section>
 
-      {/* Your plan */}
       <section className="mt-8 rounded-2xl border border-border bg-card p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Crown className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Your plan</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("home.yourPlan")}
+          </h2>
         </div>
         <h3 className="mt-2 text-xl font-bold">{plan.name}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          What you can do with <span className="font-medium text-foreground">{plan.name}</span> right now:
+          {t("home.planCanDo")} <span className="font-medium text-foreground">{plan.name}</span>:
         </p>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2">
           {plan.features.slice(0, 6).map((f) => (
@@ -121,8 +122,11 @@ export function SignedInHomeBody() {
           ))}
         </ul>
         <p className="mt-3 text-xs text-muted-foreground">
-          Image edits cost {CREDIT_COST.image} credits
-          {plan.video ? ` · Video ${CREDIT_COST.video} · Music ${CREDIT_COST.music}` : " · Video and music require Lite or higher"}.
+          {t("home.creditCosts")
+            .replace("{image}", String(CREDIT_COST.image))
+            .replace("{video}", String(CREDIT_COST.video))
+            .replace("{music}", String(CREDIT_COST.music))}
+          {!plan.video ? ` ${t("home.videoMusicLocked")}` : ""}
         </p>
         {planId !== "business" && (
           <Link to="/pricing" className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">
@@ -131,42 +135,41 @@ export function SignedInHomeBody() {
         )}
       </section>
 
-      {/* How image editing works */}
       <section className="mt-8">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">How image editing works</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Five short steps from upload to download.</p>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("edu.howTitle")}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t("edu.howLead")}</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {HOW_STEPS.map((s, i) => {
+          {howSteps.map((s, i) => {
             const Icon = s.icon;
             return (
-              <div key={s.title} className="rounded-xl border border-border bg-card p-4">
+              <div key={s.titleKey} className="rounded-xl border border-border bg-card p-4">
                 <div className="flex items-center gap-2">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                     {i + 1}
                   </span>
                   <Icon className="h-4 w-4 text-primary" />
                 </div>
-                <p className="mt-3 text-sm font-semibold">{s.title}</p>
-                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{s.body}</p>
+                <p className="mt-3 text-sm font-semibold">{t(s.titleKey)}</p>
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{t(s.bodyKey)}</p>
               </div>
             );
           })}
         </div>
       </section>
 
-      {/* Auto Edit education */}
       <section className="mt-8 rounded-2xl border border-primary/25 bg-primary/5 p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-bold">Auto Edit</h2>
+          <h2 className="text-lg font-bold">{t("edu.autoTitle")}</h2>
         </div>
-        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Describe what you want in plain language. Motio2edit focuses on the requested change and aims to preserve
-          parts of the image you did not ask to modify. Results depend on your prompt clarity and source photo quality.
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{t("edu.autoBody")}</p>
+        <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("edu.examples")}
         </p>
-        <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Example prompts</p>
         <ul className="mt-2 flex flex-wrap gap-2">
-          {AUTO_EXAMPLES.map((ex) => (
+          {autoExamples.map((ex) => (
             <li
               key={ex}
               className="rounded-full border border-border bg-background/80 px-3 py-1 text-xs text-foreground"
@@ -180,29 +183,26 @@ export function SignedInHomeBody() {
             <Link to="/editor">{t("studio.openEditor")}</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link to="/studio/image/tools">Browse all image tools</Link>
+            <Link to="/studio/image/tools">{t("home.exploreTools")}</Link>
           </Button>
         </div>
       </section>
 
       <SignedInStudioCards />
 
-      {/* Coming soon */}
       <section className="mt-8 rounded-xl border border-dashed border-border bg-card/40 p-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Coming soon</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Advanced Prompt Intelligence and deeper Auto Edit analysis are planned for a future release. The current
-          editor remains the workspace for all live image and video tools.
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("home.comingSoon")}
         </p>
+        <p className="mt-1 text-sm text-muted-foreground">{t("home.comingSoonBody")}</p>
       </section>
 
-      {/* Recent */}
       <section className="mt-10">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             <HistoryIcon className="h-4 w-4" /> {t("home.recentHistory")}
           </h2>
-          <Link to="/history" className="text-xs font-medium text-primary hover:underline">
+          <Link to="/history" className="shrink-0 text-xs font-medium text-primary hover:underline">
             {t("home.viewAll")}
           </Link>
         </div>
@@ -214,7 +214,10 @@ export function SignedInHomeBody() {
                 <Link to="/editor">{t("studio.openEditor")}</Link>
               </Button>
               <Button asChild size="sm" variant="outline">
-                <Link to="/studio/image">{t("studio.image")}</Link>
+                <Link to="/studio/video">{t("home.createVideo")}</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/music">{t("home.createMusic")}</Link>
               </Button>
             </div>
           </div>
@@ -235,7 +238,8 @@ export function SignedInHomeBody() {
                       alt={g.prompt ?? ""}
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
+                        const el = e.target as HTMLImageElement;
+                        el.style.display = "none";
                       }}
                     />
                   )

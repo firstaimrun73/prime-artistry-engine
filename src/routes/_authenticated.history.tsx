@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { InContentAd } from "@/components/ads";
 import { MusicHistoryList } from "@/components/MusicHistoryList";
 import { useEffect, useState } from "react";
@@ -15,6 +15,7 @@ import { CREDIT_COST } from "@/lib/plans";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { secureDownloadImage } from "@/lib/download.functions";
+import { useI18n } from "@/lib/i18n";
 import {
   Download, Pencil, Trash2, ZoomIn, ZoomOut, Image as ImageIcon,
   Video, History as HistoryIcon, FolderOpen, Music,
@@ -34,7 +35,8 @@ type Generation = {
 };
 
 function HistoryPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const secureDownload = useServerFn(secureDownloadImage);
   const [gens, setGens] = useState<Generation[]>([]);
@@ -67,13 +69,10 @@ function HistoryPage() {
     if (!g.output_url) return;
     try {
       let href = g.output_url;
-      // Images: always route through server policy (free cannot bypass).
       if (g.type === "image") {
         const res = await secureDownload({
           data: {
             imageUrl: g.output_url,
-            // Paid preference is not stored in history; default OFF for paid
-            // (clean). Free is forced server-side to primary+secondary.
             keepWatermark: false,
           },
         });
@@ -117,29 +116,28 @@ function HistoryPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12">
+    <div className="mx-auto max-w-6xl px-4 py-12 pb-24 md:pb-12">
       <div className="flex items-center gap-2">
         <HistoryIcon className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold">Your workspace</h1>
+        <h1 className="text-2xl font-bold">{t("history.title")}</h1>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Every creation lives here. Open any item to view full size, download, edit again or delete — no need to re-upload.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{t("history.lead")}</p>
 
       <InContentAd />
 
-      <div className="mt-6 flex gap-2">
-        {(["media", "music"] as const).map((t) => (
+      <div className="mt-6 flex flex-wrap gap-2">
+        {(["media", "music"] as const).map((tabId) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-full border px-4 py-1.5 text-xs font-semibold capitalize transition-colors ${
-              tab === t
+            key={tabId}
+            type="button"
+            onClick={() => setTab(tabId)}
+            className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition-colors ${
+              tab === tabId
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border text-muted-foreground hover:border-primary"
             }`}
           >
-            {t === "media" ? "Images & Videos" : "Music"}
+            {tabId === "media" ? t("history.media") : t("history.music")}
           </button>
         ))}
       </div>
@@ -147,35 +145,54 @@ function HistoryPage() {
       {tab === "music" ? (
         <MusicHistoryList userId={user?.id} />
       ) : loading ? (
-
-        <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
+        <p className="mt-8 text-sm text-muted-foreground">{t("common.loading")}</p>
       ) : gens.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-border p-10 text-center">
           <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground" />
-          <p className="mt-3 text-sm text-muted-foreground">Nothing here yet. Create something in the editor.</p>
-          <Button asChild className="mt-4" size="sm">
-            <button onClick={() => navigate({ to: "/editor" })}>Open editor</button>
-          </Button>
+          <p className="mt-3 text-sm font-medium text-foreground">{t("history.emptyTitle")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("history.empty")}</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Button size="sm" onClick={() => navigate({ to: "/editor" })}>
+              {t("studio.openEditor")}
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/studio/video">{t("home.createVideo")}</Link>
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/music">{t("home.createMusic")}</Link>
+            </Button>
+          </div>
         </div>
       ) : (
-        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           {gens.map((g) => (
             <button
               key={g.id}
+              type="button"
               onClick={() => open(g)}
               className="group overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-primary"
             >
               <div className="relative aspect-square w-full bg-secondary">
                 {g.output_url ? (
                   g.type === "video" ? (
-                    <video src={g.output_url} className="h-full w-full object-cover" muted />
+                    <video src={g.output_url} className="h-full w-full object-cover" muted playsInline />
                   ) : g.type === "music" ? (
                     <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/25 to-purple-500/5">
                       <Music className="h-8 w-8 text-primary" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Audio track</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Audio
+                      </span>
                     </div>
                   ) : (
-                    <img src={g.output_url} alt={g.prompt ?? "Generated"} loading="lazy" className="h-full w-full object-cover" />
+                    <img
+                      src={g.output_url}
+                      alt={g.prompt ?? "Generated"}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.opacity = "0.3";
+                      }}
+                    />
                   )
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
@@ -183,25 +200,18 @@ function HistoryPage() {
                   </div>
                 )}
                 <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-semibold capitalize backdrop-blur">
-                  {g.type === "video" ? <Video className="h-3 w-3" /> : g.type === "music" ? <Music className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                  {g.type === "video" ? (
+                    <Video className="h-3 w-3" />
+                  ) : g.type === "music" ? (
+                    <Music className="h-3 w-3" />
+                  ) : (
+                    <ImageIcon className="h-3 w-3" />
+                  )}
                   {g.type}
                 </span>
-                {g.type === "video" && (() => {
-                  const meta = (g as { metadata?: Record<string, unknown> | null }).metadata ?? null;
-                  const dur = meta && typeof meta === "object" ? (meta as Record<string, unknown>).duration : null;
-                  const res = meta && typeof meta === "object" ? (meta as Record<string, unknown>).resolution : null;
-                  if (!dur && !res) return null;
-                  return (
-                    <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-semibold backdrop-blur">
-                      {dur ? `${String(dur)}s` : null}
-                      {dur && res ? " · " : null}
-                      {res ? String(res) : null}
-                    </span>
-                  );
-                })()}
               </div>
               <div className="p-3">
-                <p className="truncate text-xs font-medium">{g.prompt ?? "Untitled"}</p>
+                <p className="truncate text-xs font-medium">{g.prompt ?? t("history.untitled")}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {new Date(g.created_at).toLocaleDateString()}
                 </p>
@@ -252,19 +262,20 @@ function HistoryPage() {
                   </Button>
                 )}
                 <Button size="sm" onClick={() => download(active)} disabled={!active.output_url}>
-                  <Download className="mr-1.5 h-4 w-4" /> Download
+                  <Download className="mr-1.5 h-4 w-4" /> {t("common.download")}
                 </Button>
                 {active.type !== "music" && (
                   <Button variant="outline" size="sm" onClick={() => editAgain(active)} disabled={!active.output_url}>
-                    <Pencil className="mr-1.5 h-4 w-4" /> Edit Again
+                    <Pencil className="mr-1.5 h-4 w-4" /> {t("common.editAgain")}
                   </Button>
                 )}
                 <Button variant="ghost" size="sm" onClick={() => remove(active)}>
-                  <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                  <Trash2 className="mr-1.5 h-4 w-4" /> {t("common.delete")}
                 </Button>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {new Date(active.created_at).toLocaleString()} · {CREDIT_COST[active.type as keyof typeof CREDIT_COST]} credits
+                {new Date(active.created_at).toLocaleString()} ·{" "}
+                {CREDIT_COST[active.type as keyof typeof CREDIT_COST] ?? "—"} credits
               </p>
             </>
           )}
