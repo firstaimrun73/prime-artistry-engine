@@ -24,6 +24,8 @@ type Props = {
 
 type Rect = { x: number; y: number; w: number; h: number };
 
+const FULL: Rect = { x: 0, y: 0, w: 1, h: 1 };
+
 /**
  * Client-side crop modal — pure UI + canvas crop.
  * Does not touch generation backends. Parent decides when to replace the upload.
@@ -32,21 +34,21 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [aspect, setAspect] = useState<CropAspect>("free");
-  const [crop, setCrop] = useState<Rect>({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
+  const [crop, setCrop] = useState<Rect>(FULL);
   const [dragging, setDragging] = useState<null | "move" | "se">(null);
   const dragStart = useRef<{ mx: number; my: number; crop: Rect } | null>(null);
   const [ready, setReady] = useState(false);
 
+  /** Reset selection: full image for free; centered max fit for fixed ratios. */
   const resetCrop = useCallback((ratio: number | null) => {
     if (ratio == null) {
-      setCrop({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
+      setCrop(FULL);
       return;
     }
-    // Fit ratio inside image as normalized rect centered
-    let w = 0.8;
+    let w = 0.9;
     let h = w / ratio;
-    if (h > 0.8) {
-      h = 0.8;
+    if (h > 0.9) {
+      h = 0.9;
       w = h * ratio;
     }
     setCrop({ x: (1 - w) / 2, y: (1 - h) / 2, w, h });
@@ -54,16 +56,18 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    setReady(false);
+    setAspect("free");
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
       imgRef.current = img;
       setReady(true);
-      resetCrop(null);
+      setCrop(FULL);
     };
     img.onerror = () => setReady(false);
     img.src = imageSrc;
-  }, [open, imageSrc, resetCrop]);
+  }, [open, imageSrc]);
 
   useEffect(() => {
     if (!open || !ready || !imgRef.current || !canvasRef.current) return;
@@ -72,17 +76,16 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const maxW = Math.min(560, window.innerWidth - 48);
+    const maxW = Math.min(560, typeof window !== "undefined" ? window.innerWidth - 48 : 560);
     const scale = Math.min(maxW / img.naturalWidth, 420 / img.naturalHeight, 1);
-    const dw = Math.round(img.naturalWidth * scale);
-    const dh = Math.round(img.naturalHeight * scale);
+    const dw = Math.max(1, Math.round(img.naturalWidth * scale));
+    const dh = Math.max(1, Math.round(img.naturalHeight * scale));
     canvas.width = dw;
     canvas.height = dh;
 
     ctx.clearRect(0, 0, dw, dh);
     ctx.drawImage(img, 0, 0, dw, dh);
 
-    // Dim outside crop
     const cx = crop.x * dw;
     const cy = crop.y * dh;
     const cw = crop.w * dw;
@@ -93,14 +96,12 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
     ctx.fillRect(0, cy, cx, ch);
     ctx.fillRect(cx + cw, cy, dw - cx - cw, ch);
 
-    // Crop border
     ctx.strokeStyle = "hsl(24 95% 53%)";
     ctx.lineWidth = 2;
     ctx.strokeRect(cx, cy, cw, ch);
 
-    // SE handle
     ctx.fillStyle = "hsl(24 95% 53%)";
-    ctx.fillRect(cx + cw - 8, cy + ch - 8, 16, 16);
+    ctx.fillRect(cx + cw - 10, cy + ch - 10, 18, 18);
   }, [open, ready, crop]);
 
   const pointerPos = (e: React.PointerEvent) => {
@@ -108,16 +109,17 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
     if (!canvas) return { x: 0, y: 0 };
     const r = canvas.getBoundingClientRect();
     return {
-      x: (e.clientX - r.left) / r.width,
-      y: (e.clientY - r.top) / r.height,
+      x: (e.clientX - r.left) / Math.max(r.width, 1),
+      y: (e.clientY - r.top) / Math.max(r.height, 1),
     };
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
     const p = pointerPos(e);
     const seX = crop.x + crop.w;
     const seY = crop.y + crop.h;
-    const nearSe = Math.abs(p.x - seX) < 0.06 && Math.abs(p.y - seY) < 0.06;
+    const nearSe = Math.abs(p.x - seX) < 0.08 && Math.abs(p.y - seY) < 0.08;
     setDragging(nearSe ? "se" : "move");
     dragStart.current = { mx: p.x, my: p.y, crop: { ...crop } };
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -132,8 +134,8 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
     const ratio = ASPECTS.find((a) => a.id === aspect)?.ratio ?? null;
 
     if (dragging === "move") {
-      let nx = Math.min(Math.max(0, base.x + dx), 1 - base.w);
-      let ny = Math.min(Math.max(0, base.y + dy), 1 - base.h);
+      const nx = Math.min(Math.max(0, base.x + dx), 1 - base.w);
+      const ny = Math.min(Math.max(0, base.y + dy), 1 - base.h);
       setCrop({ ...base, x: nx, y: ny });
     } else {
       let nw = Math.min(Math.max(0.08, base.w + dx), 1 - base.x);
@@ -144,8 +146,12 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
           nh = 1 - base.y;
           nw = nh * ratio;
         }
+        if (nw > 1 - base.x) {
+          nw = 1 - base.x;
+          nh = nw / ratio;
+        }
       }
-      setCrop({ ...base, w: nw, h: nh });
+      setCrop({ ...base, w: nw, h: Math.min(nh, 1 - base.y) });
     }
   };
 
@@ -159,15 +165,16 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
     if (!img) return;
     const sx = Math.round(crop.x * img.naturalWidth);
     const sy = Math.round(crop.y * img.naturalHeight);
-    const sw = Math.round(crop.w * img.naturalWidth);
-    const sh = Math.round(crop.h * img.naturalHeight);
+    const sw = Math.max(1, Math.round(crop.w * img.naturalWidth));
+    const sh = Math.max(1, Math.round(crop.h * img.naturalHeight));
     const out = document.createElement("canvas");
     out.width = sw;
     out.height = sh;
     const ctx = out.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    onApply(out.toDataURL("image/jpeg", 0.92));
+    // High-quality JPEG for the working image (generation uploads this data URL).
+    onApply(out.toDataURL("image/jpeg", 0.95));
     onClose();
   };
 
@@ -175,15 +182,18 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90 p-3 backdrop-blur-md"
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-background/90 p-0 backdrop-blur-md sm:items-center sm:p-3"
       role="dialog"
       aria-modal="true"
       aria-label="Crop image"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-4 shadow-xl">
+      <div className="flex max-h-[95vh] w-full max-w-xl flex-col overflow-auto rounded-t-2xl border border-border bg-card p-4 shadow-xl sm:rounded-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold">Crop image</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-full p-1 hover:bg-muted">
+          <button type="button" onClick={onClose} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full hover:bg-muted">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -198,7 +208,7 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
                 resetCrop(a.ratio);
               }}
               className={
-                "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors " +
+                "min-h-[36px] rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors " +
                 (aspect === a.id
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border text-muted-foreground hover:border-primary/40")
@@ -213,7 +223,7 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
           {ready ? (
             <canvas
               ref={canvasRef}
-              className="max-w-full touch-none cursor-crosshair"
+              className="max-h-[50vh] max-w-full touch-none cursor-crosshair"
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -227,17 +237,23 @@ export function ImageCropModal({ imageSrc, open, onClose, onApply }: Props) {
         </div>
 
         <p className="mt-2 text-[11px] text-muted-foreground">
-          Drag the box to move · drag the corner to resize · Apply replaces the upload for generation only.
+          Drag to move · corner handle to resize · Apply updates the working image for generation. Cancel leaves the original unchanged.
         </p>
 
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={() => resetCrop(ASPECTS.find((a) => a.id === aspect)?.ratio ?? null)}>
+        <div className="mt-4 flex flex-wrap justify-end gap-2 pb-[env(safe-area-inset-bottom)]">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-[44px]"
+            onClick={() => resetCrop(ASPECTS.find((a) => a.id === aspect)?.ratio ?? null)}
+          >
             <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reset
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+          <Button type="button" variant="outline" size="sm" className="min-h-[44px]" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="button" size="sm" onClick={apply} disabled={!ready}>
+          <Button type="button" size="sm" className="min-h-[44px]" onClick={apply} disabled={!ready}>
             Apply crop
           </Button>
         </div>
