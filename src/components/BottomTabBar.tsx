@@ -1,19 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { Home, Sparkles, History, MessageSquare, User } from "lucide-react";
+import { Home, Image as ImageIcon, History, MessageSquare, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
-import { isPaidPlan } from "@/lib/policy";
+import { canAccessChat } from "@/lib/policy";
 
 /**
- * Mobile-only fixed bottom navigation. Hidden on md+ (desktop uses the top nav).
- * Chat is paid-only (hidden for free plan).
+ * Mobile-only fixed bottom navigation. Hidden on md+ (desktop uses sidebar).
+ * Chat is paid-only. Free users get Home / Image / History / Profile.
  */
 export function BottomTabBar() {
   const { user, profile } = useAuth();
   if (!user) return null;
 
-  const showChat =
-    isAdminEmail(profile?.email) || isPaidPlan(profile?.plan);
+  const admin = isAdminEmail(profile?.email);
+  const showChat = canAccessChat({ plan: profile?.plan, email: profile?.email, isAdmin: admin });
 
   const items: {
     to: string;
@@ -22,7 +22,7 @@ export function BottomTabBar() {
     exact?: boolean;
   }[] = [
     { to: "/", label: "Home", icon: Home, exact: true },
-    { to: "/studio", label: "Studio", icon: Sparkles },
+    { to: "/studio/image", label: "Image", icon: ImageIcon },
     { to: "/history", label: "History", icon: History },
     ...(showChat
       ? [{ to: "/chat", label: "Chat", icon: MessageSquare }]

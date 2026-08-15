@@ -1,43 +1,45 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Sparkles, Image as ImageIcon, Video, Music, History, MessageSquare, User, Settings } from "lucide-react";
+import { Home, Image as ImageIcon, Video, Music, History, MessageSquare, User, Settings } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { isAdminEmail } from "@/lib/admin-config";
-import { isPaidPlan } from "@/lib/policy";
+import { canAccessChat, canAccessVideo, canAccessMusic, isFreePlan } from "@/lib/policy";
+import { BrandMark } from "@/components/BrandMark";
 
 /**
  * Desktop vertical sidebar for authenticated routes.
  * Hidden on mobile (< md) — BottomTabBar handles mobile.
- * Chat is paid-only (hidden for free plan).
+ * Actual Free: Home, Image, History (+ Profile/Settings).
+ * Paid Lite: Image + Music + Chat (no Video — plans.video=false).
+ * Plus+: Image + Video + Music + Chat per existing entitlements.
  */
-const ITEMS_BASE: { to: string; label: string; icon: typeof Home; exact?: boolean }[] = [
-  { to: "/", label: "Home", icon: Home, exact: true },
-  { to: "/studio", label: "Studio", icon: Sparkles },
-  { to: "/studio/image", label: "Image", icon: ImageIcon },
-  { to: "/studio/video", label: "Video", icon: Video },
-  { to: "/studio/music", label: "Music", icon: Music },
-  { to: "/history", label: "History", icon: History },
-];
-
-const CHAT_ITEM = { to: "/chat", label: "Chat", icon: MessageSquare };
-
 export function AppSidebar() {
   const { user, profile } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const showChat =
-    isAdminEmail(profile?.email) || isPaidPlan(profile?.plan);
-  const items = showChat ? [...ITEMS_BASE, CHAT_ITEM] : ITEMS_BASE;
+  const admin = isAdminEmail(profile?.email);
+  const plan = profile?.plan;
+
+  const showVideo = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
+  const showMusic = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
+  const showChat = canAccessChat({ plan, email: profile?.email, isAdmin: admin });
+
+  type NavItem = { to: string; label: string; icon: typeof Home; exact?: boolean };
+  const items: NavItem[] = [
+    { to: "/", label: "Home", icon: Home, exact: true },
+    { to: "/studio/image", label: "Image", icon: ImageIcon },
+  ];
+  if (showVideo) items.push({ to: "/studio/video", label: "Video", icon: Video });
+  if (showMusic) items.push({ to: "/studio/music", label: "Music", icon: Music });
+  items.push({ to: "/history", label: "History", icon: History });
+  if (showChat) items.push({ to: "/chat", label: "Chat", icon: MessageSquare });
 
   return (
     <aside
       aria-label="Primary"
       className="fixed inset-y-0 left-0 z-40 hidden w-56 flex-col border-r border-border bg-sidebar/80 backdrop-blur md:flex"
     >
-      <Link to="/" className="flex items-center gap-2 px-5 py-4 font-extrabold tracking-tight">
-        <Sparkles className="h-5 w-5 text-primary" />
-        <span className="text-lg leading-none whitespace-nowrap">
-          MOTI<span className="text-primary">O2</span>EDIT
-        </span>
+      <Link to="/" className="flex items-center gap-2 px-5 py-4">
+        <BrandMark />
       </Link>
       <nav className="flex-1 space-y-0.5 px-3">
         {items.map(({ to, label, icon: Icon, exact }) => {
