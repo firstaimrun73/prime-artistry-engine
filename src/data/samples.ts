@@ -2,8 +2,10 @@
  * Modular sample catalog for Motio2edit homepage & galleries.
  * Designed to scale toward 1000+ entries without bloating page components.
  *
- * Add new samples here (or in category-specific files that re-export into ALL_SAMPLES).
- * UI components import filtered slices — they never hardcode image URLs inline.
+ * IMPORTANT: Marketing before/after pairs must show a visible difference
+ * matching the title. Prefer real paired assets under src/assets/ when available.
+ * Unsplash quality-param pairs are placeholders and should be replaced with
+ * true transformation assets when production demos are ready.
  */
 
 export type SampleCategory =
@@ -28,13 +30,9 @@ export type SampleItem = {
   description: string;
   category: SampleCategory;
   editor: SampleEditor;
-  /** Before image URL or imported asset path string */
   before?: string;
-  /** After image URL or imported asset path string */
   after?: string;
-  /** Single thumbnail when before/after not applicable */
   thumb?: string;
-  /** Optional demo media (video mp4 / audio mp3) */
   mediaUrl?: string;
   prompt: string;
   creditCost?: number;
@@ -47,7 +45,6 @@ export type SampleItem = {
   mood?: string;
 };
 
-/** Reliable external demo posters (no missing /demo/ paths). */
 const VIDEO_POSTERS = {
   landscape:
     "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=960&h=540&fit=crop&q=80",
@@ -57,15 +54,16 @@ const VIDEO_POSTERS = {
 } as const;
 
 /**
- * Core image before/after pairs.
- * Prefer distinct before/after when real paired assets exist under src/assets/.
- * Unsplash pairs keep the same subject id on both sides (quality params only differ).
+ * Image samples.
+ * Upscale uses clearly different resolution/quality params on the same subject
+ * so the before/after difference is visible. Other pairs still need true
+ * transformation assets for production marketing honesty.
  */
 export const IMAGE_SAMPLES: SampleItem[] = [
   {
     id: "img-bg-removal",
     title: "Background Removal",
-    description: "Clean cut-outs with crisp edges",
+    description: "Subject kept · background removed",
     category: "background-removal",
     editor: "image",
     before:
@@ -78,7 +76,7 @@ export const IMAGE_SAMPLES: SampleItem[] = [
   {
     id: "img-photo-restore",
     title: "Photo Restoration",
-    description: "Repair and colorise old memories",
+    description: "Damaged / faded → restored clarity",
     category: "photo-restoration",
     editor: "image",
     before:
@@ -102,7 +100,7 @@ export const IMAGE_SAMPLES: SampleItem[] = [
   {
     id: "img-upscale",
     title: "AI Upscaling",
-    description: "Low-res to sharp detail",
+    description: "Low-res soft → sharper detail",
     category: "ai-upscaling",
     editor: "image",
     before:
@@ -115,7 +113,7 @@ export const IMAGE_SAMPLES: SampleItem[] = [
   {
     id: "img-style",
     title: "Style Transfer",
-    description: "Reimagine any shot as fine art",
+    description: "Photo → fine-art restyle",
     category: "style-transfer",
     editor: "image",
     before: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=600&h=600&fit=crop&q=85",
@@ -127,7 +125,7 @@ export const IMAGE_SAMPLES: SampleItem[] = [
   {
     id: "img-portrait",
     title: "Portrait Enhancement",
-    description: "Studio-grade face and lighting",
+    description: "Soft portrait → studio clarity",
     category: "portrait",
     editor: "image",
     before:
@@ -140,7 +138,7 @@ export const IMAGE_SAMPLES: SampleItem[] = [
   {
     id: "img-circle-remove",
     title: "Circle & Remove",
-    description: "Circle any person or object to remove it",
+    description: "Circle a person or object to remove it",
     category: "object-removal",
     editor: "image",
     before:
@@ -249,7 +247,6 @@ export const MUSIC_SAMPLES: SampleItem[] = [
   },
 ];
 
-/** Flat catalog for search / future pagination. */
 export const ALL_SAMPLES: SampleItem[] = [
   ...IMAGE_SAMPLES,
   ...VIDEO_SAMPLES,
