@@ -3,93 +3,102 @@ import { Image as ImageIcon, Video, Music, ArrowRight, Lock } from "lucide-react
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
+import { useI18n } from "@/lib/i18n";
 
 /**
- * Signed-in home: quick start + studio cards + feature discovery.
- * Free: Image usable; Video + Music visible but locked (premium discovery).
- * Paid Lite+: all three open.
+ * Signed-in home: quick start + studios + capability discovery.
+ * All labels go through useI18n so language changes are visible.
  */
 export function SignedInStudioCards() {
   const { profile } = useAuth();
+  const { t } = useI18n();
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
   const videoOpen = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
   const musicOpen = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
 
   type Card = {
-    name: string;
+    nameKey: string;
     to: "/studio/image" | "/studio/video" | "/studio/music" | "/pricing";
     icon: typeof ImageIcon;
     gradient: string;
     locked: boolean;
     lockLabel?: string;
-    bullets: string[];
+    bulletKeys: string[];
   };
 
   const studios: Card[] = [
     {
-      name: "Image Studio",
+      nameKey: "studio.image",
       to: "/studio/image",
       icon: ImageIcon,
       gradient: "gradient-image",
       locked: false,
-      bullets: ["Remove objects & backgrounds", "Restore, upscale, retouch", "Open full Image Editor"],
+      bulletKeys: ["feat.removeObject", "feat.enhance", "studio.openEditor"],
     },
     {
-      name: "Video Studio",
+      nameKey: "studio.video",
       to: videoOpen ? "/studio/video" : "/pricing",
       icon: Video,
       gradient: "gradient-video",
       locked: !videoOpen,
-      lockLabel: "Requires Lite plan or higher",
-      bullets: ["Text-to-video & image-to-video", "Cinematic camera presets", "Reels & shorts lengths"],
+      lockLabel: t("home.requiresLite"),
+      bulletKeys: ["feat.video", "feat.textToImage"],
     },
     {
-      name: "Music Studio",
+      nameKey: "studio.music",
       to: musicOpen ? "/studio/music" : "/pricing",
       icon: Music,
       gradient: "gradient-music",
       locked: !musicOpen,
-      lockLabel: "Requires Lite plan or higher",
-      bullets: ["Mood, genre & tempo", "15s–2 min tracks", "Download MP3"],
+      lockLabel: t("home.requiresLite"),
+      bulletKeys: ["feat.music", "music.mood"],
     },
   ];
 
   const quickActions: {
-    to: "/editor" | "/studio/image" | "/history" | "/dashboard";
-    label: string;
-    desc: string;
+    to: "/editor" | "/studio/video" | "/music" | "/history";
+    labelKey: string;
+    descKey: string;
     primary?: boolean;
   }[] = [
-    { to: "/editor", label: "Open Image Editor", desc: "Full workspace", primary: true },
-    { to: "/studio/image", label: "Image tools", desc: "Presets & shortcuts" },
-    { to: "/history", label: "History", desc: "Recent projects" },
-    { to: "/dashboard", label: "Profile", desc: "Plan & account" },
+    { to: "/editor", labelKey: "studio.openEditor", descKey: "studio.presetsHint", primary: true },
+    { to: "/studio/video", labelKey: "home.createVideo", descKey: "feat.videoDesc" },
+    { to: "/music", labelKey: "home.createMusic", descKey: "feat.musicDesc" },
+    { to: "/history", labelKey: "home.viewHistory", descKey: "home.recentHistory" },
   ];
 
-  const tools: {
-    to: "/editor" | "/studio/image" | "/studio/video" | "/music";
-    label: string;
-    desc: string;
-  }[] = [
-    { to: "/editor", label: "Circle to Remove", desc: "Mark and erase objects" },
-    { to: "/studio/image", label: "Background removal", desc: "Clean cut-outs" },
-    { to: "/studio/image", label: "Image enhancement", desc: "Upscale & restore" },
-    { to: "/studio/video", label: "Video creation", desc: "Text & image to video" },
-    { to: "/music", label: "Music Studio", desc: "Mood & genre tracks" },
-    { to: "/editor", label: "Generate from text", desc: "New image from prompt" },
+  const capabilities: { to: "/editor" | "/studio/image" | "/studio/video" | "/music"; titleKey: string; descKey: string }[] = [
+    { to: "/editor", titleKey: "feat.circleRemove", descKey: "feat.circleRemoveDesc" },
+    { to: "/studio/image", titleKey: "feat.removeObject", descKey: "feat.removeObjectDesc" },
+    { to: "/studio/image", titleKey: "feat.removeBg", descKey: "feat.removeBgDesc" },
+    { to: "/studio/image", titleKey: "feat.replaceBg", descKey: "feat.replaceBgDesc" },
+    { to: "/studio/image", titleKey: "feat.enhance", descKey: "feat.enhanceDesc" },
+    { to: "/studio/image", titleKey: "feat.upscale", descKey: "feat.upscaleDesc" },
+    { to: "/studio/image", titleKey: "feat.faceRestore", descKey: "feat.faceRestoreDesc" },
+    { to: "/studio/image", titleKey: "feat.oldPhoto", descKey: "feat.oldPhotoDesc" },
+    { to: "/studio/image", titleKey: "feat.colorize", descKey: "feat.colorizeDesc" },
+    { to: "/studio/image", titleKey: "feat.clothing", descKey: "feat.clothingDesc" },
+    { to: "/studio/image", titleKey: "feat.portrait", descKey: "feat.portraitDesc" },
+    { to: "/studio/image", titleKey: "feat.headshot", descKey: "feat.headshotDesc" },
+    { to: "/studio/image", titleKey: "feat.product", descKey: "feat.productDesc" },
+    { to: "/studio/image", titleKey: "feat.interior", descKey: "feat.interiorDesc" },
+    { to: "/studio/image", titleKey: "feat.style", descKey: "feat.styleDesc" },
+    { to: "/editor", titleKey: "feat.textToImage", descKey: "feat.textToImageDesc" },
+    { to: "/studio/video", titleKey: "feat.video", descKey: "feat.videoDesc" },
+    { to: "/music", titleKey: "feat.music", descKey: "feat.musicDesc" },
   ];
 
   return (
     <div className="mt-6 space-y-8">
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Quick start
+          {t("home.quickStart")}
         </h2>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {quickActions.map((a) => (
             <Link
-              key={a.label}
+              key={a.labelKey}
               to={a.to}
               className={
                 "rounded-xl border px-3 py-3 transition-colors hover:border-primary/50 " +
@@ -98,8 +107,8 @@ export function SignedInStudioCards() {
                   : "border-border bg-card text-foreground")
               }
             >
-              <div className="text-sm font-semibold">{a.label}</div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground">{a.desc}</div>
+              <div className="text-sm font-semibold">{t(a.labelKey)}</div>
+              <div className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{t(a.descKey)}</div>
             </Link>
           ))}
         </div>
@@ -110,7 +119,7 @@ export function SignedInStudioCards() {
           const Icon = s.icon;
           return (
             <Link
-              key={s.name}
+              key={s.nameKey}
               to={s.to}
               className={
                 "group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg" +
@@ -131,27 +140,27 @@ export function SignedInStudioCards() {
                   {s.locked && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                       <Lock className="h-3 w-3" />
-                      Locked
+                      {t("home.locked")}
                     </span>
                   )}
                 </div>
-                <div className="mt-4 text-lg font-bold">{s.name}</div>
+                <div className="mt-4 text-lg font-bold">{t(s.nameKey)}</div>
                 <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                  {s.bullets.map((b) => (
-                    <li key={b}>• {b}</li>
+                  {s.bulletKeys.map((k) => (
+                    <li key={k}>• {t(k)}</li>
                   ))}
                 </ul>
                 {s.locked ? (
                   <>
                     <p className="mt-2 text-xs text-muted-foreground">{s.lockLabel}</p>
                     <div className="relative mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                      Upgrade to unlock{" "}
+                      {t("home.upgradeUnlock")}{" "}
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </div>
                   </>
                 ) : (
                   <div className="relative mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                    Open studio{" "}
+                    {t("studio.open")}{" "}
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                   </div>
                 )}
@@ -163,17 +172,18 @@ export function SignedInStudioCards() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          What you can do
+          {t("home.whatYouCanDo")}
         </h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {tools.map((t) => (
+        <p className="mb-3 text-xs text-muted-foreground">{t("studio.presetsHint")}</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {capabilities.map((c) => (
             <Link
-              key={t.label}
-              to={t.to}
+              key={c.titleKey}
+              to={c.to}
               className="rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
             >
-              <div className="text-sm font-semibold">{t.label}</div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground">{t.desc}</div>
+              <div className="text-sm font-semibold">{t(c.titleKey)}</div>
+              <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{t(c.descKey)}</div>
             </Link>
           ))}
         </div>

@@ -3,6 +3,7 @@ import { Home, Image as ImageIcon, History, MessageSquare, User } from "lucide-r
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessChat } from "@/lib/policy";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * Mobile-only fixed bottom navigation. Hidden on md+ (desktop uses sidebar).
@@ -10,6 +11,7 @@ import { canAccessChat } from "@/lib/policy";
  */
 export function BottomTabBar() {
   const { user, profile } = useAuth();
+  const { t } = useI18n();
   if (!user) return null;
 
   const admin = isAdminEmail(profile?.email);
@@ -21,13 +23,11 @@ export function BottomTabBar() {
     icon: typeof Home;
     exact?: boolean;
   }[] = [
-    { to: "/", label: "Home", icon: Home, exact: true },
-    { to: "/studio/image", label: "Image", icon: ImageIcon },
-    { to: "/history", label: "History", icon: History },
-    ...(showChat
-      ? [{ to: "/chat", label: "Chat", icon: MessageSquare }]
-      : []),
-    { to: "/dashboard", label: "Profile", icon: User },
+    { to: "/", label: t("nav.home"), icon: Home, exact: true },
+    { to: "/studio/image", label: t("nav.image"), icon: ImageIcon },
+    { to: "/history", label: t("nav.history"), icon: History },
+    ...(showChat ? [{ to: "/chat", label: t("nav.chat"), icon: MessageSquare }] : []),
+    { to: "/dashboard", label: t("nav.profile"), icon: User },
   ];
 
   return (
@@ -38,7 +38,7 @@ export function BottomTabBar() {
     >
       <ul className="mx-auto flex max-w-6xl items-stretch justify-around">
         {items.map(({ to, label, icon: Icon, exact }) => (
-          <li key={label} className="flex-1">
+          <li key={to + label} className="flex-1">
             <Link
               to={to}
               activeOptions={exact ? { exact: true } : undefined}
