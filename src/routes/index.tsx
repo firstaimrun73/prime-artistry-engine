@@ -7,12 +7,10 @@ import { Image as ImageIcon, Video, Music, Download, Zap, Wand2, Lock, ArrowRigh
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/routes/feedback";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
-import { History as HistoryIcon } from "lucide-react";
 import { SampleShowcase } from "@/components/SampleShowcase";
 import { SampleGallery } from "@/components/SampleGallery";
 import { MusicSamples } from "@/components/MusicSamples";
@@ -23,7 +21,7 @@ import { TrustSection } from "@/components/home/TrustSection";
 import { WhyChoose } from "@/components/home/WhyChoose";
 import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
 import { FinalCTA } from "@/components/home/FinalCTA";
-import { SignedInStudioCards } from "@/components/SignedInStudioCards";
+import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,6 +47,17 @@ function Index() {
   const { user, profile } = useAuth();
   if (user && profile) return <SignedInHome />;
   return <SignedOutHome />;
+}
+
+function SignedInHome() {
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <SignedInHomeBody />
+      <FooterAd />
+      <Footer />
+    </div>
+  );
 }
 
 function SignedOutHome() {
@@ -357,104 +366,5 @@ function StudioLoopingShowcase() {
         A single hub for image, video, and music — powered by Motion2AI.
       </p>
     </section>
-  );
-}
-
-type RecentGen = {
-  id: string;
-  type: string;
-  prompt: string | null;
-  output_url: string | null;
-  created_at: string;
-};
-
-function SignedInHome() {
-  const { user, profile } = useAuth();
-  const isAdmin = isAdminEmail(profile?.email);
-  const [recent, setRecent] = useState<RecentGen[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("generations")
-      .select("id, type, prompt, output_url, created_at")
-      .order("created_at", { ascending: false })
-      .limit(6)
-      .then(({ data }) => {
-        if (data) setRecent(data as RecentGen[]);
-      });
-  }, [user]);
-
-  return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main className="mx-auto max-w-6xl px-4 pt-10 pb-16">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-              Welcome back{profile?.display_name ? `, ${profile.display_name.split(" ")[0]}` : ""}.
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">Pick a studio and keep creating.</p>
-          </div>
-          <Link
-            to="/pricing"
-            className="rounded-xl border border-border bg-card px-4 py-3 text-right transition-colors hover:border-primary/40"
-          >
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Credits</div>
-            <div className="text-2xl font-extrabold text-primary">
-              {isAdmin ? "∞" : (profile?.credits ?? 0).toLocaleString()}
-            </div>
-            <div className="mt-0.5 text-[10px] text-muted-foreground">View plans →</div>
-          </Link>
-        </div>
-
-        {/* Free: Video + Music visible but locked; Lite+: all open */}
-        <SignedInStudioCards />
-
-        <section className="mt-10">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              <HistoryIcon className="h-4 w-4" /> Recent history
-            </h2>
-            <Link to="/history" className="text-xs font-medium text-primary hover:underline">
-              View all →
-            </Link>
-          </div>
-          {recent.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
-              No generations yet — pick a studio above to start.
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-              {recent.map((g) => (
-                <Link
-                  key={g.id}
-                  to="/history"
-                  className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-card"
-                >
-                  {g.output_url && g.type !== "music" ? (
-                    g.type === "video" ? (
-                      <video src={g.output_url} className="h-full w-full object-cover" muted />
-                    ) : (
-                      <img
-                        src={g.output_url}
-                        alt={g.prompt ?? ""}
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                      />
-                    )
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-muted">
-                      <Music className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                  )}
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
-      <FooterAd />
-      <Footer />
-    </div>
   );
 }
