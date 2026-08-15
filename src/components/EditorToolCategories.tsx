@@ -8,6 +8,12 @@ import {
   Shirt,
   ImagePlus,
   Wand2,
+  Crop,
+  Maximize2,
+  RotateCcw,
+  FlipHorizontal,
+  Focus,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +23,8 @@ type Tool = {
   label: string;
   icon: LucideIcon;
   prompt: string;
+  /** UI-only tools that do not fill a generation prompt (e.g. local crop). */
+  uiOnly?: boolean;
 };
 
 type Category = {
@@ -29,6 +37,7 @@ type Category = {
  * Common image-edit tools grouped for progressive disclosure.
  * Selecting a tool fills the prompt — generation still uses the existing pipeline.
  * Auto Edit is a UI entry only (no backend algorithm in this module).
+ * Tools marked uiOnly are architecture hooks (e.g. Crop) without fake generation.
  */
 export const AUTO_EDIT_PROMPT =
   "Automatically analyze this image and apply professional improvements: enhance clarity and detail, balance exposure and color, reduce noise, and polish the overall look while keeping the subject identity, composition and framing identical.";
@@ -58,6 +67,41 @@ export const EDITOR_TOOL_CATEGORIES: Category[] = [
         prompt:
           "Add the described object into this photo naturally, matching lighting, perspective and shadows. Do not change the person or background otherwise.",
       },
+      {
+        id: "replace-object",
+        label: "Replace object",
+        icon: Wand2,
+        prompt:
+          "Replace the specified object with the described alternative. Match lighting, scale and perspective. Keep everything else identical.",
+      },
+      {
+        id: "crop",
+        label: "Crop",
+        icon: Crop,
+        prompt: "__CROP__",
+        uiOnly: true,
+      },
+      {
+        id: "expand",
+        label: "Expand / Outpaint",
+        icon: Maximize2,
+        prompt:
+          "Expand the canvas outward and naturally continue the scene beyond the current edges. Match style, lighting and perspective. Keep the original subject unchanged.",
+      },
+      {
+        id: "rotate",
+        label: "Straighten",
+        icon: RotateCcw,
+        prompt:
+          "Straighten the horizon and correct any tilt. Keep the subject and composition otherwise identical.",
+      },
+      {
+        id: "flip",
+        label: "Flip",
+        icon: FlipHorizontal,
+        prompt:
+          "Mirror this image horizontally while keeping quality and details intact.",
+      },
     ],
   },
   {
@@ -81,9 +125,23 @@ export const EDITOR_TOOL_CATEGORIES: Category[] = [
       {
         id: "blur-bg",
         label: "Blur background",
-        icon: Wand2,
+        icon: Focus,
         prompt:
           "Blur only the background with a natural shallow depth of field. Keep the subject sharp and unchanged.",
+      },
+      {
+        id: "extend-bg",
+        label: "Extend background",
+        icon: Maximize2,
+        prompt:
+          "Extend the background outward while keeping the main subject fixed and unchanged.",
+      },
+      {
+        id: "clean-bg",
+        label: "Clean background",
+        icon: Wand2,
+        prompt:
+          "Clean and simplify the background: remove clutter and distractions while keeping the subject identical.",
       },
     ],
   },
@@ -99,18 +157,81 @@ export const EDITOR_TOOL_CATEGORIES: Category[] = [
           "Enhance this photo: increase sharpness, clarity and fine detail, reduce noise. Keep composition, subject and colors identical.",
       },
       {
+        id: "upscale",
+        label: "AI Upscale",
+        icon: Maximize2,
+        prompt:
+          "Upscale and enhance resolution with natural detail recovery. Keep the subject, composition and colors identical.",
+      },
+      {
+        id: "sharpen",
+        label: "Sharpen",
+        icon: Focus,
+        prompt:
+          "Sharpen fine detail and edges without introducing artifacts. Keep identity and composition identical.",
+      },
+      {
+        id: "deblur",
+        label: "Deblur",
+        icon: Focus,
+        prompt:
+          "Reduce motion blur and soft focus while preserving natural texture. Keep the subject unchanged.",
+      },
+      {
+        id: "denoise",
+        label: "Denoise",
+        icon: Sparkles,
+        prompt:
+          "Reduce noise and grain while keeping fine detail and natural skin texture.",
+      },
+      {
         id: "hdr",
-        label: "HDR look",
+        label: "HDR Enhancement",
         icon: Sun,
         prompt:
           "Apply a high-dynamic-range look with expanded highlights and shadows, punchy micro-contrast and natural colors. Keep the subject unchanged.",
       },
       {
-        id: "cinematic",
-        label: "Cinematic",
+        id: "fix-lighting",
+        label: "Fix lighting",
         icon: Sun,
         prompt:
-          "Apply a cinematic color grade with teal-and-orange tones, filmic contrast and subtle grain while keeping the original subject unchanged.",
+          "Balance exposure and lighting: recover shadows and highlights naturally without changing the subject.",
+      },
+      {
+        id: "fix-exposure",
+        label: "Fix exposure",
+        icon: Sun,
+        prompt:
+          "Correct under- or over-exposure for a balanced, natural look. Keep composition identical.",
+      },
+      {
+        id: "restore",
+        label: "Restore photo",
+        icon: Sparkles,
+        prompt:
+          "Restore this photo: repair scratches, fade and damage while preserving the original look and subjects.",
+      },
+      {
+        id: "color-correct",
+        label: "Color correction",
+        icon: Palette,
+        prompt:
+          "Correct white balance and colors for a natural, true-to-life look. Keep the subject unchanged.",
+      },
+      {
+        id: "colorize",
+        label: "Colorize",
+        icon: Palette,
+        prompt:
+          "Colorize this image with realistic, period-appropriate colors while keeping structure identical.",
+      },
+      {
+        id: "artifacts",
+        label: "Reduce artifacts",
+        icon: Wand2,
+        prompt:
+          "Reduce compression artifacts and blockiness while preserving detail and identity.",
       },
     ],
   },
@@ -120,17 +241,52 @@ export const EDITOR_TOOL_CATEGORIES: Category[] = [
     tools: [
       {
         id: "face-enhance",
-        label: "Enhance face",
+        label: "Face enhancement",
         icon: Users,
         prompt:
           "Enhance facial detail with natural skin texture, sharp eyes and balanced lighting. Do NOT change identity, expression or age.",
       },
       {
         id: "skin",
-        label: "Skin retouch",
+        label: "Skin smoothing",
         icon: Sparkles,
         prompt:
           "Retouch the skin naturally: remove blemishes, keep pores and realistic texture. Do not change identity.",
+      },
+      {
+        id: "portrait-retouch",
+        label: "Portrait retouch",
+        icon: Users,
+        prompt:
+          "Professional portrait retouch: refine skin, eyes and lighting while keeping identity and expression identical.",
+      },
+      {
+        id: "eye-enhance",
+        label: "Eye enhancement",
+        icon: Focus,
+        prompt:
+          "Sharpen and brighten the eyes naturally. Do not change eye color or identity.",
+      },
+      {
+        id: "hair",
+        label: "Hair enhancement",
+        icon: Wand2,
+        prompt:
+          "Enhance hair detail and shine naturally without changing hairstyle or color dramatically.",
+      },
+      {
+        id: "portrait-light",
+        label: "Lighting correction",
+        icon: Sun,
+        prompt:
+          "Improve portrait lighting for flattering, natural face illumination. Keep identity identical.",
+      },
+      {
+        id: "red-eye",
+        label: "Red eye correction",
+        icon: Focus,
+        prompt:
+          "Remove red-eye from the pupils while keeping natural eye color and identity.",
       },
     ],
   },
@@ -140,10 +296,31 @@ export const EDITOR_TOOL_CATEGORIES: Category[] = [
     tools: [
       {
         id: "outfit",
-        label: "Change outfit",
+        label: "Change clothing",
         icon: Shirt,
         prompt:
           "Change only the clothing/outfit as described. Keep the exact same face, identity, pose and background.",
+      },
+      {
+        id: "replace-outfit",
+        label: "Replace outfit",
+        icon: Shirt,
+        prompt:
+          "Replace the full outfit with the described clothing. Keep face, body proportions and background identical.",
+      },
+      {
+        id: "clothing-color",
+        label: "Clothing color",
+        icon: Palette,
+        prompt:
+          "Change only the clothing color as described. Keep fabric texture, fit, face and background identical.",
+      },
+      {
+        id: "clothing-style",
+        label: "Clothing style",
+        icon: Shirt,
+        prompt:
+          "Restyle the clothing while keeping the same person, pose and background.",
       },
     ],
   },
@@ -152,11 +329,46 @@ export const EDITOR_TOOL_CATEGORIES: Category[] = [
     label: "Style",
     tools: [
       {
-        id: "cartoon",
-        label: "Cartoon",
+        id: "style-transfer",
+        label: "Style transfer",
         icon: Wand2,
         prompt:
-          "Convert to a vibrant cartoon illustration with bold outlines while keeping the subject's identity, pose and framing.",
+          "Apply an artistic style transfer while keeping the subject's identity and pose recognizable.",
+      },
+      {
+        id: "cinematic",
+        label: "Cinematic",
+        icon: Sun,
+        prompt:
+          "Apply a cinematic color grade with teal-and-orange tones, filmic contrast and subtle grain while keeping the original subject unchanged.",
+      },
+      {
+        id: "anime",
+        label: "Anime",
+        icon: Wand2,
+        prompt:
+          "Convert to a polished anime illustration style while keeping the subject's identity and pose.",
+      },
+      {
+        id: "illustration",
+        label: "Illustration",
+        icon: Palette,
+        prompt:
+          "Convert to a clean digital illustration while keeping composition and subject identity.",
+      },
+      {
+        id: "product",
+        label: "Product photography",
+        icon: Sparkles,
+        prompt:
+          "Restyle as clean product photography with studio lighting and a simple backdrop. Keep the product form accurate.",
+      },
+      {
+        id: "film-look",
+        label: "Film look",
+        icon: Sun,
+        prompt:
+          "Apply a classic film look with natural grain and soft contrast. Keep the subject sharp and recognizable.",
       },
       {
         id: "vintage",
@@ -164,6 +376,20 @@ export const EDITOR_TOOL_CATEGORIES: Category[] = [
         icon: Wand2,
         prompt:
           "Apply a vintage 1970s film look with warm tones and soft grain while keeping the subject sharp and recognizable.",
+      },
+      {
+        id: "bw",
+        label: "Black & White",
+        icon: Palette,
+        prompt:
+          "Convert to a rich black-and-white photograph with strong tonal range. Keep composition identical.",
+      },
+      {
+        id: "cartoon",
+        label: "Cartoon",
+        icon: Wand2,
+        prompt:
+          "Convert to a vibrant cartoon illustration with bold outlines while keeping the subject's identity, pose and framing.",
       },
     ],
   },
@@ -233,7 +459,8 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {cat.tools.map((t) => {
           const Icon = t.icon;
-          const needsImage = t.id !== "cartoon" && t.id !== "vintage";
+          const styleOnly = t.id === "cartoon" || t.id === "vintage" || t.id === "anime" || t.id === "illustration" || t.id === "bw";
+          const needsImage = !styleOnly;
           return (
             <button
               key={t.id}
