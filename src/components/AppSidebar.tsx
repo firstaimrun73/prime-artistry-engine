@@ -3,15 +3,13 @@ import { Home, Image as ImageIcon, Video, Music, History, MessageSquare, User, S
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { isAdminEmail } from "@/lib/admin-config";
-import { canAccessChat, canAccessVideo, canAccessMusic, isFreePlan } from "@/lib/policy";
+import { canAccessChat, canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { BrandMark } from "@/components/BrandMark";
 
 /**
  * Desktop vertical sidebar for authenticated routes.
- * Hidden on mobile (< md) — BottomTabBar handles mobile.
- * Actual Free: Home, Image, History (+ Profile/Settings).
- * Paid Lite: Image + Music + Chat (no Video — plans.video=false).
- * Plus+: Image + Video + Music + Chat per existing entitlements.
+ * Free: Home, Image, History (+ Profile/Settings).
+ * Paid Lite+: Image + Video + Music + Chat per canAccess* helpers.
  */
 export function AppSidebar() {
   const { user, profile } = useAuth();

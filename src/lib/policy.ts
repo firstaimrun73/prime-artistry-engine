@@ -29,10 +29,7 @@ export function isFreePlan(plan: string | null | undefined): boolean {
   return !isPaidPlan(plan);
 }
 
-/**
- * Chat: all paid plans (including Lite). Free never.
- * Matches existing chat.functions.ts server gate.
- */
+/** Chat: all paid plans (including Lite). Free never. */
 export function canAccessChat(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
@@ -43,8 +40,8 @@ export function canAccessChat(opts: {
 }
 
 /**
- * Video generation: driven by plans.ts `video` flag (Plus+).
- * Lite is paid but does NOT get Video. Free never.
+ * Video: all paid plans including Lite. Free never.
+ * Aligns product matrix; keep plans.ts lite.video in sync so editor plan.video gate matches.
  */
 export function canAccessVideo(opts: {
   plan: string | null | undefined;
@@ -52,14 +49,10 @@ export function canAccessVideo(opts: {
   isAdmin?: boolean;
 }): boolean {
   if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
-  if (!opts.plan || isFreePlan(opts.plan)) return false;
-  return getPlan(opts.plan as PlanId).video === true;
+  return isPaidPlan(opts.plan);
 }
 
-/**
- * Music: all paid plans (Lite includes music per plans.ts features).
- * Free never. Does not invent new entitlements — mirrors product config.
- */
+/** Music: all paid plans (Lite includes music). Free never. */
 export function canAccessMusic(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
@@ -69,68 +62,33 @@ export function canAccessMusic(opts: {
   return isPaidPlan(opts.plan);
 }
 
-/**
- * Authoritative ad decision.
- *
- *   ADMIN  → never show ads / never load Monetag or vignette scripts
- *   PAID   → never show ads
- *   FREE   → ads allowed (outside editor/studio excluded routes)
- *
- * Prefer not initializing ad scripts at all for admin/paid rather than
- * loading them and only hiding the container.
- */
 export function shouldShowAds(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
   isAdmin?: boolean;
 }): boolean {
-  const admin =
-    opts.isAdmin === true || isAdminEmail(opts.email);
+  const admin = opts.isAdmin === true || isAdminEmail(opts.email);
   if (admin) return false;
   if (isPaidPlan(opts.plan)) return false;
-  return true; // free (or unknown → treat as free for safety of ad display only)
+  return true;
 }
 
-/**
- * Watermark composition mode for a given user + optional paid toggle.
- *
- * FREE:
- *   - primary always on (preview + download)
- *   - secondary (diagonal grid) always on for download; strong on preview
- *   - cannot disable
- *
- * PAID:
- *   - primary only when user opts in (keepWatermark === true)
- *   - secondary NEVER
- *
- * ADMIN:
- *   - none
- */
 export function getWatermarkMode(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
   isAdmin?: boolean;
-  /** Paid-user preference only; ignored for free/admin. */
   keepWatermark?: boolean;
-  /** When true, include secondary layer (download path for free). */
   forDownload?: boolean;
 }): WatermarkMode {
-  const admin =
-    opts.isAdmin === true || isAdminEmail(opts.email);
+  const admin = opts.isAdmin === true || isAdminEmail(opts.email);
   if (admin) return "none";
-
   if (isFreePlan(opts.plan)) {
-    // Free always gets primary; secondary on download (and we also use
-    // strong primary path for preview so free users never see a clean URL).
-    return opts.forDownload ? "primary+secondary" : "primary+secondary";
+    return "primary+secondary";
   }
-
-  // Paid: primary only if they opted in
   if (opts.keepWatermark) return "primary";
   return "none";
 }
 
-/** Convenience: should the client apply any watermark at all? */
 export function shouldApplyWatermark(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
@@ -140,14 +98,12 @@ export function shouldApplyWatermark(opts: {
   return getWatermarkMode(opts) !== "none";
 }
 
-/** Convenience: strong (secondary grid) only for free users. */
 export function shouldApplySecondaryWatermark(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
   isAdmin?: boolean;
 }): boolean {
-  const admin =
-    opts.isAdmin === true || isAdminEmail(opts.email);
+  const admin = opts.isAdmin === true || isAdminEmail(opts.email);
   if (admin) return false;
   return isFreePlan(opts.plan);
 }
