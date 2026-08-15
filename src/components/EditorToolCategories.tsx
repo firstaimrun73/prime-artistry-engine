@@ -28,7 +28,11 @@ type Category = {
 /**
  * Common image-edit tools grouped for progressive disclosure.
  * Selecting a tool fills the prompt — generation still uses the existing pipeline.
+ * Auto Edit is a UI entry only (no backend algorithm in this module).
  */
+export const AUTO_EDIT_PROMPT =
+  "Automatically analyze this image and apply professional improvements: enhance clarity and detail, balance exposure and color, reduce noise, and polish the overall look while keeping the subject identity, composition and framing identical.";
+
 export const EDITOR_TOOL_CATEGORIES: Category[] = [
   {
     id: "edit",
@@ -168,7 +172,6 @@ export const EDITOR_TOOL_CATEGORIES: Category[] = [
 type Props = {
   onSelectTool: (tool: Tool) => void;
   disabled?: boolean;
-  /** When true, show tools that need an uploaded image first */
   hasImage?: boolean;
 };
 
@@ -178,13 +181,37 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
 
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
+      {/* Auto Edit — UI entry only for ALL plans; fills enhance prompt via existing pipeline */}
+      <button
+        type="button"
+        disabled={disabled || !hasImage}
+        onClick={() =>
+          onSelectTool({
+            id: "auto-edit",
+            label: "Auto Edit",
+            icon: Sparkles,
+            prompt: AUTO_EDIT_PROMPT,
+          })
+        }
+        className="flex w-full min-h-[48px] items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2.5 text-left transition-colors hover:bg-primary/10 disabled:opacity-50"
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
+          <Sparkles className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-primary">Auto Edit ✨</span>
+          <span className="block text-[11px] text-muted-foreground leading-snug">
+            Let Motio2edit analyze your image and automatically improve it.
+          </span>
+        </span>
+      </button>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Choose a tool
         </p>
         <p className="text-[11px] text-muted-foreground">Edit · Background · Enhance · Portrait · Clothing · Style</p>
       </div>
-      {/* Category tabs */}
       <div className="flex flex-wrap gap-1.5">
         {EDITOR_TOOL_CATEGORIES.map((c) => (
           <button
@@ -203,7 +230,6 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
           </button>
         ))}
       </div>
-      {/* Tools in active category — icon + label, never emoji */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {cat.tools.map((t) => {
           const Icon = t.icon;
@@ -224,7 +250,7 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
       </div>
       {!hasImage && (
         <p className="text-[11px] text-muted-foreground">
-          Upload an image to unlock most edit tools. Style tools and text-to-image work without an upload.
+          Upload an image to unlock Auto Edit and most tools. Style tools and text-to-image work without an upload.
         </p>
       )}
     </div>
