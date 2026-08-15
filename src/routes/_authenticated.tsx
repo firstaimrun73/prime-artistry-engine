@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AdminPopupModal } from "@/components/AdminPopupModal";
 import { FirstGenerationFeedback } from "@/components/FirstGenerationFeedback";
 import { FreePlanNotices } from "@/components/FreePlanNotices";
+import { MusicAccessGate } from "@/components/MusicAccessGate";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const { loading, user } = useAuth();
   const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
@@ -34,6 +36,16 @@ function AuthenticatedLayout() {
     );
   }
 
+  const isMusicRoute = pathname === "/music" || pathname.startsWith("/music/");
+
+  const main = isMusicRoute ? (
+    <MusicAccessGate>
+      <Outlet />
+    </MusicAccessGate>
+  ) : (
+    <Outlet />
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar />
@@ -41,7 +53,7 @@ function AuthenticatedLayout() {
         <div className="md:hidden">
           <Header />
         </div>
-        <Outlet />
+        {main}
         <AdminPopupModal />
         <FirstGenerationFeedback />
         <FreePlanNotices />
