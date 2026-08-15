@@ -10,6 +10,10 @@ import type { TranslationDict } from "./types";
 import enUS from "./locales/en-US";
 import de from "./locales/de";
 import fr from "./locales/fr";
+import it from "./locales/it";
+import nl from "./locales/nl";
+import pl from "./locales/pl";
+import vi from "./locales/vi";
 
 const CATALOG: Partial<Record<Locale, TranslationDict>> = {
   "en-US": enUS,
@@ -18,6 +22,10 @@ const CATALOG: Partial<Record<Locale, TranslationDict>> = {
   de,
   fr,
   "fr-CA": fr,
+  it,
+  nl,
+  pl,
+  vi,
 };
 
 let currentLocale: Locale = DEFAULT_LOCALE;
