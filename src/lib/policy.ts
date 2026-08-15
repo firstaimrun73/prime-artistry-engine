@@ -6,6 +6,7 @@
 // Never treat client-only React state or localStorage as authorization.
 
 import type { PlanId } from "./plans";
+import { getPlan } from "./plans";
 import { isAdminEmail } from "./admin-config";
 
 export type WatermarkMode = "none" | "primary" | "primary+secondary";
@@ -26,6 +27,46 @@ export function isPaidPlan(plan: string | null | undefined): boolean {
 
 export function isFreePlan(plan: string | null | undefined): boolean {
   return !isPaidPlan(plan);
+}
+
+/**
+ * Chat: all paid plans (including Lite). Free never.
+ * Matches existing chat.functions.ts server gate.
+ */
+export function canAccessChat(opts: {
+  plan: string | null | undefined;
+  email?: string | null | undefined;
+  isAdmin?: boolean;
+}): boolean {
+  if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
+  return isPaidPlan(opts.plan);
+}
+
+/**
+ * Video generation: driven by plans.ts `video` flag (Plus+).
+ * Lite is paid but does NOT get Video. Free never.
+ */
+export function canAccessVideo(opts: {
+  plan: string | null | undefined;
+  email?: string | null | undefined;
+  isAdmin?: boolean;
+}): boolean {
+  if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
+  if (!opts.plan || isFreePlan(opts.plan)) return false;
+  return getPlan(opts.plan as PlanId).video === true;
+}
+
+/**
+ * Music: all paid plans (Lite includes music per plans.ts features).
+ * Free never. Does not invent new entitlements — mirrors product config.
+ */
+export function canAccessMusic(opts: {
+  plan: string | null | undefined;
+  email?: string | null | undefined;
+  isAdmin?: boolean;
+}): boolean {
+  if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
+  return isPaidPlan(opts.plan);
 }
 
 /**
