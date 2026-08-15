@@ -2,138 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Eraser, Film, Music, Pause, Play, Sparkles } from "lucide-react";
-
-type ImageSample = {
-  label: string;
-  title: string;
-  before: string;
-  after: string;
-  prompt: string;
-  smartRemove?: boolean;
-};
-
-/** Before/after pairs must show the same subject when the label claims an edit. */
-const IMAGE_SAMPLES: ImageSample[] = [
-  {
-    label: "Background Removal",
-    title: "Remove the background completely",
-    before:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&h=500&fit=crop&crop=faces&q=90",
-    after:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&h=500&fit=crop&crop=faces&q=90&sat=-100&bri=10",
-    prompt: "Remove the background completely",
-  },
-  {
-    label: "Photo Restoration",
-    title: "Restore and enhance this old photo",
-    before:
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=500&fit=crop&crop=faces&q=90&sat=-80&con=-30",
-    after:
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=500&fit=crop&crop=faces&q=90",
-    prompt: "Restore and enhance this old photo",
-  },
-  {
-    label: "Object Removal",
-    title: "Remove distractions from the scene",
-    // Same mountain frame — demo of cleanup intent (Try this edit opens real pipeline)
-    before: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&h=500&fit=crop&q=70",
-    after: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&h=500&fit=crop&q=90",
-    prompt: "Remove all people from the scene and rebuild the background naturally",
-  },
-  {
-    label: "4K AI Enhancement",
-    title: "Enhance to 4K quality",
-    before: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&h=300&fit=crop&crop=faces&q=10",
-    after: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&h=500&fit=crop&crop=faces&q=100",
-    prompt: "Enhance to 4K quality",
-  },
-  {
-    label: "Artistic Style",
-    title: "Make this look like oil painting",
-    // Same composition; after uses a painterly treatment URL of the same subject family
-    before: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=500&h=500&fit=crop&q=90",
-    after: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=500&h=500&fit=crop&q=90&sat=30&con=20",
-    prompt: "Make this look like oil painting",
-  },
-  {
-    label: "Portrait Enhancement",
-    title: "Enhance face and lighting",
-    // Same person both sides (was previously two different faces)
-    before:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop&crop=faces&q=40",
-    after:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop&crop=faces&q=100",
-    prompt: "Enhance face and lighting",
-  },
-  {
-    label: "Circle & Remove",
-    title: "Draw a circle over any person or object to remove it instantly",
-    // Same group scene both sides; try-flow opens Smart Remove with matching prompt
-    before:
-      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=500&h=500&fit=crop&crop=faces&q=80",
-    after:
-      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=500&h=500&fit=crop&crop=faces&q=95",
-    prompt: "Remove the circled person and rebuild the background naturally",
-    smartRemove: true,
-  },
-];
-
-const VIDEO_SAMPLES = [
-  {
-    title: "Cinematic Landscape",
-    badge: "Text to Video",
-    thumb: "/demo/video/poster-landscape.jpg",
-    prompt:
-      "A cinematic drone shot flying over misty mountains at golden hour with dramatic lighting",
-  },
-  {
-    title: "Tech Visualization",
-    badge: "Text to Video",
-    thumb: "/demo/video/poster-tech.jpg",
-    prompt:
-      "Futuristic AI robot assembling itself from particles of light in a dark laboratory with blue glow",
-  },
-  {
-    title: "Fitness Motivation",
-    badge: "Image to Video",
-    thumb: "/demo/video/poster-portrait.jpg",
-    prompt:
-      "Athletic person running through city streets at sunset with motion blur and cinematic color grading",
-  },
-];
-
-const MUSIC_SAMPLES = [
-  {
-    title: "Epic Cinematic Trailer",
-    genre: "Orchestral",
-    mood: "Epic",
-    duration: "30s",
-    icons: "🎻 🥁",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    prompt:
-      "Epic cinematic trailer track with soaring strings, deep taiko drums and a triumphant brass finale.",
-  },
-  {
-    title: "Lo-fi Study Beats",
-    genre: "Lo-fi",
-    mood: "Chill",
-    duration: "30s",
-    icons: "🎹 🎸",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    prompt:
-      "Warm lofi hip hop beat with dusty vinyl crackle, mellow Rhodes piano chords and a laid-back bassline.",
-  },
-  {
-    title: "Electronic Dance",
-    genre: "Electronic",
-    mood: "Energetic",
-    duration: "30s",
-    icons: "🎛️ 🎧",
-    audio: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    prompt:
-      "High-energy electronic dance track with pulsing synth bass, bright arpeggios and a euphoric drop.",
-  },
-];
+import { IMAGE_SAMPLES, VIDEO_SAMPLES, MUSIC_SAMPLES } from "@/data/samples";
 
 function Waveform({ active }: { active: boolean }) {
   return (
@@ -192,11 +61,15 @@ export function SampleShowcase() {
     stopTimer.current = setTimeout(stopAudio, 15000);
   };
 
-  const tryEdit = (sample: { prompt: string; smartRemove?: boolean }) => {
+  const tryEdit = (sample: (typeof IMAGE_SAMPLES)[number]) => {
     try {
       sessionStorage.setItem(
         "motio2edit-preset",
-        JSON.stringify({ prompt: sample.prompt, mode: "image", smartRemove: !!sample.smartRemove }),
+        JSON.stringify({
+          prompt: sample.prompt,
+          mode: "image",
+          smartRemove: !!sample.smartRemove,
+        }),
       );
     } catch {
       /* ignore */
@@ -258,7 +131,7 @@ export function SampleShowcase() {
         <div className="relative">
           {IMAGE_SAMPLES.map((s, i) => (
             <div
-              key={s.label}
+              key={s.id}
               className={`transition-opacity duration-700 ${
                 i === index ? "opacity-100" : "pointer-events-none absolute inset-0 opacity-0"
               }`}
@@ -266,13 +139,13 @@ export function SampleShowcase() {
             >
               <div className="grid grid-cols-2 gap-2 sm:gap-4">
                 {[
-                  { src: s.before, tag: "Before" },
-                  { src: s.after, tag: "After" },
+                  { src: s.before!, tag: "Before" },
+                  { src: s.after!, tag: "After" },
                 ].map((img) => (
                   <figure key={img.tag} className="relative overflow-hidden rounded-2xl border border-border">
                     <img
                       src={img.src}
-                      alt={`${s.label} — ${img.tag}`}
+                      alt={`${s.title} — ${img.tag}`}
                       loading="lazy"
                       width={500}
                       height={500}
@@ -297,8 +170,8 @@ export function SampleShowcase() {
 
         <div className="mt-5 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">{active.label}</p>
-            <h3 className="mt-1 break-words font-bold">{active.title}</h3>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">{active.title}</p>
+            <h3 className="mt-1 break-words font-bold">{active.description}</h3>
           </div>
           <Button onClick={() => tryEdit(active)} className="btn-animate w-full shrink-0 sm:w-auto">
             {active.smartRemove ? (
@@ -315,9 +188,9 @@ export function SampleShowcase() {
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {IMAGE_SAMPLES.map((s, i) => (
             <button
-              key={s.label}
+              key={s.id}
               type="button"
-              aria-label={`Show ${s.label} example`}
+              aria-label={`Show ${s.title} example`}
               aria-current={i === index}
               onClick={() => go(i)}
               className={`h-2 rounded-full transition-all ${
@@ -336,7 +209,7 @@ export function SampleShowcase() {
         <div className="mt-4 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {VIDEO_SAMPLES.map((v) => (
             <div
-              key={v.title}
+              key={v.id}
               className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card transition-colors hover:border-primary"
             >
               <button
@@ -363,14 +236,23 @@ export function SampleShowcase() {
                   {v.badge}
                 </span>
                 <span className="absolute bottom-3 right-3 flex gap-1.5">
-                  <span className="rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">10s</span>
-                  <span className="rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">1080p</span>
+                  <span className="rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">
+                    {v.duration}
+                  </span>
+                  <span className="rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">
+                    1080p
+                  </span>
                 </span>
               </button>
               <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
                 <p className="truncate font-bold">{v.title}</p>
                 <p className="mt-2 line-clamp-3 flex-1 text-sm text-muted-foreground">{v.prompt}</p>
-                <Button variant="outline" size="sm" className="btn-animate mt-4" onClick={() => tryVideo(v.prompt)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="btn-animate mt-4"
+                  onClick={() => tryVideo(v.prompt)}
+                >
                   Generate similar
                 </Button>
               </div>
@@ -386,15 +268,15 @@ export function SampleShowcase() {
         </div>
         <div className="mt-4 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {MUSIC_SAMPLES.map((m) => {
-            const isPlaying = playing === m.audio;
+            const isPlaying = playing === m.mediaUrl;
             return (
               <div
-                key={m.title}
+                key={m.id}
                 className="flex h-full min-w-0 flex-col rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary sm:p-5"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-2xl" aria-hidden>
-                    {m.icons}
+                    🎵
                   </span>
                   <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
                     {m.duration}
@@ -408,17 +290,22 @@ export function SampleShowcase() {
                 <div className="mt-4 flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => togglePlay(m.audio)}
+                    onClick={() => m.mediaUrl && togglePlay(m.mediaUrl)}
                     aria-label={isPlaying ? `Pause ${m.title}` : `Play ${m.title} preview`}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
                   >
                     {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
                   </button>
-                  <Waveform active={isPlaying} />
+                  <Waveform active={!!isPlaying} />
                 </div>
 
                 <p className="mt-4 flex-1 text-sm text-muted-foreground">{m.prompt}</p>
-                <Button variant="outline" size="sm" className="btn-animate mt-4" onClick={() => tryMusic(m.prompt)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="btn-animate mt-4"
+                  onClick={() => tryMusic(m.prompt)}
+                >
                   Generate similar
                 </Button>
               </div>
