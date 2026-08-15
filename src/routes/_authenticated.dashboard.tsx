@@ -6,7 +6,7 @@ import { getPlan, PLAN_CREDITS, CREDIT_COST } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
-import { Coins, Crown, Image as ImageIcon, Settings, Zap, History, FolderOpen, LifeBuoy, Ticket, HelpCircle, Mail, CheckCircle2 } from "lucide-react";
+import { Coins, Crown, Image as ImageIcon, Settings, Zap, History, FolderOpen, LifeBuoy, Ticket, HelpCircle, Mail, CheckCircle2, Video } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -47,7 +47,7 @@ function Dashboard() {
   const videos = gens.filter((g) => g.type === "video").length;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12">
+    <div className="mx-auto max-w-5xl px-4 py-12 pb-24 md:pb-12">
       <div className="flex items-center gap-4">
         <Avatar className="h-12 w-12">
           <AvatarImage src={profile.avatar_signed_url ?? undefined} alt={profile.display_name ?? "Avatar"} />
@@ -101,7 +101,10 @@ function Dashboard() {
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Button asChild>
-          <Link to="/editor">Open editor</Link>
+          <Link to="/editor">Open Image Editor</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link to="/studio/image">Image Studio</Link>
         </Button>
         <Button asChild variant="outline">
           <Link to="/history">
@@ -177,12 +180,31 @@ function Dashboard() {
             {gens.map((g) => (
               <div key={g.id} className="overflow-hidden rounded-xl border border-border bg-card">
                 {g.output_url ? (
-                  <img
-                    src={g.output_url}
-                    alt={g.prompt ?? "Generated"}
-                    loading="lazy"
-                    className="aspect-square w-full object-cover"
-                  />
+                  g.type === "video" ? (
+                    <div className="relative aspect-square w-full bg-secondary">
+                      <video
+                        src={g.output_url}
+                        className="h-full w-full object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                      <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-background/85 px-2 py-0.5 text-[10px] font-semibold backdrop-blur">
+                        <Video className="h-3 w-3" /> Video
+                      </span>
+                    </div>
+                  ) : g.type === "music" ? (
+                    <div className="flex aspect-square w-full items-center justify-center bg-secondary">
+                      <span className="text-sm font-medium text-muted-foreground">Music</span>
+                    </div>
+                  ) : (
+                    <img
+                      src={g.output_url}
+                      alt={g.prompt ?? "Generated"}
+                      loading="lazy"
+                      className="aspect-square w-full object-cover"
+                    />
+                  )
                 ) : (
                   <div className="flex aspect-square w-full items-center justify-center bg-secondary">
                     <ImageIcon className="h-6 w-6 text-muted-foreground" />
