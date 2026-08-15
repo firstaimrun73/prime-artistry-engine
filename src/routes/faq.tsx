@@ -11,12 +11,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { CREDIT_COST } from "@/lib/plans";
 
 export const Route = createFileRoute("/faq")({
   head: () => ({
     meta: [
       { title: "FAQ — MOTIO2EDIT" },
-      { name: "description", content: "Frequently asked questions about MOTIO2EDIT: account, credits, billing, AI video editing, privacy, security, and subscription plans." },
+      {
+        name: "description",
+        content:
+          "Frequently asked questions about MOTIO2EDIT: account, credits, billing, AI image and video editing, privacy, security, and subscription plans.",
+      },
       { property: "og:title", content: "FAQ — MOTIO2EDIT" },
       { property: "og:description", content: "Answers about account, credits, billing, AI editing, privacy, and plans." },
     ],
@@ -29,80 +34,146 @@ type Category = { title: string; items: QA[] };
 
 const CATEGORIES: Category[] = [
   {
-    title: "Account & Login",
+    title: "Getting Started",
     items: [
-      { q: "How do I create an account?", a: "Click Sign in, then choose to register with your email and password (or continue with Google). Your account and starter credits are created instantly." },
-      { q: "How do I reset my password?", a: "On the sign-in page, use the reset-password link. We'll email you a secure link to set a new password. You can also change it anytime in Settings → Security." },
-      { q: "How do I change my email?", a: "Email changes are managed from your account. Contact us through the Support page if you need help transferring your account to a new email." },
+      {
+        q: "How do I edit an image?",
+        a: "Open the Image Editor (or Image Studio → Open Image Editor). Upload a photo, describe the change you want, and generate. You can also explore tools on the Image Tools page, then open the editor with a preset.",
+      },
+      {
+        q: "How does Auto Edit work?",
+        a: "Auto Edit is designed so you can describe the change in plain language (for example, remove a person or change a shirt). The editor focuses on the requested change and aims to preserve parts of the image you did not ask to modify. Results depend on prompt clarity and source quality.",
+      },
+      {
+        q: "How do I generate an image from text?",
+        a: "In the Image Editor or Image Tools, choose Text to Image (or leave the canvas without an upload), describe the scene, and generate. Text-to-image still uses your credit balance.",
+      },
+      {
+        q: "How do I create an account?",
+        a: "Click Sign in, then register with email and password or continue with Google. Your account and starter credits are created when signup completes.",
+      },
     ],
   },
   {
-    title: "Credits & Billing",
+    title: "Image Editing",
     items: [
-      { q: "How do credits work?", a: "Every generation spends credits. Image generation costs 25 credits and video generation costs 125 credits. Your balance is shown in the header and on your dashboard." },
-      { q: "Do credits expire?", a: "Monthly plan credits refresh with each billing cycle. Starter credits on the Free plan do not expire until used." },
-      { q: "Can I buy additional credits?", a: "Yes — upgrade to a higher plan for a larger monthly allowance. Additional one-off credit top-ups can be requested through Support." },
-      { q: "What payment methods are supported?", a: "Credit / Debit Card (processed securely via Razorpay) and Crypto (USDT, BTC, ETH). Card payments are charged in INR." },
+      {
+        q: "What can I remove?",
+        a: "You can remove people, objects, logos, and clutter using text prompts or Circle to Remove when available in the editor. Complex scenes may need a clearer prompt or a second pass.",
+      },
+      {
+        q: "How does Circle to Remove work?",
+        a: "In the Image Editor, mark the region to remove, then generate. The system aims to reconstruct the surrounding area so the object is gone. Open Image Tools → Circle to Remove for a guided path into the editor.",
+      },
+      {
+        q: "Can I change clothing?",
+        a: "Yes — describe the outfit change in the prompt (or use the Clothing Change tool entry). Identity and background preservation depend on the photo and instruction.",
+      },
+      {
+        q: "Can I restore old photos?",
+        a: "Yes — use Old Photo Restoration from Image Studio or Image Tools, or describe restoration in the editor prompt (scratches, fade, noise).",
+      },
+      {
+        q: "What image formats can I upload?",
+        a: "JPG, PNG, and WEBP are supported. Higher-resolution sources generally produce better results.",
+      },
+      {
+        q: `How many credits does image editing use?`,
+        a: `Image generation and editing costs ${CREDIT_COST.image} credits per result. Your balance updates after each successful generation.`,
+      },
     ],
   },
   {
-    title: "AI Video Editing",
+    title: "Video",
     items: [
-      { q: "What file formats are supported?", a: "Common image formats (JPG, PNG, WEBP) and standard video formats are supported for upload and generation." },
-      { q: "How long does rendering take?", a: "Most images render in seconds. Videos take longer depending on length and quality. Paid plans use a priority queue for faster processing." },
-      { q: "What is the maximum upload size?", a: "Uploads are limited to keep processing fast and reliable. If you hit a limit, try compressing your file or upgrading your plan." },
-      { q: "Can I edit videos multiple times?", a: "Yes — you can re-edit and regenerate as many times as you like, as long as you have credits available." },
+      {
+        q: "How does video generation work?",
+        a: "On a paid plan with video access (Lite and above), open Video Studio or the editor in video mode. Use text-to-video or image-to-video presets, then generate. Processing takes longer than images.",
+      },
+      {
+        q: "What video modes are available?",
+        a: "Text-to-video and image-to-video, plus cinematic motion presets such as push-in, orbit, slow-motion, and product spin — depending on what is enabled in Video Studio.",
+      },
+      {
+        q: "Does generated video include audio?",
+        a: "Current video generation may produce silent video depending on the provider model. Do not assume an audio track is included. Music can be created separately in Music Studio where your plan allows.",
+      },
+      {
+        q: `How many credits does video use?`,
+        a: `Video generation costs ${CREDIT_COST.video} credits per result on plans that include video.`,
+      },
     ],
   },
   {
-    title: "AI Image Editing",
+    title: "Credits & Plans",
     items: [
-      { q: "How do I edit an image with AI?", a: "Upload an image in the editor, describe the change you want in the prompt, and generate. You can refine the result with follow-up prompts." },
-      { q: "What image formats can I upload?", a: "JPG, PNG, and WEBP are supported. For best results, use high-resolution source images." },
-      { q: "Can I remove or replace backgrounds?", a: "Yes — describe the change in your prompt (e.g. 'remove background' or 'replace with a studio backdrop') and generate." },
-      { q: "How many credits does image editing use?", a: "Image generation costs 12 credits per result. Your balance updates instantly after each generation." },
+      {
+        q: "How do credits work?",
+        a: `Every generation spends credits. Image costs ${CREDIT_COST.image} credits, video ${CREDIT_COST.video}, and music ${CREDIT_COST.music} (music lite ${CREDIT_COST.music_lite} where applicable). Your balance is shown on the home page, dashboard, and header areas.`,
+      },
+      {
+        q: "What does each plan include?",
+        a: "Free includes image editing with a signup credit bonus and watermarks; video and music require upgrade. Lite and above add video and music with increasing monthly credits and quality options. See Pricing for the live feature list — the Pricing page is the source of truth.",
+      },
+      {
+        q: "What happens when credits run out?",
+        a: "Generation is blocked until you have enough credits again. You can upgrade your plan or purchase a credit top-up where available.",
+      },
+      {
+        q: "Do credits expire?",
+        a: "Monthly plan credits refresh with each billing cycle. Free signup credits remain until used. One-time top-ups follow the product rules described on Pricing.",
+      },
     ],
   },
   {
-    title: "Payments",
+    title: "Account",
     items: [
-      { q: "What payment methods are accepted?", a: "Credit / Debit Card (processed securely via Razorpay) and Crypto (USDT, BTC, ETH). Card payments are charged in INR." },
-      { q: "Is my payment information secure?", a: "Yes. Payments are handled by PCI-DSS compliant processors. We never see or store your full card details." },
-      { q: "When am I charged?", a: "Paid plans are billed at the start of each billing cycle. You can view your plan and billing details in Settings." },
-      { q: "Will my subscription renew automatically?", a: "Yes — plans renew automatically until you cancel. You keep access until the end of the current period after cancelling." },
+      {
+        q: "How do I change my language?",
+        a: "Open Settings → Language and choose a supported locale. The preference is saved in your browser and applied to the translated parts of the app.",
+      },
+      {
+        q: "How do I manage my account?",
+        a: "Use Profile (dashboard) for plan and credits at a glance, and Settings for display name, password, theme, language, and notifications.",
+      },
+      {
+        q: "How do I contact support?",
+        a: "Open Support or Tickets from Profile/Support. You can also email support@motio2edit.com. Include your account email and a short description of the issue.",
+      },
+      {
+        q: "How do I reset my password?",
+        a: "On the sign-in page, use the reset-password link, or change password in Settings → Security when signed in.",
+      },
     ],
   },
   {
-    title: "Security & Privacy",
+    title: "Payments & Security",
     items: [
-      { q: "Is my content private?", a: "Yes. Your content stays private to your account and is never shared publicly without your action." },
-      { q: "Are files encrypted?", a: "Yes — data is encrypted in transit and at rest using industry-standard encryption." },
-      { q: "Is my data shared with third parties?", a: "We do not sell your data. Files are only processed by trusted infrastructure required to deliver generations." },
-      { q: "How secure is Motio2Edit?", a: "We use encryption, secure payments, restricted access, and continuous monitoring. See the Security page for full details." },
+      {
+        q: "What payment methods are supported?",
+        a: "Card (via configured processors such as Razorpay/PayPal depending on currency) and crypto where enabled. We do not store full card numbers.",
+      },
+      {
+        q: "Is my content private?",
+        a: "Your generations stay tied to your account. We do not sell your content. Files are processed as needed to deliver AI results through trusted providers.",
+      },
+      {
+        q: "Is payment information secure?",
+        a: "Payments are handled by payment processors. Full card details are not stored on Motio2edit servers.",
+      },
     ],
   },
   {
     title: "Refunds",
     items: [
-      { q: "What is your refund policy?", a: "Refunds are reviewed case by case. If you experienced a billing error or a technical issue, contact us and we'll make it right." },
-      { q: "How do I request a refund?", a: "Open a ticket from the Tickets page with the Billing category, or email support@motio2edit.com with your account details." },
-      { q: "Are used credits refundable?", a: "Credits already spent on completed generations are generally non-refundable, but reach out if something went wrong." },
-    ],
-  },
-  {
-    title: "API & Integrations",
-    items: [
-      { q: "Does Motio2Edit offer an API?", a: "API access is on our roadmap. Contact Support to register your interest and be notified when it launches." },
-      { q: "Can I integrate Motio2Edit with other tools?", a: "Integrations are planned. For now, you can download your generated assets and use them anywhere." },
-      { q: "Is there a commercial usage license?", a: "Higher-tier plans include broader usage rights. See the pricing page or contact Support for licensing questions." },
-    ],
-  },
-  {
-    title: "Subscription Plans",
-    items: [
-      { q: "What happens if I cancel?", a: "You keep access until the end of your current billing period, after which your account returns to the Free plan." },
-      { q: "Can I upgrade my plan?", a: "Yes — upgrade anytime from the Pricing page. Your new credit allowance applies immediately." },
-      { q: "Can I downgrade my plan?", a: "Yes — you can downgrade, and the change takes effect at the start of your next billing cycle." },
+      {
+        q: "What is your refund policy?",
+        a: "Refunds are reviewed case by case for billing errors or technical issues. Contact Support with your account details.",
+      },
+      {
+        q: "Are used credits refundable?",
+        a: "Credits already spent on completed generations are generally non-refundable, but contact Support if something went wrong.",
+      },
     ],
   },
 ];
@@ -116,8 +187,7 @@ function FAQ() {
     return CATEGORIES.map((cat) => ({
       ...cat,
       items: cat.items.filter(
-        (item) =>
-          item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q),
+        (item) => item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q),
       ),
     })).filter((cat) => cat.items.length > 0);
   }, [query]);
@@ -125,7 +195,7 @@ function FAQ() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-3xl px-4 py-16">
+      <div className="mx-auto max-w-3xl px-4 py-12 pb-24 sm:py-16 md:pb-16">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Frequently asked questions</h1>
         <p className="mt-3 text-muted-foreground">Everything you need to know about MOTIO2EDIT.</p>
 

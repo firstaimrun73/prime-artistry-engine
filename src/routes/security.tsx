@@ -8,6 +8,7 @@ import {
   EyeOff,
   Cpu,
   Activity,
+  ArrowRight,
 } from "lucide-react";
 
 export const Route = createFileRoute("/security")({
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/security")({
       {
         name: "description",
         content:
-          "How MOTIO2EDIT protects your data: encryption, account protection, secure payments, privacy, AI processing security, and continuous monitoring.",
+          "How MOTIO2EDIT protects your data: encryption, account protection, secure payments, privacy, AI processing, and monitoring.",
       },
       { property: "og:title", content: "Security — MOTIO2EDIT" },
       {
@@ -31,34 +32,40 @@ export const Route = createFileRoute("/security")({
 
 const SECTIONS = [
   {
+    slug: "encryption",
     icon: Lock,
     title: "Data Encryption",
-    body: "Your data is protected in transit and at rest with industry-standard encryption (TLS in transit, AES at rest). Sensitive information is never stored in plain text.",
+    body: "Data is protected in transit with industry-standard TLS. Sensitive values are not stored in plain text on application servers.",
   },
   {
+    slug: "account",
     icon: ShieldCheck,
     title: "Account Protection",
-    body: "We enforce strong password requirements and secure session handling. We recommend using a unique, long password and keeping your login credentials private.",
+    body: "Authenticated sessions and strong password practices protect access. Each user can only access their own profile and generations.",
   },
   {
+    slug: "payments",
     icon: CreditCard,
     title: "Secure Payments",
-    body: "All payments are processed through trusted, PCI-DSS compliant providers. We never see or store your full card details — checkout is handled by the payment processor.",
+    body: "Payments are processed by third-party providers. Motio2edit does not store full card numbers.",
   },
   {
+    slug: "privacy",
     icon: EyeOff,
     title: "Privacy Protection",
-    body: "Your content stays private to your account. We do not sell your data, and access is restricted so no unauthorized party can view your projects.",
+    body: "Your content stays tied to your account. We do not sell your personal content for advertising.",
   },
   {
+    slug: "ai-processing",
     icon: Cpu,
     title: "AI Processing Security",
-    body: "Uploaded files are handled securely and processed temporarily for generation. Inputs are not used to train public models without consent.",
+    body: "Uploads are sent to AI providers only as needed to produce results. Processing is temporary for generation workflows.",
   },
   {
+    slug: "monitoring",
     icon: Activity,
     title: "Platform Monitoring",
-    body: "Our systems are continuously monitored for suspicious activity. Automated abuse-prevention and rate limiting protect the platform and your account.",
+    body: "Systems are monitored for abuse and unusual activity. Rate limiting helps protect the platform and accounts.",
   },
 ];
 
@@ -73,9 +80,11 @@ function Security() {
         </div>
 
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-          {SECTIONS.map(({ icon: Icon, title, body }) => (
-            <div
-              key={title}
+          {SECTIONS.map(({ slug, icon: Icon, title, body }) => (
+            <Link
+              key={slug}
+              to="/security/$slug"
+              params={{ slug }}
               className="flex h-full min-h-[11rem] flex-col rounded-2xl border border-border bg-card p-5 sm:p-6 transition-colors hover:border-primary"
             >
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
@@ -83,7 +92,10 @@ function Security() {
               </div>
               <h2 className="mt-4 font-semibold">{title}</h2>
               <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{body}</p>
-            </div>
+              <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+                Read more <ArrowRight className="h-4 w-4" />
+              </span>
+            </Link>
           ))}
         </div>
 
