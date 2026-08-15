@@ -3,7 +3,7 @@ import { FooterAd } from "@/components/ads";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, Video, Music, Download, Zap, Wand2, ShieldCheck, Lock, ArrowRight, Check } from "lucide-react";
+import { Image as ImageIcon, Video, Music, Download, Zap, Wand2, Lock, ArrowRight, Check } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +23,7 @@ import { TrustSection } from "@/components/home/TrustSection";
 import { WhyChoose } from "@/components/home/WhyChoose";
 import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
 import { FinalCTA } from "@/components/home/FinalCTA";
+import { SignedInStudioCards } from "@/components/SignedInStudioCards";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -51,13 +52,10 @@ function Index() {
 }
 
 function SignedOutHome() {
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
-
       <HomeHero />
-
       <BeforeAfterShowcase />
       <SampleShowcase />
       <SampleGallery />
@@ -65,12 +63,9 @@ function SignedOutHome() {
       <VideoSamples />
       <StudioLoopingShowcase />
       <StudioShowcase />
-
       <TrustSection />
       <WhyChoose />
-
       <MusicHomeSection />
-
       <TestimonialsCarousel />
       <HomeTestimonials />
       <FinalCTA />
@@ -79,7 +74,6 @@ function SignedOutHome() {
     </div>
   );
 }
-
 
 function HomeTestimonials() {
   const fetchFeedback = useServerFn(listPublicFeedback);
@@ -176,7 +170,6 @@ const STUDIO_CARDS: StudioCardSpec[] = [
   },
 ];
 
-
 function StudioShowcase() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -252,7 +245,7 @@ type LoopSlide = {
   label: string;
   tagline: string;
   icon: typeof ImageIcon;
-  bg: string; // inline background CSS
+  bg: string;
 };
 
 const LOOP_SLIDES: LoopSlide[] = [
@@ -367,7 +360,6 @@ function StudioLoopingShowcase() {
   );
 }
 
-
 type RecentGen = {
   id: string;
   type: string;
@@ -393,12 +385,6 @@ function SignedInHome() {
       });
   }, [user]);
 
-  const studios: { name: string; to: "/studio/image" | "/studio/video" | "/studio/music"; icon: typeof ImageIcon; gradient: string }[] = [
-    { name: "Image Studio", to: "/studio/image", icon: ImageIcon, gradient: "gradient-image" },
-    { name: "Video Studio", to: "/studio/video", icon: Video, gradient: "gradient-video" },
-    { name: "Music Studio", to: "/studio/music", icon: Music, gradient: "gradient-music" },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -422,34 +408,17 @@ function SignedInHome() {
           </Link>
         </div>
 
-        <section className="mt-8 grid gap-4 md:grid-cols-3">
-          {studios.map((s) => {
-            const Icon = s.icon;
-            return (
-              <Link
-                key={s.name}
-                to={s.to}
-                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg"
-              >
-                <div className={`pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full ${s.gradient} opacity-25 blur-2xl`} />
-                <div className={`relative inline-flex rounded-xl ${s.gradient} p-2.5 text-white shadow-md`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="relative mt-4 text-lg font-bold">{s.name}</div>
-                <div className="relative mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-                  Open <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                </div>
-              </Link>
-            );
-          })}
-        </section>
+        {/* Free: Video + Music visible but locked; Lite+: all open */}
+        <SignedInStudioCards />
 
         <section className="mt-10">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               <HistoryIcon className="h-4 w-4" /> Recent history
             </h2>
-            <Link to="/history" className="text-xs font-medium text-primary hover:underline">View all →</Link>
+            <Link to="/history" className="text-xs font-medium text-primary hover:underline">
+              View all →
+            </Link>
           </div>
           {recent.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">
@@ -467,7 +436,11 @@ function SignedInHome() {
                     g.type === "video" ? (
                       <video src={g.output_url} className="h-full w-full object-cover" muted />
                     ) : (
-                      <img src={g.output_url} alt={g.prompt ?? ""} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                      <img
+                        src={g.output_url}
+                        alt={g.prompt ?? ""}
+                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                      />
                     )
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-muted">
