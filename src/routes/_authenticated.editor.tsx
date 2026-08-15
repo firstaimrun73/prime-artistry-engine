@@ -902,4 +902,304 @@ function Editor() {
                 </div>
               </div>
             )}
+          </section>            {mediaType === "video" && (
+              <div className="space-y-3 rounded-lg border border-border bg-card p-3">
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration</span>
+                    <span
+                      title={MODEL_TIER_DESCRIPTION[modelTierForDuration(videoDuration)]}
+                      className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
+                    >
+                      {MODEL_TIER_LABEL[modelTierForDuration(videoDuration)]}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {VIDEO_DURATIONS.map((d) => {
+                      const allowed = isDurationAllowed(profile.plan, d, isAdmin);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          disabled={loading}
+                          title={allowed ? `${videoCreditCost(d)} credits` : `Upgrade to ${planRequiredForDuration(d)} to unlock ${d}s videos`}
+                          onClick={() => {
+                            if (!allowed) {
+                              toast.error(`Upgrade to ${planRequiredForDuration(d)} to unlock ${d}s videos`);
+                              return;
+                            }
+                            setVideoDuration(d);
+                          }}
+                          className={`min-h-[36px] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            videoDuration === d
+                              ? "bg-primary text-primary-foreground"
+                              : allowed
+                                ? "bg-secondary text-foreground hover:bg-secondary/70"
+                                : "bg-secondary/50 text-muted-foreground"
+                          }`}
+                        >
+                          {allowed ? "" : "🔒"}{d}s
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {videoDuration >= 15 && (
+                    <p className="mt-1.5 text-[11px] font-medium text-primary">
+                      {videoDuration}s videos take ~3–5 minutes. Please don't close this page.
+                    </p>
+                  )}
+                  {!isAdmin && !isDurationAllowed(profile.plan, 30) && (
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">
+                      Longer clips need a higher plan.{" "}
+                      <Link to="/pricing" className="font-medium text-primary hover:underline">View plans</Link>
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aspect ratio</span>
+                  <div className="flex flex-wrap gap-2">
+                    {VIDEO_ASPECT_RATIOS.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => setVideoAspect(r.id)}
+                        className={`min-h-[36px] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          videoAspect === r.id
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-foreground hover:bg-secondary/70"
+                        }`}
+                      >
+                        {r.icon} {r.id} {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Output resolution
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {VIDEO_RESOLUTION_OPTIONS.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        title={r.hint}
+                        disabled={loading}
+                        onClick={() => setVideoResolution(r.id)}
+                        className={`min-h-[36px] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          videoResolution === r.id
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-foreground hover:bg-secondary/70"
+                        }`}
+                      >
+                        {r.label} · {Math.round(videoCreditCost(videoDuration) * r.multiplier)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    {VIDEO_RESOLUTION_OPTIONS.find((r) => r.id === videoResolution)?.hint}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border bg-background/60 p-3 text-xs">
+                  <div className="mb-1 flex items-center gap-1.5 font-semibold">
+                    <Coins className="h-3.5 w-3.5 text-primary" /> Estimated cost: {cost} credits
+                  </div>
+                  <div className="text-muted-foreground">
+                    Your balance: {isAdmin ? "∞" : profile.credits} credits
+                  </div>
+                  <div className="text-muted-foreground">
+                    After generation: {isAdmin ? "∞" : Math.max(0, profile.credits - cost)} credits remaining
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Watermark control — free users are locked on; paid users choose. */}
+            <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-sm">
+              <span className="text-muted-foreground">Motio2edit watermark</span>
+              {isFree ? (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Lock className="h-3 w-3" /> On (Free)
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setKeepWatermark((v) => {
+                      const next = !v;
+                      try { localStorage.setItem(WATERMARK_PREF_KEY, next ? "on" : "off"); } catch { /* ignore */ }
+                      return next;
+                    })
+                  }
+                  disabled={loading}
+                  className={`min-h-[32px] rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                    keepWatermark ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  {keepWatermark ? "Watermark ON" : "No Watermark"}
+                </button>
+              )}
+            </div>
           </section>
+
+          {/* 5. GENERATE */}
+          <section className="space-y-2 pt-1">
+            {loading ? (
+              <Button variant="destructive" className="min-h-[48px] w-full text-base" onClick={handleStop}>
+                <Square className="mr-1.5 h-4 w-4 fill-current" /> Stop Generation
+              </Button>
+            ) : (
+              <Button className="min-h-[48px] w-full text-base hover-scale" onClick={runGenerate} disabled={videoLocked || noCredits}>
+                <Sparkles className="mr-1.5 h-4 w-4" /> Generate
+              </Button>
+            )}
+
+            {noCredits && (
+              <p className="text-center text-xs text-destructive-foreground">
+                Out of credits — <Link to="/pricing" className="underline">get more</Link>.
+              </p>
+            )}
+          </section>
+        </div>
+
+        {/* RIGHT — preview / result (on mobile stacks below controls) */}
+        <div className="order-2 space-y-4 lg:sticky lg:top-4 lg:self-start">
+          {state === "analyzing" ? (
+            <div className="flex h-full min-h-56 flex-col items-center justify-center rounded-xl border border-border bg-card p-6 text-center animate-scale-in">
+              <Wand2 className="h-8 w-8 animate-pulse text-primary" />
+              <p className="mt-3 text-sm font-semibold text-primary">Analyzing your request…</p>
+              <p className="mt-1 text-xs text-muted-foreground">Understanding exactly what you mean</p>
+            </div>
+          ) : state === "loading" ? (
+            <div className="rounded-xl border border-border bg-card p-5 animate-scale-in">
+              <p className="text-sm font-semibold text-primary">{LOADING_MESSAGES[msgIdx]}</p>
+              <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <ul className="mt-4 space-y-2">
+                {stages.map((s, i) => (
+                  <li key={s} className="flex items-center gap-2 text-sm">
+                    <span
+                      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] transition-all ${
+                        i < stage ? "bg-primary text-primary-foreground"
+                        : i === stage ? "bg-primary/20 text-primary animate-pulse"
+                        : "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {i < stage ? <Check className="h-3 w-3" /> : i + 1}
+                    </span>
+                    <span className={i <= stage ? "text-foreground" : "text-muted-foreground"}>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : output && !outputIsVideo && mediaType === "image" && inputPreview ? (
+            <div className="animate-scale-in">
+              <CompareSlider before={inputPreview} after={output} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Before</p>
+                <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
+                  {inputPreview ? (
+                    inputKind === "video" ? (
+                      <video src={inputPreview} className="h-full w-full object-cover" controls />
+                    ) : (
+                      <img src={inputPreview} alt="input" className="h-full w-full object-contain" />
+                    )
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No upload</span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">After</p>
+                <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
+                  {output ? (
+                    outputIsVideo ? (
+                      <div className="relative h-full w-full">
+                        <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
+                        {!isAdmin && (isFree || keepWatermark) && (
+                          <span className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/55 px-2 py-1 text-[11px] font-bold tracking-wide text-white/95">
+                            Motio2edit
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <img
+                        src={output}
+                        alt="output"
+                        className="h-full w-full object-contain animate-scale-in select-none"
+                        draggable={false}
+                        onContextMenu={(e) => e.preventDefault()}
+                        style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+                      />
+                    )
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Output appears here</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}          {output && !loading && (
+            <div className="space-y-2 animate-fade-in">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Button variant="default" className="min-h-[44px]" onClick={handleDownload}>
+                  <Download className="mr-1.5 h-4 w-4" /> Download
+                </Button>
+                <Button variant="outline" className="min-h-[44px]" onClick={runGenerate}>
+                  <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerate
+                </Button>
+                <Button variant="outline" className="min-h-[44px]" onClick={handleUseResultAsInput}>
+                  <Recycle className="mr-1.5 h-4 w-4" /> Edit Again
+                </Button>
+                <Button variant="outline" className="min-h-[44px]" onClick={handleShare}>
+                  <Share2 className="mr-1.5 h-4 w-4" /> Share
+                </Button>
+              </div>
+              <Button variant="ghost" className="min-h-[44px] w-full" onClick={handleClear}>
+                <RotateCcw className="mr-1.5 h-4 w-4" /> New Edit
+              </Button>
+              {isFree && (
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Free images include a small watermark. <Link to="/pricing" className="underline">Upgrade</Link> to remove it.
+                </p>
+              )}
+            </div>
+          )}
+
+          {downloaded && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3 text-sm animate-fade-in">
+              <span className="text-muted-foreground">Saved! What next?</span>
+              <Button size="sm" variant="secondary" onClick={handleClear}>
+                <RotateCcw className="mr-1.5 h-4 w-4" /> New Edit
+              </Button>
+            </div>
+          )}
+        </div>
+        <EditorDisclaimer />
+      </div>
+
+      {/* Smart Remove ("Circle to Remove") — single entry via EditorToolCategories → __CIRCLE_REMOVE__ */}
+      <SmartRemoveModal
+        open={smartRemoveOpen}
+        imageUrl={inputPreview}
+        onCancel={() => setSmartRemoveOpen(false)}
+        onApply={(masked) => {
+          setRemoveMaskDataUrl(masked);
+          setPrompt(SMART_REMOVE_PROMPT);
+          setSmartRemoveOpen(false);
+          toast.success("Selection saved — click Generate to remove.");
+        }}
+      />
+    </div>
+  );
+}
