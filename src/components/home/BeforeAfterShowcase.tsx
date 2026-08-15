@@ -3,6 +3,15 @@ import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { MoveHorizontal, Sparkles } from "lucide-react";
 
+import sampleObjectBefore from "@/assets/sample-object-before.jpg";
+import sampleObjectAfter from "@/assets/sample-object-after.jpg";
+import sampleRemovalBefore from "@/assets/sample-removal-before.jpg";
+import sampleRemovalAfter from "@/assets/sample-removal-after.jpg";
+import sampleRestoreBefore from "@/assets/sample-restore-before.jpg";
+import sampleRestoreAfter from "@/assets/sample-restore-after.jpg";
+import sampleUpscaleBefore from "@/assets/sample-upscale-before.jpg";
+import sampleUpscaleAfter from "@/assets/sample-upscale-after.jpg";
+
 type Sample = {
   label: string;
   title: string;
@@ -11,50 +20,38 @@ type Sample = {
   prompt: string;
 };
 
-/** Same-subject pairs only — labels must match what the images show. */
+/**
+ * Only pairs that use real distinct before/after assets under src/assets/.
+ * Do not use CSS filters to fake an AI transformation.
+ */
 const SAMPLES: Sample[] = [
   {
-    label: "Batman Bike Transformation",
-    title: "Turn any bike into a Batman-style machine",
-    before: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=700&h=700&fit=crop&q=85",
-    after: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=700&h=700&fit=crop&q=85&sat=-100&con=40&exp=-15",
-    prompt: "Make this bike look like the Batman bike, dark matte black armored styling, keep the exact same angle and proportions",
-  },
-  {
     label: "Object Removal",
-    title: "Clean up the scene",
-    before: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=700&h=700&fit=crop&q=70",
-    after: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=700&h=700&fit=crop&q=90",
-    prompt: "Remove all people from the scene and rebuild the background naturally",
+    title: "Remove unwanted objects from the scene",
+    before: sampleObjectBefore,
+    after: sampleObjectAfter,
+    prompt: "Remove the unwanted object completely and rebuild the background naturally",
   },
   {
-    label: "Background Removal",
-    title: "Clean cut-outs with crisp edges",
-    before: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=700&h=700&fit=crop&crop=faces&q=85",
-    after: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=700&h=700&fit=crop&crop=faces&q=85&sat=-100",
-    prompt: "Remove the background completely and keep clean edges",
-  },
-  {
-    label: "Face Enhancement",
-    title: "Studio-grade portrait retouching",
-    // Same person both sides (was two different faces)
-    before: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=700&h=700&fit=crop&crop=faces&q=40",
-    after: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=700&h=700&fit=crop&crop=faces&q=100",
-    prompt: "Enhance the face, skin and lighting while keeping the identity identical",
+    label: "Circle to Remove",
+    title: "Mark a person or object and erase it",
+    before: sampleRemovalBefore,
+    after: sampleRemovalAfter,
+    prompt: "Remove the circled person and rebuild the background naturally",
   },
   {
     label: "Photo Restoration",
-    title: "Repair and colorise old memories",
-    before: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&h=700&fit=crop&crop=faces&q=85&sat=-80&con=-30",
-    after: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&h=700&fit=crop&crop=faces&q=85",
-    prompt: "Restore this old damaged photo and colorise it naturally",
+    title: "Repair and restore damaged photos",
+    before: sampleRestoreBefore,
+    after: sampleRestoreAfter,
+    prompt: "Restore this old damaged photo and improve clarity while keeping content intact",
   },
   {
-    label: "AI Style Transfer",
-    title: "Reimagine any shot as fine art",
-    before: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=700&h=700&fit=crop&q=85",
-    after: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=700&h=700&fit=crop&q=85&sat=30&con=25",
-    prompt: "Repaint this photo as a detailed oil painting while keeping the composition identical",
+    label: "AI Upscaling",
+    title: "Low-resolution to sharp detail",
+    before: sampleUpscaleBefore,
+    after: sampleUpscaleAfter,
+    prompt: "Upscale this image with sharper detail while preserving identity and composition",
   },
 ];
 
@@ -144,11 +141,11 @@ export function BeforeAfterShowcase() {
         </span>
         <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">Drag to see the difference</h2>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Real transformation styles you can run on your own photos in one click.
+          Real transformation pairs — drag the slider, then try the same edit on your own photo.
         </p>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
         {SAMPLES.map((s, i) => (
           <article
             key={s.label}

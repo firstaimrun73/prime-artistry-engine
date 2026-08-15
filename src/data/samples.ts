@@ -1,12 +1,16 @@
 /**
  * Modular sample catalog for Motio2edit homepage & galleries.
- * Designed to scale toward 1000+ entries without bloating page components.
- *
- * IMPORTANT: Marketing before/after pairs must show a visible difference
- * matching the title. Prefer real paired assets under src/assets/ when available.
- * Unsplash quality-param pairs are placeholders and should be replaced with
- * true transformation assets when production demos are ready.
+ * Prefer real paired assets under src/assets/ for before/after honesty.
  */
+
+import sampleObjectBefore from "@/assets/sample-object-before.jpg";
+import sampleObjectAfter from "@/assets/sample-object-after.jpg";
+import sampleRemovalBefore from "@/assets/sample-removal-before.jpg";
+import sampleRemovalAfter from "@/assets/sample-removal-after.jpg";
+import sampleRestoreBefore from "@/assets/sample-restore-before.jpg";
+import sampleRestoreAfter from "@/assets/sample-restore-after.jpg";
+import sampleUpscaleBefore from "@/assets/sample-upscale-before.jpg";
+import sampleUpscaleAfter from "@/assets/sample-upscale-after.jpg";
 
 export type SampleCategory =
   | "background-removal"
@@ -53,100 +57,51 @@ const VIDEO_POSTERS = {
     "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=960&h=540&fit=crop&crop=faces&q=80",
 } as const;
 
-/**
- * Image samples.
- * Upscale uses clearly different resolution/quality params on the same subject
- * so the before/after difference is visible. Other pairs still need true
- * transformation assets for production marketing honesty.
- */
+/** Image samples with real local before/after pairs only. */
 export const IMAGE_SAMPLES: SampleItem[] = [
-  {
-    id: "img-bg-removal",
-    title: "Background Removal",
-    description: "Subject kept · background removed",
-    category: "background-removal",
-    editor: "image",
-    before:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&h=600&fit=crop&crop=faces&q=85",
-    after:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&h=600&fit=crop&crop=faces&q=85&sat=-100&bri=8",
-    prompt: "Remove the background completely and keep clean edges",
-    creditCost: 25,
-  },
-  {
-    id: "img-photo-restore",
-    title: "Photo Restoration",
-    description: "Damaged / faded → restored clarity",
-    category: "photo-restoration",
-    editor: "image",
-    before:
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=600&fit=crop&crop=faces&q=80&sat=-90&con=-35",
-    after:
-      "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=600&fit=crop&crop=faces&q=90",
-    prompt: "Restore this old damaged photo and colorise it naturally",
-    creditCost: 25,
-  },
   {
     id: "img-object-removal",
     title: "Object Removal",
     description: "Erase distractions and rebuild the scene",
     category: "object-removal",
     editor: "image",
-    before: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&h=600&fit=crop&q=65",
-    after: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&h=600&fit=crop&q=90",
-    prompt: "Remove all people from the scene and rebuild the background naturally",
+    before: sampleObjectBefore,
+    after: sampleObjectAfter,
+    prompt: "Remove the unwanted object completely and rebuild the background naturally",
+    creditCost: 25,
+  },
+  {
+    id: "img-circle-remove",
+    title: "Circle to Remove",
+    description: "Circle a person or object to remove it",
+    category: "object-removal",
+    editor: "image",
+    before: sampleRemovalBefore,
+    after: sampleRemovalAfter,
+    prompt: "Remove the circled person and rebuild the background naturally",
+    smartRemove: true,
+    creditCost: 25,
+  },
+  {
+    id: "img-photo-restore",
+    title: "Photo Restoration",
+    description: "Repair damaged or faded photos",
+    category: "photo-restoration",
+    editor: "image",
+    before: sampleRestoreBefore,
+    after: sampleRestoreAfter,
+    prompt: "Restore this old damaged photo and improve clarity while keeping content intact",
     creditCost: 25,
   },
   {
     id: "img-upscale",
     title: "AI Upscaling",
-    description: "Low-res soft → sharper detail",
+    description: "Low-res to sharper detail",
     category: "ai-upscaling",
     editor: "image",
-    before:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=280&h=280&fit=crop&crop=faces&q=8",
-    after:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&h=600&fit=crop&crop=faces&q=95",
-    prompt: "Enhance to 4K quality with maximum detail",
-    creditCost: 25,
-  },
-  {
-    id: "img-style",
-    title: "Style Transfer",
-    description: "Photo → fine-art restyle",
-    category: "style-transfer",
-    editor: "image",
-    before: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=600&h=600&fit=crop&q=85",
-    after:
-      "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=600&h=600&fit=crop&q=85&sat=35&con=25",
-    prompt: "Repaint this photo as a detailed oil painting while keeping the composition identical",
-    creditCost: 25,
-  },
-  {
-    id: "img-portrait",
-    title: "Portrait Enhancement",
-    description: "Soft portrait → studio clarity",
-    category: "portrait",
-    editor: "image",
-    before:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=600&fit=crop&crop=faces&q=35",
-    after:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&h=600&fit=crop&crop=faces&q=95",
-    prompt: "Enhance face and lighting while keeping the identity identical",
-    creditCost: 25,
-  },
-  {
-    id: "img-circle-remove",
-    title: "Circle & Remove",
-    description: "Circle a person or object to remove it",
-    category: "object-removal",
-    editor: "image",
-    before:
-      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=600&h=600&fit=crop&crop=faces&q=75",
-    after:
-      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=600&h=600&fit=crop&crop=faces&q=95",
-    prompt: "Remove the circled person and rebuild the background naturally",
-    smartRemove: true,
+    before: sampleUpscaleBefore,
+    after: sampleUpscaleAfter,
+    prompt: "Upscale this image with sharper detail while preserving identity and composition",
     creditCost: 25,
   },
 ];
