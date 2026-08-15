@@ -11,11 +11,13 @@
 //     A failed / empty generation never charges the user.
 //   • Every successful generation is persisted to public.generations with
 //     type='music' so it appears in /history alongside images and videos.
+//   • Free plan cannot generate music (Lite+ only). Enforced here, not only in UI.
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { CREDIT_COST } from "@/lib/plans";
+import { canAccessMusic } from "@/lib/policy";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 // High quality chain: minimax first (richest, most musical output), then the
@@ -222,6 +224,12 @@ export const generateMusic = createServerFn({ method: "POST" })
       !!adminEmail &&
       !!profile.email &&
       profile.email.toLowerCase() === adminEmail;
+
+    // Plan gate: Free cannot generate music. Lite+ and admin allowed.
+    if (!canAccessMusic({ plan: profile.plan, email: profile.email, isAdmin })) {
+      throw new Error("Music generation requires Lite or a higher plan. Upgrade to unlock Music Studio.");
+    }
+
     if (!isAdmin && profile.credits < cost) {
       throw new Error(
         `Not enough credits. Music generation costs ${cost} credits. Buy credits or upgrade your plan.`,
