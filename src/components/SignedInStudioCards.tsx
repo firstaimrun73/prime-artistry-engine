@@ -6,8 +6,7 @@ import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { useI18n } from "@/lib/i18n";
 
 /**
- * Signed-in home: quick start + studios + capability discovery.
- * All labels go through useI18n so language changes are visible.
+ * Signed-in home: quick start + studios + capability discovery (grouped).
  */
 export function SignedInStudioCards() {
   const { profile } = useAuth();
@@ -43,7 +42,7 @@ export function SignedInStudioCards() {
       gradient: "gradient-video",
       locked: !videoOpen,
       lockLabel: t("home.requiresLite"),
-      bulletKeys: ["feat.video", "feat.textToImage"],
+      bulletKeys: ["feat.video", "video.preset.textToVideo"],
     },
     {
       nameKey: "studio.music",
@@ -57,24 +56,28 @@ export function SignedInStudioCards() {
   ];
 
   const quickActions: {
-    to: "/editor" | "/studio/video" | "/music" | "/history";
+    to: "/editor" | "/studio/image" | "/studio/video" | "/music" | "/history";
     labelKey: string;
     descKey: string;
     primary?: boolean;
   }[] = [
     { to: "/editor", labelKey: "studio.openEditor", descKey: "studio.presetsHint", primary: true },
+    { to: "/studio/image", labelKey: "studio.image", descKey: "feat.enhanceDesc" },
     { to: "/studio/video", labelKey: "home.createVideo", descKey: "feat.videoDesc" },
     { to: "/music", labelKey: "home.createMusic", descKey: "feat.musicDesc" },
     { to: "/history", labelKey: "home.viewHistory", descKey: "home.recentHistory" },
   ];
 
-  const capabilities: { to: "/editor" | "/studio/image" | "/studio/video" | "/music"; titleKey: string; descKey: string }[] = [
+  const popular: { to: "/editor" | "/studio/image"; titleKey: string; descKey: string }[] = [
     { to: "/editor", titleKey: "feat.circleRemove", descKey: "feat.circleRemoveDesc" },
     { to: "/studio/image", titleKey: "feat.removeObject", descKey: "feat.removeObjectDesc" },
     { to: "/studio/image", titleKey: "feat.removeBg", descKey: "feat.removeBgDesc" },
     { to: "/studio/image", titleKey: "feat.replaceBg", descKey: "feat.replaceBgDesc" },
     { to: "/studio/image", titleKey: "feat.enhance", descKey: "feat.enhanceDesc" },
     { to: "/studio/image", titleKey: "feat.upscale", descKey: "feat.upscaleDesc" },
+  ];
+
+  const more: { to: "/editor" | "/studio/image" | "/studio/video" | "/music"; titleKey: string; descKey: string }[] = [
     { to: "/studio/image", titleKey: "feat.faceRestore", descKey: "feat.faceRestoreDesc" },
     { to: "/studio/image", titleKey: "feat.oldPhoto", descKey: "feat.oldPhotoDesc" },
     { to: "/studio/image", titleKey: "feat.colorize", descKey: "feat.colorizeDesc" },
@@ -95,7 +98,7 @@ export function SignedInStudioCards() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {t("home.quickStart")}
         </h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {quickActions.map((a) => (
             <Link
               key={a.labelKey}
@@ -172,11 +175,10 @@ export function SignedInStudioCards() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("home.whatYouCanDo")}
+          {t("home.popularTools")}
         </h2>
-        <p className="mb-3 text-xs text-muted-foreground">{t("studio.presetsHint")}</p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {capabilities.map((c) => (
+          {popular.map((c) => (
             <Link
               key={c.titleKey}
               to={c.to}
@@ -184,6 +186,24 @@ export function SignedInStudioCards() {
             >
               <div className="text-sm font-semibold">{t(c.titleKey)}</div>
               <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{t(c.descKey)}</div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("home.moreTools")}
+        </h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {more.map((c) => (
+            <Link
+              key={c.titleKey}
+              to={c.to}
+              className="rounded-xl border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary/40"
+            >
+              <div className="text-sm font-semibold">{t(c.titleKey)}</div>
+              <div className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{t(c.descKey)}</div>
             </Link>
           ))}
         </div>
