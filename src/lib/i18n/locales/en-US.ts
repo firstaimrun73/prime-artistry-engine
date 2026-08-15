@@ -1,0 +1,43 @@
+import type { TranslationDict } from "../types";
+
+/** Motio2edit UI strings — brand name never translated. */
+const dict: TranslationDict = {
+  "nav.home": "Home",
+  "nav.image": "Image",
+  "nav.video": "Video",
+  "nav.music": "Music",
+  "nav.history": "History",
+  "nav.chat": "Chat",
+  "nav.profile": "Profile",
+  "nav.settings": "Settings",
+  "nav.studio": "Studio",
+  "nav.pricing": "Pricing",
+  "studio.image": "Image Studio",
+  "studio.video": "Video Studio",
+  "studio.music": "Music Studio",
+  "studio.open": "Open studio",
+  "editor.generate": "Generate",
+  "editor.upload": "Upload image",
+  "editor.autoEdit": "Auto Edit ✨",
+  "editor.autoEditDesc": "Let Motio2edit analyze your image and automatically improve it.",
+  "editor.circleRemove": "Circle to Remove",
+  "editor.download": "Download",
+  "settings.title": "Settings",
+  "settings.language": "Language",
+  "settings.preferredLanguage": "Preferred language",
+  "settings.saved": "Language preference saved.",
+  "free.introTitle": "You're using Motio2edit Free",
+  "free.introAds": "Ads are included with the Free plan.",
+  "free.viewPlans": "View plans",
+  "free.outTitle": "You're out of credits",
+  "plan.free": "Free",
+  "plan.lite": "Lite",
+  "plan.plus": "Plus",
+  "plan.pro": "Pro",
+  "plan.studio": "Studio",
+  "plan.masterStudio": "Master Studio",
+  "common.signIn": "Sign in",
+  "common.getStarted": "Get started",
+};
+
+export default dict;
