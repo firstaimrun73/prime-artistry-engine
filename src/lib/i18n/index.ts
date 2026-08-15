@@ -8,9 +8,16 @@ import {
 } from "./config";
 import type { TranslationDict } from "./types";
 import enUS from "./locales/en-US";
+import de from "./locales/de";
+import fr from "./locales/fr";
 
 const CATALOG: Partial<Record<Locale, TranslationDict>> = {
   "en-US": enUS,
+  "en-GB": enUS,
+  "en-CA": enUS,
+  de,
+  fr,
+  "fr-CA": fr,
 };
 
 let currentLocale: Locale = DEFAULT_LOCALE;
