@@ -107,7 +107,7 @@ function SettingsPage() {
     } catch {
       // ignore
     }
-    toast.success(t("settings.saved") || "Language preference saved.");
+    toast.success(t("settings.saved"));
   };
 
   const handleSignOut = async () => {
@@ -175,12 +175,12 @@ function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 pb-24 md:pb-12">
       <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-bold">{t("settings.title") || "Settings"}</h1>
+        <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
         <CrownBadge plan={profile.plan} showLabel size="md" />
       </div>
 
       <section className="mt-8 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Profile picture</h2>
+        <h2 className="font-semibold">{t("settings.profilePicture")}</h2>
         <div className="mt-4 flex items-center gap-4">
           <Avatar className="h-16 w-16">
             <AvatarImage src={profile.avatar_signed_url ?? undefined} alt={profile.display_name ?? "Avatar"} />
@@ -202,10 +202,10 @@ function SettingsPage() {
           ) : (
             <div className="flex flex-col gap-1">
               <Button size="sm" variant="outline" disabled className="gap-1.5">
-                <Lock className="h-3.5 w-3.5" /> Locked
+                <Lock className="h-3.5 w-3.5" /> {t("home.locked")}
               </Button>
               <a href="/pricing" className="text-xs text-primary hover:underline">
-                Upgrade to change photo
+                {t("common.upgrade")}
               </a>
             </div>
           )}
@@ -227,7 +227,7 @@ function SettingsPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Profile</h2>
+        <h2 className="font-semibold">{t("settings.profile")}</h2>
         <div className="mt-4 space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
@@ -238,13 +238,13 @@ function SettingsPage() {
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5" />
           </div>
           <Button onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("common.loading") : t("settings.save")}
           </Button>
         </div>
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Security</h2>
+        <h2 className="font-semibold">{t("settings.security")}</h2>
         <div className="mt-4 space-y-4">
           <div>
             <Label htmlFor="pw">New password</Label>
@@ -258,40 +258,38 @@ function SettingsPage() {
             />
           </div>
           <Button onClick={changePassword} disabled={pwSaving} variant="outline">
-            {pwSaving ? "Updating…" : "Change password"}
+            {pwSaving ? t("common.loading") : "Change password"}
           </Button>
         </div>
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Appearance</h2>
+        <h2 className="font-semibold">{t("settings.appearance")}</h2>
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Theme</span>
+          <span className="text-sm text-muted-foreground">{t("settings.theme")}</span>
           <div className="flex gap-2">
             <Button
               variant={theme === "light" ? "default" : "outline"}
               size="sm"
               onClick={() => setTheme("light")}
             >
-              <Sun className="mr-1.5 h-4 w-4" /> Light
+              <Sun className="mr-1.5 h-4 w-4" /> {t("settings.light")}
             </Button>
             <Button
               variant={theme === "dark" ? "default" : "outline"}
               size="sm"
               onClick={() => setTheme("dark")}
             >
-              <Moon className="mr-1.5 h-4 w-4" /> Dark
+              <Moon className="mr-1.5 h-4 w-4" /> {t("settings.dark")}
             </Button>
           </div>
         </div>
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">{t("settings.language") || "Language"}</h2>
+        <h2 className="font-semibold">{t("settings.language")}</h2>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm text-muted-foreground">
-            {t("settings.preferredLanguage") || "Preferred language"}
-          </span>
+          <span className="text-sm text-muted-foreground">{t("settings.preferredLanguage")}</span>
           <Select value={locale} onValueChange={changeLanguage}>
             <SelectTrigger className="w-full sm:w-56">
               <SelectValue />
@@ -305,14 +303,11 @@ function SettingsPage() {
             </SelectContent>
           </Select>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          UI language persists across sessions. Full string coverage is currently complete for English (US);
-          other locales fall back to English until their dictionaries are completed.
-        </p>
+        <p className="mt-3 text-xs text-muted-foreground">{t("settings.langHint")}</p>
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Notification preferences</h2>
+        <h2 className="font-semibold">{t("settings.notifications")}</h2>
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -339,14 +334,14 @@ function SettingsPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Subscription &amp; billing</h2>
+        <h2 className="font-semibold">{t("settings.subscription")}</h2>
         <div className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">Current plan</span>
+            <span className="text-muted-foreground">{t("settings.currentPlan")}</span>
             <span className="font-medium capitalize">{plan.name}</span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">Credits remaining</span>
+            <span className="text-muted-foreground">{t("settings.creditsRemaining")}</span>
             <span className="font-medium">{isAdminEmail(profile.email) ? "∞" : profile.credits}</span>
           </div>
           <div className="flex justify-between gap-2">
@@ -361,20 +356,20 @@ function SettingsPage() {
         <div className="mt-4 flex flex-wrap gap-3">
           {profile.plan !== "business" && (
             <Button asChild>
-              <Link to="/pricing">Upgrade plan</Link>
+              <Link to="/pricing">{t("common.upgrade")}</Link>
             </Button>
           )}
           <Button asChild variant="outline">
-            <Link to="/profile/subscription">Subscription & billing</Link>
+            <Link to="/profile/subscription">{t("settings.subscription")}</Link>
           </Button>
         </div>
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Account</h2>
+        <h2 className="font-semibold">{t("settings.account")}</h2>
         <div className="mt-4 flex flex-wrap gap-3">
           <Button variant="outline" onClick={handleSignOut}>
-            Log out
+            {t("settings.logout")}
           </Button>
         </div>
       </section>

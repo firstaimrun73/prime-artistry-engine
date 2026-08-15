@@ -3,6 +3,7 @@ import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
 import {
   ImageIcon, Eraser, Wand2, Scissors, Palette, ArrowUpRightSquare, Sparkles,
   Sun, Users, Building2, ShoppingBag, Camera, PencilRuler, Layers, Crop, ArrowRight,
@@ -217,6 +218,7 @@ const CATEGORIES: { label: string; presets: Preset[] }[] = [
 
 function ImageStudio() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   const openBlank = () => {
@@ -249,34 +251,30 @@ function ImageStudio() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <Link to="/studio" className="text-xs font-medium text-muted-foreground hover:text-foreground">
-              ← All studios
+              {t("studio.allStudios")}
             </Link>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight">
-              Image <span className="text-primary">Studio</span>
+              {t("studio.image").replace(" Studio", "")} <span className="text-primary">Studio</span>
             </h1>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Use a preset for a guided start, or open the full Image Editor with a blank canvas.
-            </p>
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">{t("studio.imageLead")}</p>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
             <Button size="lg" onClick={openBlank} className="w-full sm:w-auto">
-              Open Image Editor
+              {t("studio.openEditor")}
               <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
-            <p className="text-[11px] text-muted-foreground">Upload any photo and write your own prompt</p>
+            <p className="text-[11px] text-muted-foreground">{t("studio.uploadOwn")}</p>
           </div>
         </div>
 
         <div className="mb-8 rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold">Prefer the full editor?</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Circle to Remove, crop, multi-image tools, and free-form prompts live in the Image Editor.
-              </p>
+              <p className="text-sm font-semibold">{t("studio.preferFull")}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t("studio.preferFullDesc")}</p>
             </div>
             <Button variant="outline" onClick={openBlank} className="w-full shrink-0 sm:w-auto">
-              Open blank editor
+              {t("studio.openEditorShort")}
             </Button>
           </div>
         </div>
@@ -300,7 +298,11 @@ function ImageStudio() {
                           <Icon className="h-4 w-4 text-primary" />
                         </div>
                         <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          {p.mode === "generate" ? "Generate" : p.needsImage ? "Edit photo" : "Tool"}
+                          {p.mode === "generate"
+                            ? t("common.generate")
+                            : p.needsImage
+                              ? t("common.editPhoto")
+                              : t("common.tool")}
                         </span>
                       </div>
                       <div className="text-sm font-semibold">{p.name}</div>
