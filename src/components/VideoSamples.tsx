@@ -1,49 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Film, Play, X } from "lucide-react";
-
-type VideoSample = {
-  title: string;
-  caption: string;
-  duration: string;
-  resolution: string;
-  category: string;
-  thumb: string;
-  src: string;
-};
-
-// Demo-only assets bundled with the app — never user uploads or generated output.
-const VIDEOS: VideoSample[] = [
-  {
-    title: "Cinematic Landscape",
-    caption: "Text-to-video drone flight over misty peaks",
-    duration: "0:10",
-    resolution: "1080p",
-    category: "Text to Video",
-    thumb: "/demo/video/poster-landscape.jpg",
-    src: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-  },
-  {
-    title: "Tech Visualization",
-    caption: "Particles assembling into a glowing AI core",
-    duration: "0:15",
-    resolution: "1080p",
-    category: "Text to Video",
-    thumb: "/demo/video/poster-tech.jpg",
-    src: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  },
-  {
-    title: "Motion Portrait",
-    caption: "Image-to-video with cinematic color grading",
-    duration: "0:15",
-    resolution: "1080p",
-    category: "Image to Video",
-    thumb: "/demo/video/poster-portrait.jpg",
-    src: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-  },
-];
+import { VIDEO_SAMPLES } from "@/data/samples";
 
 export function VideoSamples() {
-  const [open, setOpen] = useState<VideoSample | null>(null);
+  const [open, setOpen] = useState<(typeof VIDEO_SAMPLES)[number] | null>(null);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -73,9 +33,9 @@ export function VideoSamples() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-        {VIDEOS.map((v, i) => (
+        {VIDEO_SAMPLES.map((v, i) => (
           <button
-            key={v.title}
+            key={v.id}
             type="button"
             onClick={() => setOpen(v)}
             aria-label={`Play ${v.title}`}
@@ -83,8 +43,8 @@ export function VideoSamples() {
             style={{ animationDelay: `${i * 70}ms` }}
           >
             <div className="relative aspect-video w-full overflow-hidden bg-secondary">
-              {!loaded[v.title] && !failed[v.title] && <div className="absolute inset-0 animate-pulse bg-secondary" />}
-              {failed[v.title] ? (
+              {!loaded[v.id] && !failed[v.id] && <div className="absolute inset-0 animate-pulse bg-secondary" />}
+              {failed[v.id] ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-secondary text-muted-foreground">
                   <Film className="h-8 w-8" />
                 </div>
@@ -97,10 +57,10 @@ export function VideoSamples() {
                   width={1024}
                   height={576}
                   draggable={false}
-                  onLoad={() => setLoaded((s) => ({ ...s, [v.title]: true }))}
-                  onError={() => setFailed((s) => ({ ...s, [v.title]: true }))}
+                  onLoad={() => setLoaded((s) => ({ ...s, [v.id]: true }))}
+                  onError={() => setFailed((s) => ({ ...s, [v.id]: true }))}
                   className={`protected-image absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
-                    loaded[v.title] ? "opacity-100" : "opacity-0"
+                    loaded[v.id] ? "opacity-100" : "opacity-0"
                   }`}
                 />
               )}
@@ -110,11 +70,11 @@ export function VideoSamples() {
                 </span>
               </span>
               <span className="absolute left-2 top-2 max-w-[70%] truncate rounded-full bg-background/85 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide backdrop-blur">
-                {v.category}
+                {v.badge}
               </span>
               <span className="absolute bottom-2 right-2 flex gap-1.5">
                 <span className="rounded-full bg-background/85 px-2 py-0.5 text-[10px] font-semibold backdrop-blur">
-                  {v.resolution}
+                  1080p
                 </span>
                 <span className="rounded-full bg-background/85 px-2 py-0.5 text-[10px] font-semibold backdrop-blur">
                   {v.duration}
@@ -123,7 +83,7 @@ export function VideoSamples() {
             </div>
             <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
               <p className="truncate font-bold">{v.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{v.caption}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{v.description}</p>
             </div>
           </button>
         ))}
@@ -148,7 +108,7 @@ export function VideoSamples() {
           </button>
           <video
             ref={videoRef}
-            src={open.src}
+            src={open.mediaUrl}
             poster={open.thumb}
             controls
             autoPlay
