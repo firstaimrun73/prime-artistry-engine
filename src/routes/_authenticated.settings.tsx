@@ -8,6 +8,14 @@ import { getTier } from "@/lib/plan-tier";
 import { CrownBadge } from "@/components/CrownBadge";
 import { Lock } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
+import {
+  LOCALE_OPTIONS,
+  LOCALE_STORAGE_KEY,
+  isLocale,
+  setLocale,
+  useI18n,
+  type Locale,
+} from "@/lib/i18n";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,17 +36,6 @@ export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "es", label: "Español" },
-  { code: "fr", label: "Français" },
-  { code: "de", label: "Deutsch" },
-  { code: "hi", label: "हिन्दी" },
-  { code: "pt", label: "Português" },
-  { code: "zh", label: "中文" },
-];
-
-const LANG_KEY = "motio2edit-language";
 const NOTIF_KEY = "motio2edit-notifications";
 
 type NotifPrefs = {
@@ -52,20 +49,18 @@ const DEFAULT_NOTIFS: NotifPrefs = { product: true, marketing: false, security: 
 function SettingsPage() {
   const { profile, user, refreshProfile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { locale, t } = useI18n();
   const navigate = useNavigate();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [saving, setSaving] = useState(false);
   const [pw, setPw] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
-  const [language, setLanguage] = useState("en");
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [notifs, setNotifs] = useState<NotifPrefs>(DEFAULT_NOTIFS);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(LANG_KEY);
-      if (stored) setLanguage(stored);
       const n = localStorage.getItem(NOTIF_KEY);
       if (n) setNotifs({ ...DEFAULT_NOTIFS, ...JSON.parse(n) });
     } catch {
@@ -105,13 +100,14 @@ function SettingsPage() {
   };
 
   const changeLanguage = (code: string) => {
-    setLanguage(code);
+    if (!isLocale(code)) return;
+    setLocale(code as Locale);
     try {
-      localStorage.setItem(LANG_KEY, code);
+      localStorage.setItem(LOCALE_STORAGE_KEY, code);
     } catch {
       // ignore
     }
-    toast.success("Language preference saved.");
+    toast.success(t("settings.saved") || "Language preference saved.");
   };
 
   const handleSignOut = async () => {
@@ -177,9 +173,9 @@ function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12">
+    <div className="mx-auto max-w-2xl px-4 py-12 pb-24 md:pb-12">
       <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-bold">Settings</h1>
+        <h1 className="text-2xl font-bold">{t("settings.title") || "Settings"}</h1>
         <CrownBadge plan={profile.plan} showLabel size="md" />
       </div>
 
@@ -230,14 +226,12 @@ function SettingsPage() {
         )}
       </section>
 
-
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">Profile</h2>
         <div className="mt-4 space-y-4">
           <div>
             <Label htmlFor="email">Email</Label>
             <Input id="email" value={user?.email ?? ""} disabled className="mt-1.5" />
-
           </div>
           <div>
             <Label htmlFor="name">Username / display name</Label>
@@ -293,42 +287,48 @@ function SettingsPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">Language</h2>
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Preferred language</span>
-          <Select value={language} onValueChange={changeLanguage}>
-            <SelectTrigger className="w-44">
+        <h2 className="font-semibold">{t("settings.language") || "Language"}</h2>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-sm text-muted-foreground">
+            {t("settings.preferredLanguage") || "Preferred language"}
+          </span>
+          <Select value={locale} onValueChange={changeLanguage}>
+            <SelectTrigger className="w-full sm:w-56">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {LANGUAGES.map((l) => (
+              {LOCALE_OPTIONS.map((l) => (
                 <SelectItem key={l.code} value={l.code}>
-                  {l.label}
+                  {l.flag} {l.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          UI language persists across sessions. Full string coverage is currently complete for English (US);
+          other locales fall back to English until their dictionaries are completed.
+        </p>
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">Notification preferences</h2>
         <div className="mt-4 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Product updates</p>
               <p className="text-xs text-muted-foreground">New features and improvements.</p>
             </div>
             <Switch checked={notifs.product} onCheckedChange={(v) => toggleNotif("product", v)} />
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Marketing & offers</p>
               <p className="text-xs text-muted-foreground">Promotions and tips.</p>
             </div>
             <Switch checked={notifs.marketing} onCheckedChange={(v) => toggleNotif("marketing", v)} />
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Security alerts</p>
               <p className="text-xs text-muted-foreground">Important account and security notices.</p>
@@ -338,24 +338,22 @@ function SettingsPage() {
         </div>
       </section>
 
-
-
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">Subscription &amp; billing</h2>
         <div className="mt-4 space-y-2 text-sm">
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-2">
             <span className="text-muted-foreground">Current plan</span>
             <span className="font-medium capitalize">{plan.name}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-2">
             <span className="text-muted-foreground">Credits remaining</span>
             <span className="font-medium">{isAdminEmail(profile.email) ? "∞" : profile.credits}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-2">
             <span className="text-muted-foreground">Currency</span>
             <span className="font-medium">{profile.currency}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-2">
             <span className="text-muted-foreground">Video generation</span>
             <span className="font-medium">{plan.video ? "Enabled" : "Disabled"}</span>
           </div>
@@ -370,7 +368,6 @@ function SettingsPage() {
             <Link to="/profile/subscription">Subscription & billing</Link>
           </Button>
         </div>
-
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
