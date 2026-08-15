@@ -263,6 +263,9 @@ function ImageStudio() {
               {t("studio.openEditor")}
               <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+              <Link to="/studio/image/tools">Explore Image Tools</Link>
+            </Button>
             <p className="text-[11px] text-muted-foreground">{t("studio.uploadOwn")}</p>
           </div>
         </div>
