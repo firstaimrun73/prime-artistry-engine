@@ -1,16 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Video, Film, Play, Zap, Sparkles, Camera, Wand2 } from "lucide-react";
+import { Video, Film, Play, Zap, Sparkles, Camera, Wand2, Lock } from "lucide-react";
+import { isAdminEmail } from "@/lib/admin-config";
+import { canAccessVideo } from "@/lib/policy";
 
 export const Route = createFileRoute("/studio/video")({
   head: () => ({
     meta: [
-      { title: "Video Studio — MOTIO2EDIT" },
+      { title: "Video Studio — Motio2edit" },
       { name: "description", content: "Cinematic AI video generation: text-to-video, image-to-video, and modern motion presets." },
-      { property: "og:title", content: "Video Studio — MOTIO2EDIT" },
+      { property: "og:title", content: "Video Studio — Motio2edit" },
       { property: "og:description", content: "Cinematic AI video generation: text-to-video, image-to-video, and modern motion presets." },
     ],
   }),
@@ -39,8 +42,35 @@ const PRESETS: { label: string; items: Preset[] }[] = [
 ];
 
 function VideoStudio() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const admin = isAdminEmail(profile?.email);
+  const allowed = canAccessVideo({ plan: profile?.plan, email: profile?.email, isAdmin: admin });
+
+  useEffect(() => {
+    if (user && profile && !allowed) {
+      navigate({ to: "/pricing" });
+    }
+  }, [user, profile, allowed, navigate]);
+
+  if (user && profile && !allowed) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-16 text-center">
+          <Lock className="h-8 w-8 text-primary" />
+          <h1 className="text-xl font-bold">Video Studio requires a paid plan</h1>
+          <p className="text-sm text-muted-foreground">
+            Upgrade to unlock AI video generation.
+          </p>
+          <Button asChild>
+            <Link to="/pricing">View plans</Link>
+          </Button>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   const openBlank = () => {
     try { sessionStorage.setItem("motio2edit-mode", "video"); } catch { /* ignore */ }
@@ -56,7 +86,6 @@ function VideoStudio() {
     } catch { /* ignore */ }
     navigate({ to: user ? "/editor" : "/auth" });
   };
-
 
   return (
     <div className="min-h-screen bg-background">
