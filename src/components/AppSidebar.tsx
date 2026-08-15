@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessChat, canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { BrandMark } from "@/components/BrandMark";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * Desktop vertical sidebar for authenticated routes.
@@ -13,6 +14,7 @@ import { BrandMark } from "@/components/BrandMark";
  */
 export function AppSidebar() {
   const { user, profile } = useAuth();
+  const { t } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
@@ -23,13 +25,13 @@ export function AppSidebar() {
 
   type NavItem = { to: string; label: string; icon: typeof Home; exact?: boolean };
   const items: NavItem[] = [
-    { to: "/", label: "Home", icon: Home, exact: true },
-    { to: "/studio/image", label: "Image", icon: ImageIcon },
+    { to: "/", label: t("nav.home"), icon: Home, exact: true },
+    { to: "/studio/image", label: t("nav.image"), icon: ImageIcon },
   ];
-  if (showVideo) items.push({ to: "/studio/video", label: "Video", icon: Video });
-  if (showMusic) items.push({ to: "/studio/music", label: "Music", icon: Music });
-  items.push({ to: "/history", label: "History", icon: History });
-  if (showChat) items.push({ to: "/chat", label: "Chat", icon: MessageSquare });
+  if (showVideo) items.push({ to: "/studio/video", label: t("nav.video"), icon: Video });
+  if (showMusic) items.push({ to: "/studio/music", label: t("nav.music"), icon: Music });
+  items.push({ to: "/history", label: t("nav.history"), icon: History });
+  if (showChat) items.push({ to: "/chat", label: t("nav.chat"), icon: MessageSquare });
 
   return (
     <aside
@@ -44,7 +46,7 @@ export function AppSidebar() {
           const active = exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
           return (
             <Link
-              key={label}
+              key={to + label}
               to={to}
               activeOptions={exact ? { exact: true } : undefined}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -57,21 +59,21 @@ export function AppSidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-border px-3 py-3 space-y-0.5">
+      <div className="space-y-0.5 border-t border-border px-3 py-3">
         <Link
           to={user ? "/dashboard" : "/auth"}
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <User className="h-4 w-4" /> Profile
+          <User className="h-4 w-4" /> {t("nav.profile")}
         </Link>
         <Link
           to="/settings"
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <Settings className="h-4 w-4" /> Settings
+          <Settings className="h-4 w-4" /> {t("nav.settings")}
         </Link>
         <div className="flex items-center justify-between px-3 pt-2">
-          <span className="text-xs text-muted-foreground">Theme</span>
+          <span className="text-xs text-muted-foreground">{t("settings.theme")}</span>
           <ThemeToggle />
         </div>
       </div>
