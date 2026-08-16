@@ -1,7 +1,7 @@
 import { Textarea } from "@/components/ui/textarea";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
-import { EditorToolCategories } from "@/components/EditorToolCategories";
-import { Sparkles, Wand2 } from "lucide-react";
+import { ImageEditorToolPanel } from "@/components/editor/ImageEditorToolPanel";
+import { Sparkles, Wand2, X } from "lucide-react";
 import { EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
 import { VIDEO_QUICK_STYLES } from "@/lib/editor/editor.constants";
 
@@ -14,11 +14,19 @@ interface EditorPromptPanelProps {
   mediaType: "image" | "video";
   loading: boolean;
   inputDataUrl: string | null;
+  /** Preview URL for crop modal (blob/data/https). */
+  inputPreview: string | null;
   prompt: string;
   setPrompt: React.Dispatch<React.SetStateAction<string>>;
   taRef: React.RefObject<HTMLTextAreaElement>;
   suggestions: Suggestion[];
-  onSelectTool: (tool: { prompt: string }) => void;
+  /** Active tool op label shown as a chip (not the internal AI text). */
+  activeToolLabel: string | null;
+  onClearTool: () => void;
+  /** Apply structured tool op — parent stores internal instruction, does not dump into visible prompt. */
+  onToolOp: (op: { label: string; prompt: string }) => void;
+  onCircleRemove: () => void;
+  onCropApplied: (croppedDataUrl: string) => void;
 }
 
 /** Compact rotating ideas — max 3 chips, not a wall of examples. */
@@ -28,11 +36,16 @@ export function EditorPromptPanel({
   mediaType,
   loading,
   inputDataUrl,
+  inputPreview,
   prompt,
   setPrompt,
   taRef,
   suggestions,
-  onSelectTool,
+  activeToolLabel,
+  onClearTool,
+  onToolOp,
+  onCircleRemove,
+  onCropApplied,
 }: EditorPromptPanelProps) {
   return (
     <>
@@ -41,11 +54,32 @@ export function EditorPromptPanel({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             2. Choose a tool
           </p>
-          <EditorToolCategories
+          <ImageEditorToolPanel
             hasImage={!!inputDataUrl}
+            imageSrc={inputPreview || inputDataUrl}
             disabled={loading}
-            onSelectTool={onSelectTool}
+            onPrompt={(internalPrompt) =>
+              onToolOp({
+                label: "Tool",
+                prompt: internalPrompt,
+              })
+            }
+            onCircleRemove={onCircleRemove}
+            onCropApplied={onCropApplied}
           />
+          {activeToolLabel && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+              <span className="font-semibold text-primary">Using: {activeToolLabel}</span>
+              <button
+                type="button"
+                onClick={onClearTool}
+                className="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                aria-label="Clear tool"
+              >
+                <X className="h-3.5 w-3.5" /> Clear
+              </button>
+            </div>
+          )}
         </section>
       )}
       {!loading && mediaType === "video" && (
@@ -61,7 +95,8 @@ export function EditorPromptPanel({
                 onClick={() => setPrompt(q.prompt)}
                 className="btn-animate min-h-[40px] rounded-full border border-border bg-card px-3 py-2 text-xs text-muted-foreground hover:border-primary hover:text-foreground"
               >
-                <span className="mr-1">{q.emoji}</span>{q.label}
+                <span className="mr-1">{q.emoji}</span>
+                {q.label}
               </button>
             ))}
           </div>
@@ -76,9 +111,11 @@ export function EditorPromptPanel({
           <Textarea
             ref={taRef}
             placeholder={
-              inputDataUrl
-                ? "Describe the edit… e.g. remove background, enhance quality"
-                : `Describe the ${mediaType} you want…`
+              activeToolLabel
+                ? "Optional: add extra direction…"
+                : inputDataUrl
+                  ? "Describe the edit… e.g. warmer light, remove the chair"
+                  : `Describe the ${mediaType} you want…`
             }
             value={prompt}
             onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
@@ -100,7 +137,6 @@ export function EditorPromptPanel({
           </div>
         </div>
 
-        {/* Keyword suggestions — max 3 */}
         {!loading && suggestions.length > 0 && (
           <div className="flex flex-wrap gap-2 animate-fade-in">
             {suggestions.slice(0, 3).map((s) => (
@@ -116,8 +152,7 @@ export function EditorPromptPanel({
           </div>
         )}
 
-        {/* Compact "Try an idea" — not a large example wall */}
-        {!loading && !prompt.trim() && (
+        {!loading && !prompt.trim() && !activeToolLabel && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
               <Sparkles className="h-3 w-3 text-primary" /> Try an idea
