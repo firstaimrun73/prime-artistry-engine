@@ -1,18 +1,28 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, Image as ImageIcon, History, MessageSquare, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessChat } from "@/lib/policy";
 import { useI18n } from "@/lib/i18n";
 
+/** Focused workspaces must not show the app bottom nav. */
+function hideBottomNav(pathname: string): boolean {
+  if (pathname.startsWith("/studio/image/circle-remove")) return true;
+  if (pathname.startsWith("/studio/image/auto-edit")) return true;
+  if (pathname.startsWith("/editor")) return true;
+  return false;
+}
+
 /**
- * Mobile-only fixed bottom navigation. Hidden on md+ (desktop uses sidebar).
- * Chat is paid-only. Free users get Home / Image / History / Profile.
+ * Mobile-only fixed bottom navigation. Hidden on md+ and on focused edit workspaces.
  */
 export function BottomTabBar() {
   const { user, profile } = useAuth();
   const { t } = useI18n();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
   if (!user) return null;
+  if (hideBottomNav(pathname)) return null;
 
   const admin = isAdminEmail(profile?.email);
   const showChat = canAccessChat({ plan: profile?.plan, email: profile?.email, isAdmin: admin });
