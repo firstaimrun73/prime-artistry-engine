@@ -1,0 +1,67 @@
+import { Plus, X } from "lucide-react";
+import type { GalleryItem } from "@/lib/editor/editor.types";
+
+interface EditorGalleryProps {
+  gallery: GalleryItem[];
+  activeImage: number;
+  maxImages: number;
+  loading: boolean;
+  onSwitch: (idx: number) => void;
+  onRemove: (idx: number) => void;
+  onAddMore: () => void;
+}
+
+export function EditorGallery({
+  gallery,
+  activeImage,
+  maxImages,
+  loading,
+  onSwitch,
+  onRemove,
+  onAddMore,
+}: EditorGalleryProps) {
+  if (gallery.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Image {activeImage + 1} of {gallery.length}</span>
+        <span>{gallery.length}/{maxImages}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {gallery.map((item, i) => (
+          <div key={item.id} className="relative h-16 w-16">
+            <button
+              type="button"
+              onClick={() => onSwitch(i)}
+              className={`h-full w-full overflow-hidden rounded-lg border-2 transition-colors ${
+                i === activeImage ? "border-primary" : "border-border hover:border-primary/50"
+              }`}
+            >
+              <img src={item.preview} alt={`Upload ${i + 1}`} className="h-full w-full object-cover protected-image" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Remove image ${i + 1}`}
+              onClick={() => onRemove(i)}
+              className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-destructive text-destructive-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+        {gallery.length < maxImages && (
+          <button
+            type="button"
+            onClick={onAddMore}
+            disabled={loading}
+            className="grid h-16 w-16 place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+            aria-label="Add more images"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
