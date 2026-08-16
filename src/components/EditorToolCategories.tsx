@@ -40,7 +40,7 @@ type Category = {
  * Tools marked uiOnly are architecture hooks (e.g. Crop) without fake generation.
  */
 export const AUTO_EDIT_PROMPT =
-  "Automatically analyze this image and apply professional improvements: enhance clarity and detail, balance exposure and color, reduce noise, and polish the overall look while keeping the subject identity, composition and framing identical.";
+  "Automatically analyze this image and apply professional improvements: enhance clarity and detail, balance exposure and color, reduce noise, and polish the overall look while keeping the subject[...]";
 
 export const EDITOR_TOOL_CATEGORIES: Category[] = [
   {
@@ -433,9 +433,7 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
       </button>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Choose a tool
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Choose a tool</p>
         <p className="text-[11px] text-muted-foreground">Edit · Background · Enhance · Portrait · Clothing · Style</p>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -467,7 +465,7 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
               type="button"
               disabled={disabled || (needsImage && !hasImage)}
               onClick={() => onSelectTool(t)}
-              className="flex min-h-[44px] items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+              className="flex items-center gap-2 min-h-[48px] rounded-lg border border-border bg-background px-3 py-2.5 text-left text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50"
             >
               <Icon className="h-4 w-4 shrink-0 text-primary" />
               <span className="leading-tight">{t.label}</span>
