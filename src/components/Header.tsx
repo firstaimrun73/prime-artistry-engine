@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CrownBadge } from "@/components/CrownBadge";
 import { BrandMark } from "@/components/BrandMark";
+import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 
@@ -78,6 +79,11 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {/* Google Translate language — desktop header */}
+          <div className="hidden md:block">
+            <GoogleLanguageSelect />
+          </div>
+
           {user ? (
             <>
               {profile && (() => {
@@ -145,6 +151,12 @@ export function Header() {
             <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
               <div className="flex items-center gap-2 border-b border-border px-5 py-4">
                 <BrandMark />
+              </div>
+              <div className="border-b border-border px-5 py-3 md:hidden">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Language
+                </p>
+                <GoogleLanguageSelect />
               </div>
               <nav className="flex flex-col p-2">
                 {links.map((l) => (
