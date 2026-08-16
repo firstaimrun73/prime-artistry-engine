@@ -11,6 +11,9 @@ import {
   Sparkles,
   Crown,
   ArrowRight,
+  User,
+  Sun,
+  Layers,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -18,6 +21,7 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { useI18n } from "@/lib/i18n";
 import { getPlan, CREDIT_COST, type PlanId } from "@/lib/plans";
 import { SignedInStudioCards } from "@/components/SignedInStudioCards";
+import { SignedInExamples } from "@/components/home/SignedInExamples";
 import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
 
@@ -29,7 +33,7 @@ type RecentGen = {
   created_at: string;
 };
 
-/** Authenticated home — education + plan context + discovery. */
+/** Authenticated home — education + plan + examples + discovery. */
 export function SignedInHomeBody() {
   const { user, profile } = useAuth();
   const { t } = useI18n();
@@ -61,13 +65,7 @@ export function SignedInHomeBody() {
     { icon: Download, titleKey: "edu.step5Title", bodyKey: "edu.step5Body" },
   ];
 
-  const autoExamples = [
-    t("edu.ex1"),
-    t("edu.ex2"),
-    t("edu.ex3"),
-    t("edu.ex4"),
-    t("edu.ex5"),
-  ];
+  const autoExamples = [t("edu.ex1"), t("edu.ex2"), t("edu.ex3"), t("edu.ex4"), t("edu.ex5")];
 
   return (
     <main className="mx-auto max-w-6xl px-4 pt-8 pb-24 md:pb-16">
@@ -159,13 +157,48 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
+      {/* Meet Auto Edit — honest about foundation vs full automation */}
       <section className="mt-8 rounded-2xl border border-primary/25 bg-primary/5 p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-bold">{t("edu.autoTitle")}</h2>
         </div>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{t("edu.autoBody")}</p>
-        <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="mt-2 max-w-3xl text-xs text-muted-foreground">
+          Auto Edit is designed to understand your instruction and focus the edit pipeline on the change you asked for,
+          while aiming to preserve the rest of the image. Deeper automatic multi-step planning is expanding over time.
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-border bg-background/70 p-3">
+            <p className="text-xs font-semibold text-foreground">Example upload</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Portrait with dark lighting and a busy background
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-background/70 p-3">
+            <p className="text-xs font-semibold text-foreground">Signals to look for</p>
+            <ul className="mt-1 space-y-1 text-[11px] text-muted-foreground">
+              <li className="flex items-center gap-1.5">
+                <Sun className="h-3 w-3 text-primary" /> Uneven / low lighting
+              </li>
+              <li className="flex items-center gap-1.5">
+                <User className="h-3 w-3 text-primary" /> Portrait subject
+              </li>
+              <li className="flex items-center gap-1.5">
+                <Layers className="h-3 w-3 text-primary" /> Distracting background
+              </li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-border bg-background/70 p-3">
+            <p className="text-xs font-semibold text-foreground">Typical directions</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Improve lighting · clean background · enhance facial detail — via clear prompts or Image Tools presets
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {t("edu.examples")}
         </p>
         <ul className="mt-2 flex flex-wrap gap-2">
@@ -187,6 +220,8 @@ export function SignedInHomeBody() {
           </Button>
         </div>
       </section>
+
+      <SignedInExamples />
 
       <SignedInStudioCards />
 
@@ -238,8 +273,7 @@ export function SignedInHomeBody() {
                       alt={g.prompt ?? ""}
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
                       onError={(e) => {
-                        const el = e.target as HTMLImageElement;
-                        el.style.display = "none";
+                        (e.target as HTMLImageElement).style.display = "none";
                       }}
                     />
                   )
