@@ -1,12 +1,13 @@
 /**
- * Google Website Translator integration for Motio2edit.
- * Floating control is route-aware: Home + Profile only.
- * Header/Settings GoogleLanguageSelect remains available where mounted.
+ * Google Website Translator for Motio2edit.
+ *
+ * Single UI surface: GoogleLanguageSelect (icon → menu) in the Header.
+ * TranslateWidget only initializes the hidden GT engine (no floating control).
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useRouterState } from "@tanstack/react-router";
-import { Languages } from "lucide-react";
+import { Check, Languages } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "motio2edit-gt-lang";
 const PAGE_LANG = "en";
@@ -50,17 +51,10 @@ declare global {
   }
 }
 
-/** Floating GT control — Home and Profile/dashboard only. */
-function shouldShowFloatingTranslate(pathname: string): boolean {
-  if (pathname === "/") return true;
-  if (pathname.startsWith("/dashboard")) return true;
-  if (pathname.startsWith("/profile")) return true;
-  return false;
-}
-
 function setGoogTransCookie(target: string) {
   const value = target === PAGE_LANG ? "" : `/${PAGE_LANG}/${target}`;
-  const expire = target === PAGE_LANG ? "Thu, 01 Jan 1970 00:00:00 GMT" : "Thu, 01 Jan 2099 00:00:00 GMT";
+  const expire =
+    target === PAGE_LANG ? "Thu, 01 Jan 1970 00:00:00 GMT" : "Thu, 01 Jan 2099 00:00:00 GMT";
   const domains = ["", window.location.hostname];
   const parts = window.location.hostname.split(".");
   if (parts.length > 2) {
@@ -144,9 +138,9 @@ function injectHideStyles() {
 }
 
 function stripGoogleJunkNodes() {
-  document.querySelectorAll(".goog-te-banner-frame, .goog-te-ftab-frame, iframe.goog-te-banner-frame").forEach((el) => {
-    el.remove();
-  });
+  document
+    .querySelectorAll(".goog-te-banner-frame, .goog-te-ftab-frame, iframe.goog-te-banner-frame")
+    .forEach((el) => el.remove());
   document.body.style.top = "0";
   document.body.style.position = "static";
 }
@@ -160,41 +154,8 @@ function ensureGoogleScript() {
   document.body.appendChild(script);
 }
 
-function LanguageControl({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (code: string) => void;
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <Languages className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-      <label htmlFor="motio-gt-lang-float" className="sr-only">
-        Language
-      </label>
-      <select
-        id="motio-gt-lang-float"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="max-w-[9.5rem] cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary sm:max-w-[11rem]"
-        aria-label="Select language"
-      >
-        {GT_LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code}>
-            {l.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
+/** Boot hidden Google Translate engine once (no visible UI). */
 export function TranslateWidget() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const visible = shouldShowFloatingTranslate(pathname);
-  const [lang, setLang] = useState(PAGE_LANG);
-  const [ready, setReady] = useState(false);
   const initOnce = useRef(false);
 
   useEffect(() => {
@@ -204,7 +165,6 @@ export function TranslateWidget() {
     injectHideStyles();
 
     const initial = readStoredLang();
-    setLang(initial);
     if (initial !== PAGE_LANG) {
       setGoogTransCookie(initial);
     }
@@ -222,7 +182,6 @@ export function TranslateWidget() {
           },
           "google_translate_element",
         );
-        setReady(true);
         stripGoogleJunkNodes();
 
         const stored = readStoredLang();
@@ -252,42 +211,94 @@ export function TranslateWidget() {
     return () => obs.disconnect();
   }, []);
 
-  // Still init GT engine globally so Header language select works on other pages,
-  // but do not render the floating control on editor/studio routes.
-  if (!visible) return null;
-
-  const onChange = (code: string) => {
-    setLang(code);
-    applyLanguage(code);
-  };
-
-  return (
-    <div
-      className="fixed bottom-20 right-3 z-[40] rounded-lg border border-border bg-card/95 p-1.5 shadow-md backdrop-blur md:bottom-4 md:right-4"
-      data-no-translate
-    >
-      <LanguageControl value={lang} onChange={onChange} />
-      {!ready && <span className="sr-only">Loading translator…</span>}
-    </div>
-  );
+  return null;
 }
 
+/**
+ * Single attractive language control: icon button → popover menu.
+ * Mount once in Header (desktop + mobile). No floating select text.
+ */
 export function GoogleLanguageSelect({ className }: { className?: string }) {
   const [lang, setLang] = useState(PAGE_LANG);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLang(readStoredLang());
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent | TouchEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const current = GT_LANGUAGES.find((l) => l.code === lang) ?? GT_LANGUAGES[0];
+
+  const pick = (code: string) => {
+    setLang(code);
+    setOpen(false);
+    applyLanguage(code);
+  };
+
   return (
-    <div className={className} data-no-translate>
-      <LanguageControl
-        value={lang}
-        onChange={(code) => {
-          setLang(code);
-          applyLanguage(code);
-        }}
-      />
+    <div ref={rootRef} className={cn("relative", className)} data-no-translate>
+      <button
+        type="button"
+        aria-label={`Language: ${current.label}. Change language`}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-colors",
+          "hover:border-primary/50 hover:text-primary",
+          open && "border-primary text-primary",
+        )}
+      >
+        <Languages className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label="Select language"
+          className="absolute right-0 top-full z-[60] mt-2 max-h-[min(70vh,22rem)] w-[11.5rem] overflow-y-auto rounded-xl border border-border bg-card p-1.5 shadow-xl"
+        >
+          {GT_LANGUAGES.map((l) => {
+            const active = l.code === lang;
+            return (
+              <button
+                key={l.code}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => pick(l.code)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
+                  active
+                    ? "bg-primary/10 font-semibold text-primary"
+                    : "text-foreground hover:bg-secondary",
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { MoveHorizontal, Sparkles } from "lucide-react";
 
@@ -18,37 +19,39 @@ type Sample = {
   before: string;
   after: string;
   prompt: string;
+  smartRemove?: boolean;
 };
 
 /**
- * Only pairs that use real distinct before/after assets under src/assets/.
- * Do not use CSS filters to fake an AI transformation.
+ * Real distinct before/after pairs under src/assets/ only.
+ * object-contain keeps full subject (faces/heads) visible — no crop clipping.
  */
 const SAMPLES: Sample[] = [
   {
     label: "Object Removal",
-    title: "Remove unwanted objects from the scene",
+    title: "Remove distractions",
     before: sampleObjectBefore,
     after: sampleObjectAfter,
     prompt: "Remove the unwanted object completely and rebuild the background naturally",
   },
   {
     label: "Circle to Remove",
-    title: "Mark a person or object and erase it",
+    title: "Erase a person or object",
     before: sampleRemovalBefore,
     after: sampleRemovalAfter,
     prompt: "Remove the circled person and rebuild the background naturally",
+    smartRemove: true,
   },
   {
     label: "Photo Restoration",
-    title: "Repair and restore damaged photos",
+    title: "Repair damaged photos",
     before: sampleRestoreBefore,
     after: sampleRestoreAfter,
     prompt: "Restore this old damaged photo and improve clarity while keeping content intact",
   },
   {
     label: "AI Upscaling",
-    title: "Low-resolution to sharp detail",
+    title: "Sharper detail",
     before: sampleUpscaleBefore,
     after: sampleUpscaleAfter,
     prompt: "Upscale this image with sharper detail while preserving identity and composition",
@@ -85,13 +88,14 @@ function DragCompare({ sample }: { sample: Sample }) {
       onTouchMove={(e) => dragging.current && update(e.touches[0].clientX)}
       onTouchEnd={() => (dragging.current = false)}
     >
+      {/* object-contain + centered so heads/faces are not clipped by cover crop */}
       <img
         src={sample.after}
         alt={`${sample.label} after`}
         loading="lazy"
         decoding="async"
         draggable={false}
-        className="absolute inset-0 h-full w-full object-cover object-center"
+        className="absolute inset-0 h-full w-full object-contain object-center"
       />
       <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
         <img
@@ -100,7 +104,7 @@ function DragCompare({ sample }: { sample: Sample }) {
           loading="lazy"
           decoding="async"
           draggable={false}
-          className="absolute inset-0 h-full w-full object-cover object-center"
+          className="absolute inset-0 h-full w-full object-contain object-center"
         />
       </div>
       <span className="absolute left-2 top-2 rounded bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur">
@@ -123,14 +127,26 @@ function DragCompare({ sample }: { sample: Sample }) {
 
 export function BeforeAfterShowcase() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const tryEdit = (prompt: string) => {
+  const tryEdit = (sample: Sample) => {
     try {
-      sessionStorage.setItem("motio2edit-preset", JSON.stringify({ prompt, mode: "image" }));
+      sessionStorage.setItem(
+        "motio2edit-preset",
+        JSON.stringify({
+          prompt: sample.prompt,
+          mode: "image",
+          smartRemove: !!sample.smartRemove,
+        }),
+      );
     } catch {
       /* ignore */
     }
-    navigate({ to: "/editor" });
+    if (user) {
+      navigate({ to: "/editor" });
+    } else {
+      navigate({ to: "/auth", search: { redirect: "/editor" } });
+    }
   };
 
   return (
@@ -140,9 +156,6 @@ export function BeforeAfterShowcase() {
           <Sparkles className="h-3.5 w-3.5 text-primary" /> Before &amp; After
         </span>
         <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">Drag to see the difference</h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Real transformation pairs — drag the slider, then try the same edit on your own photo.
-        </p>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
@@ -155,9 +168,9 @@ export function BeforeAfterShowcase() {
             <DragCompare sample={s} />
             <div className="min-w-0 flex-1 px-1 pt-3">
               <p className="truncate text-sm font-bold">{s.label}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{s.title}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{s.title}</p>
             </div>
-            <Button size="sm" className="btn-animate mt-3 w-full" onClick={() => tryEdit(s.prompt)}>
+            <Button size="sm" className="btn-animate mt-3 w-full" onClick={() => tryEdit(s)}>
               Try this effect
             </Button>
           </article>
