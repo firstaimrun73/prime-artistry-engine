@@ -8,7 +8,6 @@ import {
   ArrowRight,
   Sparkles,
   Lock,
-  Layers,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -40,9 +39,10 @@ type InspirationCard = {
   prompt: string;
   badge?: string;
   smartRemove?: boolean;
+  toolId?: string;
 };
 
-/** Build ~16–20 visual inspiration cards from local assets + gallery. */
+/** Visual inspiration from local + gallery assets only (no scraped URLs). */
 function buildInspiration(): InspirationCard[] {
   const fromSamples: InspirationCard[] = IMAGE_SAMPLES.map((s) => ({
     id: s.id,
@@ -98,17 +98,13 @@ function buildInspiration(): InspirationCard[] {
     if (seen.has(c.title)) continue;
     seen.add(c.title);
     out.push(c);
-    if (out.length >= 18) break;
+    if (out.length >= 20) break;
   }
   return out;
 }
 
 const INSPIRATION = buildInspiration();
 
-/**
- * Post-login home — visual discovery / inspiration feed.
- * Not a tool list. Not a profile page.
- */
 export function SignedInHomeBody() {
   const { user, profile } = useAuth();
   const { t } = useI18n();
@@ -140,11 +136,14 @@ export function SignedInHomeBody() {
       sessionStorage.setItem(
         "motio2edit-preset",
         JSON.stringify({
+          // Structured preset — editor applies as tool op, not forced visible text when possible
           prompt: c.prompt,
           mode: "image",
           smartRemove: !!c.smartRemove,
+          toolId: c.toolId,
         }),
       );
+      sessionStorage.setItem("motio2edit-mode", "image");
     } catch {
       /* ignore */
     }
@@ -153,7 +152,6 @@ export function SignedInHomeBody() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:pb-12">
-      {/* Compact welcome — not a text wall */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -172,7 +170,7 @@ export function SignedInHomeBody() {
         </div>
       </div>
 
-      {/* Auto Edit hero — visual, not text-heavy */}
+      {/* Shortcut to dedicated Auto (bottom-nav product) — not a fourth Studio */}
       <Link
         to="/studio/image/auto-edit"
         className="mt-5 flex items-center gap-4 overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-4 transition-transform hover:scale-[1.01] sm:p-5"
@@ -183,23 +181,17 @@ export function SignedInHomeBody() {
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold sm:text-lg">Auto Edit</p>
           <p className="text-xs text-muted-foreground sm:text-sm">
-            Drop a photo — AI analyzes and enhances it for you
+            One photo · no prompt · AI decides
           </p>
         </div>
         <ArrowRight className="h-5 w-5 shrink-0 text-primary" />
       </Link>
 
-      {/* Inspiration feed — visual first */}
       <section className="mt-8">
-        <div className="mb-3 flex items-end justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              Inspiration
-            </h2>
-            <p className="text-xs text-muted-foreground">Tap Try this to open the editor</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+          Inspiration
+        </h2>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
           {INSPIRATION.map((c) => (
             <article
               key={c.id}
@@ -233,69 +225,42 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* Studios — Image large, Video/Music locked for free */}
+      {/* Exactly three studios */}
       <section className="mt-10 space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Studios</h2>
 
         <Link
           to="/studio/image"
-          className="relative flex min-h-[140px] flex-col justify-end overflow-hidden rounded-2xl border border-border bg-card p-5 transition-transform hover:scale-[1.01] sm:min-h-[180px]"
+          className="relative flex min-h-[120px] flex-col justify-end overflow-hidden rounded-2xl border border-border bg-card p-5 transition-transform hover:scale-[1.01]"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-transparent" />
-          <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
           <div className="relative flex items-center gap-2">
             <ImageIcon className="h-5 w-5 text-primary" />
             <p className="text-lg font-bold">Image Studio</p>
           </div>
-          <p className="relative mt-1 max-w-md text-xs text-muted-foreground sm:text-sm">
-            Edit, enhance, remove, restyle — full professional workspace
-          </p>
-          <div className="relative mt-3 flex flex-wrap gap-1.5">
-            {["AI Edit", "Auto Edit", "Remove", "Enhance", "Multi-Image"].map((chip) => (
-              <span
-                key={chip}
-                className="rounded-full border border-border bg-background/80 px-2 py-0.5 text-[10px] font-semibold"
-              >
-                {chip}
-              </span>
-            ))}
-          </div>
-          <span className="relative mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">
-            Open Image Studio <ArrowRight className="h-4 w-4" />
+          <span className="relative mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary">
+            Open <ArrowRight className="h-4 w-4" />
           </span>
         </Link>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <StudioMiniCard
             title="Video Studio"
-            desc="Cinematic motion from text or image"
+            desc="Cinematic motion"
             icon={Video}
             locked={!videoOk}
             href={videoOk ? "/studio/video" : "/pricing"}
           />
           <StudioMiniCard
             title="Music Studio"
-            desc="Tracks by mood and genre"
+            desc="Tracks by mood"
             icon={Music}
             locked={!musicOk}
             href={musicOk ? "/studio/music" : "/pricing"}
           />
         </div>
-
-        <Link
-          to="/studio/image/multi"
-          className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40"
-        >
-          <Layers className="h-4 w-4 text-primary" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Multi-Image</p>
-            <p className="text-[11px] text-muted-foreground">Blend references · paid plans</p>
-          </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        </Link>
       </section>
 
-      {/* Recent creations — visual strip */}
       <section className="mt-10">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
@@ -307,7 +272,7 @@ export function SignedInHomeBody() {
         </div>
         {recent.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
-            <p className="text-sm text-muted-foreground">No creations yet — try Auto Edit</p>
+            <p className="text-sm text-muted-foreground">No creations yet</p>
             <Button asChild size="sm" className="mt-3">
               <Link to="/studio/image/auto-edit">
                 <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Auto Edit
@@ -324,7 +289,12 @@ export function SignedInHomeBody() {
               >
                 {g.output_url && g.type !== "music" ? (
                   g.type === "video" ? (
-                    <video src={g.output_url} className="h-full w-full object-cover" muted playsInline />
+                    <video
+                      src={g.output_url}
+                      className="h-full w-full object-cover"
+                      muted
+                      playsInline
+                    />
                   ) : (
                     <img src={g.output_url} alt="" className="h-full w-full object-cover" />
                   )
@@ -380,7 +350,7 @@ function StudioMiniCard({
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{desc}</p>
       <p className="mt-3 text-xs font-semibold text-primary">
-        {locked ? "Upgrade to unlock" : `Open ${title.replace(" Studio", "")}`}
+        {locked ? "Upgrade to unlock" : "Open"}
       </p>
     </Link>
   );
