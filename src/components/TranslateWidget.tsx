@@ -1,13 +1,11 @@
 /**
  * Google Website Translator integration for Motio2edit.
- * - Hidden Google Translate element drives real page translation
- * - Visible Motio2edit-styled language control (desktop + mobile)
- * - Preference persisted in localStorage + googtrans cookie
- * - No API keys required (uses public element.js)
- * - Aggressive hide of GT chrome (banner, "Powered by", junk link bars)
+ * Floating control is route-aware: Home + Profile only.
+ * Header/Settings GoogleLanguageSelect remains available where mounted.
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { Languages } from "lucide-react";
 
 const STORAGE_KEY = "motio2edit-gt-lang";
@@ -50,6 +48,14 @@ declare global {
       };
     };
   }
+}
+
+/** Floating GT control — Home and Profile/dashboard only. */
+function shouldShowFloatingTranslate(pathname: string): boolean {
+  if (pathname === "/") return true;
+  if (pathname.startsWith("/dashboard")) return true;
+  if (pathname.startsWith("/profile")) return true;
+  return false;
 }
 
 function setGoogTransCookie(target: string) {
@@ -112,26 +118,7 @@ function injectHideStyles() {
   if (document.getElementById("motio-gt-hide-style")) return;
   const style = document.createElement("style");
   style.id = "motio-gt-hide-style";
-  // Hide all Google Translate chrome, including junk "IYMC / Mobile Version / Fax" bars
   style.textContent = `
-    .goog-te-banner-frame,
-    .goog-te-balloon-frame,
-    #goog-gt-tt,
-    .goog-te-menu-frame,
-    .skiptranslate iframe.goog-te-banner-frame,
-    iframe.goog-te-banner-frame,
-    .goog-te-ftab-frame,
-    .goog-te-gadget,
-    .goog-te-gadget-icon,
-    .goog-logo-link,
-    .goog-te-balloon-frame,
-    div.skiptranslate:not(#google_translate_element),
-    .VIpgJd-ZVi9od-ORHb-OEVmcd,
-    .VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
-    .VIpgJd-ZVi9od-l4eHX-hSRGPd,
-    font > font > font {
-      /* do not blanket-hide all fonts — only GT chrome below */
-    }
     .goog-te-banner-frame, .goog-te-balloon-frame, #goog-gt-tt,
     .goog-te-menu-frame, iframe.goog-te-banner-frame, .goog-te-ftab-frame,
     .goog-te-gadget, .goog-logo-link,
@@ -157,11 +144,9 @@ function injectHideStyles() {
 }
 
 function stripGoogleJunkNodes() {
-  // Remove residual GT UI that sometimes injects link strips at page bottom
   document.querySelectorAll(".goog-te-banner-frame, .goog-te-ftab-frame, iframe.goog-te-banner-frame").forEach((el) => {
     el.remove();
   });
-  // Body top offset forced by GT
   document.body.style.top = "0";
   document.body.style.position = "static";
 }
@@ -181,16 +166,15 @@ function LanguageControl({
 }: {
   value: string;
   onChange: (code: string) => void;
-  compact?: boolean;
 }) {
   return (
     <div className="flex items-center gap-1.5">
       <Languages className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-      <label htmlFor="motio-gt-lang" className="sr-only">
+      <label htmlFor="motio-gt-lang-float" className="sr-only">
         Language
       </label>
       <select
-        id="motio-gt-lang"
+        id="motio-gt-lang-float"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="max-w-[9.5rem] cursor-pointer rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary sm:max-w-[11rem]"
@@ -207,6 +191,8 @@ function LanguageControl({
 }
 
 export function TranslateWidget() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const visible = shouldShowFloatingTranslate(pathname);
   const [lang, setLang] = useState(PAGE_LANG);
   const [ready, setReady] = useState(false);
   const initOnce = useRef(false);
@@ -266,6 +252,10 @@ export function TranslateWidget() {
     return () => obs.disconnect();
   }, []);
 
+  // Still init GT engine globally so Header language select works on other pages,
+  // but do not render the floating control on editor/studio routes.
+  if (!visible) return null;
+
   const onChange = (code: string) => {
     setLang(code);
     applyLanguage(code);
@@ -273,7 +263,7 @@ export function TranslateWidget() {
 
   return (
     <div
-      className="fixed bottom-20 right-3 z-[60] rounded-lg border border-border bg-card/95 p-1.5 shadow-md backdrop-blur md:bottom-4 md:right-4"
+      className="fixed bottom-20 right-3 z-[40] rounded-lg border border-border bg-card/95 p-1.5 shadow-md backdrop-blur md:bottom-4 md:right-4"
       data-no-translate
     >
       <LanguageControl value={lang} onChange={onChange} />
