@@ -1,6 +1,7 @@
 /**
  * Conservative Auto Edit decision engine.
  * Low confidence → NO_CHANGE. Caps operations. Respects risk with faces present.
+ * Plans are automatic: defaultSelected ops are applied without user choosing tools.
  */
 
 import type { ImageAnalysisResult } from "./types";
@@ -66,7 +67,8 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
       confidence,
       detectedIssues: [],
       operations: [],
-      message: "Analysis confidence is too low for safe automatic edits. Upload a clearer photo or use the Image Editor.",
+      message:
+        "Analysis confidence is too low for safe automatic edits. Upload a clearer photo or use the Image Editor.",
     };
   }
 
@@ -122,7 +124,7 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
 
   if (hasFace && (faces.blurry || faces.poorLighting || faces.hasArtifacts)) {
     detectedIssues.push("face_quality");
-    // High-risk: default off when confidence is modest
+    // High-risk: default on only when confidence is solid
     const faceDefault = confidence >= 0.55;
     pushOp(ops, "FACE_DETAIL_RESTORATION", "Face detail or lighting can be improved", faceDefault);
     pushOp(ops, "PORTRAIT_REPAIR", "Portrait cleanup suggested", faceDefault && faces.hasArtifacts);
@@ -130,7 +132,8 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
 
   if (bg.isCluttered || bg.hasDistractingElements || bg.hasUnwantedObjects) {
     detectedIssues.push("background");
-    pushOp(ops, "BACKGROUND_CLEANUP", "Background clutter detected", false);
+    // Medium risk: auto only when confidence is high
+    pushOp(ops, "BACKGROUND_CLEANUP", "Background clutter detected", confidence >= 0.65);
   }
 
   if (q.needsEnhancement || (q.overallScore > 0 && q.overallScore < 0.75)) {
@@ -138,7 +141,10 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
     pushOp(ops, "IMAGE_ENHANCEMENT", "Overall quality can be improved", true);
   }
 
-  if (issues.includes("low_resolution") || (analysis.dimensions.megapixels > 0 && analysis.dimensions.megapixels < 1)) {
+  if (
+    issues.includes("low_resolution") ||
+    (analysis.dimensions.megapixels > 0 && analysis.dimensions.megapixels < 1)
+  ) {
     detectedIssues.push("low_resolution");
     pushOp(ops, "UPSCALE", "Low resolution signal", false);
   }
@@ -168,13 +174,24 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
     };
   }
 
+  const autoCount = capped.filter((o) => o.defaultSelected).length;
+
   return {
     status: "READY",
     confidence,
     detectedIssues: [...new Set(detectedIssues)],
     operations: capped,
-    message: `Suggested ${capped.length} operation(s). Review and confirm before applying.`,
+    message:
+      autoCount > 0
+        ? `Automatic plan ready: ${autoCount} safe operation(s).`
+        : `Plan ready with ${capped.length} optional operation(s); none auto-selected at this confidence.`,
   };
+}
+
+/** Operations marked defaultSelected, in priority order — used for fully automatic runs. */
+export function automaticOperationsInOrder(plan: AutoEditPlan): AutoEditOperationId[] {
+  const ids = plan.operations.filter((o) => o.defaultSelected).map((o) => o.id);
+  return sortOperationsByPriority(ids);
 }
 
 export function selectedOperationsInOrder(
