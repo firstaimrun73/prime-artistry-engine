@@ -5,10 +5,10 @@ import {
   Music,
   Image as ImageIcon,
   Video,
-  Sparkles,
   ArrowRight,
   Settings,
   User,
+  Wrench,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -27,8 +27,8 @@ type RecentGen = {
 };
 
 /**
- * Post-login home — action-first, not a wall of education cards.
- * Mobile-first spacing; desktop uses width without crowding.
+ * Post-login home — compact professional dashboard.
+ * Order: Welcome → Featured create → Studios → Recent → Quick access.
  */
 export function SignedInHomeBody() {
   const { user, profile } = useAuth();
@@ -52,42 +52,19 @@ export function SignedInHomeBody() {
   const plan = getPlan(planId);
   const firstName = profile?.display_name ? profile.display_name.split(" ")[0] : "";
   const credits = isAdmin ? "∞" : (profile?.credits ?? 0).toLocaleString();
-
-  const studios = [
-    {
-      to: "/editor" as const,
-      icon: ImageIcon,
-      title: "Image Editor",
-      body: "Edit photos, remove objects, enhance & restore",
-      primary: true,
-    },
-    {
-      to: "/studio/video" as const,
-      icon: Video,
-      title: "Video Studio",
-      body: plan.video ? "Text-to-video & image-to-video" : "Requires Lite or higher",
-      locked: !plan.video && !isAdmin,
-    },
-    {
-      to: "/music" as const,
-      icon: Music,
-      title: "Music Studio",
-      body: plan.video ? "Generate tracks by mood & genre" : "Requires Lite or higher",
-      locked: !plan.video && !isAdmin,
-    },
-  ];
+  const videoLocked = !plan.video && !isAdmin;
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 pt-6 pb-24 sm:pt-8 md:pb-12">
-      {/* Welcome — compact */}
-      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <main className="mx-auto w-full max-w-5xl px-4 pt-5 pb-24 sm:pt-8 md:pb-12">
+      {/* 1. Welcome */}
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {t("home.welcome")}
               {firstName ? `, ${firstName}` : ""}
             </p>
-            <h1 className="mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">
+            <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">
               {t("home.readyCreate")}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -98,92 +75,129 @@ export function SignedInHomeBody() {
               </span>
             </div>
           </div>
-          <Button asChild className="w-full shrink-0 sm:w-auto">
-            <Link to="/editor">
-              Open Image Editor <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Link>
-          </Button>
         </div>
       </section>
 
-      {/* Primary studios — 3 clear actions */}
-      <section className="mt-6">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Create
-        </h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {studios.map((s) => {
-            const Icon = s.icon;
-            const inner = (
-              <>
-                <div className="flex items-center gap-2">
-                  <div className="rounded-lg border border-border bg-background p-2">
-                    <Icon className="h-4 w-4 text-primary" />
-                  </div>
-                  <p className="font-semibold text-sm">{s.title}</p>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">{s.body}</p>
-                {s.locked && (
-                  <span className="mt-2 inline-block text-[10px] font-semibold text-primary">
-                    Upgrade to unlock
-                  </span>
-                )}
-              </>
-            );
-            if (s.locked) {
-              return (
-                <Link
-                  key={s.title}
-                  to="/pricing"
-                  className="rounded-xl border border-border bg-card p-4 opacity-90 transition-colors hover:border-primary/40"
-                >
-                  {inner}
-                </Link>
-              );
-            }
-            return (
-              <Link
-                key={s.title}
-                to={s.to}
-                className={`rounded-xl border p-4 transition-colors hover:border-primary/50 ${
-                  s.primary
-                    ? "border-primary/30 bg-primary/5"
-                    : "border-border bg-card"
-                }`}
-              >
-                {inner}
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Auto Edit — dedicated workflow page */}
-      <section className="mt-6 rounded-xl border border-border bg-card p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-bold">Auto Edit</h2>
+      {/* 2. Featured creation — dominant CTA */}
+      <section className="mt-5">
+        <Link
+          to="/editor"
+          className="flex flex-col gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-4 transition-colors hover:bg-primary/10 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+        >
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl border border-primary/30 bg-background p-2.5">
+              <ImageIcon className="h-5 w-5 text-primary" />
             </div>
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              Upload a photo, review AI suggestions, and apply real edits — not just a prompt preset.
-            </p>
+            <div>
+              <p className="text-base font-bold">Image Editor</p>
+              <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+                Upload, edit, enhance, remove objects, and generate
+              </p>
+            </div>
           </div>
-          <Button asChild size="sm" className="w-full shrink-0 sm:w-auto">
-            <Link to="/studio/image/auto-edit">Open Auto Edit</Link>
-          </Button>
+          <span className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground sm:shrink-0">
+            Open editor <ArrowRight className="h-4 w-4" />
+          </span>
+        </Link>
+      </section>
+
+      {/* 3. Other studios */}
+      <section className="mt-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Studios</h2>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Link
+            to={videoLocked ? "/pricing" : "/studio/video"}
+            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-center gap-2">
+              <Video className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Video Studio</p>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {videoLocked ? "Requires Lite or higher" : "Text-to-video & image-to-video"}
+            </p>
+            {videoLocked && (
+              <span className="mt-1 inline-block text-[10px] font-semibold text-primary">Upgrade</span>
+            )}
+          </Link>
+          <Link
+            to={videoLocked ? "/pricing" : "/music"}
+            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-center gap-2">
+              <Music className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Music Studio</p>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {videoLocked ? "Requires Lite or higher" : "Tracks by mood & genre"}
+            </p>
+            {videoLocked && (
+              <span className="mt-1 inline-block text-[10px] font-semibold text-primary">Upgrade</span>
+            )}
+          </Link>
         </div>
       </section>
 
-      {/* Quick links — single row, no duplication of bottom nav */}
+      {/* 4. Recent */}
+      <section className="mt-6">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <HistoryIcon className="h-3.5 w-3.5" /> Recent
+          </h2>
+          <Link to="/history" className="text-xs font-medium text-primary hover:underline">
+            View all
+          </Link>
+        </div>
+        {recent.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border px-4 py-7 text-center">
+            <p className="text-sm text-muted-foreground">No creations yet.</p>
+            <Button asChild size="sm" className="mt-3">
+              <Link to="/editor">Start in Image Editor</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {recent.map((g) => (
+              <Link
+                key={g.id}
+                to="/history"
+                className="relative aspect-square overflow-hidden rounded-lg border border-border bg-card"
+              >
+                {g.output_url && g.type !== "music" ? (
+                  g.type === "video" ? (
+                    <video src={g.output_url} className="h-full w-full object-cover" muted playsInline />
+                  ) : (
+                    <img
+                      src={g.output_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.opacity = "0.3";
+                      }}
+                    />
+                  )
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-muted">
+                    <Music className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 5. Quick access */}
       <section className="mt-6">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Quick access
         </h2>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
-            <Link to="/studio/image/tools">Image Tools</Link>
+            <Link to="/studio/image/tools">
+              <Wrench className="mr-1.5 h-3.5 w-3.5" />
+              Image Tools
+            </Link>
           </Button>
           <Button asChild size="sm" variant="outline">
             <Link to="/history">
@@ -204,60 +218,6 @@ export function SignedInHomeBody() {
             </Link>
           </Button>
         </div>
-      </section>
-
-      {/* Recent — useful or empty CTA */}
-      <section className="mt-8">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <HistoryIcon className="h-3.5 w-3.5" /> Recent
-          </h2>
-          <Link to="/history" className="text-xs font-medium text-primary hover:underline">
-            View all
-          </Link>
-        </div>
-        {recent.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
-            <p className="text-sm text-muted-foreground">Your creations will appear here.</p>
-            <Button asChild size="sm" className="mt-3">
-              <Link to="/editor">Open Image Editor</Link>
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
-            {recent.map((g) => (
-              <Link
-                key={g.id}
-                to="/history"
-                className="relative aspect-square overflow-hidden rounded-lg border border-border bg-card"
-              >
-                {g.output_url && g.type !== "music" ? (
-                  g.type === "video" ? (
-                    <video
-                      src={g.output_url}
-                      className="h-full w-full object-cover"
-                      muted
-                      playsInline
-                    />
-                  ) : (
-                    <img
-                      src={g.output_url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.opacity = "0.3";
-                      }}
-                    />
-                  )
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-muted">
-                    <Music className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
       </section>
 
       {planId !== "business" && (

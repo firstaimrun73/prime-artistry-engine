@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   Crop,
   Eraser,
@@ -14,47 +15,21 @@ import { cn } from "@/lib/utils";
 
 export type PriorityToolAction =
   | { kind: "prompt"; id: string; label: string; prompt: string; icon: LucideIcon }
-  | { kind: "circle-remove"; id: string; label: string; icon: LucideIcon }
   | { kind: "crop"; id: string; label: string; icon: LucideIcon }
   | { kind: "route"; id: string; label: string; icon: LucideIcon; mode: "remove" | "add" };
 
-/** Real-feature priority tools — prefer dedicated UI/routes over prompt chips. */
-export const PRIORITY_TOOLS: PriorityToolAction[] = [
-  {
-    kind: "route",
-    id: "circle-remove",
-    label: "Circle to Remove",
-    icon: Eraser,
-    mode: "remove",
-  },
-  {
-    kind: "route",
-    id: "circle-add",
-    label: "Circle to Add",
-    icon: Wand2,
-    mode: "add",
-  },
-  {
-    kind: "crop",
-    id: "crop",
-    label: "Crop",
-    icon: Crop,
-  },
+/** Always-visible primary actions (compact). */
+export const PRIORITY_CORE: PriorityToolAction[] = [
+  { kind: "route", id: "circle-remove", label: "Circle to Remove", icon: Eraser, mode: "remove" },
+  { kind: "route", id: "circle-add", label: "Circle to Add", icon: Wand2, mode: "add" },
+  { kind: "crop", id: "crop", label: "Crop", icon: Crop },
   {
     kind: "prompt",
     id: "remove-bg",
-    label: "Remove background",
+    label: "Remove BG",
     icon: Layers,
     prompt:
       "Remove the background cleanly and replace it with a soft neutral studio backdrop while keeping the main subject's edges, hair detail and identity perfectly intact.",
-  },
-  {
-    kind: "prompt",
-    id: "replace-bg",
-    label: "Replace background",
-    icon: Layers,
-    prompt:
-      "Replace only the background with a new scene. Keep the subject pixel-perfect identical with clean edges.",
   },
   {
     kind: "prompt",
@@ -63,6 +38,26 @@ export const PRIORITY_TOOLS: PriorityToolAction[] = [
     icon: Eraser,
     prompt:
       "Remove the unwanted object completely and reconstruct the background naturally with matching textures, lighting and perspective. Keep the main subject identical.",
+  },
+  {
+    kind: "prompt",
+    id: "enhance",
+    label: "Enhance",
+    icon: Sparkles,
+    prompt:
+      "Enhance this photo: increase sharpness, clarity and fine detail, reduce noise. Keep composition, subject and colors identical.",
+  },
+];
+
+/** Secondary real tools — collapsed by default. */
+export const PRIORITY_MORE: PriorityToolAction[] = [
+  {
+    kind: "prompt",
+    id: "replace-bg",
+    label: "Replace BG",
+    icon: Layers,
+    prompt:
+      "Replace only the background with a new scene. Keep the subject pixel-perfect identical with clean edges.",
   },
   {
     kind: "prompt",
@@ -75,7 +70,7 @@ export const PRIORITY_TOOLS: PriorityToolAction[] = [
   {
     kind: "prompt",
     id: "expand",
-    label: "Expand / Outpaint",
+    label: "Expand",
     icon: Maximize2,
     prompt:
       "Expand the canvas outward and naturally continue the scene beyond the current edges. Match style, lighting and perspective. Keep the original subject unchanged.",
@@ -83,23 +78,15 @@ export const PRIORITY_TOOLS: PriorityToolAction[] = [
   {
     kind: "prompt",
     id: "generative-fill",
-    label: "Generative fill",
+    label: "Gen fill",
     icon: Wand2,
     prompt:
       "Extend and fill the empty areas of the image with content that matches the existing scene in style, lighting and perspective.",
   },
   {
     kind: "prompt",
-    id: "enhance",
-    label: "Enhance",
-    icon: Sparkles,
-    prompt:
-      "Enhance this photo: increase sharpness, clarity and fine detail, reduce noise. Keep composition, subject and colors identical.",
-  },
-  {
-    kind: "prompt",
     id: "upscale",
-    label: "AI Upscale",
+    label: "Upscale",
     icon: Maximize2,
     prompt:
       "Upscale and enhance resolution with natural detail recovery. Keep the subject, composition and colors identical.",
@@ -123,7 +110,7 @@ export const PRIORITY_TOOLS: PriorityToolAction[] = [
   {
     kind: "prompt",
     id: "color-correct",
-    label: "Color correction",
+    label: "Color fix",
     icon: Wand2,
     prompt:
       "Correct white balance and colors for a natural, true-to-life look. Keep the subject unchanged.",
@@ -146,62 +133,79 @@ type Props = {
   onCrop: () => void;
 };
 
-export function PriorityToolGrid({
+function ToolButton({
+  t,
   hasImage,
   disabled,
   onPrompt,
   onCircleRemove,
   onCrop,
-}: Props) {
+}: Props & { t: PriorityToolAction }) {
+  const Icon = t.icon;
+  const base =
+    "flex min-h-[44px] items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2 text-left text-xs font-medium transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50";
+
+  if (t.kind === "route") {
+    return (
+      <Link
+        to="/studio/image/circle-remove"
+        className={cn(base, (disabled || !hasImage) && "pointer-events-none opacity-50")}
+        onClick={() => {
+          try {
+            sessionStorage.setItem("motio2edit-circle-mode", t.mode);
+          } catch {
+            /* ignore */
+          }
+        }}
+      >
+        <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+        <span className="leading-tight">{t.label}</span>
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={disabled || !hasImage}
+      className={base}
+      onClick={() => {
+        if (t.kind === "crop") onCrop();
+        else if (t.kind === "prompt") onPrompt(t.prompt);
+      }}
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+      <span className="leading-tight">{t.label}</span>
+    </button>
+  );
+}
+
+export function PriorityToolGrid(props: Props) {
+  const [more, setMore] = useState(false);
+
   return (
     <div className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Primary tools
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tools</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {PRIORITY_TOOLS.map((t) => {
-          const Icon = t.icon;
-          const base =
-            "flex min-h-[48px] items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-left text-xs font-medium transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50";
-
-          if (t.kind === "route") {
-            return (
-              <Link
-                key={t.id}
-                to="/studio/image/circle-remove"
-                className={cn(base, (disabled || !hasImage) && "pointer-events-none opacity-50")}
-                onClick={() => {
-                  try {
-                    sessionStorage.setItem("motio2edit-circle-mode", t.mode);
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-              >
-                <Icon className="h-4 w-4 shrink-0 text-primary" />
-                <span className="leading-tight">{t.label}</span>
-              </Link>
-            );
-          }
-
-          return (
-            <button
-              key={t.id}
-              type="button"
-              disabled={disabled || !hasImage}
-              className={base}
-              onClick={() => {
-                if (t.kind === "circle-remove") onCircleRemove();
-                else if (t.kind === "crop") onCrop();
-                else if (t.kind === "prompt") onPrompt(t.prompt);
-              }}
-            >
-              <Icon className="h-4 w-4 shrink-0 text-primary" />
-              <span className="leading-tight">{t.label}</span>
-            </button>
-          );
-        })}
+        {PRIORITY_CORE.map((t) => (
+          <ToolButton key={t.id} t={t} {...props} />
+        ))}
       </div>
+      <button
+        type="button"
+        disabled={props.disabled}
+        onClick={() => setMore((v) => !v)}
+        className="text-[11px] font-semibold text-primary hover:underline disabled:opacity-50"
+      >
+        {more ? "Hide more tools" : "More tools"}
+      </button>
+      {more && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {PRIORITY_MORE.map((t) => (
+            <ToolButton key={t.id} t={t} {...props} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
