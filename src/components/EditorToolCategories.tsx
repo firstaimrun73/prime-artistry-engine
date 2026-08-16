@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   Eraser,
   Layers,
@@ -35,12 +36,12 @@ type Category = {
 
 /**
  * Common image-edit tools grouped for progressive disclosure.
- * Selecting a tool fills the prompt — generation still uses the existing pipeline.
- * Auto Edit is a UI entry only (no backend algorithm in this module).
+ * Most tools still fill the prompt for the existing FAL edit pipeline.
+ * Auto Edit navigates to /studio/image/auto-edit (dedicated workflow).
  * Tools marked uiOnly are architecture hooks (e.g. Crop) without fake generation.
  */
 export const AUTO_EDIT_PROMPT =
-  "Automatically analyze this image and apply professional improvements: enhance clarity and detail, balance exposure and color, reduce noise, and polish the overall look while keeping the subject[...]";
+  "Automatically analyze this image and apply professional improvements: enhance clarity and detail, balance exposure and color, reduce noise, and polish the overall look while keeping the subject identical.";
 
 export const EDITOR_TOOL_CATEGORIES: Category[] = [
   {
@@ -407,19 +408,16 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
 
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
-      {/* Auto Edit — UI entry only for ALL plans; fills enhance prompt via existing pipeline */}
-      <button
-        type="button"
-        disabled={disabled || !hasImage}
-        onClick={() =>
-          onSelectTool({
-            id: "auto-edit",
-            label: "Auto Edit",
-            icon: Sparkles,
-            prompt: AUTO_EDIT_PROMPT,
-          })
-        }
-        className="flex w-full min-h-[48px] items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2.5 text-left transition-colors hover:bg-primary/10 disabled:opacity-50"
+      {/* Auto Edit — dedicated page, not a prompt preset */}
+      <Link
+        to="/studio/image/auto-edit"
+        className={cn(
+          "flex w-full min-h-[48px] items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2.5 text-left transition-colors hover:bg-primary/10",
+          (disabled || !hasImage) && "pointer-events-none opacity-50",
+        )}
+        onClick={(e) => {
+          if (disabled || !hasImage) e.preventDefault();
+        }}
       >
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
           <Sparkles className="h-4 w-4" />
@@ -427,10 +425,10 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-primary">Auto Edit ✨</span>
           <span className="block text-[11px] text-muted-foreground leading-snug">
-            Let Motio2edit analyze your image and automatically improve it.
+            Opens the Auto Edit workspace — analyze, select improvements, apply.
           </span>
         </span>
-      </button>
+      </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Choose a tool</p>
