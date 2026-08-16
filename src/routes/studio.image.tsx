@@ -270,6 +270,38 @@ function ImageStudio() {
           </div>
         </div>
 
+        {/* Real feature surfaces — before discovery presets */}
+        <div className="mb-8 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <Link
+            to="/editor"
+            className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10"
+          >
+            <p className="text-sm font-semibold text-primary">Image Editor</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Full workspace</p>
+          </Link>
+          <Link
+            to="/studio/image/auto-edit"
+            className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40"
+          >
+            <p className="text-sm font-semibold">Auto Edit</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Analyze & structured plan</p>
+          </Link>
+          <Link
+            to="/studio/image/multi"
+            className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40"
+          >
+            <p className="text-sm font-semibold">Multi-Image</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Paid · references</p>
+          </Link>
+          <Link
+            to="/studio/image/circle-remove"
+            className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40"
+          >
+            <p className="text-sm font-semibold">Circle to Remove</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Mask remove / add</p>
+          </Link>
+        </div>
+
         <div className="mb-8 rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>

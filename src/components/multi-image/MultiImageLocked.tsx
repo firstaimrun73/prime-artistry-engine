@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Lock } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { MULTI_IMAGE_UPGRADE_MESSAGE } from "@/lib/multi-image";
 
@@ -13,6 +15,13 @@ type Props = {
  * Logic must still reject Free elsewhere — this is UI only.
  */
 export function MultiImageLocked({ variant = "card" }: Props) {
+  useEffect(() => {
+    toast.message(MULTI_IMAGE_UPGRADE_MESSAGE, {
+      duration: 6000,
+      id: "multi-image-free-lock",
+    });
+  }, []);
+
   if (variant === "banner") {
     return (
       <div className="flex flex-wrap items-start gap-3 rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm shadow-sm">

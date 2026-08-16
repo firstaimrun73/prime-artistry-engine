@@ -9,6 +9,9 @@ import {
   Settings,
   User,
   Wrench,
+  Sparkles,
+  Layers,
+  Eraser,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -28,7 +31,7 @@ type RecentGen = {
 
 /**
  * Post-login home — compact professional dashboard.
- * Order: Welcome → Featured create → Studios → Recent → Quick access.
+ * Order: Welcome → Featured create → Feature tools → Studios → Recent → Quick access.
  */
 export function SignedInHomeBody() {
   const { user, profile } = useAuth();
@@ -56,7 +59,6 @@ export function SignedInHomeBody() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pt-5 pb-24 sm:pt-8 md:pb-12">
-      {/* 1. Welcome */}
       <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
@@ -78,7 +80,6 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* 2. Featured creation — dominant CTA */}
       <section className="mt-5">
         <Link
           to="/editor"
@@ -101,7 +102,45 @@ export function SignedInHomeBody() {
         </Link>
       </section>
 
-      {/* 3. Other studios */}
+      {/* Real feature entry points (dedicated pages — not prompt paste) */}
+      <section className="mt-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Image features
+        </h2>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <Link
+            to="/studio/image/auto-edit"
+            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Auto Edit</p>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Analyze → plan → apply</p>
+          </Link>
+          <Link
+            to="/studio/image/multi"
+            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Multi-Image</p>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Paid plans · references</p>
+          </Link>
+          <Link
+            to="/studio/image/circle-remove"
+            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-center gap-2">
+              <Eraser className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Circle to Remove</p>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Paint mask · remove or add</p>
+          </Link>
+        </div>
+      </section>
+
       <section className="mt-5">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Studios</h2>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -138,7 +177,6 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* 4. Recent */}
       <section className="mt-6">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -187,7 +225,6 @@ export function SignedInHomeBody() {
         )}
       </section>
 
-      {/* 5. Quick access */}
       <section className="mt-6">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Quick access
