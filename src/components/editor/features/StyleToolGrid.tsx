@@ -5,6 +5,7 @@ type StyleTool = {
   id: string;
   label: string;
   icon: LucideIcon;
+  /** Internal generation instruction — applied as tool op, not forced into the visible prompt. */
   prompt: string;
   needsImage?: boolean;
 };
@@ -100,7 +101,7 @@ export function StyleToolGrid({ hasImage, disabled, onPrompt }: Props) {
             })}
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Styles fill the prompt for the existing generation pipeline. Refine before generating.
+            Styles apply as a tool operation. Your prompt stays optional for extra direction.
           </p>
         </>
       )}
