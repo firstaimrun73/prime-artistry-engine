@@ -4,6 +4,7 @@
  * - Visible Motio2edit-styled language control (desktop + mobile)
  * - Preference persisted in localStorage + googtrans cookie
  * - No API keys required (uses public element.js)
+ * - Aggressive hide of GT chrome (banner, "Powered by", junk link bars)
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -12,7 +13,6 @@ import { Languages } from "lucide-react";
 const STORAGE_KEY = "motio2edit-gt-lang";
 const PAGE_LANG = "en";
 
-/** User-requested languages (Google Translate language codes). */
 export const GT_LANGUAGES = [
   { code: "en", label: "English" },
   { code: "hi", label: "Hindi" },
@@ -56,7 +56,6 @@ function setGoogTransCookie(target: string) {
   const value = target === PAGE_LANG ? "" : `/${PAGE_LANG}/${target}`;
   const expire = target === PAGE_LANG ? "Thu, 01 Jan 1970 00:00:00 GMT" : "Thu, 01 Jan 2099 00:00:00 GMT";
   const domains = ["", window.location.hostname];
-  // Host + root domain variants improve persistence across subdomains
   const parts = window.location.hostname.split(".");
   if (parts.length > 2) {
     domains.push(`.${parts.slice(-2).join(".")}`);
@@ -102,37 +101,69 @@ function applyLanguage(lang: string) {
 
   if (combo) {
     fireComboChange(combo, lang);
-    // Google sometimes needs a second tick
     setTimeout(() => fireComboChange(combo, lang), 200);
     return;
   }
 
-  // Widget not ready yet — cookie is set; soft reload so GT picks it up
-  if (lang !== PAGE_LANG) {
-    window.location.reload();
-  } else {
-    // Reset to English: clear and reload
-    setGoogTransCookie(PAGE_LANG);
-    window.location.reload();
-  }
+  window.location.reload();
 }
 
 function injectHideStyles() {
   if (document.getElementById("motio-gt-hide-style")) return;
   const style = document.createElement("style");
   style.id = "motio-gt-hide-style";
+  // Hide all Google Translate chrome, including junk "IYMC / Mobile Version / Fax" bars
   style.textContent = `
-    .goog-te-banner-frame, .goog-te-balloon-frame, #goog-gt-tt,
-    .goog-te-menu-frame, .skiptranslate iframe.goog-te-banner-frame {
-      display: none !important; visibility: hidden !important;
+    .goog-te-banner-frame,
+    .goog-te-balloon-frame,
+    #goog-gt-tt,
+    .goog-te-menu-frame,
+    .skiptranslate iframe.goog-te-banner-frame,
+    iframe.goog-te-banner-frame,
+    .goog-te-ftab-frame,
+    .goog-te-gadget,
+    .goog-te-gadget-icon,
+    .goog-logo-link,
+    .goog-te-balloon-frame,
+    div.skiptranslate:not(#google_translate_element),
+    .VIpgJd-ZVi9od-ORHb-OEVmcd,
+    .VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+    .VIpgJd-ZVi9od-l4eHX-hSRGPd,
+    font > font > font {
+      /* do not blanket-hide all fonts — only GT chrome below */
     }
-    body { top: 0 !important; }
+    .goog-te-banner-frame, .goog-te-balloon-frame, #goog-gt-tt,
+    .goog-te-menu-frame, iframe.goog-te-banner-frame, .goog-te-ftab-frame,
+    .goog-te-gadget, .goog-logo-link,
+    .VIpgJd-ZVi9od-ORHb-OEVmcd, .VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+    .VIpgJd-ZVi9od-l4eHX-hSRGPd {
+      display: none !important;
+      visibility: hidden !important;
+      height: 0 !important;
+      max-height: 0 !important;
+      overflow: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    body { top: 0 !important; position: static !important; }
+    html.translated-ltr body, html.translated-rtl body { top: 0 !important; }
     .goog-text-highlight { background: none !important; box-shadow: none !important; }
-    #google_translate_element { position: absolute !important; left: -9999px !important;
-      width: 1px !important; height: 1px !important; overflow: hidden !important; }
-    .VIpgJd-ZVi9od-ORHb-OEVmcd, .VIpgJd-ZVi9od-aZ2wEe-wOHMyf { display: none !important; }
+    #google_translate_element {
+      position: absolute !important; left: -9999px !important;
+      width: 1px !important; height: 1px !important; overflow: hidden !important;
+    }
   `;
   document.head.appendChild(style);
+}
+
+function stripGoogleJunkNodes() {
+  // Remove residual GT UI that sometimes injects link strips at page bottom
+  document.querySelectorAll(".goog-te-banner-frame, .goog-te-ftab-frame, iframe.goog-te-banner-frame").forEach((el) => {
+    el.remove();
+  });
+  // Body top offset forced by GT
+  document.body.style.top = "0";
+  document.body.style.position = "static";
 }
 
 function ensureGoogleScript() {
@@ -147,14 +178,13 @@ function ensureGoogleScript() {
 function LanguageControl({
   value,
   onChange,
-  compact,
 }: {
   value: string;
   onChange: (code: string) => void;
   compact?: boolean;
 }) {
   return (
-    <div className={`flex items-center gap-1.5 ${compact ? "" : ""}`}>
+    <div className="flex items-center gap-1.5">
       <Languages className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <label htmlFor="motio-gt-lang" className="sr-only">
         Language
@@ -176,10 +206,6 @@ function LanguageControl({
   );
 }
 
-/**
- * Floating control (always available) + hidden Google Translate mount.
- * Also exports LanguageControl for Header if desired.
- */
 export function TranslateWidget() {
   const [lang, setLang] = useState(PAGE_LANG);
   const [ready, setReady] = useState(false);
@@ -211,15 +237,14 @@ export function TranslateWidget() {
           "google_translate_element",
         );
         setReady(true);
+        stripGoogleJunkNodes();
 
-        // Re-apply stored language after widget builds the combo
         const stored = readStoredLang();
         if (stored && stored !== PAGE_LANG) {
           setTimeout(() => {
-            const combo = document.querySelector(
-              "select.goog-te-combo",
-            ) as HTMLSelectElement | null;
+            const combo = document.querySelector("select.goog-te-combo") as HTMLSelectElement | null;
             if (combo) fireComboChange(combo, stored);
+            stripGoogleJunkNodes();
           }, 400);
         }
       } catch (e) {
@@ -227,7 +252,6 @@ export function TranslateWidget() {
       }
     };
 
-    // Mount hidden host if missing
     if (!document.getElementById("google_translate_element")) {
       const host = document.createElement("div");
       host.id = "google_translate_element";
@@ -236,6 +260,10 @@ export function TranslateWidget() {
     }
 
     ensureGoogleScript();
+
+    const obs = new MutationObserver(() => stripGoogleJunkNodes());
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
   }, []);
 
   const onChange = (code: string) => {
@@ -244,22 +272,16 @@ export function TranslateWidget() {
   };
 
   return (
-    <>
-      {/* Accessible language control — fixed, non-intrusive */}
-      <div
-        className="fixed bottom-20 right-3 z-[60] rounded-lg border border-border bg-card/95 p-1.5 shadow-md backdrop-blur md:bottom-4 md:right-4"
-        data-no-translate
-      >
-        <LanguageControl value={lang} onChange={onChange} />
-        {!ready && (
-          <span className="sr-only">Loading translator…</span>
-        )}
-      </div>
-    </>
+    <div
+      className="fixed bottom-20 right-3 z-[60] rounded-lg border border-border bg-card/95 p-1.5 shadow-md backdrop-blur md:bottom-4 md:right-4"
+      data-no-translate
+    >
+      <LanguageControl value={lang} onChange={onChange} />
+      {!ready && <span className="sr-only">Loading translator…</span>}
+    </div>
   );
 }
 
-/** Compact selector for Header / Settings (shares same GT engine). */
 export function GoogleLanguageSelect({ className }: { className?: string }) {
   const [lang, setLang] = useState(PAGE_LANG);
 
@@ -275,7 +297,6 @@ export function GoogleLanguageSelect({ className }: { className?: string }) {
           setLang(code);
           applyLanguage(code);
         }}
-        compact
       />
     </div>
   );
