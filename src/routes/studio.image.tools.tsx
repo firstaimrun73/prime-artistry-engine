@@ -30,6 +30,8 @@ type Tool = {
   prompt: string;
   needsImage: boolean;
   icon: typeof Eraser;
+  /** Dedicated product route instead of prompt preset into editor */
+  href?: "/studio/image/circle-remove" | "/studio/image/auto-edit" | "/studio/image/multi";
 };
 
 type Category = { label: string; tools: Tool[] };
@@ -43,9 +45,10 @@ const CATEGORIES: Category[] = [
         summary: "Mark an unwanted object or person and remove it while reconstructing the surrounding area.",
         when: "People in the background, poles, logos, clutter.",
         example: "Circle a bystander → clean background fill.",
-        prompt: "Remove the highlighted object completely. Reconstruct the background naturally with matching textures, lighting and shadows.",
+        prompt: "",
         needsImage: true,
         icon: Eraser,
+        href: "/studio/image/circle-remove",
       },
       {
         name: "Object Removal",
@@ -88,6 +91,26 @@ const CATEGORIES: Category[] = [
   {
     label: "Enhance & Restore",
     tools: [
+      {
+        name: "Auto Edit",
+        summary: "Analyze the photo and apply a structured improvement plan without writing a prompt.",
+        when: "You want automatic professional polish.",
+        example: "Upload → analyze → confirm operations → result.",
+        prompt: "",
+        needsImage: true,
+        icon: Sparkles,
+        href: "/studio/image/auto-edit",
+      },
+      {
+        name: "Multi-Image",
+        summary: "Combine primary + reference images in one paid-plan job.",
+        when: "Outfit transfer, multi-reference edits.",
+        example: "Person + clothing reference → combined edit.",
+        prompt: "",
+        needsImage: true,
+        icon: Layers,
+        href: "/studio/image/multi",
+      },
       {
         name: "Upscale",
         summary: "Increase resolution and recover sharper detail.",
@@ -249,6 +272,18 @@ function ImageToolsPage() {
     navigate({ to: user ? "/editor" : "/auth" });
   };
 
+  const openTool = (tool: Tool) => {
+    if (tool.href) {
+      if (!user) {
+        navigate({ to: "/auth" });
+        return;
+      }
+      navigate({ to: tool.href });
+      return;
+    }
+    openEditor(tool.prompt);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -262,8 +297,7 @@ function ImageToolsPage() {
               AI Image <span className="text-primary">Tools</span>
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Discover what Motio2edit can do, then open the Image Editor to work. This page is for discovery — the
-              editor is your workspace.
+              Real features open dedicated tools. Prompt presets open the Image Editor workspace.
             </p>
           </div>
           <Button size="lg" onClick={() => openEditor("")} className="w-full sm:w-auto">
@@ -304,16 +338,22 @@ function ImageToolsPage() {
                         </div>
                         <div>
                           <dt className="font-semibold text-foreground/80">Input</dt>
-                          <dd>{tool.needsImage ? "Upload a photo, then generate" : "Prompt only or editor tool"}</dd>
+                          <dd>
+                            {tool.href
+                              ? "Dedicated feature page"
+                              : tool.needsImage
+                                ? "Upload a photo, then generate"
+                                : "Prompt only or editor tool"}
+                          </dd>
                         </div>
                       </dl>
                       <Button
                         size="sm"
                         className="mt-4 w-full"
-                        variant="outline"
-                        onClick={() => openEditor(tool.prompt)}
+                        variant={tool.href ? "default" : "outline"}
+                        onClick={() => openTool(tool)}
                       >
-                        Open Image Editor
+                        {tool.href ? "Open feature" : "Open Image Editor"}
                       </Button>
                     </article>
                   );
