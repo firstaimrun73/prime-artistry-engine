@@ -6,29 +6,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPlan } from "@/lib/plans";
 import { getTier } from "@/lib/plan-tier";
 import { CrownBadge } from "@/components/CrownBadge";
+import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { Lock } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
-import {
-  LOCALE_OPTIONS,
-  LOCALE_STORAGE_KEY,
-  isLocale,
-  setLocale,
-  useI18n,
-  type Locale,
-} from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,7 +36,7 @@ const DEFAULT_NOTIFS: NotifPrefs = { product: true, marketing: false, security: 
 function SettingsPage() {
   const { profile, user, refreshProfile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [saving, setSaving] = useState(false);
@@ -97,17 +84,6 @@ function SettingsPage() {
       setPw("");
       toast.success("Password changed.");
     }
-  };
-
-  const changeLanguage = (code: string) => {
-    if (!isLocale(code)) return;
-    setLocale(code as Locale);
-    try {
-      localStorage.setItem(LOCALE_STORAGE_KEY, code);
-    } catch {
-      // ignore
-    }
-    toast.success(t("settings.saved"));
   };
 
   const handleSignOut = async () => {
@@ -288,22 +264,15 @@ function SettingsPage() {
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">{t("settings.language")}</h2>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm text-muted-foreground">{t("settings.preferredLanguage")}</span>
-          <Select value={locale} onValueChange={changeLanguage}>
-            <SelectTrigger className="w-full sm:w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LOCALE_OPTIONS.map((l) => (
-                <SelectItem key={l.code} value={l.code}>
-                  {l.flag} {l.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Translate the Motio2edit interface using Google Translate. Your choice is saved and applied across pages.
+        </p>
+        <div className="mt-4">
+          <GoogleLanguageSelect />
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">{t("settings.langHint")}</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Numbers, credits, plan IDs, and form values are not meant to be translated. Brand name Motio2edit stays as written.
+        </p>
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
