@@ -1,6 +1,7 @@
 import { getPlanLimits } from "@/utils/planLimits";
 import { Link } from "@tanstack/react-router";
 import { Lock } from "lucide-react";
+import { toast } from "sonner";
 
 interface MultiImageInputProps {
   userPlan: string;
@@ -12,21 +13,50 @@ interface MultiImageInputProps {
 
 export function MultiImageInput({ userPlan, images, onChange, disabled }: MultiImageInputProps) {
   const limits = getPlanLimits(userPlan);
-  const canAddMore = images.length < limits.maxImages;
-  const atLimit = images.length >= limits.maxImages;
   const isFree = userPlan === "free" || !userPlan;
-  const upgradeHint =
-    isFree
-      ? "Multi-image editing starts with Lite"
-      : userPlan === "lite"
-        ? "Upgrade to Plus for up to 4 images"
-        : "Upgrade for higher multi-image limits";
+  const maxAllowed = isFree ? 1 : limits.maxImages;
+  const canAddMore = images.length < maxAllowed;
+  const atLimit = images.length >= maxAllowed;
+
+  const notifyFreeLock = () => {
+    toast.error("Multi-image editing is available on paid plans. Upgrade your plan to use multiple images.", {
+      action: {
+        label: "Upgrade",
+        onClick: () => {
+          window.location.href = "/pricing";
+        },
+      },
+    });
+  };
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image"));
-    const remaining = limits.maxImages - images.length;
+    e.target.value = "";
+
+    if (isFree) {
+      // Free: never accept additional reference images
+      if (images.length >= 1 || files.length > 1) {
+        notifyFreeLock();
+        return;
+      }
+      // First image only if empty — still single-image workflow
+      if (files.length === 1 && images.length === 0) {
+        const f = files[0];
+        const reader = new FileReader();
+        reader.onload = () => onChange([reader.result as string]);
+        reader.readAsDataURL(f);
+      }
+      return;
+    }
+
+    const remaining = maxAllowed - images.length;
     const toAdd = files.slice(0, Math.max(0, remaining));
-    if (toAdd.length === 0) return;
+    if (toAdd.length === 0) {
+      if (files.length > 0) {
+        toast.message(`Your plan allows up to ${maxAllowed} images.`);
+      }
+      return;
+    }
 
     Promise.all(
       toAdd.map(
@@ -37,9 +67,7 @@ export function MultiImageInput({ userPlan, images, onChange, disabled }: MultiI
             reader.readAsDataURL(f);
           }),
       ),
-    ).then((newImgs) => onChange([...images, ...newImgs].slice(0, limits.maxImages)));
-    // reset so picking the same file again re-triggers change
-    e.target.value = "";
+    ).then((newImgs) => onChange([...images, ...newImgs].slice(0, maxAllowed)));
   };
 
   const removeImage = (idx: number) => {
@@ -48,6 +76,22 @@ export function MultiImageInput({ userPlan, images, onChange, disabled }: MultiI
 
   return (
     <div className="space-y-3">
+      {isFree && (
+        <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+          <div className="min-w-0">
+            <p className="font-semibold text-foreground">Multi-image locked on Free</p>
+            <p className="mt-0.5 text-muted-foreground">
+              Single image only.{" "}
+              <Link to="/pricing" className="font-medium text-primary hover:underline">
+                Upgrade
+              </Link>{" "}
+              to edit with multiple images.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {images.map((src, i) => (
           <div key={i} className="relative h-20 w-20">
@@ -65,30 +109,50 @@ export function MultiImageInput({ userPlan, images, onChange, disabled }: MultiI
           </div>
         ))}
 
-        {canAddMore && !disabled && (
+        {canAddMore && !disabled && !isFree && (
           <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border transition hover:border-primary">
             <span className="text-2xl text-muted-foreground">+</span>
-            <input type="file" accept="image/*" multiple={limits.maxImages > 1} className="hidden" onChange={handleUpload} />
+            <input
+              type="file"
+              accept="image/*"
+              multiple={maxAllowed > 1}
+              className="hidden"
+              onChange={handleUpload}
+            />
           </label>
         )}
 
-        {atLimit && isFree && (
-          <Link
-            to="/pricing"
+        {(isFree || atLimit) && (
+          <button
+            type="button"
+            onClick={isFree ? notifyFreeLock : () => toast.message(`Limit is ${maxAllowed} images on your plan.`)}
             className="relative flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 text-center transition hover:border-primary hover:bg-primary/10"
           >
             <Lock className="h-4 w-4 text-primary" />
-            <span className="px-1 text-[10px] font-semibold leading-tight text-primary">Upgrade</span>
-          </Link>
+            <span className="px-1 text-[10px] font-semibold leading-tight text-primary">
+              {isFree ? "Upgrade" : "Limit"}
+            </span>
+          </button>
         )}
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {images.length}/{limits.maxImages} images
-        {atLimit && (
-          <Link to="/pricing" className="ml-2 font-medium text-primary hover:underline">
-            ↑ {upgradeHint}
-          </Link>
+        {isFree ? (
+          <>
+            Free plan: 1 image{" "}
+            <Link to="/pricing" className="ml-1 font-medium text-primary hover:underline">
+              Unlock multi-image
+            </Link>
+          </>
+        ) : (
+          <>
+            {images.length}/{maxAllowed} images
+            {atLimit && (
+              <Link to="/pricing" className="ml-2 font-medium text-primary hover:underline">
+                Higher limits on higher plans
+              </Link>
+            )}
+          </>
         )}
       </p>
     </div>
