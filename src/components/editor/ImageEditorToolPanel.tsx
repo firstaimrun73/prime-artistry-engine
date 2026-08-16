@@ -15,8 +15,8 @@ type Props = {
   /** Current working image (data URL or https) used for crop source */
   imageSrc: string | null;
   disabled?: boolean;
-  /** Fill the prompt box (existing Image-to-Image pipeline) */
-  onPrompt: (prompt: string) => void;
+  /** Structured tool op — parent must NOT dump this into the visible prompt field */
+  onPrompt: (prompt: string, meta?: { label: string; id: string }) => void;
   /** Open existing SmartRemoveModal */
   onCircleRemove: () => void;
   /** Replace working image after crop Apply — does not call generation */
@@ -59,7 +59,7 @@ export function ImageEditorToolPanel({
     // Internal UI markers must not leak into the prompt field
     if (tool.prompt.startsWith("__")) return;
 
-    onPrompt(tool.prompt);
+    onPrompt(tool.prompt, { label: tool.label, id: tool.id });
   };
 
   return (
