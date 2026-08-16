@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -29,7 +29,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { isAdminEmail } from "@/lib/admin-config";
 import { secureDownloadImage } from "@/lib/download.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/studio/image/auto-edit")({
   head: () => ({
@@ -37,7 +36,7 @@ export const Route = createFileRoute("/studio/image/auto-edit")({
       { title: "Auto Edit — Motio2edit" },
       {
         name: "description",
-        content: "Upload a photo. MOTIO2EDIT analyzes and enhances it automatically.",
+        content: "Upload one photo. Motio2AI analyzes and enhances it — no prompt needed.",
       },
     ],
   }),
@@ -45,6 +44,15 @@ export const Route = createFileRoute("/studio/image/auto-edit")({
 });
 
 type Step = "upload" | "analyze" | "ready" | "generate" | "result";
+
+/** Soft progressive labels shown while analysis is in-flight (not claimed results). */
+const ANALYZE_PHASES = [
+  "Detecting image quality…",
+  "Analyzing lighting…",
+  "Checking color balance…",
+  "Understanding the subject…",
+  "Looking for restoration opportunities…",
+];
 
 function AutoEditPage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -68,6 +76,7 @@ function AutoEditPage() {
   const [progressPct, setProgressPct] = useState(8);
   const [busy, setBusy] = useState(false);
   const [dlBusy, setDlBusy] = useState(false);
+  const [analyzePhase, setAnalyzePhase] = useState(0);
   const autoAnalyzeRef = useRef(false);
 
   const isAdmin = isAdminEmail(profile?.email);
@@ -76,7 +85,6 @@ function AutoEditPage() {
   const credits = profile?.credits ?? 0;
   const noCredits = !isAdmin && credits < creditEst.total;
 
-  // Estimated seconds: ~6–8s per operation (honest range, not a hard promise)
   const estSeconds =
     selectedCount <= 0 ? 0 : Math.max(12, Math.min(90, selectedCount * 7 + 6));
 
@@ -90,7 +98,7 @@ function AutoEditPage() {
           </span>
           <h1 className="mt-6 text-xl font-bold">Sign in for Auto Edit</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Drop a photo — AI analyzes and enhances it for you.
+            One photo · Motio2AI decides · no prompt required
           </p>
           <Button asChild className="mt-6">
             <Link to="/auth">Sign in</Link>
@@ -121,6 +129,10 @@ function AutoEditPage() {
   const runAnalyze = async (f: File, size: { w: number; h: number } | null) => {
     setBusy(true);
     setStep("analyze");
+    setAnalyzePhase(0);
+    const phaseTimer = setInterval(() => {
+      setAnalyzePhase((p) => Math.min(ANALYZE_PHASES.length - 1, p + 1));
+    }, 900);
     try {
       const imageUrl = await uploadToStorage(f);
       const res = await analyzeFn({
@@ -136,7 +148,6 @@ function AutoEditPage() {
         setSelected(new Set());
         toast.message(res.plan.message);
       } else {
-        // Auto-select all recommended defaults — user does not configure ops
         setSelected(
           new Set(res.plan.operations.filter((o) => o.defaultSelected).map((o) => o.id)),
         );
@@ -146,6 +157,7 @@ function AutoEditPage() {
       setStep("upload");
       toast.error(err instanceof Error ? err.message : "Analysis failed.");
     } finally {
+      clearInterval(phaseTimer);
       setBusy(false);
       autoAnalyzeRef.current = false;
     }
@@ -248,7 +260,6 @@ function AutoEditPage() {
     }
   };
 
-  /** Download via existing watermark architecture (never bypass). */
   const download = async () => {
     if (!output) return;
     setDlBusy(true);
@@ -279,7 +290,6 @@ function AutoEditPage() {
     setHistory([]);
   };
 
-  // Detected findings for display (from plan — no invented %)
   const findings =
     plan?.operations.filter((o) => selected.has(o.id)).map((o) => o.title) ?? [];
   const issueLabels = (plan?.detectedIssues ?? []).map((i) => i.replace(/_/g, " "));
@@ -301,13 +311,12 @@ function AutoEditPage() {
           </span>
           <h1 className="mt-4 text-2xl font-extrabold tracking-tight">Auto Edit</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Upload a photo. AI takes care of the rest.
+            One photo · no prompt · <span className="font-semibold text-foreground">Motio2AI</span> decides
           </p>
         </div>
 
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
 
-        {/* UPLOAD — primary UI */}
         {(step === "upload" || (step === "ready" && !preview)) && (
           <button
             type="button"
@@ -319,11 +328,10 @@ function AutoEditPage() {
               <Upload className="h-6 w-6" />
             </span>
             <span className="text-base font-bold">Upload your photo</span>
-            <span className="text-xs text-muted-foreground">JPG, PNG · up to 25 MB</span>
+            <span className="text-xs text-muted-foreground">One image · JPG, PNG · up to 25 MB</span>
           </button>
         )}
 
-        {/* ANALYZE */}
         {step === "analyze" && (
           <div className="mt-8 space-y-4">
             {preview && (
@@ -331,18 +339,41 @@ function AutoEditPage() {
                 <img src={preview} alt="" className="mx-auto max-h-56 w-full object-contain opacity-80" />
               </div>
             )}
-            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center">
-              <Wand2 className="mx-auto h-8 w-8 animate-pulse text-primary" />
-              <p className="mt-3 text-sm font-bold text-primary">Analyzing your photo…</p>
-              <p className="mt-1 text-xs text-muted-foreground">Detecting quality, lighting, and detail</p>
-              <div className="mx-auto mt-4 h-1.5 w-40 overflow-hidden rounded-full bg-secondary">
-                <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6">
+              <div className="text-center">
+                <Wand2 className="mx-auto h-8 w-8 animate-pulse text-primary" />
+                <p className="mt-3 text-sm font-bold text-primary">Motio2AI is analyzing…</p>
+                <p className="mt-1 text-xs text-muted-foreground">{ANALYZE_PHASES[analyzePhase]}</p>
+              </div>
+              <ul className="mt-5 space-y-2">
+                {ANALYZE_PHASES.map((label, i) => (
+                  <li
+                    key={label}
+                    className={`flex items-center gap-2 text-xs ${
+                      i <= analyzePhase ? "text-foreground" : "text-muted-foreground/50"
+                    }`}
+                  >
+                    <Check
+                      className={`h-3.5 w-3.5 shrink-0 ${
+                        i <= analyzePhase ? "text-primary" : "text-muted-foreground/30"
+                      }`}
+                    />
+                    {label.replace(/…$/, "")}
+                  </li>
+                ))}
+              </ul>
+              <div className="mx-auto mt-4 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-700"
+                  style={{
+                    width: `${Math.min(95, 18 + analyzePhase * 18)}%`,
+                  }}
+                />
               </div>
             </div>
           </div>
         )}
 
-        {/* READY — findings + one enhance button (no prompt, no ops checklist required) */}
         {step === "ready" && plan && preview && (
           <div className="mt-6 space-y-4">
             <div className="overflow-hidden rounded-2xl border border-border">
@@ -353,7 +384,7 @@ function AutoEditPage() {
               <>
                 <div className="rounded-2xl border border-border bg-card p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    We found
+                    Analysis
                   </p>
                   <ul className="mt-3 space-y-2">
                     {issueLabels.length > 0
@@ -372,7 +403,7 @@ function AutoEditPage() {
                   </ul>
                   {analysis?.analysisConfidence != null && (
                     <p className="mt-3 text-[11px] text-muted-foreground">
-                      Analysis confidence {(analysis.analysisConfidence * 100).toFixed(0)}%
+                      Confidence {(analysis.analysisConfidence * 100).toFixed(0)}%
                       {pixelSize ? ` · ${pixelSize.w}×${pixelSize.h}` : ""}
                     </p>
                   )}
@@ -380,32 +411,34 @@ function AutoEditPage() {
 
                 <div className="rounded-2xl border border-border bg-card p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Recommended edits
+                    Recommended improvements
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {findings.map((f) => (
                       <span
                         key={f}
-                        className="rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary"
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary"
                       >
-                        {f}
+                        <Check className="h-3 w-3" /> {f}
                       </span>
                     ))}
                   </div>
                   <p className="mt-3 text-xs text-muted-foreground">
-                    Estimated ~{estSeconds}s · {creditEst.total} credits
-                    {" · "}
-                    Balance: {isAdmin ? "∞" : credits}
+                    Estimated ~{estSeconds}s · {creditEst.total} credits · Balance:{" "}
+                    {isAdmin ? "∞" : credits}
                   </p>
                   <p className="mt-1 text-[10px] text-muted-foreground">{creditEst.note}</p>
                 </div>
 
                 <Button
-                  className="min-h-[48px] w-full text-base"
+                  className="min-h-[52px] w-full text-base font-bold"
                   disabled={busy || noCredits || selectedCount === 0}
                   onClick={runApply}
                 >
-                  <Sparkles className="mr-1.5 h-4 w-4" /> Enhance my photo
+                  <span className="mr-2 grid h-7 w-7 place-items-center rounded-full bg-primary-foreground/20 text-xs font-black">
+                    A✦
+                  </span>
+                  Motio2AI · Enhance
                 </Button>
                 {noCredits && (
                   <p className="text-center text-xs text-destructive">
@@ -421,8 +454,8 @@ function AutoEditPage() {
             {plan.status === "NO_CHANGE" && (
               <div className="rounded-2xl border border-border bg-card p-4 text-center">
                 <p className="text-sm text-muted-foreground">{plan.message}</p>
-                <Button asChild variant="outline" className="mt-4 w-full">
-                  <Link to="/editor">Open Image Editor</Link>
+                <Button variant="outline" className="mt-4 w-full" onClick={reset}>
+                  Try another photo
                 </Button>
               </div>
             )}
@@ -437,7 +470,6 @@ function AutoEditPage() {
           </div>
         )}
 
-        {/* GENERATE */}
         {step === "generate" && (
           <div className="mt-8 space-y-4">
             {preview && (
@@ -447,7 +479,7 @@ function AutoEditPage() {
             )}
             <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center">
               <Sparkles className="mx-auto h-8 w-8 animate-pulse text-primary" />
-              <p className="mt-3 text-sm font-bold text-primary">AI is restoring your photo</p>
+              <p className="mt-3 text-sm font-bold text-primary">Motio2AI is improving your photo</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {progressLabel ? `Working: ${progressLabel}` : "Applying recommended edits…"}
               </p>
@@ -464,7 +496,6 @@ function AutoEditPage() {
           </div>
         )}
 
-        {/* RESULT */}
         {step === "result" && output && preview && (
           <section className="mt-6 space-y-4">
             {history.length > 0 && (
@@ -492,7 +523,7 @@ function AutoEditPage() {
                   navigate({ to: "/editor" });
                 }}
               >
-                Use in Image Studio
+                Continue in Editor
               </Button>
             </div>
             <Button variant="ghost" className="w-full" onClick={reset}>
