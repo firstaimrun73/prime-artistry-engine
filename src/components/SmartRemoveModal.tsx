@@ -1,16 +1,26 @@
 // Professional masking system for "Circle to Remove".
 //
-// Produces a black/white mask (white = area to remove) that feeds the
-// inpainting pipeline. Includes brush + erase, opacity/hardness/feather,
-// zoom + pan, mask overlay toggle, invert, undo/redo, and before/after view.
+// Mobile-first UI: large image, preserved aspect ratio, compact bottom controls.
+// Keeps desktop controls intact. Produces a hard B/W mask PNG via onApply(maskDataUrl).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
-  X, Eraser, Check, Brush, ZoomIn, ZoomOut, Undo2, Redo2,
-  Move, EyeOff, Eye, FlipHorizontal2, RotateCcw,
+  X,
+  Eraser,
+  Check,
+  Brush,
+  ZoomIn,
+  ZoomOut,
+  Undo2,
+  Redo2,
+  Move,
+  EyeOff,
+  Eye,
+  FlipHorizontal2,
+  RotateCcw,
 } from "lucide-react";
 
 type Props = {
@@ -29,9 +39,11 @@ const MAX_HISTORY = 30;
 
 export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const maskCanvasRef = useRef<HTMLCanvasElement>(null);   // natural-resolution raw mask (alpha only)
-  const viewCanvasRef = useRef<HTMLCanvasElement>(null);   // on-screen composite
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null); // natural-resolution raw mask (alpha only)
+  const viewCanvasRef = useRef<HTMLCanvasElement>(null); // on-screen composite
   const viewportRef = useRef<HTMLDivElement>(null);
+  const bottomControlsRef = useRef<HTMLDivElement | null>(null);
+
   const drawingRef = useRef(false);
   const lastPtRef = useRef<{ x: number; y: number } | null>(null);
   const panningRef = useRef(false);
@@ -49,8 +61,8 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const [tool, setTool] = useState<Tool>("brush");
   const [brush, setBrush] = useState(40);
   const [opacity, setOpacity] = useState(100);
-  const [hardness, setHardness] = useState(80);   // 100 = crisp, lower = softer edge
-  const [feather, setFeather] = useState(2);      // extra soft edge (px, in natural res)
+  const [hardness, setHardness] = useState(80); // 100 = crisp, lower = softer edge
+  const [feather, setFeather] = useState(2); // extra soft edge (px, in natural res)
   const [overlayOpacity, setOverlayOpacity] = useState(55);
   const [showMask, setShowMask] = useState(true);
   const [zoom, setZoom] = useState(1);
@@ -66,6 +78,15 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   useEffect(() => {
     setBrush((b) => Math.min(b, maxBrush));
   }, [maxBrush]);
+
+  // Track window size so fit calculations stay accurate on resize
+  const [winSize, setWinSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const onResize = () => setWinSize({ w: window.innerWidth, h: window.innerHeight });
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Reset on open/close
   useEffect(() => {
@@ -90,13 +111,15 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       : null;
   };
 
-  // Fit image inside viewport at zoom=1
+  // Fit image inside viewport at zoom=1 — subtract the real bottom control height
   const fitScale = useMemo(() => {
     const vp = viewportRef.current;
     const n = naturalSize();
     if (!vp || !n) return 1;
-    return Math.min(vp.clientWidth / n.w, vp.clientHeight / n.h, 1);
-  }, [ready, open]);
+    const bottomH = bottomControlsRef.current?.clientHeight ?? 0;
+    const availableH = Math.max(100, vp.clientHeight - bottomH);
+    return Math.min(vp.clientWidth / n.w, availableH / n.h, 1);
+  }, [ready, open, winSize.w, winSize.h, isMobile]);
 
   const displayScale = fitScale * zoom;
 
@@ -312,7 +335,11 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     continueStroke(e.clientX, e.clientY);
   };
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    try { (e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    try {
+      (e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
     if (panningRef.current) {
       panningRef.current = false;
       panStartRef.current = null;
@@ -336,14 +363,24 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.code === "Space") { spaceDownRef.current = true; e.preventDefault(); return; }
+      if (e.code === "Space") {
+        spaceDownRef.current = true;
+        e.preventDefault();
+        return;
+      }
       if (e.key === "[") setBrush((b) => Math.max(1, b - 2));
       if (e.key === "]") setBrush((b) => Math.min(maxBrush, b + 2));
       if (e.key.toLowerCase() === "b") setTool("brush");
       if (e.key.toLowerCase() === "e") setTool("erase");
       if (e.key.toLowerCase() === "m") setShowMask((v) => !v);
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
-      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) { e.preventDefault(); redo(); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) {
+        e.preventDefault();
+        redo();
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === "Space") spaceDownRef.current = false;
@@ -367,7 +404,10 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     // Recompute hasMark quickly
     let any = false;
     for (let i = 3; i < snap.data.length; i += 4) {
-      if (snap.data[i] > 0) { any = true; break; }
+      if (snap.data[i] > 0) {
+        any = true;
+        break;
+      }
     }
     setHasMark(any);
   };
@@ -407,7 +447,9 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     if (!ctx) return;
     const img = ctx.getImageData(0, 0, c.width, c.height);
     for (let i = 0; i < img.data.length; i += 4) {
-      img.data[i] = 255; img.data[i + 1] = 255; img.data[i + 2] = 255;
+      img.data[i] = 255;
+      img.data[i + 1] = 255;
+      img.data[i + 2] = 255;
       img.data[i + 3] = 255 - img.data[i + 3];
     }
     ctx.putImageData(img, 0, 0);
@@ -450,9 +492,16 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       for (let i = 0; i < src.data.length; i += 4) {
         const on = src.data[i + 3] >= 24 ? 255 : 0;
         if (on) painted++;
-        bw.data[i] = on; bw.data[i + 1] = on; bw.data[i + 2] = on; bw.data[i + 3] = 255;
+        bw.data[i] = on;
+        bw.data[i + 1] = on;
+        bw.data[i + 2] = on;
+        bw.data[i + 3] = 255;
       }
-      if (painted === 0) { setApplying(false); setHasMark(false); return; }
+      if (painted === 0) {
+        setApplying(false);
+        setHasMark(false);
+        return;
+      }
       octx.putImageData(bw, 0, 0);
       // Keep the processing overlay up (and drawing disabled) until the parent
       // closes the modal after the AI result comes back.
@@ -470,63 +519,71 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const dispH = n ? Math.round(n.h * displayScale) : 0;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col bg-black/85"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-white/10 bg-background/95 px-4 py-3">
-        <div>
-          <h2 className="text-base font-bold">Circle to Remove</h2>
-          <p className="text-xs text-muted-foreground">
-            Paint what you want gone. Costs 25 credits. Space = pan · [/] = brush size · Ctrl+Z / Ctrl+Y = undo/redo
-          </p>
-        </div>
-        <button onClick={onCancel} className="rounded-md p-2 text-muted-foreground hover:bg-secondary" aria-label="Close">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-background/95 px-4 py-2 text-xs">
-        <div className="inline-flex overflow-hidden rounded-md border border-border">
-          <button onClick={() => setTool("brush")} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 ${tool === "brush" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
-            <Brush className="h-3.5 w-3.5" /> Brush
-          </button>
-          <button onClick={() => setTool("erase")} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 ${tool === "erase" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
-            <Eraser className="h-3.5 w-3.5" /> Erase
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/85" role="dialog" aria-modal="true">
+      {/* Top bar (desktop only) */}
+      {!isMobile && (
+        <div className="flex items-center justify-between border-b border-white/10 bg-background/95 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold">Circle to Remove</h2>
+            <p className="text-xs text-muted-foreground">
+              Paint what you want gone. Costs 25 credits. Space = pan · [/] = brush size · Ctrl+Z / Ctrl+Y = undo/redo
+            </p>
+          </div>
+          <button onClick={onCancel} className="rounded-md p-2 text-muted-foreground hover:bg-secondary" aria-label="Close">
+            <X className="h-4 w-4" />
           </button>
         </div>
+      )}
 
-        <div className="inline-flex items-center gap-1 rounded-md border border-border px-1">
-          <button onClick={() => stepZoom(-1)} className="p-1.5 hover:bg-secondary" aria-label="Zoom out"><ZoomOut className="h-3.5 w-3.5" /></button>
-          <span className="tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
-          <button onClick={() => stepZoom(1)} className="p-1.5 hover:bg-secondary" aria-label="Zoom in"><ZoomIn className="h-3.5 w-3.5" /></button>
+      {/* Toolbar (desktop only) */}
+      {!isMobile && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-background/95 px-4 py-2 text-xs">
+          <div className="inline-flex overflow-hidden rounded-md border border-border">
+            <button
+              onClick={() => setTool("brush")}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 ${tool === "brush" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+              <Brush className="h-3.5 w-3.5" /> Brush
+            </button>
+            <button
+              onClick={() => setTool("erase")}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 ${tool === "erase" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+              <Eraser className="h-3.5 w-3.5" /> Erase
+            </button>
+          </div>
+
+          <div className="inline-flex items-center gap-1 rounded-md border border-border px-1">
+            <button onClick={() => stepZoom(-1)} className="p-1.5 hover:bg-secondary" aria-label="Zoom out">
+              <ZoomOut className="h-3.5 w-3.5" />
+            </button>
+            <span className="tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button onClick={() => stepZoom(1)} className="p-1.5 hover:bg-secondary" aria-label="Zoom in">
+              <ZoomIn className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <button onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary">
+            <Move className="h-3.5 w-3.5" /> Fit
+          </button>
+
+          <button onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
+            <Undo2 className="h-3.5 w-3.5" /> Undo
+          </button>
+          <button onClick={redo} disabled={!canRedo} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
+            <Redo2 className="h-3.5 w-3.5" /> Redo
+          </button>
+
+          <button onClick={invertMask} disabled={!hasMark} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
+            <FlipHorizontal2 className="h-3.5 w-3.5" /> Invert
+          </button>
+          <button onClick={clearMask} disabled={!hasMark} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
+            <RotateCcw className="h-3.5 w-3.5" /> Clear
+          </button>
+          <button onClick={() => setShowMask((v) => !v)} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary">
+            {showMask ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {showMask ? "Hide mask" : "Show mask"}
+          </button>
         </div>
-
-        <button onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary">
-          <Move className="h-3.5 w-3.5" /> Fit
-        </button>
-
-        <button onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
-          <Undo2 className="h-3.5 w-3.5" /> Undo
-        </button>
-        <button onClick={redo} disabled={!canRedo} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
-          <Redo2 className="h-3.5 w-3.5" /> Redo
-        </button>
-
-        <button onClick={invertMask} disabled={!hasMark} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
-          <FlipHorizontal2 className="h-3.5 w-3.5" /> Invert
-        </button>
-        <button onClick={clearMask} disabled={!hasMark} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
-          <RotateCcw className="h-3.5 w-3.5" /> Clear
-        </button>
-        <button onClick={() => setShowMask((v) => !v)} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary">
-          {showMask ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-          {showMask ? "Hide mask" : "Show mask"}
-        </button>
-      </div>
+      )}
 
       {/* Stage */}
       <div
@@ -578,47 +635,100 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
         )}
       </div>
 
-      {/* Settings + actions */}
-      <div className="space-y-3 border-t border-white/10 bg-background/95 p-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-          <SliderRow label="Size" value={brush} min={1} max={maxBrush} onChange={setBrush} suffix="px" />
-          <SliderRow label="Opacity" value={opacity} min={10} max={100} onChange={setOpacity} suffix="%" />
-          <SliderRow label="Hardness" value={hardness} min={0} max={100} onChange={setHardness} suffix="%" />
-          <SliderRow label="Feather" value={feather} min={0} max={20} onChange={setFeather} suffix="px" />
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <SliderRow label="Overlay" value={overlayOpacity} min={10} max={100} onChange={setOverlayOpacity} suffix="%" />
+      {/* Settings + actions — mobile compact version */}
+      {isMobile ? (
+        <div ref={bottomControlsRef} className="space-y-2 border-t border-white/10 bg-background/95 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="inline-flex overflow-hidden rounded-md border border-border">
+              <button onClick={() => setTool("brush")} className={`inline-flex items-center gap-2 px-3 py-2 ${tool === "brush" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+                <Brush className="h-4 w-4" />
+              </button>
+              <button onClick={() => setTool("erase")} className={`inline-flex items-center gap-2 px-3 py-2 ${tool === "erase" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+                <Eraser className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 hover:bg-secondary disabled:opacity-40">
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button onClick={redo} disabled={!canRedo} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 hover:bg-secondary disabled:opacity-40">
+                <Redo2 className="h-4 w-4" />
+              </button>
+              <button onClick={clearMask} disabled={!hasMark} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 hover:bg-secondary disabled:opacity-40">
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">Brush</span>
+            <Slider value={[brush]} min={4} max={maxBrush} step={1} onValueChange={(v) => setBrush(v[0])} />
+            <span className="w-12 text-right tabular-nums text-sm">{brush}px</span>
+          </div>
+
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={onCancel} disabled={applying}>Cancel</Button>
+            <Button
+              onClick={apply}
+              disabled={!hasMark || applying}
+              className="h-12 w-44 bg-orange-500 text-base font-semibold text-white shadow-lg hover:bg-orange-600 disabled:opacity-60"
+            >
+              {applying ? (
+                <>
+                  <Check className="mr-1.5 h-4 w-4 animate-pulse" /> Removing…
+                </>
+              ) : hasMark ? (
+                <>Remove</>
+              ) : (
+                <>Paint to remove</>
+              )}
+            </Button>
           </div>
         </div>
+      ) : (
+        <div ref={bottomControlsRef} className="space-y-3 border-t border-white/10 bg-background/95 p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <SliderRow label="Size" value={brush} min={1} max={maxBrush} onChange={setBrush} suffix="px" />
+            <SliderRow label="Opacity" value={opacity} min={10} max={100} onChange={setOpacity} suffix="%" />
+            <SliderRow label="Hardness" value={hardness} min={0} max={100} onChange={setHardness} suffix="%" />
+            <SliderRow label="Feather" value={feather} min={0} max={20} onChange={setFeather} suffix="px" />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <SliderRow label="Overlay" value={overlayOpacity} min={10} max={100} onChange={setOverlayOpacity} suffix="%" />
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="ghost" onClick={onCancel} disabled={applying}>Cancel</Button>
+            </div>
+          </div>
 
-        {/* Primary action: large full-width button under the canvas. */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-          <Button
-            onClick={apply}
-            disabled={!hasMark || applying}
-            className="btn-animate h-12 w-full bg-orange-500 text-base font-semibold text-white shadow-lg hover:bg-orange-600 disabled:opacity-60"
-          >
-            {applying ? (
-              <><Check className="mr-1.5 h-4 w-4 animate-pulse" /> Removing…</>
-            ) : hasMark ? (
-              <>✨ Remove Selected Area</>
-            ) : (
-              <>Paint an area to remove</>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={clearMask}
-            disabled={!hasMark || applying}
-            className="btn-animate h-12 whitespace-nowrap"
-          >
-            <RotateCcw className="mr-1.5 h-4 w-4" /> Clear &amp; Try Again
-          </Button>
+          {/* Primary action: large full-width button under the canvas. */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+            <Button
+              onClick={apply}
+              disabled={!hasMark || applying}
+              className="btn-animate h-12 w-full bg-orange-500 text-base font-semibold text-white shadow-lg hover:bg-orange-600 disabled:opacity-60"
+            >
+              {applying ? (
+                <>
+                  <Check className="mr-1.5 h-4 w-4 animate-pulse" /> Removing…
+                </>
+              ) : hasMark ? (
+                <>✨ Remove Selected Area</>
+              ) : (
+                <>Paint an area to remove</>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={clearMask}
+              disabled={!hasMark || applying}
+              className="btn-animate h-12 whitespace-nowrap"
+            >
+              <RotateCcw className="mr-1.5 h-4 w-4" /> Clear &amp; Try Again
+            </Button>
+          </div>
+
         </div>
-
-      </div>
+      )}
     </div>
   );
 }
@@ -626,7 +736,12 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
 function SliderRow({
   label, value, min, max, onChange, suffix,
 }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void; suffix?: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+  suffix?: string;
 }) {
   return (
     <div className="flex items-center gap-3 text-xs">
