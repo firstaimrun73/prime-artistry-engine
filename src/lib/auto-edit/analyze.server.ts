@@ -8,8 +8,6 @@
 import type { ImageAnalysisResult, ImageDimensions } from "./types";
 import { ANALYSIS_MODEL, ANALYSIS_MAX_TOKENS } from "./config";
 import { classifyScene } from "./analysis/scene";
-import { analyzePeople, analyzeFaces } from "./analysis/people";
-import { analyzeBackground, analyzeLighting } from "./analysis/lighting";
 import { buildQualityAnalysis } from "./analysis/technical";
 
 const VISION_SYSTEM_PROMPT = `You are a professional photo analyst and image quality expert.Analyze the provided image in complete technical detail.Your response MUST be structured JSON with this exact schema:{ "scene": "description of the scene type", "peopleCount": 0, "hasPrimarySubject": true, "hasBackgroundPeople": false, "hasPhotobombers": false, "hasPartiallyVisiblePeople": false, "faceDetected": true, "faceCount": 1, "faceBlurry": false, "faceHasArtifacts": false, "redEye": false, "facePoorLighting": false, "faceOccluded": false, "isOldPhoto": false, "isNightPhoto": false, "isLowLight": false, "qualityIssues": [], "restorationIssues": [], "backgroundCluttered": false, "backgroundHasDistractingElements": false, "backgroundHasUnwantedObjects": false, "lightingUnderexposed": false, "lightingOverexposed": false, "lightingUneven": false, "colorTemperatureOff": false, "overallQualityScore": 0.8, "analysisConfidence": 0.9, "plainTextSummary": "A brief plain text description of the main issues and what can be improved."}qualityIssues can include: blur, motion_blur, defocus, noise, compression_artifacts, pixelation, overexposed, underexposed, low_contrast, color_cast, oversharpened, low_resolution, missing_detailrestorationIssues can include: fading, scratches, cracks, dust, stains, tears, damaged_regions, monochrome_aged, color_lossBe accurate. Do not hallucinate problems that are not present.If the image is in good condition, return overallQualityScore close to 1.0.Return ONLY the JSON object — no markdown, no explanation.`.trim();
@@ -27,7 +25,7 @@ interface VisionJSON {
   faceHasArtifacts?: boolean;
   redEye?: boolean;
   facePoorLighting?: boolean;
-  faceOccluded?: false;
+  faceOccluded?: boolean;
   isOldPhoto?: boolean;
   isNightPhoto?: boolean;
   isLowLight?: boolean;
@@ -102,18 +100,21 @@ async function callAnthropicVision(
   return parsed;
 }
 
-function placeholderDimensions(): ImageDimensions {
+function resolveDimensions(provided?: { width?: number; height?: number }): ImageDimensions {
+  const width = provided?.width && provided.width > 0 ? provided.width : 0;
+  const height = provided?.height && provided.height > 0 ? provided.height : 0;
   return {
-    width: 0,
-    height: 0,
-    aspectRatio: 1,
-    megapixels: 0,
+    width,
+    height,
+    aspectRatio: height > 0 ? width / height : 1,
+    megapixels: width > 0 && height > 0 ? (width * height) / 1_000_000 : 0,
   };
 }
 
 export async function analyzeImage(
   imageUrl: string,
   anthropicApiKey: string,
+  providedDims?: { width?: number; height?: number },
 ): Promise<ImageAnalysisResult> {
   if (!imageUrl.startsWith("https://")) {
     throw new Error("Image URL must be a valid https:// URL for analysis.");
@@ -128,14 +129,16 @@ export async function analyzeImage(
   }
 
   const plainText = visionData.plainTextSummary ?? JSON.stringify(visionData);
-
+  const dimensions = resolveDimensions(providedDims);
   const scene = classifyScene(`${visionData.scene ?? ""} ${plainText}`);
 
   const people = {
     count: visionData.peopleCount ?? 0,
     hasPrimarySubject: visionData.hasPrimarySubject ?? false,
     hasSecondaryPeople:
-      (visionData.peopleCount ?? 0) > 1 || (visionData.hasBackgroundPeople ?? false) || (visionData.hasPhotobombers ?? false),
+      (visionData.peopleCount ?? 0) > 1 ||
+      (visionData.hasBackgroundPeople ?? false) ||
+      (visionData.hasPhotobombers ?? false),
     hasBackgroundPeople: visionData.hasBackgroundPeople ?? false,
     hasPhotobombers: visionData.hasPhotobombers ?? false,
     hasPartiallyVisiblePeople: visionData.hasPartiallyVisiblePeople ?? false,
@@ -169,24 +172,26 @@ export async function analyzeImage(
     colorTemperatureOff: visionData.colorTemperatureOff ?? false,
   };
 
-  const quality = buildQualityAnalysis(plainText, placeholderDimensions());
+  const quality = buildQualityAnalysis(plainText, dimensions);
 
   const mergedIssues = [
     ...quality.issues,
-    ...(visionData.qualityIssues ?? []).filter((i) => !quality.issues.includes(i as typeof quality.issues[number])),
+    ...(visionData.qualityIssues ?? []).filter(
+      (i) => !quality.issues.includes(i as (typeof quality.issues)[number]),
+    ),
   ] as typeof quality.issues;
 
   const mergedRestoration = [
     ...quality.restorationIssues,
     ...(visionData.restorationIssues ?? []).filter(
-      (i) => !quality.restorationIssues.includes(i as typeof quality.restorationIssues[number]),
+      (i) => !quality.restorationIssues.includes(i as (typeof quality.restorationIssues)[number]),
     ),
   ] as typeof quality.restorationIssues;
 
   const isOldPhoto = visionData.isOldPhoto ?? quality.isOldPhoto;
 
   return {
-    dimensions: placeholderDimensions(),
+    dimensions,
     scene,
     people,
     faces,
