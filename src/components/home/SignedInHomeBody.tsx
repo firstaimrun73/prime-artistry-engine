@@ -158,7 +158,7 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* Auto Edit — short, not a lecture */}
+      {/* Auto Edit — dedicated workflow page */}
       <section className="mt-6 rounded-xl border border-border bg-card p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
@@ -167,12 +167,11 @@ export function SignedInHomeBody() {
               <h2 className="text-sm font-bold">Auto Edit</h2>
             </div>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              Describe what you want in plain language — e.g. “Remove the person behind me.”
-              Opens in the Image Editor.
+              Upload a photo, review AI suggestions, and apply real edits — not just a prompt preset.
             </p>
           </div>
           <Button asChild size="sm" className="w-full shrink-0 sm:w-auto">
-            <Link to="/editor">Try Auto Edit</Link>
+            <Link to="/studio/image/auto-edit">Open Auto Edit</Link>
           </Button>
         </div>
       </section>
