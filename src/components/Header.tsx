@@ -26,8 +26,9 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/tickets", label: "Tickets" },
 ];
 
+/** Auth users: Studio hub (not a lone Image Editor link). */
 const AUTH_LINKS_BASE: NavItem[] = [
-  { to: "/editor", label: "Editor" },
+  { to: "/studio", label: "Studio" },
   { to: "/history", label: "History" },
 ];
 
@@ -43,7 +44,13 @@ export function Header() {
   const authLinks: NavItem[] = showChat
     ? [...AUTH_LINKS_BASE, CHAT_LINK]
     : AUTH_LINKS_BASE;
-  const links: NavItem[] = [...PUBLIC_LINKS, ...(user ? authLinks : [])];
+  // Dedupe Studio when already in PUBLIC_LINKS for signed-in users
+  const links: NavItem[] = user
+    ? [
+        ...PUBLIC_LINKS.filter((l) => l.to !== "/studio"),
+        ...authLinks,
+      ]
+    : PUBLIC_LINKS;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">

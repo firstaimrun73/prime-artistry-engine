@@ -27,6 +27,8 @@ import type { ImageAnalysisResult } from "@/lib/auto-edit/types";
 import { type ImageQuality } from "@/lib/quality-options";
 import { supabase } from "@/integrations/supabase/client";
 import { isAdminEmail } from "@/lib/admin-config";
+import { secureDownloadImage } from "@/lib/download.functions";
+import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/studio/image/auto-edit")({
@@ -50,6 +52,7 @@ function AutoEditPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const analyzeFn = useServerFn(analyzeForAutoEdit);
   const generate = useServerFn(generateMedia);
+  const secureDl = useServerFn(secureDownloadImage);
 
   const [step, setStep] = useState<Step>("upload");
   const [preview, setPreview] = useState<string | null>(null);
@@ -64,6 +67,7 @@ function AutoEditPage() {
   const [progressLabel, setProgressLabel] = useState("");
   const [progressPct, setProgressPct] = useState(8);
   const [busy, setBusy] = useState(false);
+  const [dlBusy, setDlBusy] = useState(false);
   const autoAnalyzeRef = useRef(false);
 
   const isAdmin = isAdminEmail(profile?.email);
@@ -244,15 +248,24 @@ function AutoEditPage() {
     }
   };
 
-  const download = () => {
+  /** Download via existing watermark architecture (never bypass). */
+  const download = async () => {
     if (!output) return;
-    const a = document.createElement("a");
-    a.href = output;
-    a.download = `motio2edit-auto-edit-${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    toast.success("Download started");
+    setDlBusy(true);
+    try {
+      const res = await secureDl({
+        data: { imageUrl: output },
+      });
+      await triggerBrowserDownload(
+        res.downloadUrl,
+        `motio2edit-auto-edit-${Date.now()}.jpg`,
+      );
+      toast.success(res.watermarked ? "Download started (branded)" : "Download started");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Download failed.");
+    } finally {
+      setDlBusy(false);
+    }
   };
 
   const reset = () => {
@@ -461,8 +474,8 @@ function AutoEditPage() {
             )}
             <CompareSlider before={preview} after={output} />
             <div className="grid grid-cols-2 gap-2">
-              <Button onClick={download}>
-                <Download className="mr-1.5 h-4 w-4" /> Download
+              <Button onClick={download} disabled={dlBusy}>
+                <Download className="mr-1.5 h-4 w-4" /> {dlBusy ? "Preparing…" : "Download"}
               </Button>
               <Button
                 variant="outline"
