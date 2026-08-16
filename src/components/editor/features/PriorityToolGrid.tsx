@@ -16,22 +16,23 @@ export type PriorityToolAction =
   | { kind: "prompt"; id: string; label: string; prompt: string; icon: LucideIcon }
   | { kind: "circle-remove"; id: string; label: string; icon: LucideIcon }
   | { kind: "crop"; id: string; label: string; icon: LucideIcon }
-  | { kind: "route"; id: string; label: string; icon: LucideIcon; to: string };
+  | { kind: "route"; id: string; label: string; icon: LucideIcon; mode: "remove" | "add" };
 
 /** Real-feature priority tools — prefer dedicated UI/routes over prompt chips. */
 export const PRIORITY_TOOLS: PriorityToolAction[] = [
   {
-    kind: "circle-remove",
+    kind: "route",
     id: "circle-remove",
     label: "Circle to Remove",
     icon: Eraser,
+    mode: "remove",
   },
   {
     kind: "route",
     id: "circle-add",
     label: "Circle to Add",
     icon: Wand2,
-    to: "/studio/image/circle-remove?mode=add",
+    mode: "add",
   },
   {
     kind: "crop",
@@ -168,8 +169,14 @@ export function PriorityToolGrid({
               <Link
                 key={t.id}
                 to="/studio/image/circle-remove"
-                search={{ mode: t.id === "circle-add" ? "add" : "remove" } as never}
                 className={cn(base, (disabled || !hasImage) && "pointer-events-none opacity-50")}
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem("motio2edit-circle-mode", t.mode);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
               >
                 <Icon className="h-4 w-4 shrink-0 text-primary" />
                 <span className="leading-tight">{t.label}</span>
