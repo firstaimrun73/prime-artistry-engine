@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
 import { X, ChevronLeft, ChevronRight, ZoomIn, Images, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import bgRemoval from "@/assets/samples/bg-removal.png.asset.json";
@@ -20,14 +21,62 @@ type GalleryItem = {
 };
 
 export const GALLERY_ITEMS: GalleryItem[] = [
-  { title: "Background Removal", caption: "Clean cut-outs with crisp edges", url: bgRemoval.url, beforeAfter: true, category: "Image", time: "~8s", prompt: "Remove the background completely and keep clean edges" },
-  { title: "Object Removal", caption: "Erase people and objects seamlessly", url: objectRemoval.url, beforeAfter: true, category: "Image", time: "~15s", prompt: "Remove all people from the scene and rebuild the background naturally" },
-  { title: "Photo Restoration", caption: "Repair and colorise old memories", url: photoRestoration.url, beforeAfter: true, category: "Image", time: "~20s", prompt: "Restore this old damaged photo and colorise it naturally" },
-  { title: "Face Enhancement", caption: "Studio-grade portrait retouching", url: faceEnhance.url, beforeAfter: true, category: "Portrait", time: "~12s", prompt: "Enhance the face, skin and lighting while keeping the identity identical" },
-  { title: "AI Upscaling", caption: "Low-res to razor sharp 4K", url: aiUpscaling.url, beforeAfter: true, category: "Enhance", time: "~25s", prompt: "Upscale this image to 4K with maximum detail" },
-  { title: "Style Transfer", caption: "Reimagine any shot as fine art", url: styleTransfer.url, beforeAfter: true, category: "Style", time: "~18s", prompt: "Repaint this photo as a detailed oil painting while keeping the composition identical" },
+  {
+    title: "Background Removal",
+    caption: "Clean cut-outs",
+    url: bgRemoval.url,
+    beforeAfter: true,
+    category: "Image",
+    time: "~8s",
+    prompt: "Remove the background completely and keep clean edges",
+  },
+  {
+    title: "Object Removal",
+    caption: "Erase people and objects",
+    url: objectRemoval.url,
+    beforeAfter: true,
+    category: "Image",
+    time: "~15s",
+    prompt: "Remove all people from the scene and rebuild the background naturally",
+  },
+  {
+    title: "Photo Restoration",
+    caption: "Repair old memories",
+    url: photoRestoration.url,
+    beforeAfter: true,
+    category: "Image",
+    time: "~20s",
+    prompt: "Restore this old damaged photo and colorise it naturally",
+  },
+  {
+    title: "Face Enhancement",
+    caption: "Studio-grade portraits",
+    url: faceEnhance.url,
+    beforeAfter: true,
+    category: "Portrait",
+    time: "~12s",
+    prompt: "Enhance the face, skin and lighting while keeping the identity identical",
+  },
+  {
+    title: "AI Upscaling",
+    caption: "Low-res to sharp",
+    url: aiUpscaling.url,
+    beforeAfter: true,
+    category: "Enhance",
+    time: "~25s",
+    prompt: "Upscale this image to 4K with maximum detail",
+  },
+  {
+    title: "Style Transfer",
+    caption: "Fine-art restyle",
+    url: styleTransfer.url,
+    beforeAfter: true,
+    category: "Style",
+    time: "~18s",
+    prompt:
+      "Repaint this photo as a detailed oil painting while keeping the composition identical",
+  },
 ];
-
 
 function Skeleton() {
   return <div className="absolute inset-0 animate-pulse bg-secondary" />;
@@ -35,6 +84,7 @@ function Skeleton() {
 
 export function SampleGallery() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [zoomed, setZoomed] = useState(false);
   const [loaded, setLoaded] = useState<Record<number, boolean>>({});
@@ -45,9 +95,9 @@ export function SampleGallery() {
     } catch {
       /* ignore */
     }
-    navigate({ to: "/editor" });
+    if (user) navigate({ to: "/editor" });
+    else navigate({ to: "/auth", search: { redirect: "/editor" } });
   };
-
 
   const close = useCallback(() => {
     setOpenIndex(null);
@@ -85,10 +135,9 @@ export function SampleGallery() {
         <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
           <Images className="h-3.5 w-3.5 text-primary" /> Sample Gallery
         </span>
-        <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">Real edits made with MOTIO2EDIT</h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Tap any sample to view it fullscreen with zoom and navigation.
-        </p>
+        <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">
+          Real edits made with MOTIO2EDIT
+        </h2>
       </div>
 
       <div className="mt-6 grid grid-cols-1 items-stretch gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
@@ -142,7 +191,6 @@ export function SampleGallery() {
             </div>
           </article>
         ))}
-
       </div>
 
       {active && (

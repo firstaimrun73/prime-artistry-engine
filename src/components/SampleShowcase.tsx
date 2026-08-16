@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Eraser, Film, Music, Pause, Play, Sparkles } from "lucide-react";
 import { IMAGE_SAMPLES, VIDEO_SAMPLES, MUSIC_SAMPLES } from "@/data/samples";
@@ -16,6 +17,7 @@ function Waveform({ active }: { active: boolean }) {
 
 export function SampleShowcase() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -61,29 +63,26 @@ export function SampleShowcase() {
     stopTimer.current = setTimeout(stopAudio, 15000);
   };
 
-  const tryEdit = (sample: (typeof IMAGE_SAMPLES)[number]) => {
+  const goEditor = (payload: { prompt: string; mode: string; smartRemove?: boolean }) => {
     try {
-      sessionStorage.setItem(
-        "motio2edit-preset",
-        JSON.stringify({
-          prompt: sample.prompt,
-          mode: "image",
-          smartRemove: !!sample.smartRemove,
-        }),
-      );
+      sessionStorage.setItem("motio2edit-preset", JSON.stringify(payload));
     } catch {
       /* ignore */
     }
-    navigate({ to: "/editor" });
+    if (user) navigate({ to: "/editor" });
+    else navigate({ to: "/auth", search: { redirect: "/editor" } });
+  };
+
+  const tryEdit = (sample: (typeof IMAGE_SAMPLES)[number]) => {
+    goEditor({
+      prompt: sample.prompt,
+      mode: "image",
+      smartRemove: !!sample.smartRemove,
+    });
   };
 
   const tryVideo = (prompt: string) => {
-    try {
-      sessionStorage.setItem("motio2edit-preset", JSON.stringify({ prompt, mode: "video" }));
-    } catch {
-      /* ignore */
-    }
-    navigate({ to: "/editor" });
+    goEditor({ prompt, mode: "video" });
   };
 
   const tryMusic = (prompt: string) => {
@@ -92,7 +91,8 @@ export function SampleShowcase() {
     } catch {
       /* ignore */
     }
-    navigate({ to: "/music" });
+    if (user) navigate({ to: "/music" });
+    else navigate({ to: "/auth", search: { redirect: "/music" } });
   };
 
   const active = IMAGE_SAMPLES[index];
@@ -106,9 +106,6 @@ export function SampleShowcase() {
         <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">
           See what Motio<span className="text-primary">2</span>edit can do
         </h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Swipe through before and after examples, then open the same edit in the studio.
-        </p>
       </div>
 
       <div
@@ -142,14 +139,17 @@ export function SampleShowcase() {
                   { src: s.before!, tag: "Before" },
                   { src: s.after!, tag: "After" },
                 ].map((img) => (
-                  <figure key={img.tag} className="relative overflow-hidden rounded-2xl border border-border">
+                  <figure
+                    key={img.tag}
+                    className="relative overflow-hidden rounded-2xl border border-border bg-secondary"
+                  >
                     <img
                       src={img.src}
                       alt={`${s.title} — ${img.tag}`}
                       loading="lazy"
                       width={500}
                       height={500}
-                      className="protected-image aspect-square w-full bg-secondary object-cover"
+                      className="protected-image aspect-square w-full object-contain object-center"
                       draggable={false}
                     />
                     <figcaption
@@ -204,7 +204,7 @@ export function SampleShowcase() {
       <div className="mt-10 sm:mt-12">
         <div className="flex items-center gap-2">
           <Film className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-bold">Video ideas to start with</h3>
+          <h3 className="text-lg font-bold">Video ideas</h3>
         </div>
         <div className="mt-4 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {VIDEO_SAMPLES.map((v) => (
@@ -235,22 +235,17 @@ export function SampleShowcase() {
                 <span className="absolute left-3 top-3 rounded-full bg-background/85 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide backdrop-blur">
                   {v.badge}
                 </span>
-                <span className="absolute bottom-3 right-3 flex gap-1.5">
-                  <span className="rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">
-                    {v.duration}
-                  </span>
-                  <span className="rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">
-                    1080p
-                  </span>
+                <span className="absolute bottom-3 right-3 rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">
+                  {v.duration}
                 </span>
               </button>
-              <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+              <div className="flex min-w-0 flex-1 flex-col p-4">
                 <p className="truncate font-bold">{v.title}</p>
-                <p className="mt-2 line-clamp-3 flex-1 text-sm text-muted-foreground">{v.prompt}</p>
+                <p className="mt-1 line-clamp-2 flex-1 text-xs text-muted-foreground">{v.description}</p>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="btn-animate mt-4"
+                  className="btn-animate mt-3"
                   onClick={() => tryVideo(v.prompt)}
                 >
                   Generate similar
@@ -264,7 +259,7 @@ export function SampleShowcase() {
       <div className="mt-10 sm:mt-12">
         <div className="flex items-center gap-2">
           <Music className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-bold">Music prompts to start with</h3>
+          <h3 className="text-lg font-bold">Music ideas</h3>
         </div>
         <div className="mt-4 grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {MUSIC_SAMPLES.map((m) => {
@@ -272,7 +267,7 @@ export function SampleShowcase() {
             return (
               <div
                 key={m.id}
-                className="flex h-full min-w-0 flex-col rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary sm:p-5"
+                className="flex h-full min-w-0 flex-col rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-2xl" aria-hidden>
@@ -299,7 +294,6 @@ export function SampleShowcase() {
                   <Waveform active={!!isPlaying} />
                 </div>
 
-                <p className="mt-4 flex-1 text-sm text-muted-foreground">{m.prompt}</p>
                 <Button
                   variant="outline"
                   size="sm"
