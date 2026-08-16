@@ -1,29 +1,46 @@
+import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
-import { ImageEditorToolPanel } from "@/components/editor/ImageEditorToolPanel";
+import { EditorToolCategories } from "@/components/EditorToolCategories";
+import { ImageCropModal } from "@/components/ImageCropModal";
 import { Sparkles, Wand2, X } from "lucide-react";
 import { EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
 import { VIDEO_QUICK_STYLES } from "@/lib/editor/editor.constants";
+import { toast } from "sonner";
 
 interface Suggestion {
   label: string;
   prompt: string;
 }
 
+type ToolPayload = {
+  id?: string;
+  label?: string;
+  prompt: string;
+  uiOnly?: boolean;
+};
+
 interface EditorPromptPanelProps {
   mediaType: "image" | "video";
   loading: boolean;
   inputDataUrl: string | null;
-  inputPreview: string | null;
+  /** Optional preview for crop (falls back to inputDataUrl). */
+  inputPreview?: string | null;
   prompt: string;
   setPrompt: React.Dispatch<React.SetStateAction<string>>;
   taRef: React.RefObject<HTMLTextAreaElement>;
   suggestions: Suggestion[];
-  activeToolLabel: string | null;
-  onClearTool: () => void;
-  onToolOp: (op: { label: string; prompt: string }) => void;
-  onCircleRemove: () => void;
-  onCropApplied: (croppedDataUrl: string) => void;
+  /** Legacy + primary: parent handles circle-remove; panel handles crop locally. */
+  onSelectTool: (tool: ToolPayload) => void;
+  /** When provided, crop Apply updates the working image without generation. */
+  onCropApplied?: (croppedDataUrl: string) => void;
+  /**
+   * When true, non-UI tools are reported via onSelectTool but the parent is
+   * expected to store internal instructions separately (not force them into
+   * the visible prompt). Panel shows an optional active chip if activeToolLabel is set.
+   */
+  activeToolLabel?: string | null;
+  onClearTool?: () => void;
 }
 
 const COMPACT_IDEAS = EXAMPLE_PROMPTS.slice(0, 3);
@@ -37,12 +54,31 @@ export function EditorPromptPanel({
   setPrompt,
   taRef,
   suggestions,
+  onSelectTool,
+  onCropApplied,
   activeToolLabel,
   onClearTool,
-  onToolOp,
-  onCircleRemove,
-  onCropApplied,
 }: EditorPromptPanelProps) {
+  const [cropOpen, setCropOpen] = useState(false);
+  const cropSrc = inputPreview || inputDataUrl;
+
+  const handleTool = (tool: ToolPayload) => {
+    if (tool.prompt === "__CROP__" || tool.id === "crop") {
+      if (!inputDataUrl || !cropSrc) {
+        toast.error("Upload an image first to crop.");
+        return;
+      }
+      if (!onCropApplied) {
+        // Parent not ready for crop apply — still open if we can no-op safely
+        toast.error("Crop is not available in this session.");
+        return;
+      }
+      setCropOpen(true);
+      return;
+    }
+    onSelectTool(tool);
+  };
+
   return (
     <>
       {!loading && mediaType === "image" && (
@@ -50,30 +86,24 @@ export function EditorPromptPanel({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             2. Choose a tool
           </p>
-          <ImageEditorToolPanel
+          <EditorToolCategories
             hasImage={!!inputDataUrl}
-            imageSrc={inputPreview || inputDataUrl}
             disabled={loading}
-            onPrompt={(internalPrompt, meta) =>
-              onToolOp({
-                label: meta?.label || "Tool",
-                prompt: internalPrompt,
-              })
-            }
-            onCircleRemove={onCircleRemove}
-            onCropApplied={onCropApplied}
+            onSelectTool={handleTool}
           />
           {activeToolLabel && (
             <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
               <span className="font-semibold text-primary">Using: {activeToolLabel}</span>
-              <button
-                type="button"
-                onClick={onClearTool}
-                className="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                aria-label="Clear tool"
-              >
-                <X className="h-3.5 w-3.5" /> Clear
-              </button>
+              {onClearTool && (
+                <button
+                  type="button"
+                  onClick={onClearTool}
+                  className="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear tool"
+                >
+                  <X className="h-3.5 w-3.5" /> Clear
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -166,6 +196,19 @@ export function EditorPromptPanel({
           </div>
         )}
       </section>
+
+      {cropSrc && onCropApplied && (
+        <ImageCropModal
+          open={cropOpen}
+          imageSrc={cropSrc}
+          onClose={() => setCropOpen(false)}
+          onApply={(cropped) => {
+            onCropApplied(cropped);
+            setCropOpen(false);
+            toast.success("Crop applied — this image will be used for generation.");
+          }}
+        />
+      )}
     </>
   );
 }
