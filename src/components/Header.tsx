@@ -51,8 +51,9 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-      <div className="mx-auto grid h-16 max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 lg:flex lg:justify-between">
-        <Link to="/" className="flex min-w-0 items-center gap-2">
+      <div className="relative mx-auto grid h-16 max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 lg:flex lg:justify-between">
+        {/* Brand — protected from crowding by translation on pre-login */}
+        <Link to="/" className="flex min-w-0 items-center gap-2 pr-2">
           <BrandMark />
           <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground xl:inline">
             by Motion2AI
@@ -83,8 +84,17 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {/* Single language control — icon only; works on all breakpoints */}
-          <GoogleLanguageSelect />
+          {/*
+            Pre-login: language sits as an independent control with extra gap from the wordmark.
+            Post-login: unchanged single header language control (do not add a second selector).
+          */}
+          {!user ? (
+            <div className="mr-0.5 sm:mr-1" data-no-translate>
+              <GoogleLanguageSelect className="shrink-0" />
+            </div>
+          ) : (
+            <GoogleLanguageSelect />
+          )}
 
           {user ? (
             <>
