@@ -49,13 +49,12 @@ function Index() {
   return <SignedOutHome />;
 }
 
+/** Post-login home: no site Footer (avoids repeated resource strip). */
 function SignedInHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <SignedInHomeBody />
-      <FooterAd />
-      <Footer />
     </div>
   );
 }
