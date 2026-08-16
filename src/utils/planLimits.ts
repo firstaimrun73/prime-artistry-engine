@@ -26,3 +26,18 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
 export function getPlanLimits(plan: string): PlanLimits {
   return PLAN_LIMITS[plan as PlanId] ?? PLAN_LIMITS.free;
 }
+
+/** Free (and unknown) plans cannot use multi-image. */
+export function isMultiImageLocked(plan: string | undefined | null, isAdmin = false): boolean {
+  if (isAdmin) return false;
+  return getPlanLimits(plan ?? "free").maxImages <= 1;
+}
+
+/** Max concurrent gallery / reference images for this plan. */
+export function maxImagesForPlan(plan: string | undefined | null, isAdmin = false): number {
+  if (isAdmin) return 10;
+  return getPlanLimits(plan ?? "free").maxImages;
+}
+
+export const MULTI_IMAGE_UPGRADE_MESSAGE =
+  "Multi-image editing is available on paid plans. Upgrade your plan to use multiple images.";
