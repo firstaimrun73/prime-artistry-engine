@@ -44,7 +44,15 @@ function CircleRemovePage() {
   const [addDescribe, setAddDescribe] = useState("");
 
   useEffect(() => {
-    setActiveMode(mode);
+    let next: "remove" | "add" = mode;
+    try {
+      const stored = sessionStorage.getItem("motio2edit-circle-mode");
+      if (stored === "add" || stored === "remove") next = stored;
+      sessionStorage.removeItem("motio2edit-circle-mode");
+    } catch {
+      /* ignore */
+    }
+    setActiveMode(next);
   }, [mode]);
 
   const isAdmin = isAdminEmail(profile?.email);
@@ -129,7 +137,6 @@ function CircleRemovePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Focused top bar — no bottom nav on this route */}
       <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
         <button
           type="button"
