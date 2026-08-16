@@ -14,22 +14,18 @@ interface EditorPromptPanelProps {
   mediaType: "image" | "video";
   loading: boolean;
   inputDataUrl: string | null;
-  /** Preview URL for crop modal (blob/data/https). */
   inputPreview: string | null;
   prompt: string;
   setPrompt: React.Dispatch<React.SetStateAction<string>>;
   taRef: React.RefObject<HTMLTextAreaElement>;
   suggestions: Suggestion[];
-  /** Active tool op label shown as a chip (not the internal AI text). */
   activeToolLabel: string | null;
   onClearTool: () => void;
-  /** Apply structured tool op — parent stores internal instruction, does not dump into visible prompt. */
   onToolOp: (op: { label: string; prompt: string }) => void;
   onCircleRemove: () => void;
   onCropApplied: (croppedDataUrl: string) => void;
 }
 
-/** Compact rotating ideas — max 3 chips, not a wall of examples. */
 const COMPACT_IDEAS = EXAMPLE_PROMPTS.slice(0, 3);
 
 export function EditorPromptPanel({
@@ -58,9 +54,9 @@ export function EditorPromptPanel({
             hasImage={!!inputDataUrl}
             imageSrc={inputPreview || inputDataUrl}
             disabled={loading}
-            onPrompt={(internalPrompt) =>
+            onPrompt={(internalPrompt, meta) =>
               onToolOp({
-                label: "Tool",
+                label: meta?.label || "Tool",
                 prompt: internalPrompt,
               })
             }
