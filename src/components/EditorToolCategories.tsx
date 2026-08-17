@@ -1,4 +1,4 @@
-import { Crop, Eraser, Sparkles, Wand2, Palette } from "lucide-react";
+import { Crop, Eraser, Wand2, Palette } from "lucide-react";
 import { PriorityToolGrid } from "@/components/editor/features/PriorityToolGrid";
 import { StyleToolGrid } from "@/components/editor/features/StyleToolGrid";
 
@@ -10,45 +10,20 @@ type Tool = {
   uiOnly?: boolean;
 };
 
-/** Sentinel for in-editor Auto — parent enables Auto mode (not one-shot). */
-export const AUTO_EDIT_SENTINEL = "__AUTO_EDIT__";
-
-/** @deprecated Prefer AUTO_EDIT_SENTINEL */
-export const AUTO_EDIT_PROMPT = AUTO_EDIT_SENTINEL;
-
 type Props = {
   onSelectTool: (tool: Tool) => void;
   disabled?: boolean;
   hasImage?: boolean;
 };
 
+/**
+ * Image Editor tool categories only.
+ * Motio2edit Auto is a separate standalone product at /studio/image/auto-edit —
+ * not an in-editor mode or tool.
+ */
 export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props) {
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
-      <button
-        type="button"
-        disabled={disabled || !hasImage}
-        onClick={() =>
-          onSelectTool({
-            id: "auto",
-            label: "Auto",
-            icon: Sparkles,
-            prompt: AUTO_EDIT_SENTINEL,
-          })
-        }
-        className="flex w-full min-h-[44px] items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-left transition-colors hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
-      >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
-          <Sparkles className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-primary">Auto</span>
-          <span className="block text-[11px] leading-snug text-muted-foreground">
-            Turn Auto ON · optional prompt · Generate runs analysis
-          </span>
-        </span>
-      </button>
-
       <PriorityToolGrid
         hasImage={hasImage}
         disabled={disabled}
