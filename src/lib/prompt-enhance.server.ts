@@ -1,8 +1,12 @@
 // Server-only Prompt Enhancement Engine.
 // Expands short / vague user prompts into detailed, model-ready instructions so
 // even a 2-3 word prompt is deeply understood before generation begins.
-// Uses the Lovable AI gateway; falls back to the raw prompt on any failure so
+// Uses Anthropic when available; falls back to the raw prompt on any failure so
 // generation never breaks because of enhancement.
+//
+// CRITICAL: For outfit / clothing transfer the lock MUST allow clothing change.
+// The old BASE_PHOTO_LOCK said "preserve clothing" and was the main reason
+// multi-image outfit edits only did weak "addon" changes.
 
 type EnhanceArgs = {
   prompt: string;
@@ -12,15 +16,20 @@ type EnhanceArgs = {
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
-// Prepended to every image-EDIT instruction so the model treats the input as a
-// real photograph and preserves identity / composition instead of regenerating.
+// Default photo lock — identity + pose + background. Clothing is NOT locked
+// here so outfit requests can succeed; outfit-specific lock is chosen below.
 const BASE_PHOTO_LOCK =
   "This is a real photograph. Treat it as a real photo edit. " +
-  "Preserve the exact person, their face, skin tone, body proportions, " +
-  "clothing and pose exactly. Preserve the exact background, lighting, " +
-  "colors and composition exactly. Only make the specific requested change. " +
-  "Do not change art style. Keep it photorealistic. Do not make it cartoon, " +
-  "anime, painting or illustration.";
+  "Preserve the exact person identity: face, facial structure, skin tone, hair, body proportions and pose. " +
+  "Preserve background, lighting, colors and composition unless the user asked to change them. " +
+  "Only make the specific requested change. Keep photorealistic. No cartoon/anime/painting.";
+
+/** Allows full clothing change — used when outfit intent is detected. */
+const OUTFIT_PHOTO_LOCK =
+  "This is a real photograph. Treat it as a real photo clothing/outfit edit. " +
+  "Preserve the exact person identity: face, facial structure, skin tone, hair, body pose, camera angle. " +
+  "You MUST change the clothing/outfit as requested — do NOT keep the original clothes. " +
+  "Keep the background unless asked otherwise. Photorealistic only.";
 
 const PEOPLE_REMOVAL_LOCK =
   "This is a real photograph. Treat it as a real photo object-removal edit. " +
@@ -37,10 +46,15 @@ function isPeopleRemovalPrompt(prompt: string): boolean {
   );
 }
 
+/** Same signals as image-edit/classify — keep in sync for outfit detection. */
+function isOutfitIntent(prompt: string): boolean {
+  return /\b(outfit|clothing|clothes|cloth|dress|shirt|jacket|armor|armour|costume|suit|wear|wearing|change\s+the\s+outfit|replace\s+outfit|swap\s+outfit|put\s+on|dress\s+(him|her|them)|clothes\s+from|from\s+the\s+ref|from\s+ref|reference\s+(img|image)|refrence|add\s+the\s+clothes|transfer\s+(the\s+)?(outfit|clothes|clothing)|swap\s+(the\s+)?(clothes|outfit))\b/i.test(
+    prompt || "",
+  );
+}
+
 /**
- * Deterministic expansion for common short editing prompts. Each entry maps a
- * set of trigger phrases to a fully detailed, FAL-ready instruction that
- * references "this exact image" and requires preservation of everything else.
+ * Deterministic expansion for common short editing prompts.
  */
 const EDIT_EXPANSIONS: { triggers: string[]; expansion: string }[] = [
   {
@@ -114,7 +128,6 @@ const EDIT_EXPANSIONS: { triggers: string[]; expansion: string }[] = [
 function expandShortEditPrompt(prompt: string): string | null {
   const normalized = prompt.trim().toLowerCase();
   const wordCount = normalized.split(/\s+/).filter(Boolean).length;
-  // Only expand short prompts; longer prompts are already detailed.
   if (wordCount > 20) return null;
   for (const { triggers, expansion } of EDIT_EXPANSIONS) {
     if (triggers.some((t) => normalized.includes(t))) return expansion;
@@ -122,19 +135,25 @@ function expandShortEditPrompt(prompt: string): string | null {
   return null;
 }
 
+function selectLock(userPrompt: string, expandedText: string): string {
+  if (isPeopleRemovalPrompt(userPrompt) || isPeopleRemovalPrompt(expandedText)) {
+    return PEOPLE_REMOVAL_LOCK;
+  }
+  if (isOutfitIntent(userPrompt) || isOutfitIntent(expandedText)) {
+    return OUTFIT_PHOTO_LOCK;
+  }
+  return BASE_PHOTO_LOCK;
+}
+
 export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<string> {
-  // For edits, always lock the photo so identity/composition are preserved.
   const lock = (text: string) => {
     if (!isEdit) return text;
-    const lockText = isPeopleRemovalPrompt(prompt) || isPeopleRemovalPrompt(text) ? PEOPLE_REMOVAL_LOCK : BASE_PHOTO_LOCK;
-    return `${lockText}\n\n${text}`;
+    return `${selectLock(prompt, text)}\n\n${text}`;
   };
 
-  // Longer prompts (>20 words) are already specific enough — send as-is.
   const wordCount = prompt.trim().split(/\s+/).filter(Boolean).length;
   if (wordCount > 20) return lock(prompt);
 
-  // Deterministic expansion of common short edit instructions.
   if (isEdit) {
     const canned = expandShortEditPrompt(prompt);
     if (canned) return lock(canned);
@@ -142,24 +161,26 @@ export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<st
 
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
-    // No AI available — still return a locked, preservation-heavy instruction.
     return lock(
       `${prompt.trim()}. Keep this photo completely photorealistic. Preserve the ` +
-        `exact person, face, skin tone, clothing, background and lighting. ` +
-        `Only make the specific requested change. Do not alter anything else.`,
+        `exact person, face, skin tone and identity. Only make the specific requested change. ` +
+        (isOutfitIntent(prompt)
+          ? "Change the clothing/outfit as asked — do not keep the original clothes."
+          : "Preserve clothing and background unless the request requires otherwise."),
     );
   }
 
   const system = isEdit
     ? [
-        "You expand photo editing instructions. Always specify: what to change, what to preserve, and keep a photorealistic style. Never suggest changing faces or identity unless the user explicitly asked. Always mention preserving the original lighting, colors and composition.",
-        "You are an expert photo editor AI assistant. Your job is to expand the user's short edit instructions into detailed, precise prompts for an instruction-based editing model (like FLUX Kontext) that preserves the original image.",
+        "You expand photo editing instructions. Always specify: what to change, what to preserve, and keep a photorealistic style.",
+        "Never suggest changing faces or identity unless the user explicitly asked.",
+        "If the user asks to change clothes/outfit/clothing from a reference image, you MUST instruct the model to REPLACE the clothing — do NOT say preserve original clothing.",
         "MULTILINGUAL: The user's prompt may be in ANY language. Silently detect the language and TRANSLATE it to English first, then produce the final English editing instruction. Never echo the original non-English text.",
-        "ALWAYS include in every expanded prompt: exact specification of what to change; an explicit instruction to preserve everything else; face/identity preservation if people are present; lighting and color preservation; background preservation unless the background is what is being changed; and a natural, realistic photographic result.",
-        "NEVER suggest: changing art style unless requested; modifying faces unless requested; adding new elements unless requested; changing composition unless requested.",
-        "Use technical photography and editing terms where useful (exposure, contrast, color grading, depth of field, seamless inpainting, edge detection).",
-        "ALWAYS end with explicit negative instructions using 'Do NOT' (e.g. 'Do NOT alter the person. Do NOT change art style. Do NOT change composition.').",
-        "Example — Input: 'remove the person on left' → Output: 'Carefully remove the person standing on the left side of this photo. Fill the removed area naturally with the background scenery, matching the texture, lighting and perspective perfectly. Preserve the person on the right and all other elements exactly as they are. Keep all colors, lighting and shadows identical to the original photo. Do NOT alter any remaining faces. Do NOT change the composition or art style.'",
+        "ALWAYS include: exact specification of what to change; face/identity preservation if people are present; lighting and color preservation where appropriate; natural photographic result.",
+        "NEVER suggest changing art style unless requested; modifying faces unless requested; adding new elements unless requested.",
+        "Use technical photography and editing terms where useful.",
+        "ALWAYS end with explicit negative instructions using 'Do NOT' where helpful.",
+        "Example outfit — Input: 'add the clothes to the person from the reference img' → Output: 'Replace all clothing on the person in the base photo with the exact outfit shown in the reference image. Match colors, materials, silhouette and details. Keep the person's face, identity, hair, pose and background unchanged. Photorealistic. Do NOT keep the original clothes. Do NOT change the face.'",
         "Do NOT add commentary, options or quotes. Output only the final English instruction, under 100 words.",
       ].join(" ")
     : [
@@ -193,4 +214,3 @@ export async function enhancePrompt({ prompt, isEdit }: EnhanceArgs): Promise<st
     return lock(prompt);
   }
 }
-
