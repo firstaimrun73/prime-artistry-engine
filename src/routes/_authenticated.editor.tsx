@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
+import { prepareAutoEditRun } from "@/lib/auto-edit/run.functions";
 import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
 import {
   imageQualityCost,
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/_authenticated/editor")({
 function Editor() {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
+  const prepareAuto = useServerFn(prepareAutoEditRun);
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -87,10 +89,8 @@ function Editor() {
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
 
-  // Stages depend on whether an image is being edited.
   const stages = getEditorStages(!!inputDataUrl);
 
-  // Watermark preference (paid users only) — persisted across sessions.
   useEffect(() => {
     try {
       const pref = localStorage.getItem(WATERMARK_PREF_KEY);
@@ -101,7 +101,6 @@ function Editor() {
     }
   }, []);
 
-  // One-time low-credit warning toast per session.
   const creditsNow = profile?.credits ?? 0;
   const adminNow = isAdminEmail(profile?.email);
   useEffect(() => {
@@ -117,7 +116,6 @@ function Editor() {
     }
   }, [creditsNow, adminNow, profile]);
 
-  // Preload media handed over from the History page ("Edit Again").
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("motio2edit-reuse");
@@ -141,8 +139,6 @@ function Editor() {
     }
   }, []);
 
-  // Preload a starting prompt/mode from a Studio preset click.
-  // FIX 2: Direct visits to /editor with no preset/reuse redirect to /studio/image.
   useEffect(() => {
     let hasContext = false;
     try {
@@ -174,7 +170,6 @@ function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // "Try Circle Remove" from the homepage: open the tool as soon as an image exists.
   useEffect(() => {
     if (pendingSmartRemove && mediaType === "image" && inputDataUrl) {
       setPendingSmartRemove(false);
@@ -183,7 +178,6 @@ function Editor() {
   }, [pendingSmartRemove, mediaType, inputDataUrl]);
 
 
-  // Auto-resize the prompt box.
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
@@ -191,7 +185,6 @@ function Editor() {
     ta.style.height = `${Math.min(ta.scrollHeight, 280)}px`;
   }, [prompt]);
 
-  // Rotating messages, stage progression + progress bar while loading.
   useEffect(() => {
     if (state !== "loading") return;
     setMsgIdx(0);
@@ -205,7 +198,6 @@ function Editor() {
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
-  // Video → Video enhancement is an upscale pass, not a generation: flat cost.
   const isVideoEnhance = mediaType === "video" && inputKind === "video" && !!inputFile;
   const cost = isVideoEnhance
     ? CREDIT_COST.video_enhance
@@ -221,7 +213,6 @@ function Editor() {
 
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
 
-  /** Load a gallery slot into the active editing state. */
   const activateSlot = (items: GalleryItem[], idx: number) => {
     const item = items[idx];
     if (!item) return;
@@ -265,7 +256,6 @@ function Editor() {
     const first = files[0];
     const isVideo = first.type.startsWith("video");
 
-    // Video keeps the existing single-file flow untouched.
     if (isVideo) {
       if (first.size > MAX_VIDEO_MB * 1024 * 1024) {
         return toast.error(
@@ -285,7 +275,6 @@ function Editor() {
       return;
     }
 
-    // Images: append to the multi-image strip (max 10 per session).
     const room = MAX_GALLERY_IMAGES - gallery.length;
     if (room <= 0) return toast.error(`You can work with up to ${MAX_GALLERY_IMAGES} images at a time.`);
 
@@ -319,13 +308,134 @@ function Editor() {
     );
   };
 
+  /** Resolve active image to https URL for analysis/generation. */
+  const resolveActiveImageUrl = async (): Promise<string> => {
+    if (inputKind === "image" && inputFile) {
+      return uploadToStorage(inputFile);
+    }
+    if (inputKind === "image" && inputDataUrl) {
+      if (inputDataUrl.startsWith("https://")) return inputDataUrl;
+      if (inputDataUrl.startsWith("data:") || inputDataUrl.startsWith("blob:")) {
+        const res = await fetch(inputDataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `img-${Date.now()}.jpg`, {
+          type: blob.type || "image/jpeg",
+        });
+        return uploadToStorage(file);
+      }
+    }
+    throw new Error("Please upload an image first.");
+  };
+
+  /**
+   * In-editor Auto Edit — stays on /editor, uses active single image.
+   * Optional prompt is merged server-side; never dumped as visible system text.
+   */
+  const runInEditorAuto = async () => {
+    if (mediaType !== "image" || !inputDataUrl) {
+      toast.error("Upload one image first to use Auto Edit.");
+      return;
+    }
+    if (gallery.length > 1) {
+      toast.error(
+        "Auto Edit currently supports only one image. Remove extra gallery images or keep a single active photo.",
+      );
+      return;
+    }
+    if (refImages.length > 0) {
+      toast.error(
+        "Auto Edit works on a single image. Clear reference images to continue, or use Generate with a prompt instead.",
+      );
+      return;
+    }
+    if (noCredits) {
+      setState("blocked");
+      return toast.error(`Not enough credits. This costs about ${cost} credits per step.`);
+    }
+
+    const runId = ++runIdRef.current;
+    setState("analyzing");
+    setOutput(null);
+    setDownloaded(false);
+    startGeneration("image", "/editor");
+    toast("A✦ Motio2Auto — analyzing your image…");
+
+    try {
+      const mediaUrl = await resolveActiveImageUrl();
+      if (runId !== runIdRef.current) return;
+
+      const prepared = await prepareAuto({
+        data: {
+          imageUrl: mediaUrl,
+          imageQuality,
+          userPrompt: prompt.trim() || undefined,
+          context: "editor",
+        },
+      });
+
+      if (runId !== runIdRef.current) return;
+
+      if (prepared.status === "NO_CHANGE" || prepared.steps.length === 0) {
+        setState("idle");
+        endGeneration();
+        toast.message(prepared.message || "No automatic changes recommended.");
+        return;
+      }
+
+      setState("loading");
+      toast(`A✦ Applying ${prepared.steps.length} automatic improvement(s)…");
+
+      let currentUrl = mediaUrl;
+      for (const step of prepared.steps) {
+        if (runId !== runIdRef.current) return;
+        const res = await generate({
+          data: {
+            prompt: step.internalPrompt,
+            type: "image",
+            imageUrl: currentUrl,
+            sourceKind: "image",
+            strength: step.strength,
+            imageQuality,
+          },
+        });
+        if (!res.outputUrl) throw new Error("Generation returned no image.");
+        currentUrl = res.outputUrl;
+      }
+
+      if (runId !== runIdRef.current) return;
+
+      let url = currentUrl;
+      setOutputIsVideo(false);
+      if (url && !isAdmin && (isFree || keepWatermark)) {
+        try {
+          const marked = await watermarkImage(url, { strong: isFree });
+          if (marked && marked !== url) url = marked;
+        } catch {
+          /* keep original */
+        }
+      }
+
+      setProgress(100);
+      setStage(stages.length);
+      setOutput(url);
+      setState("success");
+      await refreshProfile();
+      toast.success("✅ Auto Edit complete — result in the canvas");
+      endGeneration();
+    } catch (err) {
+      if (runId !== runIdRef.current) return;
+      setState("idle");
+      endGeneration();
+      toast.error(err instanceof Error ? `❌ ${err.message}` : "❌ Auto Edit failed.");
+    }
+  };
+
   const runGenerate = async () => {
     if (!prompt.trim()) return toast.error("Enter a prompt first.");
     if (videoLocked) { setState("blocked"); return toast.error("Video generation requires a paid plan."); }
     if (noCredits) { setState("blocked"); return toast.error(`Not enough credits. This costs ${cost} credits.`); }
 
     const runId = ++runIdRef.current;
-    // 1) "Analyzing your request…" beat so the AI feels intelligent.
     setState("analyzing");
     setOutput(null);
     setDownloaded(false);
@@ -335,8 +445,6 @@ function Editor() {
     setState("loading");
     toast(mediaType === "video" ? "🎬 Generating your video..." : "🎨 Generating your image...");
     startGeneration(mediaType === "video" ? "video" : "image", "/editor");
-    // Long-run progress messages so the user knows we're still working while
-    // the server retries a slow or failed AI attempt.
     const progressTimers = [
       setTimeout(() => {
         if (runId === runIdRef.current) toast("⏳ Still working — high quality takes a moment...");
@@ -347,21 +455,14 @@ function Editor() {
     ];
     try {
 
-      // Resolve the source media URL to send to the AI.
-      // Uploaded files (image OR video) go to private storage and we pass a
-      // signed URL fal can fetch. This avoids sending huge base64 bodies that
-      // fail for large phone photos. A reused result (already an https URL)
-      // is passed through directly.
       let mediaUrl: string | undefined;
       let maskImageUrl: string | undefined;
       let sourceKind: "image" | "video" | undefined;
       if (inputKind === "image" && inputFile) {
-        // Fresh upload → upload to Supabase
         mediaUrl = await uploadToStorage(inputFile);
         sourceKind = "image";
       } else if (inputKind === "image" && inputDataUrl) {
         if (inputDataUrl.startsWith("data:") || inputDataUrl.startsWith("blob:")) {
-          // Convert base64/blob → File → upload to Supabase
           const res = await fetch(inputDataUrl);
           const blob = await res.blob();
           const file = new File([blob], `img-${Date.now()}.jpg`, {
@@ -369,7 +470,6 @@ function Editor() {
           });
           mediaUrl = await uploadToStorage(file);
         } else if (inputDataUrl.startsWith("https://")) {
-          // Already a real URL (reused from history)
           mediaUrl = inputDataUrl;
         } else {
           throw new Error("Invalid image. Please re-upload your photo.");
@@ -380,11 +480,9 @@ function Editor() {
         sourceKind = "video";
       }
 
-      // SAFETY CHECK: Verify URL is valid https before sending to FAL.ai
       if (mediaUrl && !mediaUrl.startsWith("https://")) {
         throw new Error("Image upload failed. Please re-upload and try again.");
       }
-      // SAFETY CHECK: If image mode needs a URL
       if (sourceKind === "image" && !mediaUrl) {
         throw new Error("Please upload an image first.");
       }
@@ -397,9 +495,6 @@ function Editor() {
         maskImageUrl = await uploadToStorage(maskFile);
       }
 
-      // Reference images (2-5) come from the picker as data URIs. FAL cannot
-      // fetch data:/blob: URLs, so every one of them is uploaded to storage
-      // first and sent as a real https URL alongside the primary image.
       let referenceImageUrls: string[] | undefined;
       if (canAddRefImages && refImages.length > 0) {
         const wanted = refImages.slice(0, Math.max(0, planLimits.maxImages - 1));
@@ -451,23 +546,14 @@ function Editor() {
       let url = res.outputUrl;
       const isVideoOut = mediaType === "video";
       setOutputIsVideo(isVideoOut);
-      // Watermarking for images. Free users get the STRONG variant (full-image
-      // grid + corner pill) burned in BEFORE the URL ever reaches the DOM —
-      // right-click / long-press / view-source cannot recover a clean image
-      // because no clean version is ever stored on the client. Paid users on
-      // "keep watermark" get only the subtle corner pill. Admins are exempt.
       if (!isVideoOut && url && !isAdmin && (isFree || keepWatermark)) {
-        console.log("[Editor] Applying watermark...", "plan:", profile?.plan, "| free:", isFree, "| keep:", keepWatermark);
         try {
           const marked = await watermarkImage(url, { strong: isFree });
           if (marked && marked !== url) {
             url = marked;
-            console.log("[Editor] Watermark done:", marked.substring(0, 50));
-          } else {
-            console.warn("[Editor] Watermark returned source URL unchanged");
           }
-        } catch (e) {
-          console.error("[Editor] Watermark error:", e);
+        } catch {
+          /* keep original */
         }
       }
 
@@ -540,20 +626,14 @@ function Editor() {
   const handleDownload = async () => {
     if (!output) return;
     let downloadUrl = output;
-    // FREE users are already stamped at generation time (strong watermark on
-    // the displayed data URL). Re-applying on download caused a double stamp.
-    // Only re-stamp free if the output is still a remote https URL (stamp
-    // failed earlier). Paid users only get a watermark when they opted in.
-    // Admin downloads are always clean.
     if (!outputIsVideo && !isAdmin) {
-      console.log("[watermark] download — plan:", profile?.plan, "| free:", isFree, "| keep:", keepWatermark);
       if (isFree) {
         const alreadyClientStamped = output.startsWith("data:");
         if (!alreadyClientStamped) {
-          try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch (e) { console.error("[watermark] download grid failed:", e); }
+          try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* ignore */ }
         }
       } else if (keepWatermark) {
-        try { downloadUrl = await watermarkImage(output); } catch (e) { console.error("[watermark] download pill failed:", e); }
+        try { downloadUrl = await watermarkImage(output); } catch { /* ignore */ }
       }
     }
     const a = document.createElement("a");
@@ -578,8 +658,7 @@ function Editor() {
     } catch { /* user cancelled */ }
   };
 
-  // Circle-to-Remove entry point — unchanged logic, now shared with EditorPromptPanel.
-  const handleSelectTool = (tool: { prompt: string }) => {
+  const handleSelectTool = (tool: { prompt: string; id?: string }) => {
     if (tool.prompt === "__CIRCLE_REMOVE__") {
       if (!inputDataUrl) {
         toast.error("Upload an image first to use Circle to Remove.");
@@ -588,6 +667,12 @@ function Editor() {
       setSmartRemoveOpen(true);
       return;
     }
+    if (tool.prompt === "__AUTO_EDIT__" || tool.id === "auto") {
+      void runInEditorAuto();
+      return;
+    }
+    // Never inject sentinel strings into the visible prompt
+    if (tool.prompt.startsWith("__") && tool.prompt.endsWith("__")) return;
     setPrompt(tool.prompt);
   };
 
@@ -616,9 +701,6 @@ function Editor() {
         <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
       </div>
 
-      {/* FIX 2: Image/Video toggle removed. Mode is fixed by the studio entry point. */}
-
-
       {videoLocked && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm animate-fade-in">
           <span className="text-destructive-foreground">Video generation is a paid feature.</span>
@@ -626,9 +708,7 @@ function Editor() {
         </div>
       )}
 
-      {/* Desktop: controls left / preview right. Mobile: natural vertical stack. */}
       <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
-        {/* LEFT — configuration flow: Upload → Tools → Prompt → Options → Generate */}
         <div className="order-1 space-y-5">
           <EditorUpload
             fileRef={fileRef}
@@ -695,7 +775,6 @@ function Editor() {
           />
         </div>
 
-        {/* RIGHT — preview / result (on mobile stacks below controls) */}
         <div className="order-2 space-y-4 lg:sticky lg:top-4 lg:self-start">
           <EditorPreview
             state={state}
@@ -726,7 +805,7 @@ function Editor() {
           />
         </div>
         <EditorDisclaimer />
-      </div>{/* Smart Remove ("Circle to Remove") — single entry via EditorToolCategories → __CIRCLE_REMOVE__ */}
+      </div>
       <SmartRemoveModal
         open={smartRemoveOpen}
         imageUrl={inputPreview}
