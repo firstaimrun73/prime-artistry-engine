@@ -1,5 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+} from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -362,7 +370,7 @@ function AutoEditPage() {
     img.src = url;
   }, []);
 
-  const onFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFileInput = (e: ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     e.target.value = "";
     if (!list?.length) return;
@@ -497,17 +505,17 @@ function AutoEditPage() {
     }
   };
 
-  const wallpaperStyle: React.CSSProperties = palette
+  const wallpaperStyle: CSSProperties = palette
     ? {
         background: `
           radial-gradient(ellipse 80% 60% at 20% 30%, ${palette.soft}, transparent 55%),
           radial-gradient(ellipse 70% 50% at 80% 70%, ${palette.deep}, transparent 50%),
-          linear-gradient(160deg, hsl(var(--background) / 0.92), hsl(var(--background) / 0.88))
+          linear-gradient(160deg, color-mix(in oklab, var(--background) 92%, transparent), color-mix(in oklab, var(--background) 88%, transparent))
         `,
       }
     : {
         background:
-          "radial-gradient(ellipse 80% 60% at 30% 20%, hsl(var(--primary) / 0.18), transparent 55%), linear-gradient(160deg, hsl(var(--background) / 0.95), hsl(var(--background) / 0.9))",
+          "radial-gradient(ellipse 80% 60% at 30% 20%, color-mix(in oklab, var(--primary) 18%, transparent), transparent 55%), linear-gradient(160deg, color-mix(in oklab, var(--background) 95%, transparent), color-mix(in oklab, var(--background) 90%, transparent))",
       };
 
   return (
