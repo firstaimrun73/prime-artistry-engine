@@ -5,6 +5,7 @@
 
 import { getOperationDef, type AutoEditOperationId } from "./operations";
 import type { ImageQuality } from "@/lib/quality-options";
+import { mergeAutoEditInstructions } from "./mergeInstructions";
 
 export type AutoEditStepInput = {
   prompt: string;
@@ -20,13 +21,14 @@ export function buildStepForOperation(
   imageUrl: string,
   imageQuality: ImageQuality,
   optionalUserNote?: string,
+  editorCommand?: string,
 ): AutoEditStepInput {
   const def = getOperationDef(opId);
-  let prompt = def.internalPrompt;
-  if (optionalUserNote?.trim()) {
-    // Optional note is secondary; never replaces operation control
-    prompt = `${prompt} Additional user preference (secondary): ${optionalUserNote.trim().slice(0, 400)}`;
-  }
+  const prompt = mergeAutoEditInstructions({
+    analysisPrompt: def.internalPrompt,
+    userPrompt: optionalUserNote,
+    editorCommand,
+  });
   return {
     prompt,
     type: "image",

@@ -1,6 +1,6 @@
 /**
- * Auto Edit server route entry — analysis only (credits stay on generateMedia).
- * Client drives status animation: Analyzing → Applying Prompts → Generating → Output.
+ * Auto Edit server route entry — analysis + internal step prep.
+ * Credits remain on generateMedia. Optional userPrompt is for Image Studio only.
  */
 
 import { createServerFn } from "@tanstack/react-start";
@@ -8,6 +8,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { analyzeImage } from "./analyze.server";
 import { prepareAutoEditFromAnalysis } from "./pipeline.service";
+import { mergeAutoEditInstructions } from "./mergeInstructions";
 import type { ImageAnalysisResult } from "./types";
 import type { ImageQuality } from "@/lib/quality-options";
 
@@ -16,6 +17,9 @@ const schema = z.object({
   imageQuality: z.enum(["hd", "2k", "4k"]).default("hd"),
   width: z.number().int().positive().max(20000).optional(),
   height: z.number().int().positive().max(20000).optional(),
+  userPrompt: z.string().max(2000).optional(),
+  editorCommand: z.string().max(500).optional(),
+  context: z.enum(["standalone", "editor"]).default("standalone"),
 });
 
 function fallbackAnalysis(width = 0, height = 0): ImageAnalysisResult {
@@ -75,9 +79,6 @@ function fallbackAnalysis(width = 0, height = 0): ImageAnalysisResult {
   };
 }
 
-/**
- * Analyze + prepare internal prompt steps (no user prompt accepted).
- */
 export const prepareAutoEditRun = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => schema.parse(data))
@@ -98,17 +99,37 @@ export const prepareAutoEditRun = createServerFn({ method: "POST" })
 
     const prepared = prepareAutoEditFromAnalysis(analysis, quality, data.imageUrl);
 
+    let steps = prepared.steps.map((s) => ({
+      operationId: s.operationId,
+      strength: s.strength,
+      internalPrompt: mergeAutoEditInstructions({
+        analysisPrompt: s.internalPrompt,
+        userPrompt: data.userPrompt,
+        editorCommand: data.editorCommand,
+      }),
+    }));
+
+    if (data.context === "editor" && data.userPrompt?.trim() && steps.length === 0) {
+      steps = [
+        {
+          operationId: "DEFAULT_POLISH",
+          strength: 0.55,
+          internalPrompt: mergeAutoEditInstructions({
+            analysisPrompt:
+              "Apply the user's requested edit carefully while preserving identity and composition where not contradicted.",
+            userPrompt: data.userPrompt,
+            editorCommand: data.editorCommand,
+          }),
+        },
+      ];
+    }
+
     return {
       mode,
       analysisConfidence: analysis.analysisConfidence,
       detectedIssues: prepared.plan.detectedIssues,
       message: prepared.message,
-      status: prepared.status,
-      /** Steps for client to feed generateMedia — internalPrompt must not be shown in UI */
-      steps: prepared.steps.map((s) => ({
-        operationId: s.operationId,
-        strength: s.strength,
-        internalPrompt: s.internalPrompt,
-      })),
+      status: steps.length > 0 ? ("READY" as const) : prepared.status,
+      steps,
     };
   });

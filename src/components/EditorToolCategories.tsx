@@ -6,14 +6,15 @@ type Tool = {
   id: string;
   label: string;
   icon: typeof Wand2;
-  /** Internal generation instruction — must not be shown as the user prompt. */
   prompt: string;
   uiOnly?: boolean;
 };
 
-/** In-editor Auto tool (not the dedicated /studio/image/auto-edit product). */
-export const AUTO_EDIT_PROMPT =
-  "Automatically analyze this image and apply professional improvements: enhance clarity and detail, balance exposure and color, reduce noise, and polish the overall look while keeping the subject identical.";
+/** Sentinel for in-editor Auto — parent runs analysis pipeline, never fills prompt bar. */
+export const AUTO_EDIT_SENTINEL = "__AUTO_EDIT__";
+
+/** @deprecated Prefer AUTO_EDIT_SENTINEL */
+export const AUTO_EDIT_PROMPT = AUTO_EDIT_SENTINEL;
 
 type Props = {
   onSelectTool: (tool: Tool) => void;
@@ -21,10 +22,6 @@ type Props = {
   hasImage?: boolean;
 };
 
-/**
- * Compact tool entry for Image Editor.
- * Auto stays inside the editor — does not navigate to dedicated Auto Edit.
- */
 export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props) {
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
@@ -36,7 +33,7 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
             id: "auto",
             label: "Auto",
             icon: Sparkles,
-            prompt: AUTO_EDIT_PROMPT,
+            prompt: AUTO_EDIT_SENTINEL,
           })
         }
         className="flex w-full min-h-[44px] items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-left transition-colors hover:bg-primary/10 disabled:pointer-events-none disabled:opacity-50"
@@ -47,7 +44,7 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-primary">Auto</span>
           <span className="block text-[11px] leading-snug text-muted-foreground">
-            One-tap polish on this image
+            Analyze this image · optional prompt · stays in editor
           </span>
         </span>
       </button>
