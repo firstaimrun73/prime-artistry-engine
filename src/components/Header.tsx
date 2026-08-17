@@ -51,16 +51,24 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-      <div className="relative mx-auto grid h-16 max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 lg:flex lg:justify-between">
-        {/* Brand — protected from crowding by translation on pre-login */}
-        <Link to="/" className="flex min-w-0 items-center gap-2 pr-2">
+      {/*
+        Flex (not minmax(0,1fr) grid): brand never shrinks under the language control.
+        Clear gap between logo cluster and actions so they cannot touch/overlap.
+      */}
+      <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-3 sm:gap-4 sm:px-4">
+        {/* Brand — shrink-0 so Motio2edit wordmark stays fully readable */}
+        <Link
+          to="/"
+          className="flex shrink-0 items-center gap-1.5 sm:gap-2"
+          aria-label="Motio2edit home"
+        >
           <BrandMark />
           <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground xl:inline">
             by Motion2AI
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-5 text-sm font-medium text-muted-foreground lg:flex">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-5 text-sm font-medium text-muted-foreground lg:flex">
           {links.map((l) => (
             <Link
               key={l.to}
@@ -83,18 +91,15 @@ export function Header() {
           )}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        {/* Actions — always a separate non-overlapping cluster */}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           {/*
-            Pre-login: language sits as an independent control with extra gap from the wordmark.
-            Post-login: unchanged single header language control (do not add a second selector).
+            Pre-login language: independent control in the action cluster (not beside logo in the same flex item).
+            Post-login: same single header language control — do not add a second selector.
           */}
-          {!user ? (
-            <div className="mr-0.5 sm:mr-1" data-no-translate>
-              <GoogleLanguageSelect className="shrink-0" />
-            </div>
-          ) : (
-            <GoogleLanguageSelect />
-          )}
+          <div className="shrink-0" data-no-translate>
+            <GoogleLanguageSelect className="shrink-0" />
+          </div>
 
           {user ? (
             <>
@@ -140,17 +145,18 @@ export function Header() {
             </>
           ) : (
             <>
+              {/* Sign in: hide on very narrow phones (still available in menu) to free width for logo + Get started */}
               <Button
                 variant="ghost"
                 size="sm"
-                className="px-2 sm:px-3"
+                className="hidden px-2 min-[400px]:inline-flex sm:px-3"
                 onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}
               >
                 Sign in
               </Button>
               <Button
                 size="sm"
-                className="px-2.5 sm:px-3"
+                className="px-2.5 text-xs sm:px-3 sm:text-sm"
                 onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}
               >
                 Get started
@@ -160,7 +166,7 @@ export function Header() {
 
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 lg:hidden">
+              <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 lg:hidden">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -168,7 +174,7 @@ export function Header() {
               <div className="flex items-center gap-2 border-b border-border px-5 py-4">
                 <BrandMark />
               </div>
-              {/* Language lives only in the header icon — no second selector here */}
+              {/* Language lives only in the header control — no second selector here */}
               <nav className="flex flex-col p-2">
                 {links.map((l) => (
                   <Link
