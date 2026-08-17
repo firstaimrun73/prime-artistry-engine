@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
-import { prepareAutoEditRun } from "@/lib/auto-edit/run.functions";
 import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
 import {
   imageQualityCost,
@@ -49,7 +48,6 @@ export const Route = createFileRoute("/_authenticated/editor")({
 function Editor() {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
-  const prepareAuto = useServerFn(prepareAutoEditRun);
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -78,8 +76,6 @@ function Editor() {
   const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>("16:9");
   const [imageQuality, setImageQuality] = useState<ImageQuality>("hd");
   const [videoResolution, setVideoResolution] = useState<VideoResolution>("1080p");
-  /** Image Studio Auto mode — separate from Global Auto page. */
-  const [autoMode, setAutoMode] = useState(false);
 
 
   const [msgIdx, setMsgIdx] = useState(0);
@@ -102,11 +98,6 @@ function Editor() {
       /* ignore */
     }
   }, []);
-
-  // Auto is image-only; leave mode when switching to video.
-  useEffect(() => {
-    if (mediaType === "video" && autoMode) setAutoMode(false);
-  }, [mediaType, autoMode]);
 
   const creditsNow = profile?.credits ?? 0;
   const adminNow = isAdminEmail(profile?.email);
@@ -315,129 +306,6 @@ function Editor() {
     );
   };
 
-  /** Resolve active image to https URL for analysis/generation. */
-  const resolveActiveImageUrl = async (): Promise<string> => {
-    if (inputKind === "image" && inputFile) {
-      return uploadToStorage(inputFile);
-    }
-    if (inputKind === "image" && inputDataUrl) {
-      if (inputDataUrl.startsWith("https://")) return inputDataUrl;
-      if (inputDataUrl.startsWith("data:") || inputDataUrl.startsWith("blob:")) {
-        const res = await fetch(inputDataUrl);
-        const blob = await res.blob();
-        const file = new File([blob], `img-${Date.now()}.jpg`, {
-          type: blob.type || "image/jpeg",
-        });
-        return uploadToStorage(file);
-      }
-    }
-    throw new Error("Please upload an image first.");
-  };
-
-  /**
-   * In-editor Auto Edit — stays on /editor, uses active single image.
-   * Optional prompt / tool text is merged server-side; never shown as system prompt.
-   * Image-only works (analysis decides the edit).
-   */
-  const runInEditorAuto = async () => {
-    if (mediaType !== "image" || !inputDataUrl) {
-      toast.error("Upload one image first to use Auto Edit.");
-      return;
-    }
-    if (gallery.length > 1) {
-      toast.error(
-        "Auto Edit currently supports only one image. Remove extra gallery images or keep a single active photo.",
-      );
-      return;
-    }
-    if (refImages.length > 0) {
-      toast.error(
-        "Auto Edit works on a single image. Clear reference images to continue, or use Generate with a prompt instead.",
-      );
-      return;
-    }
-    if (noCredits) {
-      setState("blocked");
-      return toast.error(`Not enough credits. This costs about ${cost} credits per step.`);
-    }
-
-    const runId = ++runIdRef.current;
-    setState("analyzing");
-    setOutput(null);
-    setDownloaded(false);
-    startGeneration("image", "/editor");
-    toast("A✦ Auto — analyzing your image…");
-
-    try {
-      const mediaUrl = await resolveActiveImageUrl();
-      if (runId !== runIdRef.current) return;
-
-      const prepared = await prepareAuto({
-        data: {
-          imageUrl: mediaUrl,
-          imageQuality,
-          userPrompt: prompt.trim() || undefined,
-          context: "editor",
-        },
-      });
-
-      if (runId !== runIdRef.current) return;
-
-      if (prepared.status === "NO_CHANGE" || prepared.steps.length === 0) {
-        setState("idle");
-        endGeneration();
-        toast.message(prepared.message || "No automatic changes recommended.");
-        return;
-      }
-
-      setState("loading");
-      toast(`A✦ Applying ${prepared.steps.length} automatic improvement(s)…`);
-
-      let currentUrl = mediaUrl;
-      for (const step of prepared.steps) {
-        if (runId !== runIdRef.current) return;
-        const res = await generate({
-          data: {
-            prompt: step.internalPrompt,
-            type: "image",
-            imageUrl: currentUrl,
-            sourceKind: "image",
-            strength: step.strength,
-            imageQuality,
-          },
-        });
-        if (!res.outputUrl) throw new Error("Generation returned no image.");
-        currentUrl = res.outputUrl;
-      }
-
-      if (runId !== runIdRef.current) return;
-
-      let url = currentUrl;
-      setOutputIsVideo(false);
-      if (url && !isAdmin && (isFree || keepWatermark)) {
-        try {
-          const marked = await watermarkImage(url, { strong: isFree });
-          if (marked && marked !== url) url = marked;
-        } catch {
-          /* keep original */
-        }
-      }
-
-      setProgress(100);
-      setStage(stages.length);
-      setOutput(url);
-      setState("success");
-      await refreshProfile();
-      toast.success("✅ Auto Edit complete — result in the canvas");
-      endGeneration();
-    } catch (err) {
-      if (runId !== runIdRef.current) return;
-      setState("idle");
-      endGeneration();
-      toast.error(err instanceof Error ? `❌ ${err.message}` : "❌ Auto Edit failed.");
-    }
-  };
-
   const runGenerate = async () => {
     if (!prompt.trim()) return toast.error("Enter a prompt first.");
     if (videoLocked) { setState("blocked"); return toast.error("Video generation requires a paid plan."); }
@@ -588,15 +456,6 @@ function Editor() {
 
   };
 
-  /** Generate respects Auto ON/OFF. Auto OFF never uses the Auto pipeline. */
-  const handleGenerate = () => {
-    if (autoMode && mediaType === "image") {
-      void runInEditorAuto();
-      return;
-    }
-    void runGenerate();
-  };
-
   const handleStop = () => {
     runIdRef.current++;
     setState("idle");
@@ -682,12 +541,6 @@ function Editor() {
         return;
       }
       setSmartRemoveOpen(true);
-      return;
-    }
-    // Auto tool enables Image Studio Auto mode — does not one-shot generate.
-    if (tool.prompt === "__AUTO_EDIT__" || tool.id === "auto") {
-      setAutoMode(true);
-      toast.message("Auto ON — click Generate (prompt optional).");
       return;
     }
     // Never inject sentinel strings into the visible prompt
@@ -787,13 +640,10 @@ function Editor() {
 
           <EditorGenerationControls
             loading={loading}
-            onGenerate={handleGenerate}
+            onGenerate={runGenerate}
             onStop={handleStop}
             videoLocked={videoLocked}
             noCredits={noCredits}
-            autoMode={autoMode}
-            onAutoModeChange={setAutoMode}
-            showAutoToggle={mediaType === "image"}
           />
         </div>
 
@@ -818,7 +668,7 @@ function Editor() {
             output={output}
             loading={loading}
             onDownload={handleDownload}
-            onRegenerate={handleGenerate}
+            onRegenerate={runGenerate}
             onEditAgain={handleUseResultAsInput}
             onShare={handleShare}
             onClear={handleClear}
