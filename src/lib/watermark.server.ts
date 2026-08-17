@@ -7,6 +7,7 @@
 // SECONDARY = top-left small Motio2edit icon (FREE / non-premium only)
 //
 // Policy: src/lib/policy.ts (getWatermarkMode / shouldApplySecondaryWatermark).
+// No external PNG assets required — overlay is pure SVG via sharp.
 
 import sharp from "sharp";
 import type { WatermarkMode } from "./policy";
@@ -24,7 +25,8 @@ function escapeXml(s: string): string {
     .replace(/&/g, "&")
     .replace(/</g, "<")
     .replace(/>/g, ">")
-    .replace(/"/g, '\\"');
+    .replace(/"/g, """)
+    .replace(/'/g, "'");
 }
 
 /**
