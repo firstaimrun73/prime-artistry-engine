@@ -78,6 +78,8 @@ function Editor() {
   const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>("16:9");
   const [imageQuality, setImageQuality] = useState<ImageQuality>("hd");
   const [videoResolution, setVideoResolution] = useState<VideoResolution>("1080p");
+  /** Image Studio Auto mode — separate from Global Auto page. */
+  const [autoMode, setAutoMode] = useState(false);
 
 
   const [msgIdx, setMsgIdx] = useState(0);
@@ -100,6 +102,11 @@ function Editor() {
       /* ignore */
     }
   }, []);
+
+  // Auto is image-only; leave mode when switching to video.
+  useEffect(() => {
+    if (mediaType === "video" && autoMode) setAutoMode(false);
+  }, [mediaType, autoMode]);
 
   const creditsNow = profile?.credits ?? 0;
   const adminNow = isAdminEmail(profile?.email);
@@ -329,7 +336,8 @@ function Editor() {
 
   /**
    * In-editor Auto Edit — stays on /editor, uses active single image.
-   * Optional prompt is merged server-side; never dumped as visible system text.
+   * Optional prompt / tool text is merged server-side; never shown as system prompt.
+   * Image-only works (analysis decides the edit).
    */
   const runInEditorAuto = async () => {
     if (mediaType !== "image" || !inputDataUrl) {
@@ -358,7 +366,7 @@ function Editor() {
     setOutput(null);
     setDownloaded(false);
     startGeneration("image", "/editor");
-    toast("A✦ Motio2Auto — analyzing your image…");
+    toast("A✦ Auto — analyzing your image…");
 
     try {
       const mediaUrl = await resolveActiveImageUrl();
@@ -580,6 +588,15 @@ function Editor() {
 
   };
 
+  /** Generate respects Auto ON/OFF. Auto OFF never uses the Auto pipeline. */
+  const handleGenerate = () => {
+    if (autoMode && mediaType === "image") {
+      void runInEditorAuto();
+      return;
+    }
+    void runGenerate();
+  };
+
   const handleStop = () => {
     runIdRef.current++;
     setState("idle");
@@ -667,8 +684,10 @@ function Editor() {
       setSmartRemoveOpen(true);
       return;
     }
+    // Auto tool enables Image Studio Auto mode — does not one-shot generate.
     if (tool.prompt === "__AUTO_EDIT__" || tool.id === "auto") {
-      void runInEditorAuto();
+      setAutoMode(true);
+      toast.message("Auto ON — click Generate (prompt optional).");
       return;
     }
     // Never inject sentinel strings into the visible prompt
@@ -768,10 +787,13 @@ function Editor() {
 
           <EditorGenerationControls
             loading={loading}
-            onGenerate={runGenerate}
+            onGenerate={handleGenerate}
             onStop={handleStop}
             videoLocked={videoLocked}
             noCredits={noCredits}
+            autoMode={autoMode}
+            onAutoModeChange={setAutoMode}
+            showAutoToggle={mediaType === "image"}
           />
         </div>
 
@@ -796,7 +818,7 @@ function Editor() {
             output={output}
             loading={loading}
             onDownload={handleDownload}
-            onRegenerate={runGenerate}
+            onRegenerate={handleGenerate}
             onEditAgain={handleUseResultAsInput}
             onShare={handleShare}
             onClear={handleClear}
