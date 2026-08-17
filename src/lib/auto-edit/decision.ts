@@ -1,5 +1,5 @@
 /**
- * Conservative Auto Edit decision engine.
+ * Conservative Auto Edit decision engine (rule-based, no LLM).
  * Low confidence → NO_CHANGE. Caps operations. Respects risk with faces present.
  * Plans are automatic: defaultSelected ops are applied without user choosing tools.
  */
@@ -79,6 +79,7 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
   const lighting = analysis.lighting;
   const bg = analysis.background;
   const hasFace = faces?.detected === true;
+  const scene = String(analysis.scene ?? "");
 
   if (q.isOldPhoto || rest.length > 0) {
     detectedIssues.push(q.isOldPhoto ? "old_photo" : "damage");
@@ -105,10 +106,10 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
     pushOp(ops, "COMPRESSION_ARTIFACT_REDUCTION", "Compression artifacts detected", true);
   }
 
-  if (lighting.isUnderexposed || issues.includes("underexposed")) {
+  if (lighting.isUnderexposed || issues.includes("underexposed") || scene === "night") {
     detectedIssues.push("underexposed");
-    pushOp(ops, "EXPOSURE_CORRECTION", "Underexposure detected", true);
-    pushOp(ops, "SHADOW_RECOVERY", "Dark shadows may need recovery", lighting.isUnderexposed);
+    pushOp(ops, "EXPOSURE_CORRECTION", "Underexposure or low-light scene", true);
+    pushOp(ops, "SHADOW_RECOVERY", "Dark shadows may need recovery", true);
   }
 
   if (lighting.isOverexposed || issues.includes("overexposed")) {
@@ -122,17 +123,24 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
     pushOp(ops, "EXPOSURE_CORRECTION", "Uneven lighting detected", true);
   }
 
+  if (issues.includes("low_contrast")) {
+    detectedIssues.push("low_contrast");
+    pushOp(ops, "IMAGE_ENHANCEMENT", "Flat / low-contrast image", true);
+  }
+
   if (hasFace && (faces.blurry || faces.poorLighting || faces.hasArtifacts)) {
     detectedIssues.push("face_quality");
-    // High-risk: default on only when confidence is solid
     const faceDefault = confidence >= 0.55;
     pushOp(ops, "FACE_DETAIL_RESTORATION", "Face detail or lighting can be improved", faceDefault);
     pushOp(ops, "PORTRAIT_REPAIR", "Portrait cleanup suggested", faceDefault && faces.hasArtifacts);
+  } else if (hasFace && scene === "portrait") {
+    // Portrait aspect / scene without explicit face defects: conservative polish
+    detectedIssues.push("portrait");
+    pushOp(ops, "IMAGE_ENHANCEMENT", "Portrait — gentle clarity polish", true);
   }
 
   if (bg.isCluttered || bg.hasDistractingElements || bg.hasUnwantedObjects) {
     detectedIssues.push("background");
-    // Medium risk: auto only when confidence is high
     pushOp(ops, "BACKGROUND_CLEANUP", "Background clutter detected", confidence >= 0.65);
   }
 
@@ -149,13 +157,17 @@ export function buildAutoEditPlan(analysis: ImageAnalysisResult): AutoEditPlan {
     pushOp(ops, "UPSCALE", "Low resolution signal", false);
   }
 
-  // Conservative face gate: drop high-risk portrait ops if confidence mid-low
+  // Image already relatively strong: still allow a single conservative enhance
+  if (ops.length === 0 && q.overallScore >= 0.75 && q.overallScore < 0.92) {
+    detectedIssues.push("conservative_polish");
+    pushOp(ops, "IMAGE_ENHANCEMENT", "Image is solid — light polish only", true);
+  }
+
   let filtered = ops;
   if (hasFace && confidence < 0.5) {
     filtered = ops.filter((o) => o.risk !== "high");
   }
 
-  // Sort and cap
   const orderedIds = sortOperationsByPriority(filtered.map((o) => o.id)).slice(
     0,
     AUTO_EDIT_MAX_OPERATIONS,
