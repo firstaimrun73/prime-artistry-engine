@@ -10,7 +10,7 @@ type Tool = {
   uiOnly?: boolean;
 };
 
-/** Sentinel for in-editor Auto — parent runs analysis pipeline, never fills prompt bar. */
+/** Sentinel for in-editor Auto — parent enables Auto mode (not one-shot). */
 export const AUTO_EDIT_SENTINEL = "__AUTO_EDIT__";
 
 /** @deprecated Prefer AUTO_EDIT_SENTINEL */
@@ -44,7 +44,7 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-primary">Auto</span>
           <span className="block text-[11px] leading-snug text-muted-foreground">
-            Analyze this image · optional prompt · stays in editor
+            Turn Auto ON · optional prompt · Generate runs analysis
           </span>
         </span>
       </button>
