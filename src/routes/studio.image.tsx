@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -23,8 +24,8 @@ export const Route = createFileRoute("/studio/image")({
 });
 
 /**
- * Image Studio gateway — opens the real Image Editor.
- * No promo wall of 20 cards. Tools live inside the editor.
+ * Image Studio → Image Editor panel directly.
+ * Never routes to Global Auto. Multi-Image remains a separate feature.
  */
 function ImageStudio() {
   const { user, profile } = useAuth();
@@ -43,6 +44,30 @@ function ImageStudio() {
     navigate({ to: user ? "/editor" : "/auth", search: user ? undefined : { redirect: "/editor" } });
   };
 
+  // Signed-in users go straight into the Image Editor panel.
+  useEffect(() => {
+    if (!user) return;
+    try {
+      sessionStorage.setItem("motio2edit-mode", "image");
+      sessionStorage.removeItem("motio2edit-preset");
+    } catch {
+      /* ignore */
+    }
+    navigate({ to: "/editor" });
+  }, [user, navigate]);
+
+  // While redirecting signed-in users, avoid flashing the gateway.
+  if (user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="mx-auto max-w-md px-4 py-16 text-center text-sm text-muted-foreground">
+          Opening Image Studio…
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -51,7 +76,7 @@ function ImageStudio() {
           {t("studio.allStudios")}
         </Link>
 
-        <div className="mt-6 overflow-hidden rounded-3xl border border-border bg-card p-8 sm:p-10">
+        <div className="relative mt-6 overflow-hidden rounded-3xl border border-border bg-card p-8 sm:p-10">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-transparent" />
           <div className="relative">
             <div className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg">
