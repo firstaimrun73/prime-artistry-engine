@@ -18,10 +18,15 @@ import {
   buildImageUpscale,
   buildTextToVideo,
   buildImageToVideo,
-  classifyEditSize,
-  isEnhancementOnly,
   type FalStep,
 } from "@/lib/fal-request";
+import {
+  understandIntent,
+  isPureEnhanceIntent,
+  buildFinalEditPrompt,
+  expandPromptDeterministic,
+  getIntentSettings,
+} from "@/lib/image-edit/prompt-engine";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -258,6 +263,13 @@ export const generateMedia = createServerFn({ method: "POST" })
       );
 
       if (data.imageUrl) {
+        const rawRefs = data.referenceImageUrls ?? [];
+        const validRefs = rawRefs.filter((u) => u.startsWith("https://"));
+        const hasRefs = validRefs.length > 0;
+        // Intent from ORIGINAL user prompt — never from auto-enhanced text
+        const intent = understandIntent(data.prompt, hasRefs);
+        console.log("[generate] understood intent:", intent, "| refs:", validRefs.length);
+
         if (data.maskImageUrl) {
           console.log("[generate] mode: masked inpaint | mask url:", data.maskImageUrl.slice(0, 64));
           const step = buildImageInpaint({
@@ -266,13 +278,14 @@ export const generateMedia = createServerFn({ method: "POST" })
             maskUrl: data.maskImageUrl,
           });
           outputUrl = await runFalStepResilient(step, falKey);
-        } else if (isEnhancementOnly(data.prompt)) {
+        } else if (intent === "pure_enhance" || isPureEnhanceIntent(data.prompt)) {
+          // STRICT: post-processing only. Never send to Kontext (which can invent removals).
           const pipeline = buildImageEnhancementPipeline({
             prompt: data.prompt,
             imageUrl: data.imageUrl,
-            strength: data.strength,
+            strength: data.strength ?? 0.85,
           });
-          console.log("[generate] mode: enhance | steps:", pipeline.map((s) => s.label).join(" → "));
+          console.log("[generate] mode: pure enhance | steps:", pipeline.map((s) => s.label).join(" → "));
 
           try {
             let current = data.imageUrl;
@@ -284,10 +297,12 @@ export const generateMedia = createServerFn({ method: "POST" })
           } catch (err) {
             const msg = err instanceof Error ? err.message : "";
             if (isPixelLimitError(msg)) {
-              console.warn("[generate] enhance hit a size limit — falling back to kontext enhance");
+              console.warn("[generate] enhance hit size limit — kontext fallback with NO-REMOVE lock");
               const step = buildImageEdit({
                 prompt:
-                  "Enhance this exact photo: increase sharpness, clarity and fine detail, reduce noise and blur, improve overall quality. Keep the composition, subject, colors and framing identical — do not add, remove or change any content.",
+                  "Enhance this exact photo: increase sharpness, clarity and fine detail, reduce noise and blur. " +
+                  "Keep composition, every person, every object, colors and framing identical. Do NOT remove any person or object.",
+                rawPrompt: data.prompt,
                 imageUrl: data.imageUrl,
               });
               outputUrl = await runFalStepResilient(step, falKey);
@@ -297,29 +312,43 @@ export const generateMedia = createServerFn({ method: "POST" })
           }
         } else {
           const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
-          const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: true });
-          console.log("[generate] mode: edit (flux kontext) | enhanced:", enhancedPrompt);
           const { getPlanLimits } = await import("@/utils/planLimits");
           const maxImages = getPlanLimits(profile.plan).maxImages;
-          const rawRefs = data.referenceImageUrls ?? [];
-          const validRefs = rawRefs.filter((u) => u.startsWith("https://"));
-          if (validRefs.length !== rawRefs.length) {
-            console.warn(
-              `[generate] dropped ${rawRefs.length - validRefs.length} reference image(s) that were not https URLs`,
-            );
-          }
           const refs = validRefs.slice(0, Math.max(0, maxImages - 1));
+
+          // Outfit multi: use deterministic transfer-first prompt (do not bury under enhance)
+          let finalPrompt: string;
+          if (intent === "outfit_transfer") {
+            finalPrompt = buildFinalEditPrompt({
+              rawPrompt: data.prompt,
+              enhancedOrExpanded: expandPromptDeterministic(data.prompt, intent, refs.length),
+              intent,
+              referenceCount: refs.length,
+            });
+            console.log("[generate] mode: multi outfit transfer | prompt length:", finalPrompt.length);
+          } else {
+            const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: true });
+            finalPrompt = buildFinalEditPrompt({
+              rawPrompt: data.prompt,
+              enhancedOrExpanded: enhancedPrompt,
+              intent,
+              referenceCount: refs.length,
+            });
+            console.log("[generate] mode: edit (flux kontext) | intent:", intent);
+          }
+
           console.log(
             `[generate] images sent to FAL: 1 primary + ${refs.length} reference(s)`,
           );
 
-          const editSize = classifyEditSize(data.prompt);
+          const settings = getIntentSettings(intent);
           const step = buildImageEdit({
-            prompt: enhancedPrompt,
+            prompt: finalPrompt,
             rawPrompt: data.prompt,
             imageUrl: data.imageUrl,
-            strength: editSize === "default" ? data.strength : undefined,
+            strength: data.strength,
             referenceImageUrls: refs.length > 0 ? refs : undefined,
+            guidanceOverride: settings.guidance_scale,
           });
           outputUrl = await runFalStepResilient(step, falKey);
         }
@@ -441,9 +470,7 @@ export const generateMedia = createServerFn({ method: "POST" })
       console.log("[generate] charged", cost, "credits → remaining", newCredits, "tx", deducted.transaction_id);
     }
 
-    // FREE image: stamp primary+secondary on the server BEFORE the client
-    // receives outputUrl. Network intercept of the generate response cannot
-    // yield a clean downloadable file. Download path still re-validates.
+    // FREE image: stamp primary+secondary on the server BEFORE the client receives outputUrl.
     if (data.type === "image" && !isAdmin && profile.plan === "free") {
       try {
         const { applyServerWatermark, fetchImageBuffer } = await import(
