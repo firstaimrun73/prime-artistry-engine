@@ -1,15 +1,16 @@
 /**
- * Auto Edit server route entry — analysis + internal step prep.
+ * Auto Edit server route entry — rule-based analysis + internal step prep.
  * Credits remain on generateMedia. Optional userPrompt is for Image Studio only.
+ *
+ * NO Anthropic / external vision API on this path.
  */
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { analyzeImage } from "./analyze.server";
 import { prepareAutoEditFromAnalysis } from "./pipeline.service";
 import { mergeAutoEditInstructions } from "./mergeInstructions";
-import type { ImageAnalysisResult } from "./types";
+import { buildRuleBasedAnalysis } from "./ruleBasedAnalysis";
 import type { ImageQuality } from "@/lib/quality-options";
 
 const schema = z.object({
@@ -17,85 +18,30 @@ const schema = z.object({
   imageQuality: z.enum(["hd", "2k", "4k"]).default("hd"),
   width: z.number().int().positive().max(20000).optional(),
   height: z.number().int().positive().max(20000).optional(),
+  /** Optional client luminance 0–1 for better rule-based lighting decisions */
+  avgLuminance: z.number().min(0).max(1).optional(),
+  /** Optional client contrast 0–1 */
+  contrastScore: z.number().min(0).max(1).optional(),
+  sceneHint: z.string().max(80).optional(),
   userPrompt: z.string().max(2000).optional(),
   editorCommand: z.string().max(500).optional(),
   context: z.enum(["standalone", "editor"]).default("standalone"),
 });
 
-function fallbackAnalysis(width = 0, height = 0): ImageAnalysisResult {
-  const megapixels = width > 0 && height > 0 ? (width * height) / 1_000_000 : 0;
-  return {
-    dimensions: { width, height, aspectRatio: height > 0 ? width / height : 1, megapixels },
-    scene: "other",
-    people: {
-      count: 0,
-      hasPrimarySubject: true,
-      hasSecondaryPeople: false,
-      hasBackgroundPeople: false,
-      hasPhotobombers: false,
-      hasPartiallyVisiblePeople: false,
-    },
-    faces: {
-      detected: false,
-      count: 0,
-      primaryFaceVisible: false,
-      blurry: false,
-      hasArtifacts: false,
-      redEye: false,
-      poorLighting: false,
-      occluded: false,
-    },
-    background: {
-      isCluttered: false,
-      hasDistractingElements: false,
-      hasUnwantedObjects: false,
-      hasDamagedRegions: false,
-      hasInconsistentLighting: false,
-    },
-    quality: {
-      issues: ["missing_detail"],
-      restorationIssues: [],
-      isOldPhoto: false,
-      overallScore: 0.65,
-      needsRestoration: false,
-      needsEnhancement: true,
-    },
-    lighting: {
-      isUnderexposed: false,
-      isOverexposed: false,
-      isUneven: false,
-      hasHighlightClipping: false,
-      hasShadowClipping: false,
-      colorTemperatureOff: false,
-    },
-    composition: {
-      horizonStraight: true,
-      subjectWellPlaced: true,
-      hasEdgeDistracted: false,
-      hasExcessiveEmptySpace: false,
-    },
-    analysisConfidence: 0.4,
-    rawVisionResponse: "Fallback analysis. Standard Motio2Auto polish.",
-  };
-}
-
 export const prepareAutoEditRun = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => schema.parse(data))
   .handler(async ({ data }) => {
-    const dims = { width: data.width ?? 0, height: data.height ?? 0 };
     const quality = (data.imageQuality ?? "hd") as ImageQuality;
 
-    const key = process.env.ANTHROPIC_API_KEY;
-    let analysis: ImageAnalysisResult;
-    let mode: "vision" | "fallback" = "fallback";
-
-    if (!key) {
-      analysis = fallbackAnalysis(dims.width, dims.height);
-    } else {
-      analysis = await analyzeImage(data.imageUrl, key, dims);
-      mode = "vision";
-    }
+    // Built-in conditional program only — never Anthropic on this path.
+    const analysis = buildRuleBasedAnalysis({
+      width: data.width,
+      height: data.height,
+      avgLuminance: data.avgLuminance,
+      contrastScore: data.contrastScore,
+      sceneHint: data.sceneHint,
+    });
 
     const prepared = prepareAutoEditFromAnalysis(analysis, quality, data.imageUrl);
 
@@ -109,7 +55,13 @@ export const prepareAutoEditRun = createServerFn({ method: "POST" })
       }),
     }));
 
-    if (data.context === "editor" && data.userPrompt?.trim() && steps.length === 0) {
+    // Image Studio Auto: user prompt / editor command can still drive a step
+    // when the plan would otherwise be empty.
+    if (
+      data.context === "editor" &&
+      (data.userPrompt?.trim() || data.editorCommand?.trim()) &&
+      steps.length === 0
+    ) {
       steps = [
         {
           operationId: "DEFAULT_POLISH",
@@ -125,7 +77,7 @@ export const prepareAutoEditRun = createServerFn({ method: "POST" })
     }
 
     return {
-      mode,
+      mode: "rule-based" as const,
       analysisConfidence: analysis.analysisConfidence,
       detectedIssues: prepared.plan.detectedIssues,
       message: prepared.message,
