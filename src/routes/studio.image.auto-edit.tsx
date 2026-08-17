@@ -23,6 +23,7 @@ import {
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { CompareSlider } from "@/components/CompareSlider";
 import { useAuth } from "@/lib/auth";
 import { generateMedia } from "@/lib/generate.functions";
@@ -41,11 +42,11 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/studio/image/auto-edit")({
   head: () => ({
     meta: [
-      { title: "MOTIO2EDIT Auto — Motio2edit" },
+      { title: "Motio2edit Auto — Motio2edit" },
       {
         name: "description",
         content:
-          "Upload one photo. MOTIO2EDIT Auto analyses and enhances it automatically — no prompt needed.",
+          "Upload one photo. Motio2edit Auto enhances it automatically — prompt optional.",
       },
     ],
   }),
@@ -184,52 +185,6 @@ function useImagePalette(src: string | null) {
   return palette;
 }
 
-function MalutoAutoLabel({ busy }: { busy: boolean }) {
-  const [showMaluto, setShowMaluto] = useState(true);
-  const reduced =
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  useEffect(() => {
-    if (busy || reduced) return;
-    const id = window.setInterval(() => setShowMaluto((v) => !v), 2800);
-    return () => window.clearInterval(id);
-  }, [busy, reduced]);
-
-  if (busy) {
-    return (
-      <span className="inline-flex items-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        Auto AI working…
-      </span>
-    );
-  }
-
-  return (
-    <span className="relative inline-flex h-5 min-w-[5.5rem] items-center justify-center">
-      <span
-        className={cn(
-          "absolute inset-0 flex items-center justify-center transition-all duration-700",
-          showMaluto ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
-        )}
-        aria-hidden={!showMaluto}
-      >
-        Maluto ai
-      </span>
-      <span
-        className={cn(
-          "absolute inset-0 flex items-center justify-center transition-all duration-700",
-          !showMaluto ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
-        )}
-        aria-hidden={showMaluto}
-      >
-        Auto ai
-      </span>
-      <span className="sr-only">Auto AI</span>
-    </span>
-  );
-}
-
 function AutoEditPage() {
   const { user, profile, refreshProfile } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -242,6 +197,7 @@ function AutoEditPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [pixelSize, setPixelSize] = useState<{ w: number; h: number } | null>(null);
   const [quality, setQuality] = useState<ImageQuality>("hd");
+  const [userPrompt, setUserPrompt] = useState("");
   const [output, setOutput] = useState<string | null>(null);
   const [phase, setPhase] = useState<UiPhase>("idle");
   const [stage, setStage] = useState<StageId>("queued");
@@ -265,16 +221,12 @@ function AutoEditPage() {
     return idx;
   }, [stage]);
 
-  // Smooth progress toward stage target without faking completion
   useEffect(() => {
     if (phase !== "processing") return;
     const target = STAGE_PROGRESS[stage] ?? progress;
     if (progress >= target) return;
     const id = window.setInterval(() => {
-      setProgress((p) => {
-        const next = Math.min(target, p + 0.6);
-        return next;
-      });
+      setProgress((p) => Math.min(target, p + 0.6));
     }, 80);
     return () => window.clearInterval(id);
   }, [phase, stage, progress]);
@@ -283,8 +235,7 @@ function AutoEditPage() {
     if (phase !== "processing") return;
     const tick = () => {
       const elapsed = Date.now() - runStartedAt.current;
-      const estTotal = 45_000;
-      const remaining = Math.max(0, estTotal - elapsed);
+      const remaining = Math.max(0, 45_000 - elapsed);
       setEtaMs(remaining);
     };
     tick();
@@ -300,7 +251,7 @@ function AutoEditPage() {
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
             A✦
           </span>
-          <h1 className="mt-5 text-xl font-bold">Sign in for MOTIO2EDIT Auto</h1>
+          <h1 className="mt-5 text-xl font-bold">Sign in for Motio2edit Auto</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             One image. Automatic analysis and enhancement.
           </p>
@@ -318,6 +269,7 @@ function AutoEditPage() {
     setFile(null);
     setFileName(null);
     setPixelSize(null);
+    setUserPrompt("");
     setOutput(null);
     setPhase("idle");
     setStage("queued");
@@ -375,7 +327,7 @@ function AutoEditPage() {
     e.target.value = "";
     if (!list?.length) return;
     if (list.length > 1) {
-      toast.error("MOTIO2EDIT Auto supports exactly one image.");
+      toast.error("Motio2edit Auto supports exactly one image.");
       return;
     }
     acceptFile(list[0]);
@@ -415,6 +367,7 @@ function AutoEditPage() {
           imageQuality: quality,
           width: pixelSize?.w,
           height: pixelSize?.h,
+          userPrompt: userPrompt.trim() || undefined,
           context: "standalone",
         },
       });
@@ -459,7 +412,6 @@ function AutoEditPage() {
       setProgress(STAGE_PROGRESS.validating ?? 82);
       await new Promise((r) => setTimeout(r, 280));
 
-      // Watermark is enforced on secure download (existing system) — show stage for transparency
       setStage("watermarking");
       setProgress(STAGE_PROGRESS.watermarking ?? 90);
       await new Promise((r) => setTimeout(r, 200));
@@ -473,7 +425,7 @@ function AutoEditPage() {
       setOutput(currentUrl);
       setPhase("done");
       await refreshProfile();
-      toast.success("MOTIO2EDIT Auto complete");
+      toast.success("Motio2edit Auto complete");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Auto Edit failed";
       setStage("error");
@@ -524,10 +476,10 @@ function AutoEditPage() {
 
       <main className="relative mx-auto max-w-6xl px-4 py-6 pb-28 sm:py-8">
         <Link
-          to="/studio/image"
+          to="/studio"
           className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Image Studio
+          <ArrowLeft className="h-3.5 w-3.5" /> Studio
         </Link>
 
         <div className="mt-5 text-center sm:mt-6">
@@ -535,10 +487,10 @@ function AutoEditPage() {
             A✦
           </span>
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">
-            MOTIO2EDIT Auto
+            Motio2edit Auto
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            One image · automatic analysis · no prompt required
+            One image · optional prompt · automatic edit
           </p>
         </div>
 
@@ -550,9 +502,7 @@ function AutoEditPage() {
           onChange={onFileInput}
         />
 
-        {/* INPUT + OUTPUT panels */}
         <div className="mt-8 grid gap-4 lg:grid-cols-2 lg:gap-6">
-          {/* INPUT */}
           <section
             className={cn(
               "glass-panel rounded-2xl p-4 sm:p-5",
@@ -569,7 +519,7 @@ function AutoEditPage() {
               const files = e.dataTransfer.files;
               if (!files?.length) return;
               if (files.length > 1) {
-                toast.error("MOTIO2EDIT Auto supports exactly one image.");
+                toast.error("Motio2edit Auto supports exactly one image.");
                 return;
               }
               acceptFile(files[0]);
@@ -652,7 +602,6 @@ function AutoEditPage() {
             )}
           </section>
 
-          {/* OUTPUT */}
           <section className="glass-panel rounded-2xl p-4 sm:p-5" aria-label="Output image">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Output
@@ -665,7 +614,7 @@ function AutoEditPage() {
                   Result appears here
                 </p>
                 <p className="max-w-[220px] text-xs text-muted-foreground/80">
-                  Run Auto AI to analyse and enhance your photo automatically.
+                  Run Auto Edit to process your photo automatically.
                 </p>
               </div>
             ) : (
@@ -676,7 +625,7 @@ function AutoEditPage() {
                   <div className="overflow-hidden rounded-xl border border-border">
                     <img
                       src={output}
-                      alt="MOTIO2EDIT Auto result"
+                      alt="Motio2edit Auto result"
                       className="mx-auto max-h-72 w-full object-contain protected-image"
                     />
                   </div>
@@ -698,8 +647,25 @@ function AutoEditPage() {
           </section>
         </div>
 
-        {/* Quality + CTA */}
         <section className="mx-auto mt-6 max-w-xl space-y-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Optional prompt
+            </p>
+            <Textarea
+              className="mt-2 min-h-[88px] resize-none"
+              placeholder='Optional — e.g. "Make this portrait cinematic with dramatic lighting." Leave empty for automatic analysis.'
+              value={userPrompt}
+              disabled={busy}
+              maxLength={2000}
+              onChange={(e) => setUserPrompt(e.target.value.slice(0, 2000))}
+              aria-label="Optional prompt for Auto Edit"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {userPrompt.length}/2000 · not required
+            </p>
+          </div>
+
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Output quality
@@ -731,10 +697,19 @@ function AutoEditPage() {
             className="min-h-[52px] w-full text-base font-bold btn-animate"
             disabled={busy || !file || noCredits}
             onClick={runAuto}
-            aria-label="Run Auto AI"
+            aria-label="Auto Edit"
           >
-            <Sparkles className="mr-2 h-4 w-4" aria-hidden />
-            <MalutoAutoLabel busy={busy} />
+            {busy ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                Processing…
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" aria-hidden />
+                Auto Edit
+              </>
+            )}
           </Button>
 
           {phase === "error" && errorMsg && (
@@ -742,14 +717,14 @@ function AutoEditPage() {
               role="alert"
               className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm"
             >
-              <p className="font-semibold text-destructive">Could not finish Auto AI</p>
+              <p className="font-semibold text-destructive">Could not finish Auto Edit</p>
               <p className="mt-1 text-muted-foreground">{errorMsg}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button size="sm" onClick={runAuto} disabled={!file || noCredits}>
                   Retry
                 </Button>
                 <Button size="sm" variant="outline" asChild>
-                  <Link to="/studio/image">Back to Image Studio</Link>
+                  <Link to="/studio">Back to Studio</Link>
                 </Button>
               </div>
             </div>
@@ -757,7 +732,6 @@ function AutoEditPage() {
         </section>
       </main>
 
-      {/* Full workspace processing overlay */}
       {phase === "processing" && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]"
@@ -767,7 +741,6 @@ function AutoEditPage() {
           aria-live="polite"
         >
           <div className="absolute inset-0" style={wallpaperStyle} aria-hidden>
-            {/* Original subtle pattern (CSS only — no external assets) */}
             <div
               className="absolute inset-0 opacity-[0.07]"
               style={{
@@ -793,7 +766,7 @@ function AutoEditPage() {
                   id="auto-ai-processing-title"
                   className="mt-3 text-lg font-extrabold tracking-tight"
                 >
-                  MOTIO2EDIT Auto
+                  Motio2edit Auto
                 </h2>
                 <p className="mt-1 text-sm font-medium text-primary">
                   {STAGE_PROCEDURE[stage] ?? "Working…"}
@@ -813,11 +786,7 @@ function AutoEditPage() {
 
               {preview && (
                 <div className="mx-auto mt-5 h-16 w-16 overflow-hidden rounded-xl border border-border/60 shadow-md sm:h-20 sm:w-20">
-                  <img
-                    src={preview}
-                    alt="Source"
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={preview} alt="Source" className="h-full w-full object-cover" />
                 </div>
               )}
 
