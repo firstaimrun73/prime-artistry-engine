@@ -383,7 +383,7 @@ function Editor() {
       }
 
       setState("loading");
-      toast(`A✦ Applying ${prepared.steps.length} automatic improvement(s)…");
+      toast(`A✦ Applying ${prepared.steps.length} automatic improvement(s)…`);
 
       let currentUrl = mediaUrl;
       for (const step of prepared.steps) {
