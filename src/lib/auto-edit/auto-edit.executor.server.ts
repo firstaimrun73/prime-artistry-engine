@@ -1,10 +1,12 @@
 /**
  * MOTIO2EDIT Auto executor (server-only).
  *
- * ONE input image → analysis → ONE internal prompt → ONE generateMedia call.
- * Does not return the internal prompt to callers of the public result shape.
+ * ONE input → analysis → layers → match → ONE internal prompt
+ * → ONE fixed Kontext generation (via runFixedImageEdit)
+ * → safe client result (no prompt leak)
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { analyzeImage } from "./analyze.server";
 import { buildRuleBasedAnalysis } from "./ruleBasedAnalysis";
 import { buildAnalysisLayers } from "./auto-edit.layers.server";
@@ -15,32 +17,35 @@ import {
 import { validateStandaloneAutoEditInput } from "./auto-edit.validation";
 import type { StandaloneAutoEditResult } from "./auto-edit.types";
 import type { ImageQuality } from "@/lib/quality-options";
-import { generateMedia } from "@/lib/generate.functions";
+import { runFixedImageEdit } from "@/lib/generation/fixed-image-edit.server";
 
 export type RunStandaloneAutoEditArgs = {
   imageUrl: string;
   imageQuality: ImageQuality;
   width?: number;
   height?: number;
+  supabase: SupabaseClient;
+  supabaseAdmin: SupabaseClient;
+  userId: string;
+  profile: { plan: string; credits: number; email?: string | null };
+  isAdmin: boolean;
 };
 
-/**
- * Full standalone pipeline. Credits + watermark remain inside generateMedia.
- */
+/** Hard invariant: generation is invoked at most once per run. */
+let __generationCallsThisRequest = 0;
+
 export async function executeStandaloneAutoEdit(
   args: RunStandaloneAutoEditArgs,
 ): Promise<StandaloneAutoEditResult> {
+  __generationCallsThisRequest = 0;
+
   const validated = validateStandaloneAutoEditInput({ imageUrl: args.imageUrl });
   if (!validated.ok) {
     throw new Error(validated.error);
   }
 
-  const dims = {
-    width: args.width,
-    height: args.height,
-  };
+  const dims = { width: args.width, height: args.height };
 
-  // Analysis: Anthropic vision when available; rule-based fallback (still structured).
   let analysis;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (anthropicKey) {
@@ -59,32 +64,47 @@ export async function executeStandaloneAutoEdit(
 
   const layers = buildAnalysisLayers(analysis);
   const matched = matchImprovements(analysis, layers);
+
+  // Good image: skip AI when score is high and matcher has nothing substantial
+  const attentionLayers = layers.layers.filter((l) => l.needsAttention);
+  const onlyPolish =
+    matched.length === 0 ||
+    (matched.length === 1 && matched[0] === "NATURAL_PHOTO_POLISH");
+  if (layers.qualityScore >= 0.92 && attentionLayers.length === 0 && onlyPolish) {
+    return {
+      success: true,
+      outputUrl: validated.imageUrl,
+      changed: false,
+      analysisSummary: {
+        qualityScore: layers.qualityScore,
+        improvementsApplied: 0,
+      },
+      message: "No significant issues detected — original returned.",
+    };
+  }
+
   const { prompt, improvementsApplied } = buildSingleAutoEditPrompt(matched);
 
-  // Single generation — never loop steps.
-  // generateMedia owns credits, FAL routing, and server watermark policy.
-  const res = await generateMedia({
-    data: {
-      prompt,
-      type: "image",
-      imageUrl: validated.imageUrl,
-      sourceKind: "image",
-      // Moderate edit strength for natural photo improvement
-      strength: 0.45,
-      imageQuality: args.imageQuality,
-      // Standalone Auto: let plan policy decide watermark (free forced, paid via prefs not exposed here)
-      keepWatermark: undefined,
-    },
-  });
-
-  if (!res?.outputUrl) {
-    throw new Error("Generation returned no image.");
+  __generationCallsThisRequest += 1;
+  if (__generationCallsThisRequest !== 1) {
+    throw new Error("Auto Edit invariant: generation must run exactly once.");
   }
+
+  const gen = await runFixedImageEdit({
+    supabase: args.supabase,
+    supabaseAdmin: args.supabaseAdmin,
+    userId: args.userId,
+    profile: args.profile,
+    isAdmin: args.isAdmin,
+    internalPrompt: prompt,
+    imageUrl: validated.imageUrl,
+    imageQuality: args.imageQuality,
+  });
 
   return {
     success: true,
-    outputUrl: res.outputUrl,
-    changed: res.outputUrl !== validated.imageUrl,
+    outputUrl: gen.outputUrl,
+    changed: gen.outputUrl !== validated.imageUrl,
     analysisSummary: {
       qualityScore: layers.qualityScore,
       improvementsApplied,
