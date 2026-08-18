@@ -1,4 +1,4 @@
-// Pure request-builders for fal.ai workflows.
+ // Pure request-builders for fal.ai workflows.
 // Framework-free so they can be unit-tested without network or auth.
 //
 // Design:
@@ -163,9 +163,10 @@ export function getEditTypeSettings(type: EditType) {
     case "enhance":
       return { strength: 0.55, guidance_scale: 2.8, num_inference_steps: 40 };
     case "color":
-      return { strength: 0.4, guidance_scale: 2.5, num_inference_steps: 36 };
+      // Higher CFG so color changes (e.g. shirt → bright red) are actually visible
+      return { strength: 0.55, guidance_scale: 4.0, num_inference_steps: 40 };
     default:
-      return { strength: 0.65, guidance_scale: 3.0, num_inference_steps: 40 };
+      return { strength: 0.65, guidance_scale: 3.2, num_inference_steps: 42 };
   }
 }
 
@@ -180,7 +181,7 @@ export function getEditTypeClause(type: EditType): string {
     case "style":
       return " Apply style; keep composition and subject placement. Preserve identity.";
     case "color":
-      return " Adjust ONLY color/lighting as asked. Subjects and composition identical.";
+      return " Apply the requested color change clearly and visibly. Subjects, face, pose and composition stay identical.";
     default:
       return "";
   }
@@ -214,9 +215,18 @@ const PRESERVATION_CLAUSE =
   " Keep photorealistic. Preserve person, face, pose, lighting and background except where the request requires change.";
 
 /**
+ * True when generate.functions / prompt-engine already assembled the full model prompt.
+ * Do NOT stack more preservation wrappers on top — that buries the edit instruction.
+ */
+export function isPromptEngineBuilt(prompt: string): boolean {
+  return /PRIMARY TASK — OUTFIT|OUTFIT TRANSFER|This is a real photograph|Only change what was requested|OUTPUT: photorealistic/i.test(
+    prompt || "",
+  );
+}
+
+/**
  * Build Kontext (single or multi) edit step.
- * When caller already passed a full transfer-first prompt (from prompt-engine),
- * we do NOT re-wrap with PRESERVATION_CONTRACT so clothing transfer is not buried.
+ * When caller already passed a full prompt-engine prompt, use it as-is.
  */
 export function buildImageEdit({
   prompt,
@@ -254,9 +264,8 @@ export function buildImageEdit({
   const isFaceRelated = editSize === "face_fix" || editType === "portrait";
   const isOutfitMulti = isMulti && OUTFIT_MATCH.test(source);
 
-  // If prompt-engine already built a full transfer / lock prompt, use as-is
-  const alreadyBuilt =
-    /PRIMARY TASK — OUTFIT|OUTFIT TRANSFER|This is a real photograph clothing/i.test(prompt);
+  // prompt-engine / generate.functions already built the instruction — do not re-wrap
+  const alreadyBuilt = isPromptEngineBuilt(prompt);
 
   let finalPrompt: string;
   if (alreadyBuilt) {
@@ -291,7 +300,6 @@ export function buildImageEdit({
           `Images 2-${refs.length + 1} are references only — copy style/outfit but never face.`;
       }
     }
-    // Outfit multi: do NOT append full PRESERVATION_CONTRACT (it fights clothing change)
     finalPrompt = isOutfitMulti
       ? `${withType}${multiNote}\nOUTPUT: same person as image 1, new clothes from reference. Photorealistic. No watermark.`
       : `${withType}${multiNote}\n\n${PRESERVATION_CONTRACT}`;
@@ -299,6 +307,7 @@ export function buildImageEdit({
 
   let guidance = guidanceOverride ?? quality.guidance_scale;
   if (isFaceRelated) guidance = Math.min(guidance, 2.4);
+  if (editType === "color") guidance = Math.max(guidance, 3.8);
   if (isOutfitMulti) guidance = Math.max(guidance, 3.8);
   else if (isMulti) guidance = Math.max(guidance, 3.0);
 
@@ -318,6 +327,26 @@ export function buildImageEdit({
   } else {
     body.image_url = imageUrl;
   }
+
+  console.log(
+    "[fal] buildImageEdit",
+    JSON.stringify({
+      model,
+      editSize,
+      editType,
+      alreadyBuilt,
+      guidance,
+      promptChars: finalPrompt.length,
+      imageUrlHost: (() => {
+        try {
+          return new URL(imageUrl).host;
+        } catch {
+          return "invalid";
+        }
+      })(),
+      refCount: refs.length,
+    }),
+  );
 
   return {
     label: `edit (flux kontext${isMulti ? ` multi ×${refs.length + 1}` : ""}, ${editSize}/${editType})`,
