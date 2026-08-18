@@ -2,7 +2,6 @@
  * Image Editor workspace — independent of Video Editor.
  * Extracted from _authenticated.editor.tsx without behavior/UI redesign.
  */
-import { Link } from "@tanstack/react-router";
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -236,8 +235,12 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     );
   };
 
-  const runGenerate = async () => {
-    if (!prompt.trim()) return toast.error("Enter a prompt first.");
+  /** Shared upload + generate path used by prompt Generate and Circle to Remove. */
+  const runImageJob = async (opts: {
+    jobPrompt: string;
+    maskDataUrl?: string | null;
+    toastStart?: string;
+  }) => {
     if (noCredits) {
       setState("blocked");
       return toast.error(`Not enough credits. This costs ${cost} credits.`);
@@ -247,11 +250,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setState("analyzing");
     setOutput(null);
     setDownloaded(false);
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 600));
     if (runId !== runIdRef.current) return;
 
     setState("loading");
-    toast("🎨 Generating your image...");
+    toast(opts.toastStart ?? "🎨 Generating your image...");
     startGeneration("image", "/editor");
     const progressTimers = [
       setTimeout(() => {
@@ -289,8 +292,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       if (inputKind === "image" && !mediaUrl) {
         throw new Error("Please upload an image first.");
       }
-      if (removeMaskDataUrl && mediaUrl) {
-        const maskRes = await fetch(removeMaskDataUrl);
+
+      const maskSrc = opts.maskDataUrl ?? removeMaskDataUrl;
+      if (maskSrc && mediaUrl) {
+        const maskRes = await fetch(maskSrc);
         const maskBlob = await maskRes.blob();
         const maskFile = new File([maskBlob], `remove-mask-${Date.now()}.png`, {
           type: "image/png",
@@ -299,7 +304,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       }
 
       let referenceImageUrls: string[] | undefined;
-      if (canAddRefImages && refImages.length > 0) {
+      if (!maskImageUrl && canAddRefImages && refImages.length > 0) {
         const wanted = refImages.slice(0, Math.max(0, planLimits.maxImages - 1));
         toast(`📤 Uploading ${wanted.length} reference image${wanted.length > 1 ? "s" : ""}...`);
         const uploaded: string[] = [];
@@ -328,7 +333,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
       const res = await generate({
         data: {
-          prompt,
+          prompt: opts.jobPrompt,
           type: "image",
           imageUrl: mediaUrl,
           sourceKind: mediaUrl ? "image" : undefined,
@@ -347,6 +352,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setStage(stages.length);
       setOutput(url);
       setState("success");
+      setRemoveMaskDataUrl(null);
       await refreshProfile();
       toast.success("✅ Image ready!");
       endGeneration();
@@ -360,6 +366,22 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     } finally {
       progressTimers.forEach(clearTimeout);
     }
+  };
+
+  const runGenerate = async () => {
+    if (!prompt.trim()) return toast.error("Enter a prompt first.");
+    await runImageJob({ jobPrompt: prompt.trim() });
+  };
+
+  /** Circle to Remove: mask only — prompt stays backend, never fills the Describe field. */
+  const runSmartRemove = async (maskDataUrl: string) => {
+    setRemoveMaskDataUrl(maskDataUrl);
+    setSmartRemoveOpen(false);
+    await runImageJob({
+      jobPrompt: SMART_REMOVE_PROMPT,
+      maskDataUrl,
+      toastStart: "✨ Removing selected area…",
+    });
   };
 
   const handleStop = () => {
@@ -443,8 +465,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setSmartRemoveOpen(true);
       return;
     }
+    // Prompt-filling tools are disabled in the UI; ignore if any leak through.
     if (tool.prompt.startsWith("__") && tool.prompt.endsWith("__")) return;
-    setPrompt(tool.prompt);
   };
 
   // No-ops for video-only props required by shared EditorOptionsPanel
@@ -580,10 +602,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         imageUrl={inputPreview}
         onCancel={() => setSmartRemoveOpen(false)}
         onApply={(masked) => {
-          setRemoveMaskDataUrl(masked);
-          setPrompt(SMART_REMOVE_PROMPT);
-          setSmartRemoveOpen(false);
-          toast.success("Selection saved — click Generate to remove.");
+          // Do NOT set visible prompt — entire feature is backend-only.
+          void runSmartRemove(masked);
         }}
       />
     </div>
