@@ -11,7 +11,8 @@ import {
   type ImageQuality,
   type VideoResolution,
 } from "@/lib/quality-options";
-import { watermarkImage, applyDownloadWatermarkGrid } from "@/lib/watermark";
+import { secureDownloadImage } from "@/lib/download.functions";
+import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/_authenticated/editor")({
 function Editor() {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
+  const secureDl = useServerFn(secureDownloadImage);
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -408,7 +410,7 @@ function Editor() {
           strength: mediaType === "image" && sourceKind === "image" ? strength : undefined,
           maskImageUrl,
           referenceImageUrls,
-
+          keepWatermark: mediaType === "image" ? keepWatermark : undefined,
           aspectRatio:
             mediaType === "image" && !mediaUrl ? aspectRatio : undefined,
           videoDurationSeconds: mediaType === "video" ? videoDuration : undefined,
@@ -419,19 +421,11 @@ function Editor() {
       });
 
       if (runId !== runIdRef.current) return;
-      let url = res.outputUrl;
+      // Server is the only watermark authority (getWatermarkMode + applyServerWatermark).
+      // Do not run the client canvas compositor on the success path.
+      const url = res.outputUrl;
       const isVideoOut = mediaType === "video";
       setOutputIsVideo(isVideoOut);
-      if (!isVideoOut && url && !isAdmin && (isFree || keepWatermark)) {
-        try {
-          const marked = await watermarkImage(url, { strong: isFree });
-          if (marked && marked !== url) {
-            url = marked;
-          }
-        } catch {
-          /* keep original */
-        }
-      }
 
       if (runId !== runIdRef.current) return;
       setProgress(100);
@@ -501,25 +495,37 @@ function Editor() {
 
   const handleDownload = async () => {
     if (!output) return;
-    let downloadUrl = output;
-    if (!outputIsVideo && !isAdmin) {
-      if (isFree) {
-        const alreadyClientStamped = output.startsWith("data:");
-        if (!alreadyClientStamped) {
-          try { downloadUrl = await applyDownloadWatermarkGrid(output); } catch { /* ignore */ }
-        }
-      } else if (keepWatermark) {
-        try { downloadUrl = await watermarkImage(output); } catch { /* ignore */ }
+
+    // Video: direct download (no image watermark pipeline).
+    if (outputIsVideo) {
+      try {
+        await triggerBrowserDownload(output, `motio2edit-${Date.now()}.mp4`);
+        setDownloaded(true);
+        toast.success("⬇️ Download started!");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Download failed.");
       }
+      return;
     }
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    a.download = `motio2edit-${Date.now()}.${outputIsVideo ? "mp4" : "png"}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setDownloaded(true);
-    toast.success("⬇️ Download started!");
+
+    // Image: server-only watermark policy via secureDownloadImage.
+    try {
+      const res = await secureDl({
+        data: {
+          imageUrl: output,
+          keepWatermark: keepWatermark === true,
+        },
+      });
+      await triggerBrowserDownload(res.downloadUrl, `motio2edit-${Date.now()}.jpg`);
+      setDownloaded(true);
+      toast.success(
+        res.watermarked ? "⬇️ Download started (branded)" : "⬇️ Download started",
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Download failed. Please try again.",
+      );
+    }
   };
 
   const handleShare = async () => {
