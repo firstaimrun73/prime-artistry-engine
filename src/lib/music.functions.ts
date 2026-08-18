@@ -1,32 +1,28 @@
-// AI Music Studio server function.
-//
-// Uses fal.ai's Stable Audio via the async queue API. The queue API is the
-// same pattern the image/video generator uses in generate.functions.ts — it
-// tolerates long jobs (music generation can take 20–60s) without holding a
-// synchronous HTTP connection open.
-//
-// Contract:
-//   • Auth is required (requireSupabaseAuth middleware).
-//   • Credits are deducted ONLY after a successful audio URL is returned.
-//     A failed / empty generation never charges the user.
-//   • Every successful generation is persisted to public.generations with
-//     type='music' so it appears in /history alongside images and videos.
-//   • Free plan cannot generate music (Lite+ only). Enforced here, not only in UI.
+/**
+ * MOTIO2EDIT Music Studio — server functions.
+ *
+ * Modes:
+ *   song         → fal-ai/minimax-music/v2 (text style + lyrics)
+ *   instrumental → fal-ai/minimax-music/v2 (instrumental / style prompt)
+ *   voiceover    → xai/tts/v1
+ *   sfx          → fal-ai/mmaudio-v2/text-to-audio  OR  fal-ai/mmaudio-v2 (video+text)
+ *
+ * Credits: generation-cost-registry (provider → Motio2edit credits).
+ * Charge only after a valid audio URL. Free plan blocked via canAccessMusic.
+ */
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { CREDIT_COST } from "@/lib/plans";
 import { canAccessMusic } from "@/lib/policy";
+import { buildMusicBrief } from "@/lib/music/music-brief";
+import {
+  estimateCredits,
+  getRegistryEntry,
+  type RegistryEntry,
+} from "@/lib/generation-cost-registry";
 
 const FAL_QUEUE = "https://queue.fal.run/";
-// High quality chain: minimax first (richest, most musical output), then the
-// CassetteAI generator, then Stable Audio as the final safety net. Chip /
-// artifact sounds in the earlier single-model setup came from returning the
-// first response even when the model produced a degenerate clip.
-const MUSIC_MODEL_PRO = "fal-ai/minimax/music-01";
-const MUSIC_MODEL_PRO_FALLBACK = "cassetteai/music-generator";
-const MUSIC_MODEL_LITE = "fal-ai/stable-audio";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const GENRES = [
@@ -41,37 +37,46 @@ const MOODS = [
   "hopeful", "nostalgic", "tense", "triumphant",
 ] as const;
 
+export type MusicMode = "song" | "instrumental" | "voiceover" | "sfx";
+
 const inputSchema = z.object({
-  prompt: z.string().trim().min(1, "Describe the music you want.").transform((s) => s.slice(0, 900)),
+  mode: z.enum(["song", "instrumental", "voiceover", "sfx"]).default("instrumental"),
+  prompt: z.string().trim().max(4000).optional().default(""),
+  lyrics: z.string().trim().max(3500).optional(),
   genre: z.enum(GENRES).optional(),
   mood: z.enum(MOODS).optional(),
-  // CassetteAI supports up to 3 minutes (180s) per generation.
-  durationSeconds: z.number().int().min(5).max(180),
-  // Model tier — "lite" is faster/cheaper (Stable Audio, 50 credits),
-  // "pro" is the higher-quality CassetteAI generator (100 credits).
-  tier: z.enum(["lite", "pro"]).optional().default("pro"),
+  durationSeconds: z.number().int().min(1).max(180).optional().default(30),
+  imageUrl: z.string().url().max(8000).optional(),
+  videoUrl: z.string().url().max(8000).optional(),
+  audioUrl: z.string().url().max(8000).optional(),
+  voice: z.string().max(40).optional(),
+  instrumental: z.boolean().optional(),
+  tier: z.enum(["lite", "pro"]).optional(),
 });
 
-// Compose the descriptive prompt Stable Audio responds to best. It benefits
-// from a comma-separated list of style, mood, instrumentation and quality
-// descriptors — free-form English works but this framing yields tighter,
-// more musical results.
-function composeMusicPrompt({
-  prompt,
-  genre,
-  mood,
-}: {
-  prompt: string;
-  genre?: string;
-  mood?: string;
-}): string {
-  const parts = [prompt.trim()];
-  if (genre) parts.push(`${genre} genre`);
-  if (mood) parts.push(`${mood} mood`);
-  parts.push("professional production", "clean mix", "high fidelity", "instrumental");
-  const composed = parts.filter(Boolean).join(", ");
-  // FAL music models cap prompts at 1000 chars — trim to 900 to leave headroom.
-  return composed.length > 900 ? composed.slice(0, 900) : composed;
+function registryForMode(mode: MusicMode, hasVideo: boolean): RegistryEntry {
+  if (mode === "voiceover") {
+    const e = getRegistryEntry("tts_xai");
+    if (!e) throw new Error("Voiceover model is not configured.");
+    return e;
+  }
+  if (mode === "sfx") {
+    if (hasVideo) {
+      const e = getRegistryEntry("sfx_mmaudio_v2");
+      if (!e) throw new Error("Video→audio model is not configured.");
+      return e;
+    }
+    const e = getRegistryEntry("sfx_mmaudio_text");
+    if (!e) throw new Error("SFX model is not configured.");
+    return e;
+  }
+  const e = getRegistryEntry("music_minimax_v2");
+  if (!e) throw new Error("Music model is not configured.");
+  return e;
+}
+
+function costFor(entry: RegistryEntry, opts: { durationSeconds?: number; characters?: number }) {
+  return estimateCredits(entry, opts);
 }
 
 function safePayload(body: Record<string, unknown>): Record<string, unknown> {
@@ -102,19 +107,19 @@ function friendlyError(status: number, txt: string): string {
   if (/balance|billing|top up|exhausted/i.test(detail))
     return "The music AI service is temporarily unavailable. Please try again later.";
   if (/nsfw|safety/i.test(detail))
-    return "This prompt was blocked by the safety filter. Try a different description.";
+    return "This request was blocked by the safety filter. Try a different description.";
   if (detail) return `Music generation failed: ${detail.slice(0, 160)}`;
   return `Music generation failed (status ${status}). Please try again.`;
 }
 
-// Submit → poll → fetch, returns the URL of the generated audio file.
-async function runStableAudio(
+async function runFalQueue(
+  model: string,
   body: Record<string, unknown>,
   falKey: string,
-  model: string,
-): Promise<string> {
+  label: string,
+): Promise<Record<string, unknown>> {
   const headers = { Authorization: `Key ${falKey}`, "Content-Type": "application/json" };
-  console.log("[music] ▶ submit", model, JSON.stringify(safePayload(body)));
+  console.log("[music] ▶", label, model, JSON.stringify(safePayload(body)));
 
   const submit = await fetch(`${FAL_QUEUE}${model}`, {
     method: "POST",
@@ -123,17 +128,16 @@ async function runStableAudio(
   });
   if (!submit.ok) {
     const txt = await submit.text();
-    console.error("[music] ✖ submit failed", submit.status, txt.slice(0, 500));
+    console.error("[music] ✖ submit", submit.status, txt.slice(0, 400));
     throw new Error(friendlyError(submit.status, txt));
   }
-  const { request_id, status_url, response_url } = (await submit.json()) as {
+  const { status_url, response_url } = (await submit.json()) as {
     request_id: string;
     status_url: string;
     response_url: string;
   };
-  console.log("[music]   queued request_id:", request_id);
 
-  const deadline = Date.now() + 180_000; // 3 min cap
+  const deadline = Date.now() + 180_000;
   let delay = 1500;
   let lastStatus = "";
   while (Date.now() < deadline) {
@@ -144,57 +148,146 @@ async function runStableAudio(
       continue;
     }
     const sj = (await st.json()) as { status?: string };
-    if (sj.status && sj.status !== lastStatus) {
-      lastStatus = sj.status;
-      console.log("[music]   status:", sj.status);
-    }
+    if (sj.status) lastStatus = sj.status;
     if (sj.status === "COMPLETED") break;
     if (sj.status === "FAILED" || sj.status === "ERROR") {
-      const body = await fetch(response_url, { headers })
+      const bodyTxt = await fetch(response_url, { headers })
         .then((r) => r.text())
         .catch(() => "");
-      throw new Error(friendlyError(500, body));
+      throw new Error(friendlyError(500, bodyTxt));
     }
     delay = Math.min(delay * 1.3, 5000);
   }
   if (lastStatus !== "COMPLETED") {
-    throw new Error("Music generation took too long and timed out. Please try again.");
+    throw new Error(`${label} timed out. Please try again.`);
   }
 
   const res = await fetch(response_url, { headers });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(friendlyError(res.status, txt));
-  }
-  const json = (await res.json()) as {
-    audio_file?: { url?: string; content_type?: string };
-    audio?: { url?: string };
-  };
-  const url = json.audio_file?.url ?? json.audio?.url ?? null;
-  console.log("[music] ✔ done →", url ?? "none");
-  if (!url) throw new Error("Music generation returned no audio. Please try again.");
-  return url;
+  if (!res.ok) throw new Error(friendlyError(res.status, await res.text()));
+  return (await res.json()) as Record<string, unknown>;
 }
 
-// Reject degenerate output ("chip" sounds are almost always sub-second or
-// near-empty files). We validate reachability + payload size, which maps to
-// roughly 5 seconds of audio at any sane bitrate.
-const MIN_AUDIO_BYTES = 40_000;
+function extractAudioUrl(json: Record<string, unknown>): string | null {
+  const audio = json.audio as { url?: string } | undefined;
+  const audioFile = json.audio_file as { url?: string } | undefined;
+  const video = json.video as { url?: string } | undefined;
+  return audio?.url ?? audioFile?.url ?? video?.url ?? null;
+}
+
+const MIN_AUDIO_BYTES = 8_000;
 async function isPlayableAudio(url: string): Promise<boolean> {
-  if (!url || !url.startsWith("http")) return false;
+  if (!url?.startsWith("http")) return false;
   try {
     const head = await fetch(url, { method: "HEAD" });
     if (!head.ok) return false;
     const len = Number(head.headers.get("content-length") ?? "0");
     if (len && len < MIN_AUDIO_BYTES) {
-      console.warn("[music] audio too small:", len, "bytes");
+      console.warn("[music] audio too small:", len);
       return false;
     }
     return true;
-  } catch (e) {
-    console.warn("[music] audio validation failed:", e);
+  } catch {
     return false;
   }
+}
+
+async function generateMinimaxMusic(args: {
+  falKey: string;
+  stylePrompt: string;
+  lyrics?: string;
+  instrumental: boolean;
+}): Promise<string> {
+  const model = "fal-ai/minimax-music/v2";
+  let style = args.stylePrompt.trim().slice(0, 300);
+  if (style.length < 10) style = `${style} professional cinematic music production`.slice(0, 300);
+
+  let lyricsPrompt: string;
+  if (args.instrumental) {
+    lyricsPrompt =
+      "## instrumental arrangement ##\n[Intro]\n[Verse]\n[Chorus]\n[Outro]\n" +
+      "(no sung vocals — instrumental only)";
+  } else {
+    lyricsPrompt = (args.lyrics || args.stylePrompt).trim();
+    if (lyricsPrompt.length < 10) {
+      lyricsPrompt = `[Verse]\n${lyricsPrompt || "Wordless melody"}\n[Chorus]\n${lyricsPrompt || "Melodic theme"}`;
+    }
+    lyricsPrompt = lyricsPrompt.slice(0, 3000);
+  }
+
+  const json = await runFalQueue(
+    model,
+    { prompt: style, lyrics_prompt: lyricsPrompt },
+    args.falKey,
+    "MiniMax Music v2",
+  );
+  const url = extractAudioUrl(json);
+  if (!url) throw new Error("Music generation returned no audio.");
+  return url;
+}
+
+async function generateMmaudio(args: {
+  falKey: string;
+  prompt: string;
+  videoUrl?: string;
+  durationSeconds: number;
+}): Promise<{ url: string; model: string }> {
+  const duration = Math.min(30, Math.max(1, args.durationSeconds));
+  const prompt = (args.prompt || "ambient cinematic soundscape").slice(0, 500);
+
+  if (args.videoUrl) {
+    const model = "fal-ai/mmaudio-v2";
+    const json = await runFalQueue(
+      model,
+      {
+        video_url: args.videoUrl,
+        prompt,
+        num_steps: 25,
+        duration,
+        cfg_strength: 4.5,
+      },
+      args.falKey,
+      "MMAudio V2 video→audio",
+    );
+    const url = extractAudioUrl(json);
+    if (!url) throw new Error("Video→music returned no audio.");
+    return { url, model };
+  }
+
+  const model = "fal-ai/mmaudio-v2/text-to-audio";
+  const json = await runFalQueue(
+    model,
+    { prompt, duration, num_steps: 25, cfg_strength: 4.5 },
+    args.falKey,
+    "MMAudio text SFX",
+  );
+  const url = extractAudioUrl(json);
+  if (!url) throw new Error("SFX generation returned no audio.");
+  return { url, model };
+}
+
+async function generateVoiceover(args: {
+  falKey: string;
+  text: string;
+  voice?: string;
+}): Promise<string> {
+  const model = "xai/tts/v1";
+  const text = args.text.trim().slice(0, 15000);
+  if (text.length < 1) throw new Error("Voiceover requires a script.");
+  const voice = (args.voice || "eve").toLowerCase();
+  const allowed = new Set(["eve", "ara", "rex", "sal", "leo"]);
+  const json = await runFalQueue(
+    model,
+    {
+      text,
+      voice: allowed.has(voice) ? voice : "eve",
+      language: "auto",
+    },
+    args.falKey,
+    "xAI TTS",
+  );
+  const url = extractAudioUrl(json);
+  if (!url) throw new Error("Voiceover returned no audio.");
+  return url;
 }
 
 export const generateMusic = createServerFn({ method: "POST" })
@@ -211,99 +304,109 @@ export const generateMusic = createServerFn({ method: "POST" })
       .single();
     if (pErr || !profile) throw new Error("Could not load your account.");
 
-    // Credit rule: Pro = 100 credits, Lite = 50 credits. Admin (ADMIN_EMAIL) bypasses.
-    const tier = data.tier ?? "pro";
-    const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
-    // Model chain: try in order, fall through on failure or degenerate audio.
-    const modelChain =
-      tier === "lite"
-        ? [MUSIC_MODEL_LITE]
-        : [MUSIC_MODEL_PRO, MUSIC_MODEL_PRO_FALLBACK, MUSIC_MODEL_LITE];
     const adminEmail = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
     const isAdmin =
-      !!adminEmail &&
-      !!profile.email &&
-      profile.email.toLowerCase() === adminEmail;
+      !!adminEmail && !!profile.email && profile.email.toLowerCase() === adminEmail;
 
-    // Plan gate: Free cannot generate music. Lite+ and admin allowed.
     if (!canAccessMusic({ plan: profile.plan, email: profile.email, isAdmin })) {
-      throw new Error("Music generation requires Lite or a higher plan. Upgrade to unlock Music Studio.");
+      throw new Error(
+        "Music generation requires Lite or a higher plan. Upgrade to unlock Music Studio.",
+      );
     }
+
+    const mode: MusicMode = data.mode;
+    const hasVideo = !!(data.videoUrl && data.videoUrl.startsWith("https://"));
+    const entry = registryForMode(mode, hasVideo);
+
+    const useVideoMusic =
+      hasVideo && (mode === "sfx" || mode === "song" || mode === "instrumental");
+
+    const durationSeconds = data.durationSeconds ?? 30;
+    const characters = (data.prompt || "").length;
+
+    const costEst = costFor(entry, {
+      durationSeconds: useVideoMusic || mode === "sfx" ? durationSeconds : undefined,
+      characters: mode === "voiceover" ? Math.max(characters, 1) : undefined,
+    });
+    const cost = costEst.credits;
 
     if (!isAdmin && profile.credits < cost) {
       throw new Error(
-        `Not enough credits. Music generation costs ${cost} credits. Buy credits or upgrade your plan.`,
+        `Not enough credits. This music job costs ${cost} credits (provider ≈ $${costEst.providerUsd.toFixed(3)}).`,
       );
     }
 
     const falKey = process.env.FAL_API_KEY;
     if (!falKey) throw new Error("Music service unavailable.");
 
-    const composed = composeMusicPrompt({
-      prompt: data.prompt,
-      genre: data.genre,
-      mood: data.mood,
+    const instrumental =
+      data.instrumental === true || mode === "instrumental" || mode === "sfx";
+    const brief = buildMusicBrief({
+      text: data.prompt || data.lyrics || "",
+      imageUrl: data.imageUrl,
+      videoUrl: data.videoUrl,
+      audioUrl: data.audioUrl,
+      preferredGenre: data.genre,
+      preferredMood: data.mood,
+      instrumental,
     });
-    console.log("[music] prompt:", composed, "tier:", tier);
 
     let outputUrl: string;
-    let usedModel = modelChain[0]!;
+    let usedModel: string;
     try {
-      let lastErr: unknown;
-      let url = "";
-      // Each model gets up to 2 attempts; a model that errors, returns no URL,
-      // or returns audio that fails validation falls through to the next one.
-      outer: for (const candidate of modelChain) {
-        for (let attempt = 0; attempt <= 1; attempt++) {
-          try {
-            if (attempt > 0) console.log(`[music] retry attempt ${attempt} on ${candidate}…`);
-            const body: Record<string, unknown> =
-              candidate === MUSIC_MODEL_PRO
-                ? {
-                    prompt: composed.slice(0, 900),
-                    duration: data.durationSeconds,
-                    instrumental: true,
-                  }
-                : {
-                    prompt: composed,
-                    duration: data.durationSeconds,
-                    seconds_total: data.durationSeconds,
-                    output_format: "mp3",
-                    sample_rate: 44100,
-                  };
-            const candidateUrl = await runStableAudio(body, falKey, candidate);
-            if (candidateUrl && (await isPlayableAudio(candidateUrl))) {
-              url = candidateUrl;
-              usedModel = candidate;
-              break outer;
-            }
-            console.warn("[music] ✖ rejected output from", candidate, "— trying next model");
-            break; // degenerate output: don't retry the same model
-          } catch (e) {
-            lastErr = e;
-            const msg = e instanceof Error ? e.message : "";
-            if (/safety filter/i.test(msg)) throw e;
-            if (attempt === 1) break;
-            await sleep(2000 * (attempt + 1));
-          }
+      if (mode === "voiceover") {
+        usedModel = "xai/tts/v1";
+        outputUrl = await generateVoiceover({
+          falKey,
+          text: data.prompt || "",
+          voice: data.voice,
+        });
+      } else if (useVideoMusic) {
+        const r = await generateMmaudio({
+          falKey,
+          prompt: brief.summaryPrompt,
+          videoUrl: data.videoUrl,
+          durationSeconds,
+        });
+        outputUrl = r.url;
+        usedModel = r.model;
+      } else if (mode === "sfx") {
+        const r = await generateMmaudio({
+          falKey,
+          prompt: data.prompt || brief.summaryPrompt,
+          durationSeconds: Math.min(30, durationSeconds),
+        });
+        outputUrl = r.url;
+        usedModel = r.model;
+      } else {
+        usedModel = "fal-ai/minimax-music/v2";
+        const style = [
+          brief.summaryPrompt,
+          data.genre ? `${data.genre} genre` : "",
+          data.mood ? `${data.mood} mood` : "",
+        ]
+          .filter(Boolean)
+          .join(". ")
+          .slice(0, 300);
+        outputUrl = await generateMinimaxMusic({
+          falKey,
+          stylePrompt: style,
+          lyrics: data.lyrics || (mode === "song" ? data.prompt : undefined),
+          instrumental: mode === "instrumental" || instrumental,
+        });
+      }
+
+      if (!(await isPlayableAudio(outputUrl))) {
+        if (!outputUrl.startsWith("http")) {
+          throw new Error("Generation returned no playable media.");
         }
       }
-      if (!url) throw lastErr ?? new Error("Music generation returned no usable audio.");
-      outputUrl = url;
-      console.log("[music] delivered by model:", usedModel);
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Generation failed.";
       console.error("[music] failed (no credits charged):", raw);
-      throw new Error(`Music generation failed. Credits not charged. Please retry. (${raw})`);
+      throw new Error(`Music generation failed. Credits not charged. (${raw})`);
     }
 
-    // Only a real, fetchable audio URL counts as a success.
-    if (!outputUrl || !outputUrl.startsWith("http")) {
-      throw new Error("Music generation returned no playable audio. Credits not charged.");
-    }
-
-
-    // Charge credits only after a confirmed successful output. Admin bypass: no charge.
     let newCredits = profile.credits;
     if (!isAdmin) {
       const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
@@ -313,36 +416,76 @@ export const generateMusic = createServerFn({ method: "POST" })
       });
       if (dErr || !deduction) {
         if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
-          throw new Error(`Not enough credits. Music generation costs ${cost} credits.`);
+          throw new Error(`Not enough credits. This job costs ${cost} credits.`);
         }
-        console.error("[music] credit deduction failed:", dErr?.message);
         throw new Error(`Could not charge credits: ${dErr?.message || "unknown error"}`);
       }
-      const deducted = deduction as { transaction_id: string; credits: number };
-      newCredits = deducted.credits;
-      console.log("[music] charged", cost, "credits → remaining", newCredits);
-    } else {
-      console.log("[music] admin bypass — no credits charged");
+      newCredits = (deduction as { credits: number }).credits;
+      console.log("[music] charged", cost, "credits →", newCredits);
     }
 
-    // Save to history so it shows up in /history alongside images and videos.
     const { error: histErr } = await supabase.from("generations").insert({
       user_id: userId,
       type: "music",
-      prompt: composed,
-      input_url: null,
+      prompt: brief.summaryPrompt.slice(0, 500),
+      input_url: data.videoUrl || data.imageUrl || data.audioUrl || null,
       output_url: outputUrl,
       status: "success",
+      metadata: {
+        mode,
+        model: usedModel,
+        credits_charged: isAdmin ? 0 : cost,
+        provider_usd_est: costEst.providerUsd,
+        brief_emotion: brief.emotion,
+        brief_genre: brief.genre,
+        sources: brief.sources,
+      },
     });
     if (histErr) console.error("[music] history insert failed:", histErr.message);
 
     return {
       outputUrl,
       credits: newCredits,
-      durationSeconds: data.durationSeconds,
-      // Lets the UI tell the user when a backup model produced the track.
+      durationSeconds,
       model: usedModel,
-      usedFallback: usedModel !== modelChain[0],
+      mode,
+      creditsCharged: isAdmin ? 0 : cost,
+      providerUsdEstimate: costEst.providerUsd,
+      brief: {
+        emotion: brief.emotion,
+        genre: brief.genre,
+        tempo: brief.tempo,
+        mood: brief.mood,
+        sources: brief.sources,
+      },
+      usedFallback: false,
+    };
+  });
+
+export const estimateMusicCost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        mode: z.enum(["song", "instrumental", "voiceover", "sfx"]).default("instrumental"),
+        durationSeconds: z.number().int().min(1).max(180).optional().default(30),
+        promptLength: z.number().int().min(0).max(20000).optional().default(0),
+        hasVideo: z.boolean().optional().default(false),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const entry = registryForMode(data.mode, !!data.hasVideo);
+    const est = costFor(entry, {
+      durationSeconds: data.durationSeconds,
+      characters: data.mode === "voiceover" ? Math.max(1, data.promptLength) : undefined,
+    });
+    return {
+      modelId: entry.modelId,
+      credits: est.credits,
+      providerUsd: est.providerUsd,
+      customerValueUsd: est.customerValueUsd,
+      mode: data.mode,
     };
   });
 
