@@ -2,17 +2,15 @@
  * MOTIO2EDIT Auto executor (server-only).
  *
  * Pipeline:
- *   ONE image → vision analysis (Claude) or rule fallback
- *            → deterministic layer validation
- *            → improvement match + ONE internal prompt
- *            → ONE fal.ai Kontext generation
+ *   ONE image → deterministic rule-based plan (no external OpenAI/Claude API)
+ *            → ONE internal instruction
+ *            → fal.ai openai/gpt-image-2/edit
  *            → watermark → charge AUTO_EDIT_CREDIT_COST once
  *
  * User never supplies a prompt. Internal prompts never return to the client.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { analyzeImage } from "./analyze.server";
 import { buildRuleBasedAnalysis } from "./ruleBasedAnalysis";
 import { buildAnalysisLayers } from "./auto-edit.layers.server";
 import {
@@ -21,9 +19,14 @@ import {
 } from "./auto-edit.prompt-builder.server";
 import { validateStandaloneAutoEditInput } from "./auto-edit.validation";
 import type { StandaloneAutoEditResult } from "./auto-edit.types";
-import { AUTO_EDIT_CREDIT_COST, labelImprovement, labelIssue } from "./constants";
+import {
+  AUTO_EDIT_CREDIT_COST,
+  AUTO_EDIT_FAL_MODEL,
+  labelImprovement,
+  labelIssue,
+} from "./constants";
+import { runAutoGptImageEdit } from "./gpt-image-edit.server";
 import type { ImageQuality } from "@/lib/quality-options";
-import { runFixedImageEdit } from "@/lib/generation/fixed-image-edit.server";
 
 export type RunStandaloneAutoEditArgs = {
   imageUrl: string;
@@ -50,7 +53,6 @@ export async function executeStandaloneAutoEdit(
     throw new Error(validated.error);
   }
 
-  // Pre-check credits for the fixed Auto Edit job (before expensive analysis)
   if (!args.isAdmin && args.profile.credits < AUTO_EDIT_CREDIT_COST) {
     throw new Error(
       `Not enough credits. Auto Edit costs ${AUTO_EDIT_CREDIT_COST} credits per job.`,
@@ -59,24 +61,8 @@ export async function executeStandaloneAutoEdit(
 
   const dims = { width: args.width, height: args.height };
 
-  // —— Analysis layer (LLM vision preferred; deterministic fallback) ——
-  let analysis;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    try {
-      analysis = await analyzeImage(validated.imageUrl, anthropicKey, dims);
-    } catch (err) {
-      console.warn(
-        "[AutoEdit] Vision analysis failed, using rule-based fallback:",
-        err instanceof Error ? err.message : err,
-      );
-      analysis = buildRuleBasedAnalysis(dims);
-    }
-  } else {
-    analysis = buildRuleBasedAnalysis(dims);
-  }
-
-  // —— Deterministic validation / planner ——
+  // Deterministic plan only — no Anthropic/OpenAI SDK. GPT Image on fal does the edit.
+  const analysis = buildRuleBasedAnalysis(dims);
   const layers = buildAnalysisLayers(analysis);
   const matched = matchImprovements(analysis, layers);
 
@@ -92,7 +78,6 @@ export async function executeStandaloneAutoEdit(
     matched.length === 0 ||
     (matched.length === 1 && matched[0] === "NATURAL_PHOTO_POLISH");
 
-  // NO_CHANGE: high quality + nothing substantial — do not charge
   if (layers.qualityScore >= 0.92 && attentionLayers.length === 0 && onlyPolish) {
     return {
       success: true,
@@ -119,8 +104,7 @@ export async function executeStandaloneAutoEdit(
     throw new Error("Auto Edit invariant: generation must run exactly once.");
   }
 
-  // —— Single fal.ai execution + fixed job credit ——
-  const gen = await runFixedImageEdit({
+  const gen = await runAutoGptImageEdit({
     supabase: args.supabase,
     supabaseAdmin: args.supabaseAdmin,
     userId: args.userId,
@@ -128,9 +112,9 @@ export async function executeStandaloneAutoEdit(
     isAdmin: args.isAdmin,
     internalPrompt: prompt,
     imageUrl: validated.imageUrl,
-    imageQuality: args.imageQuality,
-    creditCost: AUTO_EDIT_CREDIT_COST,
   });
+
+  console.log("[AutoEdit] primary model:", AUTO_EDIT_FAL_MODEL);
 
   return {
     success: true,
