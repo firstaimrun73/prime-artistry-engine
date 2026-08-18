@@ -27,6 +27,7 @@ import {
   expandPromptDeterministic,
   getIntentSettings,
 } from "@/lib/image-edit/prompt-engine";
+import { getWatermarkMode } from "@/lib/policy";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -199,6 +200,8 @@ const inputSchema = z.object({
   imageQuality: z.enum(["hd", "2k", "4k"]).optional(),
   videoResolution: z.enum(["720p", "1080p", "4k"]).optional(),
   videoMode: z.enum(["transform", "enhance"]).optional(),
+  /** Paid users: when true, apply primary watermark. Free is always forced on by policy. */
+  keepWatermark: z.boolean().optional(),
 });
 
 export const generateMedia = createServerFn({ method: "POST" })
@@ -470,34 +473,52 @@ export const generateMedia = createServerFn({ method: "POST" })
       console.log("[generate] charged", cost, "credits → remaining", newCredits, "tx", deducted.transaction_id);
     }
 
-    // FREE image: stamp primary+secondary on the server BEFORE the client receives outputUrl.
-    if (data.type === "image" && !isAdmin && profile.plan === "free") {
-      try {
-        const { applyServerWatermark, fetchImageBuffer } = await import(
-          "@/lib/watermark.server"
-        );
-        const raw = await fetchImageBuffer(outputUrl);
-        const stamped = await applyServerWatermark(raw, "primary+secondary");
-        const path = `${userId}/out-wm-${Date.now()}.jpg`;
-        const { error: upErr } = await supabaseAdmin.storage
-          .from("uploads")
-          .upload(path, stamped, { contentType: "image/jpeg", upsert: true });
-        if (!upErr) {
+    // Single source of truth: getWatermarkMode + server-side applyServerWatermark.
+    // Free → always primary+secondary. Paid → primary when keepWatermark true. Admin → none.
+    // Never return a silently clean image when a mark was required.
+    if (data.type === "image") {
+      const wmMode = getWatermarkMode({
+        plan: profile.plan,
+        email: profile.email,
+        isAdmin,
+        keepWatermark: data.keepWatermark === true,
+      });
+      if (wmMode !== "none") {
+        try {
+          const { applyServerWatermark, fetchImageBuffer } = await import(
+            "@/lib/watermark.server"
+          );
+          const raw = await fetchImageBuffer(outputUrl);
+          const stamped = await applyServerWatermark(raw, wmMode);
+          const path = `${userId}/out-wm-${Date.now()}.jpg`;
+          const { error: upErr } = await supabaseAdmin.storage
+            .from("uploads")
+            .upload(path, stamped, { contentType: "image/jpeg", upsert: true });
+          if (upErr) {
+            console.error("[generate] wm upload failed:", upErr.message);
+            throw new Error(
+              "Could not apply watermark to your image. Please try again or contact support.",
+            );
+          }
           const { data: signed } = await supabaseAdmin.storage
             .from("uploads")
             .createSignedUrl(path, 60 * 60 * 24 * 7);
-          if (signed?.signedUrl) {
-            outputUrl = signed.signedUrl;
-            console.log("[generate] free output stamped server-side (primary+secondary)");
+          if (!signed?.signedUrl) {
+            throw new Error(
+              "Could not finalize watermarked image. Please try again or contact support.",
+            );
           }
-        } else {
-          console.error("[generate] wm upload failed:", upErr.message);
+          outputUrl = signed.signedUrl;
+          console.log("[generate] output stamped server-side:", wmMode);
+        } catch (e) {
+          console.error("[generate] server watermark failed:", e);
+          if (e instanceof Error && e.message.includes("watermark")) throw e;
+          throw new Error(
+            e instanceof Error
+              ? e.message
+              : "Could not apply watermark to your image. Please try again.",
+          );
         }
-      } catch (e) {
-        console.error(
-          "[generate] server watermark failed; secure download still enforces branding:",
-          e,
-        );
       }
     }
 
