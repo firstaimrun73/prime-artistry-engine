@@ -2,12 +2,13 @@
  * MOTIO2EDIT Auto executor (server-only).
  *
  * Pipeline:
- *   ONE image → deterministic rule-based plan (no external OpenAI/Claude API)
- *            → ONE internal instruction
- *            → fal.ai openai/gpt-image-2/edit
+ *   ONE image → rule hints (not forced ops)
+ *            → ONE inspect-and-decide internal instruction
+ *            → ONE fal.ai openai/gpt-image-2/edit call
  *            → watermark → charge AUTO_EDIT_CREDIT_COST once
  *
- * User never supplies a prompt. Internal prompts never return to the client.
+ * No user prompt. No OpenAI/Claude/Gemini API keys.
+ * GPT Image receives the photograph and decides appropriate improvements.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -40,7 +41,6 @@ export type RunStandaloneAutoEditArgs = {
   isAdmin: boolean;
 };
 
-/** Hard invariant: generation is invoked at most once per run. */
 let __generationCallsThisRequest = 0;
 
 export async function executeStandaloneAutoEdit(
@@ -61,7 +61,7 @@ export async function executeStandaloneAutoEdit(
 
   const dims = { width: args.width, height: args.height };
 
-  // Deterministic plan only — no Anthropic/OpenAI SDK. GPT Image on fal does the edit.
+  // Soft heuristic hints only — not a paid vision API
   const analysis = buildRuleBasedAnalysis(dims);
   const layers = buildAnalysisLayers(analysis);
   const matched = matchImprovements(analysis, layers);
@@ -78,6 +78,7 @@ export async function executeStandaloneAutoEdit(
     matched.length === 0 ||
     (matched.length === 1 && matched[0] === "NATURAL_PHOTO_POLISH");
 
+  // Safeguard: skip generation when heuristics say the photo is already strong
   if (layers.qualityScore >= 0.92 && attentionLayers.length === 0 && onlyPolish) {
     return {
       success: true,
@@ -97,13 +98,14 @@ export async function executeStandaloneAutoEdit(
     };
   }
 
-  const { prompt, improvementsApplied } = buildSingleAutoEditPrompt(matched);
+  const { prompt, improvementsApplied } = buildSingleAutoEditPrompt(matched, analysis);
 
   __generationCallsThisRequest += 1;
   if (__generationCallsThisRequest !== 1) {
     throw new Error("Auto Edit invariant: generation must run exactly once.");
   }
 
+  // Single fal.ai GPT Image 2 Edit call
   const gen = await runAutoGptImageEdit({
     supabase: args.supabase,
     supabaseAdmin: args.supabaseAdmin,
@@ -114,7 +116,7 @@ export async function executeStandaloneAutoEdit(
     imageUrl: validated.imageUrl,
   });
 
-  console.log("[AutoEdit] primary model:", AUTO_EDIT_FAL_MODEL);
+  console.log("[AutoEdit] model:", AUTO_EDIT_FAL_MODEL, "| falCalls: 1");
 
   return {
     success: true,
