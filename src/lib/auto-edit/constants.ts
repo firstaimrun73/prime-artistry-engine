@@ -1,12 +1,25 @@
 /**
  * MOTIO2EDIT Auto Edit — product constants.
  *
- * One Auto Edit job = vision analysis + plan + single fal.ai execution + watermark.
+ * One Auto Edit job = deterministic plan + single fal.ai GPT Image edit + watermark.
  * User is charged once for the whole pipeline, not per internal step.
  */
 
-/** Credits charged for one complete Auto Edit (analysis + generation). */
+/** Credits charged for one complete Auto Edit (plan + generation). */
 export const AUTO_EDIT_CREDIT_COST = 70;
+
+/**
+ * Primary fal.ai GPT Image edit endpoint (NOT Flux Kontext, NOT external OpenAI SDK).
+ * Docs: https://fal.ai/models/openai/gpt-image-2/edit
+ */
+export const AUTO_EDIT_FAL_MODEL = "openai/gpt-image-2/edit" as const;
+
+/**
+ * Quality tier for GPT Image 2 edit.
+ * medium ≈ $0.061 at 1024×1024 (edit pricing table on fal) — under ~$0.09 target.
+ * high ≈ $0.219 at 1024×1024 — exceeds target; do not use as default.
+ */
+export const AUTO_EDIT_GPT_QUALITY = "medium" as const;
 
 /** Product name shown in UI. */
 export const AUTO_EDIT_PRODUCT_NAME = "MOTIO2EDIT Auto Edit" as const;
