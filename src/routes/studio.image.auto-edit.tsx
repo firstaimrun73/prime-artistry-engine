@@ -26,9 +26,10 @@ import { Progress } from "@/components/ui/progress";
 import { CompareSlider } from "@/components/CompareSlider";
 import { useAuth } from "@/lib/auth";
 import { runStandaloneAutoEdit } from "@/lib/auto-edit/auto-edit.functions";
+import { AUTO_EDIT_CREDIT_COST } from "@/lib/auto-edit/constants";
+import type { AutoEditAnalysisSummary } from "@/lib/auto-edit/auto-edit.types";
 import {
   IMAGE_QUALITY_OPTIONS,
-  imageQualityCost,
   type ImageQuality,
 } from "@/lib/quality-options";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,10 +41,11 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/studio/image/auto-edit")({
   head: () => ({
     meta: [
-      { title: "Motio2edit Auto — Motio2edit" },
+      { title: "MOTIO2EDIT Auto Edit — Motio2edit" },
       {
         name: "description",
-        content: "Upload one photo. Motio2edit Auto analyses and improves it automatically.",
+        content:
+          "Upload one photo. MOTIO2EDIT Auto Edit analyses and improves it automatically — no prompt needed.",
       },
     ],
   }),
@@ -63,8 +65,8 @@ type UiPhase = "idle" | "processing" | "done" | "error";
 
 const TIMELINE_STEPS: { id: StageId; label: string }[] = [
   { id: "analysing", label: "Analysing image" },
-  { id: "preparing", label: "Preparing automatic improvements" },
-  { id: "generating", label: "Creating your improved image" },
+  { id: "preparing", label: "Selecting the best improvements" },
+  { id: "generating", label: "Applying AI edit" },
   { id: "finalising", label: "Finalising" },
 ];
 
@@ -80,7 +82,7 @@ const STAGE_PROGRESS: Partial<Record<StageId, number>> = {
 const STAGE_PROCEDURE: Partial<Record<StageId, string>> = {
   queued: "Queued",
   analysing: "Analysing image…",
-  preparing: "Understanding image quality…",
+  preparing: "Choosing the best edit…",
   generating: "Creating your improved image…",
   finalising: "Finalising…",
   complete: "Complete",
@@ -177,14 +179,13 @@ function AutoEditPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [dlBusy, setDlBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [summary, setSummary] = useState<{ qualityScore: number; improvementsApplied: number } | null>(
-    null,
-  );
+  const [summary, setSummary] = useState<AutoEditAnalysisSummary | null>(null);
+  const [jobStatus, setJobStatus] = useState<"COMPLETE" | "NO_CHANGE" | null>(null);
   const runStartedAt = useRef<number>(0);
 
   const palette = useImagePalette(preview);
   const isAdmin = isAdminEmail(profile?.email);
-  const cost = imageQualityCost(quality);
+  const cost = AUTO_EDIT_CREDIT_COST;
   const credits = profile?.credits ?? 0;
   const noCredits = !isAdmin && credits < cost;
   const busy = phase === "processing";
@@ -224,9 +225,9 @@ function AutoEditPage() {
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
             A✦
           </span>
-          <h1 className="mt-5 text-xl font-bold">Sign in for Motio2edit Auto</h1>
+          <h1 className="mt-5 text-xl font-bold">Sign in for MOTIO2EDIT Auto Edit</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            One image. Automatic analysis and enhancement.
+            One image. AI analyses and improves it — no prompt needed.
           </p>
           <Button asChild className="mt-6 btn-animate">
             <Link to="/auth">Sign in</Link>
@@ -244,6 +245,7 @@ function AutoEditPage() {
     setPixelSize(null);
     setOutput(null);
     setSummary(null);
+    setJobStatus(null);
     setPhase("idle");
     setStage("queued");
     setProgress(0);
@@ -286,6 +288,7 @@ function AutoEditPage() {
     });
     setOutput(null);
     setSummary(null);
+    setJobStatus(null);
     setPhase("idle");
     setStage("queued");
     setProgress(0);
@@ -301,7 +304,7 @@ function AutoEditPage() {
     e.target.value = "";
     if (!list?.length) return;
     if (list.length > 1) {
-      toast.error("Motio2edit Auto supports exactly one image.");
+      toast.error("Auto Edit supports exactly one image.");
       return;
     }
     acceptFile(list[0]);
@@ -313,13 +316,14 @@ function AutoEditPage() {
       return;
     }
     if (noCredits) {
-      toast.error(`Need ${cost} credits for ${quality.toUpperCase()}.`);
+      toast.error(`Need ${cost} credits for Auto Edit.`);
       return;
     }
 
     setPhase("processing");
     setOutput(null);
     setSummary(null);
+    setJobStatus(null);
     setErrorMsg(null);
     setStage("queued");
     setProgress(0);
@@ -336,7 +340,7 @@ function AutoEditPage() {
       setStage("generating");
       setProgress(STAGE_PROGRESS.generating ?? 62);
 
-      // Single server pass: analyse → one prompt → one FAL generation
+      // Backend: vision analysis → plan → one fal.ai job → watermark → charge once
       const result = await runAutoFn({
         data: {
           imageUrl,
@@ -357,9 +361,15 @@ function AutoEditPage() {
       setProgress(100);
       setOutput(result.outputUrl);
       setSummary(result.analysisSummary);
+      setJobStatus(result.status ?? (result.changed ? "COMPLETE" : "NO_CHANGE"));
       setPhase("done");
       await refreshProfile();
-      toast.success("Motio2edit Auto complete");
+
+      if (result.status === "NO_CHANGE" || result.changed === false) {
+        toast.message(result.message || "No automatic changes needed.");
+      } else {
+        toast.success("MOTIO2EDIT Auto Edit complete");
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Auto Edit failed";
       setStage("error");
@@ -413,10 +423,10 @@ function AutoEditPage() {
             A✦
           </span>
           <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">
-            Motio2edit Auto
+            MOTIO2EDIT Auto Edit
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            One image · automatic analysis · one improved result
+            One photo · AI analysis · automatic edit · no prompt
           </p>
         </div>
 
@@ -445,7 +455,7 @@ function AutoEditPage() {
               const files = e.dataTransfer.files;
               if (!files?.length) return;
               if (files.length > 1) {
-                toast.error("Motio2edit Auto supports exactly one image.");
+                toast.error("Auto Edit supports exactly one image.");
                 return;
               }
               acceptFile(files[0]);
@@ -527,7 +537,7 @@ function AutoEditPage() {
                 <ImageIcon className="h-8 w-8 text-muted-foreground/50" aria-hidden />
                 <p className="text-sm font-medium text-muted-foreground">Result appears here</p>
                 <p className="max-w-[220px] text-xs text-muted-foreground/80">
-                  Tap Auto AI to analyse and improve your photo automatically.
+                  AI analyses your photo and applies the right improvements automatically.
                 </p>
               </div>
             ) : (
@@ -538,25 +548,53 @@ function AutoEditPage() {
                   <div className="overflow-hidden rounded-xl border border-border">
                     <img
                       src={output}
-                      alt="Motio2edit Auto result"
+                      alt="Auto Edit result"
                       className="mx-auto max-h-72 w-full object-contain protected-image"
                     />
                   </div>
                 )}
-                {summary && (
-                  <p className="text-center text-xs text-muted-foreground">
-                    Quality score {Math.round(summary.qualityScore * 100)}% ·{" "}
-                    {summary.improvementsApplied} automatic improvement
-                    {summary.improvementsApplied === 1 ? "" : "s"}
+                {jobStatus === "NO_CHANGE" && (
+                  <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground">
+                    No automatic changes needed — your photo already looks good.
                   </p>
+                )}
+                {summary && (
+                  <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3 text-left text-xs">
+                    <p className="text-muted-foreground">
+                      Quality score {Math.round(summary.qualityScore * 100)}%
+                      {summary.improvementsApplied > 0
+                        ? ` · ${summary.improvementsApplied} improvement${summary.improvementsApplied === 1 ? "" : "s"}`
+                        : ""}
+                    </p>
+                    {summary.detectedIssues?.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-foreground">Detected</p>
+                        <ul className="mt-1 list-inside list-disc text-muted-foreground">
+                          {summary.detectedIssues.map((x) => (
+                            <li key={x}>{x}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {summary.recommended?.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-foreground">Applied</p>
+                        <ul className="mt-1 list-inside list-disc text-muted-foreground">
+                          {summary.recommended.map((x) => (
+                            <li key={x}>{x}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <Button className="w-full btn-animate" onClick={download} disabled={dlBusy}>
                   <Download className="mr-1.5 h-4 w-4" />
                   {dlBusy ? "Preparing…" : "Download"}
                 </Button>
-                <p className="text-center text-[10px] text-muted-foreground">
-                  Secure download · existing watermark policy
-                </p>
+                <Button type="button" variant="outline" className="w-full" onClick={clearImage}>
+                  Edit another photo
+                </Button>
               </div>
             )}
           </section>
@@ -581,12 +619,13 @@ function AutoEditPage() {
                       : "border-border bg-card text-muted-foreground hover:border-primary/50",
                   )}
                 >
-                  {q.label} · {q.credits}
+                  {q.label}
                 </button>
               ))}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Cost {cost} credits (one generation) · Balance {isAdmin ? "∞" : credits}
+              Auto Edit costs <span className="font-semibold text-foreground">{cost} credits</span> per
+              complete job (analysis + edit) · Balance {isAdmin ? "∞" : credits}
             </p>
           </div>
 
@@ -594,7 +633,7 @@ function AutoEditPage() {
             className="min-h-[52px] w-full text-base font-bold btn-animate"
             disabled={busy || !file || noCredits}
             onClick={runAuto}
-            aria-label="Auto AI"
+            aria-label="Auto Edit"
           >
             {busy ? (
               <>
@@ -604,7 +643,7 @@ function AutoEditPage() {
             ) : (
               <>
                 <Sparkles className="mr-2 h-4 w-4" aria-hidden />
-                Auto AI
+                Auto Edit
               </>
             )}
           </Button>
@@ -657,7 +696,7 @@ function AutoEditPage() {
                   id="auto-ai-processing-title"
                   className="mt-3 text-lg font-extrabold tracking-tight"
                 >
-                  Motio2edit Auto
+                  MOTIO2EDIT Auto Edit
                 </h2>
                 <p className="mt-1 text-sm font-medium text-primary">
                   {STAGE_PROCEDURE[stage] ?? "Working…"}
