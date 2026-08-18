@@ -5,3 +5,6 @@ export { EditorOptionsPanel } from "./EditorOptionsPanel";
 export { EditorGenerationControls } from "./EditorGenerationControls";
 export { EditorPreview } from "./EditorPreview";
 export { EditorResult } from "./EditorResult";
+export { ImageEditor } from "./image/ImageEditor";
+export { VideoEditor } from "./video/VideoEditor";
+export type { EditorBootstrap, EditorWorkspace } from "./editor-bootstrap";
