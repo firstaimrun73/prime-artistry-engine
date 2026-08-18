@@ -1,6 +1,6 @@
 /**
  * Auto Edit pipeline service (pure TypeScript).
- * Maps analysis → hidden prompts from autoPrompts config.
+ * Maps analysis → operation plan → analysis-driven internal prompts.
  * Does not call FAL directly — the route/UI uses generateMedia with these instructions.
  */
 
@@ -12,6 +12,7 @@ import {
 } from "./decision";
 import { buildStepForOperation } from "./execute";
 import { AUTO_PROMPTS, instructionForOperationId } from "./autoPrompts";
+import { buildAutoEditPrompt } from "./promptGenerator";
 import type { ImageQuality } from "@/lib/quality-options";
 import type { AutoEditOperationId } from "./operations";
 
@@ -35,6 +36,19 @@ export type PreparedAutoEditRun = {
   steps: PipelineStepPayload[];
   message: string;
 };
+
+function promptForStep(
+  analysis: ImageAnalysisResult,
+  operationId: string,
+  catalogFallback?: string,
+): string {
+  return buildAutoEditPrompt({
+    analysis,
+    operationId,
+    catalogInstruction:
+      catalogFallback ?? instructionForOperationId(operationId) ?? undefined,
+  });
+}
 
 /**
  * After vision/fallback analysis: build plan and resolve internal prompts.
@@ -71,15 +85,14 @@ export function prepareAutoEditFromAnalysis(
   }
 
   if (opIds.length === 0) {
-    const def = AUTO_PROMPTS.find((p) => p.id === "DEFAULT_POLISH")!;
     return {
       plan,
       status: "READY",
       steps: [
         {
           operationId: "DEFAULT_POLISH",
-          internalPrompt: def.instruction,
-          strength: 0.5,
+          internalPrompt: promptForStep(analysis, "DEFAULT_POLISH"),
+          strength: 0.55,
         },
       ],
       message: "Applying standard Motio2Auto polish.",
@@ -91,12 +104,15 @@ export function prepareAutoEditFromAnalysis(
       const step = buildStepForOperation(id, imageUrl, imageQuality);
       return {
         operationId: id,
-        internalPrompt: instructionForOperationId(id) ?? step.prompt,
+        internalPrompt: promptForStep(analysis, id, step.prompt),
         strength: step.strength,
       };
     } catch {
-      const inst = instructionForOperationId(id) ?? AUTO_PROMPTS[AUTO_PROMPTS.length - 1].instruction;
-      return { operationId: id, internalPrompt: inst, strength: 0.5 };
+      return {
+        operationId: id,
+        internalPrompt: promptForStep(analysis, id),
+        strength: 0.5,
+      };
     }
   });
 
