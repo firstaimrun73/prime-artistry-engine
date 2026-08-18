@@ -39,8 +39,8 @@ const MAX_HISTORY = 30;
 
 export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const maskCanvasRef = useRef<HTMLCanvasElement>(null); // natural-resolution raw mask (alpha only)
-  const viewCanvasRef = useRef<HTMLCanvasElement>(null); // on-screen composite
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const viewCanvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const bottomControlsRef = useRef<HTMLDivElement | null>(null);
 
@@ -51,18 +51,15 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const spaceDownRef = useRef(false);
   const historyRef = useRef<ImageData[]>([]);
   const historyIndexRef = useRef(-1);
-  // Perf: paints are coalesced into one requestAnimationFrame callback and
-  // the mask canvas is capped so huge phone photos don't lock up the UI.
   const rafRef = useRef<number | null>(null);
   const maskScaleRef = useRef(1);
   const hasMarkRef = useRef(false);
 
-  // Settings
   const [tool, setTool] = useState<Tool>("brush");
   const [brush, setBrush] = useState(40);
   const [opacity, setOpacity] = useState(100);
-  const [hardness, setHardness] = useState(80); // 100 = crisp, lower = softer edge
-  const [feather, setFeather] = useState(2); // extra soft edge (px, in natural res)
+  const [hardness, setHardness] = useState(80);
+  const [feather, setFeather] = useState(2);
   const [overlayOpacity, setOverlayOpacity] = useState(55);
   const [showMask, setShowMask] = useState(true);
   const [zoom, setZoom] = useState(1);
@@ -73,13 +70,11 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const isMobile = useIsMobile();
-  // Large brushes stamp far more pixels per stroke; phones can't keep up.
   const maxBrush = isMobile ? 80 : 100;
   useEffect(() => {
     setBrush((b) => Math.min(b, maxBrush));
   }, [maxBrush]);
 
-  // Track window size so fit calculations stay accurate on resize
   const [winSize, setWinSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
     const onResize = () => setWinSize({ w: window.innerWidth, h: window.innerHeight });
@@ -88,7 +83,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Reset on open/close
   useEffect(() => {
     if (!open) {
       setReady(false);
@@ -111,14 +105,18 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       : null;
   };
 
-  // Fit image inside viewport at zoom=1 — subtract the real bottom control height
+  // Fit image to use most of the stage; allow mild upscale so small photos fill the screen.
   const fitScale = useMemo(() => {
     const vp = viewportRef.current;
     const n = naturalSize();
     if (!vp || !n) return 1;
-    const bottomH = bottomControlsRef.current?.clientHeight ?? 0;
-    const availableH = Math.max(100, vp.clientHeight - bottomH);
-    return Math.min(vp.clientWidth / n.w, availableH / n.h, 1);
+    const bottomH = bottomControlsRef.current?.clientHeight ?? (isMobile ? 140 : 160);
+    const pad = 8;
+    const availableH = Math.max(120, vp.clientHeight - bottomH - pad);
+    const availableW = Math.max(80, vp.clientWidth - pad * 2);
+    const scale = Math.min(availableW / n.w, availableH / n.h);
+    // Cap extreme upscale (phone screenshots) but allow up to 2.5× so images fill the view.
+    return Math.min(Math.max(scale, 0.15), 2.5);
   }, [ready, open, winSize.w, winSize.h, isMobile]);
 
   const displayScale = fitScale * zoom;
@@ -159,7 +157,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     ctx.drawImage(img, 0, 0, w, h);
 
     if (showMask) {
-      // Convert alpha mask to a red tint overlay for display.
       const tint = document.createElement("canvas");
       tint.width = mask.width;
       tint.height = mask.height;
@@ -176,7 +173,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     }
   }, [displayScale, showMask, overlayOpacity]);
 
-  // Coalesce repaint requests: at most one canvas composite per frame.
   const requestPaint = useCallback(() => {
     if (rafRef.current !== null) return;
     rafRef.current = requestAnimationFrame(() => {
@@ -197,9 +193,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     const img = imgRef.current;
     const mask = maskCanvasRef.current;
     if (!img || !mask) return;
-    // Cap the mask working resolution — masks are resized by the inpainting
-    // model anyway, and full-resolution phone photos (12MP+) make every brush
-    // stroke allocate megabytes and freeze the device.
     const MAX_MASK_DIM = 1400;
     const scale = Math.min(1, MAX_MASK_DIM / Math.max(img.naturalWidth, img.naturalHeight));
     maskScaleRef.current = scale;
@@ -212,7 +205,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     setHasMark(false);
     historyRef.current = [];
     historyIndexRef.current = -1;
-    // Seed history with an empty snapshot for clean undo baseline.
     setTimeout(() => {
       pushHistory();
       paintView();
@@ -224,7 +216,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     paintView();
   }, [ready, paintView]);
 
-  // Redraw on resize
   useEffect(() => {
     if (!open) return;
     const onResize = () => paintView();
@@ -232,7 +223,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     return () => window.removeEventListener("resize", onResize);
   }, [open, paintView]);
 
-  // Map viewport-relative client coords to natural-image pixel coords.
   const pointFromClient = (clientX: number, clientY: number) => {
     const view = viewCanvasRef.current!;
     const rect = view.getBoundingClientRect();
@@ -310,7 +300,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     pushHistory();
   };
 
-  // Pointer handlers
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (applying) return;
     if (spaceDownRef.current || e.button === 1) {
@@ -348,7 +337,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     endStroke();
   };
 
-  // Wheel: zoom (ctrl/meta) or brush resize (default)
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) {
@@ -358,7 +346,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     }
   };
 
-  // Keyboard shortcuts
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -401,7 +388,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     if (!ctx) return;
     ctx.putImageData(snap, 0, 0);
     paintView();
-    // Recompute hasMark quickly
     let any = false;
     for (let i = 3; i < snap.data.length; i += 4) {
       if (snap.data[i] > 0) {
@@ -461,7 +447,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
   const stepZoom = (dir: 1 | -1) => {
     const i = ZOOM_STEPS.findIndex((v) => Math.abs(v - zoom) < 0.001);
     if (i === -1) {
-      // pick nearest
       let nearest = 0;
       for (let k = 0; k < ZOOM_STEPS.length; k++) {
         if (Math.abs(ZOOM_STEPS[k] - zoom) < Math.abs(ZOOM_STEPS[nearest] - zoom)) nearest = k;
@@ -477,7 +462,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
     if (!c || !hasMark) return;
     setApplying(true);
     try {
-      // Threshold soft alpha into hard B/W mask for the inpainting model.
       const out = document.createElement("canvas");
       out.width = c.width;
       out.height = c.height;
@@ -503,8 +487,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
         return;
       }
       octx.putImageData(bw, 0, 0);
-      // Keep the processing overlay up (and drawing disabled) until the parent
-      // closes the modal after the AI result comes back.
       onApply(out.toDataURL("image/png"));
     } catch (e) {
       console.error("[smart-remove] apply failed:", e);
@@ -520,13 +502,12 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/85" role="dialog" aria-modal="true">
-      {/* Top bar (desktop only) */}
       {!isMobile && (
         <div className="flex items-center justify-between border-b border-white/10 bg-background/95 px-4 py-3">
           <div>
             <h2 className="text-base font-bold">Circle to Remove</h2>
             <p className="text-xs text-muted-foreground">
-              Paint what you want gone. Costs 25 credits. Space = pan · [/] = brush size · Ctrl+Z / Ctrl+Y = undo/redo
+              Paint what you want gone. Space = pan · [/] = brush size · Ctrl+Z / Ctrl+Y = undo/redo
             </p>
           </div>
           <button onClick={onCancel} className="rounded-md p-2 text-muted-foreground hover:bg-secondary" aria-label="Close">
@@ -535,7 +516,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
         </div>
       )}
 
-      {/* Toolbar (desktop only) */}
       {!isMobile && (
         <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-background/95 px-4 py-2 text-xs">
           <div className="inline-flex overflow-hidden rounded-md border border-border">
@@ -585,7 +565,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
         </div>
       )}
 
-      {/* Stage */}
       <div
         ref={viewportRef}
         className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_60%)]"
@@ -635,7 +614,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
         )}
       </div>
 
-      {/* Settings + actions — mobile compact version */}
       {isMobile ? (
         <div ref={bottomControlsRef} className="space-y-2 border-t border-white/10 bg-background/95 p-3">
           <div className="flex items-center justify-between gap-2">
@@ -700,7 +678,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
             </div>
           </div>
 
-          {/* Primary action: large full-width button under the canvas. */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
             <Button
               onClick={apply}
@@ -726,7 +703,6 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
               <RotateCcw className="mr-1.5 h-4 w-4" /> Clear &amp; Try Again
             </Button>
           </div>
-
         </div>
       )}
     </div>
