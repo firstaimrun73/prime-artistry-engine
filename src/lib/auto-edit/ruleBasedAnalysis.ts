@@ -60,11 +60,25 @@ export function buildRuleBasedAnalysis(input: RuleBasedAnalysisInput): ImageAnal
     contrast != null ? contrast > 0.72 && lum != null && lum > 0.25 && lum < 0.75 : false;
   const isLowLight = isUnderexposed || scene === "night";
 
+  // Approximate soft focus / noise without a vision model:
+  // low res + low contrast often correlates with soft or grainy phone shots.
+  const softFocusHeuristic =
+    (megapixels > 0 && megapixels < 1.2) ||
+    (contrast != null && contrast < 0.28) ||
+    (isLowLight && megapixels > 0 && megapixels < 2);
+  const noiseHeuristic =
+    isLowLight || (megapixels > 0 && megapixels < 0.6 && contrast != null && contrast > 0.55);
+
   const issues: string[] = [];
   const restorationIssues: string[] = [];
 
   if (megapixels > 0 && megapixels < 0.9) issues.push("low_resolution");
   if (megapixels > 0 && megapixels < 0.35) issues.push("missing_detail");
+  if (softFocusHeuristic) {
+    issues.push("blur");
+    issues.push("missing_detail");
+  }
+  if (noiseHeuristic) issues.push("noise");
   if (isUnderexposed) issues.push("underexposed");
   if (isOverexposed) issues.push("overexposed");
   if (contrast != null && contrast < 0.22) issues.push("low_contrast");
@@ -78,6 +92,8 @@ export function buildRuleBasedAnalysis(input: RuleBasedAnalysisInput): ImageAnal
   if (isUnderexposed || isOverexposed) overallScore -= 0.12;
   if (contrast != null && contrast < 0.25) overallScore -= 0.1;
   if (megapixels > 0 && megapixels < 1) overallScore -= 0.08;
+  if (softFocusHeuristic) overallScore -= 0.08;
+  if (noiseHeuristic) overallScore -= 0.05;
   if (issues.includes("missing_detail")) overallScore -= 0.05;
   overallScore = clamp01(overallScore);
 
@@ -90,6 +106,7 @@ export function buildRuleBasedAnalysis(input: RuleBasedAnalysisInput): ImageAnal
     overallScore < 0.8 ||
     issues.length > 0 ||
     isLowLight ||
+    softFocusHeuristic ||
     (contrast != null && contrast < 0.3);
 
   return {
@@ -107,7 +124,7 @@ export function buildRuleBasedAnalysis(input: RuleBasedAnalysisInput): ImageAnal
       detected: faceDetected,
       count: faceDetected ? 1 : 0,
       primaryFaceVisible: faceDetected,
-      blurry: false,
+      blurry: softFocusHeuristic && faceDetected,
       hasArtifacts: false,
       redEye: false,
       poorLighting: isLowLight && faceDetected,
@@ -149,6 +166,8 @@ export function buildRuleBasedAnalysis(input: RuleBasedAnalysisInput): ImageAnal
       `mp=${megapixels.toFixed(2)}`,
       lum != null ? `lum=${lum.toFixed(2)}` : null,
       contrast != null ? `contrast=${contrast.toFixed(2)}` : null,
+      softFocusHeuristic ? "softFocus=1" : null,
+      noiseHeuristic ? "noise=1" : null,
       `issues=${issues.join(",")}`,
     ]
       .filter(Boolean)
