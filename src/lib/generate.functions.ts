@@ -26,13 +26,28 @@ import {
   buildFinalEditPrompt,
   expandPromptDeterministic,
   getIntentSettings,
+  type EditorIntent,
 } from "@/lib/image-edit/prompt-engine";
 import { getWatermarkMode } from "@/lib/policy";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** User-facing message when post-generation prep (incl. brand stamp) fails. */
+/** Intents that must NOT go through free-form prompt enhance (dilutes the task). */
+const DETERMINISTIC_INTENTS: ReadonlySet<EditorIntent> = new Set([
+  "outfit_transfer",
+  "outfit_single",
+  "color",
+  "remove_people",
+  "object_remove",
+  "add_subject",
+  "restore",
+  "colorize",
+  "face_fix",
+  "background",
+  "small_add",
+]);
+
 const PREPARE_FAILED =
   "Couldn't finish preparing your image. Please try again or contact support.";
 
@@ -249,6 +264,7 @@ export const generateMedia = createServerFn({ method: "POST" })
         console.log("[generate] understood intent:", intent, "| refs:", validRefs.length);
 
         if (data.maskImageUrl) {
+          // Circle to Remove — mask path unchanged
           console.log("[generate] mode: masked inpaint | mask url:", data.maskImageUrl.slice(0, 64));
           const step = buildImageInpaint({
             prompt: data.prompt, imageUrl: data.imageUrl, maskUrl: data.maskImageUrl,
@@ -289,7 +305,7 @@ export const generateMedia = createServerFn({ method: "POST" })
           const refs = validRefs.slice(0, Math.max(0, maxImages - 1));
 
           let finalPrompt: string;
-          if (intent === "outfit_transfer" || intent === "color" || intent === "outfit_single") {
+          if (DETERMINISTIC_INTENTS.has(intent)) {
             finalPrompt = buildFinalEditPrompt({
               rawPrompt: data.prompt,
               enhancedOrExpanded: expandPromptDeterministic(data.prompt, intent, refs.length),
