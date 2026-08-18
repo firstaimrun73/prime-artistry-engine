@@ -23,11 +23,9 @@ import {
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
 import { CompareSlider } from "@/components/CompareSlider";
 import { useAuth } from "@/lib/auth";
-import { generateMedia } from "@/lib/generate.functions";
-import { prepareAutoEditRun } from "@/lib/auto-edit/run.functions";
+import { runStandaloneAutoEdit } from "@/lib/auto-edit/auto-edit.functions";
 import {
   IMAGE_QUALITY_OPTIONS,
   imageQualityCost,
@@ -45,68 +43,47 @@ export const Route = createFileRoute("/studio/image/auto-edit")({
       { title: "Motio2edit Auto — Motio2edit" },
       {
         name: "description",
-        content:
-          "Upload one photo. Motio2edit Auto enhances it automatically — prompt optional.",
+        content: "Upload one photo. Motio2edit Auto analyses and improves it automatically.",
       },
     ],
   }),
   component: AutoEditPage,
 });
 
-/** Stages driven by the real client/server flow (no invented backend statuses). */
 type StageId =
   | "queued"
   | "analysing"
-  | "storing"
-  | "searching"
-  | "applying"
+  | "preparing"
   | "generating"
-  | "validating"
-  | "watermarking"
   | "finalising"
   | "complete"
-  | "no_change"
   | "error";
 
 type UiPhase = "idle" | "processing" | "done" | "error";
 
 const TIMELINE_STEPS: { id: StageId; label: string }[] = [
   { id: "analysing", label: "Analysing image" },
-  { id: "storing", label: "Keeping photo ready for editing" },
-  { id: "searching", label: "Selecting the best edit" },
-  { id: "applying", label: "Applying edit instructions" },
-  { id: "generating", label: "Generating result" },
-  { id: "validating", label: "Validating generated image" },
-  { id: "watermarking", label: "Applying watermark" },
-  { id: "finalising", label: "Finalising result" },
+  { id: "preparing", label: "Preparing automatic improvements" },
+  { id: "generating", label: "Creating your improved image" },
+  { id: "finalising", label: "Finalising" },
 ];
 
 const STAGE_PROGRESS: Partial<Record<StageId, number>> = {
   queued: 0,
-  analysing: 4,
-  storing: 8,
-  searching: 14,
-  applying: 22,
-  generating: 55,
-  validating: 82,
-  watermarking: 90,
-  finalising: 96,
+  analysing: 12,
+  preparing: 28,
+  generating: 62,
+  finalising: 92,
   complete: 100,
-  no_change: 100,
 };
 
 const STAGE_PROCEDURE: Partial<Record<StageId, string>> = {
   queued: "Queued",
-  analysing: "Analysing",
-  storing: "Storing",
-  searching: "Selecting the best edit",
-  applying: "Applying edit instructions",
-  generating: "Generating result",
-  validating: "Validating generated image",
-  watermarking: "Applying watermark",
-  finalising: "Finalising result",
+  analysing: "Analysing image…",
+  preparing: "Understanding image quality…",
+  generating: "Creating your improved image…",
+  finalising: "Finalising…",
   complete: "Complete",
-  no_change: "No automatic changes needed",
   error: "Something went wrong",
 };
 
@@ -120,7 +97,6 @@ function formatEta(ms: number | null): string {
   return "Less than a minute remaining";
 }
 
-/** Extract a simple dominant palette from the input preview (client-side, no deps). */
 function useImagePalette(src: string | null) {
   const [palette, setPalette] = useState<{
     dominant: string;
@@ -151,8 +127,7 @@ function useImagePalette(src: string | null) {
           b = 0,
           n = 0;
         for (let i = 0; i < data.length; i += 4) {
-          const a = data[i + 3];
-          if (a < 128) continue;
+          if (data[i + 3] < 128) continue;
           r += data[i];
           g += data[i + 1];
           b += data[i + 2];
@@ -162,12 +137,10 @@ function useImagePalette(src: string | null) {
         r = Math.round(r / n);
         g = Math.round(g / n);
         b = Math.round(b / n);
-        const soft = `rgba(${r},${g},${b},0.35)`;
-        const deep = `rgba(${Math.max(0, r - 40)},${Math.max(0, g - 40)},${Math.max(0, b - 40)},0.55)`;
         setPalette({
           dominant: `rgb(${r},${g},${b})`,
-          soft,
-          deep,
+          soft: `rgba(${r},${g},${b},0.35)`,
+          deep: `rgba(${Math.max(0, r - 40)},${Math.max(0, g - 40)},${Math.max(0, b - 40)},0.55)`,
         });
       } catch {
         if (!cancelled) setPalette(null);
@@ -188,8 +161,7 @@ function useImagePalette(src: string | null) {
 function AutoEditPage() {
   const { user, profile, refreshProfile } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
-  const prepareFn = useServerFn(prepareAutoEditRun);
-  const generate = useServerFn(generateMedia);
+  const runAutoFn = useServerFn(runStandaloneAutoEdit);
   const secureDl = useServerFn(secureDownloadImage);
 
   const [preview, setPreview] = useState<string | null>(null);
@@ -197,7 +169,6 @@ function AutoEditPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [pixelSize, setPixelSize] = useState<{ w: number; h: number } | null>(null);
   const [quality, setQuality] = useState<ImageQuality>("hd");
-  const [userPrompt, setUserPrompt] = useState("");
   const [output, setOutput] = useState<string | null>(null);
   const [phase, setPhase] = useState<UiPhase>("idle");
   const [stage, setStage] = useState<StageId>("queued");
@@ -206,6 +177,9 @@ function AutoEditPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [dlBusy, setDlBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [summary, setSummary] = useState<{ qualityScore: number; improvementsApplied: number } | null>(
+    null,
+  );
   const runStartedAt = useRef<number>(0);
 
   const palette = useImagePalette(preview);
@@ -217,7 +191,7 @@ function AutoEditPage() {
 
   const timelineIndex = useMemo(() => {
     const idx = TIMELINE_STEPS.findIndex((s) => s.id === stage);
-    if (stage === "complete" || stage === "no_change") return TIMELINE_STEPS.length;
+    if (stage === "complete") return TIMELINE_STEPS.length;
     return idx;
   }, [stage]);
 
@@ -235,8 +209,7 @@ function AutoEditPage() {
     if (phase !== "processing") return;
     const tick = () => {
       const elapsed = Date.now() - runStartedAt.current;
-      const remaining = Math.max(0, 45_000 - elapsed);
-      setEtaMs(remaining);
+      setEtaMs(Math.max(0, 50_000 - elapsed));
     };
     tick();
     const id = window.setInterval(tick, 1000);
@@ -269,8 +242,8 @@ function AutoEditPage() {
     setFile(null);
     setFileName(null);
     setPixelSize(null);
-    setUserPrompt("");
     setOutput(null);
+    setSummary(null);
     setPhase("idle");
     setStage("queued");
     setProgress(0);
@@ -312,6 +285,7 @@ function AutoEditPage() {
       return url;
     });
     setOutput(null);
+    setSummary(null);
     setPhase("idle");
     setStage("queued");
     setProgress(0);
@@ -345,6 +319,7 @@ function AutoEditPage() {
 
     setPhase("processing");
     setOutput(null);
+    setSummary(null);
     setErrorMsg(null);
     setStage("queued");
     setProgress(0);
@@ -352,77 +327,36 @@ function AutoEditPage() {
 
     try {
       setStage("analysing");
-      setProgress(STAGE_PROGRESS.analysing ?? 4);
-
-      setStage("storing");
-      setProgress(STAGE_PROGRESS.storing ?? 8);
+      setProgress(STAGE_PROGRESS.analysing ?? 12);
       const imageUrl = await uploadToStorage(file);
 
-      setStage("searching");
-      setProgress(STAGE_PROGRESS.searching ?? 14);
+      setStage("preparing");
+      setProgress(STAGE_PROGRESS.preparing ?? 28);
 
-      const prepared = await prepareFn({
+      setStage("generating");
+      setProgress(STAGE_PROGRESS.generating ?? 62);
+
+      // Single server pass: analyse → one prompt → one FAL generation
+      const result = await runAutoFn({
         data: {
           imageUrl,
           imageQuality: quality,
           width: pixelSize?.w,
           height: pixelSize?.h,
-          userPrompt: userPrompt.trim() || undefined,
-          context: "standalone",
         },
       });
 
-      if (prepared.status === "NO_CHANGE" || prepared.steps.length === 0) {
-        setStage("no_change");
-        setProgress(100);
-        setOutput(preview);
-        setPhase("done");
-        toast.message(prepared.message || "No automatic changes needed");
-        return;
+      if (!result.success || !result.outputUrl) {
+        throw new Error(result.message || "Auto Edit failed");
       }
-
-      setStage("applying");
-      setProgress(STAGE_PROGRESS.applying ?? 22);
-
-      setStage("generating");
-      let currentUrl = imageUrl;
-      const stepCount = prepared.steps.length;
-
-      for (let i = 0; i < stepCount; i++) {
-        const step = prepared.steps[i];
-        const base = STAGE_PROGRESS.generating ?? 55;
-        const span = 25;
-        setProgress(base + (span * i) / Math.max(1, stepCount));
-
-        const res = await generate({
-          data: {
-            prompt: step.internalPrompt,
-            type: "image",
-            imageUrl: currentUrl,
-            sourceKind: "image",
-            strength: step.strength,
-            imageQuality: quality,
-          },
-        });
-        if (!res.outputUrl) throw new Error("Generation returned no image.");
-        currentUrl = res.outputUrl;
-      }
-
-      setStage("validating");
-      setProgress(STAGE_PROGRESS.validating ?? 82);
-      await new Promise((r) => setTimeout(r, 280));
-
-      setStage("watermarking");
-      setProgress(STAGE_PROGRESS.watermarking ?? 90);
-      await new Promise((r) => setTimeout(r, 200));
 
       setStage("finalising");
-      setProgress(STAGE_PROGRESS.finalising ?? 96);
-      await new Promise((r) => setTimeout(r, 180));
+      setProgress(STAGE_PROGRESS.finalising ?? 92);
 
       setStage("complete");
       setProgress(100);
-      setOutput(currentUrl);
+      setOutput(result.outputUrl);
+      setSummary(result.analysisSummary);
       setPhase("done");
       await refreshProfile();
       toast.success("Motio2edit Auto complete");
@@ -436,15 +370,7 @@ function AutoEditPage() {
   };
 
   const download = async () => {
-    if (!output || output.startsWith("blob:")) {
-      if (preview) {
-        const a = document.createElement("a");
-        a.href = preview;
-        a.download = `motio2edit-auto-${Date.now()}.jpg`;
-        a.click();
-      }
-      return;
-    }
+    if (!output) return;
     setDlBusy(true);
     try {
       const res = await secureDl({ data: { imageUrl: output } });
@@ -490,7 +416,7 @@ function AutoEditPage() {
             Motio2edit Auto
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            One image · optional prompt · automatic edit
+            One image · automatic analysis · one improved result
           </p>
         </div>
 
@@ -548,23 +474,12 @@ function AutoEditPage() {
               </button>
             ) : (
               <div className="mt-3 space-y-3">
-                <div
-                  className={cn(
-                    "relative overflow-hidden rounded-xl border border-border bg-background/40",
-                    busy && stage === "analysing" && "ring-2 ring-primary/40",
-                  )}
-                >
+                <div className="relative overflow-hidden rounded-xl border border-border bg-background/40">
                   <img
                     src={preview}
                     alt={fileName ? `Source: ${fileName}` : "Input photo"}
                     className="mx-auto max-h-64 w-full object-contain sm:max-h-72"
                   />
-                  {busy && stage === "analysing" && (
-                    <div
-                      className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/10 via-transparent to-primary/10 animate-pulse"
-                      aria-hidden
-                    />
-                  )}
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span className="truncate max-w-[60%]" title={fileName ?? undefined}>
@@ -610,16 +525,14 @@ function AutoEditPage() {
             {!output ? (
               <div className="mt-3 flex min-h-[200px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/60 bg-background/30 text-center sm:min-h-[240px]">
                 <ImageIcon className="h-8 w-8 text-muted-foreground/50" aria-hidden />
-                <p className="text-sm font-medium text-muted-foreground">
-                  Result appears here
-                </p>
+                <p className="text-sm font-medium text-muted-foreground">Result appears here</p>
                 <p className="max-w-[220px] text-xs text-muted-foreground/80">
-                  Run Auto Edit to process your photo automatically.
+                  Tap Auto AI to analyse and improve your photo automatically.
                 </p>
               </div>
             ) : (
               <div className="mt-3 space-y-3">
-                {preview && output && !output.startsWith("blob:") ? (
+                {preview ? (
                   <CompareSlider before={preview} after={output} />
                 ) : (
                   <div className="overflow-hidden rounded-xl border border-border">
@@ -630,9 +543,11 @@ function AutoEditPage() {
                     />
                   </div>
                 )}
-                {stage === "no_change" && (
+                {summary && (
                   <p className="text-center text-xs text-muted-foreground">
-                    No automatic changes needed — showing your original.
+                    Quality score {Math.round(summary.qualityScore * 100)}% ·{" "}
+                    {summary.improvementsApplied} automatic improvement
+                    {summary.improvementsApplied === 1 ? "" : "s"}
                   </p>
                 )}
                 <Button className="w-full btn-animate" onClick={download} disabled={dlBusy}>
@@ -640,7 +555,7 @@ function AutoEditPage() {
                   {dlBusy ? "Preparing…" : "Download"}
                 </Button>
                 <p className="text-center text-[10px] text-muted-foreground">
-                  Secure download · watermark policy applied by the existing pipeline
+                  Secure download · existing watermark policy
                 </p>
               </div>
             )}
@@ -648,24 +563,6 @@ function AutoEditPage() {
         </div>
 
         <section className="mx-auto mt-6 max-w-xl space-y-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Optional prompt
-            </p>
-            <Textarea
-              className="mt-2 min-h-[88px] resize-none"
-              placeholder='Optional — e.g. "Make this portrait cinematic with dramatic lighting." Leave empty for automatic analysis.'
-              value={userPrompt}
-              disabled={busy}
-              maxLength={2000}
-              onChange={(e) => setUserPrompt(e.target.value.slice(0, 2000))}
-              aria-label="Optional prompt for Auto Edit"
-            />
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {userPrompt.length}/2000 · not required
-            </p>
-          </div>
-
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Output quality
@@ -689,7 +586,7 @@ function AutoEditPage() {
               ))}
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Cost {cost} credits · Balance {isAdmin ? "∞" : credits}
+              Cost {cost} credits (one generation) · Balance {isAdmin ? "∞" : credits}
             </p>
           </div>
 
@@ -697,7 +594,7 @@ function AutoEditPage() {
             className="min-h-[52px] w-full text-base font-bold btn-animate"
             disabled={busy || !file || noCredits}
             onClick={runAuto}
-            aria-label="Auto Edit"
+            aria-label="Auto AI"
           >
             {busy ? (
               <>
@@ -707,7 +604,7 @@ function AutoEditPage() {
             ) : (
               <>
                 <Sparkles className="mr-2 h-4 w-4" aria-hidden />
-                Auto Edit
+                Auto AI
               </>
             )}
           </Button>
@@ -741,12 +638,6 @@ function AutoEditPage() {
           aria-live="polite"
         >
           <div className="absolute inset-0" style={wallpaperStyle} aria-hidden>
-            <div
-              className="absolute inset-0 opacity-[0.07]"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-              }}
-            />
             {preview && (
               <img
                 src={preview}
@@ -790,7 +681,7 @@ function AutoEditPage() {
                 </div>
               )}
 
-              <ol className="mt-6 max-h-[40vh] space-y-1.5 overflow-y-auto pr-1">
+              <ol className="mt-6 space-y-1.5 pr-1">
                 {TIMELINE_STEPS.map((step, i) => {
                   const done = timelineIndex > i;
                   const active = timelineIndex === i;
