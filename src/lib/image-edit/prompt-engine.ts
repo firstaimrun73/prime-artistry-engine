@@ -32,6 +32,10 @@ const REMOVE_PEOPLE =
 const OUTFIT =
   /\b(outfit|clothing|clothes|cloth|dress|shirt|jacket|armor|armour|costume|suit|wear|wearing|change\s+the\s+outfit|replace\s+outfit|swap\s+outfit|put\s+on|dress\s+(him|her|them)|clothes\s+from|from\s+the\s+ref|from\s+ref|reference\s+(img|image)|refrence|add\s+the\s+clothes|transfer\s+(the\s+)?(outfit|clothes|clothing)|swap\s+(the\s+)?(clothes|outfit)|wear\s+the)\b/i;
 
+/** Full outfit swap / transfer — not mere color of a garment */
+const OUTFIT_TRANSFERISH =
+  /\b(transfer|from\s+(the\s+)?ref|replace\s+(the\s+)?outfit|swap\s+(the\s+)?(outfit|clothes)|change\s+the\s+outfit|put\s+on\s+the|wear\s+the\s+(outfit|clothes|armor))\b/i;
+
 const FACE =
   /\b(fix\s+(eye|eyes|face|mouth|nose|teeth|skin)|face\s+fix|make\s+(her|him|them)?\s*(smile|younger|older)|change\s+(expression|face|eyes|skin|hair)|younger|older|wrinkle|smooth\s+skin|beauty|retouch|skin\s+tone|makeup|lipstick|beard|mustache)\b/i;
 
@@ -48,11 +52,14 @@ const STYLE =
   /\b(cartoon|anime|painting|sketch|watercolor|artistic|cinematic|vintage|retro|style\s+transfer)\b/i;
 
 const COLOR =
-  /\b(brighten|darken|contrast|colou?r|saturation|warm|cool|relight|exposure)\b/i;
+  /\b(brighten|darken|contrast|colou?r|saturation|warm|cool|relight|exposure|recolou?r|dye|tint)\b/i;
+
+/** Explicit garment / object color change (prefer over outfit_single) */
+const COLOR_CHANGE =
+  /\b(change|make|turn|set|paint|recolou?r|dye|tint)\b[\s\S]{0,60}\b(colou?r|red|blue|green|yellow|white|black|pink|purple|orange|brown|grey|gray)\b/i;
 
 /**
  * Understand the user's real intent from the ORIGINAL prompt (before auto-enhance).
- * This drives path selection: pure enhance → post-processing only; outfit → multi transfer; etc.
  */
 export function understandIntent(
   rawPrompt: string,
@@ -63,6 +70,12 @@ export function understandIntent(
 
   if (REMOVE_PEOPLE.test(p)) return "remove_people";
   if (OUTFIT.test(p) && hasReferenceImages) return "outfit_transfer";
+
+  // "change the shirt color to bright red" is COLOR, not a full outfit swap
+  if (COLOR_CHANGE.test(p) || (COLOR.test(p) && !OUTFIT_TRANSFERISH.test(p))) {
+    if (!OUTFIT_TRANSFERISH.test(p)) return "color";
+  }
+
   if (OUTFIT.test(p)) return "outfit_single";
   if (FACE.test(p)) return "face_fix";
   if (BACKGROUND.test(p)) return "background";
@@ -71,9 +84,7 @@ export function understandIntent(
   if (STYLE.test(p)) return "style";
   if (COLOR.test(p) && !QUALITY_ONLY.test(p)) return "color";
 
-  // Pure enhance: quality words dominate and no strong edit verbs about people/objects
   if (QUALITY_ONLY.test(p)) {
-    // Reject if user also asked to remove/add specific things
     if (REMOVE_PEOPLE.test(p) || OBJECT_REMOVE.test(p) || OUTFIT.test(p) || FACE.test(p)) {
       return "general_edit";
     }
@@ -91,7 +102,6 @@ export function isOutfitIntent(prompt: string): boolean {
   return OUTFIT.test(prompt || "");
 }
 
-/** Locks — short and non-conflicting. Never stack walls of "change nothing". */
 export const LOCKS = {
   pure_enhance:
     "This is a real photograph. ONLY improve sharpness, clarity, detail and noise reduction. " +
@@ -122,15 +132,15 @@ export const LOCKS = {
     "This is a real photograph. Change ONLY the background as requested. Keep subject edges, identity " +
     "and lighting on the subject identical.",
 
+  color:
+    "This is a real photograph color edit. Apply the requested color change clearly and visibly. " +
+    "Keep face, identity, body pose, clothing shape and background the same except for the specified color.",
+
   general:
     "This is a real photograph. Preserve exact person identity (face, skin, hair). " +
     "Only make the specific requested change. Keep photorealistic. No cartoon/anime.",
 } as const;
 
-/**
- * Expand a short user prompt into a clear, model-ready instruction.
- * Deterministic first; no network required for common cases.
- */
 export function expandPromptDeterministic(
   rawPrompt: string,
   intent: EditorIntent,
@@ -163,6 +173,12 @@ export function expandPromptDeterministic(
         `Keep face, identity, pose and background the same. New clothes must look natural and photorealistic.`
       );
 
+    case "color":
+      return (
+        `Apply this color change clearly and visibly on the exact uploaded photo: ${p}. ` +
+        `The new color must be obvious. Keep face, identity, pose, garment shape and background unchanged.`
+      );
+
     case "remove_people":
       return (
         `Completely remove the target person or all visible people from this photo. ` +
@@ -187,10 +203,6 @@ export function expandPromptDeterministic(
   }
 }
 
-/**
- * Build the final prompt sent to Kontext (or multi).
- * Order matters: transfer instruction FIRST for outfit multi so it is not buried.
- */
 export function buildFinalEditPrompt(args: {
   rawPrompt: string;
   enhancedOrExpanded: string;
@@ -198,16 +210,25 @@ export function buildFinalEditPrompt(args: {
   referenceCount: number;
 }): string {
   const { rawPrompt, enhancedOrExpanded, intent, referenceCount } = args;
-  const lock = LOCKS[intent === "outfit_transfer" ? "outfit_transfer"
-    : intent === "outfit_single" ? "outfit_single"
-    : intent === "remove_people" ? "remove_people"
-    : intent === "face_fix" ? "face_fix"
-    : intent === "background" ? "background"
-    : intent === "pure_enhance" ? "pure_enhance"
-    : "general"];
+  void referenceCount;
+  const lock =
+    intent === "outfit_transfer"
+      ? LOCKS.outfit_transfer
+      : intent === "outfit_single"
+        ? LOCKS.outfit_single
+        : intent === "remove_people"
+          ? LOCKS.remove_people
+          : intent === "face_fix"
+            ? LOCKS.face_fix
+            : intent === "background"
+              ? LOCKS.background
+              : intent === "pure_enhance"
+                ? LOCKS.pure_enhance
+                : intent === "color"
+                  ? LOCKS.color
+                  : LOCKS.general;
 
   if (intent === "outfit_transfer") {
-    // Transfer instruction dominates; short user line; identity only (not clothing)
     return (
       `${LOCKS.outfit_transfer}\n` +
       `User request: ${rawPrompt || enhancedOrExpanded}.\n` +
@@ -219,7 +240,14 @@ export function buildFinalEditPrompt(args: {
     return `${LOCKS.pure_enhance}\n${enhancedOrExpanded}\nDo NOT remove any person or object.`;
   }
 
-  // General path: lock + instruction. Avoid stacking huge preservation contracts.
+  if (intent === "color") {
+    return (
+      `${LOCKS.color}\n` +
+      `${enhancedOrExpanded}\n` +
+      `Only change what was requested. Keep unmentioned areas identical. Photorealistic. No watermark.`
+    );
+  }
+
   return (
     `${lock}\n` +
     `${enhancedOrExpanded}\n` +
@@ -227,7 +255,6 @@ export function buildFinalEditPrompt(args: {
   );
 }
 
-/** Quality / guidance settings tuned per intent. */
 export function getIntentSettings(intent: EditorIntent): {
   guidance_scale: number;
   num_inference_steps: number;
@@ -249,6 +276,8 @@ export function getIntentSettings(intent: EditorIntent): {
       return { guidance_scale: 2.6, num_inference_steps: 40 };
     case "style":
       return { guidance_scale: 3.5, num_inference_steps: 45 };
+    case "color":
+      return { guidance_scale: 4.0, num_inference_steps: 40 };
     default:
       return { guidance_scale: 3.2, num_inference_steps: 42 };
   }
