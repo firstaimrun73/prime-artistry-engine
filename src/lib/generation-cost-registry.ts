@@ -120,7 +120,6 @@ export function estimateCredits(
  * Image Studio / Auto Edit keep their existing fixed credit costs elsewhere.
  */
 export const GENERATION_REGISTRY: RegistryEntry[] = [
-  // ── Music ──────────────────────────────────────────────────────────────
   {
     id: "music_minimax_v2",
     modelId: "fal-ai/minimax-music/v2",
@@ -176,10 +175,8 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     outputTypes: ["audio"],
     minimumPlan: "pro",
     notes: "~$0.80 per output minute, rounded up. Premium only.",
-    enabled: false, // enable after product sign-off on cost
+    enabled: false,
   },
-
-  // ── Video-aware audio / SFX ────────────────────────────────────────────
   {
     id: "sfx_mmaudio_v2",
     modelId: "fal-ai/mmaudio-v2",
@@ -211,11 +208,9 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     notes: "Text-only SFX / ambient; $0.001/s.",
     enabled: true,
   },
-
-  // ── Voiceover / TTS (placeholder rates — re-verify before enable) ──────
   {
     id: "tts_xai",
-    modelId: "fal-ai/xai/tts",
+    modelId: "xai/tts/v1",
     category: "voiceover",
     operation: "tts",
     provider: "xAI via fal",
@@ -224,11 +219,9 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     inputTypes: ["text"],
     outputTypes: ["audio"],
     minimumPlan: "lite",
-    notes: "~$0.015 / 1k characters (verify current fal page before go-live).",
-    enabled: false,
+    notes: "Verified: xai/tts/v1 — $0.015 / 1k characters. Voices: eve, ara, rex, sal, leo.",
+    enabled: true,
   },
-
-  // ── Video generation (illustrative; align with existing generate.functions) ─
   {
     id: "video_kling_t2v_std",
     modelId: "fal-ai/kling-video/v1.6/standard/text-to-video",
@@ -284,7 +277,6 @@ export function getEnabledByCategory(category: MediaCategory): RegistryEntry[] {
   return GENERATION_REGISTRY.filter((e) => e.category === category && e.enabled);
 }
 
-/** Plan rank for gating (higher = more access). */
 const PLAN_RANK: Record<PlanId, number> = {
   free: 0,
   lite: 1,
@@ -298,7 +290,6 @@ export function planMeetsMinimum(userPlan: PlanId, minimum: PlanId): boolean {
   return PLAN_RANK[userPlan] >= PLAN_RANK[minimum];
 }
 
-/** Profitability snapshot for ops (not shown as absolute guarantee to end users). */
 export function profitabilityRow(
   entry: RegistryEntry,
   opts: { durationSeconds?: number; characters?: number } = {},
