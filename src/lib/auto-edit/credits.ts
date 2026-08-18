@@ -1,26 +1,22 @@
 /**
- * Auto Edit credit estimates — uses existing imageQualityCost.
- * Standalone Motio2edit Auto performs exactly ONE generateMedia call,
- * so charge = one image generation at the selected quality (HD/2K/4K).
- * Actual deduction happens only inside generateMedia.
+ * Auto Edit credit policy.
+ *
+ * ONE Auto Edit job (vision analysis + plan + single fal.ai generation + watermark)
+ * costs AUTO_EDIT_CREDIT_COST credits total — not per internal operation.
  */
 
-import { imageQualityCost, type ImageQuality } from "@/lib/quality-options";
+import { AUTO_EDIT_CREDIT_COST } from "./constants";
 
-export function estimateAutoEditCredits(
-  _operationCount: number,
-  quality: ImageQuality,
-): {
-  perOperation: number;
+export { AUTO_EDIT_CREDIT_COST };
+
+export function estimateAutoEditCredits(_operationCount?: number): {
   total: number;
   operationCount: number;
   note: string;
 } {
-  const perOperation = imageQualityCost(quality);
   return {
-    perOperation,
-    total: perOperation,
+    total: AUTO_EDIT_CREDIT_COST,
     operationCount: 1,
-    note: `Standalone Auto Edit = one image generation (${perOperation} credits at ${quality}). Matched improvements do not multiply the charge.`,
+    note: `Auto Edit = one complete job (${AUTO_EDIT_CREDIT_COST} credits). Analysis + planning + generation are not charged separately.`,
   };
 }

@@ -81,14 +81,27 @@ export type AutoImprovementId =
   | "DISTRACTION_REDUCTION"
   | "NATURAL_PHOTO_POLISH";
 
+/** Safe analysis summary for the dedicated Auto UI (no prompts / no raw vision). */
+export type AutoEditAnalysisSummary = {
+  qualityScore: number;
+  improvementsApplied: number;
+  needsEdit: boolean;
+  confidence: number;
+  /** Human-readable detected issues */
+  detectedIssues: string[];
+  /** Human-readable recommended operations */
+  recommended: string[];
+};
+
 /** Safe payload returned to the Auto UI */
 export type StandaloneAutoEditResult = {
   success: boolean;
   outputUrl: string;
   changed: boolean;
-  analysisSummary: {
-    qualityScore: number;
-    improvementsApplied: number;
-  };
+  /** NO_CHANGE when analysis says image is already good */
+  status: "COMPLETE" | "NO_CHANGE";
+  analysisSummary: AutoEditAnalysisSummary;
+  /** Credits charged for this job (0 if NO_CHANGE or admin) */
+  creditsCharged: number;
   message?: string;
 };
