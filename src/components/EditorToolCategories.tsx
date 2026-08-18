@@ -1,11 +1,10 @@
-import { Crop, Eraser, Wand2, Palette } from "lucide-react";
+import { Eraser } from "lucide-react";
 import { PriorityToolGrid } from "@/components/editor/features/PriorityToolGrid";
-import { StyleToolGrid } from "@/components/editor/features/StyleToolGrid";
 
 type Tool = {
   id: string;
   label: string;
-  icon: typeof Wand2;
+  icon: typeof Eraser;
   prompt: string;
   uiOnly?: boolean;
 };
@@ -17,9 +16,8 @@ type Props = {
 };
 
 /**
- * Image Editor tool categories only.
- * Motio2edit Auto is a separate standalone product at /studio/image/auto-edit —
- * not an in-editor mode or tool.
+ * Image Editor tool strip — Circle to Remove only for now.
+ * Other tools/styles removed from UI until redesigned.
  */
 export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props) {
   return (
@@ -27,9 +25,9 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
       <PriorityToolGrid
         hasImage={hasImage}
         disabled={disabled}
-        onPrompt={(prompt) =>
-          onSelectTool({ id: "priority", label: "tool", icon: Wand2, prompt })
-        }
+        onPrompt={() => {
+          /* prompt tools disabled */
+        }}
         onCircleRemove={() =>
           onSelectTool({
             id: "circle-remove",
@@ -38,21 +36,13 @@ export function EditorToolCategories({ onSelectTool, disabled, hasImage }: Props
             prompt: "__CIRCLE_REMOVE__",
           })
         }
-        onCrop={() =>
-          onSelectTool({ id: "crop", label: "Crop", icon: Crop, prompt: "__CROP__", uiOnly: true })
-        }
-      />
-
-      <StyleToolGrid
-        hasImage={hasImage}
-        disabled={disabled}
-        onPrompt={(prompt) =>
-          onSelectTool({ id: "style", label: "style", icon: Palette, prompt })
-        }
+        onCrop={() => {
+          /* crop removed from tools UI */
+        }}
       />
 
       {!hasImage && (
-        <p className="text-[11px] text-muted-foreground">Upload an image first to unlock edit tools.</p>
+        <p className="text-[11px] text-muted-foreground">Upload an image first to unlock Circle to Remove.</p>
       )}
     </div>
   );
