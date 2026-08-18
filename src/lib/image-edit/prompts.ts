@@ -22,7 +22,6 @@ export const BASE_PHOTO_LOCK =
   "Preserve background, lighting, colors and composition unless the user asked to change them. " +
   "Only make the specific requested change. Keep photorealistic. No cartoon/anime/painting.";
 
-/** Allows clothing change — used for outfit transfer. */
 export const OUTFIT_PHOTO_LOCK =
   "This is a real photograph. Treat it as a real photo clothing/outfit edit. " +
   "Preserve the exact person identity: face, facial structure, skin tone, hair, body pose, camera angle. " +
@@ -32,10 +31,10 @@ export const OUTFIT_PHOTO_LOCK =
 export const PEOPLE_REMOVAL_LOCK =
   "This is a real photograph. Treat it as object-removal. " +
   "Remove the requested people completely (faces, bodies, shadows). " +
-  "Preserve non-human content. Photorealistic. Do not add replacement people.";
+  "Preserve non-human content and any people not targeted. Photorealistic. Do not add replacement people.";
 
 const PEOPLE_REMOVAL_PROMPT_CLAUSE =
-  " Completely remove the target person or all visible people. Erase faces, bodies, clothing, hair, limbs, shadows. Reconstruct background matching texture, lighting and perspective. Keep non-human content. Photorealistic.";
+  " Completely remove the target person. Erase faces, bodies, clothing, hair, limbs, shadows. Reconstruct background matching texture, lighting and perspective. Keep non-target people and non-human content. Photorealistic.";
 
 const FACE_EDIT_CLAUSE =
   " Apply only the requested face/skin/expression change. Same individual as input — same facial structure and identity.";
@@ -49,8 +48,12 @@ const STYLE_TRANSFORM_CLAUSE =
 const OUTFIT_SINGLE_CLAUSE =
   " Change the clothing/outfit on the person as requested. Keep face, identity, pose and background the same. New clothes must look natural and photorealistic.";
 
+const RESTORE_CLAUSE =
+  " Restore this photo: reduce scratches, tears, stains, noise and blur; recover detail and natural contrast. Keep the same people, faces, clothing and composition.";
+
+/** Natural language: edit out, remove the girl, etc. */
 export function isPeopleRemovalPrompt(prompt: string): boolean {
-  return /\b(remove\s+(people|person|persons|humans?|human|everyone|all)|erase\s+(person|people)|delete\s+(person|people))\b/i.test(
+  return /\b((edit|cut|take|paint)\s+out|(remove|erase|delete|get\s+rid\s+of|take\s+away)\s+(the\s+)?(people|person|persons|humans?|human|everyone|all|girl|boy|guy|man|woman|lady|kid|child|someone|somebody|figure)|(remove|erase|delete)\s+(people|person|persons))\b/i.test(
     prompt || "",
   );
 }
@@ -76,9 +79,11 @@ export function buildMultiOutfitInstruction(refCount: number): string {
 export function buildMultiGeneralInstruction(refCount: number): string {
   const n = Math.max(1, refCount);
   return (
-    ` MULTI-IMAGE: Image 1 is the base subject. Images 2-${n + 1} are references only. ` +
-    `Apply the user's request using the references (style, object, or attribute) while keeping ` +
-    `the face and identity from image 1 unchanged unless the user explicitly asked to change identity.`
+    ` MULTI-IMAGE: Image 1 is the BASE photo (preserve this subject, face, pose, and scene). ` +
+    `Images 2-${n + 1} are REFERENCE images only. ` +
+    `Apply the user's request by transferring the relevant attribute, object, or style from the reference(s) onto image 1. ` +
+    `Do not discard or ignore the reference content when the user asks to use it. ` +
+    `Keep face and identity from image 1 unless the user explicitly asked to change identity.`
   );
 }
 
@@ -96,19 +101,15 @@ export function getEditTypeClause(type: EditType): string {
       return " Adjust only color/lighting as asked. Subjects and composition identical.";
     case "outfit":
       return " Change clothing as asked. Face and identity stay the same.";
+    case "restore":
+      return " Restore quality and damage; do not reinvent subjects.";
     default:
       return "";
   }
 }
 
-/**
- * Build the final Kontext prompt.
- * Multi + outfit: transfer instruction is FIRST so it is not buried under locks.
- */
 export function buildKontextEditPrompt(args: {
-  /** Already-enhanced or raw instruction */
   prompt: string;
-  /** Original user text for classification */
   rawPrompt: string;
   referenceCount: number;
 }): string {
@@ -123,8 +124,9 @@ export function buildKontextEditPrompt(args: {
 
   if (editSize === "remove_people") {
     core = `${prompt}.${PEOPLE_REMOVAL_PROMPT_CLAUSE}`;
+  } else if (editSize === "restore" || editType === "restore") {
+    core = `${prompt}.${RESTORE_CLAUSE}${FACE_IDENTITY_LOCK}`;
   } else if (isOutfit && isMulti) {
-    // Outfit multi: transfer FIRST, then short user intent, then identity (not clothing) lock
     core =
       `${buildMultiOutfitInstruction(referenceCount)} ` +
       `User request: ${source}. ` +
@@ -147,7 +149,6 @@ export function buildKontextEditPrompt(args: {
 
   const withType = `${core}${getEditTypeClause(editType)}`;
 
-  // Light preservation footer — avoid stacking walls of "change nothing" on outfit multi
   if (isOutfit && isMulti) {
     return (
       `${withType}\n` +
