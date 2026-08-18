@@ -257,7 +257,7 @@ export const generateMedia = createServerFn({ method: "POST" })
     }
     if (!outputUrl || outputUrl.trim().length === 0) throw new Error("Generation returned no output. Credits not charged.");
     try {
-      const { finalizeMediaAsset } = await import("@/lib/watermark");
+      const { finalizeMediaAsset } = await import("@/lib/watermark/finalize");
       const finalized = await finalizeMediaAsset({
         sourceUrl: outputUrl,
         mediaKind: data.type === "video" ? "video" : "image",
