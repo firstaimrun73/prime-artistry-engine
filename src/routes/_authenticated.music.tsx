@@ -1,19 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Footer } from "@/components/Footer";
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
-import { isAdminEmail } from "@/lib/admin-config";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
-import { VoiceInputButton } from "@/components/VoiceInputButton";
-import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { CREDIT_COST } from "@/lib/plans";
-import { generateMusic, MUSIC_GENRES, MUSIC_MOODS } from "@/lib/music.functions";
-import { analyzeImageMood } from "@/lib/image-mood.functions";
+import {
+  generateMusic,
+  estimateMusicCost,
+  MUSIC_GENRES,
+  MUSIC_MOODS,
+  type MusicMode,
+} from "@/lib/music.functions";
+import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { toast } from "sonner";
 import {
   Music as MusicIcon,
@@ -22,333 +23,281 @@ import {
   Loader2,
   Play,
   Pause,
-  Share2,
-  RotateCcw,
-  Coins,
-  Zap,
-  Crown,
+  Mic2,
+  Waves,
+  Video,
   ImagePlus,
+  Coins,
+  X,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/music")({
   head: () => ({
     meta: [
-      { title: "AI Music — Generate Original Tracks | MOTIO2EDIT" },
+      { title: "Music Studio — Song, Voiceover & Sound | MOTIO2EDIT" },
       {
         name: "description",
         content:
-          "Generate original AI music from a prompt. Pick instruments, mood, and duration. Preview instantly and download as MP3.",
+          "Create songs, instrumentals, voiceovers, and sound effects. Text, image, or video can inspire the track.",
       },
-      { property: "og:title", content: "AI Music — MOTIO2EDIT" },
-      {
-        property: "og:description",
-        content: "Generate original AI music tracks from a text prompt.",
-      },
+      { property: "og:title", content: "Music Studio — MOTIO2EDIT" },
     ],
   }),
   component: MusicPage,
 });
 
-// ── Quick-pick chips (labels + emojis for the new colorful section) ────
-type Chip = { key: string; label: string; emoji: string; promptAdd?: string };
-
-const INSTRUMENTS: Chip[] = [
-  { key: "guitar", label: "Guitar", emoji: "🎸", promptAdd: "acoustic and electric guitar as the lead instrument" },
-  { key: "piano", label: "Piano", emoji: "🎹", promptAdd: "grand piano melody as the lead instrument" },
-  { key: "drums", label: "Drums", emoji: "🥁", promptAdd: "prominent drum kit and percussion" },
-  { key: "trumpet", label: "Trumpet", emoji: "🎺", promptAdd: "brass trumpet as the lead instrument" },
-  { key: "violin", label: "Violin", emoji: "🎻", promptAdd: "expressive solo violin" },
-  { key: "orchestral", label: "Orchestral", emoji: "🎵", promptAdd: "full orchestral arrangement with strings and brass" },
-  { key: "vocal", label: "Vocal", emoji: "🎤", promptAdd: "with vocal harmonies" },
-  { key: "electronic", label: "Electronic", emoji: "🎧", promptAdd: "electronic synths and modern production" },
-  { key: "trailer", label: "Trailer", emoji: "🎬", promptAdd: "epic movie trailer style with rising tension" },
-  { key: "wedding", label: "Wedding", emoji: "🎊", promptAdd: "romantic wedding ceremony style" },
-  { key: "sad", label: "Sad", emoji: "😢", promptAdd: "melancholic and emotional" },
-  { key: "energetic", label: "Energetic", emoji: "⚡", promptAdd: "high energy and driving rhythm" },
-  { key: "calm", label: "Calm", emoji: "🧘", promptAdd: "calm, ambient and relaxing" },
-  { key: "gaming", label: "Gaming", emoji: "🎮", promptAdd: "video game soundtrack style" },
+const MODES: { id: MusicMode; label: string; hint: string; icon: typeof MusicIcon }[] = [
+  { id: "song", label: "Song", hint: "Vocals + arrangement", icon: MusicIcon },
+  { id: "instrumental", label: "Instrumental", hint: "No vocals", icon: Waves },
+  { id: "voiceover", label: "Voiceover", hint: "Script → speech", icon: Mic2 },
+  { id: "sfx", label: "Sound", hint: "SFX / ambience", icon: Sparkles },
 ];
 
-const MOODS: { key: string; label: string }[] = [
-  { key: "happy", label: "Happy" },
-  { key: "sad", label: "Sad" },
-  { key: "energetic", label: "Energetic" },
-  { key: "calm", label: "Calm" },
-  { key: "epic", label: "Epic" },
-];
+const VOICES = [
+  { id: "eve", label: "Eve" },
+  { id: "ara", label: "Ara" },
+  { id: "rex", label: "Rex" },
+  { id: "sal", label: "Sal" },
+  { id: "leo", label: "Leo" },
+] as const;
 
 const DURATIONS = [
+  { s: 8, label: "8s" },
   { s: 15, label: "15s" },
   { s: 30, label: "30s" },
   { s: 60, label: "60s" },
-  { s: 120, label: "2 min" },
-];
-
-const MUSIC_EXAMPLES = [
-  "Wedding ceremony music",
-  "Epic movie trailer",
-  "Lo-fi study beats",
-  "Gaming background music",
-  "Meditation and calm",
-  "Birthday celebration",
 ];
 
 const LOADING_STEPS = [
-  "Composing your melody...",
-  "Adding instruments...",
-  "Mixing your track...",
-  "Finalizing your music...",
+  "Preparing…",
+  "Creating music…",
+  "Processing…",
+  "Finalizing…",
 ];
 
-// Map a UI mood to the backend MUSIC_MOODS enum (best-effort match).
-function mapMoodToBackend(m: string | null): (typeof MUSIC_MOODS)[number] | undefined {
-  if (!m) return undefined;
-  const set = new Set<string>(MUSIC_MOODS as readonly string[]);
-  const lower = m.toLowerCase();
-  if (set.has(lower)) return lower as (typeof MUSIC_MOODS)[number];
-  if (lower === "happy") return "uplifting" as (typeof MUSIC_MOODS)[number];
-  return undefined;
-}
-
-// Map a UI instrument chip to the backend MUSIC_GENRES enum when possible.
-function mapInstrumentToGenre(k: string | null): (typeof MUSIC_GENRES)[number] | undefined {
-  if (!k) return undefined;
-  const set = new Set<string>(MUSIC_GENRES as readonly string[]);
-  const table: Record<string, string> = {
-    orchestral: "orchestral",
-    trailer: "trailer",
-    electronic: "electronic",
-    gaming: "cinematic",
-    wedding: "classical",
-    piano: "classical",
-    violin: "classical",
-    trumpet: "jazz",
-  };
-  const mapped = table[k];
-  if (mapped && set.has(mapped)) return mapped as (typeof MUSIC_GENRES)[number];
-  return undefined;
-}
-
-// Enhance short prompts with instrument, mood, duration and quality descriptors.
-function enhancePrompt(opts: {
-  prompt: string;
-  instrument: Chip | null;
-  mood: string | null;
-  duration: number;
-}): string {
-  const base = opts.prompt.trim();
-  const parts: string[] = [];
-  parts.push(
-    base.length > 0
-      ? `Create a professional, high quality music track: ${base}.`
-      : "Create a professional, high quality music track.",
-  );
-  if (opts.instrument?.promptAdd) parts.push(`${opts.instrument.promptAdd}.`);
-  if (opts.mood) parts.push(`${opts.mood} atmosphere.`);
-  parts.push(`Approximately ${opts.duration} seconds long.`);
-  parts.push("High audio quality, studio recording sound, clean mix, instrumental.");
-  return parts.join(" ");
+async function uploadToSupabase(file: File, userId: string, folder: string): Promise<string> {
+  const ext = file.name.split(".").pop() || "bin";
+  const path = `${userId}/${folder}/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from("uploads").upload(path, file, {
+    contentType: file.type || "application/octet-stream",
+    upsert: true,
+  });
+  if (error) throw new Error(error.message || "Upload failed.");
+  const { data: signed } = await supabase.storage.from("uploads").createSignedUrl(path, 60 * 60 * 24 * 7);
+  if (!signed?.signedUrl) throw new Error("Could not create a secure file URL.");
+  return signed.signedUrl;
 }
 
 function MusicPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const generate = useServerFn(generateMusic);
+  const estimate = useServerFn(estimateMusicCost);
 
+  const [mode, setMode] = useState<MusicMode>("instrumental");
   const [prompt, setPrompt] = useState("");
-  const [instrument, setInstrument] = useState<Chip | null>(null);
-  const [mood, setMood] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number>(30);
-  const [bpm, setBpm] = useState<number>(120);
-  const [tier, setTier] = useState<"lite" | "pro">("pro");
-  const [customDuration, setCustomDuration] = useState<boolean>(false);
+  const [lyrics, setLyrics] = useState("");
+  const [genre, setGenre] = useState<string>("");
+  const [mood, setMood] = useState<string>("");
+  const [duration, setDuration] = useState(30);
+  const [voice, setVoice] = useState<string>("eve");
+
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoName, setVideoName] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const [estCredits, setEstCredits] = useState<number | null>(null);
+  const [estProvider, setEstProvider] = useState<number | null>(null);
+  const [estLoading, setEstLoading] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
-  const [loadingStart, setLoadingStart] = useState<number>(0);
-  const [now, setNow] = useState<number>(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [resultModel, setResultModel] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [showRestore, setShowRestore] = useState<null | { prompt?: string; instrument?: Chip | null; mood?: string | null; duration?: number; bpm?: number; tier?: "lite" | "pro"; audioUrl?: string | null; customDuration?: boolean }>(null);
-
-  // Optional image → mood reference (Anthropic vision describes the mood and
-  // the description is appended to the music prompt at generation time).
-  const [moodImage, setMoodImage] = useState<string | null>(null);
-  const [detectedMood, setDetectedMood] = useState<string | null>(null);
-  const [moodLoading, setMoodLoading] = useState(false);
-  const moodFileRef = useRef<HTMLInputElement | null>(null);
-  const analyzeMood = useServerFn(analyzeImageMood);
-
-  async function onMoodImage(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Image is too large. Maximum is 8 MB.");
-      return;
-    }
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.onerror = () => reject(new Error("Could not read that image."));
-      r.readAsDataURL(file);
-    }).catch(() => null);
-    if (!dataUrl) {
-      toast.error("Could not read that image.");
-      return;
-    }
-    setMoodImage(dataUrl);
-    setDetectedMood(null);
-    setMoodLoading(true);
-    try {
-      const res = await analyzeMood({ data: { imageUrl: dataUrl } });
-      setDetectedMood(res.mood);
-      toast.success("🎨 Mood detected from your image.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not analyze that image.");
-    } finally {
-      setMoodLoading(false);
-    }
-  }
-
-  function clearMoodImage() {
-    setMoodImage(null);
-    setDetectedMood(null);
-    setMoodLoading(false);
-  }
-
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const cost = tier === "lite" ? CREDIT_COST.music_lite : CREDIT_COST.music;
-  const isAdmin = isAdminEmail(profile?.email);
-  const credits = profile?.credits ?? 0;
-  const insufficient = !isAdmin && credits < cost;
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+
+  const refreshEstimate = useCallback(async () => {
+    setEstLoading(true);
+    try {
+      const res = await estimate({
+        data: {
+          mode,
+          durationSeconds: duration,
+          promptLength: prompt.length,
+          hasVideo: !!videoUrl && (mode === "sfx" || mode === "song" || mode === "instrumental"),
+        },
+      });
+      setEstCredits(res.credits);
+      setEstProvider(res.providerUsd);
+    } catch {
+      setEstCredits(null);
+      setEstProvider(null);
+    } finally {
+      setEstLoading(false);
+    }
+  }, [estimate, mode, duration, prompt, videoUrl]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void refreshEstimate();
+    }, 250);
+    return () => clearTimeout(t);
+  }, [refreshEstimate]);
 
   useEffect(() => {
     if (!loading) return;
-    setNow(Date.now());
-    const id = setInterval(() => {
-      setLoadingStep((s) => (s + 1) % LOADING_STEPS.length);
-      setNow(Date.now());
-    }, 1000);
-    const stepId = setInterval(() => {
-      setLoadingStep((s) => (s + 1) % LOADING_STEPS.length);
-    }, 2000);
-    return () => {
-      clearInterval(id);
-      clearInterval(stepId);
-    };
+    setLoadingStep(0);
+    const id = window.setInterval(() => {
+      setLoadingStep((s) => Math.min(s + 1, LOADING_STEPS.length - 1));
+    }, 2800);
+    return () => window.clearInterval(id);
   }, [loading]);
 
-  // Pre-fill prompt from Studio sample clicks (sessionStorage bridge).
-  // Restore session: read localStorage but ASK before applying so users can start fresh.
-  useEffect(() => {
-    try {
-      const pre = sessionStorage.getItem("prefill-prompt");
-      if (pre) {
-        setPrompt(pre);
-        sessionStorage.removeItem("prefill-prompt");
-      }
-      const raw = localStorage.getItem("motio2edit-music-session");
-      if (raw) {
-        const s = JSON.parse(raw);
-        const hasSomething =
-          (typeof s.prompt === "string" && s.prompt.length > 0) ||
-          s.instrument || s.mood || s.audioUrl;
-        if (!pre && hasSomething) setShowRestore(s);
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  function applyRestore() {
-    const s = showRestore;
-    if (!s) return;
-    if (typeof s.prompt === "string") setPrompt(s.prompt);
-    if (s.instrument) setInstrument(s.instrument);
-    if (typeof s.mood === "string") setMood(s.mood);
-    if (typeof s.duration === "number") setDuration(s.duration);
-    if (typeof s.bpm === "number") setBpm(s.bpm);
-    if (s.tier === "lite" || s.tier === "pro") setTier(s.tier);
-    if (typeof s.audioUrl === "string") setAudioUrl(s.audioUrl);
-    if (typeof s.customDuration === "boolean") setCustomDuration(s.customDuration);
-    setShowRestore(null);
-  }
-  function dismissRestore() {
-    setShowRestore(null);
-    try { localStorage.removeItem("motio2edit-music-session"); } catch { /* ignore */ }
-  }
-
-  // Persist every change so the workspace is restored on next visit.
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "motio2edit-music-session",
-        JSON.stringify({ prompt, instrument, mood, duration, bpm, tier, audioUrl, customDuration }),
-      );
-    } catch { /* ignore */ }
-  }, [prompt, instrument, mood, duration, bpm, tier, audioUrl, customDuration]);
-
-
-
-
-  const isFree = (profile?.plan ?? "free") === "free";
-  const filename = (() => {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const base = `${isFree ? "motio2edit-free-" : ""}motio2edit-${stamp}.mp3`;
-    return base;
-  })();
-
-  async function onGenerate() {
-    if (loading) return;
-    if (insufficient) {
-      toast.error(`Not enough credits. Music generation costs ${cost} credits. Buy credits or upgrade your plan.`);
+  async function onImageFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file (JPG, PNG, WebP).");
       return;
     }
-    setLoading(true);
-    setLoadingStep(0);
-    setLoadingStart(Date.now());
-    setNow(Date.now());
-    setAudioUrl(null);
-    setPlaying(false);
-    toast("🎵 Composing your music...");
-    startGeneration("music", "/music");
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error("Image is too large (max 12 MB).");
+      return;
+    }
+    if (!user?.id) {
+      toast.error("Sign in required to upload.");
+      return;
+    }
+    setUploading(true);
     try {
-      const moodSuffix = detectedMood ? ` Mood inspired by: ${detectedMood}.` : "";
-      const enhanced = `${enhancePrompt({ prompt, instrument, mood, duration })} Tempo around ${bpm} BPM.${moodSuffix}`;
-      const backendMood = mapMoodToBackend(mood);
-      const backendGenre = mapInstrumentToGenre(instrument?.key ?? null);
+      const preview = URL.createObjectURL(file);
+      setImagePreview(preview);
+      const url = await uploadToSupabase(file, user.id, "music-img");
+      setImageUrl(url);
+      toast.success("Image attached — it will influence the music atmosphere.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Image upload failed.");
+      setImagePreview(null);
+      setImageUrl(null);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function onVideoFile(file: File) {
+    if (!file.type.startsWith("video/")) {
+      toast.error("Please choose a video file (MP4, MOV, WebM).");
+      return;
+    }
+    if (file.size > 80 * 1024 * 1024) {
+      toast.error("Video is too large (max 80 MB).");
+      return;
+    }
+    if (!user?.id) {
+      toast.error("Sign in required to upload.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const url = await uploadToSupabase(file, user.id, "music-vid");
+      setVideoUrl(url);
+      setVideoName(file.name);
+      toast.success("Video attached — music will sync to this video.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Video upload failed.");
+      setVideoUrl(null);
+      setVideoName(null);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function clearImage() {
+    setImageUrl(null);
+    setImagePreview(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  }
+
+  function clearVideo() {
+    setVideoUrl(null);
+    setVideoName(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  }
+
+  function togglePlay() {
+    const el = audioRef.current;
+    if (!el || !audioUrl) return;
+    if (playing) {
+      el.pause();
+      setPlaying(false);
+    } else {
+      void el.play();
+      setPlaying(true);
+    }
+  }
+
+  async function onGenerate() {
+    if (loading || uploading) return;
+
+    if (mode === "voiceover" && !prompt.trim()) {
+      toast.error("Enter a script for the voiceover.");
+      return;
+    }
+    if (mode === "sfx" && !prompt.trim() && !videoUrl) {
+      toast.error("Describe the sound, or upload a video for video→music.");
+      return;
+    }
+    if ((mode === "song" || mode === "instrumental") && !prompt.trim() && !imageUrl && !videoUrl) {
+      toast.error("Add a description, image, or video to inspire the track.");
+      return;
+    }
+
+    const creditsNeeded = estCredits ?? 1;
+    if (profile && typeof profile.credits === "number" && profile.credits < creditsNeeded) {
+      toast.error(`Not enough credits. This job needs about ${creditsNeeded} credits.`);
+      return;
+    }
+
+    setLoading(true);
+    setAudioUrl(null);
+    setResultModel(null);
+    setPlaying(false);
+    startGeneration("music", "/music");
+
+    try {
       const res = await generate({
         data: {
-          prompt: enhanced,
+          mode,
+          prompt: prompt.trim(),
+          lyrics: mode === "song" ? lyrics.trim() || undefined : undefined,
+          genre: genre && (MUSIC_GENRES as readonly string[]).includes(genre)
+            ? (genre as (typeof MUSIC_GENRES)[number])
+            : undefined,
+          mood: mood && (MUSIC_MOODS as readonly string[]).includes(mood)
+            ? (mood as (typeof MUSIC_MOODS)[number])
+            : undefined,
           durationSeconds: duration,
-          tier,
-          ...(backendGenre ? { genre: backendGenre } : {}),
-          ...(backendMood ? { mood: backendMood } : {}),
+          imageUrl: imageUrl || undefined,
+          videoUrl: videoUrl || undefined,
+          voice: mode === "voiceover" ? voice : undefined,
+          instrumental: mode === "instrumental",
         },
       });
-      setAudioUrl(res.outputUrl);
-      if (res.usedFallback) toast("Switched to backup model for a cleaner track.");
-      toast.success("✅ Music ready!");
 
-      // Save the finished track to the user's music history.
-      if (profile?.id && res.outputUrl) {
-        const { error: saveErr } = await supabase.from("music_history").insert({
-          user_id: profile.id,
-          track_title: `Track ${new Date().toLocaleDateString("en-IN")}`,
-          prompt,
-          genre: backendGenre ?? null,
-          mood: backendMood ?? null,
-          bpm,
-          duration,
-          audio_url: res.outputUrl,
-        });
-        if (saveErr) {
-          console.error("[music] history save failed:", saveErr.message);
-        } else {
-          toast.success("🎵 Track saved to history!");
-        }
+      if (!res?.outputUrl) {
+        throw new Error("No audio was returned.");
       }
-    } catch (err) {
-      const msg = err instanceof Error ? `❌ ${err.message}` : "❌ Failed. Credits not charged.";
+      setAudioUrl(res.outputUrl);
+      setResultModel(res.model ?? null);
+      toast.success(
+        res.creditsCharged
+          ? `Track ready · ${res.creditsCharged} credits used`
+          : "Track ready",
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Generation failed.";
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -356,514 +305,373 @@ function MusicPage() {
     }
   }
 
-  function togglePlay() {
-    const el = audioRef.current;
-    if (!el) return;
-    if (el.paused) {
-      void el.play();
-      setPlaying(true);
-    } else {
-      el.pause();
-      setPlaying(false);
-    }
-  }
-
-  async function onDownload() {
-    if (!audioUrl) return;
-    try {
-      const resp = await fetch(audioUrl);
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Could not download the track. Try again.");
-    }
-  }
-
-  async function onShare() {
-    if (!audioUrl) return;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "MOTIO2EDIT — AI Music", url: audioUrl });
-      } else {
-        await navigator.clipboard.writeText(audioUrl);
-        toast.success("Track link copied to clipboard.");
-      }
-    } catch {
-      /* user cancelled */
-    }
-  }
+  const showMusicFields = mode === "song" || mode === "instrumental";
+  const showLyrics = mode === "song";
+  const showVoice = mode === "voiceover";
+  const showDuration = mode !== "voiceover";
+  const promptLabel =
+    mode === "voiceover"
+      ? "Script"
+      : mode === "sfx"
+        ? "Sound / effect description"
+        : mode === "song"
+          ? "Song description / brief"
+          : "Instrumental description";
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10">
-        {/* Header block with orange→purple gradient accent — music section only */}
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 md:p-8">
-          <div
-            aria-hidden
-            className="absolute inset-0 -z-10 opacity-30"
-            style={{
-              background:
-                "radial-gradient(600px circle at 15% 20%, rgba(249,115,22,0.35), transparent 60%), radial-gradient(600px circle at 85% 80%, rgba(168,85,247,0.35), transparent 60%)",
-            }}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-purple-600 text-white shadow-lg">
-                <MusicIcon className="h-5 w-5" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-extrabold tracking-tight md:text-3xl">
-                  AI Music
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Powered by Motion2AI. Every generation costs{" "}
-                  <span className="font-semibold text-foreground">{cost} credits</span>.
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground/80">
-                  Motion2AI can make mistakes.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-1.5 text-xs font-semibold backdrop-blur">
-              <Coins className="h-3.5 w-3.5 text-primary" />
-              {isAdmin ? "∞ credits" : `${credits} credits`}
-            </div>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Music Studio</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Song, instrumental, voiceover, and sound — text, image, or video can inspire the result.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Coins className="h-4 w-4" />
+            <span className="tabular-nums">
+              {profile?.credits != null ? `${profile.credits} credits` : "—"}
+            </span>
           </div>
         </div>
 
-        {/* Prompt input */}
-        <section className="mt-6 rounded-2xl border border-border bg-card p-5">
-          {/* Audio quality: Standard (Stable Audio, 50cr) vs High Quality (100cr) */}
-          <div className="mb-1 flex items-center justify-between gap-3">
-            <label className="block text-sm font-semibold">Describe your track</label>
-            <div className="inline-flex rounded-full border border-border bg-background/60 p-1 text-xs">
+        <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {MODES.map((m) => {
+            const active = mode === m.id;
+            const Icon = m.icon;
+            return (
               <button
+                key={m.id}
                 type="button"
-                onClick={() => setTier("lite")}
-                title="Stable Audio — faster, lower cost"
+                onClick={() => setMode(m.id)}
                 className={
-                  "flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition " +
-                  (tier === "lite"
-                    ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
-                    : "text-muted-foreground hover:text-foreground")
+                  "flex flex-col items-start rounded-xl border p-3 text-left transition " +
+                  (active
+                    ? "border-transparent bg-gradient-to-br from-orange-500/90 to-purple-600/90 text-white shadow-md"
+                    : "border-border bg-card hover:border-primary/40")
                 }
               >
-                <Zap className="h-3 w-3" /> Standard · {CREDIT_COST.music_lite}
+                <Icon className={"mb-1 h-5 w-5 " + (active ? "text-white" : "text-primary")} />
+                <span className="text-sm font-semibold">{m.label}</span>
+                <span className={"text-xs " + (active ? "text-white/80" : "text-muted-foreground")}>
+                  {m.hint}
+                </span>
               </button>
-              <button
-                type="button"
-                onClick={() => setTier("pro")}
-                title="Studio-grade model — richest detail and mix"
-                className={
-                  "flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition " +
-                  (tier === "pro"
-                    ? "bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
-                    : "text-muted-foreground hover:text-foreground")
+            );
+          })}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-5 rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {promptLabel}
+              </label>
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={mode === "voiceover" ? 6 : 3}
+                placeholder={
+                  mode === "voiceover"
+                    ? "Write the script to speak…"
+                    : mode === "sfx"
+                      ? "e.g. soft rain on a window, distant thunder"
+                      : "e.g. nostalgic piano for an old family photo"
                 }
+                className="resize-y"
+              />
+            </div>
+
+            {showLyrics && (
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Lyrics (optional structure tags)
+                </label>
+                <Textarea
+                  value={lyrics}
+                  onChange={(e) => setLyrics(e.target.value)}
+                  rows={5}
+                  placeholder={"[Verse]\n...\n[Chorus]\n..."}
+                  className="resize-y font-mono text-sm"
+                />
+              </div>
+            )}
+
+            {showVoice && (
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Voice
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {VOICES.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setVoice(v.id)}
+                      className={
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition " +
+                        (voice === v.id
+                          ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white"
+                          : "border-border hover:border-primary/40")
+                      }
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showMusicFields && (
+              <>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Genre
+                  </label>
+                  <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+                    {MUSIC_GENRES.map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setGenre(genre === g ? "" : g)}
+                        className={
+                          "rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize transition " +
+                          (genre === g
+                            ? "border-transparent bg-orange-500 text-white"
+                            : "border-border hover:border-primary/40")
+                        }
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Mood
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MUSIC_MOODS.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setMood(mood === m ? "" : m)}
+                        className={
+                          "rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize transition " +
+                          (mood === m
+                            ? "border-transparent bg-purple-600 text-white"
+                            : "border-border hover:border-primary/40")
+                        }
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {showDuration && (
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Duration
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {DURATIONS.map((d) => (
+                    <button
+                      key={d.s}
+                      type="button"
+                      onClick={() => setDuration(d.s)}
+                      className={
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition " +
+                        (duration === d.s
+                          ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white"
+                          : "border-border hover:border-primary/40")
+                      }
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(mode === "song" || mode === "instrumental") && (
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  Image → atmosphere (optional)
+                </label>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void onImageFile(f);
+                  }}
+                />
+                {imagePreview ? (
+                  <div className="relative overflow-hidden rounded-xl border border-border">
+                    <img src={imagePreview} alt="Mood reference" className="max-h-40 w-full object-cover" />
+                    <button type="button" onClick={clearImage} className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white" aria-label="Remove image">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => imageInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border px-3 py-6 text-sm text-muted-foreground hover:border-primary/40"
+                  >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                    Upload photo
+                  </button>
+                )}
+              </div>
+            )}
+
+            {(mode === "sfx" || mode === "song" || mode === "instrumental") && (
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Video className="h-3.5 w-3.5" />
+                  Video → music (optional)
+                </label>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void onVideoFile(f);
+                  }}
+                />
+                {videoUrl ? (
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm">
+                    <span className="truncate">{videoName || "Video attached"}</span>
+                    <button type="button" onClick={clearVideo} className="ml-2 text-muted-foreground hover:text-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => videoInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border px-3 py-6 text-sm text-muted-foreground hover:border-primary/40"
+                  >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                    Upload video for synced audio
+                  </button>
+                )}
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Uses MMAudio V2 — not video-to-video. Your video gets a matching soundtrack.
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm">
+                <span className="text-muted-foreground">Estimated cost: </span>
+                {estLoading ? (
+                  <span className="text-muted-foreground">…</span>
+                ) : estCredits != null ? (
+                  <span className="font-semibold tabular-nums">~{estCredits} credits</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+                {estProvider != null && (
+                  <span className="ml-1 text-[11px] text-muted-foreground">
+                    (provider ≈ ${estProvider.toFixed(3)})
+                  </span>
+                )}
+              </div>
+              <Button
+                type="button"
+                disabled={loading || uploading}
+                onClick={() => void onGenerate()}
+                className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-95"
               >
-                <Crown className="h-3 w-3" /> High Quality · {CREDIT_COST.music}
-              </button>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate
+                  </>
+                )}
+              </Button>
             </div>
           </div>
-          <p className="mb-4 text-[11px] text-muted-foreground">
-            {tier === "lite"
-              ? "Standard — fast generation, MP3 44.1 kHz."
-              : "High Quality — studio-grade detail and mix, MP3 44.1 kHz."}
-          </p>
 
-          {/* Image → mood (optional) */}
-          <div className="mb-4 rounded-xl border border-border bg-background/60 p-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-xs font-semibold text-muted-foreground">
-                Generate from image mood (optional)
-              </span>
-              <input
-                ref={moodFileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void onMoodImage(f);
-                  e.target.value = "";
-                }}
-              />
-              {!moodImage && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={moodLoading || loading}
-                  onClick={() => moodFileRef.current?.click()}
-                >
-                  {moodLoading ? (
-                    <>
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Reading mood…
-                    </>
-                  ) : (
-                    <>
-                      <ImagePlus className="mr-1.5 h-4 w-4" /> Upload Image 🖼️
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-            {moodImage && (
-              <div className="mt-3 flex items-center gap-3">
-                <img
-                  src={moodImage}
-                  alt="Mood reference"
-                  className="h-14 w-14 rounded-lg object-cover"
+          <div className="flex min-h-[280px] flex-col rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Result</h2>
+            {loading && (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+                <p className="text-sm font-medium">{LOADING_STEPS[loadingStep]}</p>
+              </div>
+            )}
+            {!loading && !audioUrl && (
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+                <MusicIcon className="h-10 w-10 opacity-40" />
+                <p className="text-sm">Your track will appear here after generation.</p>
+              </div>
+            )}
+            {!loading && audioUrl && (
+              <div className="flex flex-1 flex-col gap-4">
+                <audio
+                  ref={audioRef}
+                  src={audioUrl}
+                  onEnded={() => setPlaying(false)}
+                  onPause={() => setPlaying(false)}
+                  onPlay={() => setPlaying(true)}
+                  className="hidden"
                 />
-                <div className="min-w-0 flex-1">
-                  {detectedMood ? (
-                    <p className="text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground">AI detected:</span>{" "}
-                      {detectedMood}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      {moodLoading ? "Analyzing image mood…" : "No mood detected."}
-                    </p>
-                  )}
+                <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-4">
+                  <button
+                    type="button"
+                    onClick={togglePlay}
+                    className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
+                    aria-label={playing ? "Pause" : "Play"}
+                  >
+                    {playing ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">Generated audio</p>
+                    {resultModel && (
+                      <p className="truncate text-[11px] text-muted-foreground">{resultModel}</p>
+                    )}
+                  </div>
                 </div>
-                <Button type="button" size="sm" variant="ghost" onClick={clearMoodImage}>
-                  Remove
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" asChild>
+                    <a href={audioUrl} download target="_blank" rel="noreferrer">
+                      <Download className="mr-1.5 h-4 w-4" />
+                      Download
+                    </a>
+                  </Button>
+                </div>
               </div>
             )}
           </div>
+        </div>
 
-          <div className="relative">
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder='e.g. "Energetic guitar music for wedding" · "Sad piano melody 30 seconds" · "Epic trailer music with drums" · Any language supported'
-              rows={3}
-              className="resize-none pr-12"
-            />
-            <div className="absolute right-2 top-2">
-              <VoiceInputButton
-                disabled={loading}
-                onTranscript={(t) => setPrompt((p) => (p ? `${p} ${t}` : t))}
-              />
-            </div>
-          </div>
-          <div
-            className={
-              "mt-1.5 text-right text-xs " +
-              (prompt.length > 900 ? "font-semibold text-destructive" : "text-muted-foreground")
-            }
-          >
-            {prompt.length > 900
-              ? `Prompt too long, will be trimmed to 900 · ${prompt.length}/900`
-              : `${prompt.length}/900 characters`}
-          </div>
-
-          {/* Example prompts */}
-          <div className="mt-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Try an example
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {MUSIC_EXAMPLES.map((ex) => (
-                <button
-                  key={ex}
-                  type="button"
-                  onClick={() => setPrompt(ex)}
-                  className="btn-animate rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                >
-                  {ex}
-                </button>
-              ))}
-            </div>
-          </div>
-
-
-          {/* Instrument / genre chips */}
-          <div className="mt-5">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Instruments & vibes
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {INSTRUMENTS.map((c) => {
-                const active = instrument?.key === c.key;
-                return (
-                  <button
-                    key={c.key}
-                    type="button"
-                    onClick={() => setInstrument(active ? null : c)}
-                    className={
-                      "rounded-full border px-3 py-1.5 text-xs font-medium transition " +
-                      (active
-                        ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
-                        : "border-border bg-background hover:border-primary/40")
-                    }
-                  >
-                    <span className="mr-1">{c.emoji}</span>
-                    {c.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Mood */}
-          <div className="mt-5">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Mood
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {MOODS.map((m) => {
-                const active = mood === m.key;
-                return (
-                  <button
-                    key={m.key}
-                    type="button"
-                    onClick={() => setMood(active ? null : m.key)}
-                    className={
-                      "rounded-full border px-3 py-1.5 text-xs font-medium transition " +
-                      (active
-                        ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
-                        : "border-border bg-background hover:border-primary/40")
-                    }
-                  >
-                    {m.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* BPM */}
-          <div className="mt-5">
-            <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <span>Tempo</span>
-              <span className="tabular-nums text-foreground">{bpm} BPM</span>
-            </div>
-            <Slider
-              min={60}
-              max={180}
-              step={1}
-              value={[bpm]}
-              onValueChange={(v) => setBpm(v[0] ?? 120)}
-            />
-          </div>
-
-          {/* Duration — presets + Custom */}
-          <div className="mt-5">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Duration
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {DURATIONS.map((d) => {
-                const active = !customDuration && duration === d.s;
-                return (
-                  <button
-                    key={d.s}
-                    type="button"
-                    onClick={() => { setCustomDuration(false); setDuration(d.s); }}
-                    className={
-                      "rounded-full border px-4 py-1.5 text-xs font-medium transition " +
-                      (active
-                        ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
-                        : "border-border bg-background hover:border-primary/40")
-                    }
-                  >
-                    {d.label}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => setCustomDuration(true)}
-                className={
-                  "rounded-full border px-4 py-1.5 text-xs font-medium transition " +
-                  (customDuration
-                    ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow"
-                    : "border-border bg-background hover:border-primary/40")
-                }
-              >
-                Custom
-              </button>
-              {customDuration && (
-                <input
-                  type="number"
-                  min={5}
-                  max={180}
-                  value={duration}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    if (Number.isFinite(v)) setDuration(Math.max(5, Math.min(180, v)));
-                  }}
-                  placeholder="Enter seconds"
-                  className="w-32 rounded-full border border-border bg-background px-3 py-1.5 text-xs"
-                />
-              )}
-            </div>
-          </div>
-
-
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-muted-foreground">
-              <Sparkles className="mr-1 inline h-3.5 w-3.5 text-primary" />
-              {cost} credits per generation · credits refunded on failure
-            </div>
-            <Button
-              onClick={onGenerate}
-              disabled={loading || insufficient}
-              className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Composing…
-                </>
-              ) : (
-                <>
-                  <MusicIcon className="mr-2 h-4 w-4" />
-                  Generate music
-                </>
-              )}
-            </Button>
-          </div>
-
-          {insufficient && (
-            <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-              Not enough credits. Music generation costs {cost} credits.{" "}
-              <Link to="/pricing" className="font-semibold text-primary underline">
-                Buy credits or upgrade your plan
-              </Link>
-              .
-            </div>
-          )}
-        </section>
-
-        {/* Loading: progress bar + spinning vinyl + rotating messages + timer */}
-        {loading && (() => {
-          const elapsedMs = Math.max(0, now - loadingStart);
-          const elapsedS = Math.floor(elapsedMs / 1000);
-          const mm = Math.floor(elapsedS / 60).toString().padStart(2, "0");
-          const ss = (elapsedS % 60).toString().padStart(2, "0");
-          // Estimate: lite ~15s, pro ~30s baseline; asymptote to 95% until real completion.
-          const estimate = tier === "lite" ? 20 : 35;
-          const pct = Math.min(95, (elapsedS / estimate) * 95);
-          return (
-            <section className="mt-6 rounded-2xl border border-border bg-card p-6 text-center">
-              <div className="mx-auto grid h-24 w-24 place-items-center">
-                <div
-                  className="relative h-24 w-24 rounded-full bg-gradient-to-br from-neutral-900 to-neutral-700 shadow-inner"
-                  style={{ animation: "vinyl-spin 2s linear infinite" }}
-                >
-                  <div className="absolute inset-2 rounded-full border border-neutral-600" />
-                  <div className="absolute inset-4 rounded-full border border-neutral-600" />
-                  <div className="absolute inset-6 rounded-full border border-neutral-600" />
-                  <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-orange-500 to-purple-600" />
-                </div>
-              </div>
-              <div className="mt-4 text-base font-semibold">{LOADING_STEPS[loadingStep]}</div>
-              <div className="mt-3 mx-auto h-2 w-full max-w-[400px] overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-orange-500 to-purple-600 transition-[width] duration-1000 ease-out animate-pulse"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <div className="mt-2 flex items-center justify-between px-1 text-xs text-muted-foreground mx-auto max-w-[400px]">
-                <span className="tabular-nums">{mm}:{ss}</span>
-                <span>~{estimate} seconds</span>
-              </div>
-              <style>{`@keyframes vinyl-spin { to { transform: rotate(360deg); } }`}</style>
-            </section>
-          );
-        })()}
-
-        {/* Restore-previous-session prompt */}
-        {showRestore && (
-          <section className="mt-6 rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="font-semibold">Restore previous session?</div>
-                <div className="text-xs text-muted-foreground">
-                  We saved your last prompt, settings{showRestore.audioUrl ? " and generated track" : ""}.
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="ghost" onClick={dismissRestore}>No, start fresh</Button>
-                <Button size="sm" onClick={applyRestore} className="bg-gradient-to-r from-orange-500 to-purple-600 text-white">Yes, restore</Button>
-              </div>
-            </div>
-          </section>
-        )}
-
-
-        {audioUrl && !loading && (
-          <section className="mt-6 rounded-2xl border border-border bg-card p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-purple-600 text-white">
-                <MusicIcon className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold">Your track is ready</div>
-                <div className="text-xs text-muted-foreground">{duration} seconds · {isFree ? "free plan (watermarked filename)" : "clean download"}</div>
-              </div>
-            </div>
-
-            {/* Simple waveform-style visual accent (CSS only) */}
-            <div className="mb-4 flex h-14 items-end gap-1 overflow-hidden rounded-lg bg-background/60 px-3 py-2">
-              {Array.from({ length: 48 }).map((_, i) => {
-                const h = 20 + Math.abs(Math.sin(i * 0.9) * 70);
-                return (
-                  <span
-                    key={i}
-                    className="w-1 rounded-sm bg-gradient-to-t from-orange-500 to-purple-500"
-                    style={{ height: `${h}%`, opacity: playing ? 1 : 0.6 }}
-                  />
-                );
-              })}
-            </div>
-
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              onEnded={() => setPlaying(false)}
-              onPause={() => setPlaying(false)}
-              onPlay={() => setPlaying(true)}
-              controls
-              className="w-full"
-            />
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={togglePlay}>
-                {playing ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
-                {playing ? "Pause" : "Play"}
-              </Button>
-              <Button variant="secondary" onClick={onDownload}>
-                <Download className="mr-2 h-4 w-4" />
-                Download MP3
-              </Button>
-              <Button variant="secondary" onClick={onShare}>
-                <Share2 className="mr-2 h-4 w-4" />
-                Share
-              </Button>
-              <Button
-                onClick={onGenerate}
-                disabled={loading || insufficient}
-                className="bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-90"
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Regenerate ({cost} credits)
-              </Button>
-            </div>
-          </section>
-        )}
-        <EditorDisclaimer />
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Need video editing?{" "}
+          <Link to="/editor" className="text-primary underline-offset-2 hover:underline">
+            Open Image / Video Studio
+          </Link>
+          . Music stays separate from Image and Video editors.
+        </p>
+        <EditorDisclaimer className="mt-4" />
       </main>
       <Footer />
     </div>
