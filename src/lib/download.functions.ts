@@ -19,7 +19,7 @@ export const secureDownloadImage = createServerFn({ method: "POST" })
     const adminEmail = process.env.ADMIN_EMAIL;
     const isAdmin = !!adminEmail && !!profile.email && profile.email.toLowerCase() === adminEmail.toLowerCase();
     if (!data.imageUrl.startsWith("https://")) throw new Error("Invalid image URL.");
-    const { finalizeMediaAsset } = await import("@/lib/watermark");
+    const { finalizeMediaAsset } = await import("@/lib/watermark/finalize");
     const result = await finalizeMediaAsset({
       sourceUrl: data.imageUrl, mediaKind: "image",
       plan: profile.plan, email: profile.email, isAdmin,
