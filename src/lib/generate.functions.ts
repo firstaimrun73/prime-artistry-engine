@@ -32,6 +32,10 @@ import { getWatermarkMode } from "@/lib/policy";
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** User-facing message when post-generation prep (incl. brand stamp) fails. */
+const PREPARE_FAILED =
+  "Couldn't finish preparing your image. Please try again or contact support.";
+
 function safePayload(body: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
@@ -442,6 +446,49 @@ export const generateMedia = createServerFn({ method: "POST" })
       throw new Error("Generation returned no output. Credits not charged.");
     }
 
+    // Deliverable prep (brand stamp) BEFORE credit deduction.
+    // Free → always primary+secondary. Paid → primary when keepWatermark true. Admin → none.
+    // If a required stamp fails, we throw here and never call deduct_credits.
+    if (data.type === "image") {
+      const wmMode = getWatermarkMode({
+        plan: profile.plan,
+        email: profile.email,
+        isAdmin,
+        keepWatermark: data.keepWatermark === true,
+      });
+      if (wmMode !== "none") {
+        try {
+          const { applyServerWatermark, fetchImageBuffer } = await import(
+            "@/lib/watermark.server"
+          );
+          const raw = await fetchImageBuffer(outputUrl);
+          const stamped = await applyServerWatermark(raw, wmMode);
+          const path = `${userId}/out-wm-${Date.now()}.jpg`;
+          const { error: upErr } = await supabaseAdmin.storage
+            .from("uploads")
+            .upload(path, stamped, { contentType: "image/jpeg", upsert: true });
+          if (upErr) {
+            console.error("[generate] wm upload failed (no credits charged):", upErr.message);
+            throw new Error(PREPARE_FAILED);
+          }
+          const { data: signed } = await supabaseAdmin.storage
+            .from("uploads")
+            .createSignedUrl(path, 60 * 60 * 24 * 7);
+          if (!signed?.signedUrl) {
+            console.error("[generate] wm signed URL failed (no credits charged)");
+            throw new Error(PREPARE_FAILED);
+          }
+          outputUrl = signed.signedUrl;
+          console.log("[generate] output stamped server-side:", wmMode);
+        } catch (e) {
+          console.error("[generate] server stamp failed (no credits charged):", e);
+          if (e instanceof Error && e.message === PREPARE_FAILED) throw e;
+          throw new Error(PREPARE_FAILED);
+        }
+      }
+    }
+
+    // Only charge once we have a complete deliverable URL (stamped if required).
     let newCredits = profile.credits;
     if (isAdmin) {
       console.log("[generate] admin account — skipping credit deduction");
@@ -471,55 +518,6 @@ export const generateMedia = createServerFn({ method: "POST" })
       const deducted = deduction as { transaction_id: string; credits: number };
       newCredits = deducted.credits;
       console.log("[generate] charged", cost, "credits → remaining", newCredits, "tx", deducted.transaction_id);
-    }
-
-    // Single source of truth: getWatermarkMode + server-side applyServerWatermark.
-    // Free → always primary+secondary. Paid → primary when keepWatermark true. Admin → none.
-    // Never return a silently clean image when a mark was required.
-    if (data.type === "image") {
-      const wmMode = getWatermarkMode({
-        plan: profile.plan,
-        email: profile.email,
-        isAdmin,
-        keepWatermark: data.keepWatermark === true,
-      });
-      if (wmMode !== "none") {
-        try {
-          const { applyServerWatermark, fetchImageBuffer } = await import(
-            "@/lib/watermark.server"
-          );
-          const raw = await fetchImageBuffer(outputUrl);
-          const stamped = await applyServerWatermark(raw, wmMode);
-          const path = `${userId}/out-wm-${Date.now()}.jpg`;
-          const { error: upErr } = await supabaseAdmin.storage
-            .from("uploads")
-            .upload(path, stamped, { contentType: "image/jpeg", upsert: true });
-          if (upErr) {
-            console.error("[generate] wm upload failed:", upErr.message);
-            throw new Error(
-              "Could not apply watermark to your image. Please try again or contact support.",
-            );
-          }
-          const { data: signed } = await supabaseAdmin.storage
-            .from("uploads")
-            .createSignedUrl(path, 60 * 60 * 24 * 7);
-          if (!signed?.signedUrl) {
-            throw new Error(
-              "Could not finalize watermarked image. Please try again or contact support.",
-            );
-          }
-          outputUrl = signed.signedUrl;
-          console.log("[generate] output stamped server-side:", wmMode);
-        } catch (e) {
-          console.error("[generate] server watermark failed:", e);
-          if (e instanceof Error && e.message.includes("watermark")) throw e;
-          throw new Error(
-            e instanceof Error
-              ? e.message
-              : "Could not apply watermark to your image. Please try again.",
-          );
-        }
-      }
     }
 
     console.log("[generate] output ready:", outputUrl.slice(0, 80));
