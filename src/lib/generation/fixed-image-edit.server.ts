@@ -6,6 +6,7 @@
  * - Exactly one primary FAL model: IMAGE_EDIT_MODEL (flux-pro/kontext)
  * - Optional quality upscale is a separate tier pass (same as generateMedia HD/2K/4K)
  * - Credits deducted only after a deliverable URL exists (stamp-then-deduct)
+ * - creditCost may be overridden (Auto Edit uses a fixed job cost)
  * - Internal prompt never leaves this module toward the client
  */
 
@@ -129,6 +130,8 @@ export type FixedImageEditArgs = {
   imageUrl: string;
   imageQuality: ImageQuality;
   keepWatermark?: boolean;
+  /** Override credit charge (Auto Edit uses fixed AUTO_EDIT_CREDIT_COST). */
+  creditCost?: number;
 };
 
 export type FixedImageEditResult = {
@@ -137,6 +140,7 @@ export type FixedImageEditResult = {
   /** Always IMAGE_EDIT_MODEL for the primary edit */
   primaryModel: typeof IMAGE_EDIT_MODEL;
   falCallsPrimary: 1;
+  creditsCharged: number;
 };
 
 /**
@@ -152,12 +156,16 @@ export async function runFixedImageEdit(
     throw new Error("Image must be a secure https URL.");
   }
 
-  const cost = imageQualityCost(args.imageQuality);
+  const cost =
+    typeof args.creditCost === "number" && args.creditCost > 0
+      ? args.creditCost
+      : imageQualityCost(args.imageQuality);
+
   if (!args.isAdmin && args.profile.credits < cost) {
-    throw new Error(`Not enough credits. Image generation costs ${cost} credits.`);
+    throw new Error(`Not enough credits. This job costs ${cost} credits.`);
   }
 
-  // PRIMARY: fixed model only — never deblur/upscale/restore model selection by defect.
+  // PRIMARY: fixed model only — never multi-step defect routing here
   const step = buildImageEdit({
     prompt: args.internalPrompt,
     rawPrompt: args.internalPrompt,
@@ -211,6 +219,7 @@ export async function runFixedImageEdit(
   }
 
   let newCredits = args.profile.credits;
+  let creditsCharged = 0;
   if (!args.isAdmin) {
     const { data: deduction, error: dErr } = await args.supabaseAdmin.rpc("deduct_credits", {
       _amount: cost,
@@ -219,15 +228,15 @@ export async function runFixedImageEdit(
     });
     if (dErr || !deduction) {
       if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
-        throw new Error(`Not enough credits. Image generation costs ${cost} credits.`);
+        throw new Error(`Not enough credits. This job costs ${cost} credits.`);
       }
       throw new Error(`Could not charge credits: ${dErr?.message || "unknown error"}`);
     }
     newCredits = (deduction as { credits: number }).credits;
+    creditsCharged = cost;
     console.log("[fixed-edit] charged", cost, "credits → remaining", newCredits);
   }
 
-  // History — store truncated prompt marker only (not full internal instruction dump required)
   const { error: histErr } = await args.supabase.from("generations").insert({
     user_id: args.userId,
     type: "image",
@@ -235,7 +244,11 @@ export async function runFixedImageEdit(
     input_url: "uploaded",
     output_url: outputUrl,
     status: "success",
-    metadata: { source: "standalone_auto", primary_model: IMAGE_EDIT_MODEL },
+    metadata: {
+      source: "standalone_auto",
+      primary_model: IMAGE_EDIT_MODEL,
+      credits_charged: creditsCharged,
+    },
   });
   if (histErr) console.error("[fixed-edit] history insert failed:", histErr.message);
 
@@ -244,6 +257,7 @@ export async function runFixedImageEdit(
     credits: newCredits,
     primaryModel: IMAGE_EDIT_MODEL,
     falCallsPrimary: 1,
+    creditsCharged,
   };
 }
 
