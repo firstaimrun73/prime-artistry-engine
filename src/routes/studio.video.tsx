@@ -242,7 +242,7 @@ function VideoStudioPage() {
         </p>
         <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-sm">
           <span className="tabular-nums font-semibold text-red-600 dark:text-red-400">
-            {admin ? "\u221e" : (profile?.credits ?? "\u2014")}
+            {admin ? "∞" : (profile?.credits ?? "—")}
           </span>
           <span className="text-muted-foreground">credits</span>
         </div>
@@ -283,10 +283,10 @@ function VideoStudioPage() {
           disabled={busy}
           placeholder={
             mode === "image"
-              ? "Describe the motion: slow push-in, orbit, product turn\u2026"
+              ? "Describe the motion: slow push-in, orbit, product turn…"
               : mode === "video"
-                ? "Optional: improve clarity, stability\u2026"
-                : "A cinematic drone shot over a mountain range at sunrise\u2026"
+                ? "Optional: improve clarity, stability…"
+                : "A cinematic drone shot over a mountain range at sunrise…"
           }
         />
       </section>
@@ -329,7 +329,7 @@ function VideoStudioPage() {
           )}
         >
           <Sparkles className="h-4 w-4" />
-          Generate Video \u00b7 {cost} credits
+          Generate Video · {cost} credits
         </button>
       )}
 
