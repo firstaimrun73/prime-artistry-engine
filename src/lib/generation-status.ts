@@ -48,7 +48,6 @@ export function startGeneration(kind: GenerationKind, editorPath: string) {
 /** Advance intermediate stage while the backend request is still running. */
 export function setGenerationStage(stage: StudioJobStage, errorMessage?: string | null) {
   if (!current) return;
-  // Never allow COMPLETE via this path if caller meant intermediate — COMPLETE is explicit.
   current = {
     ...current,
     stage,
