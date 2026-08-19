@@ -1,16 +1,15 @@
 import { useEffect, useState } from "react";
 import {
+  AudioLines,
   Camera,
   Crop,
   FileText,
   Film,
   Image as ImageIcon,
   Loader2,
-  Scissors,
   Search,
   Sparkles,
   Wand2,
-  Waveform,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StudioEditorKind, StudioTier } from "@/lib/studio/studio-tier";
@@ -83,12 +82,12 @@ function StageIcon({
   if (stage === "PREPARING") return <FileText className={cls} />;
   if (stage === "PROCESSING") {
     if (kind === "video") return <Camera className={cls} />;
-    if (kind === "music") return <Waveform className={cls} />;
+    if (kind === "music") return <AudioLines className={cls} />;
     return <Sparkles className={cls} />;
   }
   if (stage === "GENERATING") {
     if (kind === "video") return <Film className={cls} />;
-    if (kind === "music") return <Waveform className={cls} />;
+    if (kind === "music") return <AudioLines className={cls} />;
     return <ImageIcon className={cls} />;
   }
   if (stage === "VALIDATING") return <Wand2 className={cls} />;
