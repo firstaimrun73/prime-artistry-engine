@@ -47,7 +47,7 @@ export function MusicModeCards({
   onChange: (m: MusicMode) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+    <div className="grid w-full grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">
       {MODES.map((m) => {
         const active = mode === m.id;
         const Icon = m.icon;
@@ -57,7 +57,7 @@ export function MusicModeCards({
             type="button"
             onClick={() => onChange(m.id)}
             className={cn(
-              "group relative overflow-hidden rounded-2xl border p-3.5 text-left transition-all sm:p-4",
+              "group relative min-w-0 overflow-hidden rounded-2xl border p-3.5 text-left transition-all sm:p-4",
               active
                 ? "border-transparent shadow-lg shadow-orange-500/20 ring-2 ring-orange-500/40"
                 : "border-border/70 bg-card hover:border-orange-500/40 hover:shadow-md",
@@ -70,7 +70,7 @@ export function MusicModeCards({
                 active && "opacity-100",
               )}
             />
-            <div className="relative z-10">
+            <div className="relative z-10 min-w-0">
               <div
                 className={cn(
                   "mb-2 flex h-9 w-9 items-center justify-center rounded-xl",
@@ -81,7 +81,7 @@ export function MusicModeCards({
               </div>
               <p
                 className={cn(
-                  "text-sm font-bold tracking-tight",
+                  "truncate text-sm font-bold tracking-tight",
                   active ? "text-white" : "text-foreground",
                 )}
               >
@@ -89,7 +89,7 @@ export function MusicModeCards({
               </p>
               <p
                 className={cn(
-                  "mt-0.5 text-[11px] leading-snug",
+                  "mt-0.5 line-clamp-2 text-[11px] leading-snug",
                   active ? "text-white/85" : "text-muted-foreground",
                 )}
               >
