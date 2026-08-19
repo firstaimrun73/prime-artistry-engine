@@ -1,12 +1,62 @@
 import type { MusicMode } from "@/lib/music.functions";
 
-export const VOICES = [
-  { id: "eve", label: "Eve", desc: "Warm · Natural" },
-  { id: "ara", label: "Ara", desc: "Professional · Clear" },
-  { id: "rex", label: "Rex", desc: "Deep · Powerful" },
-  { id: "sal", label: "Sal", desc: "Friendly · Conversational" },
-  { id: "leo", label: "Leo", desc: "Energetic · Young" },
+/** Canonical xAI TTS voice IDs — must match xai/tts/v1 VoiceEnum. */
+export type VoiceId = "eve" | "ara" | "rex" | "sal" | "leo";
+
+/**
+ * Voice library for Voiceover mode.
+ * Descriptions match official xAI TTS characteristics (not marketing fiction).
+ * previewSrc: static public file when present; otherwise server getVoicePreview caches real TTS.
+ */
+export const VOICES: ReadonlyArray<{
+  id: VoiceId;
+  label: string;
+  desc: string;
+  previewSrc: string;
+  sampleLine: string;
+}> = [
+  {
+    id: "eve",
+    label: "Eve",
+    desc: "Energetic · Upbeat",
+    previewSrc: "/voice-previews/eve.mp3",
+    sampleLine: "Hi, I'm Eve — clear, energetic, and ready for your story.",
+  },
+  {
+    id: "ara",
+    label: "Ara",
+    desc: "Warm · Friendly",
+    previewSrc: "/voice-previews/ara.mp3",
+    sampleLine: "Hello, I'm Ara. Warm, friendly, and easy to listen to.",
+  },
+  {
+    id: "rex",
+    label: "Rex",
+    desc: "Confident · Clear",
+    previewSrc: "/voice-previews/rex.mp3",
+    sampleLine: "I'm Rex. Confident, clear, and built for strong narration.",
+  },
+  {
+    id: "sal",
+    label: "Sal",
+    desc: "Smooth · Balanced",
+    previewSrc: "/voice-previews/sal.mp3",
+    sampleLine: "Hey, I'm Sal — smooth, balanced, and conversational.",
+  },
+  {
+    id: "leo",
+    label: "Leo",
+    desc: "Authoritative · Strong",
+    previewSrc: "/voice-previews/leo.mp3",
+    sampleLine: "This is Leo. Authoritative, strong, and made to lead.",
+  },
 ] as const;
+
+export const VOICE_IDS = VOICES.map((v) => v.id);
+
+export function isVoiceId(v: string): v is VoiceId {
+  return (VOICE_IDS as readonly string[]).includes(v);
+}
 
 export const DURATIONS = [
   { s: 8, label: "8s" },
