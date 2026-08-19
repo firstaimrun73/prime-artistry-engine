@@ -8,7 +8,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { canAccessMusic } from "@/lib/policy";
 import { buildMusicBrief } from "@/lib/music/music-brief";
 import { estimateMusicCustomerCredits, type MusicQualityTier } from "@/lib/music/music-pricing";
-import { getRegistryEntry } from "@/lib/generation-cost-registry";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -28,6 +27,23 @@ const INSTRUMENTS = [
   "flute", "saxophone", "percussion", "pads", "choir",
 ] as const;
 
+/** Official xai/tts/v1 voices — single source of truth for Voiceover. */
+const XAI_VOICES = ["eve", "ara", "rex", "sal", "leo"] as const;
+export type XaiVoiceId = (typeof XAI_VOICES)[number];
+
+const PREVIEW_LINES: Record<XaiVoiceId, string> = {
+  eve: "Hi, I'm Eve — clear, energetic, and ready for your story.",
+  ara: "Hello, I'm Ara. Warm, friendly, and easy to listen to.",
+  rex: "I'm Rex. Confident, clear, and built for strong narration.",
+  sal: "Hey, I'm Sal — smooth, balanced, and conversational.",
+  leo: "This is Leo. Authoritative, strong, and made to lead.",
+};
+
+function normalizeVoice(raw?: string | null): XaiVoiceId {
+  const v = (raw || "eve").toLowerCase().trim();
+  return (XAI_VOICES as readonly string[]).includes(v) ? (v as XaiVoiceId) : "eve";
+}
+
 export type MusicMode = "song" | "instrumental" | "voiceover" | "sfx";
 
 const inputSchema = z.object({
@@ -41,12 +57,12 @@ const inputSchema = z.object({
   imageUrl: z.string().url().max(8000).optional(),
   videoUrl: z.string().url().max(8000).optional(),
   audioUrl: z.string().url().max(8000).optional(),
-  voice: z.string().max(40).optional(),
+  voice: z.enum(XAI_VOICES).optional(),
   instrumental: z.boolean().optional(),
   qualityTier: z.enum(["standard", "premium"]).optional().default("standard"),
 });
 
-function friendlyError(status: number, txt: string): string {
+function friendlyError(status: number, _txt: string): string {
   if (status === 429) return "Music service is rate-limited. Please retry in a moment.";
   if (status === 401 || status === 403) return "Music service authentication failed. Please try again shortly.";
   return `Music generation failed (status ${status}). Please try again.`;
@@ -103,6 +119,54 @@ async function analyzeImageMoodServer(imageUrl: string): Promise<string> {
   } catch { return ""; }
 }
 
+/**
+ * Short real xAI TTS sample for Voice Library preview.
+ * Does NOT charge credits. Caches per-voice in Supabase storage when possible.
+ */
+export const getVoicePreview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ voice: z.enum(XAI_VOICES) }).parse(data))
+  .handler(async ({ data }) => {
+    const voice = data.voice;
+    const falKey = process.env.FAL_API_KEY;
+    if (!falKey) throw new Error("Preview service unavailable.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const storagePath = `system/voice-previews/${voice}.mp3`;
+
+    // 1) Cached object in storage
+    try {
+      const { data: signed } = await supabaseAdmin.storage.from("uploads").createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+      if (signed?.signedUrl) {
+        const probe = await fetch(signed.signedUrl, { method: "HEAD" });
+        if (probe.ok) return { url: signed.signedUrl, voice, cached: true as const };
+      }
+    } catch { /* generate below */ }
+
+    // 2) Generate once via xAI TTS
+    const json = await runFalQueue(
+      "xai/tts/v1",
+      { text: PREVIEW_LINES[voice], voice, language: "en" },
+      falKey,
+      "xAI TTS preview",
+    );
+    const remoteUrl = extractAudioUrl(json);
+    if (!remoteUrl) throw new Error("Preview returned no audio.");
+
+    // 3) Persist for next callers (best-effort)
+    try {
+      const bin = await fetch(remoteUrl).then((r) => r.arrayBuffer());
+      await supabaseAdmin.storage.from("uploads").upload(storagePath, bin, {
+        contentType: "audio/mpeg",
+        upsert: true,
+      });
+      const { data: signed } = await supabaseAdmin.storage.from("uploads").createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+      if (signed?.signedUrl) return { url: signed.signedUrl, voice, cached: false as const };
+    } catch { /* fall through */ }
+
+    return { url: remoteUrl, voice, cached: false as const };
+  });
+
 export const generateMusic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => inputSchema.parse(data))
@@ -141,10 +205,16 @@ export const generateMusic = createServerFn({ method: "POST" })
 
     let outputUrl: string;
     let usedModel: string;
+    const selectedVoice = normalizeVoice(data.voice);
     try {
       if (mode === "voiceover") {
         usedModel = "xai/tts/v1";
-        const json = await runFalQueue(usedModel, { text: (data.prompt || "").slice(0, 15000), voice: (data.voice || "eve").toLowerCase(), language: "auto" }, falKey, "xAI TTS");
+        const json = await runFalQueue(
+          usedModel,
+          { text: (data.prompt || "").slice(0, 15000), voice: selectedVoice, language: "auto" },
+          falKey,
+          "xAI TTS",
+        );
         const url = extractAudioUrl(json);
         if (!url) throw new Error("Voiceover returned no audio.");
         outputUrl = url;
@@ -191,14 +261,24 @@ export const generateMusic = createServerFn({ method: "POST" })
     await supabase.from("generations").insert({
       user_id: userId, type: "music", prompt: brief.summaryPrompt.slice(0, 500), title: trackTitle,
       input_url: data.videoUrl || data.imageUrl || null, output_url: outputUrl, status: "success",
-      metadata: { mode, model: usedModel, credits_charged: isAdmin ? 0 : cost, duration_seconds: durationSeconds, quality_tier: qualityTier, image_mood: imageMoodText || null },
+      metadata: {
+        mode, model: usedModel, credits_charged: isAdmin ? 0 : cost, duration_seconds: durationSeconds,
+        quality_tier: qualityTier, image_mood: imageMoodText || null,
+        voice: mode === "voiceover" ? selectedVoice : null,
+      },
     });
     await supabase.from("music_history").insert({
       user_id: userId, track_title: trackTitle, prompt: (data.prompt || brief.summaryPrompt).slice(0, 500),
       genre: data.genre || brief.genre || null, mood: data.mood || brief.emotion || null, duration: durationSeconds, audio_url: outputUrl,
     });
 
-    return { outputUrl, credits: newCredits, durationSeconds, model: usedModel, mode, creditsCharged: isAdmin ? 0 : cost, trackTitle, imageMood: imageMoodText || null, brief: { emotion: brief.emotion, genre: brief.genre, tempo: brief.tempo, mood: brief.mood, sources: brief.sources }, usedFallback: false };
+    return {
+      outputUrl, credits: newCredits, durationSeconds, model: usedModel, mode,
+      creditsCharged: isAdmin ? 0 : cost, trackTitle, imageMood: imageMoodText || null,
+      voice: mode === "voiceover" ? selectedVoice : null,
+      brief: { emotion: brief.emotion, genre: brief.genre, tempo: brief.tempo, mood: brief.mood, sources: brief.sources },
+      usedFallback: false,
+    };
   });
 
 export const estimateMusicCost = createServerFn({ method: "POST" })
@@ -222,4 +302,4 @@ export const estimateMusicCost = createServerFn({ method: "POST" })
 export const MUSIC_GENRES = GENRES;
 export const MUSIC_MOODS = MOODS;
 export const MUSIC_INSTRUMENTS = INSTRUMENTS;
-export { estimateMusicCustomerCredits };
+export { estimateMusicCustomerCredits, XAI_VOICES, normalizeVoice };
