@@ -5,10 +5,6 @@ import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-/**
- * Hide bottom nav on focused editor workspaces so it does not interrupt editing.
- * Studio hub (/studio) still shows the nav.
- */
 function hideBottomNav(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
   if (pathname.startsWith("/studio/video")) return true;
@@ -19,19 +15,29 @@ function hideBottomNav(pathname: string): boolean {
   return false;
 }
 
-/**
- * Center Auto mark — default Plus, every 10s flash "A" (Gemini-style, no asterisk)
- * for 1.5s with multi-color pulse (orange → red → violet).
- */
 function AutoCenterIcon({ active }: { active?: boolean }) {
   const [flash, setFlash] = useState(false);
+  const [nudge, setNudge] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
+    const dirs = [
+      { x: -6, y: 0 },
+      { x: 6, y: 0 },
+      { x: 0, y: -6 },
+      { x: 0, y: 6 },
+      { x: -4, y: -4 },
+      { x: 4, y: -4 },
+    ];
     const cycle = () => {
+      const d = dirs[Math.floor(Math.random() * dirs.length)];
+      setNudge(d);
       setFlash(true);
-      window.setTimeout(() => setFlash(false), 1500);
+      window.setTimeout(() => {
+        setNudge({ x: 0, y: 0 });
+        setFlash(false);
+      }, 1500);
     };
-    const first = window.setTimeout(cycle, 10_000);
+    const first = window.setTimeout(cycle, 8_000);
     const id = window.setInterval(cycle, 10_000);
     return () => {
       clearTimeout(first);
@@ -42,13 +48,12 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
   return (
     <span
       className={cn(
-        "relative flex h-12 w-12 -translate-y-3 items-center justify-center rounded-full border-4 border-background shadow-lg transition-all duration-300",
+        "relative flex h-12 w-12 -translate-y-3 items-center justify-center rounded-full border-4 border-background shadow-lg transition-transform duration-500 ease-out",
         flash
-          ? "bg-gradient-to-br from-orange-500 via-red-500 to-violet-600 text-white scale-105"
-          : active
-            ? "bg-primary text-primary-foreground"
-            : "bg-primary text-primary-foreground",
+          ? "bg-gradient-to-br from-orange-500 via-red-500 to-violet-600 text-white scale-110"
+          : "bg-primary text-primary-foreground",
       )}
+      style={{ transform: `translate(${nudge.x}px, calc(-0.75rem + ${nudge.y}px))` }}
       aria-hidden
     >
       {flash ? (
@@ -60,10 +65,6 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
   );
 }
 
-/**
- * Mobile bottom nav — 4 side items + elevated center Auto (YouTube-style).
- * Hides on focused studios and while scrolling down on the homepage.
- */
 export function BottomTabBar() {
   const { user } = useAuth();
   const { t } = useI18n();
