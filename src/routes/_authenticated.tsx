@@ -47,9 +47,10 @@ function AuthenticatedLayout() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen w-full min-w-0 overflow-x-clip bg-background">
       <AppSidebar />
-      <div className="md:pl-56">
+      {/* min-w-0: flex/grid children can shrink; avoids mobile "desktop canvas" overflow */}
+      <div className="w-full min-w-0 md:pl-56">
         <div className="md:hidden">
           <Header />
         </div>
