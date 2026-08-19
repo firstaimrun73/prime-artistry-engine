@@ -14,18 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { StudioEditorKind, StudioTier } from "@/lib/studio/studio-tier";
 import { studioCardClass } from "@/lib/studio/studio-tier";
-
-/** Backend-aligned stages (Phase 2 §36). COMPLETE only when parent sets complete. */
-export type StudioJobStage =
-  | "QUEUED"
-  | "ANALYSING"
-  | "PREPARING"
-  | "PROCESSING"
-  | "GENERATING"
-  | "VALIDATING"
-  | "STORING"
-  | "COMPLETE"
-  | "ERROR";
+import type { StudioJobStage } from "@/lib/generation-status";
 
 const STAGE_ORDER: StudioJobStage[] = [
   "QUEUED",
@@ -42,15 +31,15 @@ function stageLabel(stage: StudioJobStage, kind: StudioEditorKind): string {
     case "QUEUED":
       return "Queued";
     case "ANALYSING":
-      return "Analysing your input";
+      return kind === "music" ? "Analysing sound intent" : "Analysing your input";
     case "PREPARING":
-      return "Studying your prompt";
+      return kind === "music" ? "Inspecting composition brief" : "Studying your prompt";
     case "PROCESSING":
       return kind === "video"
         ? "Planning camera movement"
         : kind === "music"
-          ? "Shaping the arrangement"
-          : "Selecting direction";
+          ? "Shaping rhythm & arrangement"
+          : "Selecting visual direction";
     case "GENERATING":
       return kind === "video"
         ? "Generating frames"
@@ -58,7 +47,7 @@ function stageLabel(stage: StudioJobStage, kind: StudioEditorKind): string {
           ? "Generating audio"
           : "Generating image";
     case "VALIDATING":
-      return "Validating output";
+      return kind === "music" ? "Mastering pass" : "Validating output";
     case "STORING":
       return "Saving to library";
     case "COMPLETE":
@@ -96,9 +85,8 @@ function StageIcon({
 }
 
 /**
- * Standard: simple progress list.
- * Pro/Premium: overlay card with richer motion (CSS only).
- * Never shows COMPLETE until parent passes stage=COMPLETE (Phase 2 §37).
+ * Overlay driven by real job stage from generation-status / local parent state.
+ * COMPLETE only when parent receives backend success — never invented by this component.
  */
 export function StudioGenerationOverlay({
   kind,
@@ -107,6 +95,7 @@ export function StudioGenerationOverlay({
   error,
   onRetry,
   className,
+  coverEditor,
 }: {
   kind: StudioEditorKind;
   tier: StudioTier;
@@ -114,6 +103,8 @@ export function StudioGenerationOverlay({
   error?: string | null;
   onRetry?: () => void;
   className?: string;
+  /** Pro/Premium: cover editor content area */
+  coverEditor?: boolean;
 }) {
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
@@ -125,50 +116,71 @@ export function StudioGenerationOverlay({
   }, []);
 
   const isError = stage === "ERROR" || !!error;
-  const isComplete = stage === "COMPLETE";
-  const currentIdx = Math.max(0, STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]));
+  if (stage === "COMPLETE") return null;
 
-  if (isComplete) return null;
-
+  const currentIdx = Math.max(
+    0,
+    STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]),
+  );
   const premium = tier === "premium";
   const pro = tier === "pro" || premium;
+  const immersive = coverEditor && pro;
 
   return (
     <div
       className={cn(
         "relative overflow-hidden p-5",
         studioCardClass(tier),
-        premium && "border-amber-500/30",
+        premium && "border-amber-500/30 bg-zinc-950 text-zinc-50",
+        immersive && "min-h-[280px]",
         className,
       )}
       role="status"
       aria-live="polite"
     >
       {pro && !reduceMotion && (
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-0 opacity-40",
-            premium
-              ? "bg-[radial-gradient(ellipse_at_top,_rgba(212,175,55,0.15),_transparent_60%)]"
-              : "bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.12),_transparent_60%)]",
+        <>
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-0 opacity-50",
+              premium
+                ? "bg-[radial-gradient(ellipse_at_top,_rgba(212,175,55,0.18),_transparent_55%)]"
+                : "bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.14),_transparent_55%)]",
+            )}
+          />
+          {premium && (
+            <div className="studio-gold-particles pointer-events-none absolute inset-0" aria-hidden />
           )}
-        />
+          {pro && !premium && (
+            <div className="studio-pro-lines pointer-events-none absolute inset-0" aria-hidden />
+          )}
+        </>
       )}
 
       <div className="relative">
-        <p className="mb-4 flex items-center gap-2 text-sm font-semibold">
+        <p
+          className={cn(
+            "mb-4 flex items-center gap-2 text-sm font-semibold",
+            premium && "text-amber-100",
+          )}
+        >
           {!isError && <Loader2 className="h-4 w-4 animate-spin" />}
           {isError ? "Generation failed" : stageLabel(stage, kind)}
         </p>
 
         {isError ? (
           <div className="space-y-3">
-            <p className="text-sm text-destructive">{error || "Something went wrong."}</p>
+            <p className="text-sm text-red-400">{error || "Something went wrong. Credits were not charged if the job failed."}</p>
             {onRetry && (
               <button
                 type="button"
                 onClick={onRetry}
-                className="rounded-full border border-border px-4 py-2 text-xs font-semibold hover:bg-muted"
+                className={cn(
+                  "rounded-full border px-4 py-2 text-xs font-semibold",
+                  premium
+                    ? "border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+                    : "border-border hover:bg-muted",
+                )}
               >
                 Retry
               </button>
@@ -184,17 +196,16 @@ export function StudioGenerationOverlay({
                   key={s}
                   className={cn(
                     "flex items-center gap-3 text-sm",
-                    done && "text-primary",
-                    active && "font-semibold text-foreground",
-                    !done && !active && "text-muted-foreground",
+                    done && (premium ? "text-amber-400" : "text-primary"),
+                    active && (premium ? "font-semibold text-amber-100" : "font-semibold text-foreground"),
+                    !done && !active && (premium ? "text-zinc-500" : "text-muted-foreground"),
                   )}
                 >
                   <span
                     className={cn(
                       "flex h-8 w-8 items-center justify-center rounded-full border",
-                      done && "border-primary bg-primary/15",
-                      active && "border-primary bg-primary/10",
-                      premium && active && "border-amber-500/50 bg-amber-500/10",
+                      done && (premium ? "border-amber-500/50 bg-amber-500/15" : "border-primary bg-primary/15"),
+                      active && (premium ? "border-amber-400 bg-amber-500/20" : "border-primary bg-primary/10"),
                     )}
                   >
                     {done ? (
@@ -223,30 +234,4 @@ export function StudioGenerationOverlay({
       </div>
     </div>
   );
-}
-
-/** Advance through stages on a timer while waiting for real backend completion. */
-export function useSimulatedStages(active: boolean, onError?: boolean): StudioJobStage {
-  const [stage, setStage] = useState<StudioJobStage>("QUEUED");
-  useEffect(() => {
-    if (!active) {
-      setStage("QUEUED");
-      return;
-    }
-    if (onError) {
-      setStage("ERROR");
-      return;
-    }
-    setStage("QUEUED");
-    const timers = [
-      setTimeout(() => setStage("ANALYSING"), 800),
-      setTimeout(() => setStage("PREPARING"), 2800),
-      setTimeout(() => setStage("PROCESSING"), 6000),
-      setTimeout(() => setStage("GENERATING"), 10000),
-      setTimeout(() => setStage("VALIDATING"), 22000),
-      setTimeout(() => setStage("STORING"), 32000),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, [active, onError]);
-  return stage;
 }
