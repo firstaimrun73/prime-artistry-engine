@@ -10,7 +10,7 @@ export function VideoGeneratingOverlay({
 }) {
   return (
     <div className="rounded-2xl border border-red-500/20 bg-gradient-to-br from-red-500/5 to-orange-500/5 p-5">
-      <p className="mb-4 text-sm font-semibold">Generating video\u2026</p>
+      <p className="mb-4 text-sm font-semibold">Generating video…</p>
       <ol className="space-y-3">
         {VIDEO_GEN_STAGES.map((s, i) => {
           const done = i < stageIndex;
@@ -32,7 +32,7 @@ export function VideoGeneratingOverlay({
                   active && "border-red-500 bg-red-500/10 animate-pulse",
                 )}
               >
-                {done ? "\u2713" : i + 1}
+                {done ? "✓" : i + 1}
               </span>
               {s.label}
             </li>
@@ -40,7 +40,7 @@ export function VideoGeneratingOverlay({
         })}
       </ol>
       <p className="mt-4 text-center text-xs text-muted-foreground">
-        Expected ~{etaSeconds}s \u2014 keep this tab open
+        Expected ~{etaSeconds}s — keep this tab open
       </p>
     </div>
   );

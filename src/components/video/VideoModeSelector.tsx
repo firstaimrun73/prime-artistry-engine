@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 import type { VideoMode } from "./video-studio-types";
 
 const MODES: { id: VideoMode; icon: typeof Sparkles; label: string; hint: string }[] = [
-  { id: "text", icon: Sparkles, label: "Text \u2192 Video", hint: "Describe a scene" },
-  { id: "image", icon: Camera, label: "Image \u2192 Video", hint: "Animate a photo" },
-  { id: "video", icon: Film, label: "Video \u2192 Video", hint: "Enhance a clip" },
+  { id: "text", icon: Sparkles, label: "Text → Video", hint: "Describe a scene" },
+  { id: "image", icon: Camera, label: "Image → Video", hint: "Animate a photo" },
+  { id: "video", icon: Film, label: "Video → Video", hint: "Enhance a clip" },
 ];
 
 export function VideoModeSelector({

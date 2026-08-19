@@ -15,29 +15,16 @@ function hideBottomNav(pathname: string): boolean {
   return false;
 }
 
+/** Center Auto mark — fixed position (-translate-y-3), flash A every 10s. */
 function AutoCenterIcon({ active }: { active?: boolean }) {
   const [flash, setFlash] = useState(false);
-  const [nudge, setNudge] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    const dirs = [
-      { x: -6, y: 0 },
-      { x: 6, y: 0 },
-      { x: 0, y: -6 },
-      { x: 0, y: 6 },
-      { x: -4, y: -4 },
-      { x: 4, y: -4 },
-    ];
     const cycle = () => {
-      const d = dirs[Math.floor(Math.random() * dirs.length)];
-      setNudge(d);
       setFlash(true);
-      window.setTimeout(() => {
-        setNudge({ x: 0, y: 0 });
-        setFlash(false);
-      }, 1500);
+      window.setTimeout(() => setFlash(false), 1500);
     };
-    const first = window.setTimeout(cycle, 8_000);
+    const first = window.setTimeout(cycle, 10_000);
     const id = window.setInterval(cycle, 10_000);
     return () => {
       clearTimeout(first);
@@ -48,12 +35,13 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
   return (
     <span
       className={cn(
-        "relative flex h-12 w-12 -translate-y-3 items-center justify-center rounded-full border-4 border-background shadow-lg transition-transform duration-500 ease-out",
+        "relative flex h-12 w-12 -translate-y-3 items-center justify-center rounded-full border-4 border-background shadow-lg transition-all duration-300",
         flash
-          ? "bg-gradient-to-br from-orange-500 via-red-500 to-violet-600 text-white scale-110"
-          : "bg-primary text-primary-foreground",
+          ? "bg-gradient-to-br from-orange-500 via-red-500 to-violet-600 text-white scale-105"
+          : active
+            ? "bg-primary text-primary-foreground"
+            : "bg-primary text-primary-foreground",
       )}
-      style={{ transform: `translate(${nudge.x}px, calc(-0.75rem + ${nudge.y}px))` }}
       aria-hidden
     >
       {flash ? (

@@ -25,7 +25,7 @@ export function VideoPromptBar({
           rows={4}
           maxLength={2000}
           onChange={(e) => onChange(e.target.value.slice(0, 2000))}
-          placeholder={placeholder ?? "Describe what you want to create\u2026"}
+          placeholder={placeholder ?? "Describe what you want to create…"}
           className="w-full resize-y rounded-2xl bg-transparent px-3 py-3 pr-20 text-sm outline-none disabled:opacity-60"
         />
         <div className="absolute bottom-2 right-2 flex items-center gap-1">
