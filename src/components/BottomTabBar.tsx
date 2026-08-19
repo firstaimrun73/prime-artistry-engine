@@ -15,40 +15,130 @@ function hideBottomNav(pathname: string): boolean {
   return false;
 }
 
-/** Center Auto mark — fixed position (-translate-y-3), flash A every 10s. */
+/**
+ * Center Auto mark — motion: rest → travel → AI spark → settle (~1.5s) → rest.
+ * Navigation is parent Link only; animation never blocks clicks.
+ * Respects prefers-reduced-motion.
+ */
 function AutoCenterIcon({ active }: { active?: boolean }) {
-  const [flash, setFlash] = useState(false);
+  const [phase, setPhase] = useState<"rest" | "travel" | "spark" | "hold">("rest");
+  const [reduced, setReduced] = useState(false);
 
   useEffect(() => {
-    const cycle = () => {
-      setFlash(true);
-      window.setTimeout(() => setFlash(false), 1500);
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (reduced) return;
+
+    let cancelled = false;
+    const timers: number[] = [];
+
+    const runCycle = () => {
+      if (cancelled) return;
+      setPhase("travel");
+      timers.push(
+        window.setTimeout(() => {
+          if (cancelled) return;
+          setPhase("spark");
+          timers.push(
+            window.setTimeout(() => {
+              if (cancelled) return;
+              setPhase("hold");
+              timers.push(
+                window.setTimeout(() => {
+                  if (cancelled) return;
+                  setPhase("rest");
+                }, 1500),
+              );
+            }, 220),
+          );
+        }, 480),
+      );
     };
-    const first = window.setTimeout(cycle, 10_000);
-    const id = window.setInterval(cycle, 10_000);
+
+    const first = window.setTimeout(runCycle, 8000);
+    const id = window.setInterval(runCycle, 12000);
     return () => {
+      cancelled = true;
       clearTimeout(first);
       clearInterval(id);
+      timers.forEach(clearTimeout);
     };
-  }, []);
+  }, [reduced]);
+
+  const showA = phase === "hold" || phase === "spark" || (reduced && active);
+  const showSpark = phase === "spark";
 
   return (
     <span
       className={cn(
-        "relative flex h-12 w-12 -translate-y-3 items-center justify-center rounded-full border-4 border-background shadow-lg transition-all duration-300",
-        flash
-          ? "bg-gradient-to-br from-orange-500 via-red-500 to-violet-600 text-white scale-105"
-          : active
-            ? "bg-primary text-primary-foreground"
-            : "bg-primary text-primary-foreground",
+        "relative flex h-12 w-12 -translate-y-3 items-center justify-center rounded-full border-4 border-background shadow-lg",
+        "transition-[transform,box-shadow] duration-300 ease-out",
+        "active:scale-90",
+        phase === "travel" && "scale-110 shadow-[0_0_20px_hsl(24_95%_53%/0.55)]",
+        phase === "spark" && "scale-105 shadow-[0_0_28px_hsl(24_95%_53%/0.7)]",
+        phase === "hold" && "scale-105 shadow-[0_0_18px_hsl(24_95%_53%/0.45)]",
+        active || phase !== "rest"
+          ? "bg-gradient-to-br from-orange-500 via-orange-600 to-violet-600 text-white"
+          : "bg-primary text-primary-foreground",
       )}
       aria-hidden
     >
-      {flash ? (
-        <span className="text-base font-black tracking-tight animate-pulse">A</span>
-      ) : (
-        <Plus className="h-6 w-6 stroke-[2.5]" />
+      <span
+        className={cn(
+          "pointer-events-none absolute inset-0 rounded-full bg-orange-400/20",
+          phase === "rest" && !reduced && "animate-[autoBreath_3.2s_ease-in-out_infinite]",
+        )}
+      />
+
+      <Plus
+        className={cn(
+          "h-6 w-6 stroke-[2.5] transition-all duration-300 ease-out",
+          showA || showSpark ? "scale-0 opacity-0 rotate-45" : "scale-100 opacity-100 rotate-0",
+        )}
+      />
+
+      <span
+        className={cn(
+          "absolute text-base font-black tracking-tight transition-all duration-500",
+          phase === "travel" &&
+            "translate-x-[-6px] translate-y-[-8px] rotate-[-12deg] scale-90 opacity-90",
+          phase === "spark" && "translate-x-0 translate-y-0 rotate-0 scale-110 opacity-100",
+          phase === "hold" &&
+            "translate-x-0 translate-y-0 rotate-0 scale-100 opacity-100 animate-[autoSettle_0.45s_cubic-bezier(0.34,1.56,0.64,1)]",
+          phase === "rest" && "scale-0 opacity-0",
+          reduced && active && "scale-100 opacity-100",
+        )}
+      >
+        A
+      </span>
+
+      {showSpark && (
+        <span className="pointer-events-none absolute text-[10px] text-white/90 animate-[autoSpark_0.22s_ease-out]">
+          ✦
+        </span>
       )}
+
+      <style>{`
+        @keyframes autoBreath {
+          0%, 100% { opacity: 0.15; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.08); }
+        }
+        @keyframes autoSettle {
+          0% { transform: scale(1.18); }
+          100% { transform: scale(1); }
+        }
+        @keyframes autoSpark {
+          0% { opacity: 0; transform: scale(0.5) translateY(4px); }
+          50% { opacity: 1; transform: scale(1.2) translateY(-2px); }
+          100% { opacity: 0; transform: scale(0.8) translateY(-8px); }
+        }
+      `}</style>
     </span>
   );
 }
@@ -80,11 +170,12 @@ export function BottomTabBar() {
 
   const autoActive = pathname.startsWith("/studio/image/auto-edit");
   const studioActive =
-    pathname === "/studio" ||
-    pathname.startsWith("/studio/image") ||
-    pathname.startsWith("/studio/video") ||
-    pathname.startsWith("/studio/music") ||
-    pathname.startsWith("/music");
+    (pathname === "/studio" ||
+      pathname.startsWith("/studio/image") ||
+      pathname.startsWith("/studio/video") ||
+      pathname.startsWith("/studio/music") ||
+      pathname.startsWith("/music")) &&
+    !autoActive;
 
   const left = [
     { to: "/", label: t("nav.home"), icon: Home, exact: true },
