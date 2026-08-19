@@ -20,10 +20,10 @@ export function VideoOutputView({
 
   const modeLabel =
     result.mode === "text"
-      ? "Text \u2192 Video"
+      ? "Text → Video"
       : result.mode === "image"
-        ? "Image \u2192 Video"
-        : "Video \u2192 Video";
+        ? "Image → Video"
+        : "Video → Video";
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-background">
@@ -109,7 +109,7 @@ export function VideoOutputView({
                 </div>
               )}
               <p className="text-muted-foreground">Prompt</p>
-              <p className="whitespace-pre-wrap text-foreground">{result.prompt || "\u2014"}</p>
+              <p className="whitespace-pre-wrap text-foreground">{result.prompt || "—"}</p>
             </div>
           )}
         </div>
