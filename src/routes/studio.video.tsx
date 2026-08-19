@@ -10,6 +10,12 @@ import {
   Upload,
   Download,
   Loader2,
+  Crown,
+  Scissors,
+  Wand2,
+  Search,
+  RefreshCw,
+  Film,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
@@ -25,15 +31,19 @@ import {
   type VideoDuration,
   isDurationAllowed,
   maxVideoDurationForPlan,
-  modelTierForDuration,
-  MODEL_TIER_LABEL,
-  videoCreditCost,
+  canUseAdvancedTier,
 } from "@/lib/video-options";
 import {
-  VIDEO_RESOLUTION_OPTIONS,
-  type VideoResolution,
-  videoResolutionMultiplier,
-} from "@/lib/quality-options";
+  computeVideoCreditCost,
+  formatCreditUsd,
+  videoEfficiencyScore,
+  estimateVideoEtaSeconds,
+  VIDEO_PROGRESS_STAGES,
+  VIDEO_QUALITY_OPTIONS,
+  TIER_UI,
+  type VideoQualityId,
+  type VideoModelTierUi,
+} from "@/lib/video-pricing";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/studio/video")({
@@ -42,14 +52,15 @@ export const Route = createFileRoute("/studio/video")({
       { title: "Video Studio — Motio2edit" },
       {
         name: "description",
-        content: "AI text-to-video and image-to-video with duration, aspect ratio and resolution controls.",
+        content:
+          "AI text-to-video, image-to-video and video enhance with live credit pricing.",
       },
     ],
   }),
   component: VideoStudio,
 });
 
-type VideoMode = "text" | "image";
+type VideoMode = "text" | "image" | "video";
 
 function VideoStudio() {
   const { user, profile, refreshProfile } = useAuth();
@@ -58,40 +69,81 @@ function VideoStudio() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const admin = isAdminEmail(profile?.email);
-  const allowed = canAccessVideo({ plan: profile?.plan, email: profile?.email, isAdmin: admin });
+  const allowed = canAccessVideo({
+    plan: profile?.plan,
+    email: profile?.email,
+    isAdmin: admin,
+  });
+  const advancedOk = canUseAdvancedTier(profile?.plan, admin);
 
   const [mode, setMode] = useState<VideoMode>("text");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState<VideoDuration>(5);
   const [aspect, setAspect] = useState<VideoAspectRatio>("16:9");
-  const [resolution, setResolution] = useState<VideoResolution>("1080p");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [quality, setQuality] = useState<VideoQualityId>("1080p");
+  const [tier, setTier] = useState<VideoModelTierUi>("standard");
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stageIdx, setStageIdx] = useState(0);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const maxDur = maxVideoDurationForPlan(profile?.plan);
-  const tier = modelTierForDuration(duration);
-  const baseCost = videoCreditCost(duration);
-  const cost = Math.round(baseCost * videoResolutionMultiplier(resolution));
+  const price = useMemo(
+    () =>
+      computeVideoCreditCost({
+        duration,
+        quality,
+        aspect,
+        tier,
+        mode: mode === "video" && mediaFile ? "enhance" : "generate",
+      }),
+    [duration, quality, aspect, tier, mode, mediaFile],
+  );
+  const cost = price.credits;
+  const efficiency = videoEfficiencyScore({ duration, quality, tier });
+  const eta = estimateVideoEtaSeconds({ duration, quality, tier });
 
   useEffect(() => {
-    if (user && profile && !allowed) {
-      navigate({ to: "/pricing" });
-    }
+    if (user && profile && !allowed) navigate({ to: "/pricing" });
   }, [user, profile, allowed, navigate]);
 
   useEffect(() => {
-    if (duration > maxDur && !admin) {
-      setDuration(maxDur);
-    }
+    if (duration > maxDur && !admin) setDuration(maxDur);
   }, [maxDur, duration, admin]);
 
+  useEffect(() => {
+    if (!advancedOk && tier === "advanced") setTier("standard");
+  }, [advancedOk, tier]);
+
+  useEffect(() => {
+    if (!busy) {
+      setStageIdx(0);
+      return;
+    }
+    setStageIdx(0);
+    const t1 = setTimeout(() => setStageIdx(1), 2500);
+    const t2 = setTimeout(() => setStageIdx(2), 12000);
+    const t3 = setTimeout(() => setStageIdx(3), 28000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [busy]);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.playbackRate = playbackRate;
+  }, [playbackRate, outputUrl]);
+
   const canGenerate = useMemo(() => {
+    if (mode === "video") return !!mediaFile;
     if (!prompt.trim()) return false;
-    if (mode === "image" && !imageFile) return false;
+    if (mode === "image" && !mediaFile) return false;
     return true;
-  }, [prompt, mode, imageFile]);
+  }, [prompt, mode, mediaFile]);
 
   if (user && profile && !allowed) {
     return (
@@ -101,7 +153,7 @@ function VideoStudio() {
           <Lock className="h-8 w-8 text-primary" />
           <h1 className="text-xl font-bold">Video Studio is locked</h1>
           <p className="text-sm text-muted-foreground">
-            Video generation requires Lite or higher.
+            Video generation requires Lite or higher. Free plan includes Image Editor only.
           </p>
           <Button asChild>
             <Link to="/pricing">View plans</Link>
@@ -127,57 +179,81 @@ function VideoStudio() {
     );
   }
 
-  const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const accept =
+    mode === "video" ? "video/*" : mode === "image" ? "image/*" : undefined;
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
-    if (!f?.type.startsWith("image/")) return toast.error("Choose an image file.");
-    if (f.size > 25 * 1024 * 1024) return toast.error("Max 25 MB.");
-    setImageFile(f);
-    setImagePreview(URL.createObjectURL(f));
+    if (!f) return;
+    if (mode === "image" && !f.type.startsWith("image/"))
+      return toast.error("Choose an image file.");
+    if (mode === "video" && !f.type.startsWith("video/"))
+      return toast.error("Choose a video file.");
+    if (f.size > 200 * 1024 * 1024) return toast.error("Max 200 MB.");
+    setMediaFile(f);
+    setMediaPreview(URL.createObjectURL(f));
     setOutputUrl(null);
   };
 
-  const uploadImage = async (file: File) => {
+  const uploadMedia = async (file: File) => {
     const uid = profile?.id ?? user.id;
     const path = `${uid}/video-src-${Date.now()}-${file.name}`;
     const { error } = await supabase.storage.from("uploads").upload(path, file, {
-      contentType: file.type || "image/jpeg",
+      contentType: file.type || "application/octet-stream",
       upsert: true,
     });
     if (error) throw new Error(error.message);
-    const { data, error: sErr } = await supabase.storage.from("uploads").createSignedUrl(path, 3600);
-    if (sErr || !data?.signedUrl) throw new Error("Could not prepare image URL.");
+    const { data, error: sErr } = await supabase.storage
+      .from("uploads")
+      .createSignedUrl(path, 3600);
+    if (sErr || !data?.signedUrl) throw new Error("Could not prepare media URL.");
     return data.signedUrl;
+  };
+
+  /** Map UI quality to backend resolution enum used by generateMedia. */
+  const toBackendResolution = (): "720p" | "1080p" | "4k" => {
+    if (quality === "4k" || quality === "8k" || quality === "2k") return "4k";
+    if (quality === "720p" || quality === "480p") return "720p";
+    return "1080p";
   };
 
   const onGenerate = async () => {
     if (!canGenerate || busy) return;
     if (!admin && (profile?.credits ?? 0) < cost) {
-      toast.error(`Not enough credits (${cost} required).`);
+      toast.error(`Not enough credits (${cost} required · ~${formatCreditUsd(cost)}).`);
       return;
     }
-    if (!isDurationAllowed(profile?.plan, duration, admin)) {
+    if (mode !== "video" && !isDurationAllowed(profile?.plan, duration, admin)) {
       toast.error(`Your plan allows up to ${maxDur}s video.`);
+      return;
+    }
+    if (tier === "advanced" && !advancedOk) {
+      toast.error("Advanced Motion requires Pro or higher.");
       return;
     }
 
     setBusy(true);
     setOutputUrl(null);
+    toast(`Expected ~${eta}s — keep this tab open.`);
     try {
       let imageUrl: string | undefined;
-      if (mode === "image" && imageFile) {
-        imageUrl = await uploadImage(imageFile);
+      let sourceKind: "image" | "video" | undefined;
+
+      if ((mode === "image" || mode === "video") && mediaFile) {
+        imageUrl = await uploadMedia(mediaFile);
+        sourceKind = mode === "video" ? "video" : "image";
       }
 
       const res = await generate({
         data: {
-          prompt: prompt.trim(),
+          prompt: prompt.trim() || (mode === "video" ? "Enhance this video, improve clarity and stability." : ""),
           type: "video",
           imageUrl,
-          sourceKind: mode === "image" ? "image" : undefined,
+          sourceKind,
           videoDurationSeconds: duration,
           videoAspectRatio: aspect,
-          videoResolution: resolution,
+          videoResolution: toBackendResolution(),
         },
       });
 
@@ -191,242 +267,434 @@ function VideoStudio() {
     }
   };
 
+  const stageIcons = [Search, Camera, Scissors, Wand2];
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-3xl px-4 py-6 pb-28 md:pb-12">
-        <div className="mb-6">
-          <Link to="/studio" className="text-xs font-medium text-muted-foreground hover:text-foreground">
-            All studios
-          </Link>
-          <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
-            Video <span className="text-primary">Studio</span>
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Text-to-video and image-to-video using Motio2edit’s existing generation pipeline.
-          </p>
+      <main className="mx-auto max-w-6xl px-4 py-6 pb-32 md:pb-12">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <Link
+              to="/studio"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              ← All studios
+            </Link>
+            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
+              Video <span className="text-primary">Studio</span>
+            </h1>
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+              Text → Video · Image → Video · Video enhance. Live credit cost before you generate.
+            </p>
+          </div>
+          <div className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
+            {admin ? "∞ credits" : `${(profile?.credits ?? 0).toLocaleString()} credits`}
+          </div>
         </div>
 
-        <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mode</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setMode("text")}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border p-3 text-left text-sm font-semibold transition-colors",
-                mode === "text"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-card hover:border-primary/40",
-              )}
-            >
-              <Sparkles className="h-4 w-4" /> Text to video
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("image")}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border p-3 text-left text-sm font-semibold transition-colors",
-                mode === "image"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-card hover:border-primary/40",
-              )}
-            >
-              <Camera className="h-4 w-4" /> Image to video
-            </button>
-          </div>
-        </section>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+          {/* ── Generator column ── */}
+          <div className="space-y-5">
+            {/* Mode switcher */}
+            <section className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Mode
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { id: "text" as const, icon: Sparkles, label: "Text → Video" },
+                    { id: "image" as const, icon: Camera, label: "Image → Video" },
+                    { id: "video" as const, icon: Film, label: "Video → Video" },
+                  ] as const
+                ).map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setMode(m.id);
+                      setMediaFile(null);
+                      setMediaPreview(null);
+                      setOutputUrl(null);
+                    }}
+                    className={cn(
+                      "flex flex-col items-center gap-1 rounded-xl border p-3 text-center text-xs font-semibold transition-colors sm:text-sm",
+                      mode === m.id
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card hover:border-primary/40",
+                    )}
+                  >
+                    <m.icon className="h-4 w-4" />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </section>
 
-        {mode === "image" && (
-          <section className="mt-5 space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Source image
-            </p>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
-            {imagePreview ? (
-              <div className="space-y-2">
-                <div className="overflow-hidden rounded-xl border border-border">
-                  <img src={imagePreview} alt="" className="mx-auto max-h-48 object-contain" />
+            {/* Input area */}
+            {(mode === "image" || mode === "video") && (
+              <section className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {mode === "image" ? "Source image" : "Source video"}
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept={accept}
+                  className="hidden"
+                  onChange={onPickFile}
+                />
+                {mediaPreview ? (
+                  <div className="space-y-2">
+                    <div className="overflow-hidden rounded-xl border border-border bg-black/5">
+                      {mode === "video" ? (
+                        <video
+                          src={mediaPreview}
+                          controls
+                          className="mx-auto max-h-48 w-full object-contain"
+                        />
+                      ) : (
+                        <img
+                          src={mediaPreview}
+                          alt=""
+                          className="mx-auto max-h-48 object-contain"
+                        />
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fileRef.current?.click()}
+                    >
+                      Replace
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card py-10 text-sm text-muted-foreground hover:border-primary"
+                  >
+                    <Upload className="h-6 w-6" />
+                    {mode === "image" ? "Upload image to animate" : "Upload video to enhance"}
+                  </button>
+                )}
+              </section>
+            )}
+
+            {/* Prompt — sticky across modes */}
+            <section className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Prompt
+              </p>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
+                rows={4}
+                disabled={busy}
+                placeholder={
+                  mode === "image"
+                    ? "Motion guidance: slow push-in, orbit, product turn…"
+                    : mode === "video"
+                      ? "Optional: what to improve (clarity, stability…)"
+                      : "Describe the scene and motion…"
+                }
+                className="w-full resize-y rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
+              />
+              <p className="text-right text-[11px] text-muted-foreground">{prompt.length}/2000</p>
+            </section>
+
+            {/* Settings */}
+            {mode !== "video" && (
+              <>
+                <section className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Duration
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {VIDEO_DURATIONS.map((d) => {
+                      const ok = isDurationAllowed(profile?.plan, d, admin);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          disabled={!ok || busy}
+                          onClick={() => setDuration(d)}
+                          className={cn(
+                            "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                            duration === d
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-card text-muted-foreground hover:border-primary/40",
+                            (!ok || busy) && "cursor-not-allowed opacity-40",
+                          )}
+                        >
+                          {d}s
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Plan max: {maxDur}s</p>
+                </section>
+
+                <section className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Aspect ratio
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {VIDEO_ASPECT_RATIOS.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setAspect(a.id)}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                          aspect === a.id
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card text-muted-foreground hover:border-primary/40",
+                        )}
+                      >
+                        {a.icon} {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Quality
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {VIDEO_QUALITY_OPTIONS.filter((q) => q.id !== "8k" || advancedOk).map(
+                      (q) => (
+                        <button
+                          key={q.id}
+                          type="button"
+                          disabled={busy}
+                          title={q.hint}
+                          onClick={() => setQuality(q.id)}
+                          className={cn(
+                            "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                            quality === q.id
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-card text-muted-foreground hover:border-primary/40",
+                          )}
+                        >
+                          {q.label}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                  {/* Efficiency bar */}
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
+                      <span>Fast &amp; cheap</span>
+                      <span>Slow &amp; max quality</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-orange-500 transition-all duration-300"
+                        style={{ width: `${Math.round(efficiency * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </section>
+              </>
+            )}
+
+            {/* Advanced tier card — capability copy only */}
+            <section
+              className={cn(
+                "rounded-2xl border p-4 transition-colors",
+                tier === "advanced"
+                  ? "border-amber-500/50 bg-amber-500/5"
+                  : "border-border bg-card",
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <Crown className="mt-0.5 h-4 w-4 text-amber-500" />
+                  <div>
+                    <p className="text-sm font-bold">{TIER_UI.advanced.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{TIER_UI.advanced.blurb}</p>
+                  </div>
                 </div>
-                <Button type="button" size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
-                  Replace image
+                <button
+                  type="button"
+                  disabled={busy || (!advancedOk && tier !== "advanced")}
+                  onClick={() => {
+                    if (!advancedOk) {
+                      toast.error("Upgrade to Pro+ for Advanced Motion");
+                      return;
+                    }
+                    setTier((t) => (t === "advanced" ? "standard" : "advanced"));
+                  }}
+                  className={cn(
+                    "shrink-0 rounded-full px-3 py-1 text-xs font-semibold",
+                    tier === "advanced"
+                      ? "bg-amber-500 text-white"
+                      : advancedOk
+                        ? "bg-secondary text-foreground hover:bg-secondary/80"
+                        : "bg-secondary/50 text-muted-foreground",
+                  )}
+                >
+                  {tier === "advanced" ? "On" : advancedOk ? "Enable" : "Pro+"}
+                </button>
+              </div>
+              {!advancedOk && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Available on Pro, Studio and Master Studio.{" "}
+                  <Link to="/pricing" className="font-medium text-primary hover:underline">
+                    View plans
+                  </Link>
+                </p>
+              )}
+            </section>
+
+            {/* Live cost + Generate */}
+            <div className="sticky bottom-0 z-10 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                  <p className="font-semibold">
+                    This generation:{" "}
+                    <span className="text-primary">{cost} credits</span>{" "}
+                    <span className="text-muted-foreground">(~{formatCreditUsd(cost)})</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {TIER_UI[tier].label} · ETA ~{eta}s
+                    {!admin && <> · Balance {(profile?.credits ?? 0).toLocaleString()}</>}
+                  </p>
+                </div>
+                <Button
+                  onClick={onGenerate}
+                  disabled={!canGenerate || busy}
+                  className="h-12 w-full sm:w-auto sm:min-w-[160px]"
+                >
+                  {busy ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Video className="mr-2 h-4 w-4" /> Generate
+                    </>
+                  )}
                 </Button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card py-10 text-sm text-muted-foreground hover:border-primary"
-              >
-                <Upload className="h-6 w-6" />
-                Upload image to animate
-              </button>
-            )}
-          </section>
-        )}
-
-        <section className="mt-5 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration</p>
-          <div className="flex flex-wrap gap-2">
-            {VIDEO_DURATIONS.map((d) => {
-              const ok = isDurationAllowed(profile?.plan, d, admin);
-              return (
-                <button
-                  key={d}
-                  type="button"
-                  disabled={!ok}
-                  onClick={() => setDuration(d)}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                    duration === d
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/40",
-                    !ok && "cursor-not-allowed opacity-40",
-                  )}
-                  title={!ok ? `Requires a higher plan (max ${maxDur}s on yours)` : undefined}
-                >
-                  {d}s
-                </button>
-              );
-            })}
+            </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Model: {MODEL_TIER_LABEL[tier]} · Your plan max: {maxDur}s
-          </p>
-        </section>
 
-        <section className="mt-5 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Aspect ratio
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {VIDEO_ASPECT_RATIOS.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => setAspect(a.id)}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                  aspect === a.id
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-card text-muted-foreground hover:border-primary/40",
-                )}
-              >
-                {a.icon} {a.label}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-5 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Resolution
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {VIDEO_RESOLUTION_OPTIONS.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setResolution(r.id)}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                  resolution === r.id
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-card text-muted-foreground hover:border-primary/40",
-                )}
-                title={r.hint}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-5 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
-            rows={4}
-            placeholder={
-              mode === "image"
-                ? "Describe motion: slow push-in, gentle camera orbit, product turn…"
-                : "Describe the scene and motion you want in the video…"
-            }
-            className="w-full resize-y rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
-          />
-        </section>
-
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-muted-foreground">
-            Cost: <span className="font-semibold text-foreground">{cost} credits</span>
-            {!admin && (
-              <> · Balance: {(profile?.credits ?? 0).toLocaleString()}</>
-            )}
-          </p>
-          <Button
-            onClick={onGenerate}
-            disabled={!canGenerate || busy}
-            className="w-full sm:w-auto"
-          >
-            {busy ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…
-              </>
-            ) : (
-              <>
-                <Video className="mr-2 h-4 w-4" /> Generate video
-              </>
-            )}
-          </Button>
-        </div>
-
-        {(busy || outputUrl) && (
-          <section className="mt-6 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
-            {busy && !outputUrl && (
-              <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card py-16 text-sm text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                Generating video — this can take a few minutes…
+          {/* ── Output column ── */}
+          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+            {busy && (
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <p className="mb-4 text-sm font-semibold">Generating…</p>
+                <ol className="space-y-3">
+                  {VIDEO_PROGRESS_STAGES.map((s, i) => {
+                    const Icon = stageIcons[i];
+                    const done = i < stageIdx;
+                    const active = i === stageIdx;
+                    return (
+                      <li
+                        key={s.id}
+                        className={cn(
+                          "flex items-center gap-3 text-sm",
+                          done && "text-primary",
+                          active && "font-semibold text-foreground",
+                          !done && !active && "text-muted-foreground",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-8 w-8 items-center justify-center rounded-full border",
+                            done && "border-primary bg-primary/15",
+                            active && "border-primary bg-primary/10",
+                          )}
+                        >
+                          {done ? (
+                            <span className="text-xs">✓</span>
+                          ) : (
+                            <Icon className={cn("h-3.5 w-3.5", active && "animate-pulse")} />
+                          )}
+                        </span>
+                        <div>
+                          <p>{s.label}</p>
+                          <p className="text-[11px] font-normal text-muted-foreground">{s.hint}</p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+                <p className="mt-4 text-center text-xs text-muted-foreground">
+                  Expected ~{eta}s — please don’t close this tab
+                </p>
               </div>
             )}
-            {outputUrl && (
-              <div className="space-y-3">
-                <div className="overflow-hidden rounded-xl border border-border bg-black">
+
+            {outputUrl && !busy && (
+              <div className="space-y-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+                <div className="overflow-hidden rounded-xl bg-black">
                   <video
+                    ref={videoRef}
                     src={outputUrl}
                     controls
                     playsInline
-                    className="mx-auto max-h-[60vh] w-full"
+                    className="mx-auto max-h-[55vh] w-full"
                   />
                 </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <span>
+                    Made with {TIER_UI[tier].label} Motion AI · {aspect} · {quality}
+                  </span>
+                  <label className="ml-auto flex items-center gap-1">
+                    Speed
+                    <select
+                      value={playbackRate}
+                      onChange={(e) => setPlaybackRate(Number(e.target.value))}
+                      className="rounded border border-border bg-background px-1 py-0.5 text-xs"
+                    >
+                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
+                        <option key={r} value={r}>
+                          {r}x
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button asChild size="sm">
+                  <Button size="sm" onClick={() => onGenerate()} disabled={busy}>
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Regenerate
+                  </Button>
+                  <Button asChild size="sm" variant="secondary">
                     <a href={outputUrl} download={`motio2edit-video-${Date.now()}.mp4`}>
                       <Download className="mr-1.5 h-3.5 w-3.5" /> Download
                     </a>
                   </Button>
-                  <Button asChild size="sm" variant="secondary">
-                    <Link
-                      to="/music"
-                      search={{ mode: "video-music", videoUrl: outputUrl }}
-                    >
-                      Add Sound
-                    </Link>
-                  </Button>
                   <Button asChild size="sm" variant="outline">
-                    <Link to="/history">Open History</Link>
+                    <Link to="/history">History</Link>
                   </Button>
                 </div>
               </div>
             )}
-          </section>
-        )}
 
-        <p className="mt-8 text-[11px] text-muted-foreground">
-          Supported by current backend: text-to-video, image-to-video, duration 5–30s (plan-gated),
-          aspect ratios 16:9 / 9:16 / 1:1 / 4:3, resolution tiers 720p / 1080p / 4K upscale.
-          Video-from-video enhance remains available in the main editor when a video file is uploaded.
+            {!busy && !outputUrl && (
+              <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center">
+                <Video className="mb-3 h-10 w-10 text-muted-foreground/50" />
+                <p className="text-sm font-medium text-muted-foreground">Output preview</p>
+                <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                  Your video appears here with playback controls after generation.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <p className="mt-10 text-[11px] text-muted-foreground">
+          Pricing: {cost} credits at $0.004/credit retail. Standard base is 125 credits for 5s.
+          Advanced uses a higher credit rate for enhanced motion quality — model vendors are never
+          shown in the product UI.
         </p>
       </main>
     </div>
