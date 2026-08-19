@@ -207,7 +207,6 @@ function VideoStudio() {
           </p>
         </div>
 
-        {/* Mode */}
         <section className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mode</p>
           <div className="grid grid-cols-2 gap-2">
@@ -238,7 +237,6 @@ function VideoStudio() {
           </div>
         </section>
 
-        {/* Image input for i2v */}
         {mode === "image" && (
           <section className="mt-5 space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -267,7 +265,6 @@ function VideoStudio() {
           </section>
         )}
 
-        {/* Duration */}
         <section className="mt-5 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration</p>
           <div className="flex flex-wrap gap-2">
@@ -298,7 +295,6 @@ function VideoStudio() {
           </p>
         </section>
 
-        {/* Aspect */}
         <section className="mt-5 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Aspect ratio
@@ -322,7 +318,6 @@ function VideoStudio() {
           </div>
         </section>
 
-        {/* Resolution */}
         <section className="mt-5 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Resolution
@@ -347,7 +342,6 @@ function VideoStudio() {
           </div>
         </section>
 
-        {/* Prompt */}
         <section className="mt-5 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
           <textarea
@@ -363,7 +357,6 @@ function VideoStudio() {
           />
         </section>
 
-        {/* Generate */}
         <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
             Cost: <span className="font-semibold text-foreground">{cost} credits</span>
@@ -388,7 +381,6 @@ function VideoStudio() {
           </Button>
         </div>
 
-        {/* Preview */}
         {(busy || outputUrl) && (
           <section className="mt-6 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
@@ -413,6 +405,14 @@ function VideoStudio() {
                     <a href={outputUrl} download={`motio2edit-video-${Date.now()}.mp4`}>
                       <Download className="mr-1.5 h-3.5 w-3.5" /> Download
                     </a>
+                  </Button>
+                  <Button asChild size="sm" variant="secondary">
+                    <Link
+                      to="/music"
+                      search={{ mode: "video-music", videoUrl: outputUrl }}
+                    >
+                      Add Sound
+                    </Link>
                   </Button>
                   <Button asChild size="sm" variant="outline">
                     <Link to="/history">Open History</Link>
