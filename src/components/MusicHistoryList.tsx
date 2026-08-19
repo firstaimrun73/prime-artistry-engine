@@ -1,5 +1,4 @@
-// Music tab for the history page: lists saved tracks from music_history with
-// inline playback (spinning vinyl), download and delete.
+// Music history: prefers music_history, falls back to generations type=music
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ type Track = {
   duration: number | null;
   audio_url: string;
   created_at: string;
+  source: "music_history" | "generations";
 };
 
 export function MusicHistoryList({ userId }: { userId: string | undefined }) {
@@ -29,16 +29,57 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
     if (!userId) return;
     let cancelled = false;
     setLoading(true);
-    void supabase
-      .from("music_history")
-      .select("id, track_title, prompt, genre, mood, bpm, duration, audio_url, created_at")
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) console.error("[music-history]", error.message);
-        setTracks((data ?? []) as Track[]);
+
+    void (async () => {
+      const { data: mh, error: mhErr } = await supabase
+        .from("music_history")
+        .select("id, track_title, prompt, genre, mood, bpm, duration, audio_url, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (cancelled) return;
+
+      if (!mhErr && mh && mh.length > 0) {
+        setTracks(mh.map((t) => ({ ...t, source: "music_history" as const })));
         setLoading(false);
-      });
+        return;
+      }
+
+      const { data: gens, error: gErr } = await supabase
+        .from("generations")
+        .select("id, title, prompt, output_url, metadata, created_at")
+        .eq("user_id", userId)
+        .eq("type", "music")
+        .eq("status", "success")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (cancelled) return;
+      if (gErr) console.error("[music-history]", gErr.message);
+
+      setTracks(
+        (gens ?? [])
+          .filter((g) => g.output_url)
+          .map((g) => {
+            const meta = (g.metadata ?? {}) as Record<string, unknown>;
+            return {
+              id: g.id,
+              track_title: g.title || "Music track",
+              prompt: g.prompt,
+              genre: typeof meta.brief_genre === "string" ? meta.brief_genre : null,
+              mood: typeof meta.brief_emotion === "string" ? meta.brief_emotion : null,
+              bpm: null,
+              duration: typeof meta.duration_seconds === "number" ? meta.duration_seconds : null,
+              audio_url: g.output_url as string,
+              created_at: g.created_at,
+              source: "generations" as const,
+            };
+          }),
+      );
+      setLoading(false);
+    })();
+
     return () => {
       cancelled = true;
     };
@@ -75,10 +116,18 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
   };
 
   const remove = async (t: Track) => {
-    const { error } = await supabase.from("music_history").delete().eq("id", t.id);
-    if (error) {
-      toast.error("Could not delete this track.");
-      return;
+    if (t.source === "music_history") {
+      const { error } = await supabase.from("music_history").delete().eq("id", t.id);
+      if (error) {
+        toast.error("Could not delete this track.");
+        return;
+      }
+    } else {
+      const { error } = await supabase.from("generations").delete().eq("id", t.id);
+      if (error) {
+        toast.error("Could not delete this track.");
+        return;
+      }
     }
     if (playingId === t.id) {
       audioRef.current?.pause();
@@ -117,7 +166,6 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
               {playingId === t.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </button>
           </div>
-
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{t.track_title}</p>
             {t.prompt && <p className="truncate text-xs text-muted-foreground">{t.prompt}</p>}
@@ -128,7 +176,6 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
               {t.mood && (
                 <span className="rounded-full bg-secondary px-2 py-0.5 capitalize">{t.mood}</span>
               )}
-              {t.bpm && <span className="rounded-full bg-secondary px-2 py-0.5">{t.bpm} BPM</span>}
               {t.duration && (
                 <span className="rounded-full bg-secondary px-2 py-0.5">{t.duration}s</span>
               )}
@@ -137,7 +184,6 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
               </span>
             </div>
           </div>
-
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => download(t)}>
               <Download className="mr-1.5 h-4 w-4" /> Download
