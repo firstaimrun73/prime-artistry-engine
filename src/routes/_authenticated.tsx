@@ -12,6 +12,17 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
+/** Focused creative pages — no top Header (matches Image Editor focus). */
+function hideChromeHeader(pathname: string): boolean {
+  if (pathname.startsWith("/editor")) return true;
+  if (pathname.startsWith("/studio/video")) return true;
+  if (pathname === "/music" || pathname.startsWith("/music/")) return true;
+  if (pathname.startsWith("/studio/music")) return true;
+  if (pathname.startsWith("/studio/image/auto-edit")) return true;
+  if (pathname.startsWith("/studio/image/circle-remove")) return true;
+  return false;
+}
+
 function AuthenticatedLayout() {
   const { loading, user } = useAuth();
   const router = useRouter();
@@ -37,6 +48,7 @@ function AuthenticatedLayout() {
   }
 
   const isMusicRoute = pathname === "/music" || pathname.startsWith("/music/");
+  const noHeader = hideChromeHeader(pathname);
 
   const main = isMusicRoute ? (
     <MusicAccessGate>
@@ -48,12 +60,13 @@ function AuthenticatedLayout() {
 
   return (
     <div className="min-h-screen w-full min-w-0 overflow-x-clip bg-background">
-      <AppSidebar />
-      {/* min-w-0: flex/grid children can shrink; avoids mobile "desktop canvas" overflow */}
-      <div className="w-full min-w-0 md:pl-56">
-        <div className="md:hidden">
-          <Header />
-        </div>
+      {!noHeader && <AppSidebar />}
+      <div className={noHeader ? "w-full min-w-0" : "w-full min-w-0 md:pl-56"}>
+        {!noHeader && (
+          <div className="md:hidden">
+            <Header />
+          </div>
+        )}
         {main}
         <AdminPopupModal />
         <FirstGenerationFeedback />
