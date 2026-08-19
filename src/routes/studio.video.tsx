@@ -10,7 +10,6 @@ import {
   Upload,
   Download,
   Loader2,
-  Crown,
   Scissors,
   Wand2,
   Search,
@@ -19,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo } from "@/lib/policy";
@@ -35,16 +35,21 @@ import {
 } from "@/lib/video-options";
 import {
   computeVideoCreditCost,
-  formatCreditUsd,
   videoEfficiencyScore,
   estimateVideoEtaSeconds,
   VIDEO_PROGRESS_STAGES,
   VIDEO_QUALITY_OPTIONS,
-  TIER_UI,
   type VideoQualityId,
-  type VideoModelTierUi,
 } from "@/lib/video-pricing";
 import { cn } from "@/lib/utils";
+import { StudioShell } from "@/components/studio/StudioShell";
+import { StudioTierSelector } from "@/components/studio/StudioTierSelector";
+import { StudioGenerateBar } from "@/components/studio/StudioGenerateBar";
+import {
+  studioCardClass,
+  studioTierToVideoUi,
+  type StudioTier,
+} from "@/lib/studio/studio-tier";
 
 export const Route = createFileRoute("/studio/video")({
   head: () => ({
@@ -52,8 +57,7 @@ export const Route = createFileRoute("/studio/video")({
       { title: "Video Studio — Motio2edit" },
       {
         name: "description",
-        content:
-          "AI text-to-video, image-to-video and video enhance with live credit pricing.",
+        content: "AI text-to-video, image-to-video and video enhance with live credit pricing.",
       },
     ],
   }),
@@ -76,35 +80,38 @@ function VideoStudio() {
   });
   const advancedOk = canUseAdvancedTier(profile?.plan, admin);
 
+  const [studioTier, setStudioTier] = useState<StudioTier>("standard");
   const [mode, setMode] = useState<VideoMode>("text");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState<VideoDuration>(5);
   const [aspect, setAspect] = useState<VideoAspectRatio>("16:9");
   const [quality, setQuality] = useState<VideoQualityId>("1080p");
-  const [tier, setTier] = useState<VideoModelTierUi>("standard");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [stageIdx, setStageIdx] = useState(0);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [charged, setCharged] = useState<number | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const videoUiTier = studioTierToVideoUi(studioTier);
   const maxDur = maxVideoDurationForPlan(profile?.plan);
+
   const price = useMemo(
     () =>
       computeVideoCreditCost({
         duration,
         quality,
         aspect,
-        tier,
+        tier: videoUiTier,
         mode: mode === "video" && mediaFile ? "enhance" : "generate",
       }),
-    [duration, quality, aspect, tier, mode, mediaFile],
+    [duration, quality, aspect, videoUiTier, mode, mediaFile],
   );
   const cost = price.credits;
-  const efficiency = videoEfficiencyScore({ duration, quality, tier });
-  const eta = estimateVideoEtaSeconds({ duration, quality, tier });
+  const efficiency = videoEfficiencyScore({ duration, quality, tier: videoUiTier });
+  const eta = estimateVideoEtaSeconds({ duration, quality, tier: videoUiTier });
 
   useEffect(() => {
     if (user && profile && !allowed) navigate({ to: "/pricing" });
@@ -115,8 +122,8 @@ function VideoStudio() {
   }, [maxDur, duration, admin]);
 
   useEffect(() => {
-    if (!advancedOk && tier === "advanced") setTier("standard");
-  }, [advancedOk, tier]);
+    if (!advancedOk && studioTier !== "standard") setStudioTier("standard");
+  }, [advancedOk, studioTier]);
 
   useEffect(() => {
     if (!busy) {
@@ -194,6 +201,7 @@ function VideoStudio() {
     setMediaFile(f);
     setMediaPreview(URL.createObjectURL(f));
     setOutputUrl(null);
+    setCharged(null);
   };
 
   const uploadMedia = async (file: File) => {
@@ -211,7 +219,6 @@ function VideoStudio() {
     return data.signedUrl;
   };
 
-  /** Map UI quality to backend resolution enum used by generateMedia. */
   const toBackendResolution = (): "720p" | "1080p" | "4k" => {
     if (quality === "4k" || quality === "8k" || quality === "2k") return "4k";
     if (quality === "720p" || quality === "480p") return "720p";
@@ -221,20 +228,21 @@ function VideoStudio() {
   const onGenerate = async () => {
     if (!canGenerate || busy) return;
     if (!admin && (profile?.credits ?? 0) < cost) {
-      toast.error(`Not enough credits (${cost} required · ~${formatCreditUsd(cost)}).`);
+      toast.error(`Not enough credits (${cost} required).`);
       return;
     }
     if (mode !== "video" && !isDurationAllowed(profile?.plan, duration, admin)) {
       toast.error(`Your plan allows up to ${maxDur}s video.`);
       return;
     }
-    if (tier === "advanced" && !advancedOk) {
-      toast.error("Advanced Motion requires Pro or higher.");
+    if (studioTier !== "standard" && !advancedOk) {
+      toast.error("Pro and Premium video tiers require Pro plan or higher.");
       return;
     }
 
     setBusy(true);
     setOutputUrl(null);
+    setCharged(null);
     toast(`Expected ~${eta}s — keep this tab open.`);
     try {
       let imageUrl: string | undefined;
@@ -247,7 +255,11 @@ function VideoStudio() {
 
       const res = await generate({
         data: {
-          prompt: prompt.trim() || (mode === "video" ? "Enhance this video, improve clarity and stability." : ""),
+          prompt:
+            prompt.trim() ||
+            (mode === "video"
+              ? "Enhance this video, improve clarity and stability."
+              : ""),
           type: "video",
           imageUrl,
           sourceKind,
@@ -258,6 +270,7 @@ function VideoStudio() {
       });
 
       setOutputUrl(res.outputUrl);
+      setCharged(cost);
       await refreshProfile();
       toast.success("Video ready");
     } catch (err) {
@@ -268,36 +281,31 @@ function VideoStudio() {
   };
 
   const stageIcons = [Search, Camera, Scissors, Wand2];
+  const card = studioCardClass(studioTier);
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-6xl px-4 py-6 pb-32 md:pb-12">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <Link
-              to="/studio"
-              className="text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              ← All studios
-            </Link>
-            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Video <span className="text-primary">Studio</span>
-            </h1>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              Text → Video · Image → Video · Video enhance. Live credit cost before you generate.
-            </p>
-          </div>
-          <div className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
-            {admin ? "∞ credits" : `${(profile?.credits ?? 0).toLocaleString()} credits`}
-          </div>
+      <StudioShell
+        kind="video"
+        tier={studioTier}
+        credits={admin ? null : profile?.credits}
+        subtitle="Text → Video · Image → Video · Video enhance. Credits shown before you generate."
+      >
+        <div className="mb-5">
+          <StudioTierSelector
+            value={studioTier}
+            onChange={setStudioTier}
+            locked={{
+              pro: !advancedOk,
+              premium: !advancedOk,
+            }}
+          />
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          {/* ── Generator column ── */}
-          <div className="space-y-5">
-            {/* Mode switcher */}
-            <section className="space-y-2">
+        <div className="grid w-full min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,1.1fr)]">
+          <div className="min-w-0 space-y-5">
+            <section className={cn("space-y-2 p-4", card)}>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Mode
               </p>
@@ -317,6 +325,7 @@ function VideoStudio() {
                       setMediaFile(null);
                       setMediaPreview(null);
                       setOutputUrl(null);
+                      setCharged(null);
                     }}
                     className={cn(
                       "flex flex-col items-center gap-1 rounded-xl border p-3 text-center text-xs font-semibold transition-colors sm:text-sm",
@@ -332,9 +341,8 @@ function VideoStudio() {
               </div>
             </section>
 
-            {/* Input area */}
             {(mode === "image" || mode === "video") && (
-              <section className="space-y-2">
+              <section className={cn("space-y-2 p-4", card)}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {mode === "image" ? "Source image" : "Source video"}
                 </p>
@@ -384,8 +392,7 @@ function VideoStudio() {
               </section>
             )}
 
-            {/* Prompt — sticky across modes */}
-            <section className="space-y-2">
+            <section className={cn("space-y-2 p-4", card)}>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Prompt
               </p>
@@ -401,15 +408,14 @@ function VideoStudio() {
                       ? "Optional: what to improve (clarity, stability…)"
                       : "Describe the scene and motion…"
                 }
-                className="w-full resize-y rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
+                className="w-full resize-y rounded-xl border border-border bg-background/50 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
               />
               <p className="text-right text-[11px] text-muted-foreground">{prompt.length}/2000</p>
             </section>
 
-            {/* Settings */}
             {mode !== "video" && (
-              <>
-                <section className="space-y-2">
+              <section className={cn("space-y-4 p-4", card)}>
+                <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Duration
                   </p>
@@ -436,9 +442,9 @@ function VideoStudio() {
                     })}
                   </div>
                   <p className="text-[11px] text-muted-foreground">Plan max: {maxDur}s</p>
-                </section>
+                </div>
 
-                <section className="space-y-2">
+                <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Aspect ratio
                   </p>
@@ -460,9 +466,9 @@ function VideoStudio() {
                       </button>
                     ))}
                   </div>
-                </section>
+                </div>
 
-                <section className="space-y-2">
+                <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Quality
                   </p>
@@ -487,11 +493,10 @@ function VideoStudio() {
                       ),
                     )}
                   </div>
-                  {/* Efficiency bar */}
                   <div className="space-y-1 pt-1">
                     <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
-                      <span>Fast &amp; cheap</span>
-                      <span>Slow &amp; max quality</span>
+                      <span>Fast</span>
+                      <span>Max quality</span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-secondary">
                       <div
@@ -500,96 +505,24 @@ function VideoStudio() {
                       />
                     </div>
                   </div>
-                </section>
-              </>
+                </div>
+              </section>
             )}
 
-            {/* Advanced tier card — capability copy only */}
-            <section
-              className={cn(
-                "rounded-2xl border p-4 transition-colors",
-                tier === "advanced"
-                  ? "border-amber-500/50 bg-amber-500/5"
-                  : "border-border bg-card",
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-2">
-                  <Crown className="mt-0.5 h-4 w-4 text-amber-500" />
-                  <div>
-                    <p className="text-sm font-bold">{TIER_UI.advanced.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{TIER_UI.advanced.blurb}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy || (!advancedOk && tier !== "advanced")}
-                  onClick={() => {
-                    if (!advancedOk) {
-                      toast.error("Upgrade to Pro+ for Advanced Motion");
-                      return;
-                    }
-                    setTier((t) => (t === "advanced" ? "standard" : "advanced"));
-                  }}
-                  className={cn(
-                    "shrink-0 rounded-full px-3 py-1 text-xs font-semibold",
-                    tier === "advanced"
-                      ? "bg-amber-500 text-white"
-                      : advancedOk
-                        ? "bg-secondary text-foreground hover:bg-secondary/80"
-                        : "bg-secondary/50 text-muted-foreground",
-                  )}
-                >
-                  {tier === "advanced" ? "On" : advancedOk ? "Enable" : "Pro+"}
-                </button>
-              </div>
-              {!advancedOk && (
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Available on Pro, Studio and Master Studio.{" "}
-                  <Link to="/pricing" className="font-medium text-primary hover:underline">
-                    View plans
-                  </Link>
-                </p>
-              )}
-            </section>
-
-            {/* Live cost + Generate */}
-            <div className="sticky bottom-0 z-10 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm">
-                  <p className="font-semibold">
-                    This generation:{" "}
-                    <span className="text-primary">{cost} credits</span>{" "}
-                    <span className="text-muted-foreground">(~{formatCreditUsd(cost)})</span>
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {TIER_UI[tier].label} · ETA ~{eta}s
-                    {!admin && <> · Balance {(profile?.credits ?? 0).toLocaleString()}</>}
-                  </p>
-                </div>
-                <Button
-                  onClick={onGenerate}
-                  disabled={!canGenerate || busy}
-                  className="h-12 w-full sm:w-auto sm:min-w-[160px]"
-                >
-                  {busy ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Video className="mr-2 h-4 w-4" /> Generate
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
+            <StudioGenerateBar
+              tier={studioTier}
+              credits={cost}
+              balance={admin ? null : profile?.credits}
+              loading={busy}
+              disabled={!canGenerate}
+              loadingLabel={`Generating · ~${eta}s`}
+              onGenerate={() => void onGenerate()}
+            />
           </div>
 
-          {/* ── Output column ── */}
-          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+          <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
             {busy && (
-              <div className="rounded-2xl border border-border bg-card p-5">
+              <div className={cn("p-5", card)}>
                 <p className="mb-4 text-sm font-semibold">Generating…</p>
                 <ol className="space-y-3">
                   {VIDEO_PROGRESS_STAGES.map((s, i) => {
@@ -634,7 +567,7 @@ function VideoStudio() {
             )}
 
             {outputUrl && !busy && (
-              <div className="space-y-3 rounded-2xl border border-border bg-card p-3 sm:p-4">
+              <div className={cn("space-y-3 p-3 sm:p-4", card)}>
                 <div className="overflow-hidden rounded-xl bg-black">
                   <video
                     ref={videoRef}
@@ -646,7 +579,8 @@ function VideoStudio() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                   <span>
-                    Made with {TIER_UI[tier].label} Motion AI · {aspect} · {quality}
+                    {studioTier} · {aspect} · {quality}
+                    {charged != null ? ` · ${charged} credits` : ""}
                   </span>
                   <label className="ml-auto flex items-center gap-1">
                     Speed
@@ -664,13 +598,23 @@ function VideoStudio() {
                   </label>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => onGenerate()} disabled={busy}>
+                  <Button size="sm" onClick={() => void onGenerate()} disabled={busy}>
                     <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Regenerate
                   </Button>
                   <Button asChild size="sm" variant="secondary">
                     <a href={outputUrl} download={`motio2edit-video-${Date.now()}.mp4`}>
                       <Download className="mr-1.5 h-3.5 w-3.5" /> Download
                     </a>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setOutputUrl(null);
+                      setCharged(null);
+                    }}
+                  >
+                    Edit again
                   </Button>
                   <Button asChild size="sm" variant="outline">
                     <Link to="/history">History</Link>
@@ -680,23 +624,23 @@ function VideoStudio() {
             )}
 
             {!busy && !outputUrl && (
-              <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center">
+              <div
+                className={cn(
+                  "flex min-h-[240px] flex-col items-center justify-center border-dashed p-8 text-center",
+                  card,
+                )}
+              >
                 <Video className="mb-3 h-10 w-10 text-muted-foreground/50" />
                 <p className="text-sm font-medium text-muted-foreground">Output preview</p>
                 <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                  Your video appears here with playback controls after generation.
+                  Your video appears here after generation — download, regenerate, or edit again.
                 </p>
               </div>
             )}
           </div>
         </div>
-
-        <p className="mt-10 text-[11px] text-muted-foreground">
-          Pricing: {cost} credits at $0.004/credit retail. Standard base is 125 credits for 5s.
-          Advanced uses a higher credit rate for enhanced motion quality — model vendors are never
-          shown in the product UI.
-        </p>
-      </main>
+      </StudioShell>
+      <Footer />
     </div>
   );
 }
