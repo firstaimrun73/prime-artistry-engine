@@ -1,6 +1,6 @@
 /**
- * Video Studio V1 — clean rebuild
- * No Standard/Pro/Premium UI. Three modes only. Base Kling path via generateMedia.
+ * Video Studio — thin orchestrator.
+ * Model registry drives endpoints, audio, resolution, duration, credits.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -14,8 +14,7 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo } from "@/lib/policy";
 import { generateMedia } from "@/lib/generate.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { maxVideoDurationForPlan, isDurationAllowed } from "@/lib/video-options";
-import { computeVideoCreditCost, estimateVideoEtaSeconds } from "@/lib/video-pricing";
+import { maxVideoDurationForPlan } from "@/lib/video-options";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { cn } from "@/lib/utils";
 import { VideoModeSelector } from "@/components/video/VideoModeSelector";
@@ -24,14 +23,17 @@ import { VideoFeaturePanel } from "@/components/video/VideoFeaturePanel";
 import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
 import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
 import { VideoOutputView } from "@/components/video/VideoOutputView";
-import type {
-  VideoMode,
-  VideoStudioAspect,
-  VideoStudioDuration,
-  VideoStudioQuality,
-  VideoStudioSize,
-  VideoStudioResult,
-} from "@/components/video/video-studio-types";
+import { VideoModelSelector } from "@/components/video/VideoModelSelector";
+import { VideoCreditsInfo } from "@/components/video/VideoCreditsInfo";
+import {
+  defaultModelForMode,
+  getVideoModel,
+  estimateModelCredits,
+  type VideoGenMode,
+  type VideoAspect,
+  type VideoResolution,
+} from "@/lib/video-model-registry";
+import type { VideoStudioResult } from "@/components/video/video-studio-types";
 
 export const Route = createFileRoute("/studio/video")({
   head: () => ({
@@ -55,33 +57,55 @@ function VideoStudioPage() {
     isAdmin: admin,
   });
 
-  const [mode, setMode] = useState<VideoMode>("text");
+  const [mode, setMode] = useState<VideoGenMode>("text");
+  const [modelId, setModelId] = useState(() => defaultModelForMode("text").id);
+  const model = getVideoModel(modelId) ?? defaultModelForMode(mode);
+
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState<VideoStudioDuration>(5);
-  const [aspect, setAspect] = useState<VideoStudioAspect>("16:9");
-  const [quality, setQuality] = useState<VideoStudioQuality>("1080p");
-  const [size, setSize] = useState<VideoStudioSize>("medium");
-  const [soundOn, setSoundOn] = useState(false);
+  const [duration, setDuration] = useState(model.durations[0] ?? 5);
+  const [customDuration, setCustomDuration] = useState("");
+  const [aspect, setAspect] = useState<VideoAspect>(model.aspects[0] ?? "16:9");
+  const [resolution, setResolution] = useState<VideoResolution>(
+    model.resolutions.includes("1080p") ? "1080p" : model.resolutions[0],
+  );
+  const [soundOn, setSoundOn] = useState(model.nativeAudio);
+  const [styleId, setStyleId] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [stageIdx, setStageIdx] = useState(0);
   const [result, setResult] = useState<VideoStudioResult | null>(null);
 
-  const maxDur = maxVideoDurationForPlan(profile?.plan);
+  const planMax = maxVideoDurationForPlan(profile?.plan);
+  const effectiveMax = Math.min(model.maxDuration, admin ? model.maxDuration : planMax);
+
+  useEffect(() => {
+    if (!model.modes.includes(mode)) {
+      setModelId(defaultModelForMode(mode).id);
+    }
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!model.aspects.includes(aspect)) setAspect(model.aspects[0]);
+    if (!model.resolutions.includes(resolution)) setResolution(model.resolutions[0]);
+    if (!model.durations.includes(duration) && !customDuration) setDuration(model.durations[0]);
+    if (duration > model.maxDuration) setDuration(model.maxDuration);
+    if (!model.nativeAudio) setSoundOn(false);
+  }, [modelId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cost = useMemo(
     () =>
-      computeVideoCreditCost({
-        duration,
-        quality,
-        aspect,
-        tier: "standard",
-        mode: mode === "video" && mediaFile ? "enhance" : "generate",
-      }).credits,
-    [duration, quality, aspect, mode, mediaFile],
+      estimateModelCredits({
+        model,
+        durationSec: duration,
+        resolution,
+        soundOn: soundOn && model.nativeAudio,
+      }),
+    [model, duration, resolution, soundOn],
   );
-  const eta = estimateVideoEtaSeconds({ duration, quality, tier: "standard" });
+
+  const eta = Math.max(30, Math.round(duration * 8));
 
   useEffect(() => {
     if (user && profile && !allowed) navigate({ to: "/pricing" });
@@ -98,11 +122,14 @@ function VideoStudioPage() {
   }, [busy]);
 
   const canGenerate = useMemo(() => {
+    if (duration > model.maxDuration) return false;
+    if (duration > effectiveMax) return false;
     if (mode === "video") return !!mediaFile;
     if (!prompt.trim()) return false;
     if (mode === "image" && !mediaFile) return false;
+    if (!model.modes.includes(mode)) return false;
     return true;
-  }, [prompt, mode, mediaFile]);
+  }, [prompt, mode, mediaFile, duration, model, effectiveMax]);
 
   if (user && profile && !allowed) {
     return (
@@ -135,10 +162,8 @@ function VideoStudioPage() {
   };
 
   const onPick = (file: File) => {
-    if (mode === "image" && !file.type.startsWith("image/"))
-      return toast.error("Choose an image file.");
-    if (mode === "video" && !file.type.startsWith("video/"))
-      return toast.error("Choose a video file.");
+    if (mode === "image" && !file.type.startsWith("image/")) return toast.error("Choose an image file.");
+    if (mode === "video" && !file.type.startsWith("video/")) return toast.error("Choose a video file.");
     if (file.size > 200 * 1024 * 1024) return toast.error("Max 200 MB.");
     setMediaFile(file);
     setMediaPreview(URL.createObjectURL(file));
@@ -159,12 +184,12 @@ function VideoStudioPage() {
 
   const onGenerate = async () => {
     if (!canGenerate || busy) return;
-    if (!admin && (profile?.credits ?? 0) < cost) {
-      toast.error(`Not enough credits (${cost} required).`);
+    if (duration > model.maxDuration) {
+      toast.error(`Max duration for ${model.name} is ${model.maxDuration}s.`);
       return;
     }
-    if (mode !== "video" && !isDurationAllowed(profile?.plan, duration, admin)) {
-      toast.error(`Your plan allows up to ${maxDur}s.`);
+    if (!admin && (profile?.credits ?? 0) < cost) {
+      toast.error(`Not enough credits (${cost} required).`);
       return;
     }
 
@@ -190,7 +215,11 @@ function VideoStudioPage() {
           sourceKind,
           videoDurationSeconds: duration,
           videoAspectRatio: aspect,
-          videoResolution: quality === "720p" ? "720p" : "1080p",
+          videoResolution: resolution === "4k" ? "4k" : resolution,
+          videoModelId: model.id,
+          videoGenerateAudio: soundOn && model.nativeAudio,
+          videoNegativePrompt: negativePrompt || undefined,
+          videoStyleId: styleId || undefined,
         },
       });
 
@@ -198,11 +227,14 @@ function VideoStudioPage() {
         outputUrl: res.outputUrl,
         mode,
         prompt: prompt.trim(),
-        duration,
-        aspect,
-        quality,
-        size,
-        soundRequested: soundOn,
+        duration: duration as 5 | 10,
+        aspect: (aspect === "16:9" || aspect === "9:16" || aspect === "1:1" ? aspect : "16:9") as
+          | "16:9"
+          | "9:16"
+          | "1:1",
+        quality: resolution === "720p" ? "720p" : "1080p",
+        size: "medium",
+        soundRequested: soundOn && model.nativeAudio,
         creditsUsed: cost,
         sourcePreview: mediaPreview,
       });
@@ -233,9 +265,7 @@ function VideoStudioPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
           Video{" "}
-          <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
-            Studio
-          </span>
+          <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">Studio</span>
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Create video from text, an image, or an existing clip.
@@ -249,9 +279,7 @@ function VideoStudioPage() {
       </header>
 
       <section className="mb-5 space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Create video from
-        </p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Create video from</p>
         <VideoModeSelector
           value={mode}
           disabled={busy}
@@ -259,7 +287,21 @@ function VideoStudioPage() {
             setMode(m);
             clearMedia();
             setResult(null);
+            setModelId(defaultModelForMode(m).id);
           }}
+        />
+      </section>
+
+      <section className="mb-5 space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Model</p>
+        <VideoModelSelector
+          mode={mode}
+          value={modelId}
+          onChange={setModelId}
+          duration={duration}
+          resolution={resolution}
+          soundOn={soundOn}
+          disabled={busy}
         />
       </section>
 
@@ -291,22 +333,25 @@ function VideoStudioPage() {
         />
       </section>
 
-      {mode !== "video" && (
+      {(mode !== "video" || !!model.videoEndpoint) && (
         <div className="mb-5">
           <VideoFeaturePanel
+            model={model}
             aspect={aspect}
             setAspect={setAspect}
-            quality={quality}
-            setQuality={setQuality}
-            size={size}
-            setSize={setSize}
+            resolution={resolution}
+            setResolution={setResolution}
             duration={duration}
             setDuration={setDuration}
+            customDuration={customDuration}
+            setCustomDuration={setCustomDuration}
             soundOn={soundOn}
             setSoundOn={setSoundOn}
-            showDuration
+            styleId={styleId}
+            setStyleId={setStyleId}
+            negativePrompt={negativePrompt}
+            setNegativePrompt={setNegativePrompt}
             disabled={busy}
-            maxDuration={Math.min(maxDur, 10)}
           />
         </div>
       )}
@@ -318,19 +363,33 @@ function VideoStudioPage() {
       )}
 
       {!busy && (
-        <button
-          type="button"
-          disabled={!canGenerate}
-          onClick={() => void onGenerate()}
-          className={cn(
-            "flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-bold text-white shadow-lg",
-            "bg-gradient-to-r from-red-500 via-red-600 to-orange-500 hover:opacity-95",
-            !canGenerate && "cursor-not-allowed opacity-50",
-          )}
-        >
-          <Sparkles className="h-4 w-4" />
-          Generate Video · {cost} credits
-        </button>
+        <div className="space-y-2">
+          <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+            <span>
+              Estimated <span className="font-bold tabular-nums text-foreground">{cost}</span> credits
+            </span>
+            <VideoCreditsInfo
+              modelName={model.name}
+              duration={duration}
+              resolution={resolution}
+              sound={model.nativeAudio ? (soundOn ? "On" : "Off") : "Unavailable"}
+              credits={cost}
+            />
+          </div>
+          <button
+            type="button"
+            disabled={!canGenerate}
+            onClick={() => void onGenerate()}
+            className={cn(
+              "flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-bold text-white shadow-lg",
+              "bg-gradient-to-r from-red-500 via-red-600 to-orange-500 hover:opacity-95",
+              !canGenerate && "cursor-not-allowed opacity-50",
+            )}
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate Video · {cost} credits
+          </button>
+        </div>
       )}
 
       {result && !busy && (
