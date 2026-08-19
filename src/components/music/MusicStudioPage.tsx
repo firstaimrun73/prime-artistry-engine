@@ -7,8 +7,10 @@ import { MusicAccessGate } from "@/components/MusicAccessGate";
 import { MusicModeCards } from "@/components/music/MusicModeCards";
 import { MusicScrollChips } from "@/components/music/MusicScrollChips";
 import { MusicResultCard } from "@/components/music/MusicResultCard";
+import { MusicVoiceLibrary } from "@/components/music/MusicVoiceLibrary";
 import {
-  VOICES, DURATIONS, SFX_CATEGORIES, MUSIC_EXAMPLES as EXAMPLES, LOADING_STEPS as LOADING,
+  DURATIONS, SFX_CATEGORIES, MUSIC_EXAMPLES as EXAMPLES, LOADING_STEPS as LOADING,
+  type VoiceId,
 } from "@/components/music/musicStudioData";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +21,7 @@ import {
 } from "@/lib/music.functions";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { toast } from "sonner";
-import { Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, ChevronDown, Volume2 } from "lucide-react";
+import { Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 async function uploadFile(file: File, userId: string, folder: string) {
@@ -62,7 +64,8 @@ function MusicStudio() {
   const [mood, setMood] = useState("");
   const [instrument, setInstrument] = useState("");
   const [duration, setDuration] = useState(30);
-  const [voice, setVoice] = useState("eve");
+  /** Canonical xAI TTS voice id — only used when mode === voiceover */
+  const [voice, setVoice] = useState<VoiceId>("eve");
   const [qualityTier, setQualityTier] = useState<"standard" | "premium">("standard");
   const [sfxCategory, setSfxCategory] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -156,14 +159,6 @@ function MusicStudio() {
     toast.message("Example loaded.");
   }
 
-  function previewVoice(id: string) {
-    try {
-      const u = new SpeechSynthesisUtterance(`Hello, I am ${id}. Browser preview only.`);
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch { toast.message("Preview unavailable."); }
-  }
-
   async function onGenerate() {
     if (loading || uploading) return;
     if (mode === "voiceover" && !prompt.trim()) return toast.error("Enter a script.");
@@ -185,7 +180,9 @@ function MusicStudio() {
           mood: mood && (MUSIC_MOODS as readonly string[]).includes(mood) ? (mood as (typeof MUSIC_MOODS)[number]) : undefined,
           instrument: instrument && (MUSIC_INSTRUMENTS as readonly string[]).includes(instrument) ? (instrument as (typeof MUSIC_INSTRUMENTS)[number]) : undefined,
           durationSeconds: duration, imageUrl: imageUrl || undefined, videoUrl: videoUrl || undefined,
-          voice: mode === "voiceover" ? voice : undefined, instrumental: mode === "instrumental",
+          // selectedVoiceId → xAI TTS (only for voiceover)
+          voice: mode === "voiceover" ? voice : undefined,
+          instrumental: mode === "instrumental",
           qualityTier: mode === "song" || mode === "instrumental" ? qualityTier : "standard",
         },
       });
@@ -260,25 +257,7 @@ function MusicStudio() {
             )}
 
             {mode === "voiceover" && (
-              <section>
-                <Label>Voice library</Label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {VOICES.map((v) => (
-                    <div key={v.id} className={cn("flex min-w-0 items-center gap-3 rounded-2xl border p-3",
-                      voice === v.id ? "border-transparent bg-gradient-to-r from-orange-500/15 to-purple-600/15 ring-2 ring-orange-500/50" : "border-border/70 bg-card")}>
-                      <button type="button" onClick={() => setVoice(v.id)} className="min-w-0 flex-1 text-left">
-                        <p className="text-sm font-semibold">{v.label}</p>
-                        <p className="text-[11px] text-muted-foreground">{v.desc}</p>
-                      </button>
-                      <button type="button" onClick={() => previewVoice(v.id)}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border" aria-label={`Preview ${v.label}`}>
-                        <Volume2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-2 text-[10px] text-muted-foreground">Browser preview only. Final audio is xAI TTS on Generate.</p>
-              </section>
+              <MusicVoiceLibrary value={voice} onChange={setVoice} />
             )}
 
             {(mode === "song" || mode === "instrumental") && (
