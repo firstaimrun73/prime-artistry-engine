@@ -1,6 +1,6 @@
 // Small mic button that uses the browser's Web Speech API (free, no key).
 // Falls back gracefully when the browser doesn't support it.
-// While listening, shows a centered floating popup with animated sound waves.
+// While listening: restrained AI-assistant ring + waveform (respects reduced-motion).
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { toast } from "sonner";
@@ -36,6 +36,7 @@ export function VoiceInputButton({
 }) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(true);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const recRef = useRef<InstanceType<SpeechRecognitionCtor> | null>(null);
 
   useEffect(() => {
@@ -47,6 +48,14 @@ export function VoiceInputButton({
         /* ignore */
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduceMotion(mq.matches);
+    const fn = () => setReduceMotion(mq.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
   }, []);
 
   function stopListening() {
@@ -103,56 +112,43 @@ export function VoiceInputButton({
         aria-label={listening ? "Stop voice input" : "Start voice input"}
         title={listening ? "Stop voice input" : "Speak your prompt"}
         className={
-          "grid h-8 w-8 place-items-center rounded-full border transition " +
+          "relative grid h-9 w-9 place-items-center rounded-full border transition " +
           (listening
-            ? "border-red-500 bg-red-500/10 text-red-500 animate-pulse"
+            ? "border-primary/50 bg-primary/10 text-primary"
             : "border-border bg-background/70 text-muted-foreground hover:text-foreground hover:border-primary/50") +
           (className ? ` ${className}` : "")
         }
       >
+        {listening && !reduceMotion && (
+          <span
+            className="voice-mic-ring pointer-events-none absolute inset-[-3px] rounded-full border border-primary/40"
+            aria-hidden
+          />
+        )}
         {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </button>
 
       {listening && (
         <div
-          role="dialog"
-          aria-label="Listening for voice input"
-          onClick={stopListening}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in"
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none absolute right-0 top-full z-20 mt-2 flex items-center gap-2 rounded-full border border-border/80 bg-card/95 px-3 py-1.5 text-xs shadow-md backdrop-blur-sm"
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative flex w-[85%] max-w-sm flex-col items-center gap-4 rounded-2xl border border-border bg-background p-6 shadow-2xl"
-          >
-            {/* Pulsing orange ring */}
-            <div className="relative grid h-20 w-20 place-items-center">
-              <span className="absolute inset-0 rounded-full bg-orange-500/30 animate-ping" />
-              <span className="absolute inset-2 rounded-full bg-orange-500/50 animate-pulse" />
-              <div className="relative grid h-14 w-14 place-items-center rounded-full bg-orange-500 text-white shadow-lg">
-                <Mic className="h-6 w-6" />
-              </div>
-            </div>
-
-            {/* Sound wave bars */}
-            <div className="flex items-end gap-1" aria-hidden>
-              {[20, 35, 50, 35, 20].map((h, i) => (
+          {!reduceMotion && (
+            <div className="flex items-end gap-0.5" aria-hidden>
+              {[10, 16, 12, 18, 11].map((h, i) => (
                 <span
                   key={i}
-                  className="w-1 rounded-sm bg-orange-500"
+                  className="voice-wave-bar w-0.5 rounded-full bg-primary"
                   style={{
                     height: `${h}px`,
-                    animation: `voicewave 0.8s ease-in-out ${i * 0.1}s infinite`,
+                    animationDelay: `${i * 0.12}s`,
                   }}
                 />
               ))}
             </div>
-
-            <div className="text-center">
-              <div className="text-base font-semibold">Listening... speak your prompt</div>
-              <div className="mt-1 text-xs text-muted-foreground">Tap anywhere to cancel</div>
-            </div>
-            <style>{`@keyframes voicewave { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(0.3); } }`}</style>
-          </div>
+          )}
+          <span className="font-medium text-foreground">Listening…</span>
         </div>
       )}
     </>

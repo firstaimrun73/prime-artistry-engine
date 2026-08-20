@@ -39,6 +39,8 @@ import {
 } from "@/components/editor";
 import type { EditorBootstrap } from "@/components/editor/editor-bootstrap";
 import { StudioTierSelector } from "@/components/studio/StudioTierSelector";
+import { PremiumImageGenerationOverlay } from "@/components/studio/overlays/PremiumImageGenerationOverlay";
+import { UltraAIImageGenerationOverlay } from "@/components/studio/overlays/UltraAIImageGenerationOverlay";
 import {
   studioCardClass,
   studioShellClass,
@@ -46,6 +48,7 @@ import {
   studioGenerateClass,
   studioAccentClass,
   studioExperienceLabel,
+  imageQualitiesForStudioTier,
   type StudioTier,
 } from "@/lib/studio/studio-tier";
 import { cn } from "@/lib/utils";
@@ -94,10 +97,16 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [stage, setStage] = useState(0);
   const [progress, setProgress] = useState(0);
   const runIdRef = useRef(0);
+  const [premiumCompleteHold, setPremiumCompleteHold] = useState(false);
+  const [premiumGenError, setPremiumGenError] = useState<string | null>(null);
+  const [ultraCompleteHold, setUltraCompleteHold] = useState(false);
+  const [ultraGenError, setUltraGenError] = useState<string | null>(null);
 
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
   const stages = getEditorStages(!!inputDataUrl);
+  const isPremiumExp = studioTier === "pro";
+  const isUltraExp = studioTier === "premium";
 
   useEffect(() => {
     try {
@@ -160,6 +169,33 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     };
   }, [state, stages.length]);
 
+  useEffect(() => {
+    if (!isPremiumExp) {
+      setPremiumCompleteHold(false);
+      setPremiumGenError(null);
+    }
+    if (!isUltraExp) {
+      setUltraCompleteHold(false);
+      setUltraGenError(null);
+    }
+    if (isPremiumExp && state === "success") {
+      setPremiumGenError(null);
+      setPremiumCompleteHold(true);
+      const t = window.setTimeout(() => setPremiumCompleteHold(false), 1400);
+      return () => window.clearTimeout(t);
+    }
+    if (isUltraExp && state === "success") {
+      setUltraGenError(null);
+      setUltraCompleteHold(true);
+      const t = window.setTimeout(() => setUltraCompleteHold(false), 1400);
+      return () => window.clearTimeout(t);
+    }
+    if (state === "idle" || state === "blocked") {
+      if (isPremiumExp && !premiumGenError) setPremiumCompleteHold(false);
+      if (isUltraExp && !ultraGenError) setUltraCompleteHold(false);
+    }
+  }, [state, isPremiumExp, isUltraExp, premiumGenError, ultraGenError]);
+
   if (!profile) return null;
 
   const cost = imageQualityCost(imageQuality);
@@ -169,6 +205,20 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
+
+  const showPremiumOverlay =
+    isPremiumExp && (loading || premiumCompleteHold || !!premiumGenError);
+  const showUltraOverlay =
+    isUltraExp && (loading || ultraCompleteHold || !!ultraGenError);
+
+  const showInlinePreview =
+    (!isPremiumExp && !isUltraExp) ||
+    (!loading &&
+      !premiumCompleteHold &&
+      !premiumGenError &&
+      !ultraCompleteHold &&
+      !ultraGenError &&
+      !!output);
 
   const activateSlot = (items: GalleryItem[], idx: number) => {
     const item = items[idx];
@@ -261,7 +311,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     const runId = ++runIdRef.current;
     setState("analyzing");
     setOutput(null);
-    setDownloaded(false);
+    setDownloaded(false;
+    setPremiumCompleteHold(false);
+    setPremiumGenError(null);
+    setUltraCompleteHold(false);
+    setUltraGenError(null);
     await new Promise((r) => setTimeout(r, 600));
     if (runId !== runIdRef.current) return;
 
@@ -365,17 +419,26 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setStage(stages.length);
       setOutput(url);
       setState("success");
+      setPremiumGenError(null);
+      setUltraGenError(null);
       setRemoveMaskDataUrl(null);
       await refreshProfile();
       toast.success("✅ Image ready!");
       endGeneration();
     } catch (err) {
       if (runId !== runIdRef.current) return;
-      setState("idle");
+      const msg = err instanceof Error ? err.message : "Failed. Credits not charged.";
       endGeneration();
-      toast.error(
-        err instanceof Error ? `❌ ${err.message}` : "❌ Failed. Credits not charged.",
-      );
+      if (isPremiumExp) {
+        setPremiumGenError(msg);
+        setState("idle");
+      } else if (isUltraExp) {
+        setUltraGenError(msg);
+        setState("idle");
+      } else {
+        setState("idle");
+      }
+      toast.error(`❌ ${msg}`);
     } finally {
       progressTimers.forEach(clearTimeout);
     }
@@ -402,7 +465,23 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     endGeneration();
     setProgress(0);
     setStage(0);
+    setPremiumCompleteHold(false);
+    setPremiumGenError(null);
+    setUltraCompleteHold(false);
+    setUltraGenError(null);
     toast("Generation stopped.");
+  };
+
+  const handleDismissPremiumError = () => {
+    setPremiumGenError(null);
+    setPremiumCompleteHold(false);
+    setState("idle");
+  };
+
+  const handleDismissUltraError = () => {
+    setUltraGenError(null);
+    setUltraCompleteHold(false);
+    setState("idle");
   };
 
   const handleClear = () => {
@@ -419,6 +498,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setDownloaded(false);
     setProgress(0);
     setStage(0);
+    setPremiumCompleteHold(false);
+    setPremiumGenError(null);
+    setUltraCompleteHold(false);
+    setUltraGenError(null);
     setGallery([]);
     setActiveImage(0);
     if (fileRef.current) fileRef.current.value = "";
@@ -489,42 +572,82 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const noopSetVideoRes = () => {};
 
   const expLabel = studioExperienceLabel(studioTier);
-  const accent = studioAccentClass(studioTier);
+
+  const premiumPhase =
+    premiumGenError
+      ? "error"
+      : state === "analyzing"
+        ? "analyzing"
+        : state === "loading"
+          ? "loading"
+          : premiumCompleteHold
+            ? "success"
+            : "loading";
+
+  const ultraPhase =
+    ultraGenError
+      ? "error"
+      : state === "analyzing"
+        ? "analyzing"
+        : state === "loading"
+          ? "loading"
+          : ultraCompleteHold
+            ? "success"
+            : "loading";
 
   return (
     <div className={cn("min-h-[70vh]", studioShellClass(studioTier))}>
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
+      {showPremiumOverlay && (
+        <PremiumImageGenerationOverlay
+          phase={premiumPhase}
+          progress={progress}
+          error={premiumGenError}
+          onRetry={runGenerate}
+          onDismiss={handleDismissPremiumError}
+        />
+      )}
+
+      {showUltraOverlay && (
+        <UltraAIImageGenerationOverlay
+          phase={ultraPhase}
+          progress={progress}
+          error={ultraGenError}
+          onRetry={runGenerate}
+          onDismiss={handleDismissUltraError}
+        />
+      )}
+
+      <div className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-10">
         <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
           <div className="space-y-2 min-w-0">
             <StudioBackLink />
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight">
-              <span className="text-foreground">IMG</span>{" "}
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight">
+              <span className="text-foreground">Image</span>{" "}
               <span className="text-orange-500">Studio</span>
-              {studioTier !== "standard" && (
-                <span
-                  className={cn(
-                    "ml-2 align-middle text-sm sm:text-base font-semibold tracking-normal",
-                    studioTier === "premium"
-                      ? "text-[#E8C547]"
-                      : "text-orange-600 dark:text-orange-400",
-                  )}
-                >
-                  {expLabel}
-                </span>
-              )}
+              <span className="mx-1.5 text-muted-foreground/50 font-normal">·</span>
+              <span
+                className={cn(
+                  "align-middle text-sm sm:text-base font-semibold tracking-normal",
+                  studioTier === "premium" && "text-[#E8C547]",
+                  studioTier === "pro" && "text-orange-600 dark:text-orange-400",
+                  studioTier === "standard" && "text-primary",
+                )}
+              >
+                {expLabel}
+              </span>
             </h1>
             <p className="text-xs text-muted-foreground">
-              Upload → Prompt → Select → Generate
+              Upload · Prompt · Experience · Generate
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full border border-border/60 bg-card/80 px-3 py-1.5 text-xs font-semibold backdrop-blur-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border/60 bg-card/80 px-2.5 py-1.5 text-xs font-semibold backdrop-blur-sm sm:px-3">
               {isAdmin ? "∞ credits" : `${profile.credits} credits`}
             </span>
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary">
-              {cost} credits / gen
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary sm:px-3">
+              {cost} / gen
             </span>
-            <Button size="sm" variant="ghost" onClick={handleClear}>
+            <Button size="sm" variant="ghost" onClick={handleClear} className="min-h-[36px]">
               <RotateCcw className="mr-1.5 h-4 w-4" /> New
             </Button>
           </div>
@@ -536,7 +659,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
           <div className="order-1 space-y-5">
-            <div className={cn("p-4 sm:p-5", studioCardClass(studioTier))}>
+            <div className={cn("space-y-3 p-4 sm:p-5", studioCardClass(studioTier))}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Image
+              </p>
               <EditorUpload
                 fileRef={fileRef}
                 mediaType="image"
@@ -555,7 +681,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               />
             </div>
 
-            <div className={cn("p-4 sm:p-5", studioCardClass(studioTier))}>
+            <div className={cn("space-y-3 p-4 sm:p-5", studioCardClass(studioTier))}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Prompt
+              </p>
               <EditorPromptPanel
                 mediaType="image"
                 loading={loading}
@@ -569,18 +698,20 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             </div>
 
             <div className={cn("space-y-4 p-4 sm:p-5", studioCardClass(studioTier))}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                3. Select
-              </p>
               <StudioTierSelector
                 value={studioTier}
                 onChange={(t) => {
                   setStudioTier(t);
+                  const allowed = imageQualitiesForStudioTier(t);
+                  const preferred = studioTierToImageQuality(t);
                   if (!qualityTouchedRef.current) {
-                    setImageQuality(studioTierToImageQuality(t));
+                    setImageQuality(preferred);
+                  } else if (!allowed.includes(imageQuality)) {
+                    setImageQuality(preferred);
                   }
                 }}
               />
+              <div className="border-t border-border/50 pt-4">
               <EditorOptionsPanel
                 mediaType="image"
                 loading={loading}
@@ -610,10 +741,15 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 keepWatermark={keepWatermark}
                 setKeepWatermark={setKeepWatermark}
                 isFree={isFree}
+                studioTier={studioTier}
               />
+              </div>
             </div>
 
-            <div className={cn("p-4 sm:p-5", studioCardClass(studioTier))}>
+            <div className={cn("space-y-3 p-4 sm:p-5 ring-1 ring-primary/15", studioCardClass(studioTier))}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Generate
+              </p>
               <EditorGenerationControls
                 loading={loading}
                 onGenerate={runGenerate}
@@ -626,7 +762,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           </div>
 
           <div className="order-2 space-y-4 lg:sticky lg:top-4 lg:self-start">
-            {(loading || output) && (
+            {showInlinePreview && (loading || output) && (
               <div className={cn("p-3 sm:p-4", studioCardClass(studioTier))}>
                 <EditorPreview
                   state={state}
@@ -649,7 +785,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
             <EditorResult
               output={output}
-              loading={loading}
+              loading={loading || premiumCompleteHold || ultraCompleteHold}
               onDownload={handleDownload}
               onRegenerate={runGenerate}
               onEditAgain={handleUseResultAsInput}
@@ -659,14 +795,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               downloaded={downloaded}
             />
 
-            {!loading && !output && (
+            {!loading && !output && !premiumCompleteHold && !premiumGenError && !ultraCompleteHold && !ultraGenError && (
               <div
                 className={cn(
-                  "flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 px-4 py-8 text-center text-sm text-muted-foreground",
-                  studioCardClass(studioTier),
+                  "flex min-h-[100px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground",
                 )}
               >
-                Your result will appear here after you generate.
+                Result appears here after Generate.
               </div>
             )}
           </div>

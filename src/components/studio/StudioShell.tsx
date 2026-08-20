@@ -9,7 +9,7 @@ import {
 } from "@/lib/studio/studio-tier";
 
 const TITLES: Record<StudioEditorKind, string> = {
-  image: "IMG",
+  image: "Image",
   video: "Video",
   music: "Music",
 };

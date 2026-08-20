@@ -18,6 +18,6 @@ export const standardGenerateClass =
 export const standardMeta = {
   id: STANDARD_TIER,
   label: "Standard",
-  short: "HD",
-  blurb: "Clean · professional · fast generation.",
+  short: "Essential",
+  blurb: "Simple · essential editing.",
 } as const;
