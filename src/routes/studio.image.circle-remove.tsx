@@ -1,27 +1,34 @@
+/**
+ * Circle to Remove — dedicated product page
+ * ONE IMAGE · NO PROMPT · mask → generateMedia inpaint → finalize → credits
+ * Route: /studio/image/circle-remove (parent Outlet must render child)
+ */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Upload, Download, Share2, Pencil, RefreshCw, X, Camera, Sparkles, Image as ImageIcon,
+  ArrowLeft,
+  Upload,
+  Download,
+  Share2,
+  Pencil,
+  RefreshCw,
+  X,
+  Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { generateMedia } from "@/lib/generate.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { isAdminEmail } from "@/lib/admin-config";
-import { cn } from "@/lib/utils";
 import { CompareSlider } from "@/components/CompareSlider";
+import { secureDownloadImage } from "@/lib/download.functions";
+import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
 export const CIRCLE_INSTANT_CREDITS = 35;
-export const CIRCLE_PREP_CREDITS = 15;
-export const CIRCLE_STUDIO_EDIT_CREDITS = 25;
-
-export const SMART_ADD_PROMPT =
-  "In the masked region only, generate and insert the described content so it matches the surrounding lighting, perspective, scale and textures. Keep every unmasked pixel identical. If no object was described, fill the masked area with natural continuation of the nearby background.";
 
 const OVERLAY_STAGES = [
   "Analyzing image…",
@@ -34,67 +41,61 @@ const OVERLAY_STAGES = [
 ];
 
 export const Route = createFileRoute("/studio/image/circle-remove")({
-  validateSearch: (s: Record<string, unknown>) => ({
-    mode: s.mode === "add" ? ("add" as const) : ("remove" as const),
-  }),
   head: () => ({
     meta: [
-      { title: "Circle to Remove — Motio2edit" },
-      { name: "description", content: "Paint a region to remove or add content with Motio2edit." },
+      { title: "Circle to Remove — MOTIO2EDIT" },
+      {
+        name: "description",
+        content: "Paint an unwanted object and remove it — one image, no prompt.",
+      },
     ],
   }),
   component: CircleRemovePage,
 });
 
-type Phase = "idle" | "mask" | "generating" | "result";
+type Phase = "upload" | "select" | "generating" | "result";
 
 function CircleRemovePage() {
-  const { mode } = Route.useSearch();
   const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const generate = useServerFn(generateMedia);
+  const secureDl = useServerFn(secureDownloadImage);
   const fileRef = useRef<HTMLInputElement>(null);
   const generatingLockRef = useRef(false);
 
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [phase, setPhase] = useState<Phase>("idle");
+  const [phase, setPhase] = useState<Phase>("upload");
   const [output, setOutput] = useState<string | null>(null);
-  const [activeMode, setActiveMode] = useState<"remove" | "add">(mode);
-  const [addDescribe, setAddDescribe] = useState("");
-  const [instantRemove, setInstantRemove] = useState(true);
   const [lastMaskDataUrl, setLastMaskDataUrl] = useState<string | null>(null);
-  const [lastMaskMeta, setLastMaskMeta] = useState<{ width: number; height: number } | null>(null);
   const [stageIdx, setStageIdx] = useState(0);
   const [etaSec, setEtaSec] = useState(55);
-
-  useEffect(() => {
-    let next: "remove" | "add" = mode;
-    try {
-      const stored = sessionStorage.getItem("motio2edit-circle-mode");
-      if (stored === "add" || stored === "remove") next = stored;
-      sessionStorage.removeItem("motio2edit-circle-mode");
-    } catch { /* */ }
-    setActiveMode(next);
-  }, [mode]);
+  const [maskOpen, setMaskOpen] = useState(false);
 
   useEffect(() => {
     if (phase !== "generating") return;
     setStageIdx(0);
     setEtaSec(55);
-    const stageTimer = setInterval(() => setStageIdx((i) => Math.min(i + 1, OVERLAY_STAGES.length - 1)), 9000);
+    const stageTimer = setInterval(
+      () => setStageIdx((i) => Math.min(i + 1, OVERLAY_STAGES.length - 1)),
+      9000,
+    );
     const etaTimer = setInterval(() => setEtaSec((s) => Math.max(5, s - 3)), 3000);
-    return () => { clearInterval(stageTimer); clearInterval(etaTimer); };
+    return () => {
+      clearInterval(stageTimer);
+      clearInterval(etaTimer);
+    };
   }, [phase]);
 
   const isAdmin = isAdminEmail(profile?.email);
-  const displayCost = instantRemove ? CIRCLE_INSTANT_CREDITS : CIRCLE_PREP_CREDITS + CIRCLE_STUDIO_EDIT_CREDITS;
 
   if (!user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-        <p className="text-sm text-muted-foreground">Sign in to use Circle tools.</p>
-        <Button asChild className="mt-4"><Link to="/auth">Sign in</Link></Button>
+        <p className="text-sm text-muted-foreground">Sign in to use Circle to Remove.</p>
+        <Button asChild className="mt-4">
+          <Link to="/auth">Sign in</Link>
+        </Button>
       </div>
     );
   }
@@ -102,151 +103,139 @@ function CircleRemovePage() {
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
-    if (!f?.type.startsWith("image/")) return toast.error("Upload an image.");
+    if (!f?.type.startsWith("image/")) return toast.error("Upload one image.");
     if (f.size > 25 * 1024 * 1024) return toast.error("Max 25 MB.");
     if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setOutput(null);
     setLastMaskDataUrl(null);
-    setLastMaskMeta(null);
-    setPhase("mask");
+    setPhase("select");
+    setMaskOpen(true);
   };
 
   const upload = async (blob: Blob, name: string) => {
     const uid = profile?.id ?? user.id;
     const path = `${uid}/circle-${Date.now()}-${name}`;
     const { error } = await supabase.storage.from("uploads").upload(path, blob, {
-      contentType: blob.type || "image/png", upsert: true,
+      contentType: blob.type || "image/png",
+      upsert: true,
     });
     if (error) throw new Error(error.message);
-    const { data, error: sErr } = await supabase.storage.from("uploads").createSignedUrl(path, 3600 * 6);
+    const { data, error: sErr } = await supabase.storage
+      .from("uploads")
+      .createSignedUrl(path, 3600 * 6);
     if (sErr || !data?.signedUrl) throw new Error("Signed URL failed");
     return data.signedUrl;
   };
 
-  const runInstantGenerate = useCallback(
-    async (maskDataUrl: string, meta: { width: number; height: number }) => {
+  const runRemove = useCallback(
+    async (maskDataUrl: string) => {
       if (!file || !preview || generatingLockRef.current) return;
       if (!isAdmin && (profile?.credits ?? 0) < CIRCLE_INSTANT_CREDITS) {
         toast.error(`Not enough credits (${CIRCLE_INSTANT_CREDITS} required).`);
-        setPhase("mask");
+        setPhase("select");
+        setMaskOpen(true);
         return;
       }
       generatingLockRef.current = true;
+      setMaskOpen(false);
       setPhase("generating");
       setLastMaskDataUrl(maskDataUrl);
-      setLastMaskMeta(meta);
-      const t0 = performance.now();
       try {
-        const tUp = performance.now();
         const imageUrl = await upload(file, file.name || "src.jpg");
         const maskRes = await fetch(maskDataUrl);
         const maskBlob = await maskRes.blob();
         const maskUrl = await upload(maskBlob, "mask.png");
-        console.log("[circle] upload+sign ms:", Math.round(performance.now() - tUp));
 
-        const prompt =
-          activeMode === "remove"
-            ? SMART_REMOVE_PROMPT
-            : addDescribe.trim()
-              ? `${SMART_ADD_PROMPT} Content to add: ${addDescribe.trim()}`
-              : SMART_ADD_PROMPT;
-
-        const tFal = performance.now();
         const res = await generate({
           data: {
-            prompt, type: "image", imageUrl, sourceKind: "image",
-            maskImageUrl: maskUrl, imageQuality: "hd", circleInstant: true,
+            prompt: SMART_REMOVE_PROMPT,
+            type: "image",
+            imageUrl,
+            sourceKind: "image",
+            maskImageUrl: maskUrl,
+            imageQuality: "hd",
+            circleInstant: true,
           },
         });
-        console.log("[circle] fal+wm ms:", Math.round(performance.now() - tFal));
-        console.log("[circle] total ms:", Math.round(performance.now() - t0));
         setOutput(res.outputUrl);
         setPhase("result");
         await refreshProfile();
-        toast.success(activeMode === "remove" ? "Removal complete" : "Add complete");
+        toast.success("Object removed");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed");
-        setPhase("mask");
+        setPhase("select");
+        setMaskOpen(true);
       } finally {
         generatingLockRef.current = false;
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [file, preview, isAdmin, profile?.credits, activeMode, addDescribe, generate, refreshProfile],
+    [file, preview, isAdmin, profile?.credits, generate, refreshProfile],
   );
-
-  const handoffToStudio = useCallback(
-    async (maskDataUrl: string, meta: { width: number; height: number }) => {
-      if (!file || !preview) return;
-      try {
-        const imageUrl = await upload(file, file.name || "src.jpg");
-        const maskRes = await fetch(maskDataUrl);
-        const maskBlob = await maskRes.blob();
-        const maskUrl = await upload(maskBlob, "mask.png");
-        sessionStorage.setItem("motio2edit-circle-handoff", JSON.stringify({
-          source: "circle-remove", imageUrl, maskUrl,
-          naturalWidth: meta.width, naturalHeight: meta.height, mode: activeMode,
-          promptHint: activeMode === "remove" ? SMART_REMOVE_PROMPT : (addDescribe.trim() || SMART_ADD_PROMPT),
-          prepCredits: CIRCLE_PREP_CREDITS,
-          message: "Your selected removal area has been preserved. Add any additional edits you want, then generate.",
-        }));
-        sessionStorage.setItem("motio2edit-mode", "image");
-        setLastMaskDataUrl(maskDataUrl);
-        setLastMaskMeta(meta);
-        toast.message("Selected area ready — continue in Image Studio");
-        navigate({ to: "/editor" });
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Could not prepare handoff");
-        setPhase("mask");
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [file, preview, activeMode, addDescribe, navigate],
-  );
-
-  const onMaskApply = async (maskDataUrl: string, meta: { width: number; height: number }) => {
-    setLastMaskDataUrl(maskDataUrl);
-    setLastMaskMeta(meta);
-    if (instantRemove) await runInstantGenerate(maskDataUrl, meta);
-    else await handoffToStudio(maskDataUrl, meta);
-  };
 
   const shareResult = async () => {
     if (!output) return;
     try {
       if (navigator.share) await navigator.share({ title: "Motio2edit result", url: output });
-      else { await navigator.clipboard.writeText(output); toast.success("Link copied"); }
-    } catch { /* */ }
+      else {
+        await navigator.clipboard.writeText(output);
+        toast.success("Link copied");
+      }
+    } catch {
+      /* cancelled */
+    }
+  };
+
+  const downloadResult = async () => {
+    if (!output) return;
+    try {
+      const res = await secureDl({ data: { imageUrl: output, keepWatermark: false } });
+      await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
+      toast.success("Download started");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Download failed");
+    }
+  };
+
+  const resetPhoto = () => {
+    if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
+    setPreview(null);
+    setFile(null);
+    setOutput(null);
+    setLastMaskDataUrl(null);
+    setPhase("upload");
+    setMaskOpen(false);
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   if (phase === "generating") {
     return (
       <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-background">
-        <div className="pointer-events-none absolute inset-0 opacity-[0.07]" style={{
-          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(
-            `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><g fill='none' stroke='%23f97316' stroke-width='1.2'><rect x='18' y='22' width='44' height='34' rx='4'/><circle cx='40' cy='39' r='10'/><circle cx='40' cy='39' r='4'/><path d='M28 22 l4-6 h16 l4 6'/></g></svg>`,
-          )}")`,
-          backgroundSize: "80px 80px",
-        }} />
-        <button type="button" aria-label="Close" className="absolute right-4 top-4 rounded-full bg-secondary/80 p-2 text-muted-foreground hover:text-foreground"
-          onClick={() => toast.message("Generation is in progress. Result will appear when ready.")}>
+        <button
+          type="button"
+          aria-label="Close"
+          className="absolute right-4 top-4 rounded-full bg-secondary/80 p-2 text-muted-foreground hover:text-foreground"
+          onClick={() => toast.message("Generation is in progress. Result will appear when ready.")}
+        >
           <X className="h-5 w-5" />
         </button>
-        <div className="relative z-10 mx-4 flex w-full max-w-sm flex-col items-center gap-5 rounded-2xl border border-border/60 bg-card/90 px-6 py-10 shadow-xl backdrop-blur">
+        <div className="relative z-10 mx-4 flex w-full max-w-sm flex-col items-center gap-5 rounded-2xl border border-border/60 bg-card/90 px-6 py-10 shadow-xl backdrop-blur-md">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-500/15">
             <Sparkles className="h-7 w-7 animate-pulse text-orange-500" />
           </div>
           <p className="text-center text-base font-semibold">{OVERLAY_STAGES[stageIdx]}</p>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-            <div className="h-full rounded-full bg-orange-500 transition-all duration-700"
-              style={{ width: `${Math.min(95, ((stageIdx + 1) / OVERLAY_STAGES.length) * 100)}%` }} />
+            <div
+              className="h-full rounded-full bg-orange-500 transition-all duration-700"
+              style={{
+                width: `${Math.min(95, ((stageIdx + 1) / OVERLAY_STAGES.length) * 100)}%`,
+              }}
+            />
           </div>
           <p className="text-sm text-muted-foreground">Estimated time: ~{etaSec}s</p>
-          <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground/80">
-            <Camera className="h-3.5 w-3.5" /><span>Motio2edit AI</span><ImageIcon className="h-3.5 w-3.5" />
-          </div>
+          <p className="text-[11px] text-muted-foreground/80">{CIRCLE_INSTANT_CREDITS} credits</p>
         </div>
       </div>
     );
@@ -255,40 +244,62 @@ function CircleRemovePage() {
   if (phase === "result" && output && preview) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
-        <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
-          <button type="button" onClick={() => { setPhase("mask"); setOutput(null); }}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Edit mask
+        <header className="flex items-center justify-between gap-2 border-b border-border/60 bg-card/50 px-3 py-3 backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => {
+              setPhase("select");
+              setOutput(null);
+              setMaskOpen(true);
+            }}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" /> Edit selection
           </button>
           <h1 className="text-sm font-semibold">Result</h1>
           <span className="w-16" />
         </header>
         <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-3 py-4">
-          <div className="overflow-hidden rounded-xl border border-border">
+          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-md">
             <CompareSlider before={preview} after={output} />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Button asChild className="h-11 bg-orange-500 hover:bg-orange-600">
-              <a href={output} download={`motio2edit-circle-${Date.now()}.jpg`}>
-                <Download className="mr-1.5 h-4 w-4" /> Download
-              </a>
+            <Button className="h-11 bg-orange-500 hover:bg-orange-600" onClick={() => void downloadResult()}>
+              <Download className="mr-1.5 h-4 w-4" /> Download
             </Button>
-            <Button variant="outline" className="h-11" onClick={shareResult}>
+            <Button variant="outline" className="h-11" onClick={() => void shareResult()}>
               <Share2 className="mr-1.5 h-4 w-4" /> Share
             </Button>
-            <Button variant="outline" className="h-11" onClick={() => setPhase("mask")}>
-              <Pencil className="mr-1.5 h-4 w-4" /> Edit mask
-            </Button>
-            <Button variant="outline" className="h-11"
+            <Button
+              variant="outline"
+              className="h-11"
               onClick={() => {
-                if (lastMaskDataUrl && lastMaskMeta) void runInstantGenerate(lastMaskDataUrl, lastMaskMeta);
-                else setPhase("mask");
-              }}>
-              <RefreshCw className="mr-1.5 h-4 w-4" /> Generate again
+                setPhase("select");
+                setOutput(null);
+                setMaskOpen(true);
+              }}
+            >
+              <Pencil className="mr-1.5 h-4 w-4" /> Remove another
+            </Button>
+            <Button
+              variant="outline"
+              className="h-11"
+              onClick={() => {
+                if (lastMaskDataUrl) void runRemove(lastMaskDataUrl);
+                else {
+                  setPhase("select");
+                  setMaskOpen(true);
+                }
+              }}
+            >
+              <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerate
             </Button>
           </div>
-          <Button variant="secondary" className="h-11 w-full" onClick={() => navigate({ to: "/studio/image" })}>
-            Continue in Image Studio
+          <Button variant="secondary" className="h-11 w-full" onClick={resetPhoto}>
+            <ImageIcon className="mr-1.5 h-4 w-4" /> Edit another photo
+          </Button>
+          <Button variant="ghost" className="h-10 w-full" onClick={() => navigate({ to: "/studio/image" })}>
+            Back to Image Studio
           </Button>
         </main>
       </div>
@@ -297,76 +308,90 @@ function CircleRemovePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-3">
-        <button type="button" onClick={() => navigate({ to: "/studio/image" })}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <header className="flex items-center justify-between gap-2 border-b border-border/60 bg-card/50 px-3 py-3 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/studio/image" })}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
-        <div className="inline-flex overflow-hidden rounded-full border border-border text-xs font-semibold">
-          <button type="button" onClick={() => setActiveMode("remove")}
-            className={cn("px-3 py-1.5", activeMode === "remove" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground")}>
-            Remove
-          </button>
-          <button type="button" onClick={() => setActiveMode("add")}
-            className={cn("px-3 py-1.5", activeMode === "add" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground")}>
-            Add
-          </button>
+        <div className="text-center">
+          <h1 className="text-sm font-semibold">
+            Circle to <span className="text-primary">Remove</span>
+          </h1>
+          <p className="text-[10px] text-muted-foreground">One image · No prompt · {CIRCLE_INSTANT_CREDITS} credits</p>
         </div>
-        <span className="text-[11px] tabular-nums text-muted-foreground">{displayCost} cr</span>
+        <span className="w-14 text-right text-[11px] tabular-nums text-muted-foreground">
+          {isAdmin ? "∞" : profile?.credits ?? 0} cr
+        </span>
       </header>
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-3 py-4">
-        {activeMode === "add" && (
-          <div className="mb-3">
-            <label className="text-xs font-medium text-muted-foreground">What to add (optional)</label>
-            <input value={addDescribe} onChange={(e) => setAddDescribe(e.target.value.slice(0, 400))}
-              placeholder="e.g. a red balloon, a wooden bench…"
-              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" />
-          </div>
-        )}
-
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
-          <div className="min-w-0">
-            <Label htmlFor="instant-remove" className="text-sm font-semibold">Instant Remove</Label>
-            <p className="text-[11px] text-muted-foreground">
-              {instantRemove
-                ? `ON — generate now (${CIRCLE_INSTANT_CREDITS} credits)`
-                : `OFF — continue in Image Studio (${CIRCLE_PREP_CREDITS}+${CIRCLE_STUDIO_EDIT_CREDITS} later)`}
-            </p>
-          </div>
-          <Switch id="instant-remove" checked={instantRemove} onCheckedChange={setInstantRemove} />
-        </div>
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-3 py-6">
+        <ol className="mb-6 flex flex-wrap gap-2 text-[11px] font-medium text-muted-foreground">
+          <li className={phase === "upload" ? "text-primary" : ""}>1. Upload</li>
+          <li aria-hidden>→</li>
+          <li className={phase === "select" ? "text-primary" : ""}>2. Select</li>
+          <li aria-hidden>→</li>
+          <li>3. Remove</li>
+          <li aria-hidden>→</li>
+          <li>4. Output</li>
+        </ol>
 
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
 
         {!preview ? (
-          <button type="button" onClick={() => fileRef.current?.click()}
-            className="flex min-h-[50vh] flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card text-sm text-muted-foreground hover:border-primary">
-            <Upload className="h-8 w-8" />
-            Upload image to paint a region
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex min-h-[50vh] flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-card/60 text-sm text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary hover:bg-primary/5"
+          >
+            <Upload className="h-9 w-9 text-primary" />
+            <span className="font-medium text-foreground">Upload one image</span>
+            <span className="text-xs">Then paint the object to remove — no prompt needed</span>
           </button>
         ) : (
-          <div className="space-y-3">
-            {phase !== "mask" && (
-              <div className="overflow-hidden rounded-xl border border-border">
-                <img src={preview} alt="" className="mx-auto max-h-[50vh] w-full object-contain" />
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => setPhase("mask")}>{lastMaskDataUrl ? "Edit mask" : "Paint mask"}</Button>
-              <Button variant="outline" onClick={() => fileRef.current?.click()}>Replace image</Button>
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-md">
+              <img
+                src={preview}
+                alt="Source"
+                className="mx-auto max-h-[55vh] w-full object-contain"
+              />
             </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="h-11 flex-1 bg-orange-500 hover:bg-orange-600 sm:flex-none"
+                onClick={() => {
+                  setPhase("select");
+                  setMaskOpen(true);
+                }}
+              >
+                <Pencil className="mr-1.5 h-4 w-4" /> Paint area to remove
+              </Button>
+              <Button variant="outline" className="h-11" onClick={() => fileRef.current?.click()}>
+                Replace image
+              </Button>
+            </div>
+            <p className="text-center text-[11px] text-muted-foreground">
+              Paint over the unwanted object, then tap Remove. No text prompt.
+            </p>
           </div>
         )}
       </main>
 
       <SmartRemoveModal
-        open={phase === "mask" && !!preview}
+        open={maskOpen && !!preview}
         imageUrl={preview}
-        onCancel={() => setPhase("idle")}
-        onApply={onMaskApply}
-        applyLabel={instantRemove ? "Generate" : "Continue"}
-        externalBusy={generatingLockRef.current}
+        onCancel={() => {
+          setMaskOpen(false);
+          if (!lastMaskDataUrl && !output) {
+            /* stay on select with image */
+          }
+        }}
+        onApply={(maskDataUrl) => {
+          void runRemove(maskDataUrl);
+        }}
       />
     </div>
   );
