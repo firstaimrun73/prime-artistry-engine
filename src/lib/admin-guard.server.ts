@@ -10,10 +10,21 @@ export function adminEmail(): string {
   return (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 }
 
+/** All accepted admin emails (ADMIN_EMAIL + optional ADMIN_EMAILS comma list + known ops). */
+export function adminEmails(): string[] {
+  const primary = adminEmail();
+  const extra = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const known = ["firstaimrun89@gmail.com", "firstaimrun73@gmail.com"];
+  return Array.from(new Set([primary, ...extra, ...known].filter(Boolean)));
+}
+
 export function isAdminClaims(claims: Claims | null | undefined): boolean {
-  const expected = adminEmail();
   const caller = String(claims?.email ?? "").trim().toLowerCase();
-  return !!expected && !!caller && caller === expected;
+  if (!caller) return false;
+  return adminEmails().includes(caller);
 }
 
 async function logAttempt(claims: Claims | null | undefined, path: string, allowed: boolean) {
