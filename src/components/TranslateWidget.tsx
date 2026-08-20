@@ -216,6 +216,8 @@ export function TranslateWidget() {
 
 /**
  * Single attractive language control: icon button → popover menu.
+ * Labels stay English: whole control uses class "notranslate" + translate="no"
+ * (Google ignores data-no-translate alone).
  * Mount once in Header (desktop + mobile). No floating select text.
  */
 export function GoogleLanguageSelect({ className }: { className?: string }) {
@@ -254,7 +256,12 @@ export function GoogleLanguageSelect({ className }: { className?: string }) {
   };
 
   return (
-    <div ref={rootRef} className={cn("relative", className)} data-no-translate>
+    <div
+      ref={rootRef}
+      className={cn("relative notranslate", className)}
+      translate="no"
+      data-no-translate
+    >
       <button
         type="button"
         aria-label={`Language: ${current.label}. Change language`}
@@ -292,7 +299,9 @@ export function GoogleLanguageSelect({ className }: { className?: string }) {
                     : "text-foreground hover:bg-secondary",
                 )}
               >
-                <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                <span className="min-w-0 flex-1 truncate notranslate" translate="no">
+                  {l.label}
+                </span>
                 {active && <Check className="h-3.5 w-3.5 shrink-0" />}
               </button>
             );
