@@ -21,7 +21,7 @@ export function StudioTierSelector({
   return (
     <div className={cn("w-full min-w-0", className)}>
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Studio tier
+        Experience
       </p>
       <div className="grid grid-cols-3 gap-2">
         {STUDIO_TIERS.map((id) => {
@@ -41,7 +41,7 @@ export function StudioTierSelector({
                 active && id === "standard" && "border-primary bg-primary/10 ring-1 ring-primary/30",
                 active && id === "pro" && "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30",
                 active && id === "premium" && "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/40",
-                !active && "border-border bg-card hover:border-primary/40",
+                !active && "border-border/80 bg-card/80 backdrop-blur-sm hover:border-primary/40",
                 isLocked && "cursor-not-allowed opacity-50",
               )}
               aria-pressed={active}
@@ -57,6 +57,9 @@ export function StudioTierSelector({
           );
         })}
       </div>
+      <p className="mt-2 text-[10px] text-muted-foreground">
+        Same approved image models · Premium defaults to higher output quality.
+      </p>
     </div>
   );
 }
