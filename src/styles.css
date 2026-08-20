@@ -289,7 +289,6 @@ body { top: 0 !important; }
   0%, 100% { transform: translateY(4%) scaleY(0.96); opacity: 0.55; }
   50% { transform: translateY(-2%) scaleY(1.04); opacity: 0.9; }
 }
-/* Ultra AI (internal premium): deep navy + gold + emerald */
 .studio-vip-field {
   background:
     radial-gradient(circle at 50% 40%, rgba(212, 175, 55, 0.12), transparent 48%),
@@ -451,4 +450,42 @@ body { top: 0 !important; }
   .ultra-ai-stage-in {
     animation: none !important;
   }
+}
+
+/* ── Voice input (Image Studio) — restrained motion ─────────────────── */
+@keyframes voice-wave-bar {
+  0%, 100% { transform: scaleY(0.45); opacity: 0.55; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+.voice-wave-bar {
+  transform-origin: bottom center;
+  animation: voice-wave-bar 0.9s ease-in-out infinite;
+}
+@keyframes voice-mic-ring {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.06); }
+}
+.voice-mic-ring {
+  animation: voice-mic-ring 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-wave-bar,
+  .voice-mic-ring {
+    animation: none !important;
+  }
+}
+
+/* Ultra AI control UI — readable secondary text on navy */
+.studio-tier-premium .text-muted-foreground {
+  color: rgb(203 213 225);
+}
+.studio-tier-premium .border-border {
+  border-color: rgba(212, 175, 55, 0.22);
+}
+.studio-tier-premium .bg-card {
+  background-color: rgba(18, 28, 48, 0.95);
+  color: rgb(241 245 249);
+}
+.studio-tier-premium .bg-background\/40 {
+  background-color: rgba(15, 23, 42, 0.55);
 }
