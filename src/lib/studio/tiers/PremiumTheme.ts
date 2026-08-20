@@ -1,29 +1,31 @@
 /**
- * PREMIUM internal id → user-facing VIP experience.
- * Midnight Navy · Luxury Gold · Electric Cyan — premium AI studio, not gaming UI.
+ * PREMIUM internal id → user-facing Ultra AI experience (flagship).
+ * Midnight Navy · Luxury Gold · Emerald accent — highest Image Studio path.
  * Internal id remains "premium" for plan gates / registry.
  *
+ * Public hierarchy: Standard → Premium → Ultra AI
+ *
  * Palette roles:
- * - Deep Navy / Midnight Blue — primary background & major surfaces
- * - Luxury Gold — VIP highlights, premium borders, selected states, primary VIP actions
- * - Electric Cyan / Ice Blue — AI / active controls, secondary interactive accents
+ * - Deep Navy / Midnight — primary background & major surfaces
+ * - Luxury Gold — Ultra AI highlights, premium borders, selected states
+ * - Emerald / Ice accents — AI activity, secondary interactive accents
  */
 
 export const PREMIUM_TIER = "premium";
 
-/** Deep navy shell — navy dominates; gold & cyan only as strategic accents. */
+/** Deep navy shell — navy dominates; gold as strategic accent. */
 export const premiumShellClass =
-  "studio-tier-premium studio-exp-vip bg-[#0B1220] text-slate-100";
+  "studio-tier-premium studio-exp-ultra bg-[#0B1220] text-slate-100";
 
-/** Cards / panels: slightly lighter navy with subtle gold border + cyan edge glow. */
+/** Cards / panels: slightly lighter navy with subtle gold border. */
 export const premiumCardClass =
-  "rounded-2xl border border-[#D4AF37]/25 bg-[#111B2E]/95 text-slate-100 shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_20px_40px_-18px_rgba(11,18,32,0.85)] backdrop-blur-md";
+  "rounded-2xl border border-[#D4AF37]/25 bg-[#111B2E]/95 text-slate-100 shadow-[0_0_0_1px_rgba(47,174,130,0.08),0_20px_40px_-18px_rgba(11,18,32,0.85)] backdrop-blur-md";
 
-/** Accent text — luxury gold for VIP identity. */
+/** Accent text — luxury gold for Ultra AI identity. */
 export const premiumAccentClass = "text-[#E8C547]";
 
 /**
- * Primary VIP action: solid luxury gold with dark navy text (high contrast, premium feel).
+ * Primary Ultra AI action: solid luxury gold with dark navy text.
  * No rainbow gradients — gold communicates exclusive.
  */
 export const premiumGenerateClass =
@@ -31,7 +33,7 @@ export const premiumGenerateClass =
 
 export const premiumMeta = {
   id: PREMIUM_TIER,
-  label: "VIP",
-  short: "Elite",
-  blurb: "Cinematic elite · highest fidelity path.",
+  label: "Ultra AI",
+  short: "Flagship",
+  blurb: "Highest-end AI · max fidelity path.",
 } as const;

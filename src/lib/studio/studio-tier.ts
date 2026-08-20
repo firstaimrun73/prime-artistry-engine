@@ -2,7 +2,7 @@
  * Shared editor tier types for Image / Video / Music studios.
  * Visual tokens live under lib/studio/tiers/
  * Internal ids: standard | pro | premium
- * User-facing: Standard | Premium | VIP (pro→Premium, premium→VIP)
+ * User-facing: Standard | Premium | Ultra AI (pro→Premium, premium→Ultra AI)
  * Model selection lives in per-studio registries under lib/studio/{image,video,music}/
  */
 
@@ -109,7 +109,7 @@ export function studioTierToImageQuality(tier: StudioTier): "sd" | "hd" | "2k" |
   }
 }
 
-/** User-facing experience name (Standard / Premium / VIP). */
+/** User-facing experience name (Standard / Premium / Ultra AI). */
 export function studioExperienceLabel(tier: StudioTier): string {
   return STUDIO_TIER_META[tier].label;
 }
@@ -126,7 +126,7 @@ export function imageStudioHeaderTitle(tier: StudioTier): string {
     case "pro":
       return "IMG Studio Premium";
     case "premium":
-      return "IMG Studio VIP";
+      return "IMG Studio Ultra AI";
   }
 }
 
