@@ -1,21 +1,21 @@
 /**
  * PREMIUM internal id → user-facing VIP experience.
- * Black · white · gold + deep plum & champagne for clear text.
+ * Indigo · violet · cyan (high contrast) — not flat black/white.
  * Internal id remains "premium" for plan gates / registry.
  */
 
 export const PREMIUM_TIER = "premium";
 
 export const premiumShellClass =
-  "studio-tier-premium studio-exp-vip bg-[#0a0a0b] text-zinc-50";
+  "studio-tier-premium studio-exp-vip bg-gradient-to-b from-indigo-950 via-violet-950 to-slate-950 text-indigo-50";
 
 export const premiumCardClass =
-  "rounded-2xl border border-[#d4af37]/35 bg-[#121214]/95 text-zinc-50 shadow-[0_0_0_1px_rgba(212,175,55,0.18),0_24px_48px_-24px_rgba(0,0,0,0.75)] backdrop-blur-md";
+  "rounded-2xl border border-cyan-400/35 bg-indigo-950/80 text-indigo-50 shadow-[0_0_0_1px_rgba(34,211,238,0.2),0_24px_48px_-20px_rgba(79,70,229,0.55)] backdrop-blur-md";
 
-export const premiumAccentClass = "text-[#e8c547]";
+export const premiumAccentClass = "text-cyan-300";
 
 export const premiumGenerateClass =
-  "bg-gradient-to-r from-[#f5e6b8] via-[#d4af37] to-[#c9a227] text-[#0a0a0b] hover:opacity-95 font-semibold shadow-lg shadow-[#d4af37]/25";
+  "bg-gradient-to-r from-cyan-400 via-violet-500 to-indigo-500 text-white hover:opacity-95 font-semibold shadow-lg shadow-violet-500/30";
 
 export const premiumMeta = {
   id: PREMIUM_TIER,

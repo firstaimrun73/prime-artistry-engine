@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { BrandMark, BRAND_NAME } from "@/components/BrandMark";
+import { useAuth } from "@/lib/auth";
 
 const LINKS: { label: string; to: string }[] = [
   { label: "FAQ", to: "/faq" },
@@ -12,17 +13,20 @@ const LINKS: { label: string; to: string }[] = [
 ];
 
 /**
- * Resource footer — intentionally limited to Profile / account surfaces
- * so it does not repeat on home, studios, editor, or other app screens.
+ * After login: footer only on profile / settings / dashboard.
+ * Logged out: marketing & legal pages may show footer.
+ * Never on studios, editor, pricing (when signed in), etc.
  */
-function shouldShowFooter(pathname: string): boolean {
-  if (pathname.startsWith("/dashboard")) return true;
-  if (pathname.startsWith("/settings")) return true;
-  if (pathname.startsWith("/profile")) return true;
-  // Public marketing / legal pages may still show a light footer
+function shouldShowFooter(pathname: string, signedIn: boolean): boolean {
+  if (signedIn) {
+    if (pathname.startsWith("/profile")) return true;
+    if (pathname.startsWith("/settings")) return true;
+    if (pathname.startsWith("/dashboard")) return true;
+    return false;
+  }
+  // Logged-out marketing / legal only
   if (
     pathname === "/" ||
-    pathname.startsWith("/pricing") ||
     pathname.startsWith("/faq") ||
     pathname.startsWith("/support") ||
     pathname.startsWith("/security") ||
@@ -31,10 +35,9 @@ function shouldShowFooter(pathname: string): boolean {
     pathname.startsWith("/features") ||
     pathname.startsWith("/feedback")
   ) {
-    // Signed-in home is "/" — parent should not pass Footer for signed-in.
-    // When used as AppFooter with auth awareness, callers control inclusion.
     return true;
   }
+  // Pricing footer hidden for everyone (cleaner checkout path)
   return false;
 }
 
@@ -48,9 +51,11 @@ export function Footer({
   forceHide?: boolean;
 } = {}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user } = useAuth();
+  const signedIn = !!user;
 
   if (forceHide) return null;
-  if (!force && !shouldShowFooter(pathname)) return null;
+  if (!force && !shouldShowFooter(pathname, signedIn)) return null;
 
   return (
     <footer className="border-t border-border bg-background">
