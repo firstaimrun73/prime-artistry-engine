@@ -1,6 +1,10 @@
 import { cn } from "@/lib/utils";
 import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-registry";
-import { VIDEO_STYLE_MODIFIERS, USER_MAX_DURATION_SEC } from "@/lib/video-model-registry";
+import {
+  VIDEO_STYLE_MODIFIERS,
+  USER_MAX_DURATION_SEC,
+  SCRIPT_MAX_DURATION_SEC,
+} from "@/lib/video-model-registry";
 
 function ChipGroup<T extends string>({
   label,
@@ -108,19 +112,13 @@ export function VideoFeaturePanel({
 }) {
   const safeAspect = (aspects.includes(aspect) ? aspect : aspects[0] ?? "16:9") as VideoAspect;
   const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
+  const customCap = SCRIPT_MAX_DURATION_SEC;
 
   const customNum = customInput.trim() === "" ? null : parseInt(customInput, 10);
   const customInvalid =
     customMode &&
     customInput.trim() !== "" &&
-    (customNum === null || Number.isNaN(customNum) || customNum < 1 || customNum > USER_MAX_DURATION_SEC);
-  const customOverAvailable =
-    customMode &&
-    customNum !== null &&
-    !Number.isNaN(customNum) &&
-    customNum >= 1 &&
-    customNum <= USER_MAX_DURATION_SEC &&
-    customNum > availableMaxDuration;
+    (customNum === null || Number.isNaN(customNum) || customNum < 1 || customNum > customCap);
 
   return (
     <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
@@ -208,7 +206,7 @@ export function VideoFeaturePanel({
         label="Resolution"
         options={resolutions.map((r) => ({
           id: r,
-          label: r === "4k" ? "4K" : r,
+          label: r === "4k" ? "4K" : r === "2k" ? "2K" : r,
         }))}
         value={safeRes}
         onChange={setResolution}
@@ -244,7 +242,7 @@ export function VideoFeaturePanel({
             disabled={disabled}
             onClick={() => {
               setCustomMode(true);
-              if (customInput === "") setCustomInput(String(duration));
+              if (customInput === "") setCustomInput(String(Math.min(duration, customCap) || 20));
             }}
             className={cn(
               "rounded-full border px-3 py-1.5 text-xs font-semibold",
@@ -257,38 +255,30 @@ export function VideoFeaturePanel({
           </button>
         </div>
         {customMode && (
-          <div className="mt-2 space-y-1">
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={USER_MAX_DURATION_SEC}
-                value={customInput}
-                disabled={disabled}
-                placeholder="1–60"
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setCustomInput(v);
-                  if (v.trim() === "") return;
-                  const n = parseInt(v, 10);
-                  if (!Number.isNaN(n) && n >= 1 && n <= USER_MAX_DURATION_SEC) {
-                    setDuration(n);
-                  }
-                }}
-                className="w-24 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
-              />
-              <span className="text-xs text-muted-foreground">seconds (1–{USER_MAX_DURATION_SEC})</span>
-            </div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={customCap}
+              value={customInput}
+              disabled={disabled}
+              placeholder="1–40"
+              onChange={(e) => {
+                const v = e.target.value;
+                setCustomInput(v);
+                if (v.trim() === "") return;
+                const n = parseInt(v, 10);
+                if (!Number.isNaN(n) && n >= 1 && n <= customCap) {
+                  setDuration(n);
+                }
+              }}
+              className="w-24 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+            />
             {customInput.trim() === "" && (
-              <p className="text-xs text-muted-foreground">Enter a duration between 1 and {USER_MAX_DURATION_SEC} seconds.</p>
+              <span className="text-xs text-muted-foreground">Enter duration</span>
             )}
             {customInvalid && (
-              <p className="text-xs font-medium text-red-600">Maximum duration is {USER_MAX_DURATION_SEC} seconds.</p>
-            )}
-            {customOverAvailable && (
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                Maximum available for these settings is {availableMaxDuration}s. Try a shorter duration or Premium.
-              </p>
+              <span className="text-xs font-medium text-red-600">Max {customCap}s</span>
             )}
           </div>
         )}
