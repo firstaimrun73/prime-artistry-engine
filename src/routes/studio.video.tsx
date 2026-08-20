@@ -1,7 +1,7 @@
 /**
  * Video Studio — thin orchestrator.
- * Model selection is backend-only via selectVideoModel().
- * Users never see fal.ai model names or model cards.
+ * User picks Standard/Premium + creative requirements.
+ * Backend selectVideoModel() chooses the engine. No model names in UI.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -15,7 +15,6 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo } from "@/lib/policy";
 import { generateMedia } from "@/lib/generate.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { maxVideoDurationForPlan } from "@/lib/video-options";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { cn } from "@/lib/utils";
 import { VideoModeSelector } from "@/components/video/VideoModeSelector";
@@ -30,6 +29,8 @@ import {
   videoSelectionUnavailableMessage,
   capabilitiesForTier,
   estimateRequestCredits,
+  availableMaxDurationFor,
+  USER_MAX_DURATION_SEC,
   type VideoGenMode,
   type VideoAspect,
   type VideoResolution,
@@ -47,13 +48,10 @@ export const Route = createFileRoute("/studio/video")({
   component: VideoStudioPage,
 });
 
-function planToTier(plan: string | null | undefined, admin: boolean): VideoTier {
-  if (admin) return "premium";
+function planAllowsPremium(plan: string | null | undefined, admin: boolean): boolean {
+  if (admin) return true;
   const p = (plan ?? "").toLowerCase();
-  if (p.includes("pro") || p.includes("premium") || p.includes("business") || p.includes("studio")) {
-    return "premium";
-  }
-  return "standard";
+  return p.includes("pro") || p.includes("premium") || p.includes("business") || p.includes("studio");
 }
 
 function VideoStudioPage() {
@@ -67,13 +65,14 @@ function VideoStudioPage() {
     email: profile?.email,
     isAdmin: admin,
   });
-
-  const tier = planToTier(profile?.plan, admin);
+  const premiumAllowed = planAllowsPremium(profile?.plan, admin);
 
   const [mode, setMode] = useState<VideoGenMode>("text");
+  const [tier, setTier] = useState<VideoTier>("standard");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(5);
-  const [customDuration, setCustomDuration] = useState("");
+  const [customMode, setCustomMode] = useState(false);
+  const [customInput, setCustomInput] = useState("");
   const [aspect, setAspect] = useState<VideoAspect>("16:9");
   const [resolution, setResolution] = useState<VideoResolution>("720p");
   const [soundOn, setSoundOn] = useState(false);
@@ -86,27 +85,14 @@ function VideoStudioPage() {
   const [result, setResult] = useState<VideoStudioResult | null>(null);
 
   const caps = useMemo(() => capabilitiesForTier(tier, mode), [tier, mode]);
-  const planMax = maxVideoDurationForPlan(profile?.plan);
-  const effectiveMax = Math.min(caps.maxDuration, admin ? caps.maxDuration : planMax);
-
-  useEffect(() => {
-    setDuration(caps.durations[0] ?? 5);
-    setCustomDuration("");
-    setAspect(caps.aspects[0] ?? "16:9");
-    setResolution(
-      caps.resolutions.includes("1080p")
-        ? "1080p"
-        : (caps.resolutions[0] ?? "720p"),
-    );
-    if (!caps.nativeAudio) setSoundOn(false);
-  }, [mode, tier]); // eslint-disable-line react-hooks/exhaustive-deps
+  const availableMax = useMemo(() => availableMaxDurationFor(tier, mode), [tier, mode]);
 
   useEffect(() => {
     if (!caps.aspects.includes(aspect)) setAspect(caps.aspects[0] ?? "16:9");
-    if (!caps.resolutions.includes(resolution)) setResolution(caps.resolutions[0] ?? "720p");
-    if (duration > caps.maxDuration) setDuration(caps.maxDuration);
-    if (!caps.nativeAudio) setSoundOn(false);
-  }, [caps, aspect, resolution, duration]);
+    if (!caps.resolutions.includes(resolution)) {
+      setResolution(caps.resolutions.includes("1080p") ? "1080p" : (caps.resolutions[0] ?? "720p"));
+    }
+  }, [caps, aspect, resolution]);
 
   const cost = useMemo(
     () =>
@@ -150,14 +136,25 @@ function VideoStudioPage() {
     return () => timers.forEach(clearTimeout);
   }, [busy]);
 
+  const customEmpty = customMode && customInput.trim() === "";
+  const customInvalid =
+    customMode &&
+    customInput.trim() !== "" &&
+    (() => {
+      const n = parseInt(customInput, 10);
+      return Number.isNaN(n) || n < 1 || n > USER_MAX_DURATION_SEC;
+    })();
+
   const canGenerate = useMemo(() => {
-    if (duration > effectiveMax) return false;
+    if (customEmpty || customInvalid) return false;
+    if (duration < 1 || duration > USER_MAX_DURATION_SEC) return false;
+    if (duration > availableMax) return false;
     if (mode === "video") return !!mediaFile;
     if (!prompt.trim()) return false;
     if (mode === "image" && !mediaFile) return false;
     if (!selected) return false;
     return true;
-  }, [prompt, mode, mediaFile, duration, effectiveMax, selected]);
+  }, [prompt, mode, mediaFile, duration, availableMax, selected, customEmpty, customInvalid]);
 
   if (user && profile && !allowed) {
     return (
@@ -213,6 +210,17 @@ function VideoStudioPage() {
   const onGenerate = async () => {
     if (!canGenerate || busy) return;
 
+    if (duration > USER_MAX_DURATION_SEC) {
+      toast.error(`Maximum duration is ${USER_MAX_DURATION_SEC} seconds.`);
+      return;
+    }
+    if (duration > availableMax) {
+      toast.error(
+        `Maximum available for these settings is ${availableMax}s. Try a shorter duration or Premium.`,
+      );
+      return;
+    }
+
     const model = selectVideoModel({
       mode,
       tier,
@@ -232,10 +240,6 @@ function VideoStudioPage() {
           soundOn,
         }),
       );
-      return;
-    }
-    if (duration > model.maxDuration) {
-      toast.error(`Max duration is ${model.maxDuration}s for these settings.`);
       return;
     }
     if (!admin && (profile?.credits ?? 0) < cost) {
@@ -384,20 +388,25 @@ function VideoStudioPage() {
 
       <div className="mb-5">
         <VideoFeaturePanel
+          tier={tier}
+          setTier={setTier}
+          premiumLocked={!premiumAllowed}
+          onPremiumLockedClick={() => navigate({ to: "/pricing" })}
           aspects={caps.aspects}
           resolutions={caps.resolutions}
-          durations={caps.durations}
-          maxDuration={caps.maxDuration}
+          availableMaxDuration={availableMax}
           nativeAudioAvailable={caps.nativeAudio}
-          supportsNegativePrompt={caps.supportsNegativePrompt}
+          supportsNegativePrompt={caps.supportsNegativePrompt && mode !== "video"}
           aspect={aspect}
           setAspect={setAspect}
           resolution={resolution}
           setResolution={setResolution}
           duration={duration}
           setDuration={setDuration}
-          customDuration={customDuration}
-          setCustomDuration={setCustomDuration}
+          customMode={customMode}
+          setCustomMode={setCustomMode}
+          customInput={customInput}
+          setCustomInput={setCustomInput}
           soundOn={soundOn}
           setSoundOn={setSoundOn}
           styleId={styleId}
@@ -416,7 +425,7 @@ function VideoStudioPage() {
 
       {!busy && (
         <div className="space-y-2">
-          {!selected && (
+          {!selected && !customEmpty && !customInvalid && (
             <p className="text-center text-xs text-amber-600 dark:text-amber-400">
               {videoSelectionUnavailableMessage({
                 mode,
@@ -433,9 +442,10 @@ function VideoStudioPage() {
               Estimated <span className="font-bold tabular-nums text-foreground">{cost || "—"}</span> credits
             </span>
             <VideoCreditsInfo
+              tier={tier}
               duration={duration}
               resolution={resolution}
-              sound={caps.nativeAudio ? (soundOn ? "On" : "Off") : "Unavailable"}
+              sound={soundOn ? "On" : "Off"}
               credits={cost}
             />
           </div>
