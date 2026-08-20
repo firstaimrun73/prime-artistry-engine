@@ -43,6 +43,7 @@ import {
   studioCardClass,
   studioShellClass,
   studioTierToImageQuality,
+  studioGenerateClass,
   imageStudioHeaderTitle,
   experienceWatermarkLine,
   studioExperienceLabel,
@@ -605,6 +606,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 onStop={handleStop}
                 videoLocked={false}
                 noCredits={noCredits}
+                generateClassName={studioGenerateClass(studioTier)}
               />
             </div>
           </div>
@@ -626,6 +628,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   isAdmin={isAdmin}
                   isFree={isFree}
                   keepWatermark={keepWatermark}
+                  studioTier={studioTier}
                 />
               </div>
             )}
