@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
  * Canonical product wordmark: Motio2edit
  * Only the digit "2" uses the primary highlight color.
  * The letter "O" is never specially colored.
+ * Always English — never translated by Google Website Translator.
  */
 export function BrandMark({
   className,
@@ -27,9 +28,11 @@ export function BrandMark({
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 items-center gap-2 font-extrabold tracking-tight",
+        "notranslate inline-flex min-w-0 items-center gap-2 font-extrabold tracking-tight",
         className,
       )}
+      translate="no"
+      data-no-translate
     >
       {showIcon && <Sparkles className={cn(icon, "shrink-0 text-primary")} />}
       <span className={cn("leading-none whitespace-nowrap", text)}>
