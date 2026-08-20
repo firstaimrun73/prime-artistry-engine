@@ -115,18 +115,16 @@ export function studioExperienceLabel(tier: StudioTier): string {
 }
 
 /**
- * Header title parts for Image Studio.
- * Prefer rendering: IMG + orange "Studio" + optional experience badge.
- * Kept for any string-only consumers; UI should use styled markup.
+ * Header title for Image Studio string consumers.
  */
 export function imageStudioHeaderTitle(tier: StudioTier): string {
   switch (tier) {
     case "standard":
-      return "IMG Studio";
+      return "Image Studio";
     case "pro":
-      return "IMG Studio Premium";
+      return "Image Studio · Premium";
     case "premium":
-      return "IMG Studio Ultra AI";
+      return "Image Studio · Ultra AI";
   }
 }
 
@@ -138,4 +136,27 @@ export function experienceWatermarkLine(tier: StudioTier, planDisplayName: strin
   const exp = studioExperienceLabel(tier);
   const plan = (planDisplayName || "Free").trim() || "Free";
   return `Motio2edit ${exp} — ${plan}`;
+}
+
+/** Image quality ids exposed per experience (public hierarchy). */
+export function imageQualitiesForStudioTier(tier: StudioTier): Array<"sd" | "hd" | "2k" | "4k"> {
+  switch (tier) {
+    case "standard":
+      return ["sd", "hd"];
+    case "pro":
+      return ["sd", "hd", "2k"];
+    case "premium":
+      return ["sd", "hd", "2k", "4k"];
+  }
+}
+
+/** Aspect ratios for text-to-image per experience. */
+export function aspectRatiosForStudioTier(tier: StudioTier): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4"> {
+  switch (tier) {
+    case "standard":
+      return ["1:1", "16:9", "9:16"];
+    case "pro":
+    case "premium":
+      return ["1:1", "4:3", "16:9", "9:16", "3:4"];
+  }
 }
