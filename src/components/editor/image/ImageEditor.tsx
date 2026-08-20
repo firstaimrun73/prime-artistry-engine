@@ -311,7 +311,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     const runId = ++runIdRef.current;
     setState("analyzing");
     setOutput(null);
-    setDownloaded(false);
+    setDownloaded(false;
     setPremiumCompleteHold(false);
     setPremiumGenError(null);
     setUltraCompleteHold(false);
@@ -624,21 +624,17 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight">
               <span className="text-foreground">Image</span>{" "}
               <span className="text-orange-500">Studio</span>
-              {studioTier !== "standard" && (
-                <>
-                  <span className="mx-1.5 text-muted-foreground/60 font-normal">·</span>
-                  <span
-                    className={cn(
-                      "align-middle text-sm sm:text-base font-semibold tracking-normal",
-                      studioTier === "premium"
-                        ? "text-[#E8C547]"
-                        : "text-orange-600 dark:text-orange-400",
-                    )}
-                  >
-                    {expLabel}
-                  </span>
-                </>
-              )}
+              <span className="mx-1.5 text-muted-foreground/50 font-normal">·</span>
+              <span
+                className={cn(
+                  "align-middle text-sm sm:text-base font-semibold tracking-normal",
+                  studioTier === "premium" && "text-[#E8C547]",
+                  studioTier === "pro" && "text-orange-600 dark:text-orange-400",
+                  studioTier === "standard" && "text-primary",
+                )}
+              >
+                {expLabel}
+              </span>
             </h1>
             <p className="text-xs text-muted-foreground">
               Upload · Prompt · Experience · Generate
@@ -750,9 +746,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               </div>
             </div>
 
-            <div className={cn("space-y-3 p-4 sm:p-5", studioCardClass(studioTier))}>
+            <div className={cn("space-y-3 p-4 sm:p-5 ring-1 ring-primary/15", studioCardClass(studioTier))}>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Generation
+                Generate
               </p>
               <EditorGenerationControls
                 loading={loading}
@@ -802,11 +798,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             {!loading && !output && !premiumCompleteHold && !premiumGenError && !ultraCompleteHold && !ultraGenError && (
               <div
                 className={cn(
-                  "flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 px-4 py-8 text-center text-sm text-muted-foreground",
-                  studioCardClass(studioTier),
+                  "flex min-h-[100px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground",
                 )}
               >
-                Your result will appear here after you generate.
+                Result appears here after Generate.
               </div>
             )}
           </div>
