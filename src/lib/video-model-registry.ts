@@ -15,6 +15,9 @@ export type VideoTier = VideoModelTierSection;
 export type VideoResolution = "480p" | "720p" | "1080p" | "4k";
 export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 
+/** Product-facing max duration (seconds). Backend may support less for a given request. */
+export const USER_MAX_DURATION_SEC = 60;
+
 export type VideoModelDef = {
   id: string;
   name: string;
@@ -417,9 +420,19 @@ export function videoSelectionUnavailableMessage(opts: {
     }
   }
   if (opts.mode === "video") {
-    return "Video → Video is not available for these settings. Try Text → Video or Image → Video, or adjust duration/resolution.";
+    return "Video → Video isn't available for these settings. Try Text → Video or Image → Video, or adjust duration/resolution.";
   }
-  return "No video engine supports this combination. Try a shorter duration, different resolution, or another aspect ratio.";
+  return "This combination isn't available yet. Try a shorter duration, different resolution, or another aspect ratio.";
+}
+
+/** Max duration the backend can fulfill for this tier/mode (union of models). */
+export function availableMaxDurationFor(tier: VideoTier, mode: VideoGenMode): number {
+  const list = modelsInTier(tier, mode);
+  if (list.length === 0 && tier === "premium") {
+    return availableMaxDurationFor("standard", mode);
+  }
+  if (list.length === 0) return 0;
+  return Math.min(USER_MAX_DURATION_SEC, Math.max(...list.map((m) => m.maxDuration)));
 }
 
 export function defaultModelForMode(mode: VideoGenMode): VideoModelDef {
