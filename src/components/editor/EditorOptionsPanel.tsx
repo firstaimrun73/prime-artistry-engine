@@ -1,4 +1,4 @@
-import { Lock, Coins } from "lucide-react";
+import { Lock, Coins, Info } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/prompt-suggestions";
@@ -25,8 +25,15 @@ import {
 import {
   imageQualitiesForStudioTier,
   aspectRatiosForStudioTier,
+  studioExperienceLabel,
   type StudioTier,
 } from "@/lib/studio/studio-tier";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useState } from "react";
 
 interface EditorOptionsPanelProps {
   mediaType: "image" | "video";
@@ -65,6 +72,25 @@ interface EditorOptionsPanelProps {
   studioTier?: StudioTier;
 }
 
+/** Compact visual shape for aspect-ratio chips. */
+function AspectShape({ id }: { id: string }) {
+  const dims: Record<string, { w: number; h: number }> = {
+    "1:1": { w: 16, h: 16 },
+    "4:3": { w: 18, h: 14 },
+    "16:9": { w: 20, h: 11 },
+    "9:16": { w: 11, h: 18 },
+    "3:4": { w: 14, h: 18 },
+  };
+  const d = dims[id] ?? { w: 16, h: 16 };
+  return (
+    <span
+      aria-hidden
+      className="block shrink-0 rounded-[2px] border-2 border-current opacity-90"
+      style={{ width: d.w, height: d.h }}
+    />
+  );
+}
+
 export function EditorOptionsPanel({
   mediaType,
   loading,
@@ -93,6 +119,11 @@ export function EditorOptionsPanel({
   isFree,
   studioTier = "standard",
 }: EditorOptionsPanelProps) {
+  const [costOpen, setCostOpen] = useState(false);
+  const expLabel = studioExperienceLabel(studioTier);
+  const qualityLabel =
+    IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.label ?? imageQuality.toUpperCase();
+
   return (
     <section className="space-y-4">
       {mediaType === "image" ? (
@@ -105,7 +136,7 @@ export function EditorOptionsPanel({
         </p>
       )}
 
-      {/* Aspect ratio — text-to-image only; tier-limited */}
+      {/* Aspect ratio — visual diagrams; tier-limited */}
       {!loading && mediaType === "image" && !inputDataUrl && (
         <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
           <p className="text-[11px] font-medium text-muted-foreground">Aspect ratio</p>
@@ -119,13 +150,14 @@ export function EditorOptionsPanel({
                   key={a.id}
                   type="button"
                   onClick={() => setAspectRatio(a.id)}
-                  className={`min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                  className={`flex min-h-[48px] min-w-[52px] flex-col items-center justify-center gap-1.5 rounded-xl border px-2.5 py-2 text-[11px] font-medium transition-all ${
                     active
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
+                      ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground"
                   }`}
                 >
-                  {a.label}
+                  <AspectShape id={a.id} />
+                  <span className="tabular-nums">{a.label}</span>
                 </button>
               );
             })}
@@ -133,13 +165,13 @@ export function EditorOptionsPanel({
         </div>
       )}
 
-      {/* Output quality — gated by experience */}
+      {/* Output quality — labels only (no credit tags); gated by experience */}
       {!loading && mediaType === "image" && (() => {
         const allowed = imageQualitiesForStudioTier(studioTier);
         const visible = IMAGE_QUALITY_OPTIONS.filter((q) => allowed.includes(q.id));
         return (
           <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
-            <p className="text-[11px] font-medium text-muted-foreground">Output quality</p>
+            <p className="text-[11px] font-medium text-muted-foreground">Quality</p>
             <div className="flex flex-wrap gap-2">
               {visible.map((q) => {
                 const active = imageQuality === q.id;
@@ -149,7 +181,7 @@ export function EditorOptionsPanel({
                     type="button"
                     title={q.hint}
                     onClick={() => setImageQuality(q.id)}
-                    className={`min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                    className={`min-h-[40px] rounded-full border px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-all ${
                       active
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
@@ -162,7 +194,7 @@ export function EditorOptionsPanel({
             </div>
             <p className="text-[11px] text-muted-foreground">
               {IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.hint}
-              {studioTier === "standard" && " · Upgrade for 2K / 4K."}
+              {studioTier === "standard" && " · Premium unlocks 2K."}
               {studioTier === "pro" && " · Ultra AI unlocks 4K."}
             </p>
           </div>
@@ -318,6 +350,51 @@ export function EditorOptionsPanel({
             <div className="text-muted-foreground">
               After generation: {isAdmin ? "∞" : Math.max(0, credits - cost)} credits remaining
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generation cost — dynamic from existing credit logic; not on quality chips */}
+      {mediaType === "image" && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
+          <span className="text-xs font-medium text-muted-foreground">Generation cost</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              {cost} credits
+            </span>
+            <Popover open={costOpen} onOpenChange={setCostOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  aria-label="Cost breakdown"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 space-y-3 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Generation cost
+                </p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Experience</span>
+                    <span className="font-medium">{expLabel}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Quality</span>
+                    <span className="font-medium">{qualityLabel}</span>
+                  </div>
+                  <div className="border-t border-border pt-2 flex justify-between gap-3">
+                    <span className="font-medium">Estimated cost</span>
+                    <span className="font-semibold tabular-nums">{cost} credits</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Balance: {isAdmin ? "∞" : credits} · After: {isAdmin ? "∞" : Math.max(0, credits - cost)}
+                </p>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       )}
