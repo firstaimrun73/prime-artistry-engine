@@ -1,10 +1,7 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-registry";
-import {
-  VIDEO_STYLE_MODIFIERS,
-  USER_MAX_DURATION_SEC,
-  SCRIPT_MAX_DURATION_SEC,
-} from "@/lib/video-model-registry";
+import { VIDEO_STYLE_MODIFIERS } from "@/lib/video-model-registry";
 
 function ChipGroup<T extends string>({
   label,
@@ -14,7 +11,7 @@ function ChipGroup<T extends string>({
   disabled,
 }: {
   label: string;
-  options: { id: T; label: string }[];
+  options: { id: T; label: string; node?: ReactNode }[];
   value: T;
   onChange: (v: T) => void;
   disabled?: boolean;
@@ -31,13 +28,14 @@ function ChipGroup<T extends string>({
             disabled={disabled}
             onClick={() => onChange(o.id)}
             className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+              "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
               value === o.id
                 ? "border-red-500 bg-red-500 text-white"
                 : "border-border bg-background text-muted-foreground hover:border-red-400/50",
               disabled && "opacity-40",
             )}
           >
+            {o.node}
             {o.label}
           </button>
         ))}
@@ -46,14 +44,38 @@ function ChipGroup<T extends string>({
   );
 }
 
+function AspectShape({ ratio, active }: { ratio: VideoAspect; active: boolean }) {
+  const map: Record<VideoAspect, { w: number; h: number }> = {
+    "16:9": { w: 22, h: 12 },
+    "9:16": { w: 10, h: 18 },
+    "1:1": { w: 14, h: 14 },
+    "4:3": { w: 18, h: 14 },
+    "3:4": { w: 12, h: 16 },
+    "21:9": { w: 24, h: 10 },
+  };
+  const s = map[ratio] ?? { w: 16, h: 12 };
+  return (
+    <span
+      className={cn(
+        "inline-block shrink-0 rounded-[2px] border",
+        active ? "border-white/80 bg-white/25" : "border-current/40 bg-current/10",
+      )}
+      style={{ width: s.w, height: s.h }}
+      aria-hidden
+    />
+  );
+}
+
 const ASPECT_LABELS: Partial<Record<VideoAspect, string>> = {
-  "9:16": "9:16 · TikTok / Reels",
-  "16:9": "16:9 · Landscape",
-  "1:1": "1:1 · Square",
-  "21:9": "21:9 · Ultrawide",
+  "16:9": "16:9",
+  "9:16": "9:16",
+  "1:1": "1:1",
+  "4:3": "4:3",
+  "3:4": "3:4",
+  "21:9": "21:9",
 };
 
-const PRESET_DURATIONS = [5, 8, 10] as const;
+export type VideoSizeOption = "small" | "medium" | "large";
 
 export function VideoFeaturePanel({
   tier,
@@ -62,25 +84,19 @@ export function VideoFeaturePanel({
   onPremiumLockedClick,
   aspects,
   resolutions,
-  availableMaxDuration,
-  nativeAudioAvailable,
-  supportsNegativePrompt,
+  durations,
   aspect,
   setAspect,
   resolution,
   setResolution,
   duration,
   setDuration,
-  customMode,
-  setCustomMode,
-  customInput,
-  setCustomInput,
+  size,
+  setSize,
   soundOn,
   setSoundOn,
   styleId,
   setStyleId,
-  negativePrompt,
-  setNegativePrompt,
   disabled,
 }: {
   tier: VideoTier;
@@ -89,36 +105,24 @@ export function VideoFeaturePanel({
   onPremiumLockedClick?: () => void;
   aspects: VideoAspect[];
   resolutions: VideoResolution[];
-  availableMaxDuration: number;
-  nativeAudioAvailable: boolean;
-  supportsNegativePrompt: boolean;
+  durations: number[];
   aspect: VideoAspect;
   setAspect: (v: VideoAspect) => void;
   resolution: VideoResolution;
   setResolution: (v: VideoResolution) => void;
   duration: number;
   setDuration: (v: number) => void;
-  customMode: boolean;
-  setCustomMode: (v: boolean) => void;
-  customInput: string;
-  setCustomInput: (v: string) => void;
+  size: VideoSizeOption;
+  setSize: (v: VideoSizeOption) => void;
   soundOn: boolean;
   setSoundOn: (v: boolean) => void;
   styleId: string;
   setStyleId: (v: string) => void;
-  negativePrompt: string;
-  setNegativePrompt: (v: string) => void;
   disabled?: boolean;
 }) {
   const safeAspect = (aspects.includes(aspect) ? aspect : aspects[0] ?? "16:9") as VideoAspect;
   const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
-  const customCap = SCRIPT_MAX_DURATION_SEC;
-
-  const customNum = customInput.trim() === "" ? null : parseInt(customInput, 10);
-  const customInvalid =
-    customMode &&
-    customInput.trim() !== "" &&
-    (customNum === null || Number.isNaN(customNum) || customNum < 1 || customNum > customCap);
+  const durationOpts = durations.length ? durations : [5, 8, 10];
 
   return (
     <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
@@ -155,11 +159,9 @@ export function VideoFeaturePanel({
                 : "border-border/70 bg-background hover:border-red-400/40",
             )}
           >
-            <p className="text-sm font-bold">
-              Premium{premiumLocked ? " 🔒" : ""}
-            </p>
+            <p className="text-sm font-bold">Premium{premiumLocked ? " 🔒" : ""}</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Higher quality, longer videos, audio, and advanced capabilities.
+              Higher quality, longer clips, audio, and advanced capabilities.
             </p>
           </button>
         </div>
@@ -169,7 +171,7 @@ export function VideoFeaturePanel({
         <div>
           <p className="text-sm font-medium">Sound</p>
           <p className="text-[11px] text-muted-foreground">
-            {soundOn ? "Synchronized audio when available" : "Silent video"}
+            {soundOn ? "Synchronized audio when supported" : "Silent video"}
           </p>
         </div>
         <button
@@ -194,16 +196,35 @@ export function VideoFeaturePanel({
         </button>
       </div>
 
-      <ChipGroup
-        label="Aspect ratio"
-        options={aspects.map((a) => ({ id: a, label: ASPECT_LABELS[a] ?? a }))}
-        value={safeAspect}
-        onChange={setAspect}
-        disabled={disabled}
-      />
+      <div>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aspect ratio</p>
+        <div className="flex flex-wrap gap-2">
+          {aspects.map((a) => {
+            const active = safeAspect === a;
+            return (
+              <button
+                key={a}
+                type="button"
+                disabled={disabled}
+                onClick={() => setAspect(a)}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
+                  active
+                    ? "border-red-500 bg-red-500 text-white"
+                    : "border-border bg-background text-muted-foreground hover:border-red-400/50",
+                  disabled && "opacity-40",
+                )}
+              >
+                <AspectShape ratio={a} active={active} />
+                {ASPECT_LABELS[a] ?? a}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <ChipGroup
-        label="Resolution"
+        label="Quality"
         options={resolutions.map((r) => ({
           id: r,
           label: r === "4k" ? "4K" : r === "2k" ? "2K" : r,
@@ -213,79 +234,28 @@ export function VideoFeaturePanel({
         disabled={disabled}
       />
 
-      <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Duration</p>
-        <div className="flex flex-wrap gap-2">
-          {PRESET_DURATIONS.map((d) => (
-            <button
-              key={d}
-              type="button"
-              disabled={disabled}
-              onClick={() => {
-                setCustomMode(false);
-                setCustomInput("");
-                setDuration(d);
-              }}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-semibold",
-                !customMode && duration === d
-                  ? "border-red-500 bg-red-500 text-white"
-                  : "border-border bg-background text-muted-foreground",
-                disabled && "opacity-40",
-              )}
-            >
-              {d}s
-            </button>
-          ))}
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => {
-              setCustomMode(true);
-              if (customInput === "") setCustomInput(String(Math.min(duration, customCap) || 20));
-            }}
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-semibold",
-              customMode
-                ? "border-red-500 bg-red-500 text-white"
-                : "border-border bg-background text-muted-foreground",
-            )}
-          >
-            Custom
-          </button>
-        </div>
-        {customMode && (
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={customCap}
-              value={customInput}
-              disabled={disabled}
-              placeholder="1–40"
-              onChange={(e) => {
-                const v = e.target.value;
-                setCustomInput(v);
-                if (v.trim() === "") return;
-                const n = parseInt(v, 10);
-                if (!Number.isNaN(n) && n >= 1 && n <= customCap) {
-                  setDuration(n);
-                }
-              }}
-              className="w-24 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
-            />
-            {customInput.trim() === "" && (
-              <span className="text-xs text-muted-foreground">Enter duration</span>
-            )}
-            {customInvalid && (
-              <span className="text-xs font-medium text-red-600">Max {customCap}s</span>
-            )}
-          </div>
-        )}
-      </div>
+      <ChipGroup
+        label="Size"
+        options={[
+          { id: "small" as VideoSizeOption, label: "Small" },
+          { id: "medium" as VideoSizeOption, label: "Medium" },
+          { id: "large" as VideoSizeOption, label: "Large" },
+        ]}
+        value={size}
+        onChange={setSize}
+        disabled={disabled}
+      />
+
+      <ChipGroup
+        label="Duration"
+        options={durationOpts.map((d) => ({ id: String(d) as `${number}`, label: `${d}s` }))}
+        value={String(duration) as `${number}`}
+        onChange={(v) => setDuration(parseInt(v, 10))}
+        disabled={disabled}
+      />
 
       <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style / Filter</p>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style</p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -316,20 +286,6 @@ export function VideoFeaturePanel({
           ))}
         </div>
       </div>
-
-      {supportsNegativePrompt && (
-        <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Negative prompt</p>
-          <input
-            type="text"
-            value={negativePrompt}
-            disabled={disabled}
-            onChange={(e) => setNegativePrompt(e.target.value)}
-            placeholder="blur, low quality, watermark…"
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-          />
-        </div>
-      )}
     </div>
   );
 }
