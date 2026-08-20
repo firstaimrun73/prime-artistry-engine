@@ -59,12 +59,13 @@ export function Header() {
         {/* Brand — shrink-0 so Motio2edit wordmark stays fully readable */}
         <Link
           to="/"
-          className="flex shrink-0 items-center gap-1.5 sm:gap-2"
+          className="notranslate flex shrink-0 items-center gap-1.5 sm:gap-2"
+          translate="no"
           aria-label="Motio2edit home"
         >
           <BrandMark />
           <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground xl:inline">
-            by Motion2AI
+            <span className="notranslate" translate="no">by Motion2AI</span>
           </span>
         </Link>
 
@@ -83,8 +84,7 @@ export function Header() {
           {user && admin && (
             <Link
               to="/admin"
-              activeProps={{ className: "text-foreground" }}
-              className="inline-flex items-center gap-1 text-primary transition-colors hover:text-foreground"
+              className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80"
             >
               <ShieldCheck className="h-3.5 w-3.5" /> Admin
             </Link>
@@ -97,7 +97,7 @@ export function Header() {
             Pre-login language: independent control in the action cluster (not beside logo in the same flex item).
             Post-login: same single header language control — do not add a second selector.
           */}
-          <div className="shrink-0" data-no-translate>
+          <div className="notranslate shrink-0" translate="no" data-no-translate>
             <GoogleLanguageSelect className="shrink-0" />
           </div>
 
@@ -118,45 +118,41 @@ export function Header() {
                   return (
                     <Link
                       to="/dashboard"
-                      className={`hidden items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold sm:flex ${tone}`}
+                      className={`hidden items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold sm:inline-flex ${tone}`}
                     >
-                      {!admin && c <= 0 ? (
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                      ) : (
-                        <Coins className={`h-3.5 w-3.5 ${tone ? "" : "text-primary"}`} />
-                      )}
-                      {admin ? "∞ credits" : `${c} credits`}
+                      <Coins className="h-3.5 w-3.5" />
+                      {admin ? "∞" : c.toLocaleString()}
                     </Link>
                   );
                 })()}
-
-              {profile && <CrownBadge plan={profile.plan} className="hidden sm:inline-flex" />}
-              <Link to="/dashboard" aria-label="Account" className="transition-opacity hover:opacity-80">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={profile?.avatar_signed_url ?? undefined}
-                    alt={profile?.display_name ?? "Account"}
-                  />
+              <Link to="/dashboard" className="hidden sm:block">
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <CrownBadge plan={profile?.plan ?? "free"} />
+                  <span className="text-xs text-muted-foreground">Dashboard</span>
+                </Button>
+              </Link>
+              <Link to="/profile" className="shrink-0">
+                <Avatar className="h-8 w-8 border border-border">
+                  <AvatarImage src={profile?.avatar_url ?? undefined} alt="" />
                   <AvatarFallback className="text-xs">
-                    {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
+                    {(profile?.email ?? user.email ?? "U").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </Link>
             </>
           ) : (
             <>
-              {/* Sign in: hide on very narrow phones (still available in menu) to free width for logo + Get started */}
               <Button
                 variant="ghost"
                 size="sm"
-                className="hidden px-2 min-[400px]:inline-flex sm:px-3"
+                className="hidden sm:inline-flex"
                 onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}
               >
                 Sign in
               </Button>
               <Button
                 size="sm"
-                className="px-2.5 text-xs sm:px-3 sm:text-sm"
+                className="hidden sm:inline-flex"
                 onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}
               >
                 Get started
