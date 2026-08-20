@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { VideoModelDef, VideoResolution, VideoAspect } from "@/lib/video-model-registry";
+import type { VideoResolution, VideoAspect } from "@/lib/video-model-registry";
 import { VIDEO_STYLE_MODIFIERS } from "@/lib/video-model-registry";
 
 function ChipGroup<T extends string>({
@@ -43,7 +43,12 @@ function ChipGroup<T extends string>({
 }
 
 export function VideoFeaturePanel({
-  model,
+  aspects,
+  resolutions,
+  durations,
+  maxDuration,
+  nativeAudioAvailable,
+  supportsNegativePrompt,
   aspect,
   setAspect,
   resolution,
@@ -60,7 +65,12 @@ export function VideoFeaturePanel({
   setNegativePrompt,
   disabled,
 }: {
-  model: VideoModelDef;
+  aspects: VideoAspect[];
+  resolutions: VideoResolution[];
+  durations: number[];
+  maxDuration: number;
+  nativeAudioAvailable: boolean;
+  supportsNegativePrompt: boolean;
   aspect: VideoAspect;
   setAspect: (v: VideoAspect) => void;
   resolution: VideoResolution;
@@ -77,6 +87,9 @@ export function VideoFeaturePanel({
   setNegativePrompt: (v: string) => void;
   disabled?: boolean;
 }) {
+  const safeAspect = (aspects.includes(aspect) ? aspect : aspects[0] ?? "16:9") as VideoAspect;
+  const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
+
   return (
     <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Features</p>
@@ -85,26 +98,29 @@ export function VideoFeaturePanel({
         <div>
           <p className="text-sm font-medium">Sound</p>
           <p className="text-[11px] text-muted-foreground">
-            {model.nativeAudio
-              ? "Native synchronized audio (dialogue, ambience, SFX where supported)"
-              : "Sound unavailable for this model"}
+            {nativeAudioAvailable
+              ? soundOn
+                ? "Synchronized audio when supported"
+                : "Silent video"
+              : "Audio not available for these settings"}
           </p>
         </div>
-        {model.nativeAudio ? (
+        {nativeAudioAvailable ? (
           <button
             type="button"
             disabled={disabled}
             aria-pressed={soundOn}
+            aria-label={soundOn ? "Sound on" : "Sound off"}
             onClick={() => setSoundOn(!soundOn)}
             className={cn(
-              "relative h-7 w-12 rounded-full transition-colors",
+              "relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-out",
               soundOn ? "bg-red-500" : "bg-muted",
               disabled && "opacity-50",
             )}
           >
             <span
               className={cn(
-                "absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                "absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ease-out",
                 soundOn ? "left-6" : "left-1",
               )}
             />
@@ -116,19 +132,19 @@ export function VideoFeaturePanel({
 
       <ChipGroup
         label="Aspect ratio"
-        options={model.aspects.map((a) => ({ id: a, label: a }))}
-        value={(model.aspects.includes(aspect) ? aspect : model.aspects[0]) as VideoAspect}
+        options={aspects.map((a) => ({ id: a, label: a }))}
+        value={safeAspect}
         onChange={setAspect}
         disabled={disabled}
       />
 
       <ChipGroup
         label="Resolution"
-        options={model.resolutions.map((r) => ({
+        options={resolutions.map((r) => ({
           id: r,
           label: r === "4k" ? "4K" : r,
         }))}
-        value={(model.resolutions.includes(resolution) ? resolution : model.resolutions[0]) as VideoResolution}
+        value={safeRes}
         onChange={setResolution}
         disabled={disabled}
       />
@@ -136,7 +152,7 @@ export function VideoFeaturePanel({
       <div>
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Duration</p>
         <div className="flex flex-wrap gap-2">
-          {model.durations.map((d) => (
+          {durations.map((d) => (
             <button
               key={d}
               type="button"
@@ -175,22 +191,22 @@ export function VideoFeaturePanel({
             <input
               type="number"
               min={1}
-              max={model.maxDuration}
+              max={maxDuration}
               value={customDuration}
               disabled={disabled}
               onChange={(e) => {
                 setCustomDuration(e.target.value);
                 const n = parseInt(e.target.value, 10);
-                if (!Number.isNaN(n) && n >= 1 && n <= model.maxDuration) setDuration(n);
+                if (!Number.isNaN(n) && n >= 1 && n <= maxDuration) setDuration(n);
               }}
               className="w-24 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
             />
-            <span className="text-xs text-muted-foreground">max {model.maxDuration}s for this model</span>
+            <span className="text-xs text-muted-foreground">max {maxDuration}s</span>
           </div>
         )}
-        {duration > model.maxDuration && (
+        {duration > maxDuration && (
           <p className="mt-1 text-xs font-medium text-red-600">
-            Duration exceeds this model's limit ({model.maxDuration}s). Generation blocked.
+            Duration exceeds the limit ({maxDuration}s). Generation blocked.
           </p>
         )}
       </div>
@@ -226,10 +242,10 @@ export function VideoFeaturePanel({
             </button>
           ))}
         </div>
-        <p className="mt-1 text-[10px] text-muted-foreground">Styles are prompt modifiers, not separate model APIs.</p>
+        <p className="mt-1 text-[10px] text-muted-foreground">Styles are prompt modifiers.</p>
       </div>
 
-      {model.supportsNegativePrompt && (
+      {supportsNegativePrompt && (
         <div>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Negative prompt</p>
           <input
