@@ -34,6 +34,6 @@ export const premiumGenerateClass =
 export const premiumMeta = {
   id: PREMIUM_TIER,
   label: "Ultra AI",
-  short: "Flagship",
-  blurb: "Highest-end AI · max fidelity path.",
+  short: "Maximum",
+  blurb: "Max quality · advanced AI path.",
 } as const;

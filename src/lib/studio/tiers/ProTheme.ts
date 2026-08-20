@@ -20,6 +20,6 @@ export const proGenerateClass =
 export const proMeta = {
   id: PRO_TIER,
   label: "Premium",
-  short: "Energy",
-  blurb: "Orange creative energy · advanced generation.",
+  short: "Advanced",
+  blurb: "More tools · better quality.",
 } as const;
