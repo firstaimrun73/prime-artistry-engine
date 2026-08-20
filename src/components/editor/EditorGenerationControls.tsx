@@ -9,11 +9,11 @@ interface EditorGenerationControlsProps {
   onStop: () => void;
   videoLocked: boolean;
   noCredits: boolean;
-  /** Image Studio Auto mode (separate from Global Auto page) */
   autoMode?: boolean;
   onAutoModeChange?: (on: boolean) => void;
-  /** Hide Auto toggle for video media */
   showAutoToggle?: boolean;
+  /** Optional Experience-specific generate button classes (Premium/VIP). */
+  generateClassName?: string;
 }
 
 export function EditorGenerationControls({
@@ -25,6 +25,7 @@ export function EditorGenerationControls({
   autoMode = false,
   onAutoModeChange,
   showAutoToggle = true,
+  generateClassName,
 }: EditorGenerationControlsProps) {
   return (
     <section className="space-y-3 pt-1">
@@ -67,22 +68,21 @@ export function EditorGenerationControls({
         </Button>
       ) : (
         <Button
-          className="min-h-[48px] w-full text-base hover-scale"
+          className={cn("min-h-[48px] w-full text-base hover-scale", generateClassName)}
           onClick={onGenerate}
           disabled={videoLocked || noCredits}
         >
           <Sparkles className="mr-1.5 h-4 w-4" />
-          {autoMode ? "Generate with Auto" : "Generate"}
+          {noCredits ? "Not enough credits" : "Generate"}
         </Button>
       )}
 
-      {noCredits && (
-        <p className="text-center text-xs text-destructive-foreground">
-          Out of credits —{" "}
-          <Link to="/pricing" className="underline">
-            get more
-          </Link>
-          .
+      {noCredits && !loading && (
+        <p className="text-center text-xs text-muted-foreground">
+          <Link to="/pricing" className="font-medium text-primary underline-offset-2 hover:underline">
+            Upgrade your plan
+          </Link>{" "}
+          to continue generating.
         </p>
       )}
     </section>
