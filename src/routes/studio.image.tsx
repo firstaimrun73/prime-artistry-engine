@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
@@ -23,14 +23,30 @@ export const Route = createFileRoute("/studio/image")({
   component: ImageStudio,
 });
 
+/** Child product routes under /studio/image/* — must render via Outlet, never redirect to /editor. */
+const CHILD_PRODUCT_PREFIXES = [
+  "/studio/image/auto-edit",
+  "/studio/image/circle-remove",
+  "/studio/image/multi",
+  "/studio/image/tools",
+] as const;
+
+function isChildProductRoute(pathname: string): boolean {
+  return CHILD_PRODUCT_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
 /**
- * Image Studio → Image Editor panel directly.
- * Never routes to Global Auto. Multi-Image remains a separate feature.
+ * Image Studio landing for exact /studio/image.
+ * Child routes (Auto Edit, Circle Remove, Multi, Tools) render themselves via Outlet.
  */
 function ImageStudio() {
   const { user, profile } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isChild = isChildProductRoute(pathname);
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
 
@@ -44,8 +60,10 @@ function ImageStudio() {
     navigate({ to: user ? "/editor" : "/auth", search: user ? undefined : { redirect: "/editor" } });
   };
 
-  // Signed-in users go straight into the Image Editor panel.
+  // Exact /studio/image only: signed-in users go into the Image Editor.
+  // Never redirect Auto Edit / Circle / Multi / Tools.
   useEffect(() => {
+    if (isChild) return;
     if (!user) return;
     try {
       sessionStorage.setItem("motio2edit-mode", "image");
@@ -53,10 +71,13 @@ function ImageStudio() {
     } catch {
       /* ignore */
     }
-    navigate({ to: "/editor" });
-  }, [user, navigate]);
+    void navigate({ to: "/editor" });
+  }, [user, navigate, isChild]);
 
-  // While redirecting signed-in users, avoid flashing the gateway.
+  if (isChild) {
+    return <Outlet />;
+  }
+
   if (user) {
     return (
       <div className="min-h-screen bg-background">
