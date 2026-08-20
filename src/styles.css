@@ -276,7 +276,7 @@ body { top: 0 !important; }
   }
 }
 
-/* ── Image Studio experiences: Premium flame + VIP field ───────────── */
+/* ── Image Studio experiences: Premium flame + Ultra AI field ───────── */
 .studio-premium-flame {
   background:
     radial-gradient(ellipse 80% 50% at 50% 100%, rgba(249, 115, 22, 0.35), transparent 70%),
@@ -289,11 +289,11 @@ body { top: 0 !important; }
   0%, 100% { transform: translateY(4%) scaleY(0.96); opacity: 0.55; }
   50% { transform: translateY(-2%) scaleY(1.04); opacity: 0.9; }
 }
-/* VIP: deep navy base with soft gold center + cyan AI edge accents */
+/* Ultra AI (internal premium): deep navy + gold + emerald */
 .studio-vip-field {
   background:
     radial-gradient(circle at 50% 40%, rgba(212, 175, 55, 0.12), transparent 48%),
-    radial-gradient(ellipse at 12% 78%, rgba(34, 211, 238, 0.10), transparent 42%),
+    radial-gradient(ellipse at 12% 78%, rgba(47, 174, 130, 0.10), transparent 42%),
     radial-gradient(ellipse at 88% 72%, rgba(56, 189, 248, 0.09), transparent 40%),
     radial-gradient(ellipse at 50% 100%, rgba(11, 18, 32, 0.6), transparent 55%);
   animation: studio-vip-breathe 6s ease-in-out infinite;
@@ -312,14 +312,12 @@ body { top: 0 !important; }
 
 /* ── Premium full-screen generation environment ─────────────────────── */
 .premium-gen-overlay {
-  /* rigid full viewport — no parent padding bleed */
   inset: 0;
   width: 100vw;
   height: 100dvh;
   max-height: 100dvh;
 }
 
-/* Abstract soft rounded “conversation” pattern — ~40% intensity */
 .premium-gen-wallpaper {
   opacity: 0.4;
   background-color: #0A0A0C;
@@ -402,4 +400,55 @@ body { top: 0 !important; }
     animation: none !important;
   }
   .premium-gen-wallpaper { opacity: 0.35; }
+}
+
+/* ── Ultra AI full-screen generation (flagship) ─────────────────────── */
+@keyframes ultra-ai-spin-cw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ultra-ai-spin-ccw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+@keyframes ultra-ai-halo-breathe {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(1.15); }
+}
+@keyframes ultra-ai-node-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+@keyframes ultra-ai-sweep-arc {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ultra-ai-fade-slide {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ultra-ai-final-pulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.ultra-ai-spin-cw { animation: ultra-ai-spin-cw 14s linear infinite; }
+.ultra-ai-spin-ccw { animation: ultra-ai-spin-ccw 10s linear infinite; }
+.ultra-ai-sweep { animation: ultra-ai-sweep-arc 3.6s linear infinite; }
+.ultra-ai-halo { animation: ultra-ai-halo-breathe 6s ease-in-out infinite; }
+.ultra-ai-node { animation: ultra-ai-node-glow 2.4s ease-in-out infinite; }
+.ultra-ai-stage-in { animation: ultra-ai-fade-slide 0.4s ease-out; }
+.ultra-ai-final { animation: ultra-ai-final-pulse 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ultra-ai-spin-cw,
+  .ultra-ai-spin-ccw,
+  .ultra-ai-sweep,
+  .ultra-ai-halo,
+  .ultra-ai-node,
+  .ultra-ai-final,
+  .ultra-ai-stage-in {
+    animation: none !important;
+  }
 }
