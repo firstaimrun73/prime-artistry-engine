@@ -1,3 +1,4 @@
+import { findPlan } from "@/lib/plans";
 import { resolveWatermarkPolicy, policyRequiresStamp } from "./policy";
 import { renderImageWatermark, fetchMediaBuffer } from "./image";
 import { renderVideoWatermark } from "./video";
@@ -13,8 +14,7 @@ export const PREPARE_FAILED = "Could not prepare your media. Please try again.";
 
 const VALID_TIERS: readonly WatermarkStudioTier[] = ["standard", "pro", "premium"] as const;
 
-/** Map internal Experience id → user-facing Experience name (never trust client free text). */
-function experienceLabelFromTier(tier: WatermarkStudioTier | undefined): string {
+function experienceLabelFromTier(tier: WatermarkStudioTier): string {
   switch (tier) {
     case "pro":
       return "Premium";
@@ -36,6 +36,7 @@ function normalizeStudioTier(raw: unknown): WatermarkStudioTier {
 /**
  * Server-authoritative watermark line.
  * Plan display name from plans registry; Experience from validated internal id.
+ * Never trusts client-supplied free-text watermark strings.
  */
 export function resolveExperienceWatermarkLabel(
   studioTier: WatermarkStudioTier | undefined,
@@ -43,17 +44,7 @@ export function resolveExperienceWatermarkLabel(
 ): string {
   const tier = normalizeStudioTier(studioTier);
   const exp = experienceLabelFromTier(tier);
-  let planName = "Free";
-  try {
-    // Dynamic import avoided — plans is client-safe and small.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { findPlan } = require("@/lib/plans") as {
-      findPlan: (id: string | null | undefined) => { name: string } | undefined;
-    };
-    planName = findPlan(planId)?.name ?? (planId ? String(planId) : "Free");
-  } catch {
-    planName = planId ? String(planId) : "Free";
-  }
+  const planName = findPlan(planId)?.name ?? (planId ? String(planId) : "Free");
   return `Motio2edit ${exp} — ${planName}`;
 }
 

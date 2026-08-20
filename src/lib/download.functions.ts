@@ -6,6 +6,8 @@ import type { WatermarkMode } from "@/lib/policy";
 const inputSchema = z.object({
   imageUrl: z.string().url().max(8_000),
   keepWatermark: z.boolean().optional(),
+  /** Internal Experience id only — server maps to label; free text rejected by Zod. */
+  studioTier: z.enum(["standard", "pro", "premium"]).optional(),
 });
 
 export const secureDownloadImage = createServerFn({ method: "POST" })
@@ -14,16 +16,29 @@ export const secureDownloadImage = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: profile, error: pErr } = await supabase
-      .from("profiles").select("plan, email").eq("id", userId).single();
+      .from("profiles")
+      .select("plan, email")
+      .eq("id", userId)
+      .single();
     if (pErr || !profile) throw new Error("Could not load your account.");
     const adminEmail = process.env.ADMIN_EMAIL;
-    const isAdmin = !!adminEmail && !!profile.email && profile.email.toLowerCase() === adminEmail.toLowerCase();
+    const isAdmin =
+      !!adminEmail && !!profile.email && profile.email.toLowerCase() === adminEmail.toLowerCase();
     if (!data.imageUrl.startsWith("https://")) throw new Error("Invalid image URL.");
     const { finalizeMediaAsset } = await import("@/lib/watermark/finalize");
     const result = await finalizeMediaAsset({
-      sourceUrl: data.imageUrl, mediaKind: "image",
-      plan: profile.plan, email: profile.email, isAdmin,
-      keepWatermark: data.keepWatermark === true, userId,
+      sourceUrl: data.imageUrl,
+      mediaKind: "image",
+      plan: profile.plan,
+      email: profile.email,
+      isAdmin,
+      keepWatermark: data.keepWatermark === true,
+      userId,
+      studioTier: data.studioTier,
     });
-    return { downloadUrl: result.finalUrl, watermarked: result.watermarked, mode: result.mode as WatermarkMode };
+    return {
+      downloadUrl: result.finalUrl,
+      watermarked: result.watermarked,
+      mode: result.mode as WatermarkMode,
+    };
   });
