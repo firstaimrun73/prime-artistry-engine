@@ -87,6 +87,7 @@ function StageIcon({
 /**
  * Overlay driven by real job stage from generation-status / local parent state.
  * COMPLETE only when parent receives backend success — never invented by this component.
+ * Experiences: Standard (progress bar) · Premium/pro (orange flame) · VIP/premium (cinematic).
  */
 export function StudioGenerationOverlay({
   kind,
@@ -103,7 +104,6 @@ export function StudioGenerationOverlay({
   error?: string | null;
   onRetry?: () => void;
   className?: string;
-  /** Pro/Premium: cover editor content area */
   coverEditor?: boolean;
 }) {
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -122,37 +122,42 @@ export function StudioGenerationOverlay({
     0,
     STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]),
   );
-  const premium = tier === "premium";
-  const pro = tier === "pro" || premium;
-  const immersive = coverEditor && pro;
+  const vip = tier === "premium";
+  const premiumExp = tier === "pro";
+  const elevated = premiumExp || vip;
+  const immersive = coverEditor && elevated;
 
   return (
     <div
       className={cn(
         "relative overflow-hidden p-5",
         studioCardClass(tier),
-        premium && "border-amber-500/30 bg-zinc-950 text-zinc-50",
-        immersive && "min-h-[280px]",
+        vip && "border-amber-500/25 bg-zinc-950 text-zinc-50",
+        premiumExp && "border-orange-500/30 bg-gradient-to-b from-orange-950/40 to-background",
+        immersive && "min-h-[280px] sm:min-h-[320px]",
         className,
       )}
       role="status"
       aria-live="polite"
     >
-      {pro && !reduceMotion && (
+      {elevated && !reduceMotion && (
         <>
           <div
             className={cn(
-              "pointer-events-none absolute inset-0 opacity-50",
-              premium
-                ? "bg-[radial-gradient(ellipse_at_top,_rgba(212,175,55,0.18),_transparent_55%)]"
-                : "bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.14),_transparent_55%)]",
+              "pointer-events-none absolute inset-0 opacity-60",
+              vip
+                ? "bg-[radial-gradient(ellipse_at_center,_rgba(212,175,55,0.14),_transparent_55%)]"
+                : "bg-[radial-gradient(ellipse_at_bottom,_rgba(249,115,22,0.22),_transparent_55%)]",
             )}
           />
-          {premium && (
-            <div className="studio-gold-particles pointer-events-none absolute inset-0" aria-hidden />
+          {premiumExp && (
+            <div className="studio-premium-flame pointer-events-none absolute inset-0" aria-hidden />
           )}
-          {pro && !premium && (
-            <div className="studio-pro-lines pointer-events-none absolute inset-0" aria-hidden />
+          {vip && (
+            <div className="studio-vip-field pointer-events-none absolute inset-0" aria-hidden />
+          )}
+          {vip && (
+            <div className="studio-gold-particles pointer-events-none absolute inset-0" aria-hidden />
           )}
         </>
       )}
@@ -161,7 +166,8 @@ export function StudioGenerationOverlay({
         <p
           className={cn(
             "mb-4 flex items-center gap-2 text-sm font-semibold",
-            premium && "text-amber-100",
+            vip && "text-amber-100",
+            premiumExp && "text-orange-50",
           )}
         >
           {!isError && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -177,9 +183,11 @@ export function StudioGenerationOverlay({
                 onClick={onRetry}
                 className={cn(
                   "rounded-full border px-4 py-2 text-xs font-semibold",
-                  premium
+                  vip
                     ? "border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
-                    : "border-border hover:bg-muted",
+                    : premiumExp
+                      ? "border-orange-500/40 text-orange-100 hover:bg-orange-500/10"
+                      : "border-border hover:bg-muted",
                 )}
               >
                 Retry
@@ -196,16 +204,31 @@ export function StudioGenerationOverlay({
                   key={s}
                   className={cn(
                     "flex items-center gap-3 text-sm",
-                    done && (premium ? "text-amber-400" : "text-primary"),
-                    active && (premium ? "font-semibold text-amber-100" : "font-semibold text-foreground"),
-                    !done && !active && (premium ? "text-zinc-500" : "text-muted-foreground"),
+                    done && (vip ? "text-amber-400" : premiumExp ? "text-orange-400" : "text-primary"),
+                    active &&
+                      (vip
+                        ? "font-semibold text-amber-100"
+                        : premiumExp
+                          ? "font-semibold text-orange-50"
+                          : "font-semibold text-foreground"),
+                    !done && !active && (vip ? "text-zinc-500" : "text-muted-foreground"),
                   )}
                 >
                   <span
                     className={cn(
                       "flex h-8 w-8 items-center justify-center rounded-full border",
-                      done && (premium ? "border-amber-500/50 bg-amber-500/15" : "border-primary bg-primary/15"),
-                      active && (premium ? "border-amber-400 bg-amber-500/20" : "border-primary bg-primary/10"),
+                      done &&
+                        (vip
+                          ? "border-amber-500/50 bg-amber-500/15"
+                          : premiumExp
+                            ? "border-orange-500/50 bg-orange-500/15"
+                            : "border-primary bg-primary/15"),
+                      active &&
+                        (vip
+                          ? "border-amber-400 bg-amber-500/20"
+                          : premiumExp
+                            ? "border-orange-400 bg-orange-500/20"
+                            : "border-primary bg-primary/10"),
                     )}
                   >
                     {done ? (
