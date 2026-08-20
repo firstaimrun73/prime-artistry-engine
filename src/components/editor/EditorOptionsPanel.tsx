@@ -22,6 +22,11 @@ import {
   type VideoDuration,
   type VideoAspectRatio,
 } from "@/lib/video-options";
+import {
+  imageQualitiesForStudioTier,
+  aspectRatiosForStudioTier,
+  type StudioTier,
+} from "@/lib/studio/studio-tier";
 
 interface EditorOptionsPanelProps {
   mediaType: "image" | "video";
@@ -56,6 +61,8 @@ interface EditorOptionsPanelProps {
   keepWatermark: boolean;
   setKeepWatermark: React.Dispatch<React.SetStateAction<boolean>>;
   isFree: boolean;
+  /** Image Studio experience — gates advanced options. Optional for video. */
+  studioTier?: StudioTier;
 }
 
 export function EditorOptionsPanel({
@@ -84,26 +91,35 @@ export function EditorOptionsPanel({
   keepWatermark,
   setKeepWatermark,
   isFree,
+  studioTier = "standard",
 }: EditorOptionsPanelProps) {
   return (
     <section className="space-y-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        4. Options
-      </p>
+      {mediaType === "image" ? (
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Format & quality
+        </p>
+      ) : (
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          4. Options
+        </p>
+      )}
 
-      {/* Aspect ratio chips — text-to-image only */}
+      {/* Aspect ratio — text-to-image only; tier-limited */}
       {!loading && mediaType === "image" && !inputDataUrl && (
-        <div className="space-y-2">
+        <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
           <p className="text-[11px] font-medium text-muted-foreground">Aspect ratio</p>
           <div className="flex flex-wrap gap-2">
-            {ASPECT_RATIOS.map((a) => {
+            {ASPECT_RATIOS.filter((a) =>
+              aspectRatiosForStudioTier(studioTier).includes(a.id),
+            ).map((a) => {
               const active = aspectRatio === a.id;
               return (
                 <button
                   key={a.id}
                   type="button"
                   onClick={() => setAspectRatio(a.id)}
-                  className={`min-h-[36px] rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:scale-105 ${
+                  className={`min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
                     active
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
@@ -117,40 +133,47 @@ export function EditorOptionsPanel({
         </div>
       )}
 
-      {/* Output quality — image only (HD / 2K / 4K) */}
-      {!loading && mediaType === "image" && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-medium text-muted-foreground">Output quality</p>
-          <div className="flex flex-wrap gap-2">
-            {IMAGE_QUALITY_OPTIONS.map((q) => {
-              const active = imageQuality === q.id;
-              return (
-                <button
-                  key={q.id}
-                  type="button"
-                  title={q.hint}
-                  onClick={() => setImageQuality(q.id)}
-                  className={`min-h-[36px] rounded-full border px-3 py-1.5 text-xs font-semibold transition-all hover:scale-105 ${
-                    active
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
-                  }`}
-                >
-                  {q.label} · {q.credits}
-                </button>
-              );
-            })}
+      {/* Output quality — gated by experience */}
+      {!loading && mediaType === "image" && (() => {
+        const allowed = imageQualitiesForStudioTier(studioTier);
+        const visible = IMAGE_QUALITY_OPTIONS.filter((q) => allowed.includes(q.id));
+        return (
+          <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
+            <p className="text-[11px] font-medium text-muted-foreground">Output quality</p>
+            <div className="flex flex-wrap gap-2">
+              {visible.map((q) => {
+                const active = imageQuality === q.id;
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    title={q.hint}
+                    onClick={() => setImageQuality(q.id)}
+                    className={`min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                      active
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
+                    }`}
+                  >
+                    {q.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.hint}
+              {studioTier === "standard" && " · Upgrade for 2K / 4K."}
+              {studioTier === "pro" && " · Ultra AI unlocks 4K."}
+            </p>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            {IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.hint}
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
-      {mediaType === "image" && inputDataUrl && (
-        <div className="space-y-2">
+      {/* Edit strength — Premium & Ultra AI only */}
+      {mediaType === "image" && inputDataUrl && studioTier !== "standard" && (
+        <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Edit strength</span>
+            <span className="font-medium">Edit strength</span>
             <span>{Math.round(strength * 100)}%</span>
           </div>
           <Slider
@@ -167,11 +190,12 @@ export function EditorOptionsPanel({
         </div>
       )}
 
-      {/* Plan-based reference images for richer multi-image edits. */}
-      {canAddRefImages && (
-        <div className="space-y-2">
+      {/* Reference images — Premium & Ultra AI only (plan still applies) */}
+      {mediaType === "image" && canAddRefImages && studioTier !== "standard" && (
+        <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
           <p className="text-[11px] font-medium text-muted-foreground">
-            Reference images (optional)
+            Reference images
+            {studioTier === "premium" ? " · multi-image intelligence" : " (optional)"}
           </p>
           <MultiImageInput
             userPlan={userPlan}
