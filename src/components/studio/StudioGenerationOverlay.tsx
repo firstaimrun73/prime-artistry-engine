@@ -132,7 +132,7 @@ export function StudioGenerationOverlay({
       className={cn(
         "relative overflow-hidden p-5",
         studioCardClass(tier),
-        vip && "border-amber-500/25 bg-zinc-950 text-zinc-50",
+        vip && "border-[#D4AF37]/30 bg-[#0B1220] text-slate-100",
         premiumExp && "border-orange-500/30 bg-gradient-to-b from-orange-950/40 to-background",
         immersive && "min-h-[280px] sm:min-h-[320px]",
         className,
@@ -146,7 +146,7 @@ export function StudioGenerationOverlay({
             className={cn(
               "pointer-events-none absolute inset-0 opacity-60",
               vip
-                ? "bg-[radial-gradient(ellipse_at_center,_rgba(212,175,55,0.14),_transparent_55%)]"
+                ? "bg-[radial-gradient(ellipse_at_center,_rgba(212,175,55,0.12),_transparent_55%),radial-gradient(ellipse_at_80%_20%,_rgba(34,211,238,0.08),_transparent_40%)]"
                 : "bg-[radial-gradient(ellipse_at_bottom,_rgba(249,115,22,0.22),_transparent_55%)]",
             )}
           />
@@ -166,7 +166,7 @@ export function StudioGenerationOverlay({
         <p
           className={cn(
             "mb-4 flex items-center gap-2 text-sm font-semibold",
-            vip && "text-amber-100",
+            vip && "text-[#F5E6B8]",
             premiumExp && "text-orange-50",
           )}
         >
@@ -184,7 +184,7 @@ export function StudioGenerationOverlay({
                 className={cn(
                   "rounded-full border px-4 py-2 text-xs font-semibold",
                   vip
-                    ? "border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+                    ? "border-[#D4AF37]/40 text-[#E8C547] hover:bg-[#D4AF37]/10"
                     : premiumExp
                       ? "border-orange-500/40 text-orange-100 hover:bg-orange-500/10"
                       : "border-border hover:bg-muted",
@@ -204,14 +204,14 @@ export function StudioGenerationOverlay({
                   key={s}
                   className={cn(
                     "flex items-center gap-3 text-sm",
-                    done && (vip ? "text-amber-400" : premiumExp ? "text-orange-400" : "text-primary"),
+                    done && (vip ? "text-[#22D3EE]" : premiumExp ? "text-orange-400" : "text-primary"),
                     active &&
                       (vip
-                        ? "font-semibold text-amber-100"
+                        ? "font-semibold text-[#F5E6B8]"
                         : premiumExp
                           ? "font-semibold text-orange-50"
                           : "font-semibold text-foreground"),
-                    !done && !active && (vip ? "text-zinc-500" : "text-muted-foreground"),
+                    !done && !active && (vip ? "text-slate-500" : "text-muted-foreground"),
                   )}
                 >
                   <span
@@ -219,13 +219,13 @@ export function StudioGenerationOverlay({
                       "flex h-8 w-8 items-center justify-center rounded-full border",
                       done &&
                         (vip
-                          ? "border-amber-500/50 bg-amber-500/15"
+                          ? "border-[#22D3EE]/40 bg-[#22D3EE]/10"
                           : premiumExp
                             ? "border-orange-500/50 bg-orange-500/15"
                             : "border-primary bg-primary/15"),
                       active &&
                         (vip
-                          ? "border-amber-400 bg-amber-500/20"
+                          ? "border-[#D4AF37]/50 bg-[#D4AF37]/15 shadow-[0_0_12px_-4px_rgba(34,211,238,0.35)]"
                           : premiumExp
                             ? "border-orange-400 bg-orange-500/20"
                             : "border-primary bg-primary/10"),
