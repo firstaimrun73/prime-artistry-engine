@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
-import type { VideoResolution, VideoAspect } from "@/lib/video-model-registry";
-import { VIDEO_STYLE_MODIFIERS } from "@/lib/video-model-registry";
+import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-registry";
+import { VIDEO_STYLE_MODIFIERS, USER_MAX_DURATION_SEC } from "@/lib/video-model-registry";
 
 function ChipGroup<T extends string>({
   label,
@@ -42,11 +42,23 @@ function ChipGroup<T extends string>({
   );
 }
 
+const ASPECT_LABELS: Partial<Record<VideoAspect, string>> = {
+  "9:16": "9:16 · TikTok / Reels",
+  "16:9": "16:9 · Landscape",
+  "1:1": "1:1 · Square",
+  "21:9": "21:9 · Ultrawide",
+};
+
+const PRESET_DURATIONS = [5, 8, 10] as const;
+
 export function VideoFeaturePanel({
+  tier,
+  setTier,
+  premiumLocked,
+  onPremiumLockedClick,
   aspects,
   resolutions,
-  durations,
-  maxDuration,
+  availableMaxDuration,
   nativeAudioAvailable,
   supportsNegativePrompt,
   aspect,
@@ -55,8 +67,10 @@ export function VideoFeaturePanel({
   setResolution,
   duration,
   setDuration,
-  customDuration,
-  setCustomDuration,
+  customMode,
+  setCustomMode,
+  customInput,
+  setCustomInput,
   soundOn,
   setSoundOn,
   styleId,
@@ -65,10 +79,13 @@ export function VideoFeaturePanel({
   setNegativePrompt,
   disabled,
 }: {
+  tier: VideoTier;
+  setTier: (t: VideoTier) => void;
+  premiumLocked?: boolean;
+  onPremiumLockedClick?: () => void;
   aspects: VideoAspect[];
   resolutions: VideoResolution[];
-  durations: number[];
-  maxDuration: number;
+  availableMaxDuration: number;
   nativeAudioAvailable: boolean;
   supportsNegativePrompt: boolean;
   aspect: VideoAspect;
@@ -77,8 +94,10 @@ export function VideoFeaturePanel({
   setResolution: (v: VideoResolution) => void;
   duration: number;
   setDuration: (v: number) => void;
-  customDuration: string;
-  setCustomDuration: (v: string) => void;
+  customMode: boolean;
+  setCustomMode: (v: boolean) => void;
+  customInput: string;
+  setCustomInput: (v: string) => void;
   soundOn: boolean;
   setSoundOn: (v: boolean) => void;
   styleId: string;
@@ -90,49 +109,96 @@ export function VideoFeaturePanel({
   const safeAspect = (aspects.includes(aspect) ? aspect : aspects[0] ?? "16:9") as VideoAspect;
   const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
 
+  const customNum = customInput.trim() === "" ? null : parseInt(customInput, 10);
+  const customInvalid =
+    customMode &&
+    customInput.trim() !== "" &&
+    (customNum === null || Number.isNaN(customNum) || customNum < 1 || customNum > USER_MAX_DURATION_SEC);
+  const customOverAvailable =
+    customMode &&
+    customNum !== null &&
+    !Number.isNaN(customNum) &&
+    customNum >= 1 &&
+    customNum <= USER_MAX_DURATION_SEC &&
+    customNum > availableMaxDuration;
+
   return (
     <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Features</p>
+
+      <div>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Generation</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setTier("standard")}
+            className={cn(
+              "rounded-2xl border p-3 text-left transition-colors",
+              tier === "standard"
+                ? "border-red-500 bg-red-500/10 ring-1 ring-red-500/30"
+                : "border-border/70 bg-background hover:border-red-400/40",
+            )}
+          >
+            <p className="text-sm font-bold">Standard</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Fast generation for everyday videos.</p>
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              if (premiumLocked) onPremiumLockedClick?.();
+              else setTier("premium");
+            }}
+            className={cn(
+              "rounded-2xl border p-3 text-left transition-colors",
+              tier === "premium"
+                ? "border-red-500 bg-red-500/10 ring-1 ring-red-500/30"
+                : "border-border/70 bg-background hover:border-red-400/40",
+            )}
+          >
+            <p className="text-sm font-bold">
+              Premium{premiumLocked ? " 🔒" : ""}
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Higher quality, longer videos, audio, and advanced capabilities.
+            </p>
+          </button>
+        </div>
+      </div>
 
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium">Sound</p>
           <p className="text-[11px] text-muted-foreground">
-            {nativeAudioAvailable
-              ? soundOn
-                ? "Synchronized audio when supported"
-                : "Silent video"
-              : "Audio not available for these settings"}
+            {soundOn ? "Synchronized audio when available" : "Silent video"}
           </p>
         </div>
-        {nativeAudioAvailable ? (
-          <button
-            type="button"
-            disabled={disabled}
-            aria-pressed={soundOn}
-            aria-label={soundOn ? "Sound on" : "Sound off"}
-            onClick={() => setSoundOn(!soundOn)}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={soundOn}
+          aria-label={soundOn ? "Sound on" : "Sound off"}
+          disabled={disabled}
+          onClick={() => setSoundOn(!soundOn)}
+          className={cn(
+            "relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-out motion-reduce:transition-none",
+            soundOn ? "bg-red-500" : "bg-muted",
+            disabled && "opacity-50",
+          )}
+        >
+          <span
             className={cn(
-              "relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-out",
-              soundOn ? "bg-red-500" : "bg-muted",
-              disabled && "opacity-50",
+              "pointer-events-none absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ease-out motion-reduce:transition-none",
+              soundOn && "translate-x-5",
             )}
-          >
-            <span
-              className={cn(
-                "absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ease-out",
-                soundOn ? "left-6" : "left-1",
-              )}
-            />
-          </button>
-        ) : (
-          <span className="text-xs text-muted-foreground">Off</span>
-        )}
+          />
+        </button>
       </div>
 
       <ChipGroup
         label="Aspect ratio"
-        options={aspects.map((a) => ({ id: a, label: a }))}
+        options={aspects.map((a) => ({ id: a, label: ASPECT_LABELS[a] ?? a }))}
         value={safeAspect}
         onChange={setAspect}
         disabled={disabled}
@@ -152,18 +218,19 @@ export function VideoFeaturePanel({
       <div>
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Duration</p>
         <div className="flex flex-wrap gap-2">
-          {durations.map((d) => (
+          {PRESET_DURATIONS.map((d) => (
             <button
               key={d}
               type="button"
               disabled={disabled}
               onClick={() => {
+                setCustomMode(false);
+                setCustomInput("");
                 setDuration(d);
-                setCustomDuration("");
               }}
               className={cn(
                 "rounded-full border px-3 py-1.5 text-xs font-semibold",
-                duration === d && !customDuration
+                !customMode && duration === d
                   ? "border-red-500 bg-red-500 text-white"
                   : "border-border bg-background text-muted-foreground",
                 disabled && "opacity-40",
@@ -175,10 +242,13 @@ export function VideoFeaturePanel({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => setCustomDuration(String(duration))}
+            onClick={() => {
+              setCustomMode(true);
+              if (customInput === "") setCustomInput(String(duration));
+            }}
             className={cn(
               "rounded-full border px-3 py-1.5 text-xs font-semibold",
-              customDuration
+              customMode
                 ? "border-red-500 bg-red-500 text-white"
                 : "border-border bg-background text-muted-foreground",
             )}
@@ -186,28 +256,41 @@ export function VideoFeaturePanel({
             Custom
           </button>
         </div>
-        {customDuration !== "" && (
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={maxDuration}
-              value={customDuration}
-              disabled={disabled}
-              onChange={(e) => {
-                setCustomDuration(e.target.value);
-                const n = parseInt(e.target.value, 10);
-                if (!Number.isNaN(n) && n >= 1 && n <= maxDuration) setDuration(n);
-              }}
-              className="w-24 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
-            />
-            <span className="text-xs text-muted-foreground">max {maxDuration}s</span>
+        {customMode && (
+          <div className="mt-2 space-y-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={USER_MAX_DURATION_SEC}
+                value={customInput}
+                disabled={disabled}
+                placeholder="1–60"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setCustomInput(v);
+                  if (v.trim() === "") return;
+                  const n = parseInt(v, 10);
+                  if (!Number.isNaN(n) && n >= 1 && n <= USER_MAX_DURATION_SEC) {
+                    setDuration(n);
+                  }
+                }}
+                className="w-24 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+              />
+              <span className="text-xs text-muted-foreground">seconds (1–{USER_MAX_DURATION_SEC})</span>
+            </div>
+            {customInput.trim() === "" && (
+              <p className="text-xs text-muted-foreground">Enter a duration between 1 and {USER_MAX_DURATION_SEC} seconds.</p>
+            )}
+            {customInvalid && (
+              <p className="text-xs font-medium text-red-600">Maximum duration is {USER_MAX_DURATION_SEC} seconds.</p>
+            )}
+            {customOverAvailable && (
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                Maximum available for these settings is {availableMaxDuration}s. Try a shorter duration or Premium.
+              </p>
+            )}
           </div>
-        )}
-        {duration > maxDuration && (
-          <p className="mt-1 text-xs font-medium text-red-600">
-            Duration exceeds the limit ({maxDuration}s). Generation blocked.
-          </p>
         )}
       </div>
 
@@ -242,7 +325,6 @@ export function VideoFeaturePanel({
             </button>
           ))}
         </div>
-        <p className="mt-1 text-[10px] text-muted-foreground">Styles are prompt modifiers.</p>
       </div>
 
       {supportsNegativePrompt && (
