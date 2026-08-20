@@ -97,10 +97,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const runIdRef = useRef(0);
   /** Brief hold after Premium success so complete state is visible before reveal */
   const [premiumCompleteHold, setPremiumCompleteHold] = useState(false);
+  /** Keep Premium overlay open on failure with Retry / Close */
+  const [premiumGenError, setPremiumGenError] = useState<string | null>(null);
 
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
   const stages = getEditorStages(!!inputDataUrl);
+  /** Internal id "pro" = user-facing Premium experience */
   const isPremiumExp = studioTier === "pro";
 
   useEffect(() => {
@@ -168,17 +171,20 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   useEffect(() => {
     if (!isPremiumExp) {
       setPremiumCompleteHold(false);
+      setPremiumGenError(null);
       return;
     }
     if (state === "success") {
+      setPremiumGenError(null);
       setPremiumCompleteHold(true);
       const t = window.setTimeout(() => setPremiumCompleteHold(false), 1400);
       return () => window.clearTimeout(t);
     }
     if (state === "idle" || state === "blocked") {
-      setPremiumCompleteHold(false);
+      // keep error overlay if premiumGenError is set; otherwise clear hold
+      if (!premiumGenError) setPremiumCompleteHold(false);
     }
-  }, [state, isPremiumExp]);
+  }, [state, isPremiumExp, premiumGenError]);
 
   if (!profile) return null;
 
@@ -190,11 +196,12 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const suggestions = getSmartSuggestions(prompt);
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
 
-  const showPremiumOverlay = isPremiumExp && (loading || premiumCompleteHold);
+  const showPremiumOverlay =
+    isPremiumExp && (loading || premiumCompleteHold || !!premiumGenError);
 
   // While Premium overlay is up, hide the inline loading card (still show result after hold)
   const showInlinePreview =
-    !isPremiumExp || (!loading && !premiumCompleteHold && !!output);
+    !isPremiumExp || (!loading && !premiumCompleteHold && !premiumGenError && !!output);
 
   const activateSlot = (items: GalleryItem[], idx: number) => {
     const item = items[idx];
@@ -289,6 +296,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setOutput(null);
     setDownloaded(false);
     setPremiumCompleteHold(false);
+    setPremiumGenError(null);
     await new Promise((r) => setTimeout(r, 600));
     if (runId !== runIdRef.current) return;
 
@@ -392,17 +400,23 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setStage(stages.length);
       setOutput(url);
       setState("success");
+      setPremiumGenError(null);
       setRemoveMaskDataUrl(null);
       await refreshProfile();
       toast.success("✅ Image ready!");
       endGeneration();
     } catch (err) {
       if (runId !== runIdRef.current) return;
-      setState("idle");
+      const msg = err instanceof Error ? err.message : "Failed. Credits not charged.";
       endGeneration();
-      toast.error(
-        err instanceof Error ? `❌ ${err.message}` : "❌ Failed. Credits not charged.",
-      );
+      if (isPremiumExp) {
+        // Keep full-screen overlay open with error UI (Retry / Close)
+        setPremiumGenError(msg);
+        setState("idle");
+      } else {
+        setState("idle");
+      }
+      toast.error(`❌ ${msg}`);
     } finally {
       progressTimers.forEach(clearTimeout);
     }
@@ -430,7 +444,14 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setProgress(0);
     setStage(0);
     setPremiumCompleteHold(false);
+    setPremiumGenError(null);
     toast("Generation stopped.");
+  };
+
+  const handleDismissPremiumError = () => {
+    setPremiumGenError(null);
+    setPremiumCompleteHold(false);
+    setState("idle");
   };
 
   const handleClear = () => {
@@ -448,6 +469,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setProgress(0);
     setStage(0);
     setPremiumCompleteHold(false);
+    setPremiumGenError(null);
     setGallery([]);
     setActiveImage(0);
     if (fileRef.current) fileRef.current.value = "";
@@ -518,26 +540,28 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const noopSetVideoRes = () => {};
 
   const expLabel = studioExperienceLabel(studioTier);
-  const accent = studioAccentClass(studioTier);
 
   const premiumPhase =
-    state === "analyzing"
-      ? "analyzing"
-      : state === "loading"
-        ? "loading"
-        : premiumCompleteHold
-          ? "success"
-          : "loading";
+    premiumGenError
+      ? "error"
+      : state === "analyzing"
+        ? "analyzing"
+        : state === "loading"
+          ? "loading"
+          : premiumCompleteHold
+            ? "success"
+            : "loading";
 
   return (
     <div className={cn("min-h-[70vh]", studioShellClass(studioTier))}>
-      {/* Premium full-viewport generation environment — rigid cover, no gaps */}
+      {/* Premium full-viewport generation — portal to body; only when tier === pro */}
       {showPremiumOverlay && (
         <PremiumImageGenerationOverlay
           phase={premiumPhase}
           progress={progress}
-          error={null}
+          error={premiumGenError}
           onRetry={runGenerate}
+          onDismiss={handleDismissPremiumError}
         />
       )}
 
@@ -707,7 +731,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               downloaded={downloaded}
             />
 
-            {!loading && !output && !premiumCompleteHold && (
+            {!loading && !output && !premiumCompleteHold && !premiumGenError && (
               <div
                 className={cn(
                   "flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 px-4 py-8 text-center text-sm text-muted-foreground",
