@@ -289,16 +289,18 @@ body { top: 0 !important; }
   0%, 100% { transform: translateY(4%) scaleY(0.96); opacity: 0.55; }
   50% { transform: translateY(-2%) scaleY(1.04); opacity: 0.9; }
 }
+/* VIP: deep navy base with soft gold center + cyan AI edge accents */
 .studio-vip-field {
   background:
-    radial-gradient(circle at 50% 35%, rgba(34, 211, 238, 0.18), transparent 45%),
-    radial-gradient(ellipse at 15% 80%, rgba(139, 92, 246, 0.22), transparent 42%),
-    radial-gradient(ellipse at 85% 70%, rgba(99, 102, 241, 0.2), transparent 40%);
+    radial-gradient(circle at 50% 40%, rgba(212, 175, 55, 0.12), transparent 48%),
+    radial-gradient(ellipse at 12% 78%, rgba(34, 211, 238, 0.10), transparent 42%),
+    radial-gradient(ellipse at 88% 72%, rgba(56, 189, 248, 0.09), transparent 40%),
+    radial-gradient(ellipse at 50% 100%, rgba(11, 18, 32, 0.6), transparent 55%);
   animation: studio-vip-breathe 6s ease-in-out infinite;
 }
 @keyframes studio-vip-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 0.85; transform: scale(1.02); }
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.015); }
 }
 @media (prefers-reduced-motion: reduce) {
   .studio-premium-flame,
