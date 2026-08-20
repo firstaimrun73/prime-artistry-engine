@@ -1,20 +1,8 @@
 import { useState } from "react";
 import { Info, X } from "lucide-react";
 
-/** Credit details — never shows backend model names. */
-export function VideoCreditsInfo({
-  tier,
-  duration,
-  resolution,
-  sound,
-  credits,
-}: {
-  tier?: string;
-  duration: number;
-  resolution: string;
-  sound: string;
-  credits: number;
-}) {
+/** Credit details — never shows backend model names or USD. */
+export function VideoCreditsInfo({ credits }: { credits: number }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -39,33 +27,14 @@ export function VideoCreditsInfo({
               </button>
             </div>
             <p className="mb-3 text-xs text-muted-foreground">
-              Your credit usage depends on Standard / Premium, duration, resolution, audio, and generation complexity.
-              Longer and higher-quality videos require more credits.
+              Your final credit usage depends on duration, quality, resolution, sound, generation complexity, and
+              processing requirements.
             </p>
-            <dl className="space-y-2 text-sm">
-              {tier && (
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Tier</dt>
-                  <dd className="font-medium capitalize">{tier}</dd>
-                </div>
-              )}
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Duration</dt>
-                <dd className="font-medium">{duration}s</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Resolution</dt>
-                <dd className="font-medium">{resolution}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Sound</dt>
-                <dd className="font-medium">{sound}</dd>
-              </div>
-              <div className="flex justify-between gap-4 border-t border-border pt-2">
-                <dt className="font-semibold">Estimated charge</dt>
-                <dd className="font-bold tabular-nums text-red-600">{credits} credits</dd>
-              </div>
-            </dl>
+            <p className="text-sm">
+              Estimated charge:{" "}
+              <span className="font-bold tabular-nums text-red-600">{credits} credits</span>
+            </p>
+            <p className="mt-2 text-[11px] text-muted-foreground">Minimum charge is 125 credits per generation.</p>
             <button
               type="button"
               onClick={() => setOpen(false)}
