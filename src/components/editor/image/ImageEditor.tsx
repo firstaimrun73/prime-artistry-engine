@@ -190,8 +190,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const suggestions = getSmartSuggestions(prompt);
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
 
-  const showPremiumOverlay =
-    isPremiumExp && (loading || premiumCompleteHold || state === "success");
+  const showPremiumOverlay = isPremiumExp && (loading || premiumCompleteHold);
 
   // While Premium overlay is up, hide the inline loading card (still show result after hold)
   const showInlinePreview =
@@ -526,7 +525,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       ? "analyzing"
       : state === "loading"
         ? "loading"
-        : state === "success" || premiumCompleteHold
+        : premiumCompleteHold
           ? "success"
           : "loading";
 
