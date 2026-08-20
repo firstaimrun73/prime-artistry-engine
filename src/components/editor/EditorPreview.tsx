@@ -18,6 +18,12 @@ interface EditorPreviewProps {
   keepWatermark: boolean;
 }
 
+/**
+ * Preview / result surface.
+ * Before generation: returns null (no empty output block).
+ * During generation: loading/analyzing UI.
+ * After success: result (compare or media).
+ */
 export function EditorPreview({
   state,
   loadingMessage,
@@ -35,7 +41,7 @@ export function EditorPreview({
 }: EditorPreviewProps) {
   if (state === "analyzing") {
     return (
-      <div className="flex h-full min-h-56 flex-col items-center justify-center rounded-xl border border-border bg-card p-6 text-center animate-scale-in">
+      <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-border/60 bg-card/70 p-6 text-center shadow-sm backdrop-blur-md animate-scale-in">
         <Wand2 className="h-8 w-8 animate-pulse text-primary" />
         <p className="mt-3 text-sm font-semibold text-primary">Analyzing your request…</p>
         <p className="mt-1 text-xs text-muted-foreground">Understanding exactly what you mean</p>
@@ -45,7 +51,7 @@ export function EditorPreview({
 
   if (state === "loading") {
     return (
-      <div className="rounded-xl border border-border bg-card p-5 animate-scale-in">
+      <div className="rounded-2xl border border-border/60 bg-card/70 p-5 shadow-sm backdrop-blur-md animate-scale-in">
         <p className="text-sm font-semibold text-primary">{loadingMessage}</p>
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-secondary">
           <div
@@ -58,9 +64,11 @@ export function EditorPreview({
             <li key={s} className="flex items-center gap-2 text-sm">
               <span
                 className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] transition-all ${
-                  i < stage ? "bg-primary text-primary-foreground"
-                  : i === stage ? "bg-primary/20 text-primary animate-pulse"
-                  : "bg-secondary text-muted-foreground"
+                  i < stage
+                    ? "bg-primary text-primary-foreground"
+                    : i === stage
+                      ? "bg-primary/20 text-primary animate-pulse"
+                      : "bg-secondary text-muted-foreground"
                 }`}
               >
                 {i < stage ? <Check className="h-3 w-3" /> : i + 1}
@@ -73,58 +81,51 @@ export function EditorPreview({
     );
   }
 
-  if (output && !outputIsVideo && mediaType === "image" && inputPreview) {
+  // No result yet — do not reserve empty Before/After panels
+  if (!output) {
+    return null;
+  }
+
+  if (!outputIsVideo && mediaType === "image" && inputPreview) {
     return (
-      <div className="animate-scale-in">
+      <div className="animate-scale-in overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-md">
         <CompareSlider before={inputPreview} after={output} />
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Before</p>
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
-          {inputPreview ? (
-            inputKind === "video" ? (
-              <video src={inputPreview} className="h-full w-full object-cover" controls />
-            ) : (
-              <img src={inputPreview} alt="input" className="h-full w-full object-contain" />
-            )
-          ) : (
-            <span className="text-xs text-muted-foreground">No upload</span>
-          )}
-        </div>
+    <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-3 shadow-sm backdrop-blur-md animate-scale-in">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
+      <div className="flex min-h-[200px] items-center justify-center overflow-hidden rounded-xl bg-background/40">
+        {outputIsVideo ? (
+          <div className="relative h-full w-full min-h-[200px]">
+            <video
+              src={output}
+              className="h-full w-full object-contain"
+              controls
+              autoPlay
+              loop
+              muted
+            />
+            {!isAdmin && (isFree || keepWatermark) && (
+              <span className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/55 px-2 py-1 text-[11px] font-bold tracking-wide text-white/95">
+                Motio2edit
+              </span>
+            )}
+          </div>
+        ) : (
+          <img
+            src={output}
+            alt="output"
+            className="max-h-[480px] w-full object-contain select-none"
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+          />
+        )}
       </div>
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">After</p>
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
-          {output ? (
-            outputIsVideo ? (
-              <div className="relative h-full w-full">
-                <video src={output} className="h-full w-full object-contain animate-scale-in" controls autoPlay loop muted />
-                {!isAdmin && (isFree || keepWatermark) && (
-                  <span className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/55 px-2 py-1 text-[11px] font-bold tracking-wide text-white/95">
-                    Motio2edit
-                  </span>
-                )}
-              </div>
-            ) : (
-              <img
-                src={output}
-                alt="output"
-                className="h-full w-full object-contain animate-scale-in select-none"
-                draggable={false}
-                onContextMenu={(e) => e.preventDefault()}
-                style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
-              />
-            )
-          ) : (
-            <span className="text-xs text-muted-foreground">Output appears here</span>
-          )}
-        </div>
-      </div>
+      {inputKind === "image" && inputPreview && !outputIsVideo ? null : null}
     </div>
   );
 }
