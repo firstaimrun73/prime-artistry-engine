@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { Info, X } from "lucide-react";
 
+/** Credit details popup — never shows backend model names. */
 export function VideoCreditsInfo({
-  modelName,
   duration,
   resolution,
   sound,
   credits,
 }: {
-  modelName: string;
   duration: number;
   resolution: string;
   sound: string;
@@ -38,10 +37,18 @@ export function VideoCreditsInfo({
               </button>
             </div>
             <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Model</dt><dd className="font-medium text-right">{modelName}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Duration</dt><dd className="font-medium">{duration}s</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Resolution</dt><dd className="font-medium">{resolution}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Sound</dt><dd className="font-medium">{sound}</dd></div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Duration</dt>
+                <dd className="font-medium">{duration}s</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Resolution</dt>
+                <dd className="font-medium">{resolution}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Sound</dt>
+                <dd className="font-medium">{sound}</dd>
+              </div>
               <div className="flex justify-between gap-4 border-t border-border pt-2">
                 <dt className="font-semibold">Estimated charge</dt>
                 <dd className="font-bold tabular-nums text-red-600">{credits} credits</dd>
