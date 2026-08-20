@@ -62,7 +62,10 @@ export function Footer({
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between">
         <Link to="/" className="flex items-center gap-2">
           <BrandMark size="md" />
-          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <span
+            className="notranslate text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+            translate="no"
+          >
             by Motion2AI
           </span>
         </Link>
@@ -84,7 +87,9 @@ export function Footer({
           support@motio2edit.com
         </a>
         <span className="mx-2">·</span>
-        © {new Date().getFullYear()} {BRAND_NAME} by Motion2AI. All rights reserved.
+        <span className="notranslate" translate="no">
+          © {new Date().getFullYear()} {BRAND_NAME} by Motion2AI. All rights reserved.
+        </span>
       </div>
     </footer>
   );
