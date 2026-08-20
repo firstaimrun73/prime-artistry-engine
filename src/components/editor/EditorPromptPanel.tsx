@@ -43,6 +43,13 @@ interface EditorPromptPanelProps {
   onClearTool?: () => void;
 }
 
+const IMAGE_IDEAS = [
+  { label: "Remove background", prompt: "Remove the background cleanly and replace with a transparent or pure white backdrop, keeping the subject sharp and natural." },
+  { label: "Replace background", prompt: "Replace the background with a clean professional studio backdrop while preserving the subject, lighting, and edges." },
+  { label: "Sky replacement", prompt: "Replace the sky with a dramatic natural sky and re-light the scene so shadows and color temperature match." },
+  { label: "Enhance lighting", prompt: "Improve lighting and color balance for a polished, natural look while preserving identity and composition." },
+] as const;
+
 const COMPACT_IDEAS = EXAMPLE_PROMPTS.slice(0, 3);
 
 export function EditorPromptPanel({
@@ -69,7 +76,6 @@ export function EditorPromptPanel({
         return;
       }
       if (!onCropApplied) {
-        // Parent not ready for crop apply — still open if we can no-op safely
         toast.error("Crop is not available in this session.");
         return;
       }
@@ -81,10 +87,10 @@ export function EditorPromptPanel({
 
   return (
     <>
-      {!loading && mediaType === "image" && (
+      {mediaType === "image" && (
         <section className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            2. Choose a tool
+            Tools
           </p>
           <EditorToolCategories
             hasImage={!!inputDataUrl}
@@ -99,22 +105,22 @@ export function EditorPromptPanel({
                   type="button"
                   onClick={onClearTool}
                   className="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                  aria-label="Clear tool"
                 >
-                  <X className="h-3.5 w-3.5" /> Clear
+                  <X className="h-3 w-3" /> Clear
                 </button>
               )}
             </div>
           )}
         </section>
       )}
-      {!loading && mediaType === "video" && (
+
+      {mediaType === "video" && (
         <section className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            2. Quick styles
+            Quick styles
           </p>
           <div className="flex flex-wrap gap-2">
-            {VIDEO_QUICK_STYLES.slice(0, 4).map((q) => (
+            {VIDEO_QUICK_STYLES.map((q) => (
               <button
                 key={q.label}
                 type="button"
@@ -129,9 +135,9 @@ export function EditorPromptPanel({
         </section>
       )}
 
-      <section className="space-y-2">
+      <section className="space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          3. Describe
+          Prompt
         </p>
         <div className="relative">
           <Textarea
@@ -139,15 +145,13 @@ export function EditorPromptPanel({
             placeholder={
               activeToolLabel
                 ? "Optional: add extra direction…"
-                : inputDataUrl
-                  ? "Describe the edit… e.g. warmer light, remove the chair"
-                  : `Describe the ${mediaType} you want…`
+                : "Describe what you want…"
             }
             value={prompt}
             onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
             rows={4}
             disabled={loading}
-            className="min-h-[100px] resize-none pr-12 text-base sm:text-sm"
+            className="min-h-[112px] resize-none pr-12 text-base leading-relaxed sm:text-sm"
           />
           <div className="absolute right-2 top-2">
             <VoiceInputButton
@@ -155,22 +159,22 @@ export function EditorPromptPanel({
               onTranscript={(t) => setPrompt((p) => (p ? `${p} ${t}` : t).slice(0, 2000))}
             />
           </div>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1 text-primary">
+          <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 text-primary/90">
               <Wand2 className="h-3 w-3" /> Auto-enhanced before generating
             </span>
-            <span>{prompt.length}/2000</span>
+            <span className="tabular-nums">{prompt.length}/2000</span>
           </div>
         </div>
 
         {!loading && suggestions.length > 0 && (
-          <div className="flex flex-wrap gap-2 animate-fade-in">
+          <div className="flex flex-wrap gap-1.5">
             {suggestions.slice(0, 3).map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => setPrompt(s.prompt)}
-                className="min-h-[36px] rounded-full border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary transition-all hover:bg-primary/10"
+                className="min-h-[32px] rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
               >
                 {s.label}
               </button>
@@ -178,17 +182,35 @@ export function EditorPromptPanel({
           </div>
         )}
 
-        {!loading && !prompt.trim() && !activeToolLabel && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-              <Sparkles className="h-3 w-3 text-primary" /> Try an idea
+        {!loading && !prompt.trim() && !activeToolLabel && mediaType === "image" && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Sparkles className="h-3 w-3 text-primary" /> Try an idea:
+            </span>
+            {IMAGE_IDEAS.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => setPrompt(s.prompt)}
+                className="min-h-[30px] rounded-full border border-border/80 bg-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!loading && !prompt.trim() && !activeToolLabel && mediaType !== "image" && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Sparkles className="h-3 w-3 text-primary" /> Try an idea:
             </span>
             {COMPACT_IDEAS.map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => setPrompt(s.prompt)}
-                className="min-h-[32px] rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                className="min-h-[30px] rounded-full border border-border/80 bg-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
               >
                 {s.label}
               </button>
