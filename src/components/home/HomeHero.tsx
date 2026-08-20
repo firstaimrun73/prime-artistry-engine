@@ -27,7 +27,7 @@ export function HomeHero() {
       <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
         <div className="reveal-up min-w-0 text-center lg:text-left">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
-            <Zap className="h-3.5 w-3.5 text-primary" /> Motio2edit · Credit-based AI studio
+            <Zap className="h-3.5 w-3.5 text-primary" /> <span className="notranslate" translate="no">Motio2edit</span> · Credit-based AI studio
           </span>
           <h1 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
             AI Image & Video Editing,{" "}
@@ -38,106 +38,93 @@ export function HomeHero() {
             change outfits, generate video — upload, describe, and generate.
           </p>
 
-          <div className="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center lg:justify-start">
-            <Button asChild size="lg" className="btn-animate">
-              <Link to="/studio/image">
-                Start Editing <ArrowRight className="ml-1.5 h-4 w-4" />
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+            <Button asChild size="lg" className="gap-2">
+              <Link to="/studio">
+                Open Studio <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="btn-animate">
-              <Link to="/features">Explore Features</Link>
+            <Button asChild size="lg" variant="outline" className="gap-2">
+              <Link to="/pricing">View pricing</Link>
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              variant="ghost"
+              className="gap-2"
+              onClick={() => setDemoOpen(true)}
+            >
+              <Play className="h-4 w-4" /> Watch demo
             </Button>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
-            {STEPS.map((s, i) => {
-              const Icon = s.icon;
-              return (
-                <span key={s.label} className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                  {i > 0 && <span className="mx-1 text-border">→</span>}
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1">
-                    <Icon className="h-3.5 w-3.5 text-primary" />
-                    {s.label}
-                  </span>
-                </span>
-              );
-            })}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+            {VALUE_PROPS.map(({ icon: Icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground"
+              >
+                <Icon className="h-3.5 w-3.5 text-primary" />
+                {label}
+              </span>
+            ))}
           </div>
 
-          <ul className="mt-7 grid grid-cols-2 gap-2 sm:gap-3">
-            {VALUE_PROPS.map((v) => {
-              const Icon = v.icon;
-              return (
-                <li
-                  key={v.label}
-                  className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-left"
-                >
-                  <Icon className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="truncate text-xs font-semibold sm:text-sm">{v.label}</span>
-                </li>
-              );
-            })}
-          </ul>
-
-          <p className="mt-4 text-xs text-muted-foreground">
-            Free credits on signup. No card required to start.{" "}
-            <button
-              type="button"
-              className="font-medium text-primary hover:underline"
-              onClick={() => setDemoOpen(true)}
-            >
-              Watch demo
-            </button>
-          </p>
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground lg:justify-start">
+            {STEPS.map(({ icon: Icon, label }, i) => (
+              <span key={label} className="inline-flex items-center gap-1.5">
+                {i > 0 && <span className="mx-1 text-border">→</span>}
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </span>
+            ))}
+          </div>
         </div>
 
-        <div className="reveal-up relative min-w-0" style={{ animationDelay: "120ms" }}>
-          <div className="pointer-events-none absolute -inset-6 -z-10 rounded-full gradient-hero opacity-20 blur-3xl" />
-          <div className="relative aspect-video w-full overflow-hidden rounded-3xl border border-border bg-card shadow-2xl">
-            <video
-              className="h-full w-full object-cover"
-              src={DEMO_VIDEO}
-              poster={DEMO_POSTER}
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="none"
+        <div className="reveal-up relative min-w-0">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+            <button
+              type="button"
+              className="group relative block w-full"
+              onClick={() => setDemoOpen(true)}
               aria-label="Motio2edit product demo"
-            />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/80 to-transparent p-4">
-              <span className="rounded-full bg-primary/90 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-primary-foreground">
-                Live demo
+            >
+              <img
+                src={DEMO_POSTER}
+                alt=""
+                className="aspect-video w-full object-cover"
+              />
+              <span className="absolute inset-0 flex items-center justify-center bg-black/30 transition group-hover:bg-black/40">
+                <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
+                  <Play className="h-6 w-6 fill-current" />
+                </span>
               </span>
-            </div>
+            </button>
           </div>
         </div>
       </div>
 
       {demoOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 p-3 backdrop-blur-md sm:p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
           role="dialog"
           aria-modal="true"
-          aria-label="Product demo video"
-          onClick={() => setDemoOpen(false)}
         >
-          <button
-            type="button"
-            aria-label="Close demo"
-            onClick={() => setDemoOpen(false)}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <div className="w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-black shadow-2xl">
+            <button
+              type="button"
+              className="absolute right-3 top-3 z-10 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+              onClick={() => setDemoOpen(false)}
+              aria-label="Close demo"
+            >
+              <X className="h-5 w-5" />
+            </button>
             <video
-              className="aspect-video w-full rounded-2xl border border-border"
               src={DEMO_VIDEO}
               poster={DEMO_POSTER}
               controls
               autoPlay
-              playsInline
+              className="aspect-video w-full"
             />
           </div>
         </div>
