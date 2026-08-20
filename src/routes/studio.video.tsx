@@ -1,6 +1,7 @@
 /**
  * Video Studio — thin orchestrator.
  * Model registry drives endpoints, audio, resolution, duration, credits.
+ * Model selection is hidden; backend auto-selects via selectVideoModel.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -23,7 +24,6 @@ import { VideoFeaturePanel } from "@/components/video/VideoFeaturePanel";
 import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
 import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
 import { VideoOutputView } from "@/components/video/VideoOutputView";
-import { VideoModelSelector } from "@/components/video/VideoModelSelector";
 import { VideoCreditsInfo } from "@/components/video/VideoCreditsInfo";
 import {
   defaultModelForMode,
@@ -58,8 +58,7 @@ function VideoStudioPage() {
   });
 
   const [mode, setMode] = useState<VideoGenMode>("text");
-  const [modelId, setModelId] = useState(() => defaultModelForMode("text").id);
-  const model = getVideoModel(modelId) ?? defaultModelForMode(mode);
+  const model = defaultModelForMode(mode);
 
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState(model.durations[0] ?? 5);
@@ -81,18 +80,22 @@ function VideoStudioPage() {
   const effectiveMax = Math.min(model.maxDuration, admin ? model.maxDuration : planMax);
 
   useEffect(() => {
-    if (!model.modes.includes(mode)) {
-      setModelId(defaultModelForMode(mode).id);
-    }
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+    // When mode changes, reset to default model for that mode
+    const newModel = defaultModelForMode(mode);
+    setDuration(newModel.durations[0] ?? 5);
+    setAspect(newModel.aspects[0] ?? "16:9");
+    setResolution(newModel.resolutions.includes("1080p") ? "1080p" : newModel.resolutions[0]);
+    setSoundOn(newModel.nativeAudio);
+  }, [mode]);
 
   useEffect(() => {
+    // Validate current settings against model capabilities
     if (!model.aspects.includes(aspect)) setAspect(model.aspects[0]);
     if (!model.resolutions.includes(resolution)) setResolution(model.resolutions[0]);
     if (!model.durations.includes(duration) && !customDuration) setDuration(model.durations[0]);
     if (duration > model.maxDuration) setDuration(model.maxDuration);
     if (!model.nativeAudio) setSoundOn(false);
-  }, [modelId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [model]);
 
   const cost = useMemo(
     () =>
@@ -193,6 +196,12 @@ function VideoStudioPage() {
       return;
     }
 
+    // Validate sound: if sound is on, model must support native audio
+    if (soundOn && !model.nativeAudio) {
+      toast.error("This model does not support audio.");
+      return;
+    }
+
     setBusy(true);
     setResult(null);
     startGeneration("video", "/studio/video");
@@ -287,21 +296,7 @@ function VideoStudioPage() {
             setMode(m);
             clearMedia();
             setResult(null);
-            setModelId(defaultModelForMode(m).id);
           }}
-        />
-      </section>
-
-      <section className="mb-5 space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Model</p>
-        <VideoModelSelector
-          mode={mode}
-          value={modelId}
-          onChange={setModelId}
-          duration={duration}
-          resolution={resolution}
-          soundOn={soundOn}
-          disabled={busy}
         />
       </section>
 
