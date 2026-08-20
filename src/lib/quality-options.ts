@@ -2,8 +2,10 @@
 //
 // Shared by the editor UI and the server generate function so the credit
 // price shown to the user always matches what the backend charges.
+//
+// SD = existing generation path with no Topaz upscale (not a separate FAL model).
 
-export type ImageQuality = "hd" | "2k" | "4k";
+export type ImageQuality = "sd" | "hd" | "2k" | "4k";
 export type VideoResolution = "720p" | "1080p" | "4k";
 
 export const IMAGE_QUALITY_OPTIONS: {
@@ -14,7 +16,14 @@ export const IMAGE_QUALITY_OPTIONS: {
   upscaleFactor: number;
   hint: string;
 }[] = [
-  { id: "hd", label: "HD", credits: 25, upscaleFactor: 1, hint: "Standard resolution — fastest." },
+  {
+    id: "sd",
+    label: "SD",
+    credits: 20,
+    upscaleFactor: 1,
+    hint: "Standard generation — no upscale, lowest cost.",
+  },
+  { id: "hd", label: "HD", credits: 25, upscaleFactor: 1, hint: "Full HD path — fast, no upscale." },
   { id: "2k", label: "2K", credits: 40, upscaleFactor: 2, hint: "Topaz 2× upscale for extra detail." },
   { id: "4k", label: "4K", credits: 60, upscaleFactor: 4, hint: "Topaz 4× upscale — maximum detail." },
 ];
