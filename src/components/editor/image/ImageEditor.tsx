@@ -356,6 +356,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           keepWatermark,
           aspectRatio: !mediaUrl ? aspectRatio : undefined,
           imageQuality,
+          studioTier,
         },
       });
 
@@ -442,6 +443,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         data: {
           imageUrl: output,
           keepWatermark: keepWatermark === true,
+          studioTier,
         },
       });
       await triggerBrowserDownload(res.downloadUrl, `motio2edit-${Date.now()}.jpg`);
