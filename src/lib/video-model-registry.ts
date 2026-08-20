@@ -8,6 +8,7 @@
  * Credit retail: $0.004 / credit.
  * Credits ≈ ceil((usdPerSec * duration * audioMult * resMult) / 0.004 * 1.25 buffer)
  * Floor: MIN_VIDEO_CREDITS (125)
+ * Video→Video charges extra (higher usdPerSec on V2V models).
  */
 
 export type VideoGenMode = "text" | "image" | "video";
@@ -20,6 +21,9 @@ export const USER_MAX_DURATION_SEC = 60;
 
 /** Minimum credits charged per video generation (product floor). */
 export const MIN_VIDEO_CREDITS = 125;
+
+/** Extra floor for video→video (base models still cost more than T2V/I2V). */
+export const MIN_VIDEO_TO_VIDEO_CREDITS = 180;
 
 export type VideoModelDef = {
   id: string;
@@ -50,8 +54,9 @@ export function estimateModelCredits(opts: {
   durationSec: number;
   resolution: VideoResolution;
   soundOn: boolean;
+  mode?: VideoGenMode;
 }): number {
-  const { model, durationSec, resolution, soundOn } = opts;
+  const { model, durationSec, resolution, soundOn, mode } = opts;
   if (!model.available) return 0;
   const d = Math.min(Math.max(1, durationSec), model.maxDuration);
   let usd = model.usdPerSec * d;
@@ -62,7 +67,8 @@ export function estimateModelCredits(opts: {
   else if (resolution === "720p") usd *= 0.95;
   else if (resolution === "480p") usd *= 0.85;
   const credits = Math.ceil((usd / 0.004) * 1.25);
-  return Math.max(MIN_VIDEO_CREDITS, credits);
+  const floor = mode === "video" ? MIN_VIDEO_TO_VIDEO_CREDITS : MIN_VIDEO_CREDITS;
+  return Math.max(floor, credits);
 }
 
 export const VIDEO_MODELS: VideoModelDef[] = [
@@ -85,6 +91,25 @@ export const VIDEO_MODELS: VideoModelDef[] = [
     audioUsdMult: 1.5,
     available: true,
     supportsNegativePrompt: true,
+  },
+  {
+    id: "kling-o3-std-v2v",
+    name: "Kling O3 Standard V2V",
+    tier: "standard",
+    bestUse: "Base video→video edit / enhance (standard tier)",
+    textEndpoint: null,
+    imageEndpoint: null,
+    videoEndpoint: "fal-ai/kling-video/o3/standard/video-to-video/edit",
+    modes: ["video"],
+    nativeAudio: true,
+    audioParam: "generate_audio",
+    resolutions: ["720p", "1080p"],
+    aspects: ["16:9", "9:16", "1:1"],
+    durations: [5, 10],
+    maxDuration: 10,
+    usdPerSec: 0.126,
+    audioUsdMult: 1,
+    available: true,
   },
   {
     id: "kling-v3-turbo-std",
@@ -163,6 +188,25 @@ export const VIDEO_MODELS: VideoModelDef[] = [
     audioUsdMult: 1.5,
     available: true,
     supportsNegativePrompt: true,
+  },
+  {
+    id: "kling-o3-pro-v2v",
+    name: "Kling O3 Pro V2V",
+    tier: "premium",
+    bestUse: "Top video→video continuity / edit (premium)",
+    textEndpoint: null,
+    imageEndpoint: null,
+    videoEndpoint: "fal-ai/kling-video/o3/pro/video-to-video/reference",
+    modes: ["video"],
+    nativeAudio: true,
+    audioParam: "generate_audio",
+    resolutions: ["720p", "1080p"],
+    aspects: ["16:9", "9:16", "1:1"],
+    durations: [5, 10],
+    maxDuration: 15,
+    usdPerSec: 0.168,
+    audioUsdMult: 1,
+    available: true,
   },
   {
     id: "veo-3.1",
@@ -401,8 +445,10 @@ export function selectVideoModel(opts: {
     const aDur = a.durations.includes(durationSec) ? 0 : 1;
     const bDur = b.durations.includes(durationSec) ? 0 : 1;
     if (aDur !== bDur) return aDur - bDur;
+    // Premium: prefer higher-end (higher usd) for video mode; standard: cheaper first
     const aCost = a.usdPerSec * (soundOn && a.nativeAudio ? a.audioUsdMult : 1);
     const bCost = b.usdPerSec * (soundOn && b.nativeAudio ? b.audioUsdMult : 1);
+    if (tier === "premium" && mode === "video") return bCost - aCost;
     return aCost - bCost;
   });
 
@@ -424,7 +470,7 @@ export function videoSelectionUnavailableMessage(opts: {
     }
   }
   if (opts.mode === "video") {
-    return "Video → Video isn't available for these settings. Try Text → Video or Image → Video, or adjust duration/resolution.";
+    return "Video → Video isn't available for these settings. Try a shorter duration, 720p/1080p, or 16:9 / 9:16 / 1:1.";
   }
   return "This combination isn't available yet. Try a shorter duration, different resolution, or another aspect ratio.";
 }
@@ -458,8 +504,10 @@ export function estimateRequestCredits(opts: {
     durationSec: opts.durationSec,
     resolution: opts.resolution,
     soundOn: opts.soundOn && model.nativeAudio,
+    mode: opts.mode,
   });
-  return Math.max(MIN_VIDEO_CREDITS, c);
+  const floor = opts.mode === "video" ? MIN_VIDEO_TO_VIDEO_CREDITS : MIN_VIDEO_CREDITS;
+  return Math.max(floor, c);
 }
 
 export const VIDEO_STYLE_MODIFIERS: Record<string, string> = {
