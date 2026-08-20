@@ -39,6 +39,7 @@ import {
 } from "@/components/editor";
 import type { EditorBootstrap } from "@/components/editor/editor-bootstrap";
 import { StudioTierSelector } from "@/components/studio/StudioTierSelector";
+import { PremiumImageGenerationOverlay } from "@/components/studio/overlays/PremiumImageGenerationOverlay";
 import {
   studioCardClass,
   studioShellClass,
@@ -94,10 +95,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [stage, setStage] = useState(0);
   const [progress, setProgress] = useState(0);
   const runIdRef = useRef(0);
+  /** Brief hold after Premium success so complete state is visible before reveal */
+  const [premiumCompleteHold, setPremiumCompleteHold] = useState(false);
 
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
   const stages = getEditorStages(!!inputDataUrl);
+  const isPremiumExp = studioTier === "pro";
 
   useEffect(() => {
     try {
@@ -160,6 +164,22 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     };
   }, [state, stages.length]);
 
+  // Premium: short complete flash before overlay dismisses
+  useEffect(() => {
+    if (!isPremiumExp) {
+      setPremiumCompleteHold(false);
+      return;
+    }
+    if (state === "success") {
+      setPremiumCompleteHold(true);
+      const t = window.setTimeout(() => setPremiumCompleteHold(false), 1400);
+      return () => window.clearTimeout(t);
+    }
+    if (state === "idle" || state === "blocked") {
+      setPremiumCompleteHold(false);
+    }
+  }, [state, isPremiumExp]);
+
   if (!profile) return null;
 
   const cost = imageQualityCost(imageQuality);
@@ -169,6 +189,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
+
+  const showPremiumOverlay =
+    isPremiumExp && (loading || premiumCompleteHold || state === "success");
+
+  // While Premium overlay is up, hide the inline loading card (still show result after hold)
+  const showInlinePreview =
+    !isPremiumExp || (!loading && !premiumCompleteHold && !!output);
 
   const activateSlot = (items: GalleryItem[], idx: number) => {
     const item = items[idx];
@@ -262,6 +289,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setState("analyzing");
     setOutput(null);
     setDownloaded(false);
+    setPremiumCompleteHold(false);
     await new Promise((r) => setTimeout(r, 600));
     if (runId !== runIdRef.current) return;
 
@@ -402,6 +430,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     endGeneration();
     setProgress(0);
     setStage(0);
+    setPremiumCompleteHold(false);
     toast("Generation stopped.");
   };
 
@@ -419,6 +448,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setDownloaded(false);
     setProgress(0);
     setStage(0);
+    setPremiumCompleteHold(false);
     setGallery([]);
     setActiveImage(0);
     if (fileRef.current) fileRef.current.value = "";
@@ -491,8 +521,27 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const expLabel = studioExperienceLabel(studioTier);
   const accent = studioAccentClass(studioTier);
 
+  const premiumPhase =
+    state === "analyzing"
+      ? "analyzing"
+      : state === "loading"
+        ? "loading"
+        : state === "success" || premiumCompleteHold
+          ? "success"
+          : "loading";
+
   return (
     <div className={cn("min-h-[70vh]", studioShellClass(studioTier))}>
+      {/* Premium full-viewport generation environment — rigid cover, no gaps */}
+      {showPremiumOverlay && (
+        <PremiumImageGenerationOverlay
+          phase={premiumPhase}
+          progress={progress}
+          error={null}
+          onRetry={runGenerate}
+        />
+      )}
+
       <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
         <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
           <div className="space-y-2 min-w-0">
@@ -626,7 +675,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           </div>
 
           <div className="order-2 space-y-4 lg:sticky lg:top-4 lg:self-start">
-            {(loading || output) && (
+            {showInlinePreview && (loading || output) && (
               <div className={cn("p-3 sm:p-4", studioCardClass(studioTier))}>
                 <EditorPreview
                   state={state}
@@ -649,7 +698,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
             <EditorResult
               output={output}
-              loading={loading}
+              loading={loading || premiumCompleteHold}
               onDownload={handleDownload}
               onRegenerate={runGenerate}
               onEditAgain={handleUseResultAsInput}
@@ -659,7 +708,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               downloaded={downloaded}
             />
 
-            {!loading && !output && (
+            {!loading && !output && !premiumCompleteHold && (
               <div
                 className={cn(
                   "flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 px-4 py-8 text-center text-sm text-muted-foreground",
