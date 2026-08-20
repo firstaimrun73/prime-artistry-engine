@@ -1,6 +1,5 @@
 /**
- * STANDARD tier — clean, focused glass UI.
- * Separate file so Standard visual changes never rewrite Pro/Premium.
+ * STANDARD tier — clean, focused Image Studio.
  */
 
 export const STANDARD_TIER = "standard";
@@ -20,5 +19,5 @@ export const standardMeta = {
   id: STANDARD_TIER,
   label: "Standard",
   short: "HD",
-  blurb: "Clean · HD quality · fast generation.",
+  blurb: "Clean · professional · fast generation.",
 } as const;
