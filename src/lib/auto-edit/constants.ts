@@ -1,5 +1,5 @@
 /**
- * MOTIO2EDIT Auto Edit — product constants.
+ * Maluto AI — product constants.
  *
  * Pipeline (all on fal.ai, FAL_API_KEY only):
  *   1) fal-ai/any-llm/vision (gemini-2.5-flash-lite) — analyse photo (~$0.01)
@@ -47,7 +47,7 @@ export const AUTO_EDIT_VISION_LLM = "google/gemini-2.5-flash-lite" as const;
 export const AUTO_EDIT_GPT_QUALITY = "medium" as const;
 
 /** Product name shown in UI. */
-export const AUTO_EDIT_PRODUCT_NAME = "MOTIO2EDIT Auto Edit" as const;
+export const AUTO_EDIT_PRODUCT_NAME = "Maluto AI" as const;
 
 /** Human-readable labels for detected quality issues (client-safe). */
 export const ISSUE_LABELS: Record<string, string> = {
