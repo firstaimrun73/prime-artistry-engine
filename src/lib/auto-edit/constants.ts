@@ -1,12 +1,29 @@
 /**
  * MOTIO2EDIT Auto Edit — product constants.
  *
- * One Auto Edit job = deterministic plan + single fal.ai GPT Image edit + watermark.
- * User is charged once for the whole pipeline, not per internal step.
+ * Pipeline (all on fal.ai, FAL_API_KEY only):
+ *   1) fal-ai/any-llm/vision (gemini-2.5-flash-lite) — analyse photo (~$0.01)
+ *   2) openai/gpt-image-2/edit medium — apply improvements (~$0.06 @ 1024)
+ * Total fal cost target: under ~$0.09 per HD job.
+ * User charged once for the whole pipeline.
  */
 
-/** Credits charged for one complete Auto Edit (plan + generation). */
+import type { ImageQuality } from "@/lib/quality-options";
+
+/** Base credits for HD Auto Edit (analysis + edit). */
 export const AUTO_EDIT_CREDIT_COST = 70;
+
+/** Credits by output quality tier (quality increases charge). */
+export const AUTO_EDIT_CREDITS_BY_QUALITY: Record<ImageQuality, number> = {
+  sd: 55,
+  hd: 70,
+  "2k": 90,
+  "4k": 110,
+};
+
+export function autoEditCreditCost(quality: ImageQuality = "hd"): number {
+  return AUTO_EDIT_CREDITS_BY_QUALITY[quality] ?? AUTO_EDIT_CREDIT_COST;
+}
 
 /**
  * Primary fal.ai GPT Image edit endpoint (NOT Flux Kontext, NOT external OpenAI SDK).
@@ -15,9 +32,17 @@ export const AUTO_EDIT_CREDIT_COST = 70;
 export const AUTO_EDIT_FAL_MODEL = "openai/gpt-image-2/edit" as const;
 
 /**
+ * Vision analysis on fal only — no Anthropic / OpenAI keys.
+ * Docs: https://fal.ai/models/fal-ai/any-llm/vision
+ * Default model google/gemini-2.5-flash-lite ≈ $0.01 / request
+ */
+export const AUTO_EDIT_VISION_MODEL = "fal-ai/any-llm/vision" as const;
+export const AUTO_EDIT_VISION_LLM = "google/gemini-2.5-flash-lite" as const;
+
+/**
  * Quality tier for GPT Image 2 edit.
- * medium ≈ $0.061 at 1024×1024 (edit pricing table on fal) — under ~$0.09 target.
- * high ≈ $0.219 at 1024×1024 — exceeds target; do not use as default.
+ * medium ≈ $0.061 at 1024×1024 — under ~$0.09 target with vision.
+ * high ≈ $0.219 — exceeds target; do not use as default.
  */
 export const AUTO_EDIT_GPT_QUALITY = "medium" as const;
 

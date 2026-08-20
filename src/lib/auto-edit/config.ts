@@ -1,10 +1,7 @@
 /**
  * Auto Edit — shared config (validation + timeouts).
- * Analysis model settings + image limits used by analyze + orchestrator.
+ * Vision analysis runs on fal.ai only (no Anthropic / OpenAI API keys).
  */
-
-export const ANALYSIS_MODEL = process.env.ANTHROPIC_ANALYSIS_MODEL ?? "claude-sonnet-4-5";
-export const ANALYSIS_MAX_TOKENS = Number(process.env.ANTHROPIC_ANALYSIS_MAX_TOKENS ?? 2000);
 
 /** Supported content types for probe validation (orchestrator). */
 export const SUPPORTED_IMAGE_TYPES = [
@@ -17,7 +14,6 @@ export const SUPPORTED_IMAGE_TYPES = [
 
 /**
  * Runtime limits for Auto Edit orchestration.
- * Generation still goes through existing generateMedia (credits + FAL).
  */
 export const AUTO_EDIT_CONFIG = {
   /** Match client upload limit (25 MB). */

@@ -1,18 +1,16 @@
 /**
  * MOTIO2EDIT Auto executor (server-only).
  *
- * Pipeline:
- *   ONE image → rule hints (not forced ops)
+ * Pipeline (FAL only — no Anthropic / OpenAI keys):
+ *   ONE image → fal any-llm/vision analysis
  *            → ONE inspect-and-decide internal instruction
- *            → ONE fal.ai openai/gpt-image-2/edit call
- *            → watermark → charge AUTO_EDIT_CREDIT_COST once
+ *            → ONE fal openai/gpt-image-2/edit call
+ *            → watermark → charge once (quality-tier credits)
  *
- * No user prompt. No OpenAI/Claude/Gemini API keys.
- * GPT Image receives the photograph and decides appropriate improvements.
+ * No user prompt required.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildRuleBasedAnalysis } from "./ruleBasedAnalysis";
 import { buildAnalysisLayers } from "./auto-edit.layers.server";
 import {
   buildSingleAutoEditPrompt,
@@ -21,12 +19,13 @@ import {
 import { validateStandaloneAutoEditInput } from "./auto-edit.validation";
 import type { StandaloneAutoEditResult } from "./auto-edit.types";
 import {
-  AUTO_EDIT_CREDIT_COST,
+  autoEditCreditCost,
   AUTO_EDIT_FAL_MODEL,
   labelImprovement,
   labelIssue,
 } from "./constants";
 import { runAutoGptImageEdit } from "./gpt-image-edit.server";
+import { analyzeImageWithFalVision } from "./fal-vision.server";
 import type { ImageQuality } from "@/lib/quality-options";
 
 export type RunStandaloneAutoEditArgs = {
@@ -53,16 +52,15 @@ export async function executeStandaloneAutoEdit(
     throw new Error(validated.error);
   }
 
-  if (!args.isAdmin && args.profile.credits < AUTO_EDIT_CREDIT_COST) {
-    throw new Error(
-      `Not enough credits. Auto Edit costs ${AUTO_EDIT_CREDIT_COST} credits per job.`,
-    );
+  const cost = autoEditCreditCost(args.imageQuality ?? "hd");
+  if (!args.isAdmin && args.profile.credits < cost) {
+    throw new Error(`Not enough credits. Auto Edit costs ${cost} credits per job.`);
   }
 
   const dims = { width: args.width, height: args.height };
 
-  // Soft heuristic hints only — not a paid vision API
-  const analysis = buildRuleBasedAnalysis(dims);
+  // fal.ai vision analysis (gemini-2.5-flash-lite) — no Anthropic
+  const analysis = await analyzeImageWithFalVision(validated.imageUrl, dims);
   const layers = buildAnalysisLayers(analysis);
   const matched = matchImprovements(analysis, layers);
 
@@ -78,7 +76,6 @@ export async function executeStandaloneAutoEdit(
     matched.length === 0 ||
     (matched.length === 1 && matched[0] === "NATURAL_PHOTO_POLISH");
 
-  // Safeguard: skip generation when heuristics say the photo is already strong
   if (layers.qualityScore >= 0.92 && attentionLayers.length === 0 && onlyPolish) {
     return {
       success: true,
@@ -105,7 +102,6 @@ export async function executeStandaloneAutoEdit(
     throw new Error("Auto Edit invariant: generation must run exactly once.");
   }
 
-  // Single fal.ai GPT Image 2 Edit call
   const gen = await runAutoGptImageEdit({
     supabase: args.supabase,
     supabaseAdmin: args.supabaseAdmin,
@@ -114,16 +110,17 @@ export async function executeStandaloneAutoEdit(
     isAdmin: args.isAdmin,
     internalPrompt: prompt,
     imageUrl: validated.imageUrl,
+    creditCost: cost,
   });
 
-  console.log("[AutoEdit] model:", AUTO_EDIT_FAL_MODEL, "| falCalls: 1");
+  console.log("[AutoEdit] model:", AUTO_EDIT_FAL_MODEL, "| falCalls: 1+vision | credits:", cost);
 
   return {
     success: true,
     outputUrl: gen.outputUrl,
     changed: gen.outputUrl !== validated.imageUrl,
     status: "COMPLETE",
-    creditsCharged: args.isAdmin ? 0 : AUTO_EDIT_CREDIT_COST,
+    creditsCharged: args.isAdmin ? 0 : cost,
     analysisSummary: {
       qualityScore: layers.qualityScore,
       improvementsApplied,
