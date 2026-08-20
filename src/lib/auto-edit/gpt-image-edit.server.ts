@@ -3,14 +3,6 @@
  *
  * Model: openai/gpt-image-2/edit
  * Auth: FAL_API_KEY only (no OPENAI_API_KEY, no Anthropic).
- *
- * Schema (fal docs):
- *   prompt: string (required)
- *   image_urls: string[] (required) — single photo for Auto Edit
- *   image_size: "auto" | presets
- *   quality: "low" | "medium" | "high" | "auto"
- *   num_images: 1
- *   output_format: jpeg | png | webp
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -126,10 +118,11 @@ export type RunAutoGptImageEditArgs = {
   userId: string;
   profile: { plan: string; credits: number; email?: string | null };
   isAdmin: boolean;
-  /** Backend-built instruction — never sent to the client */
   internalPrompt: string;
   imageUrl: string;
   keepWatermark?: boolean;
+  /** Override credit charge (quality tier). Default AUTO_EDIT_CREDIT_COST. */
+  creditCost?: number;
 };
 
 export type RunAutoGptImageEditResult = {
@@ -139,9 +132,6 @@ export type RunAutoGptImageEditResult = {
   primaryModel: typeof AUTO_EDIT_FAL_MODEL;
 };
 
-/**
- * One fal.ai GPT Image 2 edit + watermark + single credit charge.
- */
 export async function runAutoGptImageEdit(
   args: RunAutoGptImageEditArgs,
 ): Promise<RunAutoGptImageEditResult> {
@@ -152,7 +142,7 @@ export async function runAutoGptImageEdit(
     throw new Error("Image must be a secure https URL.");
   }
 
-  const cost = AUTO_EDIT_CREDIT_COST;
+  const cost = args.creditCost ?? AUTO_EDIT_CREDIT_COST;
   if (!args.isAdmin && args.profile.credits < cost) {
     throw new Error(`Not enough credits. Auto Edit costs ${cost} credits.`);
   }
@@ -179,7 +169,6 @@ export async function runAutoGptImageEdit(
     throw new Error(`${msg} — Generation failed. Credits not charged.`);
   }
 
-  // Watermark before deduct
   const wmMode = getWatermarkMode({
     plan: args.profile.plan as "free" | "plus" | "pro" | "studio" | "business",
     email: args.profile.email,
