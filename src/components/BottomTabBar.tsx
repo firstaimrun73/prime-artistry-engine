@@ -17,6 +17,7 @@ function hideBottomNav(pathname: string): boolean {
 
 /**
  * Center Auto mark — motion: rest → travel → AI spark → settle (~1.5s) → rest.
+ * Gemini-like multi-star during pulse. Cycle every 10 seconds.
  * Navigation is parent Link only; animation never blocks clicks.
  * Respects prefers-reduced-motion.
  */
@@ -61,8 +62,8 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
       );
     };
 
-    const first = window.setTimeout(runCycle, 8000);
-    const id = window.setInterval(runCycle, 12000);
+    const first = window.setTimeout(runCycle, 3000);
+    const id = window.setInterval(runCycle, 10_000);
     return () => {
       cancelled = true;
       clearTimeout(first);
@@ -103,25 +104,34 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
         )}
       />
 
+      {/* Gemini-like sparkle mark (A** style) during Auto Edit pulse */}
       <span
         className={cn(
-          "absolute text-base font-black tracking-tight transition-all duration-500",
-          phase === "travel" &&
-            "translate-x-[-6px] translate-y-[-8px] rotate-[-12deg] scale-90 opacity-90",
-          phase === "spark" && "translate-x-0 translate-y-0 rotate-0 scale-110 opacity-100",
+          "absolute inset-0 flex items-center justify-center transition-all duration-500",
+          phase === "travel" && "scale-90 opacity-90 -rotate-12",
+          phase === "spark" && "scale-110 opacity-100 rotate-0",
           phase === "hold" &&
-            "translate-x-0 translate-y-0 rotate-0 scale-100 opacity-100 animate-[autoSettle_0.45s_cubic-bezier(0.34,1.56,0.64,1)]",
+            "scale-100 opacity-100 rotate-0 animate-[autoSettle_0.45s_cubic-bezier(0.34,1.56,0.64,1)]",
           phase === "rest" && "scale-0 opacity-0",
           reduced && active && "scale-100 opacity-100",
         )}
+        aria-hidden
       >
-        A
+        <svg viewBox="0 0 48 48" className="h-7 w-7 text-white drop-shadow" fill="currentColor">
+          {/* large 4-point star */}
+          <path d="M24 4 L27.2 18.2 L42 21.5 L27.2 24.8 L24 39 L20.8 24.8 L6 21.5 L20.8 18.2 Z" />
+          {/* small star (top-right) */}
+          <path
+            d="M36 6 L37.2 10.2 L41.5 11.5 L37.2 12.8 L36 17 L34.8 12.8 L30.5 11.5 L34.8 10.2 Z"
+            className={showSpark ? "opacity-100" : "opacity-80"}
+          />
+          {/* tiny star (bottom-left) */}
+          <path d="M12 30 L12.8 33 L16 33.8 L12.8 34.6 L12 37.5 L11.2 34.6 L8 33.8 L11.2 33 Z" opacity="0.9" />
+        </svg>
       </span>
 
       {showSpark && (
-        <span className="pointer-events-none absolute text-[10px] text-white/90 animate-[autoSpark_0.22s_ease-out]">
-          ✦
-        </span>
+        <span className="pointer-events-none absolute inset-0 rounded-full animate-[autoSpark_0.35s_ease-out] bg-white/25" />
       )}
 
       <style>{`
@@ -134,11 +144,55 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
           100% { transform: scale(1); }
         }
         @keyframes autoSpark {
-          0% { opacity: 0; transform: scale(0.5) translateY(4px); }
-          50% { opacity: 1; transform: scale(1.2) translateY(-2px); }
-          100% { opacity: 0; transform: scale(0.8) translateY(-8px); }
+          0% { opacity: 0.6; transform: scale(0.85); }
+          50% { opacity: 0.35; transform: scale(1.15); }
+          100% { opacity: 0; transform: scale(1.35); }
         }
       `}</style>
+    </span>
+  );
+}
+
+/** Tab caption: pulses "Auto edit" every ~10s with the center mark. */
+function AutoTabLabel({ active }: { active?: boolean }) {
+  const [pulse, setPulse] = useState(false);
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (reduced) return;
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      setPulse(true);
+      window.setTimeout(() => {
+        if (!cancelled) setPulse(false);
+      }, 2200);
+    };
+    const first = window.setTimeout(run, 3000);
+    const id = window.setInterval(run, 10_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [reduced]);
+
+  return (
+    <span
+      className={cn(
+        "-mt-1 max-w-[4.5rem] truncate text-center transition-all duration-300",
+        pulse || active ? "font-bold text-primary" : "",
+      )}
+    >
+      {pulse ? "Auto edit" : "Auto"}
     </span>
   );
 }
@@ -170,43 +224,34 @@ export function BottomTabBar() {
 
   const autoActive = pathname.startsWith("/studio/image/auto-edit");
   const studioActive =
-    (pathname === "/studio" ||
-      pathname.startsWith("/studio/image") ||
-      pathname.startsWith("/studio/video") ||
-      pathname.startsWith("/studio/music") ||
-      pathname.startsWith("/music")) &&
-    !autoActive;
+    pathname.startsWith("/studio") && !autoActive;
 
   const left = [
-    { to: "/", label: t("nav.home"), icon: Home, exact: true },
-    { to: "/studio", label: "Studio", icon: LayoutGrid },
-  ] as const;
+    { to: "/" as const, label: t("nav.home") || "Home", icon: Home },
+    { to: "/studio" as const, label: t("nav.studio") || "Studio", icon: LayoutGrid },
+  ];
   const right = [
-    { to: "/history", label: t("nav.history"), icon: History },
-    { to: "/dashboard", label: t("nav.profile"), icon: User },
-  ] as const;
+    { to: "/history" as const, label: t("nav.history") || "History", icon: History },
+    { to: "/profile" as const, label: t("nav.profile") || "Profile", icon: User },
+  ];
 
   return (
     <nav
-      aria-label="Primary"
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur transition-transform duration-300 md:hidden",
+        "fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden",
+        "transition-transform duration-300",
         hiddenByScroll && "translate-y-full",
       )}
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      aria-label="Primary"
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-5 items-end px-1">
-        {left.map(({ to, label, icon: Icon, exact }) => (
+      <ul className="mx-auto grid h-16 max-w-lg grid-cols-5 items-end px-1">
+        {left.map(({ to, label, icon: Icon }) => (
           <li key={to} className="flex justify-center">
             <Link
               to={to}
-              activeOptions={exact ? { exact: true } : undefined}
               activeProps={{ className: "text-primary" }}
               inactiveProps={{ className: "text-muted-foreground" }}
-              className={cn(
-                "flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium",
-                to === "/studio" && studioActive && "text-primary",
-              )}
+              className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium"
             >
               <Icon className="h-5 w-5" />
               {label}
@@ -224,7 +269,7 @@ export function BottomTabBar() {
             )}
           >
             <AutoCenterIcon active={autoActive} />
-            <span className="-mt-1">Auto</span>
+            <AutoTabLabel active={autoActive} />
           </Link>
         </li>
 
