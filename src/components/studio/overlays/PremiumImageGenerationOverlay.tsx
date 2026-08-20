@@ -2,8 +2,11 @@
  * PREMIUM Image Studio — full-viewport generation environment.
  * Rigid edge-to-edge overlay. Zero transparency. Editor completely hidden.
  * Only used when studioTier === "pro" (Premium experience).
+ *
+ * Rendered via portal to document.body so parent overflow/transform cannot clip it.
  */
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Brain,
   Check,
@@ -116,6 +119,9 @@ const STAGES: StageDef[] = [
   },
 ];
 
+/** Hard cap while generation is still running — never show 100% early. */
+const RUNNING_CAP = 96;
+
 function CircularProgress({
   value,
   complete,
@@ -138,17 +144,15 @@ function CircularProgress({
       style={{ width: size, height: size }}
       aria-hidden
     >
-      <svg width={size} height={size} className="-rotate-90">
-        {/* track */}
+      <svg width={size} height={size} className="-rotate-90" viewBox={`0 0 ${size} ${size}`}>
         <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="rgba(255,255,255,0.08)"
+          stroke="rgba(255,255,255,0.10)"
           strokeWidth={stroke}
         />
-        {/* active ring */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -160,10 +164,12 @@ function CircularProgress({
           strokeDasharray={c}
           strokeDashoffset={offset}
           style={{
-            transition: reduceMotion ? undefined : "stroke-dashoffset 0.85s cubic-bezier(0.22, 1, 0.36, 1)",
+            transition: reduceMotion
+              ? undefined
+              : "stroke-dashoffset 0.85s cubic-bezier(0.22, 1, 0.36, 1)",
             filter: complete
               ? "drop-shadow(0 0 10px rgba(232, 197, 71, 0.55))"
-              : "drop-shadow(0 0 6px rgba(212, 175, 55, 0.35))",
+              : "drop-shadow(0 0 6px rgba(212, 175, 55, 0.4))",
           }}
         />
         <defs>
@@ -193,18 +199,25 @@ export function PremiumImageGenerationOverlay({
   progress,
   error,
   onRetry,
+  onDismiss,
 }: {
-  /** analyzing | loading | success | error — driven by ImageEditor GenState */
   phase: PremiumGenPhase;
   /** Estimated 0–100 from parent; never trusted as complete until phase === success */
   progress: number;
   error?: string | null;
   onRetry?: () => void;
+  /** Close overlay after error without retrying */
+  onDismiss?: () => void;
 }) {
   const [reduceMotion, setReduceMotion] = useState(false);
   const [stageIdx, setStageIdx] = useState(0);
   const [displayPct, setDisplayPct] = useState(4);
   const [completeFlash, setCompleteFlash] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -214,20 +227,19 @@ export function PremiumImageGenerationOverlay({
     return () => mq.removeEventListener("change", fn);
   }, []);
 
-  // Stage rotation while loading / analyzing — independent of real backend stages
+  // Stage rotation while analyzing/loading — still advances under reduced-motion
   useEffect(() => {
     if (phase === "success" || phase === "error") return;
-    if (reduceMotion) return;
 
-    // Start near beginning when generation starts
     setStageIdx(0);
+    const intervalMs = reduceMotion ? 2800 : 2200;
     const id = window.setInterval(() => {
       setStageIdx((i) => Math.min(STAGES.length - 1, i + 1));
-    }, 2200);
+    }, intervalMs);
     return () => window.clearInterval(id);
   }, [phase, reduceMotion]);
 
-  // Smooth display %: follow parent progress, stage targets, but never 100 until success
+  // Continuous easing toward stage/parent target; hard-cap until success
   useEffect(() => {
     if (phase === "success") {
       setDisplayPct(100);
@@ -237,19 +249,18 @@ export function PremiumImageGenerationOverlay({
     if (phase === "error") return;
 
     const stageTarget = STAGES[stageIdx]?.targetPct ?? 90;
-    const parent = Math.min(94, Math.max(0, progress));
-    const blended = Math.max(displayPct, Math.min(96, Math.max(stageTarget * 0.85, parent)));
+    const parent = Math.min(RUNNING_CAP - 2, Math.max(0, progress));
+    const goal = Math.min(RUNNING_CAP, Math.max(stageTarget * 0.9, parent, 4));
 
-    // Ease toward blended
-    const t = window.setTimeout(() => {
+    const id = window.setInterval(() => {
       setDisplayPct((p) => {
-        if (p >= blended) return p;
-        const step = Math.max(0.4, (blended - p) * 0.18);
-        return Math.min(96, p + step);
+        if (p >= goal) return Math.min(p, RUNNING_CAP);
+        const step = Math.max(0.35, (goal - p) * 0.12);
+        return Math.min(RUNNING_CAP, p + step);
       });
-    }, 120);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, 100);
+
+    return () => window.clearInterval(id);
   }, [phase, progress, stageIdx]);
 
   const stage = STAGES[Math.min(stageIdx, STAGES.length - 1)];
@@ -264,23 +275,41 @@ export function PremiumImageGenerationOverlay({
   }, [isError, isComplete, stage]);
 
   const support = useMemo(() => {
-    if (isError) return error || "Something went wrong. Credits were not charged if the job failed.";
+    if (isError)
+      return error || "Something went wrong. Credits were not charged if the job failed.";
     if (isComplete) return "Premium transform complete — revealing result";
     return stage?.support ?? "";
   }, [isError, isComplete, error, stage]);
 
-  // Lock scroll while overlay is mounted
+  // Lock body scroll while mounted
   useEffect(() => {
-    const prev = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
+    const prevTouch = document.body.style.touchAction;
     document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouch;
     };
   }, []);
 
-  return (
+  if (!mounted || typeof document === "undefined") return null;
+
+  const ui = (
     <div
-      className="premium-gen-overlay fixed inset-0 z-[200] flex flex-col items-center justify-start overflow-hidden bg-[#0A0A0C] text-slate-100"
+      className="premium-gen-overlay fixed left-0 top-0 right-0 bottom-0 z-[9999] flex flex-col items-center justify-start overflow-hidden bg-[#0A0A0C] text-slate-100 isolation-isolate"
+      style={{
+        width: "100vw",
+        height: "100dvh",
+        maxHeight: "100dvh",
+        minHeight: "100dvh",
+        // Opaque solid — no alpha
+        backgroundColor: "#0A0A0C",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)",
+      }}
       role="status"
       aria-live="polite"
       aria-busy={!isComplete && !isError}
@@ -308,9 +337,8 @@ export function PremiumImageGenerationOverlay({
         </>
       )}
 
-      {/* Content — vertical breathing room */}
-      <div className="relative z-10 flex w-full max-w-lg flex-1 flex-col items-center px-5 pt-[12vh] pb-10 sm:pt-[14vh]">
-        {/* Upper animation + stage */}
+      {/* Content — intentional vertical separation: status UP, ring BELOW */}
+      <div className="relative z-10 flex w-full max-w-lg flex-1 flex-col items-center px-5 pt-[10vh] pb-10 sm:pt-[12vh] md:pt-[14vh]">
         <div className="flex w-full flex-col items-center text-center">
           <div
             className={cn(
@@ -332,8 +360,8 @@ export function PremiumImageGenerationOverlay({
           <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-400">{support}</p>
         </div>
 
-        {/* Circular progress — middle / lower-middle */}
-        <div className="mt-10 sm:mt-12">
+        {/* Breathing room between status block and progress ring */}
+        <div className="mt-12 sm:mt-14 md:mt-16">
           {!isError && (
             <CircularProgress
               value={isComplete ? 100 : displayPct}
@@ -343,22 +371,37 @@ export function PremiumImageGenerationOverlay({
           )}
         </div>
 
-        {isError && onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="mt-8 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-5 py-2.5 text-sm font-semibold text-[#E8C547] transition hover:bg-[#D4AF37]/18"
-          >
-            Retry
-          </button>
+        {isError && (
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-5 py-2.5 text-sm font-semibold text-[#E8C547] transition hover:bg-[#D4AF37]/18"
+              >
+                Retry
+              </button>
+            )}
+            {onDismiss && (
+              <button
+                type="button"
+                onClick={onDismiss}
+                className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10"
+              >
+                Close
+              </button>
+            )}
+          </div>
         )}
 
         {!isError && !isComplete && (
-          <p className="mt-8 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+          <p className="mt-10 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
             MOTIO2EDIT · Premium
           </p>
         )}
       </div>
     </div>
   );
+
+  return createPortal(ui, document.body);
 }
