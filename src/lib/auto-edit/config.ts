@@ -16,8 +16,8 @@ export const SUPPORTED_IMAGE_TYPES = [
  * Runtime limits for Auto Edit orchestration.
  */
 export const AUTO_EDIT_CONFIG = {
-  /** Match client upload limit (25 MB). */
-  maxImageSizeBytes: 25 * 1024 * 1024,
+  /** Match client upload limit (40 MB). */
+  maxImageSizeBytes: 40 * 1024 * 1024,
   maxImageDimensionPx: 8192,
   minImageDimensionPx: 64,
   /** Analysis + sequential ops budget (guards runaway loops). */
