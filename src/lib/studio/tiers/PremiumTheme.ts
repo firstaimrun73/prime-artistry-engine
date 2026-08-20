@@ -1,5 +1,6 @@
 /**
- * PREMIUM tier — black + white + gold elite workstation.
+ * PREMIUM tier — glass + amber elite workstation.
+ * Same approved image models as Standard; higher default quality + richer UI.
  * Separate file so Premium visual changes never rewrite Standard/Pro.
  */
 
@@ -9,7 +10,7 @@ export const premiumShellClass =
   "studio-tier-premium bg-zinc-950 text-zinc-50";
 
 export const premiumCardClass =
-  "rounded-2xl border border-amber-500/25 bg-zinc-900/80 shadow-[0_0_0_1px_rgba(212,175,55,0.12)]";
+  "rounded-2xl border border-amber-500/25 bg-zinc-900/80 shadow-[0_0_0_1px_rgba(212,175,55,0.12)] backdrop-blur-md";
 
 export const premiumAccentClass = "text-amber-400";
 
@@ -19,6 +20,6 @@ export const premiumGenerateClass =
 export const premiumMeta = {
   id: PREMIUM_TIER,
   label: "Premium",
-  short: "Elite",
-  blurb: "Maximum quality, advanced controls, cinematic UI.",
+  short: "4K",
+  blurb: "Premium experience · up to 4K · richer controls.",
 } as const;
