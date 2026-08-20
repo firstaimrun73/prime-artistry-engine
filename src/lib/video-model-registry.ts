@@ -12,11 +12,15 @@
 export type VideoGenMode = "text" | "image" | "video";
 export type VideoModelTierSection = "standard" | "premium";
 export type VideoTier = VideoModelTierSection;
-export type VideoResolution = "480p" | "720p" | "1080p" | "4k";
+export type VideoResolution = "480p" | "720p" | "1080p" | "2k" | "4k";
 export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 
-/** Product-facing max duration (seconds). Backend may support less for a given request. */
 export const USER_MAX_DURATION_SEC = 60;
+
+/** Script/Custom flow: each segment ~20s, max 2 generations → 40s product cap. */
+export const SCRIPT_SEGMENT_SEC = 20;
+export const SCRIPT_MAX_SEGMENTS = 2;
+export const SCRIPT_MAX_DURATION_SEC = SCRIPT_SEGMENT_SEC * SCRIPT_MAX_SEGMENTS;
 
 export type VideoModelDef = {
   id: string;
@@ -54,6 +58,7 @@ export function estimateModelCredits(opts: {
   let usd = model.usdPerSec * d;
   if (soundOn && model.nativeAudio) usd *= model.audioUsdMult;
   if (resolution === "4k" && model.res4kMult) usd *= model.res4kMult;
+  else if (resolution === "2k") usd *= 1.35;
   else if (resolution === "1080p") usd *= 1.0;
   else if (resolution === "720p") usd *= 0.95;
   else if (resolution === "480p") usd *= 0.85;
@@ -354,7 +359,7 @@ export function capabilitiesForTier(tier: VideoTier, mode: VideoGenMode): {
   const nativeAudio = list.some((m) => m.nativeAudio);
   const supportsNegativePrompt = list.some((m) => m.supportsNegativePrompt);
   const aspectOrder: VideoAspect[] = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"];
-  const resOrder: VideoResolution[] = ["480p", "720p", "1080p", "4k"];
+  const resOrder: VideoResolution[] = ["480p", "720p", "1080p", "2k", "4k"];
   return {
     aspects: aspectOrder.filter((a) => aspects.includes(a)),
     resolutions: resOrder.filter((r) => resolutions.includes(r)),
