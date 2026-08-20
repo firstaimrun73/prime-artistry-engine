@@ -5,25 +5,15 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { CREDIT_COST } from "@/lib/plans";
 
 export const Route = createFileRoute("/faq")({
   head: () => ({
     meta: [
-      { title: "FAQ — MOTIO2EDIT" },
+      { title: "FAQ — Motio2edit" },
       {
         name: "description",
-        content:
-          "Frequently asked questions about MOTIO2EDIT: account, credits, billing, AI image and video editing, privacy, security, and subscription plans.",
+        content: "Frequently asked questions about Motio2edit image, video, and music AI tools.",
       },
-      { property: "og:title", content: "FAQ — MOTIO2EDIT" },
-      { property: "og:description", content: "Answers about account, credits, billing, AI editing, privacy, and plans." },
     ],
   }),
   component: FAQ,
@@ -41,8 +31,12 @@ const CATEGORIES: Category[] = [
         a: "Open the Image Editor (or Image Studio → Open Image Editor). Upload a photo, describe the change you want, and generate. You can also explore tools on the Image Tools page, then open the editor with a preset.",
       },
       {
+        q: "What is the center Auto (+) button?",
+        a: "On mobile, the center tab opens Auto Edit. The + mark periodically animates into a sparkle logo and shows “Auto edit” so you can find one-tap photo improvement without writing a prompt.",
+      },
+      {
         q: "How does Auto Edit work?",
-        a: "Auto Edit is designed so you can describe the change in plain language (for example, remove a person or change a shirt). The editor focuses on the requested change and aims to preserve parts of the image you did not ask to modify. Results depend on prompt clarity and source quality.",
+        a: "Upload one photo. Motio2edit analyzes the image on fal.ai and applies cleanup edits (restore, declutter, background tidy, etc.) without requiring a prompt. Quality tiers change credit cost. Typical jobs stay under a few credits path configured on the server.",
       },
       {
         q: "How do I generate an image from text?",
@@ -75,32 +69,24 @@ const CATEGORIES: Category[] = [
       },
       {
         q: "What image formats can I upload?",
-        a: "JPG, PNG, and WEBP are supported. Higher-resolution sources generally produce better results.",
-      },
-      {
-        q: `How many credits does image editing use?`,
-        a: `Image generation and editing costs ${CREDIT_COST.image} credits per result. Your balance updates after each successful generation.`,
+        a: "JPG, PNG, and WEBP are supported. Higher-resolution sources generally produce better results. Maximum upload size is about 40 MB.",
       },
     ],
   },
   {
-    title: "Video",
+    title: "Music Studio",
     items: [
       {
-        q: "How does video generation work?",
-        a: "On a paid plan with video access (Lite and above), open Video Studio or the editor in video mode. Use text-to-video or image-to-video presets, then generate. Processing takes longer than images.",
+        q: "Who can use Music Studio?",
+        a: "Music generation is available on Lite and higher plans. Free accounts can still use Image Studio. Administrators always have full Music Studio access.",
       },
       {
-        q: "What video modes are available?",
-        a: "Text-to-video and image-to-video, plus cinematic motion presets such as push-in, orbit, slow-motion, and product spin — depending on what is enabled in Video Studio.",
+        q: "Why can’t I generate music?",
+        a: "Confirm you are on Lite+ (or admin), that you have enough credits for the selected mode and duration, and that the prompt (or image/video attachment) is filled for the mode you chose. Failed jobs do not charge credits.",
       },
       {
-        q: "Does generated video include audio?",
-        a: "Current video generation may produce silent video depending on the provider model. Do not assume an audio track is included. Music can be created separately in Music Studio where your plan allows.",
-      },
-      {
-        q: `How many credits does video use?`,
-        a: `Video generation costs ${CREDIT_COST.video} credits per result on plans that include video.`,
+        q: "What can I create in Music Studio?",
+        a: "Songs, instrumentals, voiceovers, and sound effects. Some modes accept an image or video for mood/sync guidance.",
       },
     ],
   },
@@ -109,70 +95,11 @@ const CATEGORIES: Category[] = [
     items: [
       {
         q: "How do credits work?",
-        a: `Every generation spends credits. Image costs ${CREDIT_COST.image} credits, video ${CREDIT_COST.video}, and music ${CREDIT_COST.music} (music lite ${CREDIT_COST.music_lite} where applicable). Your balance is shown on the home page, dashboard, and header areas.`,
+        a: "Each generation spends credits based on media type and quality. Failed generations do not charge credits. Your balance is shown in the header and dashboard.",
       },
       {
-        q: "What does each plan include?",
-        a: "Free includes image editing with a signup credit bonus and watermarks; video and music require upgrade. Lite and above add video and music with increasing monthly credits and quality options. See Pricing for the live feature list — the Pricing page is the source of truth.",
-      },
-      {
-        q: "What happens when credits run out?",
-        a: "Generation is blocked until you have enough credits again. You can upgrade your plan or purchase a credit top-up where available.",
-      },
-      {
-        q: "Do credits expire?",
-        a: "Monthly plan credits refresh with each billing cycle. Free signup credits remain until used. One-time top-ups follow the product rules described on Pricing.",
-      },
-    ],
-  },
-  {
-    title: "Account",
-    items: [
-      {
-        q: "How do I change my language?",
-        a: "Open Settings → Language and choose a supported locale. The preference is saved in your browser and applied to the translated parts of the app.",
-      },
-      {
-        q: "How do I manage my account?",
-        a: "Use Profile (dashboard) for plan and credits at a glance, and Settings for display name, password, theme, language, and notifications.",
-      },
-      {
-        q: "How do I contact support?",
-        a: "Open Support or Tickets from Profile/Support. You can also email support@motio2edit.com. Include your account email and a short description of the issue.",
-      },
-      {
-        q: "How do I reset my password?",
-        a: "On the sign-in page, use the reset-password link, or change password in Settings → Security when signed in.",
-      },
-    ],
-  },
-  {
-    title: "Payments & Security",
-    items: [
-      {
-        q: "What payment methods are supported?",
-        a: "Card (via configured processors such as Razorpay/PayPal depending on currency) and crypto where enabled. We do not store full card numbers.",
-      },
-      {
-        q: "Is my content private?",
-        a: "Your generations stay tied to your account. We do not sell your content. Files are processed as needed to deliver AI results through trusted providers.",
-      },
-      {
-        q: "Is payment information secure?",
-        a: "Payments are handled by payment processors. Full card details are not stored on Motio2edit servers.",
-      },
-    ],
-  },
-  {
-    title: "Refunds",
-    items: [
-      {
-        q: "What is your refund policy?",
-        a: "Refunds are reviewed case by case for billing errors or technical issues. Contact Support with your account details.",
-      },
-      {
-        q: "Are used credits refundable?",
-        a: "Credits already spent on completed generations are generally non-refundable, but contact Support if something went wrong.",
+        q: "Do free accounts have a watermark?",
+        a: "Free image outputs may include watermark protection. Paid plans unlock cleaner downloads according to plan rules.",
       },
     ],
   },
@@ -180,7 +107,6 @@ const CATEGORIES: Category[] = [
 
 function FAQ() {
   const [query, setQuery] = useState("");
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return CATEGORIES;
@@ -195,11 +121,10 @@ function FAQ() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-3xl px-4 py-12 pb-24 sm:py-16 md:pb-16">
+      <main className="mx-auto max-w-3xl px-4 py-12">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Frequently asked questions</h1>
         <p className="mt-3 text-muted-foreground">Everything you need to know about MOTIO2EDIT.</p>
-
-        <div className="relative mt-8">
+        <div className="relative mt-6">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
@@ -208,27 +133,30 @@ function FAQ() {
             className="pl-9"
           />
         </div>
-
-        {filtered.length === 0 ? (
-          <p className="mt-10 text-sm text-muted-foreground">No results found for “{query}”.</p>
-        ) : (
-          <div className="mt-10 space-y-10">
-            {filtered.map((cat) => (
-              <section key={cat.title}>
-                <h2 className="text-lg font-bold">{cat.title}</h2>
-                <Accordion type="single" collapsible className="mt-3">
-                  {cat.items.map((item, i) => (
-                    <AccordionItem key={i} value={`${cat.title}-${i}`}>
-                      <AccordionTrigger className="text-left">{item.q}</AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">{item.a}</AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </section>
-            ))}
-          </div>
-        )}
-      </div>
+        <div className="mt-10 space-y-10">
+          {filtered.map((cat) => (
+            <section key={cat.title}>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{cat.title}</h2>
+              <div className="mt-3 space-y-4">
+                {cat.items.map((item) => (
+                  <details
+                    key={item.q}
+                    className="group rounded-xl border border-border bg-card px-4 py-3 open:shadow-sm"
+                  >
+                    <summary className="cursor-pointer list-none font-medium marker:content-none">
+                      {item.q}
+                    </summary>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.a}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          ))}
+          {filtered.length === 0 && (
+            <p className="text-sm text-muted-foreground">No matches. Try a different search.</p>
+          )}
+        </div>
+      </main>
       <FooterAd />
       <Footer />
     </div>
