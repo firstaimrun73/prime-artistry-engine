@@ -114,13 +114,11 @@ export function studioExperienceLabel(tier: StudioTier): string {
   return STUDIO_TIER_META[tier].label;
 }
 
-/**
- * Header title for Image Studio string consumers.
- */
+/** Header title for Image Studio string consumers. */
 export function imageStudioHeaderTitle(tier: StudioTier): string {
   switch (tier) {
     case "standard":
-      return "Image Studio";
+      return "Image Studio · Standard";
     case "pro":
       return "Image Studio · Premium";
     case "premium":

@@ -59,7 +59,7 @@ export function StudioTierSelector({
                 if (!isLocked) onChange(id);
               }}
               className={cn(
-                "relative flex min-h-[88px] min-w-0 flex-col items-start gap-1 rounded-xl border px-2 py-2.5 text-left transition-all duration-200 sm:min-h-[96px] sm:px-3 sm:py-3",
+                "relative flex min-h-[92px] min-w-0 flex-col items-start gap-1 rounded-xl border px-2 py-2.5 text-left transition-all duration-200 sm:min-h-[100px] sm:px-3 sm:py-3",
                 active &&
                   id === "standard" &&
                   "border-primary bg-primary/10 ring-1 ring-primary/30",
@@ -68,7 +68,7 @@ export function StudioTierSelector({
                   "border-orange-500/60 bg-orange-500/10 ring-1 ring-orange-500/40 shadow-[0_0_20px_-6px_rgba(249,115,22,0.45)]",
                 active &&
                   id === "premium" &&
-                  "border-[#D4AF37]/50 bg-[#0B1220] ring-1 ring-[#D4AF37]/40 text-slate-100 shadow-[0_0_22px_-8px_rgba(212,175,55,0.4)]",
+                  "border-[#D4AF37]/55 bg-[#121C30] ring-1 ring-[#D4AF37]/45 text-slate-100 shadow-[0_0_22px_-8px_rgba(212,175,55,0.4)]",
                 !active &&
                   "border-border/70 bg-card/70 backdrop-blur-sm hover:border-primary/35 hover:bg-card",
                 isLocked && "cursor-not-allowed opacity-50",
