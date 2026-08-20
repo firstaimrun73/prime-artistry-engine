@@ -3,6 +3,9 @@
  * Visual tokens live in separate theme files under lib/studio/tiers/
  * so a Standard change cannot break Pro or Premium (and vice versa).
  * Model selection lives in per-studio registries under lib/studio/{image,video,music}/.
+ *
+ * Image tiers share the same approved FAL models; tier primarily controls
+ * default quality preference, plan gates, and visual treatment.
  */
 
 import {
@@ -100,8 +103,8 @@ export function studioTierToMusicQuality(tier: StudioTier): "standard" | "premiu
   return tier === "standard" ? "standard" : "premium";
 }
 
-/** Map studio tier → image quality preference for cost estimates. */
-export function studioTierToImageQuality(tier: StudioTier): "hd" | "2k" | "4k" {
+/** Map studio tier → image quality preference for defaults / cost estimates. */
+export function studioTierToImageQuality(tier: StudioTier): "sd" | "hd" | "2k" | "4k" {
   switch (tier) {
     case "standard":
       return "hd";
