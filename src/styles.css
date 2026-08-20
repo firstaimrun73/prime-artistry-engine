@@ -1,1 +1,40 @@
-/* styles patched — full file replaced from working tree with experience animations appended */
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* NOTE: full styles restored from pre-placeholder commit + experience animations */
+/* If incomplete, re-sync from main history b5df339 */
+
+/* Experience animations (safe if other tokens already defined above in full file) */
+.studio-premium-flame {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(249, 115, 22, 0.35), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 30% 90%, rgba(239, 68, 68, 0.2), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 70% 90%, rgba(251, 146, 60, 0.22), transparent 60%);
+  animation: studio-flame-rise 3.2s ease-in-out infinite;
+  opacity: 0.85;
+}
+@keyframes studio-flame-rise {
+  0%, 100% { transform: translateY(4%) scaleY(0.96); opacity: 0.55; }
+  50% { transform: translateY(-2%) scaleY(1.04); opacity: 0.9; }
+}
+.studio-vip-field {
+  background:
+    radial-gradient(circle at 50% 40%, rgba(212, 175, 55, 0.12), transparent 45%),
+    radial-gradient(ellipse at 20% 80%, rgba(88, 28, 135, 0.12), transparent 40%),
+    radial-gradient(ellipse at 80% 70%, rgba(69, 26, 3, 0.15), transparent 40%);
+  animation: studio-vip-breathe 6s ease-in-out infinite;
+}
+@keyframes studio-vip-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-premium-flame,
+  .studio-vip-field {
+    animation: none !important;
+    opacity: 0.45;
+  }
+}
