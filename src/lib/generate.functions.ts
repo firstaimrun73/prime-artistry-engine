@@ -139,7 +139,7 @@ const inputSchema = z.object({
   videoNegativePrompt: z.string().max(500).optional(),
   videoStyleId: z.string().optional(),
   videoAspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3"]).optional(),
-  imageQuality: z.enum(["hd", "2k", "4k"]).optional(),
+  imageQuality: z.enum(["sd", "hd", "2k", "4k"]).optional(),
   videoResolution: z.enum(["480p", "720p", "1080p", "4k"]).optional(),
   videoMode: z.enum(["transform", "enhance"]).optional(),
   keepWatermark: z.boolean().optional(),
