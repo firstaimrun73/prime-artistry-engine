@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Info, X } from "lucide-react";
 
-/** Credit details popup — never shows backend model names. */
+/** Credit details — never shows backend model names. */
 export function VideoCreditsInfo({
+  tier,
   duration,
   resolution,
   sound,
   credits,
 }: {
+  tier?: string;
   duration: number;
   resolution: string;
   sound: string;
@@ -31,12 +33,22 @@ export function VideoCreditsInfo({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold">Generation Credits</h3>
+              <h3 className="text-sm font-bold">Video generation credits</h3>
               <button type="button" onClick={() => setOpen(false)} className="rounded-full p-1 hover:bg-muted">
                 <X className="h-4 w-4" />
               </button>
             </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Your credit usage depends on Standard / Premium, duration, resolution, audio, and generation complexity.
+              Longer and higher-quality videos require more credits.
+            </p>
             <dl className="space-y-2 text-sm">
+              {tier && (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Tier</dt>
+                  <dd className="font-medium capitalize">{tier}</dd>
+                </div>
+              )}
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Duration</dt>
                 <dd className="font-medium">{duration}s</dd>
@@ -54,7 +66,6 @@ export function VideoCreditsInfo({
                 <dd className="font-bold tabular-nums text-red-600">{credits} credits</dd>
               </div>
             </dl>
-            <p className="mt-3 text-[11px] text-muted-foreground">Credits only. No USD shown to users.</p>
             <button
               type="button"
               onClick={() => setOpen(false)}
