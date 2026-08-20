@@ -28,7 +28,7 @@ interface EditorPreviewProps {
  * Generation UI branches by Experience:
  * - Standard: clean progress bar
  * - Premium (pro): orange energy / flame atmosphere
- * - VIP (premium): deep navy + luxury gold + electric cyan — high contrast
+ * - Ultra AI (premium): deep navy + luxury gold + electric cyan — high contrast
  */
 export function EditorPreview({
   state,
@@ -93,7 +93,7 @@ export function EditorPreview({
             )}
           >
             {vip
-              ? "Initialising VIP creative engine"
+              ? "Initialising Ultra AI creative engine"
               : premiumExp
                 ? "Analysing your image"
                 : "Analyzing your request…"}
@@ -165,7 +165,7 @@ export function EditorPreview({
             </div>
           )}
 
-          {/* VIP: gold progress with subtle cyan tip */}
+          {/* Ultra AI: gold progress with subtle cyan tip */}
           {vip && (
             <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-[#111B2E]">
               <div
