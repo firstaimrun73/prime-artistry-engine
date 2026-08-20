@@ -14,7 +14,6 @@ export function StudioTierSelector({
 }: {
   value: StudioTier;
   onChange: (t: StudioTier) => void;
-  /** Tiers the user cannot select (plan gate). */
   locked?: Partial<Record<StudioTier, boolean>>;
   className?: string;
 }) {
@@ -37,10 +36,14 @@ export function StudioTierSelector({
                 if (!isLocked) onChange(id);
               }}
               className={cn(
-                "relative flex min-w-0 flex-col items-start rounded-xl border px-2.5 py-2.5 text-left transition-colors sm:px-3",
+                "relative flex min-w-0 flex-col items-start rounded-xl border px-2.5 py-2.5 text-left transition-all duration-200 sm:px-3",
                 active && id === "standard" && "border-primary bg-primary/10 ring-1 ring-primary/30",
-                active && id === "pro" && "border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/30",
-                active && id === "premium" && "border-amber-500/50 bg-amber-500/10 ring-1 ring-amber-500/40",
+                active &&
+                  id === "pro" &&
+                  "border-orange-500/60 bg-orange-500/10 ring-1 ring-orange-500/40 shadow-[0_0_20px_-6px_rgba(249,115,22,0.45)]",
+                active &&
+                  id === "premium" &&
+                  "border-amber-400/50 bg-zinc-900 ring-1 ring-amber-500/35 text-zinc-50 shadow-[0_0_24px_-8px_rgba(212,175,55,0.35)]",
                 !active && "border-border/80 bg-card/80 backdrop-blur-sm hover:border-primary/40",
                 isLocked && "cursor-not-allowed opacity-50",
               )}
@@ -50,16 +53,18 @@ export function StudioTierSelector({
                 <Lock className="absolute right-2 top-2 h-3 w-3 text-muted-foreground" />
               )}
               <span className="text-xs font-bold sm:text-sm">{meta.label}</span>
-              <span className="mt-0.5 line-clamp-2 text-[10px] text-muted-foreground sm:text-[11px]">
+              <span
+                className={cn(
+                  "mt-0.5 line-clamp-2 text-[10px] sm:text-[11px]",
+                  active && id === "premium" ? "text-zinc-400" : "text-muted-foreground",
+                )}
+              >
                 {meta.blurb}
               </span>
             </button>
           );
         })}
       </div>
-      <p className="mt-2 text-[10px] text-muted-foreground">
-        Same approved image models · Premium defaults to higher output quality.
-      </p>
     </div>
   );
 }

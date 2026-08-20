@@ -1,11 +1,9 @@
 /**
  * Shared editor tier types for Image / Video / Music studios.
- * Visual tokens live in separate theme files under lib/studio/tiers/
- * so a Standard change cannot break Pro or Premium (and vice versa).
- * Model selection lives in per-studio registries under lib/studio/{image,video,music}/.
- *
- * Image tiers share the same approved FAL models; tier primarily controls
- * default quality preference, plan gates, and visual treatment.
+ * Visual tokens live under lib/studio/tiers/
+ * Internal ids: standard | pro | premium
+ * User-facing: Standard | Premium | VIP (pro→Premium, premium→VIP)
+ * Model selection lives in per-studio registries under lib/studio/{image,video,music}/
  */
 
 import {
@@ -48,7 +46,6 @@ export const STUDIO_TIER_META: Record<StudioTier, StudioTierMeta> = {
   premium: { ...premiumMeta },
 };
 
-/** CSS class sets applied to the editor content shell (not global nav). */
 export function studioShellClass(tier: StudioTier): string {
   switch (tier) {
     case "standard":
@@ -93,17 +90,14 @@ export function studioGenerateClass(tier: StudioTier): string {
   }
 }
 
-/** Map studio tier → video-pricing UI tier (standard | advanced). */
 export function studioTierToVideoUi(tier: StudioTier): "standard" | "advanced" {
   return tier === "standard" ? "standard" : "advanced";
 }
 
-/** Map studio tier → existing music qualityTier (backend currently standard|premium). */
 export function studioTierToMusicQuality(tier: StudioTier): "standard" | "premium" {
   return tier === "standard" ? "standard" : "premium";
 }
 
-/** Map studio tier → image quality preference for defaults / cost estimates. */
 export function studioTierToImageQuality(tier: StudioTier): "sd" | "hd" | "2k" | "4k" {
   switch (tier) {
     case "standard":
@@ -113,4 +107,31 @@ export function studioTierToImageQuality(tier: StudioTier): "sd" | "hd" | "2k" |
     case "premium":
       return "4k";
   }
+}
+
+/** User-facing experience name (Standard / Premium / VIP). */
+export function studioExperienceLabel(tier: StudioTier): string {
+  return STUDIO_TIER_META[tier].label;
+}
+
+/** Header title for Image Studio by experience. */
+export function imageStudioHeaderTitle(tier: StudioTier): string {
+  switch (tier) {
+    case "standard":
+      return "IMG STUDIO";
+    case "pro":
+      return "IMG STUDIO PREMIUM";
+    case "premium":
+      return "IMG STUDIO VIP";
+  }
+}
+
+/**
+ * Watermark line for UI (and stamp pipeline when custom text is supported).
+ * Format: Motio2edit {Experience} — {plan display name}
+ */
+export function experienceWatermarkLine(tier: StudioTier, planDisplayName: string): string {
+  const exp = studioExperienceLabel(tier);
+  const plan = (planDisplayName || "Free").trim() || "Free";
+  return `Motio2edit ${exp} — ${plan}`;
 }
