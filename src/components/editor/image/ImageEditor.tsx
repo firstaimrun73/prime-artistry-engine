@@ -1,11 +1,10 @@
 /**
  * Image Editor workspace — independent of Video Editor.
- * Extracted from _authenticated.editor.tsx without behavior/UI redesign.
+ * UPLOAD → PROMPT → SELECT → GENERATE → OUTPUT
  */
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
 import { imageQualityCost, type ImageQuality } from "@/lib/quality-options";
@@ -39,6 +38,14 @@ import {
   EditorResult,
 } from "@/components/editor";
 import type { EditorBootstrap } from "@/components/editor/editor-bootstrap";
+import { StudioTierSelector } from "@/components/studio/StudioTierSelector";
+import {
+  studioCardClass,
+  studioShellClass,
+  studioTierToImageQuality,
+  type StudioTier,
+} from "@/lib/studio/studio-tier";
+import { cn } from "@/lib/utils";
 
 export type ImageEditorProps = {
   bootstrap?: EditorBootstrap;
@@ -77,6 +84,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [activeImage, setActiveImage] = useState(0);
   const [imageQuality, setImageQuality] = useState<ImageQuality>("hd");
+  const [studioTier, setStudioTier] = useState<StudioTier>("standard");
+  const qualityTouchedRef = useRef(false);
 
   const [msgIdx, setMsgIdx] = useState(0);
   const [stage, setStage] = useState(0);
@@ -198,9 +207,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     if (files.length === 0) return;
     e.target.value = "";
 
-    const room = MAX_GALLERY_IMAGES - gallery.length;
+    const room = Math.min(MAX_GALLERY_IMAGES, planLimits.maxImages) - gallery.length;
     if (room <= 0) {
-      return toast.error(`You can work with up to ${MAX_GALLERY_IMAGES} images at a time.`);
+      return toast.error(`Your plan allows up to ${planLimits.maxImages} images at a time.`);
     }
 
     const accepted: File[] = [];
@@ -236,7 +245,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     );
   };
 
-  /** Shared upload + generate path used by prompt Generate and Circle to Remove. */
   const runImageJob = async (opts: {
     jobPrompt: string;
     maskDataUrl?: string | null;
@@ -374,7 +382,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     await runImageJob({ jobPrompt: prompt.trim() });
   };
 
-  /** Circle to Remove: mask only — prompt stays backend, never fills the Describe field. */
   const runSmartRemove = async (maskDataUrl: string) => {
     setRemoveMaskDataUrl(maskDataUrl);
     setSmartRemoveOpen(false);
@@ -477,138 +484,181 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const noopSetVideoRes = () => {};
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
-      <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-        <div className="space-y-2">
-          <StudioBackLink />
-          <h1 className="text-2xl font-bold tracking-tight">
-            Image <span className="text-primary">Studio</span>
-          </h1>
+    <div className={cn("min-h-[70vh]", studioShellClass(studioTier))}>
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
+        <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+          <div className="space-y-2">
+            <StudioBackLink />
+            <h1 className="text-2xl font-bold tracking-tight">
+              Image <span className="text-primary">Editor</span>
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              Upload → Prompt → Select → Generate → Output
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-border/60 bg-card/80 px-3 py-1.5 text-xs font-semibold backdrop-blur-sm">
+              {isAdmin ? "∞ credits" : `${profile.credits} credits`}
+            </span>
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary">
+              {cost} credits / gen
+            </span>
+            <Button size="sm" variant="ghost" onClick={handleClear}>
+              <RotateCcw className="mr-1.5 h-4 w-4" /> New
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold">
-            {isAdmin ? "∞ credits" : `${profile.credits} credits`}
-          </span>
-          <span className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            Image {CREDIT_COST.image} credits
-          </span>
-          <Button size="sm" variant="ghost" onClick={handleClear}>
-            <RotateCcw className="mr-1.5 h-4 w-4" /> New Project
-          </Button>
+
+        <div className="mt-4">
+          <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
         </div>
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
+          <div className="order-1 space-y-5">
+            <div className={cn("p-4 sm:p-5", studioCardClass(studioTier))}>
+              <EditorUpload
+                fileRef={fileRef}
+                mediaType="image"
+                videoLocked={false}
+                loading={loading}
+                inputPreview={inputPreview}
+                inputKind={inputKind}
+                maxImageMb={MAX_IMAGE_MB}
+                maxVideoMb={200}
+                onFile={onFile}
+                gallery={gallery}
+                activeImage={activeImage}
+                maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, planLimits.maxImages)}
+                onSwitchImage={switchImage}
+                onRemoveImage={removeImage}
+              />
+            </div>
+
+            <div className={cn("p-4 sm:p-5", studioCardClass(studioTier))}>
+              <EditorPromptPanel
+                mediaType="image"
+                loading={loading}
+                inputDataUrl={inputDataUrl}
+                prompt={prompt}
+                setPrompt={setPrompt}
+                taRef={taRef}
+                suggestions={suggestions}
+                onSelectTool={handleSelectTool}
+              />
+            </div>
+
+            <div className={cn("space-y-4 p-4 sm:p-5", studioCardClass(studioTier))}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                3. Select
+              </p>
+              <StudioTierSelector
+                value={studioTier}
+                onChange={(t) => {
+                  setStudioTier(t);
+                  if (!qualityTouchedRef.current) {
+                    setImageQuality(studioTierToImageQuality(t));
+                  }
+                }}
+              />
+              <EditorOptionsPanel
+                mediaType="image"
+                loading={loading}
+                inputDataUrl={inputDataUrl}
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+                imageQuality={imageQuality}
+                setImageQuality={(q) => {
+                  qualityTouchedRef.current = true;
+                  setImageQuality(q);
+                }}
+                strength={strength}
+                setStrength={setStrength}
+                canAddRefImages={canAddRefImages}
+                refImages={refImages}
+                setRefImages={setRefImages}
+                userPlan={profile.plan}
+                videoDuration={noopVideoDuration}
+                setVideoDuration={noopSetVideoDuration as never}
+                videoAspect={noopVideoAspect}
+                setVideoAspect={noopSetVideoAspect as never}
+                videoResolution={noopVideoRes}
+                setVideoResolution={noopSetVideoRes as never}
+                cost={cost}
+                isAdmin={isAdmin}
+                credits={profile.credits}
+                keepWatermark={keepWatermark}
+                setKeepWatermark={setKeepWatermark}
+                isFree={isFree}
+              />
+            </div>
+
+            <div className={cn("p-4 sm:p-5", studioCardClass(studioTier))}>
+              <EditorGenerationControls
+                loading={loading}
+                onGenerate={runGenerate}
+                onStop={handleStop}
+                videoLocked={false}
+                noCredits={noCredits}
+              />
+            </div>
+          </div>
+
+          <div className="order-2 space-y-4 lg:sticky lg:top-4 lg:self-start">
+            {(loading || output) && (
+              <div className={cn("p-3 sm:p-4", studioCardClass(studioTier))}>
+                <EditorPreview
+                  state={state}
+                  loadingMessage={LOADING_MESSAGES[msgIdx]}
+                  progress={progress}
+                  stage={stage}
+                  stages={stages}
+                  output={output}
+                  outputIsVideo={false}
+                  mediaType="image"
+                  inputPreview={inputPreview}
+                  inputKind={inputKind}
+                  isAdmin={isAdmin}
+                  isFree={isFree}
+                  keepWatermark={keepWatermark}
+                />
+              </div>
+            )}
+
+            <EditorResult
+              output={output}
+              loading={loading}
+              onDownload={handleDownload}
+              onRegenerate={runGenerate}
+              onEditAgain={handleUseResultAsInput}
+              onShare={handleShare}
+              onClear={handleClear}
+              isFree={isFree}
+              downloaded={downloaded}
+            />
+
+            {!loading && !output && (
+              <div
+                className={cn(
+                  "flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 px-4 py-8 text-center text-sm text-muted-foreground",
+                  studioCardClass(studioTier),
+                )}
+              >
+                Your result will appear here after you generate.
+              </div>
+            )}
+          </div>
+          <EditorDisclaimer />
+        </div>
+
+        <SmartRemoveModal
+          open={smartRemoveOpen}
+          imageUrl={inputPreview}
+          onCancel={() => setSmartRemoveOpen(false)}
+          onApply={(masked) => {
+            void runSmartRemove(masked);
+          }}
+        />
       </div>
-
-      <div className="mt-4">
-        <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
-      </div>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
-        <div className="order-1 space-y-5">
-          <EditorUpload
-            fileRef={fileRef}
-            mediaType="image"
-            videoLocked={false}
-            loading={loading}
-            inputPreview={inputPreview}
-            inputKind={inputKind}
-            maxImageMb={MAX_IMAGE_MB}
-            maxVideoMb={200}
-            onFile={onFile}
-            gallery={gallery}
-            activeImage={activeImage}
-            maxGalleryImages={MAX_GALLERY_IMAGES}
-            onSwitchImage={switchImage}
-            onRemoveImage={removeImage}
-          />
-
-          <EditorPromptPanel
-            mediaType="image"
-            loading={loading}
-            inputDataUrl={inputDataUrl}
-            prompt={prompt}
-            setPrompt={setPrompt}
-            taRef={taRef}
-            suggestions={suggestions}
-            onSelectTool={handleSelectTool}
-          />
-
-          <EditorOptionsPanel
-            mediaType="image"
-            loading={loading}
-            inputDataUrl={inputDataUrl}
-            aspectRatio={aspectRatio}
-            setAspectRatio={setAspectRatio}
-            imageQuality={imageQuality}
-            setImageQuality={setImageQuality}
-            strength={strength}
-            setStrength={setStrength}
-            canAddRefImages={canAddRefImages}
-            refImages={refImages}
-            setRefImages={setRefImages}
-            userPlan={profile.plan}
-            videoDuration={noopVideoDuration}
-            setVideoDuration={noopSetVideoDuration as never}
-            videoAspect={noopVideoAspect}
-            setVideoAspect={noopSetVideoAspect as never}
-            videoResolution={noopVideoRes}
-            setVideoResolution={noopSetVideoRes as never}
-            cost={cost}
-            isAdmin={isAdmin}
-            credits={profile.credits}
-            keepWatermark={keepWatermark}
-            setKeepWatermark={setKeepWatermark}
-            isFree={isFree}
-          />
-
-          <EditorGenerationControls
-            loading={loading}
-            onGenerate={runGenerate}
-            onStop={handleStop}
-            videoLocked={false}
-            noCredits={noCredits}
-          />
-        </div>
-
-        <div className="order-2 space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <EditorPreview
-            state={state}
-            loadingMessage={LOADING_MESSAGES[msgIdx]}
-            progress={progress}
-            stage={stage}
-            stages={stages}
-            output={output}
-            outputIsVideo={false}
-            mediaType="image"
-            inputPreview={inputPreview}
-            inputKind={inputKind}
-            isAdmin={isAdmin}
-            isFree={isFree}
-            keepWatermark={keepWatermark}
-          />
-
-          <EditorResult
-            output={output}
-            loading={loading}
-            onDownload={handleDownload}
-            onRegenerate={runGenerate}
-            onEditAgain={handleUseResultAsInput}
-            onShare={handleShare}
-            onClear={handleClear}
-            isFree={isFree}
-            downloaded={downloaded}
-          />
-        </div>
-        <EditorDisclaimer />
-      </div>
-
-      <SmartRemoveModal
-        open={smartRemoveOpen}
-        imageUrl={inputPreview}
-        onCancel={() => setSmartRemoveOpen(false)}
-        onApply={(masked) => {
-          void runSmartRemove(masked);
-        }}
-      />
     </div>
   );
 }
