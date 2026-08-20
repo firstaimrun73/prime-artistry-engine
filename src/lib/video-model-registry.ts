@@ -7,6 +7,7 @@
  *
  * Credit retail: $0.004 / credit.
  * Credits ≈ ceil((usdPerSec * duration * audioMult * resMult) / 0.004 * 1.25 buffer)
+ * Floor: MIN_VIDEO_CREDITS (125)
  */
 
 export type VideoGenMode = "text" | "image" | "video";
@@ -17,10 +18,8 @@ export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 
 export const USER_MAX_DURATION_SEC = 60;
 
-/** Script/Custom flow: each segment ~20s, max 2 generations → 40s product cap. */
-export const SCRIPT_SEGMENT_SEC = 20;
-export const SCRIPT_MAX_SEGMENTS = 2;
-export const SCRIPT_MAX_DURATION_SEC = SCRIPT_SEGMENT_SEC * SCRIPT_MAX_SEGMENTS;
+/** Minimum credits charged per video generation (product floor). */
+export const MIN_VIDEO_CREDITS = 125;
 
 export type VideoModelDef = {
   id: string;
@@ -63,7 +62,7 @@ export function estimateModelCredits(opts: {
   else if (resolution === "720p") usd *= 0.95;
   else if (resolution === "480p") usd *= 0.85;
   const credits = Math.ceil((usd / 0.004) * 1.25);
-  return Math.max(15, credits);
+  return Math.max(MIN_VIDEO_CREDITS, credits);
 }
 
 export const VIDEO_MODELS: VideoModelDef[] = [
@@ -430,7 +429,6 @@ export function videoSelectionUnavailableMessage(opts: {
   return "This combination isn't available yet. Try a shorter duration, different resolution, or another aspect ratio.";
 }
 
-/** Max duration the backend can fulfill for this tier/mode (union of models). */
 export function availableMaxDurationFor(tier: VideoTier, mode: VideoGenMode): number {
   const list = modelsInTier(tier, mode);
   if (list.length === 0 && tier === "premium") {
@@ -455,12 +453,13 @@ export function estimateRequestCredits(opts: {
 }): number {
   const model = selectVideoModel(opts);
   if (!model) return 0;
-  return estimateModelCredits({
+  const c = estimateModelCredits({
     model,
     durationSec: opts.durationSec,
     resolution: opts.resolution,
     soundOn: opts.soundOn && model.nativeAudio,
   });
+  return Math.max(MIN_VIDEO_CREDITS, c);
 }
 
 export const VIDEO_STYLE_MODIFIERS: Record<string, string> = {
