@@ -15,6 +15,7 @@ type Props = {
  * First-class image quality control.
  * Selected value must be passed to generateMedia as `imageQuality`
  * (existing pipeline applies Topaz upscale factor + credit cost).
+ * Quality chips show labels only — no credit numbers.
  */
 export function OutputQualitySelector({ value, onChange, disabled, className }: Props) {
   return (
@@ -40,7 +41,7 @@ export function OutputQualitySelector({ value, onChange, disabled, className }: 
                 disabled && "opacity-50",
               )}
             >
-              {q.label} · {q.credits}
+              {q.label}
             </button>
           );
         })}
