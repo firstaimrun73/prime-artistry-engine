@@ -9,7 +9,7 @@ import {
 } from "@/lib/studio/studio-tier";
 
 const TITLES: Record<StudioEditorKind, string> = {
-  image: "Image",
+  image: "IMG",
   video: "Video",
   music: "Music",
 };
@@ -51,7 +51,7 @@ export function StudioShell({
             </Link>
             <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
               {TITLES[kind]}{" "}
-              <span className={studioAccentClass(tier)}>Studio</span>
+              <span className="text-orange-500">Studio</span>
             </h1>
             {subtitle && (
               <p className="mt-1 max-w-md text-sm text-muted-foreground">{subtitle}</p>

@@ -28,7 +28,7 @@ interface EditorPreviewProps {
  * Generation UI branches by Experience:
  * - Standard: clean progress bar
  * - Premium (pro): orange energy / flame atmosphere
- * - VIP (premium): dark cinematic field
+ * - VIP (premium): dark cinematic gold field — high contrast text
  */
 export function EditorPreview({
   state,
@@ -64,9 +64,9 @@ export function EditorPreview({
         className={cn(
           "relative flex min-h-56 flex-col items-center justify-center overflow-hidden rounded-2xl border p-6 text-center shadow-sm backdrop-blur-md animate-scale-in",
           vip
-            ? "border-amber-500/25 bg-zinc-950 text-zinc-50"
+            ? "border-[#d4af37]/35 bg-[#0a0a0b] text-zinc-50"
             : premiumExp
-              ? "border-orange-500/30 bg-gradient-to-b from-orange-950/30 to-card/80"
+              ? "border-orange-500/30 bg-gradient-to-b from-orange-950/30 to-card/80 text-foreground"
               : "border-border/60 bg-card/70",
         )}
       >
@@ -83,13 +83,13 @@ export function EditorPreview({
           <Wand2
             className={cn(
               "mx-auto h-8 w-8 animate-pulse",
-              vip ? "text-amber-300" : premiumExp ? "text-orange-400" : "text-primary",
+              vip ? "text-[#e8c547]" : premiumExp ? "text-orange-400" : "text-primary",
             )}
           />
           <p
             className={cn(
               "mt-3 text-sm font-semibold",
-              vip ? "text-amber-100" : premiumExp ? "text-orange-100" : "text-primary",
+              vip ? "text-[#f5e6b8]" : premiumExp ? "text-orange-100" : "text-primary",
             )}
           >
             {vip
@@ -98,7 +98,7 @@ export function EditorPreview({
                 ? "Analysing your image"
                 : "Analyzing your request…"}
           </p>
-          <p className={cn("mt-1 text-xs", vip ? "text-zinc-400" : "text-muted-foreground")}>
+          <p className={cn("mt-1 text-xs", vip ? "text-zinc-300" : "text-muted-foreground")}>
             {vip
               ? "Understanding visual structure"
               : premiumExp
@@ -116,9 +116,9 @@ export function EditorPreview({
         className={cn(
           "relative overflow-hidden rounded-2xl border p-5 shadow-sm backdrop-blur-md animate-scale-in",
           vip
-            ? "border-amber-500/25 bg-zinc-950 text-zinc-50"
+            ? "border-[#d4af37]/35 bg-[#0a0a0b] text-zinc-50"
             : premiumExp
-              ? "border-orange-500/30 bg-gradient-to-b from-orange-950/40 to-card/80"
+              ? "border-orange-500/30 bg-gradient-to-b from-orange-950/40 to-card/80 text-foreground"
               : "border-border/60 bg-card/70",
         )}
         role="status"
@@ -138,15 +138,11 @@ export function EditorPreview({
           <p
             className={cn(
               "flex items-center gap-2 text-sm font-semibold",
-              vip ? "text-amber-100" : premiumExp ? "text-orange-50" : "text-primary",
+              vip ? "text-[#f5e6b8]" : premiumExp ? "text-orange-50" : "text-primary",
             )}
           >
             <Loader2 className="h-4 w-4 animate-spin" />
-            {vip
-              ? loadingMessage.replace(/^./, (c) => c.toUpperCase())
-              : premiumExp
-                ? loadingMessage
-                : loadingMessage}
+            {loadingMessage}
           </p>
 
           {/* Standard: progress bar */}
@@ -163,17 +159,17 @@ export function EditorPreview({
           {premiumExp && (
             <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-orange-950/50">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-orange-500 via-red-500 to-orange-400 transition-all duration-500"
+                className="h-full rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-400 transition-all duration-500"
                 style={{ width: `${Math.min(96, progress)}%` }}
               />
             </div>
           )}
 
-          {/* VIP: thin metallic bar */}
+          {/* VIP: thin metallic gold bar */}
           {vip && (
             <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-zinc-800">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-600/80 via-amber-200 to-amber-500/80 transition-all duration-700"
+                className="h-full rounded-full bg-gradient-to-r from-[#c9a227] via-[#f5e6b8] to-[#d4af37] transition-all duration-700"
                 style={{ width: `${Math.min(96, progress)}%` }}
               />
             </div>
@@ -190,19 +186,19 @@ export function EditorPreview({
                       "grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] transition-all",
                       done &&
                         (vip
-                          ? "bg-amber-500/25 text-amber-200"
+                          ? "bg-[#d4af37]/30 text-[#f5e6b8]"
                           : premiumExp
                             ? "bg-orange-500/30 text-orange-100"
                             : "bg-primary text-primary-foreground"),
                       active &&
                         (vip
-                          ? "bg-amber-500/20 text-amber-100 animate-pulse"
+                          ? "bg-[#d4af37]/25 text-[#f5e6b8] animate-pulse"
                           : premiumExp
                             ? "bg-orange-500/25 text-orange-50 animate-pulse"
                             : "bg-primary/20 text-primary animate-pulse"),
                       !done &&
                         !active &&
-                        (vip ? "bg-zinc-800 text-zinc-500" : "bg-secondary text-muted-foreground"),
+                        (vip ? "bg-zinc-800 text-zinc-400" : "bg-secondary text-muted-foreground"),
                     )}
                   >
                     {done ? <Check className="h-3 w-3" /> : i + 1}
@@ -211,12 +207,12 @@ export function EditorPreview({
                     className={cn(
                       done || active
                         ? vip
-                          ? "text-amber-50"
+                          ? "text-zinc-50"
                           : premiumExp
                             ? "text-orange-50"
                             : "text-foreground"
                         : vip
-                          ? "text-zinc-500"
+                          ? "text-zinc-400"
                           : "text-muted-foreground",
                       active && "font-semibold",
                     )}

@@ -1,24 +1,25 @@
 /**
  * PREMIUM internal id → user-facing VIP experience.
- * Dark cinematic elite. Internal id remains "premium" for plan gates / registry.
+ * Black · white · gold + deep plum & champagne for clear text.
+ * Internal id remains "premium" for plan gates / registry.
  */
 
 export const PREMIUM_TIER = "premium";
 
 export const premiumShellClass =
-  "studio-tier-premium studio-exp-vip bg-zinc-950 text-zinc-50";
+  "studio-tier-premium studio-exp-vip bg-[#0a0a0b] text-zinc-50";
 
 export const premiumCardClass =
-  "rounded-2xl border border-amber-500/20 bg-zinc-900/85 shadow-[0_0_0_1px_rgba(212,175,55,0.12),0_20px_50px_-20px_rgba(0,0,0,0.6)] backdrop-blur-md";
+  "rounded-2xl border border-[#d4af37]/35 bg-[#121214]/95 text-zinc-50 shadow-[0_0_0_1px_rgba(212,175,55,0.18),0_24px_48px_-24px_rgba(0,0,0,0.75)] backdrop-blur-md";
 
-export const premiumAccentClass = "text-amber-300";
+export const premiumAccentClass = "text-[#e8c547]";
 
 export const premiumGenerateClass =
-  "bg-gradient-to-r from-zinc-100 via-amber-100 to-amber-300 text-zinc-950 hover:opacity-95 font-semibold shadow-lg shadow-amber-900/30";
+  "bg-gradient-to-r from-[#f5e6b8] via-[#d4af37] to-[#c9a227] text-[#0a0a0b] hover:opacity-95 font-semibold shadow-lg shadow-[#d4af37]/25";
 
 export const premiumMeta = {
   id: PREMIUM_TIER,
   label: "VIP",
   short: "Elite",
-  blurb: "Cinematic elite interface · highest fidelity path.",
+  blurb: "Cinematic elite · highest fidelity path.",
 } as const;

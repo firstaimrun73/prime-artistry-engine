@@ -43,7 +43,7 @@ export function StudioTierSelector({
                   "border-orange-500/60 bg-orange-500/10 ring-1 ring-orange-500/40 shadow-[0_0_20px_-6px_rgba(249,115,22,0.45)]",
                 active &&
                   id === "premium" &&
-                  "border-amber-400/50 bg-zinc-900 ring-1 ring-amber-500/35 text-zinc-50 shadow-[0_0_24px_-8px_rgba(212,175,55,0.35)]",
+                  "border-[#d4af37]/50 bg-[#121214] ring-1 ring-[#d4af37]/40 text-zinc-50 shadow-[0_0_24px_-8px_rgba(212,175,55,0.4)]",
                 !active && "border-border/80 bg-card/80 backdrop-blur-sm hover:border-primary/40",
                 isLocked && "cursor-not-allowed opacity-50",
               )}
@@ -52,11 +52,18 @@ export function StudioTierSelector({
               {isLocked && (
                 <Lock className="absolute right-2 top-2 h-3 w-3 text-muted-foreground" />
               )}
-              <span className="text-xs font-bold sm:text-sm">{meta.label}</span>
+              <span
+                className={cn(
+                  "text-xs font-bold sm:text-sm",
+                  active && id === "premium" && "text-[#e8c547]",
+                )}
+              >
+                {meta.label}
+              </span>
               <span
                 className={cn(
                   "mt-0.5 line-clamp-2 text-[10px] sm:text-[11px]",
-                  active && id === "premium" ? "text-zinc-400" : "text-muted-foreground",
+                  active && id === "premium" ? "text-zinc-300" : "text-muted-foreground",
                 )}
               >
                 {meta.blurb}

@@ -114,20 +114,24 @@ export function studioExperienceLabel(tier: StudioTier): string {
   return STUDIO_TIER_META[tier].label;
 }
 
-/** Header title for Image Studio by experience. */
+/**
+ * Header title parts for Image Studio.
+ * Prefer rendering: IMG + orange "Studio" + optional experience badge.
+ * Kept for any string-only consumers; UI should use styled markup.
+ */
 export function imageStudioHeaderTitle(tier: StudioTier): string {
   switch (tier) {
     case "standard":
-      return "IMG STUDIO";
+      return "IMG Studio";
     case "pro":
-      return "IMG STUDIO PREMIUM";
+      return "IMG Studio Premium";
     case "premium":
-      return "IMG STUDIO VIP";
+      return "IMG Studio VIP";
   }
 }
 
 /**
- * Watermark line for UI (and stamp pipeline when custom text is supported).
+ * Watermark line for backend stamp pipeline only (not shown in frontend UI).
  * Format: Motio2edit {Experience} — {plan display name}
  */
 export function experienceWatermarkLine(tier: StudioTier, planDisplayName: string): string {

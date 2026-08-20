@@ -44,8 +44,7 @@ import {
   studioShellClass,
   studioTierToImageQuality,
   studioGenerateClass,
-  imageStudioHeaderTitle,
-  experienceWatermarkLine,
+  studioAccentClass,
   studioExperienceLabel,
   type StudioTier,
 } from "@/lib/studio/studio-tier";
@@ -489,20 +488,33 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const noopVideoRes = "1080p" as const;
   const noopSetVideoRes = () => {};
 
+  const expLabel = studioExperienceLabel(studioTier);
+  const accent = studioAccentClass(studioTier);
+
   return (
     <div className={cn("min-h-[70vh]", studioShellClass(studioTier))}>
       <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
         <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-          <div className="space-y-2">
+          <div className="space-y-2 min-w-0">
             <StudioBackLink />
-            <h1 className="text-2xl font-bold tracking-tight tracking-[0.02em]">
-              {imageStudioHeaderTitle(studioTier)}
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight">
+              <span className="text-foreground">IMG</span>{" "}
+              <span className="text-orange-500">Studio</span>
+              {studioTier !== "standard" && (
+                <span
+                  className={cn(
+                    "ml-2 align-middle text-sm sm:text-base font-semibold tracking-normal",
+                    studioTier === "premium"
+                      ? "text-[#e8c547]"
+                      : "text-orange-600 dark:text-orange-400",
+                  )}
+                >
+                  {expLabel}
+                </span>
+              )}
             </h1>
             <p className="text-xs text-muted-foreground">
-              {studioExperienceLabel(studioTier)} · Upload → Prompt → Select → Generate
-            </p>
-            <p className="text-[10px] text-muted-foreground/80">
-              Watermark: {experienceWatermarkLine(studioTier, profile.plan ? profile.plan.charAt(0).toUpperCase() + profile.plan.slice(1) : "Free")}
+              Upload → Prompt → Select → Generate
             </p>
           </div>
           <div className="flex items-center gap-2">
