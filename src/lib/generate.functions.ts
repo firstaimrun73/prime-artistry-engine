@@ -6,11 +6,11 @@ import { maxVideoDurationForPlan, videoCreditCost } from "@/lib/video-options";
 import { getVideoModel, applyVideoStyle, estimateModelCredits } from "@/lib/video-model-registry";
 import { buildVideoFromRegistry } from "@/lib/video-fal-step";
 import {
-  imageQualityCost,
   imageUpscaleFactor,
   videoResolutionMultiplier,
   videoResolutionUpscales,
 } from "@/lib/quality-options";
+import { computeImageExperienceCredits } from "@/lib/studio/image/image-experience-credits";
 import {
   buildFalRequest,
   buildImageEdit,
@@ -139,7 +139,7 @@ const inputSchema = z.object({
   videoNegativePrompt: z.string().max(500).optional(),
   videoStyleId: z.string().optional(),
   videoAspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3"]).optional(),
-  imageQuality: z.enum(["sd", "hd", "2k", "4k"]).optional(),
+  imageQuality: z.enum(["sd", "hd", "2k", "4k", "8k"]).optional(),
   videoResolution: z.enum(["480p", "720p", "1080p", "4k"]).optional(),
   videoMode: z.enum(["transform", "enhance"]).optional(),
   keepWatermark: z.boolean().optional(),
@@ -180,9 +180,20 @@ export const generateMedia = createServerFn({ method: "POST" })
             }
             return Math.round(videoCreditCost(videoDuration as 5 | 10 | 15 | 20 | 25 | 30) * videoResolutionMultiplier(data.videoResolution));
           })()
-        : data.circleInstant && data.maskImageUrl
-          ? CIRCLE_INSTANT_CREDITS
-          : imageQualityCost(data.imageQuality) + (data.circlePrepCredits ?? 0);
+        : (() => {
+            const refs = (data.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.startsWith("https://"));
+            const credit = computeImageExperienceCredits({
+              studioTier: data.studioTier,
+              hasSourceImage: !!data.imageUrl,
+              referenceCount: refs.length,
+              imageQuality: data.imageQuality,
+              plan: profile.plan,
+              isAdmin,
+              circleInstant: !!(data.circleInstant && data.maskImageUrl),
+              circleInstantCredits: CIRCLE_INSTANT_CREDITS,
+            });
+            return credit.credits + (data.circlePrepCredits ?? 0);
+          })();
     if (!isAdmin && profile.credits < cost) {
       throw new Error(`Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`);
     }
@@ -303,7 +314,6 @@ export const generateMedia = createServerFn({ method: "POST" })
         mediaKind: data.type === "video" ? "video" : "image",
         plan: profile.plan, email: profile.email, isAdmin,
         keepWatermark: data.keepWatermark === true, userId,
-        studioTier: data.type === "image" ? data.studioTier : undefined,
       });
       outputUrl = finalized.finalUrl;
       console.log("[generate] finalized mode=%s watermarked=%s", finalized.mode, finalized.watermarked);
