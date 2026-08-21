@@ -27,6 +27,7 @@ import {
   premiumGenerateClass,
   premiumMeta,
 } from "@/lib/studio/tiers/PremiumTheme";
+import type { ImageQuality } from "@/lib/quality-options";
 
 export type StudioEditorKind = "image" | "video" | "music";
 export type StudioTier = "standard" | "pro" | "premium";
@@ -98,7 +99,8 @@ export function studioTierToMusicQuality(tier: StudioTier): "standard" | "premiu
   return tier === "standard" ? "standard" : "premium";
 }
 
-export function studioTierToImageQuality(tier: StudioTier): "sd" | "hd" | "2k" | "4k" {
+/** Default quality preference when switching experience (before manual override). */
+export function studioTierToImageQuality(tier: StudioTier): ImageQuality {
   switch (tier) {
     case "standard":
       return "hd";
@@ -136,20 +138,27 @@ export function experienceWatermarkLine(tier: StudioTier, planDisplayName: strin
   return `Motio2edit ${exp} — ${plan}`;
 }
 
-/** Image quality ids exposed per experience (public hierarchy). */
-export function imageQualitiesForStudioTier(tier: StudioTier): Array<"sd" | "hd" | "2k" | "4k"> {
+/**
+ * Quality chips exposed per experience (labels only — no credit numbers).
+ * Standard: SD, HD only.
+ * Premium (pro): SD–8K via Topaz pipeline where requested.
+ * Ultra AI (premium): SD–8K.
+ */
+export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
   switch (tier) {
     case "standard":
       return ["sd", "hd"];
     case "pro":
-      return ["sd", "hd", "2k"];
+      return ["sd", "hd", "2k", "4k", "8k"];
     case "premium":
-      return ["sd", "hd", "2k", "4k"];
+      return ["sd", "hd", "2k", "4k", "8k"];
   }
 }
 
 /** Aspect ratios for text-to-image per experience. */
-export function aspectRatiosForStudioTier(tier: StudioTier): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4"> {
+export function aspectRatiosForStudioTier(
+  tier: StudioTier,
+): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4"> {
   switch (tier) {
     case "standard":
       return ["1:1", "16:9", "9:16"];
