@@ -29,21 +29,32 @@ export type AdSettings = {
 };
 export type AppSettings = { planVisibility: PlanVisibility; ads: AdSettings };
 
+/**
+ * Fail-closed defaults: if app_settings is missing or unreadable,
+ * ads stay OFF until Admin successfully persists a row.
+ * (Previously enabled:true caused ads to keep showing when the table was absent.)
+ */
 export const DEFAULT_SETTINGS: AppSettings = {
   planVisibility: { free: true, lite: true, plus: true, pro: true, studio: true, business: true },
-  ads: { enabled: true, target: "all", placements: { home: true, history: true, features: true, pricing: true } },
+  ads: {
+    enabled: false,
+    target: "all",
+    placements: { home: true, history: true, features: true, pricing: true },
+  },
 };
 
 function normalizeSettings(row: { plan_visibility?: unknown; ad_settings?: unknown } | null): AppSettings {
-  const pv = (row?.plan_visibility ?? {}) as Partial<PlanVisibility>;
-  const ad = (row?.ad_settings ?? {}) as Partial<AdSettings>;
+  if (!row) return DEFAULT_SETTINGS;
+  const pv = (row.plan_visibility ?? {}) as Partial<PlanVisibility>;
+  const ad = (row.ad_settings ?? {}) as Partial<AdSettings>;
   const placements = (ad.placements ?? {}) as Partial<Record<AdPlacement, boolean>>;
   return {
     planVisibility: Object.fromEntries(
       PLAN_IDS.map((p) => [p, pv[p] !== false]),
     ) as PlanVisibility,
     ads: {
-      enabled: ad.enabled !== false,
+      // Explicit boolean: only true when stored value is exactly true
+      enabled: ad.enabled === true,
       target: (AD_TARGETS as readonly string[]).includes(String(ad.target)) ? (ad.target as AdTarget) : "all",
       placements: Object.fromEntries(
         AD_PLACEMENTS.map((p) => [p, placements[p] !== false]),
@@ -68,14 +79,22 @@ export const getPublicSettings = createServerFn({ method: "GET" }).handler(async
         },
       },
     });
-    const { data } = await (client as any)
+    const { data, error } = await (client as any)
       .from("app_settings")
       .select("plan_visibility, ad_settings")
       .eq("id", 1)
       .maybeSingle();
-    return normalizeSettings(data ?? null);
+    if (error) {
+      console.error("[settings] app_settings read error (fail-closed ads OFF):", error.message ?? error);
+      return DEFAULT_SETTINGS;
+    }
+    if (!data) {
+      console.warn("[settings] app_settings row id=1 missing — ads OFF until Admin saves");
+      return DEFAULT_SETTINGS;
+    }
+    return normalizeSettings(data);
   } catch (err) {
-    console.error("[settings] read failed, using defaults:", err);
+    console.error("[settings] read failed, fail-closed ads OFF:", err);
     return DEFAULT_SETTINGS;
   }
 });
@@ -98,11 +117,25 @@ export const saveAppSettings = createServerFn({ method: "POST" })
     const { assertAdmin } = await import("./admin-guard.server");
     await assertAdmin(context.claims, "/admin/settings");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Upsert so first save works even if the singleton row was never inserted.
     const { error } = await (supabaseAdmin as any)
       .from("app_settings")
-      .update({ plan_visibility: data.planVisibility, ad_settings: data.ads })
-      .eq("id", 1);
-    if (error) throw new Error(error.message);
+      .upsert(
+        {
+          id: 1,
+          plan_visibility: data.planVisibility,
+          ad_settings: data.ads,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" },
+      );
+    if (error) {
+      throw new Error(
+        error.message?.includes("schema cache") || error.code === "PGRST205"
+          ? "app_settings table is missing in the database. Apply the Supabase migration for public.app_settings, then save again."
+          : error.message,
+      );
+    }
     return { ok: true };
   });
 
