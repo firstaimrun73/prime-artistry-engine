@@ -260,6 +260,7 @@ function UserManagement() {
 // ── Sections 2 + 3: plan visibility and ad control ──────────────────────────
 
 function SettingsControl() {
+  const qc = useQueryClient();
   const load = useServerFn(getPublicSettings);
   const save = useServerFn(saveAppSettings);
   const { data } = useQuery({ queryKey: ["app-settings"], queryFn: () => load() });
@@ -272,8 +273,10 @@ function SettingsControl() {
     setBusy(true);
     try {
       await save({ data: next });
+      qc.setQueryData(["app-settings"], next);
       toast.success("Settings saved.");
     } catch (err) {
+      setDraft(data ?? null);
       toast.error(err instanceof Error ? err.message : "Could not save settings.");
     } finally {
       setBusy(false);

@@ -21,11 +21,11 @@ export const IMAGE_QUALITY_OPTIONS: {
     label: "SD",
     credits: 20,
     upscaleFactor: 1,
-    hint: "Standard generation — no upscale, lowest cost.",
+    hint: "Standard definition — fast, no upscale.",
   },
-  { id: "hd", label: "HD", credits: 25, upscaleFactor: 1, hint: "Full HD path — fast, no upscale." },
-  { id: "2k", label: "2K", credits: 40, upscaleFactor: 2, hint: "Topaz 2× upscale for extra detail." },
-  { id: "4k", label: "4K", credits: 60, upscaleFactor: 4, hint: "Topaz 4× upscale — maximum detail." },
+  { id: "hd", label: "HD", credits: 25, upscaleFactor: 1, hint: "Full HD — sharp, no upscale." },
+  { id: "2k", label: "2K", credits: 40, upscaleFactor: 2, hint: "2K — extra detail via upscale." },
+  { id: "4k", label: "4K", credits: 60, upscaleFactor: 4, hint: "4K — maximum detail via upscale." },
 ];
 
 export function imageQualityCost(q: ImageQuality | undefined): number {

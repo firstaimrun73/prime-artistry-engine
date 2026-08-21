@@ -596,7 +596,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             : "loading";
 
   return (
-    <div className={cn("min-h-[70vh]", studioShellClass(studioTier))}>
+    <div className={cn("min-h-[100dvh] pb-8", studioShellClass(studioTier))}>
       {showPremiumOverlay && (
         <PremiumImageGenerationOverlay
           phase={premiumPhase}
@@ -643,9 +643,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-border/60 bg-card/80 px-2.5 py-1.5 text-xs font-semibold backdrop-blur-sm sm:px-3">
               {isAdmin ? "∞ credits" : `${profile.credits} credits`}
-            </span>
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary sm:px-3">
-              {cost} / gen
             </span>
             <Button size="sm" variant="ghost" onClick={handleClear} className="min-h-[36px]">
               <RotateCcw className="mr-1.5 h-4 w-4" /> New

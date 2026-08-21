@@ -195,7 +195,7 @@ export function SignedInWorkspace() {
           )}
         </section>
       </main>
-      <FooterAd />
+      <FooterAd placement="home" />
       <Footer />
     </div>
   );

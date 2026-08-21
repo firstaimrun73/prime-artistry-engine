@@ -234,7 +234,7 @@ function Pricing() {
           payment verification.
         </p>
       </div>
-      <FooterAd />
+      <FooterAd placement="pricing" />
       <Footer />
     </div>
   );

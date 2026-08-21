@@ -42,6 +42,7 @@ import { Route as AuthenticatedEditorRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated.chat'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated.profile'
 import { Route as AuthenticatedProfileSubscriptionRouteImport } from './routes/_authenticated.profile.subscription'
 import { Route as AuthenticatedAdminRefundsRouteImport } from './routes/_authenticated.admin_.refunds'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
@@ -215,11 +216,16 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedProfileSubscriptionRoute =
   AuthenticatedProfileSubscriptionRouteImport.update({
-    id: '/profile/subscription',
-    path: '/profile/subscription',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/subscription',
+    path: '/subscription',
+    getParentRoute: () => AuthenticatedProfileRoute,
   } as any)
 const AuthenticatedAdminRefundsRoute =
   AuthenticatedAdminRefundsRouteImport.update({
@@ -290,6 +296,7 @@ export interface FileRoutesByFullPath {
   '/editor': typeof AuthenticatedEditorRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/music': typeof AuthenticatedMusicRoute
+  '/profile': typeof AuthenticatedProfileRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
@@ -332,6 +339,7 @@ export interface FileRoutesByTo {
   '/editor': typeof AuthenticatedEditorRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/music': typeof AuthenticatedMusicRoute
+  '/profile': typeof AuthenticatedProfileRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
@@ -376,6 +384,7 @@ export interface FileRoutesById {
   '/_authenticated/editor': typeof AuthenticatedEditorRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/music': typeof AuthenticatedMusicRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/studio/image': typeof StudioImageRoute
   '/studio/music': typeof StudioMusicRoute
@@ -425,6 +434,7 @@ export interface FileRouteTypes {
     | '/studio/music'
     | '/studio/video'
     | '/admin/refunds'
+    | '/profile'
     | '/profile/subscription'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
@@ -467,6 +477,7 @@ export interface FileRouteTypes {
     | '/studio/music'
     | '/studio/video'
     | '/admin/refunds'
+    | '/profile'
     | '/profile/subscription'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
@@ -510,6 +521,7 @@ export interface FileRouteTypes {
     | '/studio/music'
     | '/studio/video'
     | '/_authenticated/admin_/refunds'
+    | '/_authenticated/profile'
     | '/_authenticated/profile/subscription'
     | '/api/public/webhooks/nowpayments'
     | '/api/public/webhooks/paypal'
@@ -784,12 +796,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/profile/subscription': {
       id: '/_authenticated/profile/subscription'
-      path: '/profile/subscription'
+      path: '/subscription'
       fullPath: '/profile/subscription'
       preLoaderRoute: typeof AuthenticatedProfileSubscriptionRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedProfileRoute
     }
     '/_authenticated/admin_/refunds': {
       id: '/_authenticated/admin_/refunds'
@@ -843,6 +862,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedProfileRouteChildren {
+  AuthenticatedProfileSubscriptionRoute: typeof AuthenticatedProfileSubscriptionRoute
+}
+
+const AuthenticatedProfileRouteChildren: AuthenticatedProfileRouteChildren = {
+  AuthenticatedProfileSubscriptionRoute: AuthenticatedProfileSubscriptionRoute,
+}
+
+const AuthenticatedProfileRouteWithChildren =
+  AuthenticatedProfileRoute._addFileChildren(AuthenticatedProfileRouteChildren)
+
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
@@ -852,7 +882,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMusicRoute: typeof AuthenticatedMusicRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedAdminRefundsRoute: typeof AuthenticatedAdminRefundsRoute
-  AuthenticatedProfileSubscriptionRoute: typeof AuthenticatedProfileSubscriptionRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -864,7 +894,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMusicRoute: AuthenticatedMusicRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedAdminRefundsRoute: AuthenticatedAdminRefundsRoute,
-  AuthenticatedProfileSubscriptionRoute: AuthenticatedProfileSubscriptionRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

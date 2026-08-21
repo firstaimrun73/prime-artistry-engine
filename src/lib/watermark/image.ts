@@ -22,7 +22,7 @@ function escapeXml(s: string): string {
  * Build Motio2edit primary pill (+ optional secondary free icon).
  * When `label` is provided (Experience-aware), it replaces the fixed brand text
  * while keeping the orange-dot Motio visual treatment.
- * Format examples: "Motio2edit Standard — Free", "Motio2edit VIP — Pro"
+ * Format examples: "Motio2edit Standard — Free", "Motio2edit Ultra AI — Pro"
  */
 export function buildImageOverlaySvg(
   w: number,

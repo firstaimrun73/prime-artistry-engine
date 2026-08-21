@@ -123,7 +123,7 @@ function Features() {
         </section>
       </div>
 
-      <FooterAd />
+      <FooterAd placement="features" />
       <Footer />
     </div>
   );

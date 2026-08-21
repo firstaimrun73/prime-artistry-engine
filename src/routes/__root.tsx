@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -16,7 +17,7 @@ import { ThemeProvider } from "../lib/theme";
 import { Toaster } from "../components/ui/sonner";
 import { trackPageView } from "../lib/analytics";
 import { TranslateWidget } from "../components/TranslateWidget";
-import { BottomTabBar } from "../components/BottomTabBar";
+import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
 
@@ -132,14 +133,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     <html lang="en">
       <head>
         <HeadContent />
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7901147042865442"
-          crossOrigin="anonymous"
-        />
-        {/* Monetag scripts removed from static shell — see AdPolicyGate */}
+        {/* AdSense + Monetag are injected only by <AdPolicyGate /> when Ads are ON. */}
       </head>
-      <body className="pb-16 md:pb-0">
+      <body>
         {children}
         <Scripts />
       </body>
@@ -161,6 +157,8 @@ function PageViewTracker() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const padForTabs = !hideBottomNav(pathname);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -169,9 +167,11 @@ function RootComponent() {
           <PageViewTracker />
           <AdPolicyGate />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
-          <GenerationStatusBar />
-          <BottomTabBar />
+          <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
+            <Outlet />
+            <GenerationStatusBar />
+            <BottomTabBar />
+          </div>
           <TranslateWidget />
           <Toaster richColors position="top-center" />
         </AuthProvider>

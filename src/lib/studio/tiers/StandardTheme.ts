@@ -19,5 +19,5 @@ export const standardMeta = {
   id: STANDARD_TIER,
   label: "Standard",
   short: "Essential",
-  blurb: "Simple · essential editing.",
+  blurb: "Simple, essential editing.",
 } as const;

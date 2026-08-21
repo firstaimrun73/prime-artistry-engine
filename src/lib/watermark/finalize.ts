@@ -19,7 +19,7 @@ function experienceLabelFromTier(tier: WatermarkStudioTier): string {
     case "pro":
       return "Premium";
     case "premium":
-      return "VIP";
+      return "Ultra AI";
     case "standard":
     default:
       return "Standard";

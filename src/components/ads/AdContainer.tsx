@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ADS_CONFIG } from "@/config/ads";
+import { useAdsVisible } from "@/lib/site-settings";
 
 type AdContainerProps = {
   slot?: string;
@@ -8,15 +9,13 @@ type AdContainerProps = {
   responsive?: boolean;
   style?: CSSProperties;
   className?: string;
-  /** fixed width x height (skips responsive) */
   width?: number;
   height?: number;
 };
 
 /**
  * Base AdSense container.
- * - Lazy-loads via IntersectionObserver (200px rootMargin).
- * - Auto-collapses when Google returns "unfilled" (no blank space).
+ * Does not render or push ads when the admin master switch is OFF.
  */
 export function AdContainer({
   slot,
@@ -28,13 +27,14 @@ export function AdContainer({
   width,
   height,
 }: AdContainerProps) {
+  const adsOn = useAdsVisible();
   const wrapRef = useRef<HTMLDivElement>(null);
   const insRef = useRef<HTMLModElement | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [pushed, setPushed] = useState(false);
 
   useEffect(() => {
-    if (!ADS_CONFIG.enabled) return;
+    if (!adsOn) return;
     const node = wrapRef.current;
     if (!node || pushed) return;
 
@@ -57,7 +57,7 @@ export function AdContainer({
     );
     io.observe(node);
     return () => io.disconnect();
-  }, [pushed]);
+  }, [pushed, adsOn]);
 
   useEffect(() => {
     const node = wrapRef.current;
@@ -77,7 +77,7 @@ export function AdContainer({
     return () => mo.disconnect();
   }, []);
 
-  if (!ADS_CONFIG.enabled) return null;
+  if (!adsOn) return null;
   if (collapsed) return null;
 
   const insStyle: CSSProperties =

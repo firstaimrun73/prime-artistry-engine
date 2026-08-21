@@ -87,7 +87,7 @@ function StageIcon({
 /**
  * Overlay driven by real job stage from generation-status / local parent state.
  * COMPLETE only when parent receives backend success — never invented by this component.
- * Experiences: Standard (progress bar) · Premium/pro (orange flame) · VIP/premium (cinematic).
+ * Experiences: Standard (progress bar) · Premium/pro (orange flame) · Ultra AI/premium (cinematic).
  */
 export function StudioGenerationOverlay({
   kind,

@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-function hideBottomNav(pathname: string): boolean {
+export function hideBottomNav(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
   if (pathname.startsWith("/studio/video")) return true;
   if (pathname === "/music" || pathname.startsWith("/music/")) return true;
@@ -273,19 +273,33 @@ export function BottomTabBar() {
           </Link>
         </li>
 
-        {right.map(({ to, label, icon: Icon }) => (
-          <li key={to} className="flex justify-center">
-            <Link
-              to={to}
-              activeProps={{ className: "text-primary" }}
-              inactiveProps={{ className: "text-muted-foreground" }}
-              className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium"
-            >
-              <Icon className="h-5 w-5" />
-              {label}
-            </Link>
-          </li>
-        ))}
+        {right.map(({ to, label, icon: Icon }) => {
+          const isProfile = to === "/profile";
+          const profileActive =
+            pathname === "/profile" ||
+            pathname.startsWith("/profile/") ||
+            pathname === "/dashboard";
+          return (
+            <li key={to} className="flex justify-center">
+              <Link
+                to={to}
+                activeProps={isProfile ? undefined : { className: "text-primary" }}
+                inactiveProps={isProfile ? undefined : { className: "text-muted-foreground" }}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium",
+                  isProfile
+                    ? profileActive
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                    : undefined,
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                {label}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

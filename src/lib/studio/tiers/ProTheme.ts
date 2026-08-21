@@ -21,5 +21,5 @@ export const proMeta = {
   id: PRO_TIER,
   label: "Premium",
   short: "Advanced",
-  blurb: "More tools · better quality.",
+  blurb: "More tools, faster HD+ quality.",
 } as const;

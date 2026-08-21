@@ -38,7 +38,7 @@ type Generation = {
   created_at: string;
 };
 
-function Dashboard() {
+export function Dashboard() {
   const { profile, user } = useAuth();
   const { t } = useI18n();
   const [gens, setGens] = useState<Generation[]>([]);

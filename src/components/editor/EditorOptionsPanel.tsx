@@ -400,15 +400,17 @@ export function EditorOptionsPanel({
       )}
 
       {/* Watermark control — free users are locked on; paid users choose. */}
-      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-sm">
-        <span className="text-muted-foreground">Motio2edit watermark</span>
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
+        <span className="text-xs font-medium text-muted-foreground">Watermark</span>
         {isFree ? (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Lock className="h-3 w-3" /> On (Free)
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Lock className="h-3 w-3" /> On
           </span>
         ) : (
           <button
             type="button"
+            role="switch"
+            aria-checked={keepWatermark}
             onClick={() =>
               setKeepWatermark((v) => {
                 const next = !v;
@@ -417,11 +419,16 @@ export function EditorOptionsPanel({
               })
             }
             disabled={loading}
-            className={`min-h-[32px] rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-              keepWatermark ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              keepWatermark ? "bg-primary" : "bg-muted"
             }`}
           >
-            {keepWatermark ? "Watermark ON" : "No Watermark"}
+            <span
+              className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow transition-transform ${
+                keepWatermark ? "translate-x-5" : ""
+              }`}
+            />
+            <span className="sr-only">{keepWatermark ? "Watermark on" : "Watermark off"}</span>
           </button>
         )}
       </div>

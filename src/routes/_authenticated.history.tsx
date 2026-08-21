@@ -123,7 +123,7 @@ function HistoryPage() {
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{t("history.lead")}</p>
 
-      <InContentAd />
+      <InContentAd placement="history" />
 
       <div className="mt-6 flex flex-wrap gap-2">
         {(["media", "music"] as const).map((tabId) => (

@@ -77,7 +77,7 @@ function SignedOutHome() {
       <TestimonialsCarousel />
       <HomeTestimonials />
       <FinalCTA />
-      <FooterAd />
+      <FooterAd placement="home" />
       <Footer />
     </div>
   );

@@ -1,15 +1,21 @@
 import { useEffect } from "react";
+import { useAdsVisible } from "@/lib/site-settings";
 
 /**
- * Small, tasteful ad slot shown ONLY to free-plan users, and ONLY when the
- * Monetag verification meta tag is present in <head>. When Monetag is not
- * connected the component renders nothing at all — no placeholder, no text.
+ * Small, tasteful ad slot shown ONLY when the admin master switch is ON
+ * and the Monetag verification meta tag is present in <head>.
+ * When Ads are OFF the script is not injected and any existing loader is removed.
  */
 export function MonetagBanner({ show }: { show: boolean }) {
+  const adsOn = useAdsVisible();
+  const allow = show && adsOn;
+
   useEffect(() => {
-    if (!show) return;
     if (typeof document === "undefined") return;
-    // Only load the ad script if the Monetag meta tag has been verified.
+    if (!allow) {
+      document.getElementById("monetag-loader")?.remove();
+      return;
+    }
     if (!document.querySelector('meta[name="monetag"]')) return;
     if (document.getElementById("monetag-loader")) return;
     const s = document.createElement("script");
@@ -18,10 +24,9 @@ export function MonetagBanner({ show }: { show: boolean }) {
     s.async = true;
     s.setAttribute("data-zone", "auto");
     document.head.appendChild(s);
-  }, [show]);
+  }, [allow]);
 
-  if (!show) return null;
-  // Hide completely when Monetag is not connected.
+  if (!allow) return null;
   if (typeof document !== "undefined" && !document.querySelector('meta[name="monetag"]')) {
     return null;
   }

@@ -475,7 +475,26 @@ body { top: 0 !important; }
   }
 }
 
-/* Ultra AI control UI — readable secondary text on navy */
+/* Ultra AI control UI — scoped tokens so children inherit navy/gold, not white */
+.studio-tier-premium {
+  --background: #0B1220;
+  --foreground: #F1F5F9;
+  --card: #121C30;
+  --card-foreground: #F1F5F9;
+  --popover: #121C30;
+  --popover-foreground: #F1F5F9;
+  --muted: #1A2740;
+  --muted-foreground: #CBD5E1;
+  --secondary: #1A2740;
+  --secondary-foreground: #E2E8F0;
+  --accent: #1A2740;
+  --accent-foreground: #E8C547;
+  --border: rgba(212, 175, 55, 0.28);
+  --input: rgba(212, 175, 55, 0.22);
+  --ring: #D4AF37;
+  color: #F1F5F9;
+  background-color: #0B1220;
+}
 .studio-tier-premium .text-muted-foreground {
   color: rgb(203 213 225);
 }
@@ -486,6 +505,14 @@ body { top: 0 !important; }
   background-color: rgba(18, 28, 48, 0.95);
   color: rgb(241 245 249);
 }
-.studio-tier-premium .bg-background\/40 {
+.studio-tier-premium .bg-background\/40,
+.studio-tier-premium .bg-background\/50 {
   background-color: rgba(15, 23, 42, 0.55);
+}
+.studio-tier-premium .bg-muted {
+  background-color: #1A2740;
+}
+.studio-tier-premium input,
+.studio-tier-premium textarea {
+  color: #F1F5F9;
 }
