@@ -219,4 +219,139 @@ export const generateMedia = createServerFn({ method: "POST" })
           }
           outputUrl = current;
         } else {
-          const { enhancePrompt } from "@/lib/prompt-enhance.server";
+          const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
+          const { getPlanLimits } = await import("@/utils/planLimits");
+          const maxImages = getPlanLimits(profile.plan).maxImages;
+          const refs = validRefs.slice(0, Math.max(0, maxImages - 1));
+          let finalPrompt: string;
+          if (DETERMINISTIC_INTENTS.has(intent)) {
+            finalPrompt = buildFinalEditPrompt({ rawPrompt: data.prompt, enhancedOrExpanded: expandPromptDeterministic(data.prompt, intent, refs.length), intent, referenceCount: refs.length });
+          } else {
+            const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: true });
+            finalPrompt = buildFinalEditPrompt({ rawPrompt: data.prompt, enhancedOrExpanded: enhancedPrompt, intent, referenceCount: refs.length });
+          }
+          const settings = getIntentSettings(intent);
+          const step = buildImageEdit({ prompt: finalPrompt, rawPrompt: data.prompt, imageUrl: data.imageUrl, strength: data.strength, referenceImageUrls: refs.length > 0 ? refs : undefined, guidanceOverride: settings.guidance_scale });
+          outputUrl = await runFalStepResilient(step, falKey);
+        }
+      } else {
+        const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
+        const enhancedPrompt = await enhancePrompt({ prompt: data.prompt, isEdit: false });
+        const { aspectToImageSize } = await import("@/lib/prompt-suggestions");
+        const req = buildFalRequest({ prompt: enhancedPrompt, imageSize: aspectToImageSize(data.aspectRatio) });
+        outputUrl = await runFalStepResilient({ label: req.workflow, model: req.model, endpoint: req.endpoint, body: req.body, outputKind: "image" }, falKey);
+      }
+      if (!outputUrl) throw new Error("Generation returned no image.");
+      const upFactor = imageUpscaleFactor(data.imageQuality);
+      if (upFactor > 1) {
+        try {
+          const up = await runFalStepResilient(buildImageUpscale({ imageUrl: outputUrl, factor: upFactor }), falKey);
+          if (up) outputUrl = up;
+        } catch (e) { console.error("[generate] quality upscale failed:", e); }
+      }
+    } else {
+      const { enhancePrompt } = await import("@/lib/prompt-enhance.server");
+      let step: FalStep | undefined;
+      const registryModel = data.videoModelId ? getVideoModel(data.videoModelId) : undefined;
+      const styledPrompt = applyVideoStyle(data.prompt || "", data.videoStyleId);
+      if (registryModel) {
+        if (videoDuration > registryModel.maxDuration) {
+          throw new Error(`Duration ${videoDuration}s exceeds ${registryModel.name} limit of ${registryModel.maxDuration}s.`);
+        }
+        const isV2V = data.sourceKind === "video";
+        let endpoint: string | null = null;
+        if (isV2V) {
+          endpoint = registryModel.videoEndpoint;
+          if (!endpoint) step = buildVideoEnhancement({ videoUrl: data.imageUrl! });
+        } else if (data.imageUrl) {
+          endpoint = registryModel.imageEndpoint;
+        } else {
+          endpoint = registryModel.textEndpoint;
+        }
+        if (!step) {
+          if (!endpoint) throw new Error(`${registryModel.name} does not support this mode.`);
+          const enhanced = await enhancePrompt({ prompt: styledPrompt, isEdit: false });
+          step = buildVideoFromRegistry({
+            endpoint,
+            prompt: enhanced,
+            imageUrl: isV2V ? undefined : (data.imageUrl || undefined),
+            videoUrl: isV2V ? data.imageUrl : undefined,
+            durationSeconds: videoDuration,
+            aspectRatio: data.videoAspectRatio ?? "16:9",
+            resolution: data.videoResolution ?? registryModel.resolutions[0],
+            generateAudio: data.videoGenerateAudio === true && registryModel.nativeAudio,
+            negativePrompt: data.videoNegativePrompt || undefined,
+          });
+        }
+      } else if (!data.imageUrl) {
+        const enhanced = await enhancePrompt({ prompt: styledPrompt, isEdit: false });
+        step = buildTextToVideo({ prompt: enhanced, durationSeconds: videoDuration, aspectRatio: data.videoAspectRatio ?? "16:9" });
+      } else if (data.sourceKind === "video") {
+        step = buildVideoEnhancement({ videoUrl: data.imageUrl });
+      } else {
+        const enhanced = await enhancePrompt({ prompt: styledPrompt, isEdit: false });
+        step = buildImageToVideo({ prompt: enhanced, imageUrl: data.imageUrl, durationSeconds: videoDuration, aspectRatio: data.videoAspectRatio ?? "16:9" });
+      }
+      if (!step) throw new Error("No video pipeline selected.");
+      outputUrl = await runFalStepResilient(step, falKey);
+      if (!outputUrl) throw new Error("Video generation returned no output.");
+      if (data.sourceKind !== "video" && videoResolutionUpscales(data.videoResolution) && !registryModel) {
+        try {
+          const up = await runFalStepResilient(buildVideoEnhancement({ videoUrl: outputUrl }), falKey);
+          if (up) outputUrl = up;
+        } catch (e) { console.error("[generate] video upscale failed:", e); }
+      }
+    }
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "Generation failed.";
+      throw new Error(`${raw} — Generation failed. Credits not charged.`);
+    }
+    if (!outputUrl || outputUrl.trim().length === 0) throw new Error("Generation returned no output. Credits not charged.");
+    try {
+      const { finalizeMediaAsset } = await import("@/lib/watermark/finalize");
+      const finalized = await finalizeMediaAsset({
+        sourceUrl: outputUrl,
+        mediaKind: data.type === "video" ? "video" : "image",
+        plan: profile.plan, email: profile.email, isAdmin,
+        keepWatermark: data.keepWatermark === true, userId,
+      });
+      outputUrl = finalized.finalUrl;
+      console.log("[generate] finalized mode=%s watermarked=%s", finalized.mode, finalized.watermarked);
+    } catch (e) {
+      console.error("[generate] finalization failed (no credits charged):", e);
+      throw new Error(PREPARE_FAILED);
+    }
+    let newCredits = profile.credits;
+    if (!isAdmin) {
+      const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", { _amount: cost, _gen_type: data.type, _user_id: userId });
+      if (dErr || !deduction) {
+        if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
+          throw new Error(`Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`);
+        }
+        throw new Error(`Could not charge credits: ${dErr?.message || "unknown error"}`);
+      }
+      newCredits = (deduction as { credits: number }).credits;
+    }
+    await supabase.from("generations").insert({
+      user_id: userId, type: data.type, prompt: data.prompt,
+      input_url: data.imageUrl ? "uploaded" : null, output_url: outputUrl, status: "success",
+      metadata: data.type === "video" ? { duration: data.videoDurationSeconds ?? 5, resolution: data.videoResolution ?? null, aspect_ratio: data.videoAspectRatio ?? null, model: data.videoModelId ?? null } : null,
+    }).then(({ error }) => { if (error) console.error("[generate] history insert failed:", error.message); });
+    return { outputUrl, credits: newCredits, plan: profile.plan };
+  });
+
+const checkoutSchema = z.object({
+  plan: z.enum(["free", "plus", "pro", "studio", "business"]),
+  currency: z.string().min(1).max(8),
+});
+
+export const completeCheckout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => checkoutSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    if (data.plan !== "free") throw new Error("Paid plans must be purchased through the secure payment checkout.");
+    const { error } = await supabase.from("profiles").update({ plan: "free", currency: data.currency, updated_at: new Date().toISOString() }).eq("id", userId);
+    if (error) throw new Error("Could not update your plan.");
+    return { ok: true, plan: "free" as PlanId, credits: 0 };
+  });
