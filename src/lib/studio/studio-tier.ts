@@ -141,15 +141,15 @@ export function experienceWatermarkLine(tier: StudioTier, planDisplayName: strin
 /**
  * Quality chips exposed per experience (labels only — no credit numbers).
  * Standard: SD, HD only.
- * Premium (pro): SD–8K via Topaz pipeline where requested.
- * Ultra AI (premium): SD–8K.
+ * Premium (pro): SD, HD, 2K only — 4K/8K are Ultra AI exclusive.
+ * Ultra AI (premium): SD, HD, 2K, 4K, 8K.
  */
 export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
   switch (tier) {
     case "standard":
       return ["sd", "hd"];
     case "pro":
-      return ["sd", "hd", "2k", "4k", "8k"];
+      return ["sd", "hd", "2k"];
     case "premium":
       return ["sd", "hd", "2k", "4k", "8k"];
   }
