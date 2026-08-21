@@ -105,7 +105,8 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       : null;
   };
 
-  // Fit image to use most of the stage; allow mild upscale so small photos fill the screen.
+  // Fit image to natural aspect ratio — never force 900×600 or any fixed box.
+  // Scale from naturalWidth/naturalHeight into the available viewport.
   const fitScale = useMemo(() => {
     const vp = viewportRef.current;
     const n = naturalSize();
@@ -615,7 +616,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
       </div>
 
       {isMobile ? (
-        <div ref={bottomControlsRef} className="space-y-2 border-t border-white/10 bg-background/95 p-3">
+        <div ref={bottomControlsRef} className="max-h-[42vh] space-y-2 overflow-y-auto border-t border-white/10 bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-between gap-2">
             <div className="inline-flex overflow-hidden rounded-md border border-border">
               <button onClick={() => setTool("brush")} className={`inline-flex items-center gap-2 px-3 py-2 ${tool === "brush" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
@@ -664,7 +665,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
           </div>
         </div>
       ) : (
-        <div ref={bottomControlsRef} className="space-y-3 border-t border-white/10 bg-background/95 p-4">
+        <div ref={bottomControlsRef} className="max-h-[50vh] space-y-3 overflow-y-auto border-t border-white/10 bg-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <SliderRow label="Size" value={brush} min={1} max={maxBrush} onChange={setBrush} suffix="px" />
             <SliderRow label="Opacity" value={opacity} min={10} max={100} onChange={setOpacity} suffix="%" />
@@ -700,7 +701,7 @@ export function SmartRemoveModal({ open, imageUrl, onCancel, onApply }: Props) {
               disabled={!hasMark || applying}
               className="btn-animate h-12 whitespace-nowrap"
             >
-              <RotateCcw className="mr-1.5 h-4 w-4" /> Clear &amp; Try Again
+              <RotateCcw className="mr-1.5 h-4 w-4" /> Clear & Try Again
             </Button>
           </div>
         </div>
