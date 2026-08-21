@@ -114,18 +114,25 @@ export function VoiceInputButton({
         className={
           "relative grid h-9 w-9 place-items-center rounded-full border transition " +
           (listening
-            ? "border-primary/50 bg-primary/10 text-primary"
+            ? "border-primary/60 bg-primary/15 text-primary shadow-[0_0_0_3px_rgba(249,115,22,0.12)]"
             : "border-border bg-background/70 text-muted-foreground hover:text-foreground hover:border-primary/50") +
           (className ? ` ${className}` : "")
         }
       >
         {listening && !reduceMotion && (
-          <span
-            className="voice-mic-ring pointer-events-none absolute inset-[-3px] rounded-full border border-primary/40"
-            aria-hidden
-          />
+          <>
+            <span
+              className="voice-mic-ring pointer-events-none absolute inset-[-4px] rounded-full border border-primary/50"
+              aria-hidden
+            />
+            <span
+              className="voice-mic-ring pointer-events-none absolute inset-[-8px] rounded-full border border-primary/25"
+              style={{ animationDelay: "0.35s" }}
+              aria-hidden
+            />
+          </>
         )}
-        {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+        {listening ? <MicOff className="relative z-[1] h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </button>
 
       {listening && (
