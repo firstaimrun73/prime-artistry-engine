@@ -32,7 +32,7 @@ export function usePlanVisible(): (plan: string) => boolean {
 /** Admin master switch + compile-time kill switch. */
 export function useAdsMasterEnabled(): boolean {
   const settings = useAppSettings();
-  return ADS_CONFIG.enabled && settings.ads.enabled !== false;
+  return ADS_CONFIG.enabled && settings.ads.enabled === true;
 }
 
 /**
@@ -46,7 +46,7 @@ export function useAdsVisible(placement?: AdPlacement): boolean {
   const admin = isAdminEmail(profile?.email);
 
   if (!ADS_CONFIG.enabled) return false;
-  if (!settings.ads.enabled) return false;
+  if (settings.ads.enabled !== true) return false;
   if (admin) return false;
   if (placement && settings.ads.placements[placement] === false) return false;
   if (settings.ads.target === "none") return false;

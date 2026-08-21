@@ -49,6 +49,9 @@ function AuthenticatedLayout() {
 
   const isMusicRoute = pathname === "/music" || pathname.startsWith("/music/");
   const noHeader = hideChromeHeader(pathname);
+  // Image Studio (/editor) owns its own shell background (Standard/Premium/Ultra AI).
+  // Do not force light bg-background underneath — that causes a white strip at the bottom.
+  const isEditorShell = pathname.startsWith("/editor");
 
   const main = isMusicRoute ? (
     <MusicAccessGate>
@@ -59,7 +62,13 @@ function AuthenticatedLayout() {
   );
 
   return (
-    <div className="min-h-screen w-full min-w-0 overflow-x-clip bg-background">
+    <div
+      className={
+        isEditorShell
+          ? "min-h-screen w-full min-w-0 overflow-x-clip bg-transparent"
+          : "min-h-screen w-full min-w-0 overflow-x-clip bg-background"
+      }
+    >
       {!noHeader && <AppSidebar />}
       <div className={noHeader ? "w-full min-w-0" : "w-full min-w-0 md:pl-56"}>
         {!noHeader && (
