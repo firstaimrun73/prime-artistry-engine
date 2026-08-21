@@ -175,6 +175,9 @@ export function EditorOptionsPanel({
             <div className="flex flex-wrap gap-2">
               {visible.map((q) => {
                 const active = imageQuality === q.id;
+                const is4k = q.id === "4k";
+                const is8k = q.id === "8k";
+                const ultraAura = studioTier === "premium" && (is4k || is8k);
                 return (
                   <button
                     key={q.id}
@@ -182,9 +185,15 @@ export function EditorOptionsPanel({
                     title={q.hint}
                     onClick={() => setImageQuality(q.id)}
                     className={`min-h-[40px] rounded-full border px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-all ${
-                      active
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
+                      ultraAura && active && is8k
+                        ? "border-[#D4AF37]/80 bg-[#D4AF37]/15 text-[#E8C547] shadow-[0_0_14px_-2px_rgba(212,175,55,0.55)]"
+                        : ultraAura && active && is4k
+                          ? "border-[#D4AF37]/55 bg-[#D4AF37]/10 text-[#D4AF37] shadow-[0_0_10px_-3px_rgba(212,175,55,0.35)]"
+                          : ultraAura && !active
+                            ? "border-[#D4AF37]/25 bg-card text-muted-foreground hover:border-[#D4AF37]/50 hover:text-[#E8C547]"
+                            : active
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
                     }`}
                   >
                     {q.label}
@@ -195,7 +204,7 @@ export function EditorOptionsPanel({
             <p className="text-[11px] text-muted-foreground">
               {IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.hint}
               {studioTier === "standard" && " · Premium unlocks 2K."}
-              {studioTier === "pro" && " · Ultra AI unlocks 4K."}
+              {studioTier === "pro" && " · Ultra AI unlocks 4K & 8K."}
             </p>
           </div>
         );
