@@ -1,16 +1,18 @@
 // Client-safe output-quality tiers for the Image and Video editors.
 //
-// Shared by the editor UI and the server generate function so the credit
-// price shown to the user always matches what the backend charges.
+// Quality selects output resolution / upscale factor — NOT user price.
+// Surface credits come from image-experience-credits.ts (experience + mode).
 //
-// SD = existing generation path with no Topaz upscale (not a separate FAL model).
+// SD/HD = generation path with no Topaz upscale.
+// 2K/4K/8K = Topaz upscale after generation (existing pipeline).
 
-export type ImageQuality = "sd" | "hd" | "2k" | "4k";
+export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k";
 export type VideoResolution = "720p" | "1080p" | "4k";
 
 export const IMAGE_QUALITY_OPTIONS: {
   id: ImageQuality;
   label: string;
+  /** @deprecated Do not show on quality chips. Kept for legacy callers only. */
   credits: number;
   /** Topaz upscale factor applied after the edit/generation (1 = no upscale). */
   upscaleFactor: number;
@@ -19,17 +21,46 @@ export const IMAGE_QUALITY_OPTIONS: {
   {
     id: "sd",
     label: "SD",
-    credits: 20,
+    credits: 0,
     upscaleFactor: 1,
     hint: "Standard definition — fast, no upscale.",
   },
-  { id: "hd", label: "HD", credits: 25, upscaleFactor: 1, hint: "Full HD — sharp, no upscale." },
-  { id: "2k", label: "2K", credits: 40, upscaleFactor: 2, hint: "2K — extra detail via upscale." },
-  { id: "4k", label: "4K", credits: 60, upscaleFactor: 4, hint: "4K — maximum detail via upscale." },
+  {
+    id: "hd",
+    label: "HD",
+    credits: 0,
+    upscaleFactor: 1,
+    hint: "Full HD — sharp, no upscale.",
+  },
+  {
+    id: "2k",
+    label: "2K",
+    credits: 0,
+    upscaleFactor: 2,
+    hint: "2K detail via upscale pipeline.",
+  },
+  {
+    id: "4k",
+    label: "4K",
+    credits: 0,
+    upscaleFactor: 4,
+    hint: "4K detail via upscale pipeline.",
+  },
+  {
+    id: "8k",
+    label: "8K",
+    credits: 0,
+    upscaleFactor: 8,
+    hint: "8K via upscale pipeline (Ultra AI · Studio plans).",
+  },
 ];
 
-export function imageQualityCost(q: ImageQuality | undefined): number {
-  return IMAGE_QUALITY_OPTIONS.find((o) => o.id === (q ?? "hd"))?.credits ?? 25;
+/**
+ * @deprecated Prefer computeImageExperienceCredits / estimateImageStudioCredits.
+ * Kept so any residual callers do not break; returns 0 (quality is not priced).
+ */
+export function imageQualityCost(_q: ImageQuality | undefined): number {
+  return 0;
 }
 
 export function imageUpscaleFactor(q: ImageQuality | undefined): number {
@@ -39,9 +70,7 @@ export function imageUpscaleFactor(q: ImageQuality | undefined): number {
 export const VIDEO_RESOLUTION_OPTIONS: {
   id: VideoResolution;
   label: string;
-  /** Multiplier applied to the duration-based credit cost. */
   multiplier: number;
-  /** Whether a Topaz video upscale pass runs after generation. */
   upscale: boolean;
   hint: string;
 }[] = [
