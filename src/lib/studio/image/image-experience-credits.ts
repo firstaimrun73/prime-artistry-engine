@@ -83,7 +83,7 @@ export function computeImageExperienceCredits(
   input: ImageExperienceCreditInput,
 ): ImageExperienceCreditResult {
   if (input.circleInstant) {
-    const c = input.circleInstantCredits ?? 35;
+    const c = input.circleInstantCredits ?? 25;
     return {
       credits: c,
       mode: "image_to_image",
