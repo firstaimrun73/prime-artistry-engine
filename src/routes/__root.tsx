@@ -89,7 +89,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Motio2edit — AI Image, Video & Music Studio by Motion2AI" },
       { name: "description", content: "Motio2edit, powered by Motion2AI. Edit images, generate videos, and create music with AI — one workspace, three studios." },
       { name: "author", content: "Motion2AI" },
-      { name: "monetag", content: "33e021a97699ebb3967c7b1d695f16d4" },
       { property: "og:title", content: "Motio2edit — AI Image, Video & Music Studio by Motion2AI" },
       { property: "og:description", content: "Edit images, generate videos, and create music with AI — one workspace, three studios." },
       { property: "og:type", content: "website" },
