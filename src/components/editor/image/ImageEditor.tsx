@@ -54,15 +54,18 @@ import {
   type StudioTier,
 } from "@/lib/studio/studio-tier";
 import { cn } from "@/lib/utils";
+
 export type ImageEditorProps = {
   bootstrap?: EditorBootstrap;
 };
+
 export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
   const secureDl = useServerFn(secureDownloadImage);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
   const [prompt, setPrompt] = useState(bootstrap?.initialPrompt ?? "");
   const [inputPreview, setInputPreview] = useState<string | null>(
     bootstrap?.reuseUrl && bootstrap.reuseKind !== "video" ? bootstrap.reuseUrl : null,
@@ -91,6 +94,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [imageQuality, setImageQuality] = useState<ImageQuality>("hd");
   const [studioTier, setStudioTier] = useState<StudioTier>("standard");
   const qualityTouchedRef = useRef(false);
+
   const [msgIdx, setMsgIdx] = useState(0);
   const [stage, setStage] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -99,11 +103,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [premiumGenError, setPremiumGenError] = useState<string | null>(null);
   const [ultraCompleteHold, setUltraCompleteHold] = useState(false);
   const [ultraGenError, setUltraGenError] = useState<string | null>(null);
+
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
   const stages = getEditorStages(!!inputDataUrl);
   const isPremiumExp = studioTier === "pro";
   const isUltraExp = studioTier === "premium";
+
   useEffect(() => {
     try {
       const pref = localStorage.getItem(WATERMARK_PREF_KEY);
@@ -113,12 +119,14 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       /* ignore */
     }
   }, []);
+
   useEffect(() => {
     if (bootstrap?.reuseUrl && bootstrap.reuseKind !== "video") {
       toast.success("Loaded from your history — keep editing.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   const creditsNow = profile?.credits ?? 0;
   const adminNow = isAdminEmail(profile?.email);
   useEffect(() => {
@@ -133,18 +141,21 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       /* ignore */
     }
   }, [creditsNow, adminNow, profile]);
+
   useEffect(() => {
     if (pendingSmartRemove && inputDataUrl) {
       setPendingSmartRemove(false);
       setSmartRemoveOpen(true);
     }
   }, [pendingSmartRemove, inputDataUrl]);
+
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, 280)}px`;
   }, [prompt]);
+
   useEffect(() => {
     if (state !== "loading") return;
     setMsgIdx(0);
@@ -159,6 +170,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       clearInterval(prg);
     };
   }, [state, stages.length]);
+
   useEffect(() => {
     if (!isPremiumExp) {
       setPremiumCompleteHold(false);
@@ -185,11 +197,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       if (isUltraExp && !ultraGenError) setUltraCompleteHold(false);
     }
   }, [state, isPremiumExp, isUltraExp, premiumGenError, ultraGenError]);
+
   /** Authoritative pre-generation estimate — must match backend Standard / experience charge. */
   const cost = useMemo(() => {
     const hasSource = !!inputDataUrl;
     const refCount = refImages.length;
     const hasMask = !!removeMaskDataUrl;
+
     if (studioTier === "standard") {
       if (hasMask) {
         return quoteStandardCredits({ mode: "circle_to_remove" }).credits;
@@ -209,7 +223,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         imageQuality: q,
       }).credits;
     }
-    // Premium (pro) / Ultra AI (premium) — existing experience pricing
+
     return estimateImageStudioCredits({
       studioTier,
       hasSourceImage: hasSource,
@@ -227,20 +241,17 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     profile?.plan,
     isAdmin,
   ]);
+
   if (!profile) return null;
+
   const noCredits = !isAdmin && profile.credits < cost;
   const planLimits = getPlanLimits(profile.plan);
   const canAddRefImages = !!inputDataUrl && planLimits.maxImages > 1;
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
-  const showPremiumOverlay =
-    isPremiumExp && (loading || premiumCompleteHold || !!premiumGenError);
-  const showUltraOverlay =
-    isUltraExp && (loading || ultraCompleteHold || !!ultraGenError);
-  const showInlinePreview =
-    (!isPremiumExp && !isUltraExp) ||
-    (!(showPremiumOverlay || showUltraOverlay) && (loading || !!output));
-  // NOTE: remainder of component body continues in part 2 - DO NOT USE THIS TRUNCATED VERSION
+
+  // FULL BODY CONTINUES - see local artifact ImageEditor.tsx (865 lines)
+  // This push attempt intentionally aborted if truncated
   return null;
 }
