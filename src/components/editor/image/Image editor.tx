@@ -297,4 +297,303 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setOutput(null);
       return;
     }
-    activateSlot(next, Math.min(idx, next.length - 1));
+    activateSlot(next, Math.min(idx, next.length - 1));};
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    e.target.value = "";
+
+    const room = Math.min(MAX_GALLERY_IMAGES, planLimits.maxImages) - gallery.length;
+    if (room <= 0) {
+      return toast.error(`Your plan allows up to ${planLimits.maxImages} images at a time.`);
+    }
+
+    const accepted: File[] = [];
+    for (const f of files.slice(0, room)) {
+      if (!f.type.startsWith("image")) {
+        toast.error("This workspace accepts images only. Use Video Editor for video.");
+        continue;
+      }
+      if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+        toast.error(
+          `\( {f.name} is too large ( \){(f.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_IMAGE_MB} MB.`,
+        );
+        continue;
+      }
+      accepted.push(f);
+    }
+    if (accepted.length === 0) return;
+
+    const items: GalleryItem[] = await Promise.all(
+      accepted.map(async (f) => ({
+        id: `\( {Date.now()}- \){Math.random().toString(36).slice(2, 8)}`,
+        preview: URL.createObjectURL(f),
+        dataUrl: await readAsDataUrl(f),
+        file: f,
+      })),
+    );
+
+    const next = [...gallery, ...items];
+    setGallery(next);
+    activateSlot(next, gallery.length);
+    toast.success(
+      items.length > 1 ? `📁 ${items.length} images uploaded!` : "📁 Upload complete!",
+    );
+  };
+
+  const runImageJob = async (opts: {
+    jobPrompt: string;
+    maskDataUrl?: string | null;
+    toastStart?: string;
+  }) => {
+    if (noCredits) {
+      setState("blocked");
+      return toast.error(`Not enough credits. This costs ${cost} credits.`);
+    }
+
+    const runId = ++runIdRef.current;
+    setState("analyzing");
+    setOutput(null);
+    setDownloaded(false);
+    setPremiumCompleteHold(false);
+    setPremiumGenError(null);
+    setUltraCompleteHold(false);
+    setUltraGenError(null);
+    await new Promise((r) => setTimeout(r, 600));
+    if (runId !== runIdRef.current) return;
+
+    setState("loading");
+    toast(opts.toastStart ?? "🎨 Generating your image...");
+    startGeneration("image", "/editor");
+    const progressTimers = [
+      setTimeout(() => {
+        if (runId === runIdRef.current) toast("⏳ Still working — high quality takes a moment...");
+      }, 30_000),
+      setTimeout(() => {
+        if (runId === runIdRef.current)
+          toast("🔁 Taking longer than usual — retrying automatically...");
+      }, 75_000),
+    ];
+    try {
+      let mediaUrl: string | undefined;
+      let maskImageUrl: string | undefined;
+
+      if (inputKind === "image" && inputFile) {
+        mediaUrl = await uploadToStorage(inputFile);
+      } else if (inputKind === "image" && inputDataUrl) {
+        if (inputDataUrl.startsWith("data:") || inputDataUrl.startsWith("blob:")) {
+          const res = await fetch(inputDataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], `img-${Date.now()}.jpg`, {
+            type: blob.type || "image/jpeg",
+          });
+          mediaUrl = await uploadToStorage(file);
+        } else if (inputDataUrl.startsWith("https://")) {
+          mediaUrl = inputDataUrl;
+        } else {
+          throw new Error("Invalid image. Please re-upload your photo.");
+        }
+      }
+
+      if (mediaUrl && !mediaUrl.startsWith("https://")) {
+        throw new Error("Image upload failed. Please re-upload and try again.");
+      }
+      if (inputKind === "image" && !mediaUrl) {
+        throw new Error("Please upload an image first.");
+      }
+
+      const maskSrc = opts.maskDataUrl ?? removeMaskDataUrl;
+      if (maskSrc && mediaUrl) {
+        const maskRes = await fetch(maskSrc);
+        const maskBlob = await maskRes.blob();
+        const maskFile = new File([maskBlob], `remove-mask-${Date.now()}.png`, {
+          type: "image/png",
+        });
+        maskImageUrl = await uploadToStorage(maskFile);
+      }
+
+      let referenceImageUrls: string[] | undefined;
+      if (!maskImageUrl && canAddRefImages && refImages.length > 0) {
+        const wanted = refImages.slice(0, Math.max(0, planLimits.maxImages - 1));
+        toast(`📤 Uploading \( {wanted.length} reference image \){wanted.length > 1 ? "s" : ""}...`);
+        const uploaded: string[] = [];
+        for (const src of wanted) {
+          if (src.startsWith("https://")) {
+            uploaded.push(src);
+            continue;
+          }
+          const refRes = await fetch(src);
+          const refBlob = await refRes.blob();
+          const refFile = new File([refBlob], `ref-\( {Date.now()}- \){uploaded.length}.jpg`, {
+            type: refBlob.type || "image/jpeg",
+          });
+          uploaded.push(await uploadToStorage(refFile));
+        }
+        const valid = uploaded.filter((u) => u.startsWith("https://"));
+        if (valid.length !== wanted.length) {
+          toast.error("Some reference images could not be uploaded and were skipped.");
+        }
+        referenceImageUrls = valid.length > 0 ? valid : undefined;
+        if (referenceImageUrls) {
+          toast.success(`✅ Sending ${referenceImageUrls.length + 1} images to the AI`);
+        }
+      }
+      if (runId !== runIdRef.current) return;
+
+      const res = await generate({
+        data: {
+          prompt: opts.jobPrompt,
+          type: "image",
+          imageUrl: mediaUrl,
+          sourceKind: mediaUrl ? "image" : undefined,
+          strength: mediaUrl ? strength : undefined,
+          maskImageUrl,
+          referenceImageUrls,
+          keepWatermark,
+          aspectRatio: !mediaUrl ? aspectRatio : undefined,
+          imageQuality,
+          studioTier,
+        },
+      });
+
+      if (runId !== runIdRef.current) return;
+      const url = res.outputUrl;
+      setProgress(100);
+      setStage(stages.length);
+      setOutput(url);
+      setState("success");
+      setPremiumGenError(null);
+      setUltraGenError(null);
+      setRemoveMaskDataUrl(null);
+      await refreshProfile();
+      toast.success("✅ Image ready!");
+      endGeneration();
+    } catch (err) {
+      if (runId !== runIdRef.current) return;
+      const msg = err instanceof Error ? err.message : "Failed. Credits not charged.";
+      endGeneration();
+      if (isPremiumExp) {
+        setPremiumGenError(msg);
+        setState("idle");
+      } else if (isUltraExp) {
+        setUltraGenError(msg);
+        setState("idle");
+      } else {
+        setState("idle");
+      }
+      toast.error(`❌ ${msg}`);
+    } finally {
+      progressTimers.forEach(clearTimeout);
+    }
+  };
+
+  const runGenerate = async () => {
+    if (!prompt.trim()) return toast.error("Enter a prompt first.");
+    await runImageJob({ jobPrompt: prompt.trim() });
+  };
+
+  const runSmartRemove = async (maskDataUrl: string) => {
+    setRemoveMaskDataUrl(maskDataUrl);
+    setSmartRemoveOpen(false);
+    await runImageJob({
+      jobPrompt: SMART_REMOVE_PROMPT,
+      maskDataUrl,
+      toastStart: "✨ Removing selected area…",
+    });
+  };
+
+  const handleStop = () => {
+    runIdRef.current++;
+    setState("idle");
+    endGeneration();
+    setProgress(0);
+    setStage(0);
+    setPremiumCompleteHold(false);
+    setPremiumGenError(null);
+    setUltraCompleteHold(false);
+    setUltraGenError(null);
+    toast("Generation stopped.");
+  };
+
+  const handleDismissPremiumError = () => {
+    setPremiumGenError(null);
+    setPremiumCompleteHold(false);
+    setState("idle");
+  };
+
+  const handleDismissUltraError = () => {
+    setUltraGenError(null);
+    setUltraCompleteHold(false);
+    setState("idle");
+  };
+
+  const handleClear = () => {
+    runIdRef.current++;
+    setPrompt("");
+    setInputPreview(null);
+    setInputDataUrl(null);
+    setInputFile(null);
+    setInputKind(null);
+    setRefImages([]);
+    setRemoveMaskDataUrl(null);
+    setOutput(null);
+    setState("idle");
+    setDownloaded(false);
+    setProgress(0);
+    setStage(0);
+    setPremiumCompleteHold(false);
+    setPremiumGenError(null);
+    setUltraCompleteHold(false);
+    setUltraGenError(null);
+    setGallery([]);
+    setActiveImage(0);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleUseResultAsInput = () => {
+    if (!output) return;
+    setInputPreview(output);
+    setInputDataUrl(output);
+    setInputKind("image");
+    setOutput(null);
+    setState("idle");
+    setDownloaded(false);
+    toast.success("Result moved to input — keep editing.");
+  };
+
+  const handleDownload = async () => {
+    if (!output) return;
+    try {
+      const res = await secureDl({
+        data: {
+          imageUrl: output,
+          keepWatermark: keepWatermark === true,
+          studioTier,
+        },
+      });
+      await triggerBrowserDownload(res.downloadUrl, `motio2edit-${Date.now()}.jpg`);
+      setDownloaded(true);
+      toast.success(
+        res.watermarked ? "⬇️ Download started (branded)" : "⬇️ Download started",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Download failed. Please try again.");
+    }
+  };
+
+  const handleShare = async () => {
+    if (!output) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Made with Motio2edit", url: output });
+      } else {
+        await navigator.clipboard.writeText(output);
+        toast.success("Link copied to clipboard.");
+      }
+    } catch {
+      /* user cancelled */
+    }
+  };
+
+  const handleSelectTool = (tool: { prompt: string; id?: string }) => {
