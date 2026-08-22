@@ -12,6 +12,11 @@ import {
 } from "@/lib/quality-options";
 import { computeImageExperienceCredits } from "@/lib/studio/image/image-experience-credits";
 import {
+  executeStandardImage,
+  quoteStandardCredits,
+  validateStandardImageRequest,
+} from "@/lib/studio/image/standard";
+import {
   buildFalRequest,
   buildImageEdit,
   buildImageEnhancementPipeline,
@@ -149,6 +154,11 @@ const inputSchema = z.object({
   circlePrepCredits: z.number().int().min(0).max(100).optional(),
 });
 
+/** Standard path when tier is standard or omitted (base experience). Pro/Premium keep legacy pipelines. */
+function useStandardImagePath(studioTier: "standard" | "pro" | "premium" | undefined): boolean {
+  return studioTier === "standard" || studioTier === undefined;
+}
+
 export const generateMedia = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => inputSchema.parse(data))
@@ -165,6 +175,7 @@ export const generateMedia = createServerFn({ method: "POST" })
     const videoDuration = isAdmin ? requestedDuration : Math.min(requestedDuration, maxDuration);
     const isVideoEnhance = data.type === "video" && data.sourceKind === "video";
     const CIRCLE_INSTANT_CREDITS = 25;
+
     const cost = isVideoEnhance
       ? CREDIT_COST.video_enhance
       : data.type === "video"
@@ -180,28 +191,73 @@ export const generateMedia = createServerFn({ method: "POST" })
             }
             return Math.round(videoCreditCost(videoDuration as 5 | 10 | 15 | 20 | 25 | 30) * videoResolutionMultiplier(data.videoResolution));
           })()
-        : (() => {
-            const refs = (data.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.startsWith("https://"));
-            const credit = computeImageExperienceCredits({
-              studioTier: data.studioTier,
-              hasSourceImage: !!data.imageUrl,
-              referenceCount: refs.length,
-              imageQuality: data.imageQuality,
-              plan: profile.plan,
-              isAdmin,
-              circleInstant: !!(data.circleInstant && data.maskImageUrl),
-              circleInstantCredits: CIRCLE_INSTANT_CREDITS,
-            });
-            return credit.credits + (data.circlePrepCredits ?? 0);
-          })();
+        : useStandardImagePath(data.studioTier)
+          ? (() => {
+              const validated = validateStandardImageRequest({
+                prompt: data.prompt,
+                imageUrl: data.imageUrl,
+                referenceImageUrls: data.referenceImageUrls,
+                maskImageUrl: data.maskImageUrl,
+                aspectRatio: data.aspectRatio,
+                imageQuality: data.imageQuality === "hd" ? "hd" : "sd",
+                strength: data.strength,
+                circleInstant: data.circleInstant,
+              });
+              if (!validated.ok) {
+                // Allow pre-check message; actual throw happens at execute
+                return STANDARD_FALLBACK_COST;
+              }
+              const q = quoteStandardCredits({
+                mode: validated.mode,
+                referenceCount: validated.referenceImageUrls.length,
+                imageQuality: validated.imageQuality,
+              });
+              return q.credits + (data.circlePrepCredits ?? 0);
+            })()
+          : (() => {
+              const refs = (data.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.startsWith("https://"));
+              const credit = computeImageExperienceCredits({
+                studioTier: data.studioTier,
+                hasSourceImage: !!data.imageUrl,
+                referenceCount: refs.length,
+                imageQuality: data.imageQuality,
+                plan: profile.plan,
+                isAdmin,
+                circleInstant: !!(data.circleInstant && data.maskImageUrl),
+                circleInstantCredits: CIRCLE_INSTANT_CREDITS,
+              });
+              return credit.credits + (data.circlePrepCredits ?? 0);
+            })();
+
     if (!isAdmin && profile.credits < cost) {
       throw new Error(`Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`);
     }
     const falKey = process.env.FAL_API_KEY;
     if (!falKey) throw new Error("AI service unavailable.");
     let outputUrl: string | null = null;
+    /** Actual charge after Standard success (may refine vs pre-check). */
+    let standardCharge: number | null = null;
+
     try {
-    if (data.type === "image") {
+    if (data.type === "image" && useStandardImagePath(data.studioTier)) {
+      // ——— STANDARD IMAGE STUDIO (locked models / credits) ———
+      const result = await executeStandardImage(
+        {
+          prompt: data.prompt,
+          imageUrl: data.imageUrl,
+          referenceImageUrls: data.referenceImageUrls,
+          maskImageUrl: data.maskImageUrl,
+          aspectRatio: data.aspectRatio,
+          imageQuality: data.imageQuality === "hd" ? "hd" : "sd",
+          strength: data.strength,
+          circleInstant: data.circleInstant,
+        },
+        { falKey },
+      );
+      outputUrl = result.outputUrl;
+      standardCharge = result.credits + (data.circlePrepCredits ?? 0);
+    } else if (data.type === "image") {
+      // ——— Pro / Premium (existing pipelines; unchanged) ———
       if (data.imageUrl) {
         const rawRefs = data.referenceImageUrls ?? [];
         const validRefs = rawRefs.filter((u) => u.startsWith("https://"));
@@ -321,12 +377,18 @@ export const generateMedia = createServerFn({ method: "POST" })
       console.error("[generate] finalization failed (no credits charged):", e);
       throw new Error(PREPARE_FAILED);
     }
+
+    const chargeAmount = standardCharge ?? cost;
+    if (!isAdmin && chargeAmount > profile.credits) {
+      throw new Error(`Not enough credits. Image generation costs ${chargeAmount} credits.`);
+    }
+
     let newCredits = profile.credits;
     if (!isAdmin) {
-      const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", { _amount: cost, _gen_type: data.type, _user_id: userId });
+      const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", { _amount: chargeAmount, _gen_type: data.type, _user_id: userId });
       if (dErr || !deduction) {
         if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
-          throw new Error(`Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`);
+          throw new Error(`Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${chargeAmount} credits.`);
         }
         throw new Error(`Could not charge credits: ${dErr?.message || "unknown error"}`);
       }
@@ -339,6 +401,9 @@ export const generateMedia = createServerFn({ method: "POST" })
     }).then(({ error }) => { if (error) console.error("[generate] history insert failed:", error.message); });
     return { outputUrl, credits: newCredits, plan: profile.plan };
   });
+
+/** Safe pre-check floor when validation fails early in cost estimator. */
+const STANDARD_FALLBACK_COST = 25;
 
 const checkoutSchema = z.object({
   plan: z.enum(["free", "plus", "pro", "studio", "business"]),
