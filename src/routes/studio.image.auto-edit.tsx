@@ -29,7 +29,8 @@ import {
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CompareSlider } from "@/components/CompareSlider";
+import { AutoEditBeforeAfter } from "@/components/auto-edit/AutoEditBeforeAfter";
+import { AutoEditResultViewer } from "@/components/auto-edit/AutoEditResultViewer";
 import { useAuth } from "@/lib/auth";
 import { runStandaloneAutoEdit } from "@/lib/auto-edit/auto-edit.functions";
 import {
@@ -139,18 +140,17 @@ function AutoEditPage() {
   const [summary, setSummary] = useState<AutoEditAnalysisSummary | null>(null);
   const [jobStatus, setJobStatus] = useState<"COMPLETE" | "NO_CHANGE" | null>(null);
   const [livePulse, setLivePulse] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const runStartedAt = useRef<number>(0);
 
   const isAdmin = isAdminEmail(profile?.email);
   const planId = profile?.plan ?? "free";
 
-  /** Plan-filtered Auto Edit qualities only — never global IMAGE_QUALITY_OPTIONS. */
   const qualityOptions = useMemo(
     () => autoEditQualitiesForPlan(planId),
     [planId],
   );
 
-  // Keep selected quality valid when plan changes.
   useEffect(() => {
     const allowed = qualityOptions.some((o) => o.id === quality);
     if (!allowed) {
@@ -209,6 +209,7 @@ function AutoEditPage() {
     setStage("queued");
     setProgress(0);
     setErrorMsg(null);
+    setViewerOpen(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -239,6 +240,7 @@ function AutoEditPage() {
     setStage("queued");
     setProgress(0);
     setErrorMsg(null);
+    setViewerOpen(false);
     const img = new Image();
     img.onload = () => setPixelSize({ w: img.naturalWidth, h: img.naturalHeight });
     img.onerror = () => setPixelSize(null);
@@ -246,15 +248,8 @@ function AutoEditPage() {
     toast.success("Photo ready for Maluto AI");
   }, []);
 
-  /**
-   * Snapshot File objects BEFORE clearing the input.
-   * Android Chrome/WebView use a live FileList — clearing value empties the list
-   * and would leave acceptFile never called (no preview, Generate stays disabled).
-   * Same pattern as ImageEditor / MultiImageFeature.
-   */
   const onFileInput = (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    // Reset so the same path can be re-selected later.
     e.target.value = "";
     if (files.length === 0) return;
     if (files.length > 1) {
@@ -295,12 +290,12 @@ function AutoEditPage() {
     setErrorMsg(null);
     setStage("queued");
     setProgress(0);
+    setViewerOpen(false);
     runStartedAt.current = Date.now();
 
     try {
       setStage("analysing");
       setProgress(STAGE_PROGRESS.analysing ?? 12);
-      // Reuse Image Studio upload: private `uploads` bucket + signed HTTPS URL.
       const imageUrl = await uploadToStorage(file, uid);
       if (!imageUrl.startsWith("https://")) {
         throw new Error("Upload did not return a secure image URL. Try again.");
@@ -434,194 +429,204 @@ function AutoEditPage() {
           </p>
         </header>
 
-        <section className="mb-6">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp,image/*"
-            className="sr-only"
-            onChange={onFileInput}
-            disabled={busy}
-            // One image only — never multi-select
-            multiple={false}
-          />
+        {/* Hide upload chrome once result is ready to reduce crowding */}
+        {phase !== "done" && (
+          <>
+            <section className="mb-6">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,image/*"
+                className="sr-only"
+                onChange={onFileInput}
+                disabled={busy}
+                multiple={false}
+              />
 
-          {!preview ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={onDrop}
-              className={cn(
-                "flex w-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-6 py-10 text-center transition-all",
-                "bg-card/70 shadow-sm backdrop-blur-sm",
-                dragOver
-                  ? "border-violet-500 bg-violet-500/10 scale-[1.01]"
-                  : "border-violet-300/60 hover:border-violet-500 hover:bg-violet-500/5 dark:border-violet-500/40",
-                busy && "pointer-events-none opacity-60",
-              )}
-            >
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-md">
-                <Upload className="h-7 w-7" />
-              </span>
-              <span className="text-base font-bold text-foreground">Drop your photo here</span>
-              <span className="text-sm text-muted-foreground">
-                or tap to choose · JPG / PNG / WEBP · max {MAX_MB} MB
-              </span>
-              <span className="mt-1 rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow">
-                Select image
-              </span>
-            </button>
-          ) : (
-            <div className="overflow-hidden rounded-3xl border border-violet-200/60 bg-card shadow-md dark:border-violet-500/30">
-              <div className="relative bg-muted/40 p-2">
-                <img
-                  src={preview}
-                  alt="Upload preview"
-                  className="mx-auto max-h-[42vh] w-full rounded-2xl object-contain"
-                />
-                {!busy && (
-                  <button
-                    type="button"
-                    onClick={clearImage}
-                    className="absolute right-4 top-4 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
-                    aria-label="Remove photo"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5 truncate font-medium text-foreground">
-                  <ImageIcon className="h-3.5 w-3.5 text-violet-500" />
-                  {fileName ?? "Photo"}
-                </span>
-                <span>
-                  {pixelSize ? `${pixelSize.w}×${pixelSize.h}` : "—"}
-                  {file ? ` · ${(file.size / 1024 / 1024).toFixed(1)} MB` : ""}
-                </span>
-              </div>
-              {!busy && (
-                <div className="border-t border-border/40 px-4 py-2">
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    className="text-xs font-semibold text-violet-600 hover:underline dark:text-violet-300"
-                  >
-                    Replace photo
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-
-        <section className="mb-6">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Output quality
-          </p>
-          <div
-            className={cn(
-              "grid gap-2",
-              qualityOptions.length <= 2
-                ? "grid-cols-2"
-                : qualityOptions.length <= 4
-                  ? "grid-cols-2 sm:grid-cols-4"
-                  : "grid-cols-2 sm:grid-cols-3",
-            )}
-          >
-            {qualityOptions.map((q) => {
-              const active = quality === q.id;
-              return (
+              {!preview ? (
                 <button
-                  key={q.id}
                   type="button"
                   disabled={busy}
-                  onClick={() => setQuality(q.id)}
+                  onClick={() => fileRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={onDrop}
                   className={cn(
-                    "rounded-2xl border px-3 py-3 text-left transition",
-                    active
-                      ? "border-transparent bg-gradient-to-br from-violet-500 to-cyan-500 text-white shadow-md"
-                      : "border-border bg-card hover:border-violet-400/50",
+                    "flex w-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-6 py-10 text-center transition-all",
+                    "bg-card/70 shadow-sm backdrop-blur-sm",
+                    dragOver
+                      ? "border-violet-500 bg-violet-500/10 scale-[1.01]"
+                      : "border-violet-300/60 hover:border-violet-500 hover:bg-violet-500/5 dark:border-violet-500/40",
+                    busy && "pointer-events-none opacity-60",
                   )}
                 >
-                  <p className="text-sm font-bold">{q.label}</p>
-                  <p className={cn("text-[11px]", active ? "text-white/80" : "text-muted-foreground")}>
-                    {q.credits} credits
-                  </p>
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-md">
+                    <Upload className="h-7 w-7" />
+                  </span>
+                  <span className="text-base font-bold text-foreground">Drop your photo here</span>
+                  <span className="text-sm text-muted-foreground">
+                    or tap to choose · JPG / PNG / WEBP · max {MAX_MB} MB
+                  </span>
+                  <span className="mt-1 rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow">
+                    Select image
+                  </span>
                 </button>
-              );
-            })}
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Your balance:{" "}
-            <strong className="text-foreground">{isAdmin ? "∞" : credits.toLocaleString()}</strong>
-            {!isAdmin && ` · this run uses ${cost} credits`}
-          </p>
-        </section>
+              ) : (
+                <div className="overflow-hidden rounded-3xl border border-violet-200/60 bg-card shadow-md dark:border-violet-500/30">
+                  <div className="relative bg-muted/40 p-2">
+                    <img
+                      src={preview}
+                      alt="Upload preview"
+                      className="mx-auto max-h-[42vh] w-full rounded-2xl object-contain"
+                    />
+                    {!busy && (
+                      <button
+                        type="button"
+                        onClick={clearImage}
+                        className="absolute right-4 top-4 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
+                        aria-label="Remove photo"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-4 py-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5 truncate font-medium text-foreground">
+                      <ImageIcon className="h-3.5 w-3.5 text-violet-500" />
+                      {fileName ?? "Photo"}
+                    </span>
+                    <span>
+                      {pixelSize ? `${pixelSize.w}×${pixelSize.h}` : "—"}
+                      {file ? ` · ${(file.size / 1024 / 1024).toFixed(1)} MB` : ""}
+                    </span>
+                  </div>
+                  {!busy && (
+                    <div className="border-t border-border/40 px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        className="text-xs font-semibold text-violet-600 hover:underline dark:text-violet-300"
+                      >
+                        Replace photo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
 
-        <section className="mb-8 space-y-3">
-          <Button
-            type="button"
-            size="lg"
-            disabled={busy || (!file && !output) || noCredits}
-            onClick={() => void runAuto()}
-            className={cn(
-              "h-14 w-full rounded-2xl text-base font-bold shadow-lg",
-              "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-500 text-white hover:opacity-95",
-            )}
-          >
-            {busy ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Maluto AI is working…
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-5 w-5" />
-                Generate with Maluto AI · one click
-              </>
-            )}
-          </Button>
-          {!file && (
-            <p className="text-center text-xs text-muted-foreground">
-              Add a photo above, then tap generate. Maluto AI handles the rest.
-            </p>
-          )}
-          {noCredits && (
-            <p className="text-center text-xs text-destructive">
-              Not enough credits.{" "}
-              <Link to="/pricing" className="underline">
-                Upgrade or buy credits
-              </Link>
-            </p>
-          )}
-          {phase === "error" && errorMsg && (
-            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
-              <p className="font-semibold text-destructive">Maluto AI could not finish</p>
-              <p className="mt-1 text-muted-foreground">{errorMsg}</p>
-              <Button size="sm" className="mt-3" onClick={() => void runAuto()} disabled={!file || noCredits}>
-                Try again
+            <section className="mb-6">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Output quality
+              </p>
+              <div
+                className={cn(
+                  "grid gap-2",
+                  qualityOptions.length <= 2
+                    ? "grid-cols-2"
+                    : qualityOptions.length <= 4
+                      ? "grid-cols-2 sm:grid-cols-4"
+                      : "grid-cols-2 sm:grid-cols-3",
+                )}
+              >
+                {qualityOptions.map((q) => {
+                  const active = quality === q.id;
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setQuality(q.id)}
+                      className={cn(
+                        "rounded-2xl border px-3 py-3 text-left transition",
+                        active
+                          ? "border-transparent bg-gradient-to-br from-violet-500 to-cyan-500 text-white shadow-md"
+                          : "border-border bg-card hover:border-violet-400/50",
+                      )}
+                    >
+                      <p className="text-sm font-bold">{q.label}</p>
+                      <p className={cn("text-[11px]", active ? "text-white/80" : "text-muted-foreground")}>
+                        {q.credits} credits
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Your balance:{" "}
+                <strong className="text-foreground">{isAdmin ? "∞" : credits.toLocaleString()}</strong>
+                {!isAdmin && ` · this run uses ${cost} credits`}
+              </p>
+            </section>
+
+            <section className="mb-8 space-y-3">
+              <Button
+                type="button"
+                size="lg"
+                disabled={busy || !file || noCredits}
+                onClick={() => void runAuto()}
+                className={cn(
+                  "h-14 w-full rounded-2xl text-base font-bold shadow-lg",
+                  "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-500 text-white hover:opacity-95",
+                )}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Maluto AI is working…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-5 w-5" />
+                    Generate with Maluto AI · one click
+                  </>
+                )}
               </Button>
-            </div>
-          )}
-        </section>
+              {!file && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Add a photo above, then tap generate. Maluto AI handles the rest.
+                </p>
+              )}
+              {noCredits && (
+                <p className="text-center text-xs text-destructive">
+                  Not enough credits.{" "}
+                  <Link to="/pricing" className="underline">
+                    Upgrade or buy credits
+                  </Link>
+                </p>
+              )}
+              {phase === "error" && errorMsg && (
+                <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
+                  <p className="font-semibold text-destructive">Maluto AI could not finish</p>
+                  <p className="mt-1 text-muted-foreground">{errorMsg}</p>
+                  <Button size="sm" className="mt-3" onClick={() => void runAuto()} disabled={!file || noCredits}>
+                    Try again
+                  </Button>
+                </div>
+              )}
+            </section>
+          </>
+        )}
 
+        {/* RESULT — full image, Before/After divider only, minimal controls */}
         {phase === "done" && output && preview && (
           <section className="mb-8 space-y-4">
             <h2 className="text-center text-sm font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
-              Before & after
+              Auto Edit result
             </h2>
-            <div className="overflow-hidden rounded-3xl border border-border bg-card p-2 shadow-md">
-              <CompareSlider before={preview} after={output} />
-            </div>
+            <p className="text-center text-xs text-muted-foreground">
+              Drag the divider to compare · tap the image for full view
+            </p>
+            <AutoEditBeforeAfter
+              before={preview}
+              after={output}
+              onOpenAfter={() => setViewerOpen(true)}
+            />
             {summary && (
-              <div className="rounded-2xl border border-border bg-card/80 p-4 text-sm">
+              <div className="rounded-2xl border border-violet-200/50 bg-violet-500/5 p-4 text-sm dark:border-violet-500/30">
                 <p className="font-semibold text-foreground">What Maluto AI saw</p>
                 {summary.detectedIssues?.length > 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -718,6 +723,16 @@ function AutoEditPage() {
             </ol>
           </div>
         </div>
+      )}
+
+      {output && (
+        <AutoEditResultViewer
+          src={output}
+          open={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          onDownload={() => void downloadResult()}
+          downloadBusy={dlBusy}
+        />
       )}
     </div>
   );
