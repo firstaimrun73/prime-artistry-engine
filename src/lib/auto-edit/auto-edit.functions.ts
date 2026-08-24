@@ -13,13 +13,22 @@ const schema = z.object({
     .string()
     .max(15_000_000)
     .refine((u) => u.startsWith("https://"), "Image must be a secure https URL."),
-  /** 8k_max is backend-supported; UI may not expose it yet. */
+  /** Includes 8k_max (backend + plan-gated UI). */
   imageQuality: z
     .enum(["sd", "hd", "2k", "4k", "8k", "8k_max"])
     .default("hd"),
   width: z.number().int().positive().max(20000).optional(),
   height: z.number().int().positive().max(20000).optional(),
 });
+
+/** Profile fields needed for Auto Edit (incl. free-limit counter). */
+type AutoEditProfileRow = {
+  plan: string;
+  credits: number;
+  email: string | null;
+  /** Live DB column; may be missing from generated Supabase types until regen. */
+  auto_edit_used_count?: number | null;
+};
 
 export const runStandaloneAutoEdit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -28,15 +37,19 @@ export const runStandaloneAutoEdit = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: profile, error: pErr } = await supabase
+    // Select includes auto_edit_used_count (migration applied on live DB).
+    // Cast through unknown: generated Database types may lag the live schema.
+    const { data: profileRaw, error: pErr } = await supabase
       .from("profiles")
       .select("plan, credits, email, auto_edit_used_count")
       .eq("id", userId)
       .single();
 
-    if (pErr || !profile) {
+    if (pErr || !profileRaw) {
       throw new Error("Could not load your account.");
     }
+
+    const profile = profileRaw as unknown as AutoEditProfileRow;
 
     const adminList = [
       (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase(),
@@ -59,9 +72,8 @@ export const runStandaloneAutoEdit = createServerFn({ method: "POST" })
         credits: profile.credits,
         email: profile.email,
         auto_edit_used_count:
-          typeof (profile as { auto_edit_used_count?: number }).auto_edit_used_count ===
-          "number"
-            ? (profile as { auto_edit_used_count: number }).auto_edit_used_count
+          typeof profile.auto_edit_used_count === "number"
+            ? profile.auto_edit_used_count
             : 0,
       },
       isAdmin,

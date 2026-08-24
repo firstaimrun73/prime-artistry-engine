@@ -27,3 +27,11 @@ export const AUTO_EDIT_CONFIG = {
   /** Per generation step; generateMedia also has its own FAL timeout. */
   stepTimeoutMs: 180_000,
 } as const;
+
+/**
+ * @deprecated Legacy analyze.server / orchestrator only.
+ * Active standalone Auto Edit uses fal-ai/any-llm/vision + Gemini Flash Lite
+ * (see constants.ts / fal-vision.server.ts). Do not use these for new code.
+ */
+export const ANALYSIS_MODEL = "deprecated-not-used-by-standalone-auto-edit" as const;
+export const ANALYSIS_MAX_TOKENS = 1024;
