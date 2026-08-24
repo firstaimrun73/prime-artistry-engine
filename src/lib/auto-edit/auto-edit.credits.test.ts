@@ -1,5 +1,5 @@
 /**
- * Unit checks for Auto Edit credits + entitlements (no network).
+ * Unit checks for Auto Edit credits + entitlements + quality isolation (no network).
  * Run: npx tsx --test src/lib/auto-edit/auto-edit.credits.test.ts
  */
 
@@ -21,6 +21,12 @@ import {
   assertFreeAutoEditAllowance,
   assertAutoEditQualityEntitlement,
 } from "./entitlements";
+import {
+  AUTO_EDIT_QUALITY_OPTIONS,
+  autoEditQualitiesForPlan,
+  defaultAutoEditQualityForPlan,
+  getAutoEditQualityOption,
+} from "./auto-edit.quality";
 
 describe("Auto Edit models", () => {
   it("uses Gemini Flash Lite + Kontext LoRA (not GPT Image 2)", () => {
@@ -84,5 +90,42 @@ describe("Auto Edit plan entitlements", () => {
     assert.doesNotThrow(() =>
       assertFreeAutoEditAllowance({ plan: "pro", isAdmin: false, autoEditUsedCount: 99 }),
     );
+  });
+});
+
+describe("Auto Edit isolated quality UI catalog", () => {
+  it("includes 8k_max with API id 8k_max and label 8K Max", () => {
+    const max = getAutoEditQualityOption("8k_max");
+    assert.ok(max);
+    assert.equal(max!.id, "8k_max");
+    assert.equal(max!.label, "8K Max");
+    assert.equal(max!.credits, 65);
+    assert.equal(max!.targetMegapixels, 6);
+    assert.equal(AUTO_EDIT_QUALITY_OPTIONS.length, 6);
+  });
+
+  it("filters qualities by plan for frontend", () => {
+    assert.deepEqual(
+      autoEditQualitiesForPlan("free").map((o) => o.id),
+      ["sd", "hd"],
+    );
+    assert.deepEqual(
+      autoEditQualitiesForPlan("plus").map((o) => o.id),
+      ["sd", "hd", "2k"],
+    );
+    assert.deepEqual(
+      autoEditQualitiesForPlan("pro").map((o) => o.id),
+      ["sd", "hd", "2k", "4k"],
+    );
+    assert.deepEqual(
+      autoEditQualitiesForPlan("studio").map((o) => o.id),
+      ["sd", "hd", "2k", "4k", "8k"],
+    );
+    assert.deepEqual(
+      autoEditQualitiesForPlan("business").map((o) => o.id),
+      ["sd", "hd", "2k", "4k", "8k", "8k_max"],
+    );
+    assert.equal(defaultAutoEditQualityForPlan("free"), "hd");
+    assert.equal(defaultAutoEditQualityForPlan("business"), "hd");
   });
 });
