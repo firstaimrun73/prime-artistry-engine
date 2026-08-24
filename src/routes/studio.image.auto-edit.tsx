@@ -44,10 +44,10 @@ import {
   defaultAutoEditQualityForPlan,
   type AutoEditQuality,
 } from "@/lib/auto-edit/auto-edit.quality";
-import { supabase } from "@/integrations/supabase/client";
 import { isAdminEmail } from "@/lib/admin-config";
 import { secureDownloadImage } from "@/lib/download.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
+import { uploadToStorage } from "@/lib/editor/editor.utils";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/studio/image/auto-edit")({
@@ -109,6 +109,13 @@ function formatEta(ms: number): string {
 }
 
 const MAX_MB = 40;
+
+/** Android gallery often returns empty MIME; allow by extension. */
+function isAcceptableImageFile(f: File): boolean {
+  if (f.type.startsWith("image/")) return true;
+  const name = f.name.toLowerCase();
+  return /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(name);
+}
 
 function AutoEditPage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -205,27 +212,13 @@ function AutoEditPage() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const uploadToStorage = async (f: File): Promise<string> => {
-    const uid = profile?.id ?? user!.id;
-    const ext = f.name.split(".").pop() || "jpg";
-    const path = `${uid}/auto-edit-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("uploads").upload(path, f, {
-      contentType: f.type || "image/jpeg",
-      upsert: true,
-    });
-    if (error) throw new Error(error.message || "Upload failed. Check the uploads storage bucket.");
-    const { data, error: sErr } = await supabase.storage
-      .from("uploads")
-      .createSignedUrl(path, 3600);
-    if (sErr || !data?.signedUrl?.startsWith("https://")) {
-      throw new Error("Could not create a signed URL for your image.");
-    }
-    return data.signedUrl;
-  };
-
   const acceptFile = useCallback((f: File) => {
-    if (!f.type.startsWith("image/")) {
+    if (!isAcceptableImageFile(f)) {
       toast.error("Please choose an image (JPG, PNG, or WEBP).");
+      return;
+    }
+    if (f.size <= 0) {
+      toast.error("That file looks empty. Try another photo.");
       return;
     }
     if (f.size > MAX_MB * 1024 * 1024) {
@@ -233,7 +226,7 @@ function AutoEditPage() {
       return;
     }
     setFile(f);
-    setFileName(f.name);
+    setFileName(f.name || "Photo");
     const url = URL.createObjectURL(f);
     setPreview((prev) => {
       if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
@@ -253,15 +246,22 @@ function AutoEditPage() {
     toast.success("Photo ready for Maluto AI");
   }, []);
 
+  /**
+   * Snapshot File objects BEFORE clearing the input.
+   * Android Chrome/WebView use a live FileList — clearing value empties the list
+   * and would leave acceptFile never called (no preview, Generate stays disabled).
+   * Same pattern as ImageEditor / MultiImageFeature.
+   */
   const onFileInput = (e: ChangeEvent<HTMLInputElement>) => {
-    const list = e.target.files;
+    const files = Array.from(e.target.files ?? []);
+    // Reset so the same path can be re-selected later.
     e.target.value = "";
-    if (!list?.length) return;
-    if (list.length > 1) {
+    if (files.length === 0) return;
+    if (files.length > 1) {
       toast.error("Upload exactly one image.");
       return;
     }
-    acceptFile(list[0]);
+    acceptFile(files[0]);
   };
 
   const onDrop = (e: DragEvent) => {
@@ -282,6 +282,12 @@ function AutoEditPage() {
       return;
     }
 
+    const uid = profile?.id ?? user?.id;
+    if (!uid) {
+      toast.error("Sign in again to continue.");
+      return;
+    }
+
     setPhase("processing");
     setOutput(null);
     setSummary(null);
@@ -294,7 +300,11 @@ function AutoEditPage() {
     try {
       setStage("analysing");
       setProgress(STAGE_PROGRESS.analysing ?? 12);
-      const imageUrl = await uploadToStorage(file);
+      // Reuse Image Studio upload: private `uploads` bucket + signed HTTPS URL.
+      const imageUrl = await uploadToStorage(file, uid);
+      if (!imageUrl.startsWith("https://")) {
+        throw new Error("Upload did not return a secure image URL. Try again.");
+      }
 
       setStage("preparing");
       setProgress(STAGE_PROGRESS.preparing ?? 28);
@@ -432,6 +442,8 @@ function AutoEditPage() {
             className="sr-only"
             onChange={onFileInput}
             disabled={busy}
+            // One image only — never multi-select
+            multiple={false}
           />
 
           {!preview ? (
@@ -658,8 +670,8 @@ function AutoEditPage() {
             <div>
               <dt className="font-semibold text-foreground">Why can’t I upload?</dt>
               <dd className="mt-0.5 text-muted-foreground">
-                Use JPG, PNG, or WEBP under {MAX_MB} MB. You must be signed in. Storage needs the private{" "}
-                <code className="text-[11px]">uploads</code> bucket in Supabase.
+                Upload one image to start Auto Edit. Use JPG, PNG, or WEBP under {MAX_MB} MB.
+                Your image is securely uploaded and prepared for AI editing. You must be signed in.
               </dd>
             </div>
           </dl>
