@@ -1,82 +1,75 @@
 /**
  * MOTIO2EDIT Auto executor (server-only).
  *
- * Pipeline (FAL only — no Anthropic / OpenAI keys):
- *   ONE image → fal any-llm/vision analysis
- *            → ONE inspect-and-decide internal instruction
- *            → ONE fal openai/gpt-image-2/edit call
- *            → watermark → charge once (quality-tier credits)
- *
- * No user prompt required.
+ * Pipeline:
+ *   ONE https image
+ *     → Gemini 2.5 Flash Lite (fal any-llm/vision) analysis + final_edit_prompt
+ *     → NO_CHANGE → return original, charge 0
+ *     → fal-ai/flux-kontext-lora with same image URL + prompt
+ *     → validate → watermark → charge once
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildAnalysisLayers } from "./auto-edit.layers.server";
-import {
-  buildSingleAutoEditPrompt,
-  matchImprovements,
-} from "./auto-edit.prompt-builder.server";
 import { validateStandaloneAutoEditInput } from "./auto-edit.validation";
 import type { StandaloneAutoEditResult } from "./auto-edit.types";
 import {
   autoEditCreditCost,
   AUTO_EDIT_FAL_MODEL,
-  labelImprovement,
   labelIssue,
+  labelImprovement,
+  type AutoEditQuality,
 } from "./constants";
-import { runAutoGptImageEdit } from "./gpt-image-edit.server";
-import { analyzeImageWithFalVision } from "./fal-vision.server";
-import type { ImageQuality } from "@/lib/quality-options";
+import { analyzeImageWithGemini } from "./fal-vision.server";
+import { runAutoKontextEdit } from "./kontext.server";
+import {
+  assertAutoEditQualityEntitlement,
+  assertFreeAutoEditAllowance,
+} from "./entitlements";
 
 export type RunStandaloneAutoEditArgs = {
   imageUrl: string;
-  imageQuality: ImageQuality;
+  imageQuality: AutoEditQuality;
   width?: number;
   height?: number;
   supabase: SupabaseClient;
   supabaseAdmin: SupabaseClient;
   userId: string;
-  profile: { plan: string; credits: number; email?: string | null };
+  profile: {
+    plan: string;
+    credits: number;
+    email?: string | null;
+    auto_edit_used_count?: number | null;
+  };
   isAdmin: boolean;
 };
-
-let __generationCallsThisRequest = 0;
 
 export async function executeStandaloneAutoEdit(
   args: RunStandaloneAutoEditArgs,
 ): Promise<StandaloneAutoEditResult> {
-  __generationCallsThisRequest = 0;
-
   const validated = validateStandaloneAutoEditInput({ imageUrl: args.imageUrl });
   if (!validated.ok) {
     throw new Error(validated.error);
   }
 
-  const cost = autoEditCreditCost(args.imageQuality ?? "hd");
+  const quality: AutoEditQuality = args.imageQuality ?? "hd";
+  assertAutoEditQualityEntitlement(args.profile.plan, quality);
+  assertFreeAutoEditAllowance({
+    plan: args.profile.plan,
+    isAdmin: args.isAdmin,
+    autoEditUsedCount: args.profile.auto_edit_used_count ?? 0,
+  });
+
+  const cost = autoEditCreditCost(quality);
   if (!args.isAdmin && args.profile.credits < cost) {
     throw new Error(`Not enough credits. Auto Edit costs ${cost} credits per job.`);
   }
 
-  const dims = { width: args.width, height: args.height };
+  const analysis = await analyzeImageWithGemini(validated.imageUrl);
 
-  // fal.ai vision analysis (gemini-2.5-flash-lite) — no Anthropic
-  const analysis = await analyzeImageWithFalVision(validated.imageUrl, dims);
-  const layers = buildAnalysisLayers(analysis);
-  const matched = matchImprovements(analysis, layers);
+  const detectedIssues = analysis.issues.map(labelIssue).slice(0, 8);
+  const recommended = analysis.recommended_actions.map(labelImprovement).slice(0, 6);
 
-  const issueIds = [
-    ...(analysis.quality.issues ?? []),
-    ...(analysis.quality.restorationIssues ?? []),
-  ];
-  const detectedIssues = [...new Set(issueIds.map(labelIssue))].slice(0, 8);
-  const recommended = matched.map(labelImprovement).slice(0, 6);
-
-  const attentionLayers = layers.layers.filter((l) => l.needsAttention);
-  const onlyPolish =
-    matched.length === 0 ||
-    (matched.length === 1 && matched[0] === "NATURAL_PHOTO_POLISH");
-
-  if (layers.qualityScore >= 0.92 && attentionLayers.length === 0 && onlyPolish) {
+  if (analysis.no_change || !analysis.final_edit_prompt.trim()) {
     return {
       success: true,
       outputUrl: validated.imageUrl,
@@ -84,10 +77,10 @@ export async function executeStandaloneAutoEdit(
       status: "NO_CHANGE",
       creditsCharged: 0,
       analysisSummary: {
-        qualityScore: layers.qualityScore,
+        qualityScore: analysis.confidence,
         improvementsApplied: 0,
         needsEdit: false,
-        confidence: layers.analysisConfidence,
+        confidence: analysis.confidence,
         detectedIssues: detectedIssues.length ? detectedIssues : ["No significant issues"],
         recommended: [],
       },
@@ -95,25 +88,25 @@ export async function executeStandaloneAutoEdit(
     };
   }
 
-  const { prompt, improvementsApplied } = buildSingleAutoEditPrompt(matched, analysis);
-
-  __generationCallsThisRequest += 1;
-  if (__generationCallsThisRequest !== 1) {
-    throw new Error("Auto Edit invariant: generation must run exactly once.");
-  }
-
-  const gen = await runAutoGptImageEdit({
+  const gen = await runAutoKontextEdit({
     supabase: args.supabase,
     supabaseAdmin: args.supabaseAdmin,
     userId: args.userId,
     profile: args.profile,
     isAdmin: args.isAdmin,
-    internalPrompt: prompt,
+    editPrompt: analysis.final_edit_prompt,
     imageUrl: validated.imageUrl,
-    creditCost: cost,
+    quality,
   });
 
-  console.log("[AutoEdit] model:", AUTO_EDIT_FAL_MODEL, "| falCalls: 1+vision | credits:", cost);
+  console.log(
+    "[AutoEdit] model:",
+    AUTO_EDIT_FAL_MODEL,
+    "| quality:",
+    quality,
+    "| credits:",
+    cost,
+  );
 
   return {
     success: true,
@@ -122,10 +115,10 @@ export async function executeStandaloneAutoEdit(
     status: "COMPLETE",
     creditsCharged: args.isAdmin ? 0 : cost,
     analysisSummary: {
-      qualityScore: layers.qualityScore,
-      improvementsApplied,
+      qualityScore: analysis.confidence,
+      improvementsApplied: Math.max(1, recommended.length),
       needsEdit: true,
-      confidence: layers.analysisConfidence,
+      confidence: analysis.confidence,
       detectedIssues,
       recommended,
     },

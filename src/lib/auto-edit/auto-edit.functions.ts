@@ -1,7 +1,6 @@
 /**
  * Public server entry for standalone MOTIO2EDIT Auto.
  * Returns only safe fields — never internal prompts or vision dumps.
- * Frontend brand: Maluto AI (fal.ai models under the hood).
  */
 
 import { createServerFn } from "@tanstack/react-start";
@@ -14,7 +13,10 @@ const schema = z.object({
     .string()
     .max(15_000_000)
     .refine((u) => u.startsWith("https://"), "Image must be a secure https URL."),
-  imageQuality: z.enum(["sd", "hd", "2k", "4k"]).default("hd"),
+  /** 8k_max is backend-supported; UI may not expose it yet. */
+  imageQuality: z
+    .enum(["sd", "hd", "2k", "4k", "8k", "8k_max"])
+    .default("hd"),
   width: z.number().int().positive().max(20000).optional(),
   height: z.number().int().positive().max(20000).optional(),
 });
@@ -28,7 +30,7 @@ export const runStandaloneAutoEdit = createServerFn({ method: "POST" })
 
     const { data: profile, error: pErr } = await supabase
       .from("profiles")
-      .select("plan, credits, email")
+      .select("plan, credits, email, auto_edit_used_count")
       .eq("id", userId)
       .single();
 
@@ -56,6 +58,11 @@ export const runStandaloneAutoEdit = createServerFn({ method: "POST" })
         plan: profile.plan,
         credits: profile.credits,
         email: profile.email,
+        auto_edit_used_count:
+          typeof (profile as { auto_edit_used_count?: number }).auto_edit_used_count ===
+          "number"
+            ? (profile as { auto_edit_used_count: number }).auto_edit_used_count
+            : 0,
       },
       isAdmin,
     });
