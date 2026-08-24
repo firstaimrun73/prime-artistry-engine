@@ -283,14 +283,16 @@ export async function runAutoKontextEdit(
     }
   }
 
-  const { error: histErr } = await args.supabase.from("generations").insert({
+  // Persist with admin client so RLS cannot silently drop History rows.
+  const { error: histErr } = await args.supabaseAdmin.from("generations").insert({
     user_id: args.userId,
     type: "image",
-    prompt: "[motio2edit-auto]",
-    input_url: "uploaded",
+    prompt: "Maluto AI Auto Edit",
+    input_url: args.imageUrl.startsWith("https://") ? args.imageUrl : "uploaded",
     output_url: outputUrl,
     status: "success",
     metadata: {
+      experience: "auto-edit",
       source: "standalone_auto",
       analysis_model: AUTO_EDIT_VISION_LLM,
       analysis_provider: "fal.ai",
