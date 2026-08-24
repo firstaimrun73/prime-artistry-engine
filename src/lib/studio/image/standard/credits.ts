@@ -1,7 +1,7 @@
 /**
  * LOCKED Standard Image Studio credits — authoritative for Standard path.
  *
- * Text → Image: SD 25, HD 30
+ * Text → Image: SD 20, HD 25
  * Image → Image: 25 (no fake HD premium)
  * Multi 1–2 refs: 30 | 3–4: 35 | 5: 40 (no fake HD)
  * Circle to Remove: 25 flat
@@ -10,8 +10,8 @@
 import type { StandardCreditQuote, StandardImageMode, StandardImageQuality } from "./types";
 
 export const STANDARD_CREDITS = {
-  textToImageSd: 25,
-  textToImageHd: 30,
+  textToImageSd: 20,
+  textToImageHd: 25,
   imageToImage: 25,
   multi1to2: 30,
   multi3to4: 35,

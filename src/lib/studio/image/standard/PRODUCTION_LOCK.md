@@ -15,8 +15,8 @@ Do not change locked models or credits without explicit product approval.
 
 | Mode | Credits |
 |------|---------|
-| Text → Image SD | 25 |
-| Text → Image HD | 30 |
+| Text → Image SD | 20 |
+| Text → Image HD | 25 |
 | Image → Image | 25 (no fake HD premium) |
 | Multi 1–2 refs | 30 |
 | Multi 3–4 refs | 35 |
