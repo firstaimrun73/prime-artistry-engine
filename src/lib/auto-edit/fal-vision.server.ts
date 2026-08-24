@@ -1,67 +1,51 @@
 /**
  * Auto Edit vision analysis via fal.ai only.
- * Endpoint: fal-ai/any-llm/vision (default google/gemini-2.5-flash-lite ~$0.01).
- * No Anthropic, OpenAI, or ChatGPT API keys.
+ * Endpoint: fal-ai/any-llm/vision (google/gemini-2.5-flash-lite).
+ * Gemini analyses the photo, decides needed fixes, and writes final_edit_prompt.
  */
 
-import type { ImageAnalysisResult } from "./types";
-import { AUTO_EDIT_VISION_LLM, AUTO_EDIT_VISION_MODEL } from "./constants";
-import { buildRuleBasedAnalysis } from "./ruleBasedAnalysis";
+import {
+  AUTO_EDIT_VISION_LLM,
+  AUTO_EDIT_VISION_MODEL,
+} from "./constants";
+import type { GeminiAutoEditAnalysis } from "./gemini-analysis.types";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const VISION_SYSTEM = `You are a professional photo analyst. Analyze the image and return ONLY valid JSON with this schema:
-{
-  "scene": "string",
-  "peopleCount": 0,
-  "hasPrimarySubject": true,
-  "hasBackgroundPeople": false,
-  "hasPhotobombers": false,
-  "faceDetected": true,
-  "faceCount": 1,
-  "faceBlurry": false,
-  "isOldPhoto": false,
-  "isLowLight": false,
-  "qualityIssues": [],
-  "restorationIssues": [],
-  "backgroundCluttered": false,
-  "backgroundHasDistractingElements": false,
-  "lightingUnderexposed": false,
-  "lightingOverexposed": false,
-  "lightingUneven": false,
-  "colorTemperatureOff": false,
-  "overallQualityScore": 0.8,
-  "analysisConfidence": 0.9,
-  "plainTextSummary": "brief summary of issues and improvements"
-}
-qualityIssues may include: blur, motion_blur, defocus, noise, compression_artifacts, pixelation, overexposed, underexposed, low_contrast, color_cast, oversharpened, low_resolution, missing_detail
-restorationIssues may include: fading, scratches, cracks, dust, stains, tears, damaged_regions, monochrome_aged, color_loss
-Do not invent problems. If the photo is strong, overallQualityScore near 1.0. JSON only.`;
+const VISION_SYSTEM = `You are a professional photo editor AI. Analyse the single photograph and decide what automatic edits (if any) are needed.
 
-type VisionJSON = {
-  scene?: string;
-  peopleCount?: number;
-  hasPrimarySubject?: boolean;
-  hasBackgroundPeople?: boolean;
-  hasPhotobombers?: boolean;
-  faceDetected?: boolean;
-  faceCount?: number;
-  faceBlurry?: boolean;
-  isOldPhoto?: boolean;
-  isLowLight?: boolean;
-  qualityIssues?: string[];
-  restorationIssues?: string[];
-  backgroundCluttered?: boolean;
-  backgroundHasDistractingElements?: boolean;
-  lightingUnderexposed?: boolean;
-  lightingOverexposed?: boolean;
-  lightingUneven?: boolean;
-  colorTemperatureOff?: boolean;
-  overallQualityScore?: number;
-  analysisConfidence?: number;
-  plainTextSummary?: string;
-};
+Return ONLY valid JSON with this exact schema:
+{
+  "image_type": "photo|old_photo|screenshot|portrait|other",
+  "issues": ["string"],
+  "recommended_actions": ["string"],
+  "crop_needed": false,
+  "crop_instruction": "string or empty",
+  "restoration_needed": false,
+  "color_restoration_needed": false,
+  "face_improvement_needed": false,
+  "background_cleanup_needed": false,
+  "distractions_to_remove": ["string"],
+  "composition_adjustments": ["string"],
+  "preserve_elements": ["identity", "faces", "composition", "natural colors"],
+  "confidence": 0.0,
+  "no_change": false,
+  "final_edit_prompt": "concise editing instruction for an image-editing model"
+}
+
+Rules:
+- Do NOT blindly apply every enhancement. Only fix real, visible problems.
+- Old / faded / B&W / scratched photos: restore, colorize when appropriate, repair damage, preserve identity.
+- Blur, noise, compression, exposure, color cast: fix only if clearly present.
+- Faces: improve detail/lighting only when needed; NEVER change identity or invent a different person.
+- Background: remove only clearly distracting photobombers/objects when warranted.
+- Screenshots: if the image is a screenshot of a photo, crop UI/borders and restore the actual photograph when possible.
+- Composition: only suggest crop/reframe when framing is clearly poor.
+- If the image is already strong and needs no meaningful automatic edit, set no_change=true and final_edit_prompt to "".
+- final_edit_prompt must be a concise, high-quality editing instruction describing what to fix/restore/remove/crop/improve and what to preserve. No unrelated objects. No watermark text. Photorealistic natural result.
+- confidence is 0–1.
+JSON only.`;
 
 async function falVisionRaw(imageUrl: string, falKey: string): Promise<string> {
   const headers = {
@@ -70,7 +54,7 @@ async function falVisionRaw(imageUrl: string, falKey: string): Promise<string> {
   };
   const body = {
     prompt:
-      "Analyze this photograph for quality issues, restoration needs, faces, background clutter, and lighting. Return the JSON object as specified in the system prompt.",
+      "Analyse this single photograph. Decide what automatic professional edits are actually needed. Return the JSON object as specified in the system prompt, including final_edit_prompt or no_change.",
     system_prompt: VISION_SYSTEM,
     image_url: imageUrl,
     model: AUTO_EDIT_VISION_LLM,
@@ -119,7 +103,7 @@ async function falVisionRaw(imageUrl: string, falKey: string): Promise<string> {
   return text;
 }
 
-function parseVisionJson(raw: string): VisionJSON {
+function parseVisionJson(raw: string): Record<string, unknown> {
   const clean = raw
     .replace(/```json\n?/gi, "")
     .replace(/```\n?/g, "")
@@ -127,98 +111,97 @@ function parseVisionJson(raw: string): VisionJSON {
   const start = clean.indexOf("{");
   const end = clean.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("Vision JSON not found");
-  return JSON.parse(clean.slice(start, end + 1)) as VisionJSON;
+  return JSON.parse(clean.slice(start, end + 1)) as Record<string, unknown>;
 }
 
-function visionToAnalysis(
-  v: VisionJSON,
-  dims?: { width?: number; height?: number },
-): ImageAnalysisResult {
-  const width = dims?.width && dims.width > 0 ? dims.width : 0;
-  const height = dims?.height && dims.height > 0 ? dims.height : 0;
-  const megapixels = width > 0 && height > 0 ? (width * height) / 1_000_000 : 0;
-  const aspectRatio = height > 0 ? width / height : 1;
+function asStringArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === "string").slice(0, 12);
+}
 
-  const issues = [...(v.qualityIssues ?? [])];
-  const restorationIssues = [...(v.restorationIssues ?? [])];
-  const isOld = v.isOldPhoto ?? false;
+function normalizeAnalysis(raw: Record<string, unknown>): GeminiAutoEditAnalysis {
+  const noChange = raw.no_change === true;
+  let finalPrompt =
+    typeof raw.final_edit_prompt === "string" ? raw.final_edit_prompt.trim() : "";
+  if (noChange) finalPrompt = "";
 
   return {
-    dimensions: { width, height, aspectRatio, megapixels },
-    scene: (v.scene as ImageAnalysisResult["scene"]) || "other",
-    people: {
-      count: v.peopleCount ?? 0,
-      hasPrimarySubject: v.hasPrimarySubject ?? true,
-      hasSecondaryPeople: (v.peopleCount ?? 0) > 1 || !!v.hasBackgroundPeople,
-      hasBackgroundPeople: v.hasBackgroundPeople ?? false,
-      hasPhotobombers: v.hasPhotobombers ?? false,
-      hasPartiallyVisiblePeople: false,
-    },
-    faces: {
-      detected: v.faceDetected ?? false,
-      count: v.faceCount ?? 0,
-      primaryFaceVisible: !!(v.faceDetected && (v.faceCount ?? 0) > 0),
-      blurry: v.faceBlurry ?? false,
-      hasArtifacts: false,
-      redEye: false,
-      poorLighting: !!(v.isLowLight && v.faceDetected),
-      occluded: false,
-    },
-    background: {
-      isCluttered: v.backgroundCluttered ?? false,
-      hasDistractingElements: v.backgroundHasDistractingElements ?? false,
-      hasUnwantedObjects: v.backgroundHasDistractingElements ?? false,
-      hasDamagedRegions: restorationIssues.length > 0,
-      hasInconsistentLighting: v.lightingUneven ?? false,
-    },
-    quality: {
-      issues,
-      restorationIssues,
-      isOldPhoto: isOld,
-      overallScore: typeof v.overallQualityScore === "number" ? v.overallQualityScore : 0.7,
-      needsRestoration: isOld || restorationIssues.length > 0,
-      needsEnhancement: issues.length > 0 || restorationIssues.length > 0,
-    },
-    lighting: {
-      isUnderexposed: v.lightingUnderexposed ?? false,
-      isOverexposed: v.lightingOverexposed ?? false,
-      isUneven: v.lightingUneven ?? false,
-      hasHighlightClipping: v.lightingOverexposed ?? false,
-      hasShadowClipping: v.lightingUnderexposed ?? false,
-      colorTemperatureOff: v.colorTemperatureOff ?? false,
-    },
-    composition: {
-      horizonStraight: true,
-      subjectWellPlaced: true,
-      hasEdgeDistractions: false,
-      hasExcessiveEmptySpace: false,
-    },
-    analysisConfidence:
-      typeof v.analysisConfidence === "number" ? v.analysisConfidence : 0.8,
-    rawVisionResponse: v.plainTextSummary ?? JSON.stringify(v),
+    image_type:
+      typeof raw.image_type === "string" ? raw.image_type : "photo",
+    issues: asStringArray(raw.issues),
+    recommended_actions: asStringArray(raw.recommended_actions),
+    crop_needed: raw.crop_needed === true,
+    crop_instruction:
+      typeof raw.crop_instruction === "string" ? raw.crop_instruction : "",
+    restoration_needed: raw.restoration_needed === true,
+    color_restoration_needed: raw.color_restoration_needed === true,
+    face_improvement_needed: raw.face_improvement_needed === true,
+    background_cleanup_needed: raw.background_cleanup_needed === true,
+    distractions_to_remove: asStringArray(raw.distractions_to_remove),
+    composition_adjustments: asStringArray(raw.composition_adjustments),
+    preserve_elements: asStringArray(raw.preserve_elements).length
+      ? asStringArray(raw.preserve_elements)
+      : ["identity", "faces", "composition", "natural appearance"],
+    confidence:
+      typeof raw.confidence === "number" && raw.confidence >= 0 && raw.confidence <= 1
+        ? raw.confidence
+        : 0.7,
+    no_change: noChange || finalPrompt.length < 8,
+    final_edit_prompt: finalPrompt,
   };
 }
 
+const FALLBACK_POLISH: GeminiAutoEditAnalysis = {
+  image_type: "photo",
+  issues: [],
+  recommended_actions: ["polish"],
+  crop_needed: false,
+  crop_instruction: "",
+  restoration_needed: false,
+  color_restoration_needed: false,
+  face_improvement_needed: false,
+  background_cleanup_needed: false,
+  distractions_to_remove: [],
+  composition_adjustments: [],
+  preserve_elements: ["identity", "faces", "composition", "natural appearance"],
+  confidence: 0.4,
+  no_change: false,
+  final_edit_prompt:
+    "Subtly improve overall photographic quality: gentle clarity, natural color balance, and mild exposure refinement only where needed. Preserve identity, faces, composition, and the original scene. Do not add or remove objects. Natural photorealistic result, no watermark.",
+};
+
 /**
- * Analyse image with fal vision; falls back to rule-based heuristics on failure.
+ * Analyse image with Gemini via fal vision.
+ * On failure, falls back to a conservative polish prompt (still runs Kontext).
  */
-export async function analyzeImageWithFalVision(
+export async function analyzeImageWithGemini(
   imageUrl: string,
-  dims?: { width?: number; height?: number },
-): Promise<ImageAnalysisResult> {
+): Promise<GeminiAutoEditAnalysis> {
   const falKey = process.env.FAL_API_KEY;
   if (!falKey) {
-    console.warn("[AutoEdit] FAL_API_KEY missing — rule-based analysis only");
-    return buildRuleBasedAnalysis({ width: dims?.width, height: dims?.height });
+    console.warn("[AutoEdit] FAL_API_KEY missing — conservative polish fallback");
+    return FALLBACK_POLISH;
   }
 
   try {
     const raw = await falVisionRaw(imageUrl, falKey);
     const parsed = parseVisionJson(raw);
-    console.log("[AutoEdit] vision model:", AUTO_EDIT_VISION_MODEL, AUTO_EDIT_VISION_LLM);
-    return visionToAnalysis(parsed, dims);
+    const analysis = normalizeAnalysis(parsed);
+    console.log(
+      "[AutoEdit] vision:",
+      AUTO_EDIT_VISION_MODEL,
+      AUTO_EDIT_VISION_LLM,
+      "| no_change:",
+      analysis.no_change,
+      "| confidence:",
+      analysis.confidence,
+    );
+    return analysis;
   } catch (err) {
-    console.warn("[AutoEdit] fal vision failed, rule-based fallback:", err);
-    return buildRuleBasedAnalysis({ width: dims?.width, height: dims?.height });
+    console.warn("[AutoEdit] fal vision failed, polish fallback:", err);
+    return FALLBACK_POLISH;
   }
 }
+
+/** @deprecated Use analyzeImageWithGemini */
+export const analyzeImageWithFalVision = analyzeImageWithGemini;
