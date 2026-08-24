@@ -1,6 +1,7 @@
 /**
  * Maluto AI — Auto Edit product page
  * Upload one photo → one click → fal.ai vision + edit (branded Maluto AI on frontend).
+ * Quality options are Auto Edit–only (src/lib/auto-edit/auto-edit.quality.ts).
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
@@ -39,9 +40,10 @@ import {
 } from "@/lib/auto-edit/constants";
 import type { AutoEditAnalysisSummary } from "@/lib/auto-edit/auto-edit.types";
 import {
-  IMAGE_QUALITY_OPTIONS,
-  type ImageQuality,
-} from "@/lib/quality-options";
+  autoEditQualitiesForPlan,
+  defaultAutoEditQualityForPlan,
+  type AutoEditQuality,
+} from "@/lib/auto-edit/auto-edit.quality";
 import { supabase } from "@/integrations/supabase/client";
 import { isAdminEmail } from "@/lib/admin-config";
 import { secureDownloadImage } from "@/lib/download.functions";
@@ -118,7 +120,7 @@ function AutoEditPage() {
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [pixelSize, setPixelSize] = useState<{ w: number; h: number } | null>(null);
-  const [quality, setQuality] = useState<ImageQuality>("hd");
+  const [quality, setQuality] = useState<AutoEditQuality>("hd");
   const [output, setOutput] = useState<string | null>(null);
   const [phase, setPhase] = useState<UiPhase>("idle");
   const [stage, setStage] = useState<StageId>("queued");
@@ -133,6 +135,22 @@ function AutoEditPage() {
   const runStartedAt = useRef<number>(0);
 
   const isAdmin = isAdminEmail(profile?.email);
+  const planId = profile?.plan ?? "free";
+
+  /** Plan-filtered Auto Edit qualities only — never global IMAGE_QUALITY_OPTIONS. */
+  const qualityOptions = useMemo(
+    () => autoEditQualitiesForPlan(planId),
+    [planId],
+  );
+
+  // Keep selected quality valid when plan changes.
+  useEffect(() => {
+    const allowed = qualityOptions.some((o) => o.id === quality);
+    if (!allowed) {
+      setQuality(defaultAutoEditQualityForPlan(planId));
+    }
+  }, [planId, qualityOptions, quality]);
+
   const cost = autoEditCreditCost(quality);
   const credits = profile?.credits ?? 0;
   const noCredits = !isAdmin && credits < cost;
@@ -495,9 +513,17 @@ function AutoEditPage() {
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Output quality
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {IMAGE_QUALITY_OPTIONS.map((q) => {
-              const c = autoEditCreditCost(q.id);
+          <div
+            className={cn(
+              "grid gap-2",
+              qualityOptions.length <= 2
+                ? "grid-cols-2"
+                : qualityOptions.length <= 4
+                  ? "grid-cols-2 sm:grid-cols-4"
+                  : "grid-cols-2 sm:grid-cols-3",
+            )}
+          >
+            {qualityOptions.map((q) => {
               const active = quality === q.id;
               return (
                 <button
@@ -514,7 +540,7 @@ function AutoEditPage() {
                 >
                   <p className="text-sm font-bold">{q.label}</p>
                   <p className={cn("text-[11px]", active ? "text-white/80" : "text-muted-foreground")}>
-                    {c} credits
+                    {q.credits} credits
                   </p>
                 </button>
               );
