@@ -1,53 +1,74 @@
 /**
- * Maluto AI — product constants.
+ * Auto Edit — product constants (Gemini Flash Lite vision + FLUX Kontext LoRA).
  *
- * Pipeline (all on fal.ai, FAL_API_KEY only):
- *   1) fal-ai/any-llm/vision (gemini-2.5-flash-lite) — analyse photo (~$0.01)
- *   2) openai/gpt-image-2/edit medium — apply improvements (~$0.06 @ 1024)
- * Total fal cost target: under ~$0.09 per HD job.
- * User charged once for the whole pipeline.
+ * Pipeline (fal.ai only, FAL_API_KEY):
+ *   1) fal-ai/any-llm/vision (google/gemini-2.5-flash-lite) — analyse + decide + final_edit_prompt
+ *   2) fal-ai/flux-kontext-lora — single-image edit with that prompt
+ *   3) watermark / finalize → charge once
  */
 
-import type { ImageQuality } from "@/lib/quality-options";
+/** Auto Edit quality tiers (includes backend-only 8k_max). */
+export type AutoEditQuality = "sd" | "hd" | "2k" | "4k" | "8k" | "8k_max";
 
-/** Base credits for HD Auto Edit (analysis + edit). */
-export const AUTO_EDIT_CREDIT_COST = 70;
-
-/** Credits by output quality tier (quality increases charge). */
-export const AUTO_EDIT_CREDITS_BY_QUALITY: Record<ImageQuality, number> = {
-  sd: 55,
-  hd: 70,
-  "2k": 90,
-  "4k": 110,
+/** Target megapixels by quality (billing / history targets). */
+export const AUTO_EDIT_TARGET_MP: Record<AutoEditQuality, number> = {
+  sd: 1,
+  hd: 1,
+  "2k": 2,
+  "4k": 3,
+  "8k": 4,
+  "8k_max": 6,
 };
 
-export function autoEditCreditCost(quality: ImageQuality = "hd"): number {
+/** Total Auto Edit credits by quality (analysis + edit bundled; no second charge). */
+export const AUTO_EDIT_CREDITS_BY_QUALITY: Record<AutoEditQuality, number> = {
+  sd: 45,
+  hd: 45,
+  "2k": 50,
+  "4k": 60,
+  "8k": 60,
+  "8k_max": 65,
+};
+
+/** @deprecated Prefer autoEditCreditCost(quality). HD default. */
+export const AUTO_EDIT_CREDIT_COST = AUTO_EDIT_CREDITS_BY_QUALITY.hd;
+
+export function autoEditCreditCost(quality: AutoEditQuality = "hd"): number {
   return AUTO_EDIT_CREDITS_BY_QUALITY[quality] ?? AUTO_EDIT_CREDIT_COST;
 }
 
-/**
- * Primary fal.ai GPT Image edit endpoint (NOT Flux Kontext, NOT external OpenAI SDK).
- * Docs: https://fal.ai/models/openai/gpt-image-2/edit
- */
-export const AUTO_EDIT_FAL_MODEL = "openai/gpt-image-2/edit" as const;
+export function autoEditTargetMegapixels(quality: AutoEditQuality = "hd"): number {
+  return AUTO_EDIT_TARGET_MP[quality] ?? 1;
+}
 
-/**
- * Vision analysis on fal only — no Anthropic / OpenAI keys.
- * Docs: https://fal.ai/models/fal-ai/any-llm/vision
- * Default model google/gemini-2.5-flash-lite ≈ $0.01 / request
- */
+/** Vision analysis on fal only. */
 export const AUTO_EDIT_VISION_MODEL = "fal-ai/any-llm/vision" as const;
 export const AUTO_EDIT_VISION_LLM = "google/gemini-2.5-flash-lite" as const;
 
-/**
- * Quality tier for GPT Image 2 edit.
- * medium ≈ $0.061 at 1024×1024 — under ~$0.09 target with vision.
- * high ≈ $0.219 — exceeds target; do not use as default.
- */
-export const AUTO_EDIT_GPT_QUALITY = "medium" as const;
+/** Primary edit model — FLUX Kontext LoRA (NOT GPT Image 2). */
+export const AUTO_EDIT_FAL_MODEL = "fal-ai/flux-kontext-lora" as const;
+
+/** Default watermark position metadata (server stamp applies it). */
+export const AUTO_EDIT_WATERMARK_POSITION = "bottom-right" as const;
 
 /** Product name shown in UI. */
 export const AUTO_EDIT_PRODUCT_NAME = "Maluto AI" as const;
+
+/** Pipeline states for client progress (no GPT-specific wording). */
+export const AUTO_EDIT_PIPELINE_STATES = [
+  "QUEUED",
+  "ANALYSING",
+  "BUILDING_EDIT_PLAN",
+  "GENERATING",
+  "VALIDATING",
+  "WATERMARKING",
+  "FINALISING",
+  "COMPLETE",
+  "NO_CHANGE",
+  "ERROR",
+] as const;
+
+export type AutoEditPipelineState = (typeof AUTO_EDIT_PIPELINE_STATES)[number];
 
 /** Human-readable labels for detected quality issues (client-safe). */
 export const ISSUE_LABELS: Record<string, string> = {
@@ -73,45 +94,24 @@ export const ISSUE_LABELS: Record<string, string> = {
   damaged_regions: "Damaged regions",
   monochrome_aged: "Aged monochrome",
   color_loss: "Color loss",
+  photobomber: "Photobomber / distraction",
+  bad_crop: "Poor crop / framing",
+  screenshot_border: "Screenshot UI / borders",
 };
 
-/** Human-readable labels for internal improvement IDs (client-safe). */
+/** Human-readable labels for recommended actions (client-safe). */
 export const IMPROVEMENT_LABELS: Record<string, string> = {
-  RESTORE_PHOTO: "Photo restoration",
-  DEBLUR: "Deblur",
-  MOTION_DEBLUR: "Motion deblur",
-  DEFOCUS_RECOVERY: "Focus recovery",
-  CLARITY_INCREASE: "Clarity",
-  DETAIL_RECOVERY: "Detail recovery",
-  SHARPEN: "Sharpen",
-  DENOISE: "Denoise",
-  NOISE_REDUCTION: "Noise reduction",
-  COMPRESSION_REPAIR: "Compression repair",
-  PIXELATION_REPAIR: "Pixelation repair",
-  LOW_RESOLUTION_RECOVERY: "Resolution recovery",
-  UPSCALE_DETAIL: "Detail upscale",
-  EXPOSURE_FIX: "Exposure correction",
-  UNDEREXPOSURE_FIX: "Underexposure fix",
-  OVEREXPOSURE_FIX: "Overexposure fix",
-  LIGHTING_BALANCE: "Lighting balance",
-  SHADOW_RECOVERY: "Shadow recovery",
-  HIGHLIGHT_RECOVERY: "Highlight recovery",
-  CONTRAST_BALANCE: "Contrast balance",
-  COLOR_BALANCE: "Color balance",
-  WHITE_BALANCE: "White balance",
-  COLOR_CAST_FIX: "Color-cast fix",
-  FACE_DETAIL_RECOVERY: "Face detail",
-  FACE_CLARITY: "Face clarity",
-  PORTRAIT_LIGHTING: "Portrait lighting",
-  SKIN_DETAIL_PRESERVATION: "Natural skin detail",
-  OLD_PHOTO_RESTORATION: "Old photo restoration",
-  FADE_REPAIR: "Fade repair",
-  SCRATCH_REPAIR: "Scratch repair",
-  DUST_REPAIR: "Dust repair",
-  DAMAGE_REPAIR: "Damage repair",
-  BACKGROUND_CLEANUP: "Background cleanup",
-  DISTRACTION_REDUCTION: "Distraction reduction",
-  NATURAL_PHOTO_POLISH: "Natural polish",
+  restore: "Photo restoration",
+  colorize: "Color restoration",
+  deblur: "Deblur / focus recovery",
+  denoise: "Noise reduction",
+  exposure: "Exposure correction",
+  color_balance: "Color / white balance",
+  face_detail: "Face detail recovery",
+  background_cleanup: "Background cleanup",
+  remove_distraction: "Remove distraction",
+  crop: "Crop / reframing",
+  polish: "Natural polish",
 };
 
 export function labelIssue(id: string): string {
