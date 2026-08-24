@@ -18,12 +18,20 @@ import { secureDownloadImage } from "@/lib/download.functions";
 import { useI18n } from "@/lib/i18n";
 import {
   Download, Pencil, Trash2, ZoomIn, ZoomOut, Image as ImageIcon,
-  Video, History as HistoryIcon, FolderOpen, Music,
+  Video, History as HistoryIcon, FolderOpen, Music, Sparkles,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/history")({
   component: HistoryPage,
 });
+
+type GenerationMeta = {
+  experience?: string;
+  source?: string;
+  quality?: string;
+  [key: string]: unknown;
+};
 
 type Generation = {
   id: string;
@@ -32,7 +40,17 @@ type Generation = {
   output_url: string | null;
   status: string;
   created_at: string;
+  metadata?: GenerationMeta | null;
 };
+
+/** Detect Auto Edit without changing other experience identities. */
+function isAutoEditGeneration(g: Generation): boolean {
+  const m = g.metadata;
+  if (m?.experience === "auto-edit") return true;
+  if (m?.source === "standalone_auto") return true;
+  const p = (g.prompt ?? "").toLowerCase();
+  return p.includes("maluto ai") || p.includes("motio2edit-auto");
+}
 
 function HistoryPage() {
   const { user } = useAuth();
@@ -50,7 +68,7 @@ function HistoryPage() {
     setLoading(true);
     supabase
       .from("generations")
-      .select("id, type, prompt, output_url, status, created_at")
+      .select("id, type, prompt, output_url, status, created_at, metadata")
       .order("created_at", { ascending: false })
       .then(({ data }) => {
         if (data) setGens(data as Generation[]);
@@ -97,6 +115,10 @@ function HistoryPage() {
 
   const editAgain = (g: Generation) => {
     if (!g.output_url) return;
+    if (isAutoEditGeneration(g)) {
+      navigate({ to: "/studio/image/auto-edit" });
+      return;
+    }
     sessionStorage.setItem(
       "motio2edit-reuse",
       JSON.stringify({ url: g.output_url, kind: g.type === "video" ? "video" : "image" }),
@@ -165,59 +187,83 @@ function HistoryPage() {
         </div>
       ) : (
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-          {gens.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => open(g)}
-              className="group overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-primary"
-            >
-              <div className="relative aspect-square w-full bg-secondary">
-                {g.output_url ? (
-                  g.type === "video" ? (
-                    <video src={g.output_url} className="h-full w-full object-cover" muted playsInline />
-                  ) : g.type === "music" ? (
-                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/25 to-purple-500/5">
-                      <Music className="h-8 w-8 text-primary" />
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Audio
-                      </span>
-                    </div>
-                  ) : (
-                    <img
-                      src={g.output_url}
-                      alt={g.prompt ?? "Generated"}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.opacity = "0.3";
-                      }}
-                    />
-                  )
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                  </div>
+          {gens.map((g) => {
+            const auto = isAutoEditGeneration(g);
+            return (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => open(g)}
+                className={cn(
+                  "group overflow-hidden rounded-xl border bg-card text-left transition-colors",
+                  auto
+                    ? "border-violet-300/70 hover:border-violet-500 dark:border-violet-500/40"
+                    : "border-border hover:border-primary",
                 )}
-                <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-semibold capitalize backdrop-blur">
-                  {g.type === "video" ? (
-                    <Video className="h-3 w-3" />
-                  ) : g.type === "music" ? (
-                    <Music className="h-3 w-3" />
-                  ) : (
-                    <ImageIcon className="h-3 w-3" />
+              >
+                <div
+                  className={cn(
+                    "relative aspect-square w-full",
+                    auto ? "bg-violet-500/10" : "bg-secondary",
                   )}
-                  {g.type}
-                </span>
-              </div>
-              <div className="p-3">
-                <p className="truncate text-xs font-medium">{g.prompt ?? t("history.untitled")}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {new Date(g.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            </button>
-          ))}
+                >
+                  {g.output_url ? (
+                    g.type === "video" ? (
+                      <video src={g.output_url} className="h-full w-full object-cover" muted playsInline />
+                    ) : g.type === "music" ? (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/25 to-purple-500/5">
+                        <Music className="h-8 w-8 text-primary" />
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Audio
+                        </span>
+                      </div>
+                    ) : (
+                      <img
+                        src={g.output_url}
+                        alt={g.prompt ?? "Generated"}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.opacity = "0.3";
+                        }}
+                      />
+                    )
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <span
+                    className={cn(
+                      "absolute left-2 top-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize backdrop-blur",
+                      auto
+                        ? "bg-gradient-to-r from-violet-600 to-cyan-500 text-white"
+                        : "bg-background/80",
+                    )}
+                  >
+                    {auto ? (
+                      <Sparkles className="h-3 w-3" />
+                    ) : g.type === "video" ? (
+                      <Video className="h-3 w-3" />
+                    ) : g.type === "music" ? (
+                      <Music className="h-3 w-3" />
+                    ) : (
+                      <ImageIcon className="h-3 w-3" />
+                    )}
+                    {auto ? "Auto Edit" : g.type}
+                  </span>
+                </div>
+                <div className={cn("p-3", auto && "bg-violet-500/5")}>
+                  <p className="truncate text-xs font-medium">
+                    {auto ? "Maluto AI Auto Edit" : g.prompt ?? t("history.untitled")}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {new Date(g.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -225,11 +271,15 @@ function HistoryPage() {
         <DialogContent className="max-w-4xl">
           {active && (
             <>
-              <DialogTitle className="capitalize">{active.type} preview</DialogTitle>
+              <DialogTitle className="capitalize">
+                {isAutoEditGeneration(active) ? "Auto Edit preview" : `${active.type} preview`}
+              </DialogTitle>
               <DialogDescription className="line-clamp-2">
-                {active.prompt ?? "No prompt"}
+                {isAutoEditGeneration(active)
+                  ? "Maluto AI Auto Edit"
+                  : active.prompt ?? "No prompt"}
               </DialogDescription>
-              <div className="mt-2 flex max-h-[60vh] items-center justify-center overflow-auto rounded-lg border border-border bg-secondary/40">
+              <div className="mt-2 flex max-h-[70vh] items-center justify-center overflow-auto rounded-lg border border-border bg-secondary/40 p-2">
                 {active.output_url ? (
                   active.type === "video" ? (
                     <video src={active.output_url} className="max-h-[60vh] w-full" controls autoPlay />
@@ -245,9 +295,10 @@ function HistoryPage() {
                       src={active.output_url}
                       alt={active.prompt ?? "Generated"}
                       onClick={() => setZoomed((z) => !z)}
-                      className={`cursor-zoom-in transition-transform duration-200 ${
-                        zoomed ? "scale-[2] cursor-zoom-out" : "max-h-[60vh] w-auto"
-                      }`}
+                      className={cn(
+                        "cursor-zoom-in object-contain transition-transform duration-200",
+                        zoomed ? "scale-[2] cursor-zoom-out" : "max-h-[65vh] w-auto max-w-full",
+                      )}
                     />
                   )
                 ) : (
@@ -274,8 +325,10 @@ function HistoryPage() {
                 </Button>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {new Date(active.created_at).toLocaleString()} ·{" "}
-                {CREDIT_COST[active.type as keyof typeof CREDIT_COST] ?? "—"} credits
+                {new Date(active.created_at).toLocaleString()}
+                {isAutoEditGeneration(active)
+                  ? " · Auto Edit"
+                  : ` · ${CREDIT_COST[active.type as keyof typeof CREDIT_COST] ?? "—"} credits`}
               </p>
             </>
           )}
