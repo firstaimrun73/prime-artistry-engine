@@ -4,6 +4,7 @@
  */
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
@@ -61,6 +62,7 @@ export type ImageEditorProps = {
 
 export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const { profile, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const generate = useServerFn(generateMedia);
   const secureDl = useServerFn(secureDownloadImage);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -98,486 +100,261 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [msgIdx, setMsgIdx] = useState(0);
   const [stage, setStage] = useState(0);
   const [progress, setProgress] = useState(0);
-  const runIdRef = useRef(0);
-  const [premiumCompleteHold, setPremiumCompleteHold] = useState(false);
-  const [premiumGenError, setPremiumGenError] = useState<string | null>(null);
-  const [ultraCompleteHold, setUltraCompleteHold] = useState(false);
-  const [ultraGenError, setUltraGenError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const isAdmin = isAdminEmail(profile?.email);
-  const isFree = profile?.plan === "free" && !isAdmin;
-  const stages = getEditorStages(!!inputDataUrl);
-  const isPremiumExp = studioTier === "pro";
-  const isUltraExp = studioTier === "premium";
-
-  useEffect(() => {
-    try {
-      const pref = localStorage.getItem(WATERMARK_PREF_KEY);
-      if (pref === "on") setKeepWatermark(true);
-      if (pref === "off") setKeepWatermark(false);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    if (bootstrap?.reuseUrl && bootstrap.reuseKind !== "video") {
-      toast.success("Loaded from your history — keep editing.");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const creditsNow = profile?.credits ?? 0;
+  const loading = state === "loading";
   const adminNow = isAdminEmail(profile?.email);
+  const creditsNow = profile?.credits ?? 0;
+  const planLimits = getPlanLimits(profile?.plan ?? "free");
+
   useEffect(() => {
-    if (adminNow || !profile) return;
     try {
-      if (sessionStorage.getItem(LOW_CREDIT_TOAST_KEY) === "1") return;
-      if (creditsNow <= 0) toast.error("🚨 No credits left. Upgrade now.");
-      else if (creditsNow < 30) toast.warning(`⚠️ Low credits: ${creditsNow} remaining`);
-      else return;
-      sessionStorage.setItem(LOW_CREDIT_TOAST_KEY, "1");
+      const raw = localStorage.getItem(WATERMARK_PREF_KEY);
+      if (raw != null) setKeepWatermark(raw === "1");
     } catch {
       /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WATERMARK_PREF_KEY, keepWatermark ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [keepWatermark]);
+
+  useEffect(() => {
+    if (!loading) return;
+    const id = window.setInterval(() => {
+      setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length);
+    }, 2200);
+    return () => window.clearInterval(id);
+  }, [loading]);
+
+  useEffect(() => {
+    if (!loading) {
+      setStage(0);
+      setProgress(0);
+      return;
+    }
+    setStage(0);
+    setProgress(8);
+    const stages = getEditorStages("image");
+    let s = 0;
+    const id = window.setInterval(() => {
+      s = Math.min(s + 1, stages.length - 1);
+      setStage(s);
+      setProgress(Math.min(92, 12 + s * 18));
+    }, 2800);
+    return () => window.clearInterval(id);
+  }, [loading]);
+
+  useEffect(() => {
+    if (creditsNow < 10 && !adminNow && profile) {
+      try {
+        const shown = sessionStorage.getItem(LOW_CREDIT_TOAST_KEY);
+        if (!shown) {
+          sessionStorage.setItem(LOW_CREDIT_TOAST_KEY, "1");
+          toast.message("Credits running low", {
+            description: "Top up to keep generating without interruption.",
+          });
+        }
+      } catch {
+        /* ignore */
+      }
     }
   }, [creditsNow, adminNow, profile]);
 
   useEffect(() => {
-    if (pendingSmartRemove && inputDataUrl) {
+    if (pendingSmartRemove) {
       setPendingSmartRemove(false);
-      setSmartRemoveOpen(true);
+      void navigate({ to: "/studio/image/circle-remove" });
     }
-  }, [pendingSmartRemove, inputDataUrl]);
+  }, [pendingSmartRemove, navigate]);
 
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 280)}px`;
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [prompt]);
 
-  useEffect(() => {
-    if (state !== "loading") return;
-    setMsgIdx(0);
-    setStage(1);
-    setProgress(12);
-    const msg = setInterval(() => setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length), 1800);
-    const stg = setInterval(() => setStage((s) => Math.min(stages.length - 1, s + 1)), 2200);
-    const prg = setInterval(() => setProgress((p) => Math.min(92, p + Math.random() * 9)), 650);
-    return () => {
-      clearInterval(msg);
-      clearInterval(stg);
-      clearInterval(prg);
-    };
-  }, [state, stages.length]);
+  const suggestions = useMemo(
+    () => getSmartSuggestions({ mediaType: "image", hasInput: !!inputDataUrl }),
+    [inputDataUrl],
+  );
 
-  useEffect(() => {
-    if (!isPremiumExp) {
-      setPremiumCompleteHold(false);
-      setPremiumGenError(null);
+  const quoted = useMemo(() => {
+    if (removeMaskDataUrl) {
+      return estimateImageStudioCredits({
+        experience: "circle-remove",
+        studioTier: "standard",
+        quality: imageQuality,
+      });
     }
-    if (!isUltraExp) {
-      setUltraCompleteHold(false);
-      setUltraGenError(null);
-    }
-    if (isPremiumExp && state === "success") {
-      setPremiumGenError(null);
-      setPremiumCompleteHold(true);
-      const t = window.setTimeout(() => setPremiumCompleteHold(false), 1400);
-      return () => window.clearTimeout(t);
-    }
-    if (isUltraExp && state === "success") {
-      setUltraGenError(null);
-      setUltraCompleteHold(true);
-      const t = window.setTimeout(() => setUltraCompleteHold(false), 1400);
-      return () => window.clearTimeout(t);
-    }
-    if (state === "idle" || state === "blocked") {
-      if (isPremiumExp && !premiumGenError) setPremiumCompleteHold(false);
-      if (isUltraExp && !ultraGenError) setUltraCompleteHold(false);
-    }
-  }, [state, isPremiumExp, isUltraExp, premiumGenError, ultraGenError]);
-
-  /** Authoritative pre-generation estimate — must match backend Standard / experience charge. */
-  const cost = useMemo(() => {
-    const hasSource = !!inputDataUrl;
-    const refCount = refImages.length;
-    const hasMask = !!removeMaskDataUrl;
-
-    if (studioTier === "standard") {
-      if (hasMask) {
-        return quoteStandardCredits({ mode: "circle_to_remove" }).credits;
-      }
-      if (hasSource && refCount > 0) {
-        return quoteStandardCredits({
-          mode: "multi_image_to_image",
-          referenceCount: refCount,
-        }).credits;
-      }
-      if (hasSource) {
-        return quoteStandardCredits({ mode: "image_to_image" }).credits;
-      }
-      const q = imageQuality === "hd" ? "hd" : "sd";
-      return quoteStandardCredits({
-        mode: "text_to_image",
-        imageQuality: q,
-      }).credits;
-    }
-
-    return estimateImageStudioCredits({
-      studioTier,
-      hasSourceImage: hasSource,
-      referenceCount: refCount,
-      imageQuality,
-      plan: profile?.plan,
-      isAdmin,
+    return quoteStandardCredits({
+      quality: imageQuality,
+      hasInputImage: !!inputDataUrl,
+      strength,
     });
-  }, [
-    studioTier,
-    inputDataUrl,
-    refImages.length,
-    removeMaskDataUrl,
-    imageQuality,
-    profile?.plan,
-    isAdmin,
-  ]);
+  }, [removeMaskDataUrl, imageQuality, inputDataUrl, strength]);
 
-  if (!profile) return null;
-
-  const noCredits = !isAdmin && profile.credits < cost;
-  const planLimits = getPlanLimits(profile.plan);
-  const canAddRefImages = !!inputDataUrl && planLimits.maxImages > 1;
-  const loading = state === "loading" || state === "analyzing";
-  const suggestions = getSmartSuggestions(prompt);
-  const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
-
-  const showPremiumOverlay =
-    isPremiumExp && (loading || premiumCompleteHold || !!premiumGenError);
-  const showUltraOverlay =
-    isUltraExp && (loading || ultraCompleteHold || !!ultraGenError);
-
-  const showInlinePreview =
-    (!isPremiumExp && !isUltraExp) ||
-    (!loading &&
-      !premiumCompleteHold &&
-      !premiumGenError &&
-      !ultraCompleteHold &&
-      !ultraGenError &&
-      !!output);
-
-  const activateSlot = (items: GalleryItem[], idx: number) => {
-    const item = items[idx];
-    if (!item) return;
-    setActiveImage(idx);
-    setInputPreview(item.preview);
-    setInputDataUrl(item.dataUrl);
-    setInputFile(item.file);
-    setInputKind("image");
-    setOutput(null);
-    setDownloaded(false);
-    setRemoveMaskDataUrl(null);
-    setState("idle");
+  const onPickFile = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      toast.error(`Image must be under ${MAX_IMAGE_MB}MB.`);
+      return;
+    }
+    try {
+      const dataUrl = await readAsDataUrl(file);
+      setInputFile(file);
+      setInputDataUrl(dataUrl);
+      setInputPreview(dataUrl);
+      setInputKind("image");
+      setOutput(null);
+      setRemoveMaskDataUrl(null);
+      setError(null);
+      setGallery((g) => {
+        const next = [{ id: crypto.randomUUID(), url: dataUrl, kind: "image" as const }, ...g];
+        return next.slice(0, MAX_GALLERY_IMAGES);
+      });
+      setActiveImage(0);
+    } catch {
+      toast.error("Could not read that image.");
+    }
   };
 
   const switchImage = (idx: number) => {
-    if (loading) return;
-    activateSlot(gallery, idx);
+    const item = gallery[idx];
+    if (!item) return;
+    setActiveImage(idx);
+    setInputPreview(item.url);
+    setInputDataUrl(item.url);
+    setInputKind("image");
+    setOutput(null);
+    setRemoveMaskDataUrl(null);
   };
 
   const removeImage = (idx: number) => {
-    if (loading) return;
-    const next = gallery.filter((_, i) => i !== idx);
-    setGallery(next);
-    if (next.length === 0) {
-      setActiveImage(0);
-      setInputPreview(null);
-      setInputDataUrl(null);
-      setInputFile(null);
-      setInputKind(null);
-      setOutput(null);
-      return;
-    }
-    activateSlot(next, Math.min(idx, next.length - 1));
-  };
-
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length === 0) return;
-    e.target.value = "";
-
-    const room = Math.min(MAX_GALLERY_IMAGES, planLimits.maxImages) - gallery.length;
-    if (room <= 0) {
-      return toast.error(`Your plan allows up to ${planLimits.maxImages} images at a time.`);
-    }
-
-    const accepted: File[] = [];
-    for (const f of files.slice(0, room)) {
-      if (!f.type.startsWith("image")) {
-        toast.error("This workspace accepts images only. Use Video Editor for video.");
-        continue;
+    setGallery((g) => {
+      const next = g.filter((_, i) => i !== idx);
+      if (next.length === 0) {
+        setInputPreview(null);
+        setInputDataUrl(null);
+        setInputFile(null);
+        setInputKind(null);
+        setActiveImage(0);
+      } else if (idx === activeImage) {
+        const ni = Math.min(idx, next.length - 1);
+        setActiveImage(ni);
+        setInputPreview(next[ni].url);
+        setInputDataUrl(next[ni].url);
+      } else if (idx < activeImage) {
+        setActiveImage((a) => a - 1);
       }
-      if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
-        toast.error(
-          `${f.name} is too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_IMAGE_MB} MB.`,
-        );
-        continue;
-      }
-      accepted.push(f);
-    }
-    if (accepted.length === 0) return;
-
-    const items: GalleryItem[] = await Promise.all(
-      accepted.map(async (f) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        preview: URL.createObjectURL(f),
-        dataUrl: await readAsDataUrl(f),
-        file: f,
-      })),
-    );
-
-    const next = [...gallery, ...items];
-    setGallery(next);
-    activateSlot(next, gallery.length);
-    toast.success(
-      items.length > 1 ? `📁 ${items.length} images uploaded!` : "📁 Upload complete!",
-    );
-  };
-
-  const runImageJob = async (opts: {
-    jobPrompt: string;
-    maskDataUrl?: string | null;
-    toastStart?: string;
-  }) => {
-    if (noCredits) {
-      setState("blocked");
-      return toast.error(`Not enough credits. This costs ${cost} credits.`);
-    }
-
-    const runId = ++runIdRef.current;
-    setState("analyzing");
-    setOutput(null);
-    setDownloaded(false);
-    setPremiumCompleteHold(false);
-    setPremiumGenError(null);
-    setUltraCompleteHold(false);
-    setUltraGenError(null);
-    await new Promise((r) => setTimeout(r, 600));
-    if (runId !== runIdRef.current) return;
-
-    setState("loading");
-    toast(opts.toastStart ?? "🎨 Generating your image...");
-    startGeneration("image", "/editor");
-    const progressTimers = [
-      setTimeout(() => {
-        if (runId === runIdRef.current) toast("⏳ Still working — high quality takes a moment...");
-      }, 30_000),
-      setTimeout(() => {
-        if (runId === runIdRef.current)
-          toast("🔁 Taking longer than usual — retrying automatically...");
-      }, 75_000),
-    ];
-    try {
-      let mediaUrl: string | undefined;
-      let maskImageUrl: string | undefined;
-
-      if (inputKind === "image" && inputFile) {
-        mediaUrl = await uploadToStorage(inputFile);
-      } else if (inputKind === "image" && inputDataUrl) {
-        if (inputDataUrl.startsWith("data:") || inputDataUrl.startsWith("blob:")) {
-          const res = await fetch(inputDataUrl);
-          const blob = await res.blob();
-          const file = new File([blob], `img-${Date.now()}.jpg`, {
-            type: blob.type || "image/jpeg",
-          });
-          mediaUrl = await uploadToStorage(file);
-        } else if (inputDataUrl.startsWith("https://")) {
-          mediaUrl = inputDataUrl;
-        } else {
-          throw new Error("Invalid image. Please re-upload your photo.");
-        }
-      }
-
-      if (mediaUrl && !mediaUrl.startsWith("https://")) {
-        throw new Error("Image upload failed. Please re-upload and try again.");
-      }
-      if (inputKind === "image" && !mediaUrl) {
-        throw new Error("Please upload an image first.");
-      }
-
-      const maskSrc = opts.maskDataUrl ?? removeMaskDataUrl;
-      if (maskSrc && mediaUrl) {
-        const maskRes = await fetch(maskSrc);
-        const maskBlob = await maskRes.blob();
-        const maskFile = new File([maskBlob], `remove-mask-${Date.now()}.png`, {
-          type: "image/png",
-        });
-        maskImageUrl = await uploadToStorage(maskFile);
-      }
-
-      let referenceImageUrls: string[] | undefined;
-      if (!maskImageUrl && canAddRefImages && refImages.length > 0) {
-        const wanted = refImages.slice(0, Math.max(0, planLimits.maxImages - 1));
-        toast(`📤 Uploading ${wanted.length} reference image${wanted.length > 1 ? "s" : ""}...`);
-        const uploaded: string[] = [];
-        for (const src of wanted) {
-          if (src.startsWith("https://")) {
-            uploaded.push(src);
-            continue;
-          }
-          const refRes = await fetch(src);
-          const refBlob = await refRes.blob();
-          const refFile = new File([refBlob], `ref-${Date.now()}-${uploaded.length}.jpg`, {
-            type: refBlob.type || "image/jpeg",
-          });
-          uploaded.push(await uploadToStorage(refFile));
-        }
-        const valid = uploaded.filter((u) => u.startsWith("https://"));
-        if (valid.length !== wanted.length) {
-          toast.error("Some reference images could not be uploaded and were skipped.");
-        }
-        referenceImageUrls = valid.length > 0 ? valid : undefined;
-        if (referenceImageUrls) {
-          toast.success(`✅ Sending ${referenceImageUrls.length + 1} images to the AI`);
-        }
-      }
-      if (runId !== runIdRef.current) return;
-
-      const res = await generate({
-        data: {
-          prompt: opts.jobPrompt,
-          type: "image",
-          imageUrl: mediaUrl,
-          sourceKind: mediaUrl ? "image" : undefined,
-          strength: mediaUrl ? strength : undefined,
-          maskImageUrl,
-          referenceImageUrls,
-          keepWatermark,
-          aspectRatio: !mediaUrl ? aspectRatio : undefined,
-          imageQuality,
-          studioTier,
-        },
-      });
-
-      if (runId !== runIdRef.current) return;
-      const url = res.outputUrl;
-      setProgress(100);
-      setStage(stages.length);
-      setOutput(url);
-      setState("success");
-      setPremiumGenError(null);
-      setUltraGenError(null);
-      setRemoveMaskDataUrl(null);
-      await refreshProfile();
-      toast.success("✅ Image ready!");
-      endGeneration();
-    } catch (err) {
-      if (runId !== runIdRef.current) return;
-      const msg = err instanceof Error ? err.message : "Failed. Credits not charged.";
-      endGeneration();
-      if (isPremiumExp) {
-        setPremiumGenError(msg);
-        setState("idle");
-      } else if (isUltraExp) {
-        setUltraGenError(msg);
-        setState("idle");
-      } else {
-        setState("idle");
-      }
-      toast.error(`❌ ${msg}`);
-    } finally {
-      progressTimers.forEach(clearTimeout);
-    }
-  };
-
-  const runGenerate = async () => {
-    if (!prompt.trim()) return toast.error("Enter a prompt first.");
-    await runImageJob({ jobPrompt: prompt.trim() });
-  };
-
-  const runSmartRemove = async (maskDataUrl: string) => {
-    setRemoveMaskDataUrl(maskDataUrl);
-    setSmartRemoveOpen(false);
-    await runImageJob({
-      jobPrompt: SMART_REMOVE_PROMPT,
-      maskDataUrl,
-      toastStart: "✨ Removing selected area…",
+      return next;
     });
   };
 
-  const handleStop = () => {
-    runIdRef.current++;
-    setState("idle");
-    endGeneration();
-    setProgress(0);
-    setStage(0);
-    setPremiumCompleteHold(false);
-    setPremiumGenError(null);
-    setUltraCompleteHold(false);
-    setUltraGenError(null);
-    toast("Generation stopped.");
-  };
-
-  const handleDismissPremiumError = () => {
-    setPremiumGenError(null);
-    setPremiumCompleteHold(false);
-    setState("idle");
-  };
-
-  const handleDismissUltraError = () => {
-    setUltraGenError(null);
-    setUltraCompleteHold(false);
-    setState("idle");
-  };
-
-  const handleClear = () => {
-    runIdRef.current++;
+  const resetAll = () => {
     setPrompt("");
     setInputPreview(null);
     setInputDataUrl(null);
     setInputFile(null);
     setInputKind(null);
     setRefImages([]);
-    setRemoveMaskDataUrl(null);
     setOutput(null);
     setState("idle");
-    setDownloaded(false);
-    setProgress(0);
-    setStage(0);
-    setPremiumCompleteHold(false);
-    setPremiumGenError(null);
-    setUltraCompleteHold(false);
-    setUltraGenError(null);
+    setError(null);
+    setRemoveMaskDataUrl(null);
     setGallery([]);
     setActiveImage(0);
-    if (fileRef.current) fileRef.current.value = "";
+    setDownloaded(false);
+    setSmartRemoveOpen(false);
   };
 
-  const handleUseResultAsInput = () => {
-    if (!output) return;
-    setInputPreview(output);
-    setInputDataUrl(output);
-    setInputKind("image");
-    setOutput(null);
-    setState("idle");
+  const uploadToStorage = async (dataUrl: string, nameHint: string) => {
+    return uploadToStorageUtil(dataUrl, nameHint);
+  };
+
+  const runGenerate = async () => {
+    if (loading) return;
+    if (!adminNow && creditsNow < (quoted?.credits ?? 1)) {
+      toast.error("Not enough credits.");
+      return;
+    }
+
+    setError(null);
+    setState("loading");
     setDownloaded(false);
-    toast.success("Result moved to input — keep editing.");
+    startGeneration();
+
+    try {
+      let imageUrl: string | undefined;
+      if (inputDataUrl) {
+        imageUrl = await uploadToStorage(inputDataUrl, inputFile?.name ?? "input.png");
+      }
+
+      let maskUrl: string | undefined;
+      if (removeMaskDataUrl) {
+        maskUrl = await uploadToStorage(removeMaskDataUrl, "mask.png");
+      }
+
+      const body: Record<string, unknown> = {
+        mediaType: "image",
+        prompt: removeMaskDataUrl ? SMART_REMOVE_PROMPT : prompt.trim(),
+        aspectRatio,
+        imageQuality,
+        strength,
+        keepWatermark,
+        studioTier,
+      };
+      if (imageUrl) body.imageUrl = imageUrl;
+      if (maskUrl) {
+        body.maskImageUrl = maskUrl;
+        body.circleInstant = true;
+      }
+      if (refImages.length) body.refImages = refImages;
+
+      const result = await generate({ data: body as never });
+      const url =
+        typeof result === "string"
+          ? result
+          : result && typeof result === "object" && "url" in result
+            ? String((result as { url: string }).url)
+            : null;
+      if (!url) throw new Error("No image returned.");
+      setOutput(url);
+      setState("done");
+      setProgress(100);
+      void refreshProfile();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Generation failed.";
+      setError(msg);
+      setState("error");
+      toast.error(msg);
+    } finally {
+      endGeneration();
+    }
   };
 
   const handleDownload = async () => {
     if (!output) return;
     try {
-      const res = await secureDl({
-        data: {
-          imageUrl: output,
-          keepWatermark: keepWatermark === true,
-          studioTier,
-        },
-      });
-      await triggerBrowserDownload(res.downloadUrl, `motio2edit-${Date.now()}.jpg`);
+      const blobOrUrl = await secureDl({ data: { url: output, keepWatermark } });
+      if (typeof blobOrUrl === "string") {
+        triggerBrowserDownload(blobOrUrl, "motio2edit-image.png");
+      } else if (blobOrUrl instanceof Blob) {
+        const u = URL.createObjectURL(blobOrUrl);
+        triggerBrowserDownload(u, "motio2edit-image.png");
+        URL.revokeObjectURL(u);
+      }
       setDownloaded(true);
-      toast.success(
-        res.watermarked ? "⬇️ Download started (branded)" : "⬇️ Download started",
-      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Download failed. Please try again.");
     }
@@ -599,11 +376,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
   const handleSelectTool = (tool: { prompt: string; id?: string }) => {
     if (tool.prompt === "__CIRCLE_REMOVE__") {
-      if (!inputDataUrl) {
-        toast.error("Upload an image first to use Circle to Remove.");
-        return;
-      }
-      setSmartRemoveOpen(true);
+      // Product path: open Circle 2edit page (not inline SmartRemoveModal)
+      void navigate({ to: "/studio/image/circle-remove" });
       return;
     }
     if (tool.prompt.startsWith("__") && tool.prompt.endsWith("__")) return;
@@ -618,103 +392,41 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
   const expLabel = studioExperienceLabel(studioTier);
 
-  const premiumPhase =
-    premiumGenError
-      ? "error"
-      : state === "analyzing"
-        ? "analyzing"
-        : state === "loading"
-          ? "loading"
-          : premiumCompleteHold
-            ? "success"
-            : "loading";
-
-  const ultraPhase =
-    ultraGenError
-      ? "error"
-      : state === "analyzing"
-        ? "analyzing"
-        : state === "loading"
-          ? "loading"
-          : ultraCompleteHold
-            ? "success"
-            : "loading";
-
   return (
-    <div className={cn("min-h-[100dvh] pb-8", studioShellClass(studioTier))}>
-      {showPremiumOverlay && (
-        <PremiumImageGenerationOverlay
-          phase={premiumPhase}
-          progress={progress}
-          error={premiumGenError}
-          onRetry={runGenerate}
-          onDismiss={handleDismissPremiumError}
-        />
-      )}
-
-      {showUltraOverlay && (
-        <UltraAIImageGenerationOverlay
-          phase={ultraPhase}
-          progress={progress}
-          error={ultraGenError}
-          onRetry={runGenerate}
-          onDismiss={handleDismissUltraError}
-        />
-      )}
-
-      <div className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-10">
-        <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-          <div className="space-y-2 min-w-0">
-            <StudioBackLink />
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight">
-              <span className="text-foreground">Image</span>{" "}
-              <span className="text-orange-500">Studio</span>
-              <span className="mx-1.5 text-muted-foreground/50 font-normal">·</span>
-              <span
-                className={cn(
-                  "align-middle text-sm sm:text-base font-semibold tracking-normal",
-                  studioTier === "premium" && "text-[#E8C547]",
-                  studioTier === "pro" && "text-orange-600 dark:text-orange-400",
-                  studioTier === "standard" && "text-primary",
-                )}
-              >
-                {expLabel}
-              </span>
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Upload · Prompt · Experience · Generate
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-border/60 bg-card/80 px-2.5 py-1.5 text-xs font-semibold backdrop-blur-sm sm:px-3">
-              {isAdmin ? "∞ credits" : `${profile.credits} credits`}
+    <div className={cn("min-h-screen", studioShellClass(studioTier))}>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-3 py-4 sm:px-6 sm:py-6">
+        <div className="flex items-center justify-between gap-3">
+          <StudioBackLink />
+          <div className="flex items-center gap-2">
+            <span className={cn("text-xs font-medium", studioAccentClass(studioTier))}>
+              {expLabel}
             </span>
-            <Button size="sm" variant="ghost" onClick={handleClear} className="min-h-[36px]">
-              <RotateCcw className="mr-1.5 h-4 w-4" /> New
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={resetAll}
+              disabled={loading}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
             </Button>
           </div>
         </div>
 
-        <div className="mt-4">
-          <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
-        </div>
+        <CreditWarningBanner credits={creditsNow} />
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
-          <div className="order-1 space-y-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+          <div className="space-y-3">
             <div className={cn("space-y-3 p-4 sm:p-5", studioCardClass(studioTier))}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Image
-              </p>
               <EditorUpload
-                fileRef={fileRef}
                 mediaType="image"
-                videoLocked={false}
                 loading={loading}
                 inputPreview={inputPreview}
                 inputKind={inputKind}
-                maxImageMb={MAX_IMAGE_MB}
-                maxVideoMb={200}
-                onFile={onFile}
+                fileRef={fileRef}
+                onPickFile={onPickFile}
                 gallery={gallery}
                 activeImage={activeImage}
                 maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, planLimits.maxImages)}
@@ -754,111 +466,97 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 }}
               />
               <div className="border-t border-border/50 pt-4">
-              <EditorOptionsPanel
-                mediaType="image"
-                loading={loading}
-                inputDataUrl={inputDataUrl}
-                aspectRatio={aspectRatio}
-                setAspectRatio={setAspectRatio}
-                imageQuality={imageQuality}
-                setImageQuality={(q) => {
-                  qualityTouchedRef.current = true;
-                  setImageQuality(q);
-                }}
-                strength={strength}
-                setStrength={setStrength}
-                canAddRefImages={canAddRefImages}
-                refImages={refImages}
-                setRefImages={setRefImages}
-                userPlan={profile.plan}
-                videoDuration={noopVideoDuration}
-                setVideoDuration={noopSetVideoDuration as never}
-                videoAspect={noopVideoAspect}
-                setVideoAspect={noopSetVideoAspect as never}
-                videoResolution={noopVideoRes}
-                setVideoResolution={noopSetVideoRes as never}
-                cost={cost}
-                isAdmin={isAdmin}
-                credits={profile.credits}
-                keepWatermark={keepWatermark}
-                setKeepWatermark={setKeepWatermark}
-                isFree={isFree}
-                studioTier={studioTier}
-              />
+                <EditorOptionsPanel
+                  mediaType="image"
+                  loading={loading}
+                  inputDataUrl={inputDataUrl}
+                  aspectRatio={aspectRatio}
+                  setAspectRatio={setAspectRatio}
+                  imageQuality={imageQuality}
+                  setImageQuality={(q) => {
+                    qualityTouchedRef.current = true;
+                    setImageQuality(q);
+                  }}
+                  strength={strength}
+                  setStrength={setStrength}
+                  keepWatermark={keepWatermark}
+                  setKeepWatermark={setKeepWatermark}
+                  videoDuration={noopVideoDuration}
+                  setVideoDuration={noopSetVideoDuration}
+                  videoAspect={noopVideoAspect}
+                  setVideoAspect={noopSetVideoAspect}
+                  videoRes={noopVideoRes}
+                  setVideoRes={noopSetVideoRes}
+                  studioTier={studioTier}
+                />
               </div>
             </div>
 
-            <div className={cn("space-y-3 p-4 sm:p-5 ring-1 ring-primary/15", studioCardClass(studioTier))}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Generate
-              </p>
+            <div className={cn("space-y-3 p-4 sm:p-5", studioCardClass(studioTier))}>
               <EditorGenerationControls
+                mediaType="image"
                 loading={loading}
+                canGenerate={!!prompt.trim() || !!removeMaskDataUrl}
+                creditLabel={quoted ? `${quoted.credits} credits` : undefined}
                 onGenerate={runGenerate}
-                onStop={handleStop}
-                videoLocked={false}
-                noCredits={noCredits}
                 generateClassName={studioGenerateClass(studioTier)}
               />
             </div>
           </div>
 
-          <div className="order-2 space-y-4 lg:sticky lg:top-4 lg:self-start">
-            {showInlinePreview && (loading || output) && (
-              <div className={cn("p-3 sm:p-4", studioCardClass(studioTier))}>
-                <EditorPreview
-                  state={state}
-                  loadingMessage={LOADING_MESSAGES[msgIdx]}
-                  progress={progress}
-                  stage={stage}
-                  stages={stages}
-                  output={output}
-                  outputIsVideo={false}
+          <div className="space-y-3">
+            <div className={cn("min-h-[280px] p-4 sm:p-5", studioCardClass(studioTier))}>
+              <EditorPreview
+                mediaType="image"
+                loading={loading}
+                inputPreview={inputPreview}
+                output={output}
+                error={error}
+                msg={LOADING_MESSAGES[msgIdx]}
+                stage={stage}
+                progress={progress}
+              />
+            </div>
+            {output && (
+              <div className={cn("p-4 sm:p-5", studioCardClass(studioTier))}>
+                <EditorResult
                   mediaType="image"
-                  inputPreview={inputPreview}
-                  inputKind={inputKind}
-                  isAdmin={isAdmin}
-                  isFree={isFree}
-                  keepWatermark={keepWatermark}
-                  studioTier={studioTier}
+                  output={output}
+                  downloaded={downloaded}
+                  onDownload={handleDownload}
+                  onShare={handleShare}
+                  onAgain={() => {
+                    setOutput(null);
+                    setState("idle");
+                    setDownloaded(false);
+                  }}
                 />
               </div>
             )}
-
-            <EditorResult
-              output={output}
-              loading={loading || premiumCompleteHold || ultraCompleteHold}
-              onDownload={handleDownload}
-              onRegenerate={runGenerate}
-              onEditAgain={handleUseResultAsInput}
-              onShare={handleShare}
-              onClear={handleClear}
-              isFree={isFree}
-              downloaded={downloaded}
-            />
-
-            {!loading && !output && !premiumCompleteHold && !premiumGenError && !ultraCompleteHold && !ultraGenError && (
-              <div
-                className={cn(
-                  "flex min-h-[100px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground",
-                )}
-              >
-                Result appears here after Generate.
-              </div>
-            )}
           </div>
-          <EditorDisclaimer />
         </div>
 
-        <SmartRemoveModal
-          open={smartRemoveOpen}
-          imageUrl={inputPreview}
-          onCancel={() => setSmartRemoveOpen(false)}
-          onApply={(masked) => {
-            void runSmartRemove(masked);
-          }}
-        />
+        <EditorDisclaimer />
       </div>
+
+      <SmartRemoveModal
+        open={smartRemoveOpen}
+        imageUrl={inputPreview}
+        onCancel={() => setSmartRemoveOpen(false)}
+        onApply={(masked) => {
+          setRemoveMaskDataUrl(masked.maskDataUrl);
+          setSmartRemoveOpen(false);
+          setPrompt(SMART_REMOVE_PROMPT);
+          toast.success("Mask applied — tap Generate to remove.");
+        }}
+      />
+
+      {loading && studioTier === "premium" && (
+        <PremiumImageGenerationOverlay progress={progress} stage={stage} />
+      )}
+      {loading && studioTier === "ultra" && (
+        <UltraAIImageGenerationOverlay progress={progress} stage={stage} />
+      )}
     </div>
   );
 }
