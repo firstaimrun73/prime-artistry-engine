@@ -189,6 +189,8 @@ function HistoryPage() {
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           {gens.map((g) => {
             const auto = isAutoEditGeneration(g);
+            const isVideo = !auto && g.type === "video";
+            const isImage = !auto && g.type === "image";
             return (
               <button
                 key={g.id}
@@ -198,13 +200,23 @@ function HistoryPage() {
                   "group overflow-hidden rounded-xl border bg-card text-left transition-colors",
                   auto
                     ? "border-violet-300/70 hover:border-violet-500 dark:border-violet-500/40"
-                    : "border-border hover:border-primary",
+                    : isVideo
+                      ? "border-rose-300/70 hover:border-rose-500 dark:border-rose-500/40"
+                      : isImage
+                        ? "border-orange-300/60 hover:border-primary dark:border-orange-500/35"
+                        : "border-border hover:border-primary",
                 )}
               >
                 <div
                   className={cn(
                     "relative aspect-square w-full",
-                    auto ? "bg-violet-500/10" : "bg-secondary",
+                    auto
+                      ? "bg-violet-500/10"
+                      : isVideo
+                        ? "bg-rose-500/10"
+                        : isImage
+                          ? "bg-orange-500/10"
+                          : "bg-secondary",
                   )}
                 >
                   {g.output_url ? (
@@ -238,7 +250,11 @@ function HistoryPage() {
                       "absolute left-2 top-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize backdrop-blur",
                       auto
                         ? "bg-gradient-to-r from-violet-600 to-cyan-500 text-white"
-                        : "bg-background/80",
+                        : isVideo
+                          ? "bg-rose-600/90 text-white"
+                          : isImage
+                            ? "bg-primary/90 text-primary-foreground"
+                            : "bg-background/80",
                     )}
                   >
                     {auto ? (
@@ -253,7 +269,14 @@ function HistoryPage() {
                     {auto ? "Auto Edit" : g.type}
                   </span>
                 </div>
-                <div className={cn("p-3", auto && "bg-violet-500/5")}>
+                <div
+                  className={cn(
+                    "p-3",
+                    auto && "bg-violet-500/5",
+                    isVideo && "bg-rose-500/5",
+                    isImage && "bg-orange-500/5",
+                  )}
+                >
                   <p className="truncate text-xs font-medium">
                     {auto ? "Maluto AI Auto Edit" : g.prompt ?? t("history.untitled")}
                   </p>
