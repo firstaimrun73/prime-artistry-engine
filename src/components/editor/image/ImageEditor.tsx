@@ -601,7 +601,16 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
   const handleSelectTool = (tool: { prompt: string; id?: string }) => {
     if (tool.prompt === "__CIRCLE_REMOVE__") {
-      // Product path: open Circle 2edit page (not inline SmartRemoveModal)
+      // Carry current image to Circle 2edit product page
+      try {
+        if (inputDataUrl) {
+          sessionStorage.setItem("circle2edit-preview", inputDataUrl);
+        } else {
+          sessionStorage.removeItem("circle2edit-preview");
+        }
+      } catch {
+        /* ignore */
+      }
       void navigate({ to: "/studio/image/circle-remove" });
       return;
     }
