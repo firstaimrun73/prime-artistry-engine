@@ -1,8 +1,7 @@
 /**
- * Circle Edit (Circle to Remove product page)
- * Route: /studio/image/circle-remove
- * Frontend UI: violet/teal Circle Edit shell (separate from Image Editor orange).
- * Backend: existing generateMedia + mask flow for Remove only. Add/Crop UI stubs.
+ * Circle 2edit product page (route: /studio/image/circle-remove)
+ * Frontend: violet/teal CircleEditShell. Remove → SmartRemoveModal + generateMedia.
+ * Add/Crop: UI-only stubs (no backend).
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -277,7 +276,7 @@ function CircleRemovePage() {
           setMaskOpen(true);
         }}
         footer={
-          <div className="shrink-0 space-y-2 border-t border-[#22232C] bg-[#15161B] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="shrink-0 space-y-2 border-t border-[#22232C] bg-[#15161B] px-3 py-2.5">
             <div className="mx-auto grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
               <Button
                 className="h-11 bg-[#8B7CFF] text-[#0E0F13] hover:bg-[#7A6BEE]"
@@ -354,7 +353,7 @@ function CircleRemovePage() {
       onBack={() => navigate({ to: "/studio/image" })}
       footer={
         preview && mode === "remove" ? (
-          <div className="flex shrink-0 items-center gap-2 border-t border-[#22232C] bg-[#15161B] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex shrink-0 items-center gap-2 border-t border-[#22232C] bg-[#15161B] px-3 py-2.5">
             <Button
               variant="outline"
               className="h-11 border-[#2A2C36] bg-transparent text-[#9A9CAA] hover:text-[#F2F2F5]"
@@ -377,30 +376,30 @@ function CircleRemovePage() {
     >
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto px-3 py-4">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-3 py-3">
         {!preview ? (
           <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
         ) : (
-          <div className="flex w-full max-w-2xl flex-col gap-3">
-            <div className="overflow-hidden rounded-2xl border border-[#2A2C36] bg-[#15161B] p-2 shadow-sm">
+          <div className="flex h-full min-h-0 w-full max-w-3xl flex-col gap-2">
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-[#2A2C36] bg-[#15161B]/80 p-2 shadow-sm">
               <img
                 src={preview}
                 alt="Source"
-                className="mx-auto max-h-[min(58vh,640px)] w-full object-contain"
+                className="max-h-full max-w-full object-contain"
               />
             </div>
             {mode === "add" && (
-              <p className="rounded-xl border border-[#2A2C36] bg-[#1D1F27] px-3 py-2 text-center text-xs text-[#9A9CAA]">
+              <p className="shrink-0 rounded-xl border border-[#2A2C36] bg-[#1D1F27] px-3 py-2 text-center text-xs text-[#9A9CAA]">
                 Add Object — paint a target area, then describe or pick an object. Backend next.
               </p>
             )}
             {mode === "crop" && (
-              <p className="rounded-xl border border-[#2A2C36] bg-[#1D1F27] px-3 py-2 text-center text-xs text-[#9A9CAA]">
+              <p className="shrink-0 rounded-xl border border-[#2A2C36] bg-[#1D1F27] px-3 py-2 text-center text-xs text-[#9A9CAA]">
                 Crop — frame & ratio tools land with the next frontend pass. Backend next.
               </p>
             )}
             {mode === "remove" && (
-              <p className="text-center text-[11px] text-[#5F6170]">
+              <p className="shrink-0 text-center text-[11px] text-[#5F6170]">
                 Paint the unwanted object, then confirm. No text prompt · {CIRCLE_INSTANT_CREDITS} credits
               </p>
             )}
