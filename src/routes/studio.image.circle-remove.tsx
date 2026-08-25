@@ -1,22 +1,20 @@
 /**
- * Circle to Remove — dedicated product page
- * ONE IMAGE · NO PROMPT · mask → generateMedia inpaint → finalize → credits
- * Route: /studio/image/circle-remove (parent Outlet must render child)
+ * Circle Edit (Circle to Remove product page)
+ * Route: /studio/image/circle-remove
+ * Frontend UI: violet/teal Circle Edit shell (separate from Image Editor orange).
+ * Backend: existing generateMedia + mask flow for Remove only. Add/Crop UI stubs.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
-  Upload,
   Download,
-  Share2,
   Pencil,
   RefreshCw,
-  X,
-  Sparkles,
+  Share2,
   Image as ImageIcon,
+  Sparkles,
 } from "lucide-react";
 import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { Button } from "@/components/ui/button";
@@ -27,11 +25,16 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { CompareSlider } from "@/components/CompareSlider";
 import { secureDownloadImage } from "@/lib/download.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
+import {
+  CircleEditShell,
+  CircleEditUploadZone,
+  type CircleEditMode,
+} from "@/components/circle-edit/CircleEditShell";
 
 export const CIRCLE_INSTANT_CREDITS = 25;
 
 const OVERLAY_STAGES = [
-  "Analyzing image…",
+  "Analysing selection…",
   "Understanding the selected area…",
   "Preparing the removal…",
   "AI is rebuilding the background…",
@@ -43,7 +46,7 @@ const OVERLAY_STAGES = [
 export const Route = createFileRoute("/studio/image/circle-remove")({
   head: () => ({
     meta: [
-      { title: "Circle to Remove — MOTIO2EDIT" },
+      { title: "Circle 2edit — MOTIO2EDIT" },
       {
         name: "description",
         content: "Paint an unwanted object and remove it — one image, no prompt.",
@@ -71,6 +74,7 @@ function CircleRemovePage() {
   const [stageIdx, setStageIdx] = useState(0);
   const [etaSec, setEtaSec] = useState(55);
   const [maskOpen, setMaskOpen] = useState(false);
+  const [mode, setMode] = useState<CircleEditMode>("remove");
 
   useEffect(() => {
     if (phase !== "generating") return;
@@ -88,12 +92,15 @@ function CircleRemovePage() {
   }, [phase]);
 
   const isAdmin = isAdminEmail(profile?.email);
+  const creditsLabel = isAdmin
+    ? "∞ credits"
+    : `${(profile?.credits ?? 0).toLocaleString()} credits`;
 
   if (!user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-        <p className="text-sm text-muted-foreground">Sign in to use Circle to Remove.</p>
-        <Button asChild className="mt-4">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0F13] px-4 text-[#F2F2F5]">
+        <p className="text-sm text-[#9A9CAA]">Sign in to use Circle 2edit.</p>
+        <Button asChild className="mt-4 bg-[#8B7CFF] text-[#0E0F13] hover:bg-[#7A6BEE]">
           <Link to="/auth">Sign in</Link>
         </Button>
       </div>
@@ -111,7 +118,7 @@ function CircleRemovePage() {
     setOutput(null);
     setLastMaskDataUrl(null);
     setPhase("select");
-    setMaskOpen(true);
+    if (mode === "remove") setMaskOpen(true);
   };
 
   const upload = async (blob: Blob, name: string) => {
@@ -210,190 +217,205 @@ function CircleRemovePage() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
+  const onModeChange = (m: CircleEditMode) => {
+    if (phase === "generating") return;
+    setMode(m);
+    if (m === "remove" && preview && phase === "select") setMaskOpen(true);
+    if (m !== "remove") setMaskOpen(false);
+    if (m === "add" || m === "crop") {
+      toast.message(
+        m === "add"
+          ? "Add Object UI is ready — backend wiring comes next."
+          : "Crop UI is ready — backend wiring comes next.",
+      );
+    }
+  };
+
   if (phase === "generating") {
     return (
-      <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-background">
-        <button
-          type="button"
-          aria-label="Close"
-          className="absolute right-4 top-4 rounded-full bg-secondary/80 p-2 text-muted-foreground hover:text-foreground"
-          onClick={() => toast.message("Generation is in progress. Result will appear when ready.")}
-        >
-          <X className="h-5 w-5" />
-        </button>
-        <div className="relative z-10 mx-4 flex w-full max-w-sm flex-col items-center gap-5 rounded-2xl border border-border/60 bg-card/90 px-6 py-10 shadow-xl backdrop-blur-md">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-500/15">
-            <Sparkles className="h-7 w-7 animate-pulse text-orange-500" />
+      <CircleEditShell
+        creditsLabel={creditsLabel}
+        mode={mode}
+        onModeChange={onModeChange}
+        generating
+        onBack={() => toast.message("Generation is in progress. Result will appear when ready.")}
+      >
+        <div className="flex flex-1 flex-col items-center justify-center px-4">
+          <div className="relative z-10 mx-4 flex w-full max-w-sm flex-col items-center gap-5 rounded-2xl border border-[#8B7CFF]/35 bg-[#15161B]/95 px-6 py-10 shadow-xl backdrop-blur-md">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#8B7CFF]/15">
+              <Sparkles className="h-7 w-7 animate-pulse text-[#8B7CFF]" />
+            </div>
+            <p className="text-center text-[10px] font-medium tracking-widest text-[#8B7CFF]/90 uppercase">
+              Circle 2edit
+            </p>
+            <p className="text-center text-base font-semibold text-[#F2F2F5]">{OVERLAY_STAGES[stageIdx]}</p>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#1D1F27]">
+              <div
+                className="h-full rounded-full bg-[#8B7CFF] transition-all duration-700"
+                style={{
+                  width: `${Math.min(95, ((stageIdx + 1) / OVERLAY_STAGES.length) * 100)}%`,
+                }}
+              />
+            </div>
+            <p className="text-sm text-[#9A9CAA]">Estimated time: ~{etaSec}s</p>
+            <p className="text-[11px] text-[#5F6170]">{CIRCLE_INSTANT_CREDITS} credits / image</p>
           </div>
-          <p className="text-center text-[10px] font-medium tracking-widest text-orange-500/90 uppercase">Motio2edit by Motion2AI</p>
-          <p className="text-center text-base font-semibold">{OVERLAY_STAGES[stageIdx]}</p>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-            <div
-              className="h-full rounded-full bg-orange-500 transition-all duration-700"
-              style={{
-                width: `${Math.min(95, ((stageIdx + 1) / OVERLAY_STAGES.length) * 100)}%`,
-              }}
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">Estimated time: ~{etaSec}s</p>
-          <p className="text-[11px] text-muted-foreground/80">{CIRCLE_INSTANT_CREDITS} credits / image</p>
         </div>
-      </div>
+      </CircleEditShell>
     );
   }
 
   if (phase === "result" && output && preview) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <header className="flex items-center justify-between gap-2 border-b border-border/60 bg-card/50 px-3 py-3 backdrop-blur-md">
-          <button
-            type="button"
-            onClick={() => {
-              setPhase("select");
-              setOutput(null);
-              setMaskOpen(true);
-            }}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" /> Edit selection
-          </button>
-          <h1 className="text-sm font-semibold">Result</h1>
-          <span className="w-16" />
-        </header>
-        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-3 py-4">
-          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-md">
+      <CircleEditShell
+        creditsLabel={creditsLabel}
+        mode={mode}
+        onModeChange={onModeChange}
+        onBack={() => {
+          setPhase("select");
+          setOutput(null);
+          setMaskOpen(true);
+        }}
+        footer={
+          <div className="shrink-0 space-y-2 border-t border-[#22232C] bg-[#15161B] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="mx-auto grid max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
+              <Button
+                className="h-11 bg-[#8B7CFF] text-[#0E0F13] hover:bg-[#7A6BEE]"
+                onClick={() => void downloadResult()}
+              >
+                <Download className="mr-1.5 h-4 w-4" /> Download
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 border-[#2A2C36] bg-transparent text-[#F2F2F5] hover:bg-[#1D1F27]"
+                onClick={() => void shareResult()}
+              >
+                <Share2 className="mr-1.5 h-4 w-4" /> Share
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 border-[#2A2C36] bg-transparent text-[#F2F2F5] hover:bg-[#1D1F27]"
+                onClick={() => {
+                  setPhase("select");
+                  setOutput(null);
+                  setMaskOpen(true);
+                }}
+              >
+                <Pencil className="mr-1.5 h-4 w-4" /> Remove another
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 border-[#2A2C36] bg-transparent text-[#F2F2F5] hover:bg-[#1D1F27]"
+                onClick={() => {
+                  if (lastMaskDataUrl) void runRemove(lastMaskDataUrl);
+                  else {
+                    setPhase("select");
+                    setMaskOpen(true);
+                  }
+                }}
+              >
+                <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerate
+              </Button>
+            </div>
+            <div className="mx-auto flex max-w-3xl gap-2">
+              <Button
+                variant="secondary"
+                className="h-10 flex-1 bg-[#1D1F27] text-[#F2F2F5] hover:bg-[#22242E]"
+                onClick={resetPhoto}
+              >
+                <ImageIcon className="mr-1.5 h-4 w-4" /> Another photo
+              </Button>
+              <Button
+                variant="ghost"
+                className="h-10 text-[#9A9CAA] hover:text-[#F2F2F5]"
+                onClick={() => navigate({ to: "/studio/image" })}
+              >
+                Image Studio
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 overflow-auto px-3 py-4">
+          <p className="text-center text-xs font-medium text-[#5CE0C0]">Result · drag divider to compare</p>
+          <div className="overflow-hidden rounded-2xl border border-[#2A2C36] bg-[#15161B] p-2 shadow-sm">
             <CompareSlider before={preview} after={output} />
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Button className="h-11 bg-orange-500 hover:bg-orange-600" onClick={() => void downloadResult()}>
-              <Download className="mr-1.5 h-4 w-4" /> Download
-            </Button>
-            <Button variant="outline" className="h-11" onClick={() => void shareResult()}>
-              <Share2 className="mr-1.5 h-4 w-4" /> Share
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11"
-              onClick={() => {
-                setPhase("select");
-                setOutput(null);
-                setMaskOpen(true);
-              }}
-            >
-              <Pencil className="mr-1.5 h-4 w-4" /> Remove another
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11"
-              onClick={() => {
-                if (lastMaskDataUrl) void runRemove(lastMaskDataUrl);
-                else {
-                  setPhase("select");
-                  setMaskOpen(true);
-                }
-              }}
-            >
-              <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerate
-            </Button>
-          </div>
-          <Button variant="secondary" className="h-11 w-full" onClick={resetPhoto}>
-            <ImageIcon className="mr-1.5 h-4 w-4" /> Edit another photo
-          </Button>
-          <Button variant="ghost" className="h-10 w-full" onClick={() => navigate({ to: "/studio/image" })}>
-            Back to Image Studio
-          </Button>
-        </main>
-      </div>
+        </div>
+      </CircleEditShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="flex items-center justify-between gap-2 border-b border-border/60 bg-card/50 px-3 py-3 backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/studio/image" })}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
-        <div className="text-center">
-          <h1 className="text-sm font-semibold">
-            Circle to <span className="text-primary">Remove</span>
-          </h1>
-          <p className="text-[10px] text-muted-foreground">One image · No prompt · {CIRCLE_INSTANT_CREDITS} credits / image</p>
-        </div>
-        <span className="w-14 text-right text-[11px] tabular-nums text-muted-foreground">
-          {isAdmin ? "∞" : profile?.credits ?? 0} cr
-        </span>
-      </header>
+    <CircleEditShell
+      creditsLabel={creditsLabel}
+      mode={mode}
+      onModeChange={onModeChange}
+      onBack={() => navigate({ to: "/studio/image" })}
+      footer={
+        preview && mode === "remove" ? (
+          <div className="flex shrink-0 items-center gap-2 border-t border-[#22232C] bg-[#15161B] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <Button
+              variant="outline"
+              className="h-11 border-[#2A2C36] bg-transparent text-[#9A9CAA] hover:text-[#F2F2F5]"
+              onClick={() => fileRef.current?.click()}
+            >
+              Replace
+            </Button>
+            <Button
+              className="ml-auto h-11 flex-1 bg-[#8B7CFF] font-bold text-[#0E0F13] hover:bg-[#7A6BEE] sm:flex-none sm:px-8"
+              onClick={() => {
+                setPhase("select");
+                setMaskOpen(true);
+              }}
+            >
+              <Pencil className="mr-1.5 h-4 w-4" /> Paint area to remove
+            </Button>
+          </div>
+        ) : null
+      }
+    >
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-3 py-6">
-        <ol className="mb-6 flex flex-wrap gap-2 text-[11px] font-medium text-muted-foreground">
-          <li className={phase === "upload" ? "text-primary" : ""}>1. Upload</li>
-          <li aria-hidden>→</li>
-          <li className={phase === "select" ? "text-primary" : ""}>2. Select</li>
-          <li aria-hidden>→</li>
-          <li>3. Remove</li>
-          <li aria-hidden>→</li>
-          <li>4. Output</li>
-        </ol>
-
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
-
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-auto px-3 py-4">
         {!preview ? (
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="flex min-h-[50vh] flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-card/60 text-sm text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-primary hover:bg-primary/5"
-          >
-            <Upload className="h-9 w-9 text-primary" />
-            <span className="font-medium text-foreground">Upload one image</span>
-            <span className="text-xs">Then paint the object to remove — no prompt needed</span>
-          </button>
+          <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
         ) : (
-          <div className="space-y-4">
-            <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-md">
+          <div className="flex w-full max-w-2xl flex-col gap-3">
+            <div className="overflow-hidden rounded-2xl border border-[#2A2C36] bg-[#15161B] p-2 shadow-sm">
               <img
                 src={preview}
                 alt="Source"
-                className="mx-auto max-h-[55vh] w-full object-contain"
+                className="mx-auto max-h-[min(58vh,640px)] w-full object-contain"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                className="h-11 flex-1 bg-orange-500 hover:bg-orange-600 sm:flex-none"
-                onClick={() => {
-                  setPhase("select");
-                  setMaskOpen(true);
-                }}
-              >
-                <Pencil className="mr-1.5 h-4 w-4" /> Paint area to remove
-              </Button>
-              <Button variant="outline" className="h-11" onClick={() => fileRef.current?.click()}>
-                Replace image
-              </Button>
-            </div>
-            <p className="text-center text-[11px] text-muted-foreground">
-              Paint over the unwanted object, then tap Remove. No text prompt.
-            </p>
+            {mode === "add" && (
+              <p className="rounded-xl border border-[#2A2C36] bg-[#1D1F27] px-3 py-2 text-center text-xs text-[#9A9CAA]">
+                Add Object — paint a target area, then describe or pick an object. Backend next.
+              </p>
+            )}
+            {mode === "crop" && (
+              <p className="rounded-xl border border-[#2A2C36] bg-[#1D1F27] px-3 py-2 text-center text-xs text-[#9A9CAA]">
+                Crop — frame & ratio tools land with the next frontend pass. Backend next.
+              </p>
+            )}
+            {mode === "remove" && (
+              <p className="text-center text-[11px] text-[#5F6170]">
+                Paint the unwanted object, then confirm. No text prompt · {CIRCLE_INSTANT_CREDITS} credits
+              </p>
+            )}
           </div>
         )}
-      </main>
+      </div>
 
       <SmartRemoveModal
-        open={maskOpen && !!preview}
+        open={maskOpen && !!preview && mode === "remove"}
         imageUrl={preview}
-        onCancel={() => {
-          setMaskOpen(false);
-          if (!lastMaskDataUrl && !output) {
-            /* stay on select with image */
-          }
-        }}
+        onCancel={() => setMaskOpen(false)}
         onApply={(maskDataUrl) => {
           void runRemove(maskDataUrl);
         }}
       />
-    </div>
+    </CircleEditShell>
   );
 }
