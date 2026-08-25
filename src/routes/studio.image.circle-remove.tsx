@@ -93,10 +93,23 @@ function CircleRemovePage() {
   const [maskOpen, setMaskOpen] = useState(false);
   const [mode, setMode] = useState<CircleEditMode>("remove");
 
-  const [addPrompt, setAddPrompt] = useState("");
+   const [addPrompt, setAddPrompt] = useState("");
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState(OBJECT_CATEGORIES[0].id);
   const [cropRatio, setCropRatio] = useState<string>("free");
+
+  // If user came from Image Editor with a photo, show it immediately
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("circle2edit-preview");
+      if (!raw) return;
+      sessionStorage.removeItem("circle2edit-preview");
+      setPreview(raw);
+      setPhase("select");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (phase !== "generating") return;
