@@ -748,8 +748,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             </div>
 
             <div className={cn("space-y-4 p-4 sm:p-5", studioCardClass(studioTier))}>
-              <StudioTierSelector
+               <StudioTierSelector
                 value={studioTier}
+                showPremiumTiers={isAdmin}
                 onChange={(t) => {
                   setStudioTier(t);
                   const allowed = imageQualitiesForStudioTier(t);
