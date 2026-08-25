@@ -29,19 +29,29 @@ export function StudioTierSelector({
   onChange,
   locked,
   className,
+  /** When false, Premium (pro) + Ultra AI (premium) are hidden — admin only. */
+  showPremiumTiers = false,
 }: {
   value: StudioTier;
   onChange: (t: StudioTier) => void;
   locked?: Partial<Record<StudioTier, boolean>>;
   className?: string;
+  showPremiumTiers?: boolean;
 }) {
+  const tiers = showPremiumTiers
+    ? STUDIO_TIERS
+    : (["standard"] as const satisfies readonly StudioTier[]);
+
   return (
     <div className={cn("w-full min-w-0", className)}>
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         Experience
       </p>
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
-        {STUDIO_TIERS.map((id) => {
+      <div className={cn(
+        "grid gap-1.5 sm:gap-2.5",
+        tiers.length === 1 ? "grid-cols-1 max-w-[200px]" : "grid-cols-3",
+      )}>
+        {tiers.map((id) => {
           const meta = STUDIO_TIER_META[id];
           const detail = TIER_DETAIL[id];
           const Icon = detail.Icon;
@@ -71,12 +81,12 @@ export function StudioTierSelector({
                 isLocked && "cursor-not-allowed opacity-50",
               )}
               aria-pressed={active}
-              aria-label={`${meta.label}: ${meta.blurb}`}
+              aria-label={`${meta.label} experience`}
             >
               {isLocked && (
-                <Lock className="absolute right-1.5 top-1.5 h-3 w-3 text-muted-foreground" />
+                <Lock className="absolute right-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
               )}
-              <div className="flex w-full items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <Icon
                   className={cn(
                     "h-3.5 w-3.5 shrink-0",
@@ -85,45 +95,38 @@ export function StudioTierSelector({
                     active && id === "premium" && "text-[#E8C547]",
                     !active && "text-muted-foreground",
                   )}
-                  strokeWidth={active ? 2.25 : 1.75}
                 />
                 <span
                   className={cn(
-                    "truncate text-[11px] font-bold leading-tight sm:text-sm",
+                    "text-xs font-bold leading-tight sm:text-sm",
                     active && id === "premium" && "text-[#E8C547]",
-                    active && id === "pro" && "text-orange-700 dark:text-orange-300",
-                    active && id === "standard" && "text-foreground",
-                    !active && "text-foreground",
                   )}
                 >
                   {meta.label}
                 </span>
               </div>
-              <span
+              <p
                 className={cn(
-                  "line-clamp-3 text-[10px] leading-snug sm:text-[11px]",
+                  "text-[10px] leading-snug sm:text-[11px]",
                   active && id === "premium" ? "text-[#E2E8F0]" : "text-muted-foreground",
                 )}
               >
-                {meta.blurb}
-              </span>
-              <span
+                {detail.capability}
+              </p>
+              <p
                 className={cn(
-                  "mt-auto pt-0.5 text-[9px] font-semibold uppercase tracking-wide sm:text-[10px]",
-                  active && id === "standard" && "text-primary",
-                  active && id === "pro" && "text-orange-600 dark:text-orange-400",
+                  "mt-auto text-[10px] leading-snug opacity-90 sm:text-[11px]",
                   active && id === "premium" && "text-[#E8C547]",
-                  !active && "text-muted-foreground",
                 )}
               >
-                {detail.capability}
-              </span>
+                {meta.short}
+              </p>
             </button>
           );
         })}
       </div>
       <p className="mt-2 text-center text-[10px] text-muted-foreground sm:text-[11px]">
-        Standard → Premium → Ultra AI
+        {showPremiumTiers ? "Standard → Premium → Ultra AI" : "Standard"}
       </p>
     </div>
   );
