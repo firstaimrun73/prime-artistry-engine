@@ -11,35 +11,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Align Ultra pre-check cost with quoteUltraCredits
+      - name: Align Ultra pre-check with quoteUltraCredits
         run: |
           python3 << 'PY'
           from pathlib import Path
+          import re
           path = Path("src/lib/generate.functions.ts")
           text = path.read_text()
-          if text.count("quoteUltraCredits") >= 2 and "isUltraCandidate({\n                studioTier: data.studioTier" in text and text.find("quoteUltraCredits") < text.find("const falKey"):
-              # cost branch already uses quoteUltraCredits before execute
+          # Already fixed if quoteUltraCredits is used in cost phase (before const falKey)
+          fal = text.find("const falKey")
+          pre = text[:fal] if fal > 0 else text
+          if pre.count("quoteUltraCredits") >= 1:
               print("already fixed")
               raise SystemExit(0)
-          old = '''                return planned.credits + (data.circlePrepCredits ?? 0);
-              })()
-            : (() => {
-              const refs = (data.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.startsWith("https://"));
-              const credit = computeImageExperienceCredits({
-                studioTier: data.studioTier,
-                hasSourceImage: !!data.imageUrl,
-                referenceCount: refs.length,
-                imageQuality: data.imageQuality,
-                plan: profile.plan,
-                isAdmin,
-                circleInstant: !!(data.circleInstant && data.maskImageUrl),
-                circleInstantCredits: CIRCLE_INSTANT_CREDITS,
-              });
-              return credit.credits + (data.circlePrepCredits ?? 0);
-            })();'''
-          new = '''                return planned.credits + (data.circlePrepCredits ?? 0);
-              })()
-            : isUltraCandidate({
+          # Find the final computeImageExperienceCredits fallback after premium multi
+          # Pattern: })()\n            : (() => {\n              const refs = ... computeImageExperienceCredits
+          needle = "computeImageExperienceCredits"
+          # Find last occurrence before const falKey (the final fallback)
+          idx = pre.rfind(needle)
+          assert idx > 0, "no computeImageExperienceCredits in pre-check"
+          # Walk back to find ": (() => {" that starts this branch
+          start = pre.rfind(": (() => {", 0, idx)
+          assert start > 0, "branch start not found"
+          # Walk forward from idx to closing })();
+          end = text.find("})();", idx)
+          assert end > 0, "branch end not found"
+          end = end + len("})();")
+          # The branch to replace starts at start (the colon)
+          replacement = """: isUltraCandidate({
                 studioTier: data.studioTier,
                 maskImageUrl: data.maskImageUrl,
                 circleInstant: data.circleInstant,
@@ -73,11 +72,12 @@ jobs:
                 circleInstantCredits: CIRCLE_INSTANT_CREDITS,
               });
               return credit.credits + (data.circlePrepCredits ?? 0);
-            })();'''
-          assert old in text, "cost marker not found"
-          path.write_text(text.replace(old, new, 1))
+            })();"""
+          new_text = text[:start] + replacement + text[end:]
+          path.write_text(new_text)
           t2 = path.read_text()
-          assert t2.count("quoteUltraCredits") >= 2
+          fal2 = t2.find("const falKey")
+          assert t2[:fal2].count("quoteUltraCredits") >= 1, "quoteUltraCredits not in pre-check"
           print("fixed", len(t2))
           PY
       - name: Commit
