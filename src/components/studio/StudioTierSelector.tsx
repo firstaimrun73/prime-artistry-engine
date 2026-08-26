@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import {
   STUDIO_TIER_META,
+  STUDIO_TIERS,
   type StudioTier,
 } from "@/lib/studio/studio-tier";
 import { Sparkles, Zap, Circle } from "lucide-react";
@@ -27,19 +28,25 @@ export function StudioTierSelector({
   value,
   onChange,
   className,
-  /** Explicit list of experiences to show. When omitted, only Standard. */
+  /** Explicit list of experiences to show. Preferred over showPremiumTiers. */
   visibleTiers,
+  /** @deprecated Prefer visibleTiers from plan access matrix. */
+  showPremiumTiers = false,
 }: {
   value: StudioTier;
   onChange: (t: StudioTier) => void;
   className?: string;
   /** Allowed experiences for this plan/admin — inaccessible tiers are hidden, not locked. */
   visibleTiers?: readonly StudioTier[];
+  /** When true and visibleTiers omitted, show all three experiences (legacy admin path). */
+  showPremiumTiers?: boolean;
 }) {
-  const tiers =
+  const tiers: readonly StudioTier[] =
     visibleTiers && visibleTiers.length > 0
       ? visibleTiers
-      : (["standard"] as const satisfies readonly StudioTier[]);
+      : showPremiumTiers
+        ? STUDIO_TIERS
+        : (["standard"] as const);
 
   return (
     <div className={cn("w-full min-w-0", className)}>
