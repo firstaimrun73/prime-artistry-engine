@@ -278,20 +278,41 @@ export const generateMedia = createServerFn({ method: "POST" })
                 }
                 return planned.credits + (data.circlePrepCredits ?? 0);
               })()
-            : (() => {
-              const refs = (data.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.startsWith("https://"));
-              const credit = computeImageExperienceCredits({
-                studioTier: data.studioTier,
-                hasSourceImage: !!data.imageUrl,
-                referenceCount: refs.length,
-                imageQuality: data.imageQuality,
-                plan: profile.plan,
-                isAdmin,
-                circleInstant: !!(data.circleInstant && data.maskImageUrl),
-                circleInstantCredits: CIRCLE_INSTANT_CREDITS,
-              });
-              return credit.credits + (data.circlePrepCredits ?? 0);
-            })();
+            : isUltraCandidate({
+      studioTier: data.studioTier,
+      maskImageUrl: data.maskImageUrl,
+      circleInstant: data.circleInstant,
+    })
+  ? (() => {
+      const validated = validateUltraImageRequest({
+        prompt: data.prompt,
+        imageUrl: data.imageUrl,
+        referenceImageUrls: data.referenceImageUrls,
+        imageQuality: data.imageQuality,
+        aspectRatio: data.aspectRatio,
+      });
+      if (!validated.ok) return STANDARD_FALLBACK_COST;
+      const q = quoteUltraCredits({
+        mode: validated.mode,
+        quality: validated.quality,
+        referenceCount: validated.referenceCount,
+      });
+      return q.credits + (data.circlePrepCredits ?? 0);
+    })()
+  : (() => {
+    const refs = (data.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.startsWith("https://"));
+    const credit = computeImageExperienceCredits({
+      studioTier: data.studioTier,
+      hasSourceImage: !!data.imageUrl,
+      referenceCount: refs.length,
+      imageQuality: data.imageQuality,
+      plan: profile.plan,
+      isAdmin,
+      circleInstant: !!(data.circleInstant && data.maskImageUrl),
+      circleInstantCredits: CIRCLE_INSTANT_CREDITS,
+    });
+    return credit.credits + (data.circlePrepCredits ?? 0);
+  })();
 
     if (!isAdmin && profile.credits < cost) {
       throw new Error(`Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`);
