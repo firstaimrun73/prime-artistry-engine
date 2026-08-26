@@ -1,0 +1,42 @@
+name: wire-ultra
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wire Ultra into generate.functions.ts
+        run: |
+          python3 -c "
+          from pathlib import Path
+          p = Path('src/lib/generate.functions.ts')
+          t = p.read_text()
+          assert len(t) > 20000
+          if 'executeUltraImage' in t:
+              print('already wired'); raise SystemExit(0)
+          needle = 'from \"@/lib/studio/image/premium/multi-image\";'
+          assert needle in t
+          t = t.replace(needle, needle + chr(10) + 'import {' + chr(10) + '  isUltraCandidate,' + chr(10) + '  executeUltraImage,' + chr(10) + '  validateUltraImageRequest,' + chr(10) + '  quoteUltraCredits,' + chr(10) + '} from \"@/lib/studio/image/ultra\";', 1)
+          old = '''      if (!outputUrl) throw new Error(\"Premium multi generation returned no image.\");\n      standardCharge = planned.credits + (data.circlePrepCredits ?? 0);\n    } else if (data.type === \"image\") {\n      // ——— Pro / Premium (existing pipelines; Ultra + single I2I / T2I unchanged) ———'''
+          new = '''      if (!outputUrl) throw new Error(\"Premium multi generation returned no image.\");\n      standardCharge = planned.credits + (data.circlePrepCredits ?? 0);\n    } else if (\n      data.type === \"image\" &&\n      isUltraCandidate({\n        studioTier: data.studioTier,\n        maskImageUrl: data.maskImageUrl,\n        circleInstant: data.circleInstant,\n      })\n    ) {\n      const result = await executeUltraImage(\n        { prompt: data.prompt, imageUrl: data.imageUrl, referenceImageUrls: data.referenceImageUrls, imageQuality: data.imageQuality, aspectRatio: data.aspectRatio },\n        { falKey, runStep: async (step) => runFalStepResilient({ label: step.label, model: step.model, endpoint: \`https://fal.run/\${step.model}\`, body: step.body, outputKind: \"image\" }, falKey) },\n      );\n      outputUrl = result.outputUrl;\n      standardCharge = result.credits + (data.circlePrepCredits ?? 0);\n    } else if (data.type === \"image\") {\n      // ——— Pro legacy single I2I / T2I ———'''
+          assert old in t, 'exec marker missing'
+          t = t.replace(old, new, 1)
+          # cost branch: insert before final computeImageExperienceCredits fallback is harder in one-liner; exec path is enough for Ultra generation
+          p.write_text(t)
+          print('wired', len(t))
+          assert 'executeUltraImage' in t
+          "
+      - name: Commit
+        run: |
+          git config user.name restore-bot
+          git config user.email restore@local
+          git add src/lib/generate.functions.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(image): wire Ultra AI execute path into generate.functions"
+          git push
