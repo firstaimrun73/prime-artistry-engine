@@ -1,4 +1,5 @@
 /**
  * Server functions entrypoint for media generation and checkout.
  */
-export { generateMedia, completeCheckout } from "@/lib/generate.media-core";
+export { generateMedia } from "@/lib/generate.media-core";
+export { completeCheckout } from "@/lib/generate.checkout";
