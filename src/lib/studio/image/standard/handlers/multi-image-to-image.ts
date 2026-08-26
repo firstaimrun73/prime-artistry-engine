@@ -4,7 +4,7 @@ import { quoteStandardCredits } from "../credits";
 
 /**
  * Preserves reference order: [base, ref#1, ref#2, …].
- * Rejects empty or >5 refs (already validated upstream).
+ * Requires 2–5 total images (base + refs). GPT Image 2 LOW only.
  */
 export async function handleMultiImageToImage(
   input: StandardExecuteInput,
@@ -13,14 +13,14 @@ export async function handleMultiImageToImage(
     throw new Error("Handler mismatch: expected multi_image_to_image");
   }
   const n = input.referenceImageUrls.length;
-  if (n < 1 || n > 5) {
-    throw new Error("Multiple Image requires 1–5 reference images.");
+  const total = 1 + n;
+  if (total < 2 || total > 5) {
+    throw new Error("Multiple Image requires 2–5 total images.");
   }
   if (!input.imageUrl) {
     throw new Error("Multiple Image requires a base image.");
   }
   const step = buildMultiImageStep(input);
-  // Defensive: ensure body order matches validation order
   const urls = step.body.image_urls as string[] | undefined;
   if (!urls || urls[0] !== input.imageUrl) {
     throw new Error("Multi-image request lost base image order.");
@@ -30,6 +30,9 @@ export async function handleMultiImageToImage(
       throw new Error("Multi-image reference order was altered. Credits not charged.");
     }
   }
+  if (step.body.quality !== "low") {
+    throw new Error("GPT Image 2 multi path must use quality low. Credits not charged.");
+  }
   const outputUrl = await input.runStep(step);
   if (!outputUrl) throw new Error("Multiple Image returned no output.");
   if (outputUrl === input.imageUrl) {
@@ -37,7 +40,8 @@ export async function handleMultiImageToImage(
   }
   const quote = quoteStandardCredits({
     mode: "multi_image_to_image",
-    referenceCount: n,
+    referenceCount: total,
+    imageQuality: input.imageQuality,
   });
   return {
     outputUrl,

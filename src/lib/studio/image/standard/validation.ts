@@ -1,6 +1,9 @@
 /**
  * Validate Standard Image Studio requests before any fal.ai call.
  * Reject invalid inputs; never reorder multi-image references.
+ *
+ * Multi (GPT Image 2): total images = primary + refs must be 2–5.
+ * 1 total image → image_to_image (Kontext). 0 → text_to_image.
  */
 
 import type { StandardImageRequest, StandardValidationResult } from "./types";
@@ -13,7 +16,7 @@ function isHttpsUrl(u: unknown): u is string {
 
 /**
  * Preserve upload order. Filter invalid slots without reordering valid ones.
- * Does not sort. Does not move later refs earlier.
+ * Cap at 5 extra refs (product max for Standard multi extras).
  */
 export function normalizeOrderedRefs(urls: unknown): string[] {
   if (!Array.isArray(urls)) return [];
@@ -37,6 +40,11 @@ export function validateStandardImageRequest(
   const maskImageUrl = isHttpsUrl(raw.maskImageUrl) ? raw.maskImageUrl : undefined;
   const referenceImageUrls = normalizeOrderedRefs(raw.referenceImageUrls ?? []);
 
+  const rawQ = String(raw.imageQuality ?? "").toLowerCase();
+  if ((rawQ === "2k" || rawQ === "4k" || rawQ === "8k") && imageUrl && referenceImageUrls.length > 0) {
+    return { ok: false, error: "Standard multi-reference supports SD and HD only (not 2K)." };
+  }
+
   const quality =
     raw.imageQuality === "hd" || raw.imageQuality === "sd" ? raw.imageQuality : "sd";
 
@@ -49,7 +57,6 @@ export function validateStandardImageRequest(
       ? raw.aspectRatio
       : undefined;
 
-  // Circle to Remove — original + mask aligned to original pixels
   if (maskImageUrl || raw.circleInstant) {
     if (!imageUrl) {
       return { ok: false, error: "Circle remove requires the original source image." };
@@ -70,10 +77,11 @@ export function validateStandardImageRequest(
     };
   }
 
-  // Multi-image: base + 1–5 refs (reject 0 extra when caller intended multi via refs array length rules)
-  if (imageUrl && referenceImageUrls.length > 0) {
-    if (referenceImageUrls.length > 5) {
-      return { ok: false, error: "Multiple Image accepts at most 5 reference images." };
+  const totalImages = (imageUrl ? 1 : 0) + referenceImageUrls.length;
+
+  if (imageUrl && totalImages >= 2) {
+    if (totalImages > 5) {
+      return { ok: false, error: "Standard Multiple Image accepts at most 5 images." };
     }
     return {
       ok: true,
@@ -87,7 +95,6 @@ export function validateStandardImageRequest(
     };
   }
 
-  // Image → Image
   if (imageUrl) {
     return {
       ok: true,
@@ -101,7 +108,6 @@ export function validateStandardImageRequest(
     };
   }
 
-  // Text → Image
   if (referenceImageUrls.length > 0) {
     return { ok: false, error: "Text → Image does not accept reference images without a base image." };
   }
