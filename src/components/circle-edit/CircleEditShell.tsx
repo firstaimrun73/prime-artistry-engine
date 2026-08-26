@@ -55,75 +55,72 @@ export function CircleEditShell({
 
   return (
     <div
-      className="flex h-[100dvh] flex-col overflow-hidden bg-[#0E0F13] text-[#F2F2F5]"
+      className="flex h-[100dvh] flex-col overflow-hidden bg-[#12141A] text-[#F2F2F5]"
       data-circle-2edit="true"
     >
       {/* Header — Galaxy-style: back · ring logo · compact title · Moto Credits */}
-      <header className="flex shrink-0 items-center gap-2.5 border-b border-[#22232C] bg-[#15161B] px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+      <header className="flex shrink-0 items-center gap-2.5 border-b border-[#2A2E3A] bg-[#181A22] px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
         <button
           type="button"
           onClick={onBack}
           aria-label="Back to Image Studio"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[#2A2C36] text-[#9A9CAA] transition-colors hover:border-[#8B7CFF] hover:text-[#F2F2F5]"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[#2E3140] text-[#9AA0B0] transition-colors hover:border-[#A89BFF] hover:text-[#F2F2F5]"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
 
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          {/* Circle ring logo — always visible; subtle glow pulse every 10s */}
           <span aria-hidden className="relative grid h-[22px] w-[22px] shrink-0 place-items-center">
             <span
               className={cn(
-                "absolute inset-0 rounded-full border-2 border-[#8B7CFF]/70 transition-shadow duration-500",
+                "absolute inset-0 rounded-full border-2 border-[#A89BFF]/70 transition-shadow duration-500",
                 brandPulse &&
-                  "animate-[ceRing_2s_ease-in-out] border-[#8B7CFF] shadow-[0_0_12px_2px_rgba(139,124,255,0.55)]",
+                  "animate-[ceRing_2s_ease-in-out] border-[#A89BFF] shadow-[0_0_12px_2px_rgba(168,155,255,0.5)]",
               )}
             />
           </span>
           <h1
             className={cn(
-              "truncate text-[15px] font-semibold tracking-tight text-[#F2F2F5]",
+              "truncate text-[15px] font-medium tracking-[-0.02em] text-[#F2F2F5]",
               brandPulse && "animate-[ceBrand_2s_ease-in-out]",
             )}
           >
-            <span className="text-[#8B7CFF]">Circle</span>
-            <span className="font-medium text-[#C8C9D0]"> 2edit</span>
+            <span className="font-semibold text-[#A89BFF]">Circle</span>
+            <span className="font-medium text-[#E8E9ED]"> 2edit</span>
           </h1>
         </div>
 
-        {/* Moto Credits — M // mark, not coin/star */}
+        {/* Moto Credits — M with horizontal slashes through the letter (¥-style) */}
         <span
-          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-[#2A2C36] bg-[#1D1F27] px-2.5 py-1.5 text-[11px] text-[#9A9CAA] sm:px-3 sm:text-[11.5px]"
+          className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-[#D0D4DC] bg-[#F3F4F7] px-2.5 py-1.5 text-[11px] text-[#3C3F4A] sm:px-3 sm:text-[11.5px]"
           title="Moto Credits"
         >
           <span
             aria-hidden
-            className="inline-flex items-baseline gap-0.5 font-semibold leading-none tracking-tight text-[#5CE0C0]"
+            className="relative inline-grid h-[18px] w-[18px] place-items-center font-bold leading-none text-[#1A1B1F]"
           >
-            <span className="text-[12px] sm:text-[13px]">M</span>
-            <span className="text-[10px] opacity-90">//</span>
+            <span className="text-[13px] tracking-tight">M</span>
+            <span className="pointer-events-none absolute left-0 right-0 top-[7px] h-[1.5px] bg-[#1A1B1F]" />
+            <span className="pointer-events-none absolute left-0 right-0 top-[11px] h-[1.5px] bg-[#1A1B1F]" />
           </span>
-          <span className="tabular-nums font-semibold text-[#5CE0C0]">{creditsLabel}</span>
+          <span className="tabular-nums font-semibold text-[#1A1B1F]">{creditsLabel}</span>
         </span>
       </header>
 
-      {/* Stage — radial gradient like prototype */}
-      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(120%_100%_at_50%_0%,#16181f_0%,#0E0F13_60%)]">
+      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(120%_100%_at_50%_0%,#1A1D26_0%,#12141A_60%)]">
         {children}
       </main>
 
-      {/* Contextual controls (brush, ratios, add gallery, etc.) */}
       {controls ? (
-        <div className="shrink-0 border-t border-[#22232C] bg-[#15161B] px-3 py-2.5 sm:px-4">
+        <div className="shrink-0 border-t border-[#2A2E3A] bg-[#181A22] px-3 py-2.5 sm:px-4">
           {controls}
         </div>
       ) : null}
 
       {actionBar}
 
-      {/* Bottom mode selector — prototype segmented control, relocated to bottom */}
       <nav
-        className="flex shrink-0 gap-1 border-t border-[#22232C] bg-[#15161B] p-2 sm:p-2.5"
+        className="flex shrink-0 gap-1 border-t border-[#2A2E3A] bg-[#181A22] p-2 sm:p-2.5"
         aria-label="Circle 2edit mode"
       >
         {(
@@ -141,10 +138,10 @@ export function CircleEditShell({
               disabled={!!generating}
               onClick={() => onModeChange(id)}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5 text-[11px] font-semibold transition-all sm:text-xs",
+                "flex flex-1 flex-col items-center gap-1 rounded-xl py-2.5 text-[11px] font-medium transition-all sm:text-xs",
                 active
-                  ? "bg-[#8B7CFF]/15 text-[#8B7CFF] ring-1 ring-[#8B7CFF]/40"
-                  : "text-[#9A9CAA] hover:bg-[#1D1F27] hover:text-[#F2F2F5]",
+                  ? "bg-[#A89BFF]/18 text-[#A89BFF] ring-1 ring-[#A89BFF]/45"
+                  : "text-[#9AA0B0] hover:bg-[#1E212B] hover:text-[#F2F2F5]",
                 generating && "opacity-50",
               )}
             >
@@ -157,8 +154,8 @@ export function CircleEditShell({
 
       <style>{`
         @keyframes ceRing {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(139,124,255,0); transform: scale(1); }
-          40% { box-shadow: 0 0 14px 3px rgba(139,124,255,0.45); transform: scale(1.08); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(168,155,255,0); transform: scale(1); }
+          40% { box-shadow: 0 0 14px 3px rgba(168,155,255,0.45); transform: scale(1.08); }
         }
         @keyframes ceBrand {
           0%, 100% { opacity: 1; }
@@ -181,20 +178,19 @@ export function CircleEditUploadZone({
       type="button"
       disabled={disabled}
       onClick={onPick}
-      className="mx-auto flex w-full max-w-md flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#2A2C36] bg-[#15161B]/80 px-6 py-16 text-center transition-colors hover:border-[#8B7CFF]/50 disabled:opacity-50"
+      className="mx-auto flex w-full max-w-md flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#2E3140] bg-[#1A1C24]/90 px-6 py-16 text-center transition-colors hover:border-[#A89BFF]/50 disabled:opacity-50"
     >
-      <span className="grid h-14 w-14 place-items-center rounded-2xl border border-[#2A2C36] bg-[#1D1F27]">
-        <Upload className="h-6 w-6 text-[#8B7CFF]" />
+      <span className="grid h-14 w-14 place-items-center rounded-2xl border border-[#2E3140] bg-[#22252F]">
+        <Upload className="h-6 w-6 text-[#A89BFF]" />
       </span>
       <div>
         <p className="text-sm font-semibold text-[#F2F2F5]">Drop your photo</p>
-        <p className="mt-1 text-xs text-[#9A9CAA]">or tap to choose from device</p>
+        <p className="mt-1 text-xs text-[#9AA0B0]">or tap to choose from device</p>
       </div>
     </button>
   );
 }
 
-/** Prototype-style generation ring overlay content */
 export function CircleEditGenOverlay({
   progressPct,
   activeStage,
@@ -207,24 +203,17 @@ export function CircleEditGenOverlay({
   caption: string;
 }) {
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0E0F13]/75 backdrop-blur-[2px]">
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#12141A]/75 backdrop-blur-[2px]">
       <div className="flex flex-col items-center gap-4 px-6">
         <div className="relative grid h-24 w-24 place-items-center">
           <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96" aria-hidden>
+            <circle cx="48" cy="48" r="40" fill="none" stroke="#2E3140" strokeWidth="4" />
             <circle
               cx="48"
               cy="48"
               r="40"
               fill="none"
-              stroke="#2A2C36"
-              strokeWidth="4"
-            />
-            <circle
-              cx="48"
-              cy="48"
-              r="40"
-              fill="none"
-              stroke="#8B7CFF"
+              stroke="#A89BFF"
               strokeWidth="4"
               strokeLinecap="round"
               strokeDasharray={2 * Math.PI * 40}
@@ -236,10 +225,10 @@ export function CircleEditGenOverlay({
             {Math.round(progressPct)}%
           </span>
         </div>
-        <div className="min-h-5 text-center text-sm font-semibold tracking-tight text-[#F2F2F5]">
+        <div className="min-h-5 text-center text-sm font-medium tracking-tight text-[#F2F2F5]">
           {caption}
         </div>
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#5F6170]">
+        <div className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#6B7080]">
           Circle 2edit
         </div>
         <div className="flex gap-1.5">
@@ -249,10 +238,10 @@ export function CircleEditGenOverlay({
               className={cn(
                 "h-[5px] w-[5px] rounded-full transition-all",
                 i < activeStage
-                  ? "bg-[#4B4470]"
+                  ? "bg-[#5A5578]"
                   : i === activeStage
-                    ? "scale-150 bg-[#8B7CFF]"
-                    : "bg-[#2A2C36]",
+                    ? "scale-150 bg-[#A89BFF]"
+                    : "bg-[#2E3140]",
               )}
             />
           ))}
@@ -282,18 +271,18 @@ export function CircleEditActionBar({
   extra?: React.ReactNode;
 }) {
   return (
-    <footer className="flex shrink-0 items-center gap-3 border-t border-[#22232C] bg-[#15161B] px-3 py-3 sm:px-4">
+    <footer className="flex shrink-0 items-center gap-3 border-t border-[#2A2E3A] bg-[#181A22] px-3 py-3 sm:px-4">
       {onClear && (
         <button
           type="button"
           onClick={onClear}
-          className="rounded-xl border border-[#2A2C36] px-4 py-3 text-[13px] font-semibold text-[#9A9CAA] transition-colors hover:border-[#9A9CAA] hover:text-[#F2F2F5]"
+          className="rounded-xl border border-[#2E3140] px-4 py-3 text-[13px] font-medium text-[#9AA0B0] transition-colors hover:border-[#9AA0B0] hover:text-[#F2F2F5]"
         >
           Clear
         </button>
       )}
       {statusText ? (
-        <span className="hidden text-xs text-[#9A9CAA] sm:block">{statusText}</span>
+        <span className="hidden text-xs text-[#9AA0B0] sm:block">{statusText}</span>
       ) : null}
       {extra}
       <button
@@ -301,18 +290,88 @@ export function CircleEditActionBar({
         disabled={ctaDisabled}
         onClick={onCta}
         className={cn(
-          "ml-auto flex items-center gap-2 whitespace-nowrap rounded-xl px-[22px] py-[13px] text-sm font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40",
-          ctaVariant === "violet" && "bg-[#8B7CFF] text-[#0E0F13] hover:brightness-110",
-          ctaVariant === "teal" && "bg-[#5CE0C0] text-[#0E0F13] hover:brightness-110",
+          "ml-auto flex items-center gap-2 whitespace-nowrap rounded-xl px-[22px] py-[13px] text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40",
+          ctaVariant === "violet" && "bg-[#A89BFF] text-[#12141A] hover:brightness-110",
+          ctaVariant === "teal" && "bg-[#5CE0C0] text-[#12141A] hover:brightness-110",
           ctaVariant === "muted" &&
-            "border border-[#2A2C36] bg-[#1D1F27] text-[#F2F2F5] hover:border-[#9A9CAA]",
+            "border border-[#2E3140] bg-[#22252F] text-[#F2F2F5] hover:border-[#9AA0B0]",
         )}
       >
         <span>{ctaLabel}</span>
         {ctaCost ? (
-          <span className="font-mono text-[11.5px] font-semibold opacity-75">· {ctaCost}</span>
+          <span className="font-mono text-[11.5px] font-medium opacity-75">· {ctaCost}</span>
         ) : null}
       </button>
     </footer>
+  );
+}
+
+/** Compact Samsung-style draw tools for Remove / Add */
+export type CircleDrawTool = "circle" | "brush" | "eraser";
+
+export function CircleDrawToolbar({
+  tool,
+  onTool,
+  brushSize,
+  onBrushSize,
+}: {
+  tool: CircleDrawTool;
+  onTool: (t: CircleDrawTool) => void;
+  brushSize: number;
+  onBrushSize: (n: number) => void;
+}) {
+  const items: { id: CircleDrawTool; label: string }[] = [
+    { id: "circle", label: "Circle" },
+    { id: "brush", label: "Brush" },
+    { id: "eraser", label: "Eraser" },
+  ];
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-1.5">
+        {items.map(({ id, label }) => {
+          const active = tool === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onTool(id)}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[12px] font-medium transition-all",
+                active
+                  ? "bg-[#A89BFF] text-[#12141A] shadow-sm"
+                  : "border border-[#2E3140] bg-[#1E212B] text-[#C5C7D0] hover:border-[#A89BFF]/50",
+              )}
+            >
+              {id === "circle" && (
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-current" />
+              )}
+              {id === "brush" && (
+                <span className="h-3.5 w-3.5 rounded-full bg-current opacity-80" />
+              )}
+              {id === "eraser" && (
+                <span className="h-3 w-3.5 rounded-sm border border-current bg-transparent" />
+              )}
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      {tool === "brush" && (
+        <div className="flex items-center gap-2.5 px-0.5">
+          <span className="shrink-0 text-[11px] font-medium text-[#9AA0B0]">Size</span>
+          <input
+            type="range"
+            min={1}
+            max={50}
+            value={brushSize}
+            onChange={(e) => onBrushSize(Number(e.target.value))}
+            className="h-1.5 w-full accent-[#A89BFF]"
+          />
+          <span className="w-8 shrink-0 text-right font-mono text-[11px] tabular-nums text-[#C5C7D0]">
+            {brushSize}px
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
