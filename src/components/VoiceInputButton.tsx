@@ -139,11 +139,11 @@ export function VoiceInputButton({
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none absolute right-0 top-full z-20 mt-2 flex items-center gap-2 rounded-full border border-border/80 bg-card/95 px-3 py-1.5 text-xs shadow-md backdrop-blur-sm"
+          className="pointer-events-none absolute -left-1 top-full z-10 mt-1 flex items-center gap-1.5 rounded-md border border-primary/30 bg-background/95 px-2 py-1 text-[10px] shadow-sm"
         >
           {!reduceMotion && (
             <div className="flex items-end gap-0.5" aria-hidden>
-              {[10, 16, 12, 18, 11].map((h, i) => (
+              {[8, 12, 10, 14, 9].map((h, i) => (
                 <span
                   key={i}
                   className="voice-wave-bar w-0.5 rounded-full bg-primary"
@@ -155,7 +155,7 @@ export function VoiceInputButton({
               ))}
             </div>
           )}
-          <span className="font-medium text-foreground">Listening…</span>
+          <span className="font-medium text-primary">Listening</span>
         </div>
       )}
     </>
