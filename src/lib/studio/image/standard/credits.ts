@@ -3,10 +3,16 @@
  *
  * Text → Image: SD 20, HD 25
  * Image → Image: 25 (no fake HD premium)
- * Multi 1–2 refs: 30 | 3–4: 35 | 5: 40 (no fake HD)
+ * Multi (GPT Image 2, 2–5 total images): gpt-image-2 credit table (SD/HD)
  * Circle to Remove: 25 flat
+ *
+ * Aspect ratio = 0 additional credits.
  */
 
+import {
+  quoteGptImage2MultiCredits,
+  type GptImage2OutputClass,
+} from "@/lib/studio/image/gpt-image-2";
 import type { StandardCreditQuote, StandardImageMode, StandardImageQuality } from "./types";
 
 export const STANDARD_CREDITS = {
@@ -21,7 +27,7 @@ export const STANDARD_CREDITS = {
 
 export function quoteStandardCredits(opts: {
   mode: StandardImageMode;
-  /** Ordered reference count (multi only). */
+  /** Total images in multi path (primary + refs), 2–5. */
   referenceCount?: number;
   imageQuality?: StandardImageQuality | null;
 }): StandardCreditQuote {
@@ -53,14 +59,16 @@ export function quoteStandardCredits(opts: {
     };
   }
 
-  // multi_image_to_image
   const n = Math.max(0, opts.referenceCount ?? 0);
-  let credits = STANDARD_CREDITS.multi1to2;
-  if (n >= 5) credits = STANDARD_CREDITS.multi5;
-  else if (n >= 3) credits = STANDARD_CREDITS.multi3to4;
+  const outputClass: GptImage2OutputClass = opts.imageQuality === "hd" ? "hd" : "sd";
+  const q = quoteGptImage2MultiCredits({
+    experience: "standard",
+    referenceCount: n,
+    outputClass,
+  });
   return {
-    credits,
+    credits: q.credits,
     mode,
-    breakdown: `Multi-image (${n} ref${n === 1 ? "" : "s"}) ${credits}`,
+    breakdown: q.breakdown,
   };
 }
