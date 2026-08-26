@@ -1,7 +1,5 @@
 /**
  * PRO internal id → user-facing PREMIUM experience.
- * Orange creative energy with strong contrast for readable text.
- * Internal id remains "pro" for plan gates / registry.
  */
 
 export const PRO_TIER = "pro";
@@ -20,6 +18,6 @@ export const proGenerateClass =
 export const proMeta = {
   id: PRO_TIER,
   label: "Premium",
-  short: "Advanced",
-  blurb: "More tools, faster HD+ quality.",
+  short: "Advanced HD+ editing",
+  blurb: "Higher detail, 2K options, and multi-reference intelligence for professional results.",
 } as const;
