@@ -1,4 +1,4 @@
-/**
+   /**
  * Build fal request bodies for locked Standard models.
  * Never reorder multi-image URLs. Never drop the source image for I2I.
  * enhance_prompt is always false — do not silently rewrite user prompts.
@@ -7,21 +7,23 @@
  */
 
 import { buildGptImage2MultiStep } from "@/lib/studio/image/gpt-image-2";
-import { STANDARD_MODELS, schnellImageSize } from "./models";
+import {
+  STANDARD_MODELS,
+  kleinImageSize,
+  standardTextToImageModel,
+} from "./models";
 import type { StandardFalStep, StandardValidationOk } from "./types";
 
-const IDENTITY =
-  "Preserve the exact same person and face identity. Only change what the user requested. Keep unrelated areas stable. Photorealistic. No watermark.";
-
 export function buildTextToImageStep(req: StandardValidationOk): StandardFalStep {
+  const model = standardTextToImageModel(req.imageQuality);
   return {
-    label: "standard text-to-image (flux schnell)",
-    model: STANDARD_MODELS.textToImage,
+    label: `standard T2I ${req.imageQuality === "hd" ? "HD klein-9b" : "SD klein-4b"}`,
+    model,
     body: {
       prompt: req.prompt,
-      image_size: schnellImageSize(req.aspectRatio, req.imageQuality),
+      image_size: kleinImageSize(req.aspectRatio, req.imageQuality),
       num_images: 1,
-      num_inference_steps: req.imageQuality === "hd" ? 8 : 4,
+      num_inference_steps: 4,
       enable_safety_checker: true,
       output_format: "png",
     },
@@ -32,18 +34,23 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
   if (!req.imageUrl) {
     throw new Error("Image → Image requires a source image.");
   }
-  const prompt = `${req.prompt}. ${IDENTITY}`;
+  // Flux 0.1 Dev I2I — supported params only (prompt, image_url, strength, steps, guidance).
+  const strength =
+    typeof req.strength === "number" && req.strength >= 0.01 && req.strength <= 1
+      ? req.strength
+      : 0.85;
   return {
-    label: "standard image-to-image (flux kontext)",
+    label: `standard I2I flux-dev ${req.imageQuality === "hd" ? "HD" : "SD"}`,
     model: STANDARD_MODELS.imageToImage,
     body: {
-      prompt,
+      prompt: req.prompt,
       image_url: req.imageUrl,
-      guidance_scale: 3.0,
+      strength,
+      num_inference_steps: req.imageQuality === "hd" ? 28 : 20,
+      guidance_scale: 3.5,
       num_images: 1,
+      enable_safety_checker: true,
       output_format: "png",
-      safety_tolerance: "2",
-      enhance_prompt: false,
     },
   };
 }
