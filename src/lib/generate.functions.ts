@@ -404,8 +404,44 @@ export const generateMedia = createServerFn({ method: "POST" })
         },
         falKey,
       );
-      if (!outputUrl) throw new Error("Premium multi generation returned no image.");
+       if (!outputUrl) throw new Error("Premium multi generation returned no image.");
       standardCharge = planned.credits + (data.circlePrepCredits ?? 0);
+    } else if (
+      data.type === "image" &&
+      isPremiumSingleCandidate({
+        studioTier: data.studioTier,
+        maskImageUrl: data.maskImageUrl,
+        circleInstant: data.circleInstant,
+        imageUrl: data.imageUrl,
+        referenceImageUrls: data.referenceImageUrls,
+      })
+    ) {
+      const result = await executePremiumImage(
+        {
+          prompt: data.prompt,
+          imageUrl: data.imageUrl,
+          referenceImageUrls: data.referenceImageUrls,
+          imageQuality: data.imageQuality,
+          aspectRatio: data.aspectRatio,
+          strength: data.strength,
+        },
+        {
+          falKey,
+          runStep: async (step) =>
+            runFalStepResilient(
+              {
+                label: step.label,
+                model: step.model,
+                endpoint: `https://fal.run/${step.model}`,
+                body: step.body,
+                outputKind: "image",
+              },
+              falKey,
+            ),
+        },
+      );
+      outputUrl = result.outputUrl;
+      standardCharge = result.credits + (data.circlePrepCredits ?? 0);
     } else if (
       data.type === "image" &&
       isUltraCandidate({
