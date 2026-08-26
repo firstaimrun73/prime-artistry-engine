@@ -11,15 +11,22 @@ import {
   videoResolutionUpscales,
 } from "@/lib/quality-options";
 import { computeImageExperienceCredits } from "@/lib/studio/image/image-experience-credits";
+import { isAdminClaims } from "@/lib/admin-guard.server";
 import {
   executeStandardImage,
   quoteStandardCredits,
   validateStandardImageRequest,
 } from "@/lib/studio/image/standard";
-import {
+ import {
   isPremiumMultiGptCandidate,
   planPremiumMultiGptImage2,
 } from "@/lib/studio/image/premium/multi-image";
+import {
+  isPremiumSingleCandidate,
+  executePremiumImage,
+  validatePremiumImageRequest,
+  quotePremiumCredits,
+} from "@/lib/studio/image/premium";
 import {
   isUltraCandidate,
   executeUltraImage,
