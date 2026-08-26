@@ -13,30 +13,53 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feat/image-studio-standard-premium-backend
-      - name: Decode and write files from .recovery
+      - name: Decode Standard/Premium modules from recovery
         run: |
           python3 << 'PY'
           import base64
           from pathlib import Path
-          man = Path(".recovery/manifest.txt")
-          assert man.exists(), "manifest missing"
-          for path in man.read_text().strip().splitlines():
+          rec = Path(".recovery")
+          modules = [
+            "src/lib/studio/image/standard/models.ts",
+            "src/lib/studio/image/standard/credits.ts",
+            "src/lib/studio/image/standard/request-builders.ts",
+            "src/lib/studio/image/standard/index.ts",
+            "src/lib/studio/image/standard/standard-router.test.ts",
+            "src/lib/studio/image/premium/models.ts",
+            "src/lib/studio/image/premium/credits.ts",
+            "src/lib/studio/image/premium/validation.ts",
+            "src/lib/studio/image/premium/request.ts",
+            "src/lib/studio/image/premium/execute.ts",
+            "src/lib/studio/image/premium/index.ts",
+            "src/lib/studio/image/premium/t2i-i2i.test.ts",
+            "src/lib/studio/image/ui-credit-parity.test.ts",
+          ]
+          for path in modules:
               safe = path.replace("/", "__")
-              b64p = Path(".recovery") / f"{safe}.b64"
-              assert b64p.exists(), f"missing {b64p}"
-              data = base64.b64decode(b64p.read_text())
+              b64 = (rec / f"{safe}.b64").read_text()
+              data = base64.b64decode(b64)
               p = Path(path)
               p.parent.mkdir(parents=True, exist_ok=True)
               p.write_bytes(data)
               print("wrote", path, len(data))
-          print("OK")
           PY
+      - name: Apply patches for generate.functions, ImageEditor, studio-tier
+        run: |
+          patch -p1 < .recovery/gen-full.diff
+          patch -p1 < .recovery/ImageEditor.diff
+          patch -p1 < .recovery/studio-tier.diff
       - name: Commit
         run: |
           git config user.name restore-bot
           git config user.email restore@local
-          git add src/lib/studio/image/standard src/lib/studio/image/premium src/lib/generate.functions.ts
+          git add \
+            src/lib/studio/image/standard \
+            src/lib/studio/image/premium \
+            src/lib/studio/image/ui-credit-parity.test.ts \
+            src/lib/studio/studio-tier.ts \
+            src/components/editor/image/ImageEditor.tsx \
+            src/lib/generate.functions.ts
           git status
           git diff --cached --stat
-          git commit -m "feat(image): lock Standard + Premium T2I/I2I models and credits" || exit 0
+          git commit -m "feat(image): Standard/Premium model lock + admin + Ultra UI credit parity" || exit 0
           git push origin HEAD:feat/image-studio-standard-premium-backend
