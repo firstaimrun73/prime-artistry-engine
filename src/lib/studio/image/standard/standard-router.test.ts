@@ -1,7 +1,6 @@
 /**
  * Zero-network unit checks for Standard Image Studio router / credits / order.
  * Run with: npx tsx --test src/lib/studio/image/standard/standard-router.test.ts
- * (or project test runner if configured)
  */
 
 import assert from "node:assert/strict";
@@ -10,6 +9,7 @@ import { validateStandardImageRequest, normalizeOrderedRefs } from "./validation
 import { quoteStandardCredits, STANDARD_CREDITS } from "./credits";
 import { buildStandardStep } from "./request-builders";
 import { STANDARD_MODELS } from "./models";
+import { GPT_IMAGE_2_EDIT_MODEL, quoteGptImage2MultiCredits } from "@/lib/studio/image/gpt-image-2";
 import type { StandardValidationOk } from "./types";
 
 describe("normalizeOrderedRefs", () => {
@@ -54,7 +54,17 @@ describe("validateStandardImageRequest", () => {
     }
   });
 
-  it("multi preserves ref order", () => {
+  it("1 ref only stays image_to_image (never GPT Image 2)", () => {
+    const r = validateStandardImageRequest({
+      prompt: "edit",
+      imageUrl: "https://cdn.example/base.png",
+      referenceImageUrls: [],
+    });
+    assert.equal(r.ok, true);
+    if (r.ok) assert.equal(r.mode, "image_to_image");
+  });
+
+  it("multi preserves ref order (2+ total images)", () => {
     const r = validateStandardImageRequest({
       prompt: "apply outfit",
       imageUrl: "https://cdn.example/base.png",
@@ -73,14 +83,24 @@ describe("validateStandardImageRequest", () => {
     }
   });
 
-  it("rejects multi with 0 refs when only base — becomes i2i", () => {
+  it("rejects multi with >5 total images", () => {
+    const refs = Array.from({ length: 5 }, (_, i) => `https://cdn.example/r${i}.png`);
     const r = validateStandardImageRequest({
-      prompt: "edit",
+      prompt: "apply",
       imageUrl: "https://cdn.example/base.png",
-      referenceImageUrls: [],
+      referenceImageUrls: refs,
     });
-    assert.equal(r.ok, true);
-    if (r.ok) assert.equal(r.mode, "image_to_image");
+    assert.equal(r.ok, false);
+  });
+
+  it("rejects Standard multi 2K", () => {
+    const r = validateStandardImageRequest({
+      prompt: "apply",
+      imageUrl: "https://cdn.example/base.png",
+      referenceImageUrls: ["https://cdn.example/r1.png"],
+      imageQuality: "2k" as "sd",
+    });
+    assert.equal(r.ok, false);
   });
 
   it("circle requires mask + original", () => {
@@ -102,7 +122,7 @@ describe("validateStandardImageRequest", () => {
 });
 
 describe("quoteStandardCredits", () => {
-  it("matches locked table", () => {
+  it("matches locked table for T2I/I2I/circle", () => {
     assert.equal(
       quoteStandardCredits({ mode: "text_to_image", imageQuality: "sd" }).credits,
       STANDARD_CREDITS.textToImageSd,
@@ -116,20 +136,56 @@ describe("quoteStandardCredits", () => {
       STANDARD_CREDITS.imageToImage,
     );
     assert.equal(
-      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 1 }).credits,
+      quoteStandardCredits({ mode: "circle_to_remove" }).credits,
+      25,
+    );
+  });
+
+  it("multi GPT Image 2 SD/HD table by total image count", () => {
+    assert.equal(
+      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 2, imageQuality: "sd" }).credits,
       30,
     );
     assert.equal(
-      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 3 }).credits,
+      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 2, imageQuality: "hd" }).credits,
       35,
     );
     assert.equal(
-      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 5 }).credits,
+      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 3, imageQuality: "sd" }).credits,
+      35,
+    );
+    assert.equal(
+      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 3, imageQuality: "hd" }).credits,
       40,
     );
     assert.equal(
-      quoteStandardCredits({ mode: "circle_to_remove" }).credits,
-      25,
+      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 4, imageQuality: "sd" }).credits,
+      35,
+    );
+    assert.equal(
+      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 5, imageQuality: "sd" }).credits,
+      40,
+    );
+    assert.equal(
+      quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 5, imageQuality: "hd" }).credits,
+      45,
+    );
+  });
+});
+
+describe("quoteGptImage2MultiCredits premium", () => {
+  it("premium table max 76", () => {
+    assert.equal(
+      quoteGptImage2MultiCredits({ experience: "premium", referenceCount: 10, outputClass: "2k" }).credits,
+      76,
+    );
+    assert.equal(
+      quoteGptImage2MultiCredits({ experience: "premium", referenceCount: 2, outputClass: "sd" }).credits,
+      35,
+    );
+    assert.equal(
+      quoteGptImage2MultiCredits({ experience: "premium", referenceCount: 4, outputClass: "hd" }).credits,
+      47,
     );
   });
 });
@@ -168,7 +224,8 @@ describe("buildStandardStep models", () => {
       ],
       imageQuality: "sd",
     } as StandardValidationOk);
-    assert.equal(multi.model, STANDARD_MODELS.multiImageToImage);
+    assert.equal(multi.model, GPT_IMAGE_2_EDIT_MODEL);
+    assert.equal(multi.body.quality, "low");
     assert.deepEqual(multi.body.image_urls, [
       "https://cdn.example/base.png",
       "https://cdn.example/r1.png",
