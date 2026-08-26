@@ -69,9 +69,17 @@ function HistoryPage() {
     supabase
       .from("generations")
       .select("id, type, prompt, output_url, status, created_at, metadata")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        if (data) setGens(data as Generation[]);
+      .limit(100)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[history] load failed:", error.message);
+          toast.error("Could not load history.");
+          setGens([]);
+        } else if (data) {
+          setGens(data as Generation[]);
+        }
         setLoading(false);
       });
   };
