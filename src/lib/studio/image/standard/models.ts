@@ -1,15 +1,23 @@
-/**
+ /**
  * LOCKED Standard Image Studio models — do not substitute without product approval.
  *
- * Multi-reference (2+ total images) uses GPT Image 2 edit @ quality low only.
- * Single-image I2I and T2I remain on Flux paths.
+ * T2I SD  → fal-ai/flux-2/klein/4b
+ * T2I HD  → fal-ai/flux-2/klein/9b
+ * Single I2I → fal-ai/flux/dev/image-to-image (Flux 0.1 Dev)
+ * Multi (2–5 total images) → openai/gpt-image-2/edit @ quality low only
+ *
+ * Never route Standard through Schnell, Flux Pro 1.1, Kontext, Seedream, or Ultra.
  */
 
 import { GPT_IMAGE_2_EDIT_MODEL } from "@/lib/studio/image/gpt-image-2";
 
 export const STANDARD_MODELS = {
-  textToImage: "fal-ai/flux/schnell",
-  imageToImage: "fal-ai/flux-pro/kontext",
+  /** T2I SD (\~0.25 MP target via image_size presets). */
+  textToImageSd: "fal-ai/flux-2/klein/4b",
+  /** T2I HD (\~1 MP target via image_size presets). */
+  textToImageHd: "fal-ai/flux-2/klein/9b",
+  /** Single-image I2I only (never multi). */
+  imageToImage: "fal-ai/flux/dev/image-to-image",
   /** Multi-reference only (2–5 total images). Never for 0–1 image. */
   multiImageToImage: GPT_IMAGE_2_EDIT_MODEL,
   circleToRemove: "fal-ai/flux-pro/v1/erase",
@@ -17,8 +25,21 @@ export const STANDARD_MODELS = {
 
 export type StandardModelId = (typeof STANDARD_MODELS)[keyof typeof STANDARD_MODELS];
 
-/** Schnell image_size for aspect + SD/HD. */
-export function schnellImageSize(
+/** Resolve T2I model by quality (default SD → 4B). */
+export function standardTextToImageModel(
+  quality?: "sd" | "hd" | null,
+): typeof STANDARD_MODELS.textToImageSd | typeof STANDARD_MODELS.textToImageHd {
+  return quality === "hd"
+    ? STANDARD_MODELS.textToImageHd
+    : STANDARD_MODELS.textToImageSd;
+}
+
+/**
+ * image_size presets for Flux 2 Klein T2I.
+ * SD → smaller presets (\~0.25 MP class); HD → larger presets (\~1 MP class).
+ * Uses only documented fal image_size enum strings.
+ */
+export function kleinImageSize(
   aspect?: string | null,
   quality?: "sd" | "hd" | null,
 ): string {
@@ -37,3 +58,6 @@ export function schnellImageSize(
       return hd ? "square_hd" : "square";
   }
 }
+
+/** @deprecated Use kleinImageSize — kept for residual callers. */
+export const schnellImageSize = kleinImageSize;
