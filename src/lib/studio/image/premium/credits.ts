@@ -2,7 +2,9 @@
  * LOCKED Premium (pro) T2I / single-I2I credits.
  * Multi credits live in gpt-image-2/credits.ts — do not duplicate here.
  *
- * Aspect ratio = 0 additional credits.
+ * T2I: SD 25, HD 30, 2K 35 (any aspect = +0)
+ * I2I: SD 30, HD 35, 2K 40 (any aspect = +0)
+ *
  * Does NOT use Ultra or Standard calculators.
  */
 
@@ -13,7 +15,7 @@ export type PremiumMode = "text_to_image" | "image_to_image";
 export const PREMIUM_T2I_CREDITS: Record<PremiumQuality, number> = {
   sd: 25,
   hd: 30,
-  "2k": 30,
+  "2k": 35,
 };
 
 export const PREMIUM_I2I_CREDITS: Record<PremiumQuality, number> = {
