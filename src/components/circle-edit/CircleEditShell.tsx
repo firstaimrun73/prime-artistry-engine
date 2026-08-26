@@ -26,6 +26,8 @@ type Props = {
   controls?: React.ReactNode;
   /** Action row: Clear · status · primary CTA */
   actionBar?: React.ReactNode;
+  /** Optional bottom sheet (e.g. Add assets) — rendered above nav */
+  sheet?: React.ReactNode;
 };
 
 export function CircleEditShell({
@@ -37,6 +39,7 @@ export function CircleEditShell({
   children,
   controls,
   actionBar,
+  sheet,
 }: Props) {
   const [brandPulse, setBrandPulse] = useState(false);
 
@@ -58,7 +61,6 @@ export function CircleEditShell({
       className="flex h-[100dvh] flex-col overflow-hidden bg-[#12141A] text-[#F2F2F5]"
       data-circle-2edit="true"
     >
-      {/* Header — Galaxy-style: back · ring logo · compact title · Moto Credits */}
       <header className="flex shrink-0 items-center gap-2.5 border-b border-[#2A2E3A] bg-[#181A22] px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
         <button
           type="button"
@@ -90,20 +92,12 @@ export function CircleEditShell({
           </h1>
         </div>
 
-        {/* Moto Credits — M with horizontal slashes through the letter (¥-style) */}
+        {/* Real credit balance only — no M / infinity badge */}
         <span
-          className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-[#D0D4DC] bg-[#F3F4F7] px-2.5 py-1.5 text-[11px] text-[#3C3F4A] sm:px-3 sm:text-[11.5px]"
-          title="Moto Credits"
+          className="ml-auto flex shrink-0 items-center rounded-full border border-[#2E3140] bg-[#22252F] px-3 py-1.5 text-[12px] font-medium text-[#E8E9ED]"
+          title="Credits"
         >
-          <span
-            aria-hidden
-            className="relative inline-grid h-[18px] w-[18px] place-items-center font-bold leading-none text-[#1A1B1F]"
-          >
-            <span className="text-[13px] tracking-tight">M</span>
-            <span className="pointer-events-none absolute left-0 right-0 top-[7px] h-[1.5px] bg-[#1A1B1F]" />
-            <span className="pointer-events-none absolute left-0 right-0 top-[11px] h-[1.5px] bg-[#1A1B1F]" />
-          </span>
-          <span className="tabular-nums font-semibold text-[#1A1B1F]">{creditsLabel}</span>
+          <span className="tabular-nums font-semibold text-[#A89BFF]">{creditsLabel}</span>
         </span>
       </header>
 
@@ -119,8 +113,10 @@ export function CircleEditShell({
 
       {actionBar}
 
+      {sheet}
+
       <nav
-        className="flex shrink-0 gap-1 border-t border-[#2A2E3A] bg-[#181A22] p-2 sm:p-2.5"
+        className="flex shrink-0 gap-1 border-t border-[#2A2E3A] bg-[#181A22] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-2.5"
         aria-label="Circle 2edit mode"
       >
         {(
@@ -290,23 +286,22 @@ export function CircleEditActionBar({
         disabled={ctaDisabled}
         onClick={onCta}
         className={cn(
-          "ml-auto flex items-center gap-2 whitespace-nowrap rounded-xl px-[22px] py-[13px] text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40",
+          "ml-auto flex min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-[13px] text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-[22px]",
           ctaVariant === "violet" && "bg-[#A89BFF] text-[#12141A] hover:brightness-110",
           ctaVariant === "teal" && "bg-[#5CE0C0] text-[#12141A] hover:brightness-110",
           ctaVariant === "muted" &&
             "border border-[#2E3140] bg-[#22252F] text-[#F2F2F5] hover:border-[#9AA0B0]",
         )}
       >
-        <span>{ctaLabel}</span>
+        <span className="truncate">{ctaLabel}</span>
         {ctaCost ? (
-          <span className="font-mono text-[11.5px] font-medium opacity-75">· {ctaCost}</span>
+          <span className="shrink-0 font-mono text-[11.5px] font-medium opacity-75">· {ctaCost}</span>
         ) : null}
       </button>
     </footer>
   );
 }
 
-/** Compact Samsung-style draw tools for Remove / Add */
 export type CircleDrawTool = "circle" | "brush" | "eraser";
 
 export function CircleDrawToolbar({
