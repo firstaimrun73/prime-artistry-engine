@@ -101,14 +101,9 @@ export function studioTierToMusicQuality(tier: StudioTier): "standard" | "premiu
 
 /** Default quality preference when switching experience (before manual override). */
 export function studioTierToImageQuality(tier: StudioTier): ImageQuality {
-  switch (tier) {
-    case "standard":
-      return "hd";
-    case "pro":
-      return "2k";
-    case "premium":
-      return "4k";
-  }
+  // Default for all experiences is SD; user must explicitly raise quality.
+  void tier;
+  return "sd";
 }
 
 /** User-facing experience name (Standard / Premium / Ultra AI). */
