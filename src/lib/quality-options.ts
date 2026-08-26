@@ -1,7 +1,7 @@
 // Client-safe output-quality tiers for the Image and Video editors.
 //
 // Quality selects output resolution / upscale factor — NOT user price.
-// Surface credits come from image-experience-credits.ts (experience + mode).
+// Surface credits come from experience quote helpers.
 //
 // SD/HD = generation path with no Topaz upscale.
 // 2K/4K/8K = Topaz upscale after generation (existing pipeline).
@@ -12,6 +12,8 @@ export type VideoResolution = "720p" | "1080p" | "4k";
 export const IMAGE_QUALITY_OPTIONS: {
   id: ImageQuality;
   label: string;
+  /** Short title under the chip (e.g. Standard Definition). */
+  title: string;
   /** @deprecated Do not show on quality chips. Kept for legacy callers only. */
   credits: number;
   /** Topaz upscale factor applied after the edit/generation (1 = no upscale). */
@@ -21,50 +23,55 @@ export const IMAGE_QUALITY_OPTIONS: {
   {
     id: "sd",
     label: "SD",
+    title: "Standard Definition",
     credits: 0,
     upscaleFactor: 1,
-    hint: "Standard definition — fast, no upscale.",
+    hint: "Fast generation · compact output · ~0.25 MP",
   },
   {
     id: "hd",
     label: "HD",
+    title: "High Definition",
     credits: 0,
     upscaleFactor: 1,
-    hint: "Full HD — sharp, no upscale.",
+    hint: "Higher detail · ~1 MP",
   },
   {
     id: "2k",
     label: "2K",
+    title: "2K",
     credits: 0,
     upscaleFactor: 2,
-    hint: "2K detail via upscale pipeline.",
+    hint: "2K-class detail",
   },
   {
     id: "4k",
     label: "4K",
+    title: "4K",
     credits: 0,
     upscaleFactor: 4,
-    hint: "4K detail via upscale pipeline.",
+    hint: "4K delivery via enhancement",
   },
   {
     id: "8k",
     label: "8K",
+    title: "8K",
     credits: 0,
     upscaleFactor: 8,
-    hint: "8K via upscale pipeline (Ultra AI · Studio plans).",
+    hint: "8K delivery via enhancement",
   },
 ];
 
 /**
- * @deprecated Prefer computeImageExperienceCredits / estimateImageStudioCredits.
- * Kept so any residual callers do not break; returns 0 (quality is not priced).
+ * @deprecated Prefer experience quote helpers.
+ * Kept so any residual callers do not break; returns 0 (quality is not priced here).
  */
 export function imageQualityCost(_q: ImageQuality | undefined): number {
   return 0;
 }
 
 export function imageUpscaleFactor(q: ImageQuality | undefined): number {
-  return IMAGE_QUALITY_OPTIONS.find((o) => o.id === (q ?? "hd"))?.upscaleFactor ?? 1;
+  return IMAGE_QUALITY_OPTIONS.find((o) => o.id === (q ?? "sd"))?.upscaleFactor ?? 1;
 }
 
 export const VIDEO_RESOLUTION_OPTIONS: {
