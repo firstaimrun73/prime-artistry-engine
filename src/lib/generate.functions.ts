@@ -304,6 +304,29 @@ export const generateMedia = createServerFn({ method: "POST" })
         quality: validated.quality,
         referenceCount: validated.referenceCount,
       });
+       return q.credits + (data.circlePrepCredits ?? 0);
+    })()
+  : isPremiumSingleCandidate({
+      studioTier: data.studioTier,
+      maskImageUrl: data.maskImageUrl,
+      circleInstant: data.circleInstant,
+      imageUrl: data.imageUrl,
+      referenceImageUrls: data.referenceImageUrls,
+    })
+  ? (() => {
+      const validated = validatePremiumImageRequest({
+        prompt: data.prompt,
+        imageUrl: data.imageUrl,
+        referenceImageUrls: data.referenceImageUrls,
+        imageQuality: data.imageQuality,
+        aspectRatio: data.aspectRatio,
+        strength: data.strength,
+      });
+      if (!validated.ok) return STANDARD_FALLBACK_COST;
+      const q = quotePremiumCredits({
+        mode: validated.mode,
+        quality: validated.quality,
+      });
       return q.credits + (data.circlePrepCredits ?? 0);
     })()
   : (() => {
@@ -320,7 +343,6 @@ export const generateMedia = createServerFn({ method: "POST" })
     });
     return credit.credits + (data.circlePrepCredits ?? 0);
   })();
-
     if (!isAdmin && profile.credits < cost) {
       throw new Error(`Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`);
     }
