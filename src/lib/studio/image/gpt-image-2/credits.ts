@@ -3,35 +3,43 @@
  * Isolated from Ultra / T2I / single I2I / video / music.
  *
  * Aspect ratio = 0 additional credits.
- * Model quality is always low (not priced).
+ * Model quality is always low (not priced) — product SD/HD/2K only adjusts credits.
+ *
+ * Standard multi (total images 2–5):
+ *   2 → 30 SD / 35 HD
+ *   3 → 35 SD / 40 HD
+ *   4 → 40 SD / 45 HD
+ *   5 → 40 SD / 45 HD
+ *
+ * Premium multi (total images 2–9, optional 10):
+ *   base SD rows below; HD = base+5; 2K = base+10
  */
 
 import type { GptImage2Experience, GptImage2OutputClass } from "./model";
 
-/** Standard: 2–5 total reference images (primary + extra refs in product count). */
+/** Standard: total images (primary + refs). */
 const STANDARD_SD: Record<number, number> = {
   2: 30,
   3: 35,
-  4: 35,
+  4: 40,
   5: 40,
 };
 
-/** Premium (studioTier "pro"): 2–10 total reference images. */
+/** Premium (studioTier "pro"): total images 2–10. */
 const PREMIUM_SD: Record<number, number> = {
   2: 35,
-  3: 40,
-  4: 42,
+  3: 35,
+  4: 40,
   5: 45,
-  6: 50,
-  7: 54,
-  8: 58,
-  9: 62,
-  10: 66,
+  6: 45,
+  7: 50,
+  8: 55,
+  9: 60,
+  10: 65,
 };
 
-const HD_ADDON = 5;
-const PREMIUM_2K_ADDON = 10;
-const PREMIUM_MAX = 76;
+/** +5 per quality step above SD (HD +5, 2K +10). */
+const QUALITY_STEP = 5;
 
 export type GptImage2CreditQuote = {
   credits: number;
@@ -61,7 +69,7 @@ export function quoteGptImage2MultiCredits(opts: {
     }
     const base = STANDARD_SD[n];
     if (base == null) throw new Error(`No Standard credit row for ${n} images.`);
-    const credits = outputClass === "hd" ? base + HD_ADDON : base;
+    const credits = outputClass === "hd" ? base + QUALITY_STEP : base;
     return {
       credits,
       experience,
@@ -78,9 +86,8 @@ export function quoteGptImage2MultiCredits(opts: {
   const base = PREMIUM_SD[n];
   if (base == null) throw new Error(`No Premium credit row for ${n} images.`);
   let credits = base;
-  if (outputClass === "hd") credits = base + HD_ADDON;
-  else if (outputClass === "2k") credits = base + PREMIUM_2K_ADDON;
-  if (credits > PREMIUM_MAX) credits = PREMIUM_MAX;
+  if (outputClass === "hd") credits = base + QUALITY_STEP;
+  else if (outputClass === "2k") credits = base + QUALITY_STEP * 2;
   return {
     credits,
     experience,
