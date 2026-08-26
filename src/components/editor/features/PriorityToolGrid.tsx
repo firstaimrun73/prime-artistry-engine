@@ -19,6 +19,8 @@ type Props = {
   onPrompt: (prompt: string) => void;
   onCircleRemove: () => void;
   onCrop: () => void;
+  /** Display-only credit hint (e.g. 25). */
+  circleCredits?: number;
 };
 
 function ToolButton({
@@ -26,10 +28,11 @@ function ToolButton({
   hasImage,
   disabled,
   onCircleRemove,
+  circleCredits = 25,
 }: Props & { t: PriorityToolAction }) {
   const Icon = t.icon;
   const base =
-    "flex min-h-[44px] items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2 text-left text-xs font-medium transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50";
+    "flex min-h-[40px] items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs font-medium transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50";
 
   if (t.kind === "route" && t.mode === "remove") {
     return (
@@ -38,9 +41,13 @@ function ToolButton({
         disabled={disabled || !hasImage}
         className={base}
         onClick={() => onCircleRemove()}
+        title={!hasImage ? "Upload an image first" : undefined}
       >
         <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
         <span className="leading-tight">{t.label}</span>
+        <span className="ml-auto tabular-nums text-[10px] font-semibold text-muted-foreground">
+          {circleCredits} credits
+        </span>
       </button>
     );
   }
@@ -51,15 +58,11 @@ function ToolButton({
 export function PriorityToolGrid(props: Props) {
   return (
     <div className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tools</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:max-w-sm">
         {PRIORITY_CORE.map((t) => (
           <ToolButton key={t.id} t={t} {...props} />
         ))}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        Paint the area to remove, then tap <strong>Remove</strong>. Generation starts automatically.
-      </p>
     </div>
   );
 }
