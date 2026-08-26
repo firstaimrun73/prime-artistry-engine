@@ -1,9 +1,9 @@
- /**
+/**
  * LOCKED Standard Image Studio credits — authoritative for Standard path.
  *
- * Text → Image: SD 20, HD 20
- * Image → Image (Flux 0.1 Dev): SD 25, HD 30
- * Multi (GPT Image 2, 2–5 total images): gpt-image-2 credit table (SD/HD)
+ * Text → Image: SD 20, HD 25 (any aspect ratio = +0)
+ * Image → Image (single): SD 25, HD 30
+ * Multi (total images 2–5): SD 30/35/40/40 → HD +5 = 35/40/45/45
  * Circle to Remove: 25 flat
  *
  * Aspect ratio = 0 additional credits.
@@ -17,7 +17,7 @@ import type { StandardCreditQuote, StandardImageMode, StandardImageQuality } fro
 
 export const STANDARD_CREDITS = {
   textToImageSd: 20,
-  textToImageHd: 20,
+  textToImageHd: 25,
   imageToImageSd: 25,
   imageToImageHd: 30,
   /** @deprecated Prefer imageToImageSd — kept for older test imports. */
