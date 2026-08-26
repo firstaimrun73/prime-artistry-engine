@@ -20,9 +20,13 @@ export function routeStandardImage(
 }
 
 export function quoteAfterValidation(ok: StandardValidationOk): StandardCreditQuote {
+  const totalImages =
+    ok.mode === "multi_image_to_image"
+      ? (ok.imageUrl ? 1 : 0) + ok.referenceImageUrls.length
+      : ok.referenceImageUrls.length;
   return quoteStandardCredits({
     mode: ok.mode,
-    referenceCount: ok.referenceImageUrls.length,
+    referenceCount: totalImages,
     imageQuality: ok.imageQuality,
   });
 }
