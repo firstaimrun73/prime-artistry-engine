@@ -1,8 +1,8 @@
-/**
+ /**
  * LOCKED Standard Image Studio credits — authoritative for Standard path.
  *
- * Text → Image: SD 20, HD 25
- * Image → Image: 25 (no fake HD premium)
+ * Text → Image: SD 20, HD 20
+ * Image → Image (Flux 0.1 Dev): SD 25, HD 30
  * Multi (GPT Image 2, 2–5 total images): gpt-image-2 credit table (SD/HD)
  * Circle to Remove: 25 flat
  *
@@ -17,7 +17,10 @@ import type { StandardCreditQuote, StandardImageMode, StandardImageQuality } fro
 
 export const STANDARD_CREDITS = {
   textToImageSd: 20,
-  textToImageHd: 25,
+  textToImageHd: 20,
+  imageToImageSd: 25,
+  imageToImageHd: 30,
+  /** @deprecated Prefer imageToImageSd — kept for older test imports. */
   imageToImage: 25,
   multi1to2: 30,
   multi3to4: 35,
@@ -52,10 +55,12 @@ export function quoteStandardCredits(opts: {
   }
 
   if (mode === "image_to_image") {
+    const hd = opts.imageQuality === "hd";
+    const credits = hd ? STANDARD_CREDITS.imageToImageHd : STANDARD_CREDITS.imageToImageSd;
     return {
-      credits: STANDARD_CREDITS.imageToImage,
+      credits,
       mode,
-      breakdown: `Image→Image ${STANDARD_CREDITS.imageToImage}`,
+      breakdown: `Image→Image ${hd ? "HD" : "SD"} ${credits}`,
     };
   }
 
