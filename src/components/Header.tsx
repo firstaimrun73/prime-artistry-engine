@@ -26,10 +26,12 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/tickets", label: "Tickets" },
 ];
 
-/** Auth users: Studio hub (not a lone Image Editor link). */
+/** Auth users: app navigation (not marketing page links). */
 const AUTH_LINKS_BASE: NavItem[] = [
   { to: "/studio", label: "Studio" },
   { to: "/history", label: "History" },
+  { to: "/dashboard", label: "Dashboard" },
+  { to: "/pricing", label: "Plans" },
 ];
 
 const CHAT_LINK: NavItem = { to: "/chat", label: "Chat" };
@@ -44,19 +46,13 @@ export function Header() {
   const authLinks: NavItem[] = showChat
     ? [...AUTH_LINKS_BASE, CHAT_LINK]
     : AUTH_LINKS_BASE;
-  // Dedupe Studio when already in PUBLIC_LINKS for signed-in users
-  const links: NavItem[] = user
-    ? [...PUBLIC_LINKS.filter((l) => l.to !== "/studio"), ...authLinks]
-    : PUBLIC_LINKS;
+  // Signed-in: application nav only (Studio, History, optional Chat).
+  // Pre-login: full marketing links.
+  const links: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-      {/*
-        Flex (not minmax(0,1fr) grid): brand never shrinks under the language control.
-        Clear gap between logo cluster and actions so they cannot touch/overlap.
-      */}
       <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-3 sm:gap-4 sm:px-4">
-        {/* Brand — shrink-0 so Motio2edit wordmark stays fully readable */}
         <Link
           to="/"
           className="notranslate flex shrink-0 items-center gap-1.5 sm:gap-2"
@@ -91,12 +87,7 @@ export function Header() {
           )}
         </nav>
 
-        {/* Actions — always a separate non-overlapping cluster */}
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-          {/*
-            Pre-login language: independent control in the action cluster (not beside logo in the same flex item).
-            Post-login: same single header language control — do not add a second selector.
-          */}
           <div className="notranslate shrink-0" translate="no" data-no-translate>
             <GoogleLanguageSelect className="shrink-0" />
           </div>
@@ -170,7 +161,6 @@ export function Header() {
               <div className="flex items-center gap-2 border-b border-border px-5 py-4">
                 <BrandMark />
               </div>
-              {/* Language lives only in the header control — no second selector here */}
               <nav className="flex flex-col p-2">
                 {links.map((l) => (
                   <Link
