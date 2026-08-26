@@ -1,9 +1,14 @@
-/**
+ /**
  * Standard Image Studio backend — public exports.
  * Frontend / UI must not import model IDs for display.
  */
 
-export { STANDARD_MODELS, schnellImageSize } from "./models";
+export {
+  STANDARD_MODELS,
+  kleinImageSize,
+  schnellImageSize,
+  standardTextToImageModel,
+} from "./models";
 export { STANDARD_CREDITS, quoteStandardCredits } from "./credits";
 export {
   validateStandardImageRequest,
