@@ -10,14 +10,16 @@ import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
 import { type ImageQuality } from "@/lib/quality-options";
 import { quoteStandardCredits } from "@/lib/studio/image/standard";
-import { estimateImageStudioCredits } from "@/lib/studio/image/image-experience-credits";
+import { quoteUltraCredits, normalizeUltraQuality } from "@/lib/studio/image/ultra";
+import { quotePremiumCredits, normalizePremiumQuality } from "@/lib/studio/image/premium";
+import { quoteGptImage2MultiCredits } from "@/lib/studio/image/gpt-image-2";
 import { secureDownloadImage } from "@/lib/download.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
-import { getPlanLimits } from "@/utils/planLimits";
+import { getPlanLimits, maxImagesForPlan } from "@/utils/planLimits";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
 import { toast } from "sonner";
@@ -93,7 +95,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1:1");
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [activeImage, setActiveImage] = useState(0);
-  const [imageQuality, setImageQuality] = useState<ImageQuality>("hd");
+  const [imageQuality, setImageQuality] = useState<ImageQuality>("sd");
   const [studioTier, setStudioTier] = useState<StudioTier>("standard");
   const qualityTouchedRef = useRef(false);
 
@@ -200,54 +202,91 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     }
   }, [state, isPremiumExp, isUltraExp, premiumGenError, ultraGenError]);
 
-  /** Authoritative pre-generation estimate — must match backend Standard / experience charge. */
+  /** Authoritative pre-generation estimate — must match server charge (Standard / Premium / Ultra). */
   const cost = useMemo(() => {
     const hasSource = !!inputDataUrl;
     const refCount = refImages.length;
     const hasMask = !!removeMaskDataUrl;
+    const totalImages = (hasSource ? 1 : 0) + refCount;
 
     if (studioTier === "standard") {
       if (hasMask) {
         return quoteStandardCredits({ mode: "circle_to_remove" }).credits;
       }
-      if (hasSource && refCount > 0) {
+      if (totalImages >= 2) {
         return quoteStandardCredits({
           mode: "multi_image_to_image",
-          referenceCount: refCount,
+          referenceCount: totalImages,
+          imageQuality: imageQuality === "hd" ? "hd" : "sd",
         }).credits;
       }
       if (hasSource) {
-        return quoteStandardCredits({ mode: "image_to_image" }).credits;
+        return quoteStandardCredits({
+          mode: "image_to_image",
+          imageQuality: imageQuality === "hd" ? "hd" : "sd",
+        }).credits;
       }
-      const q = imageQuality === "hd" ? "hd" : "sd";
       return quoteStandardCredits({
         mode: "text_to_image",
-        imageQuality: q,
+        imageQuality: imageQuality === "hd" ? "hd" : "sd",
       }).credits;
     }
 
-    return estimateImageStudioCredits({
-      studioTier,
-      hasSourceImage: hasSource,
-      referenceCount: refCount,
-      imageQuality,
-      plan: profile?.plan,
-      isAdmin,
-    });
+    // Premium (pro)
+    if (studioTier === "pro") {
+      if (totalImages >= 2) {
+        const outputClass =
+          imageQuality === "2k" ? "2k" : imageQuality === "hd" ? "hd" : "sd";
+        return quoteGptImage2MultiCredits({
+          experience: "premium",
+          referenceCount: totalImages,
+          outputClass,
+        }).credits;
+      }
+      if (hasSource) {
+        return quotePremiumCredits({
+          mode: "image_to_image",
+          quality: normalizePremiumQuality(imageQuality),
+        }).credits;
+      }
+      return quotePremiumCredits({
+        mode: "text_to_image",
+        quality: normalizePremiumQuality(imageQuality),
+      }).credits;
+    }
+
+    // Ultra AI (premium tier) — same quoteUltraCredits as server
+    if (studioTier === "premium") {
+      const quality = normalizeUltraQuality(imageQuality);
+      if (totalImages >= 2) {
+        return quoteUltraCredits({
+          mode: "multi_image",
+          quality,
+          referenceCount: totalImages,
+        }).credits;
+      }
+      if (hasSource) {
+        return quoteUltraCredits({ mode: "image_to_image", quality }).credits;
+      }
+      return quoteUltraCredits({ mode: "text_to_image", quality }).credits;
+    }
+
+    return 25;
   }, [
     studioTier,
     inputDataUrl,
     refImages.length,
     removeMaskDataUrl,
     imageQuality,
-    profile?.plan,
-    isAdmin,
   ]);
 
   if (!profile) return null;
 
   const noCredits = !isAdmin && profile.credits < cost;
-  const planLimits = getPlanLimits(profile.plan);
+  // Admin uses maxImagesForPlan(..., true) → 10; non-admin stays on plan matrix
+  const planLimits = isAdmin
+    ? { ...getPlanLimits(profile.plan), maxImages: maxImagesForPlan(profile.plan, true), videoEnabled: true, hd: true }
+    : getPlanLimits(profile.plan);
   const canAddRefImages = !!inputDataUrl && planLimits.maxImages > 1;
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
