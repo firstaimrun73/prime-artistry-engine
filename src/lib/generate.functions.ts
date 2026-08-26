@@ -196,8 +196,8 @@ export const generateMedia = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profile, error: pErr } = await supabase.from("profiles").select("plan, credits, email").eq("id", userId).single();
     if (pErr || !profile) throw new Error("Could not load your account.");
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const isAdmin = !!adminEmail && !!profile.email && profile.email.toLowerCase() === adminEmail.toLowerCase();
+     // Single authority: same admin list as admin-guard.server (ADMIN_EMAIL + ADMIN_EMAILS + known ops)
+    const isAdmin = isAdminClaims({ email: profile.email ?? undefined });
     if (!isAdmin && data.type === "video" && profile.plan === "free") throw new Error("Video generation requires a paid plan.");
     const requestedDuration = data.videoDurationSeconds ?? 5;
     const maxDuration = maxVideoDurationForPlan(profile.plan);
