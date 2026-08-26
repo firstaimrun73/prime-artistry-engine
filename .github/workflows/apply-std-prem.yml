@@ -1,0 +1,42 @@
+name: apply-std-prem
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/image-studio-standard-premium-backend
+      - name: Decode and write files from .recovery
+        run: |
+          python3 << 'PY'
+          import base64
+          from pathlib import Path
+          man = Path(".recovery/manifest.txt")
+          assert man.exists(), "manifest missing"
+          for path in man.read_text().strip().splitlines():
+              safe = path.replace("/", "__")
+              b64p = Path(".recovery") / f"{safe}.b64"
+              assert b64p.exists(), f"missing {b64p}"
+              data = base64.b64decode(b64p.read_text())
+              p = Path(path)
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_bytes(data)
+              print("wrote", path, len(data))
+          print("OK")
+          PY
+      - name: Commit
+        run: |
+          git config user.name restore-bot
+          git config user.email restore@local
+          git add src/lib/studio/image/standard src/lib/studio/image/premium src/lib/generate.functions.ts
+          git status
+          git diff --cached --stat
+          git commit -m "feat(image): lock Standard + Premium T2I/I2I models and credits" || exit 0
+          git push origin HEAD:feat/image-studio-standard-premium-backend
