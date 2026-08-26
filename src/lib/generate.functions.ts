@@ -1,1 +1,4 @@
-SEE_LOCAL_FILE_AT_tmp_gen_for_push.ts_SIZE_26459
+/**
+ * Server functions entrypoint for media generation and checkout.
+ */
+export { generateMedia, completeCheckout } from "@/lib/generate.media-core";
