@@ -21,6 +21,12 @@ import {
   planPremiumMultiGptImage2,
 } from "@/lib/studio/image/premium/multi-image";
 import {
+  isUltraCandidate,
+  executeUltraImage,
+  validateUltraImageRequest,
+  quoteUltraCredits,
+} from "@/lib/studio/image/ultra";
+import {
   buildFalRequest,
   buildImageEdit,
   buildImageEnhancementPipeline,
@@ -350,8 +356,22 @@ export const generateMedia = createServerFn({ method: "POST" })
       );
       if (!outputUrl) throw new Error("Premium multi generation returned no image.");
       standardCharge = planned.credits + (data.circlePrepCredits ?? 0);
+    } else if (
+      data.type === "image" &&
+      isUltraCandidate({
+        studioTier: data.studioTier,
+        maskImageUrl: data.maskImageUrl,
+        circleInstant: data.circleInstant,
+      })
+    ) {
+      const result = await executeUltraImage(
+        { prompt: data.prompt, imageUrl: data.imageUrl, referenceImageUrls: data.referenceImageUrls, imageQuality: data.imageQuality, aspectRatio: data.aspectRatio },
+        { falKey, runStep: async (step) => runFalStepResilient({ label: step.label, model: step.model, endpoint: `https://fal.run/${step.model}`, body: step.body, outputKind: "image" }, falKey) },
+      );
+      outputUrl = result.outputUrl;
+      standardCharge = result.credits + (data.circlePrepCredits ?? 0);
     } else if (data.type === "image") {
-      // ——— Pro / Premium (existing pipelines; Ultra + single I2I / T2I unchanged) ———
+      // ——— Pro legacy single I2I / T2I ———
       if (data.imageUrl) {
         const rawRefs = data.referenceImageUrls ?? [];
         const validRefs = rawRefs.filter((u) => u.startsWith("https://"));
