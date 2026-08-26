@@ -15,7 +15,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Restore complete generate.functions.ts from 8291bb7
+      - name: Restore generate.functions.ts from 8291bb7
         run: |
           git show 8291bb7bf112e53808394c94da56df1c4080ab0a:src/lib/generate.functions.ts > src/lib/generate.functions.ts
           SIZE=$(wc -c < src/lib/generate.functions.ts)
@@ -26,126 +26,8 @@ jobs:
           grep -q "planPremiumMultiGptImage2" src/lib/generate.functions.ts
           grep -q "finalizeMediaAsset" src/lib/generate.functions.ts
           grep -q "deduct_credits" src/lib/generate.functions.ts
-          grep -q "export const completeCheckout" src/lib/generate.functions.ts
           ! grep -q "PLACEHOLDER" src/lib/generate.functions.ts
           ! grep -q "generate.media-core" src/lib/generate.functions.ts
-
-      - name: Apply Ultra AI integration wire
-        run: |
-          python3 << 'PY'
-          from pathlib import Path
-          base = Path("src/lib/generate.functions.ts").read_text()
-          if 'from "@/lib/studio/image/ultra"' not in base:
-              needle = 'from "@/lib/studio/image/premium/multi-image";'
-              assert needle in base
-              base = base.replace(
-                  needle,
-                  needle + "\nimport {\n  isUltraCandidate,\n  executeUltraImage,\n  validateUltraImageRequest,\n  quoteUltraCredits,\n} from \"@/lib/studio/image/ultra\";",
-                  1,
-              )
-          marker = """            : (() => {
-              const refs = (data.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.startsWith("https://"));
-              const credit = computeImageExperienceCredits({
-                studioTier: data.studioTier,
-                hasSourceImage: !!data.imageUrl,
-                referenceCount: refs.length,
-                imageQuality: data.imageQuality,
-                plan: profile.plan,
-                isAdmin,
-                circleInstant: !!(data.circleInstant && data.maskImageUrl),
-                circleInstantCredits: CIRCLE_INSTANT_CREDITS,
-              });
-              return credit.credits + (data.circlePrepCredits ?? 0);
-            })();"""
-          ultra_cost = """            : isUltraCandidate({
-                studioTier: data.studioTier,
-                maskImageUrl: data.maskImageUrl,
-                circleInstant: data.circleInstant,
-              })
-            ? (() => {
-                const validated = validateUltraImageRequest({
-                  prompt: data.prompt,
-                  imageUrl: data.imageUrl,
-                  referenceImageUrls: data.referenceImageUrls,
-                  imageQuality: data.imageQuality,
-                  aspectRatio: data.aspectRatio,
-                });
-                if (!validated.ok) return STANDARD_FALLBACK_COST;
-                const q = quoteUltraCredits({
-                  mode: validated.mode,
-                  quality: validated.quality,
-                  referenceCount: validated.referenceCount,
-                });
-                return q.credits + (data.circlePrepCredits ?? 0);
-              })()
-            : (() => {
-              const refs = (data.referenceImageUrls ?? []).filter((u) => typeof u === "string" && u.startsWith("https://"));
-              const credit = computeImageExperienceCredits({
-                studioTier: data.studioTier,
-                hasSourceImage: !!data.imageUrl,
-                referenceCount: refs.length,
-                imageQuality: data.imageQuality,
-                plan: profile.plan,
-                isAdmin,
-                circleInstant: !!(data.circleInstant && data.maskImageUrl),
-                circleInstantCredits: CIRCLE_INSTANT_CREDITS,
-              });
-              return credit.credits + (data.circlePrepCredits ?? 0);
-            })();"""
-          if "isUltraCandidate({" not in base:
-              assert marker in base, "cost marker missing"
-              base = base.replace(marker, ultra_cost, 1)
-          old_exec = """      if (!outputUrl) throw new Error("Premium multi generation returned no image.");
-      standardCharge = planned.credits + (data.circlePrepCredits ?? 0);
-    } else if (data.type === "image") {
-      // ——— Pro / Premium (existing pipelines; Ultra + single I2I / T2I unchanged) ———"""
-          new_exec = """      if (!outputUrl) throw new Error("Premium multi generation returned no image.");
-      standardCharge = planned.credits + (data.circlePrepCredits ?? 0);
-    } else if (
-      data.type === "image" &&
-      isUltraCandidate({
-        studioTier: data.studioTier,
-        maskImageUrl: data.maskImageUrl,
-        circleInstant: data.circleInstant,
-      })
-    ) {
-      // ——— ULTRA AI (studioTier premium): Flux 2 Pro T2I/I2I, Seedream multi 2–10 ———
-      const result = await executeUltraImage(
-        {
-          prompt: data.prompt,
-          imageUrl: data.imageUrl,
-          referenceImageUrls: data.referenceImageUrls,
-          imageQuality: data.imageQuality,
-          aspectRatio: data.aspectRatio,
-        },
-        {
-          falKey,
-          runStep: async (step) =>
-            runFalStepResilient(
-              {
-                label: step.label,
-                model: step.model,
-                endpoint: `https://fal.run/${step.model}`,
-                body: step.body,
-                outputKind: "image",
-              },
-              falKey,
-            ),
-        },
-      );
-      outputUrl = result.outputUrl;
-      standardCharge = result.credits + (data.circlePrepCredits ?? 0);
-    } else if (data.type === "image") {
-      // ——— Pro legacy single I2I / T2I (Ultra handled above; Premium multi GPT above) ———"""
-          if base.count("executeUltraImage") < 2 and old_exec in base:
-              base = base.replace(old_exec, new_exec, 1)
-          Path("src/lib/generate.functions.ts").write_text(base)
-          print("SIZE", len(base))
-          assert len(base) > 25000
-          assert "executeUltraImage" in base
-          assert "PLACEHOLDER" not in base
-          assert "generate.media-core" not in base
-          PY
 
       - name: Commit and push
         run: |
@@ -156,5 +38,5 @@ jobs:
             echo "No changes"
             exit 0
           fi
-          git commit -m "fix(image): restore complete generate.functions from 8291bb7 + Ultra wire"
+          git commit -m "fix(image): restore complete generate.functions from 8291bb7"
           git push
