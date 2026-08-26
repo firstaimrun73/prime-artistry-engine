@@ -15,29 +15,22 @@ jobs:
         run: |
           python3 << 'PY'
           from pathlib import Path
-          import re
           path = Path("src/lib/generate.functions.ts")
           text = path.read_text()
-          # Already fixed if quoteUltraCredits is used in cost phase (before const falKey)
           fal = text.find("const falKey")
           pre = text[:fal] if fal > 0 else text
-          if pre.count("quoteUltraCredits") >= 1:
+          # Import alone is not a fix — need actual call in cost phase
+          if "const q = quoteUltraCredits" in pre:
               print("already fixed")
               raise SystemExit(0)
-          # Find the final computeImageExperienceCredits fallback after premium multi
-          # Pattern: })()\n            : (() => {\n              const refs = ... computeImageExperienceCredits
           needle = "computeImageExperienceCredits"
-          # Find last occurrence before const falKey (the final fallback)
           idx = pre.rfind(needle)
           assert idx > 0, "no computeImageExperienceCredits in pre-check"
-          # Walk back to find ": (() => {" that starts this branch
           start = pre.rfind(": (() => {", 0, idx)
           assert start > 0, "branch start not found"
-          # Walk forward from idx to closing })();
           end = text.find("})();", idx)
           assert end > 0, "branch end not found"
           end = end + len("})();")
-          # The branch to replace starts at start (the colon)
           replacement = """: isUltraCandidate({
                 studioTier: data.studioTier,
                 maskImageUrl: data.maskImageUrl,
@@ -77,7 +70,7 @@ jobs:
           path.write_text(new_text)
           t2 = path.read_text()
           fal2 = t2.find("const falKey")
-          assert t2[:fal2].count("quoteUltraCredits") >= 1, "quoteUltraCredits not in pre-check"
+          assert "const q = quoteUltraCredits" in t2[:fal2], "quoteUltraCredits call not in pre-check"
           print("fixed", len(t2))
           PY
       - name: Commit
