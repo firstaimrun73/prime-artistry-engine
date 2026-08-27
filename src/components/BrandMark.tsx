@@ -1,12 +1,46 @@
-import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
  * Canonical product wordmark: Motio2edit
  * Only the digit "2" uses the primary highlight color.
- * The letter "O" is never specially colored.
- * Always English — never translated by Google Website Translator.
+ * Original mark: layered frames suggesting image/video/music edit — not a third-party AI logo.
  */
+function MotioMarkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden
+    >
+      {/* Outer frame */}
+      <rect
+        x="3"
+        y="4"
+        width="14"
+        height="14"
+        rx="2.5"
+        className="stroke-primary"
+        strokeWidth="1.75"
+      />
+      {/* Inner frame offset — motion / multi-media depth */}
+      <rect
+        x="7"
+        y="6"
+        width="14"
+        height="14"
+        rx="2.5"
+        className="stroke-foreground/70"
+        strokeWidth="1.5"
+        opacity="0.85"
+      />
+      {/* Accent pixel */}
+      <circle cx="10" cy="11" r="1.35" className="fill-primary" />
+    </svg>
+  );
+}
+
 export function BrandMark({
   className,
   showIcon = true,
@@ -34,7 +68,7 @@ export function BrandMark({
       translate="no"
       data-no-translate
     >
-      {showIcon && <Sparkles className={cn(icon, "shrink-0 text-primary")} />}
+      {showIcon && <MotioMarkIcon className={cn(icon, "shrink-0")} />}
       <span className={cn("leading-none whitespace-nowrap", text)}>
         Motio<span className="text-primary">2</span>edit
       </span>
