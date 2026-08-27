@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Motio2edit mark — clean image frame + generative spark.
- * White/orange brand treatment; legible at favicon and header sizes.
+ * Motio2edit mark — rounded app tile + generative spark (star + plus).
+ * Uses brand primary orange so it matches the site header and CTAs.
+ * Sized for clear visibility on mobile and desktop headers.
  */
 export function MotioMarkIcon({
   className,
@@ -13,43 +14,59 @@ export function MotioMarkIcon({
 }) {
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="0 0 48 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={cn(animate && "motio-mark-animate", className)}
       aria-hidden
     >
-      {/* Soft orange disc — brand presence at small sizes */}
-      <circle cx="16" cy="16" r="15" className="fill-primary/15" />
-      {/* Image frame */}
+      <defs>
+        {/* Soft depth on the tile — stays in the orange family */}
+        <linearGradient id="motioTile" x1="6" y1="4" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+          <stop stopColor="hsl(var(--primary))" stopOpacity="0.22" />
+          <stop offset="1" stopColor="hsl(var(--primary))" stopOpacity="0.08" />
+        </linearGradient>
+        <linearGradient id="motioSpark" x1="14" y1="12" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+          <stop stopColor="hsl(var(--primary))" />
+          <stop offset="1" stopColor="hsl(var(--primary))" stopOpacity="0.85" />
+        </linearGradient>
+      </defs>
+
+      {/* Rounded square tile — app-icon silhouette */}
       <rect
-        x="6"
-        y="7"
-        width="16"
-        height="16"
-        rx="3.25"
+        x="3"
+        y="3"
+        width="42"
+        height="42"
+        rx="11"
+        fill="url(#motioTile)"
         className="stroke-primary"
-        strokeWidth="2"
-        fill="none"
+        strokeWidth="2.25"
       />
-      {/* Crop / precision corner */}
+
+      {/* Main 4-point spark (generative star) */}
       <path
-        d="M10 12h3.5M10 12v3.5"
+        d="M24 11.5 L26.35 20.15 L35 22.5 L26.35 24.85 L24 33.5 L21.65 24.85 L13 22.5 L21.65 20.15 Z"
+        fill="url(#motioSpark)"
+      />
+
+      {/* Plus arm accents — match the + on the reference mark */}
+      <path
+        d="M24 15.2v14.6M16.7 22.5h14.6"
         className="stroke-primary"
-        strokeWidth="1.6"
+        strokeWidth="2.4"
         strokeLinecap="round"
+        opacity="0.35"
       />
-      {/* Primary generative spark */}
+
+      {/* Secondary small spark (upper-right, like the reference) */}
       <path
-        d="M24.5 5 L25.75 8.1 L29 9.25 L25.75 10.4 L24.5 13.5 L23.25 10.4 L20 9.25 L23.25 8.1 Z"
+        d="M34.2 13.2 L35.05 15.35 L37.3 16.2 L35.05 17.05 L34.2 19.2 L33.35 17.05 L31.1 16.2 L33.35 15.35 Z"
         className="fill-primary"
       />
-      {/* Secondary spark */}
-      <path
-        d="M27 14.5 L27.55 15.95 L29.1 16.5 L27.55 17.05 L27 18.5 L26.45 17.05 L24.9 16.5 L26.45 15.95 Z"
-        className="fill-primary"
-        fillOpacity="0.8"
-      />
+
+      {/* Tiny accent dot (lower-left of spark, reference detail) */}
+      <circle cx="16.2" cy="30.8" r="1.55" className="fill-primary" opacity="0.9" />
     </svg>
   );
 }
@@ -71,9 +88,13 @@ export function BrandMark({
       : size === "sm"
         ? "text-sm"
         : "text-base sm:text-lg";
-  // ~25% larger than previous h-5/h-7 defaults — visible but not oversized
+  // Larger than before — easy to spot in the sticky header
   const icon =
-    size === "lg" ? "h-8 w-8" : size === "sm" ? "h-5 w-5" : "h-6 w-6 sm:h-7 sm:w-7";
+    size === "lg"
+      ? "h-9 w-9 sm:h-10 sm:w-10"
+      : size === "sm"
+        ? "h-6 w-6"
+        : "h-8 w-8 sm:h-9 sm:w-9";
 
   return (
     <span
