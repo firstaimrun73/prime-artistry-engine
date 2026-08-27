@@ -1,13 +1,5 @@
 // Client-safe output-quality tiers for the Image and Video editors.
-//
 // Quality selects output resolution / upscale factor — NOT user price.
-// Surface credits come from experience quote helpers.
-//
-// SD/HD = generation path with no Topaz upscale.
-// 2K/4K/8K = Topaz upscale after generation (existing pipeline).
-//
-// Dimension labels match ultraDeliveryDimensions long-side targets
-// (src/lib/studio/image/ultra/model.ts) for 1:1 reference display.
 
 export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k";
 export type VideoResolution = "720p" | "1080p" | "4k";
@@ -21,18 +13,36 @@ export const IMAGE_QUALITY_LONG_SIDE: Record<ImageQuality, number> = {
   "8k": 4320,
 };
 
-export function imageQualityDimensionLabel(q: ImageQuality, aspect = "1:1"): string {
+/**
+ * Pixel dimensions from quality long-side + aspect ratio.
+ * IMAX is 1.43:1 (not 21:9).
+ */
+export function imageQualityDimensions(
+  q: ImageQuality,
+  aspect: string = "1:1",
+): { w: number; h: number } {
   const long = IMAGE_QUALITY_LONG_SIDE[q];
-  const ar = aspect === "imax" ? "21:9" : aspect;
-  const map: Record<string, [number, number]> = {
-    "1:1": [long, long],
-    "4:3": [long, Math.round((long * 3) / 4)],
-    "3:4": [Math.round((long * 3) / 4), long],
-    "16:9": [long, Math.round((long * 9) / 16)],
-    "9:16": [Math.round((long * 9) / 16), long],
-    "21:9": [long, Math.round((long * 9) / 21)],
-  };
-  const [w, h] = map[ar] ?? map["1:1"];
+  switch (aspect) {
+    case "4:3":
+      return { w: long, h: Math.round((long * 3) / 4) };
+    case "3:4":
+      return { w: Math.round((long * 3) / 4), h: long };
+    case "16:9":
+      return { w: long, h: Math.round((long * 9) / 16) };
+    case "9:16":
+      return { w: Math.round((long * 9) / 16), h: long };
+    case "imax": {
+      // 1.43:1 — long side is width
+      return { w: long, h: Math.round(long / 1.43) };
+    }
+    case "1:1":
+    default:
+      return { w: long, h: long };
+  }
+}
+
+export function imageQualityDimensionLabel(q: ImageQuality, aspect = "1:1"): string {
+  const { w, h } = imageQualityDimensions(q, aspect);
   return `${w} × ${h}`;
 }
 
@@ -53,7 +63,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "Standard Definition",
     credits: 0,
     upscaleFactor: 1,
-    hint: `Fast · ${imageQualityDimensionLabel("sd")} (1:1)`,
+    hint: "Standard Definition",
   },
   {
     id: "hd",
@@ -61,38 +71,34 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "High Definition",
     credits: 0,
     upscaleFactor: 1,
-    hint: `Higher detail · ${imageQualityDimensionLabel("hd")} (1:1)`,
+    hint: "High Definition",
   },
   {
     id: "2k",
     label: "2K",
-    title: "2K",
+    title: "2K Resolution",
     credits: 0,
     upscaleFactor: 2,
-    hint: `2K delivery · ${imageQualityDimensionLabel("2k")} (1:1)`,
+    hint: "2K Resolution",
   },
   {
     id: "4k",
     label: "4K",
-    title: "4K",
+    title: "4K Resolution",
     credits: 0,
     upscaleFactor: 4,
-    hint: `4K delivery · ${imageQualityDimensionLabel("4k")} (1:1)`,
+    hint: "4K Resolution",
   },
   {
     id: "8k",
     label: "8K",
-    title: "8K",
+    title: "8K Resolution",
     credits: 0,
     upscaleFactor: 8,
-    hint: `8K delivery · ${imageQualityDimensionLabel("8k")} (1:1)`,
+    hint: "8K Resolution",
   },
 ];
 
-/**
- * @deprecated Prefer experience quote helpers.
- * Kept so any residual callers do not break; returns 0 (quality is not priced here).
- */
 export function imageQualityCost(_q: ImageQuality | undefined): number {
   return 0;
 }
