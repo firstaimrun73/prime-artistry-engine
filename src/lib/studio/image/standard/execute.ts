@@ -9,6 +9,7 @@ import { handleTextToImage } from "./handlers/text-to-image";
 import { handleImageToImage } from "./handlers/image-to-image";
 import { handleMultiImageToImage } from "./handlers/multi-image-to-image";
 import { handleCircleToRemove } from "./handlers/circle-to-remove";
+import { handleCircleToAdd } from "./handlers/circle-to-add";
 import type {
   StandardExecuteResult,
   StandardFalStep,
@@ -50,6 +51,9 @@ export async function executeStandardImage(
       break;
     case "circle_to_remove":
       result = await handleCircleToRemove(input);
+      break;
+    case "circle_to_add":
+      result = await handleCircleToAdd(input);
       break;
     default: {
       const _e: never = validated.mode;

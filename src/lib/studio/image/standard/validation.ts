@@ -4,6 +4,8 @@
  *
  * Multi (GPT Image 2): total images = primary + refs must be 2–5.
  * 1 total image → image_to_image (Kontext). 0 → text_to_image.
+ * Mask + circleInstant → circle_to_remove (flux erase).
+ * Mask without circleInstant → circle_to_add (flux inpaint).
  */
 
 import type { StandardImageRequest, StandardValidationResult } from "./types";
@@ -57,16 +59,19 @@ export function validateStandardImageRequest(
       ? raw.aspectRatio
       : undefined;
 
+  // Masked Circle 2edit paths (remove = erase, add = inpaint)
   if (maskImageUrl || raw.circleInstant) {
     if (!imageUrl) {
-      return { ok: false, error: "Circle remove requires the original source image." };
+      return { ok: false, error: "Circle edit requires the original source image." };
     }
     if (!maskImageUrl) {
-      return { ok: false, error: "Circle remove requires a mask matched to the original image size." };
+      return { ok: false, error: "Circle edit requires a mask matched to the original image size." };
     }
+    // circleInstant → erase; mask without circleInstant → inpaint (Add)
+    const mode = raw.circleInstant ? "circle_to_remove" : "circle_to_add";
     return {
       ok: true,
-      mode: "circle_to_remove",
+      mode,
       prompt,
       imageUrl,
       referenceImageUrls: [],
