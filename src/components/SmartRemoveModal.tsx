@@ -1,3 +1,822 @@
 // Professional masking system for "Circle to Remove".
 //
-// PLACEHOLDER_LOAD_FROM_/tmp/srm_fixed.tsx
+// Mobile-first UI: large image, preserved aspect ratio, compact bottom controls.
+// Keeps desktop controls intact. Produces a hard B/W mask PNG via onApply(maskDataUrl).
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  X,
+  Eraser,
+  Check,
+  Brush,
+  ZoomIn,
+  ZoomOut,
+  Undo2,
+  Redo2,
+  Move,
+  EyeOff,
+  Eye,
+  FlipHorizontal2,
+  RotateCcw,
+  Circle,
+} from "lucide-react";
+
+type Props = {
+  open: boolean;
+  imageUrl: string | null;
+  onCancel: () => void;
+  onApply: (maskDataUrl: string) => void;
+  /** Default tool when modal opens */
+  initialTool?: Tool;
+};
+
+type Tool = "brush" | "erase" | "circle";
+
+export const SMART_REMOVE_PROMPT =
+  "Remove only the masked area completely. Reconstruct it naturally using the surrounding textures, lighting, shadows, reflections and perspective so the result looks like the object was never there. Keep every unmasked pixel identical.";
+
+const ZOOM_STEPS = [0.25, 0.5, 1, 2, 4, 8];
+const MAX_HISTORY = 30;
+
+export function SmartRemoveModal({ open, imageUrl, onCancel, onApply, initialTool = "circle" }: Props) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const viewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const bottomControlsRef = useRef<HTMLDivElement | null>(null);
+
+  const drawingRef = useRef(false);
+  const lastPtRef = useRef<{ x: number; y: number } | null>(null);
+  const circleStartRef = useRef<{ x: number; y: number } | null>(null);
+  const circleLiveRef = useRef<{ x: number; y: number; rx: number; ry: number } | null>(null);
+  const panningRef = useRef(false);
+  const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const spaceDownRef = useRef(false);
+  const historyRef = useRef<ImageData[]>([]);
+  const historyIndexRef = useRef(-1);
+  const rafRef = useRef<number | null>(null);
+  const maskScaleRef = useRef(1);
+  const hasMarkRef = useRef(false);
+
+  const [tool, setTool] = useState<Tool>(initialTool);
+  const [brush, setBrush] = useState(40);
+  const [opacity, setOpacity] = useState(100);
+  const [hardness, setHardness] = useState(80);
+  const [feather, setFeather] = useState(2);
+  const [overlayOpacity, setOverlayOpacity] = useState(55);
+  const [showMask, setShowMask] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [ready, setReady] = useState(false);
+  const [hasMark, setHasMark] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const isMobile = useIsMobile();
+  const maxBrush = isMobile ? 80 : 100;
+  useEffect(() => {
+    setBrush((b) => Math.min(b, maxBrush));
+  }, [maxBrush]);
+
+  const [winSize, setWinSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const onResize = () => setWinSize({ w: window.innerWidth, h: window.innerHeight });
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setReady(false);
+      hasMarkRef.current = false;
+      setHasMark(false);
+      setApplying(false);
+      setZoom(1);
+      setOffset({ x: 0, y: 0 });
+      historyRef.current = [];
+      historyIndexRef.current = -1;
+      setCanUndo(false);
+      setCanRedo(false);
+      circleStartRef.current = null;
+      circleLiveRef.current = null;
+    } else {
+      setTool(initialTool);
+    }
+  }, [open, initialTool]);
+
+  const naturalSize = () => {
+    const img = imgRef.current;
+    return img && img.naturalWidth && img.naturalHeight
+      ? { w: img.naturalWidth, h: img.naturalHeight }
+      : null;
+  };
+
+  // Contain-fit: scale image to fully fit inside the viewport without cropping.
+  // Viewport is already the flex-1 stage above bottom controls — do not subtract bottom height again.
+  const fitScale = useMemo(() => {
+    const vp = viewportRef.current;
+    const n = naturalSize();
+    if (!vp || !n) return 1;
+    const pad = 12;
+    const availableH = Math.max(120, vp.clientHeight - pad * 2);
+    const availableW = Math.max(80, vp.clientWidth - pad * 2);
+    const scale = Math.min(availableW / n.w, availableH / n.h);
+    // Cap extreme upscale but allow up to 2.5× so small images fill the view.
+    return Math.min(Math.max(scale, 0.15), 2.5);
+  }, [ready, open, winSize.w, winSize.h, isMobile]);
+
+  const displayScale = fitScale * zoom;
+
+  const pushHistory = useCallback(() => {
+    const c = maskCanvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const snap = ctx.getImageData(0, 0, c.width, c.height);
+    const arr = historyRef.current.slice(0, historyIndexRef.current + 1);
+    arr.push(snap);
+    if (arr.length > MAX_HISTORY) arr.shift();
+    historyRef.current = arr;
+    historyIndexRef.current = arr.length - 1;
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(false);
+  }, []);
+
+  const paintView = useCallback(() => {
+    const view = viewCanvasRef.current;
+    const img = imgRef.current;
+    const mask = maskCanvasRef.current;
+    if (!view || !img || !mask) return;
+    const n = naturalSize();
+    if (!n) return;
+
+    const w = Math.max(1, Math.round(n.w * displayScale));
+    const h = Math.max(1, Math.round(n.h * displayScale));
+    if (view.width !== w) view.width = w;
+    if (view.height !== h) view.height = h;
+
+    const ctx = view.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, w, h);
+
+    if (showMask) {
+      const tint = document.createElement("canvas");
+      tint.width = mask.width;
+      tint.height = mask.height;
+      const tctx = tint.getContext("2d");
+      if (tctx) {
+        tctx.drawImage(mask, 0, 0);
+        tctx.globalCompositeOperation = "source-in";
+        tctx.fillStyle = "rgba(239, 68, 68, 1)";
+        tctx.fillRect(0, 0, tint.width, tint.height);
+        ctx.globalAlpha = overlayOpacity / 100;
+        ctx.drawImage(tint, 0, 0, w, h);
+        ctx.globalAlpha = 1;
+      }
+    }
+    // Live circle preview
+    const live = circleLiveRef.current;
+    if (live && tool === "circle") {
+      const sx = displayScale;
+      ctx.save();
+      ctx.strokeStyle = "rgba(168,155,255,0.95)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.ellipse(live.x * sx, live.y * sx, Math.max(1, live.rx * sx), Math.max(1, live.ry * sx), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(168,155,255,0.25)";
+      ctx.fill();
+      ctx.restore();
+    }
+  }, [displayScale, showMask, overlayOpacity, tool]);
+
+  const requestPaint = useCallback(() => {
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      paintView();
+    });
+  }, [paintView]);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    },
+    [],
+  );
+
+  const onImageLoad = () => {
+    const img = imgRef.current;
+    const mask = maskCanvasRef.current;
+    if (!img || !mask) return;
+    const MAX_MASK_DIM = 1400;
+    const scale = Math.min(1, MAX_MASK_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+    maskScaleRef.current = scale;
+    mask.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    mask.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = mask.getContext("2d");
+    if (ctx) ctx.clearRect(0, 0, mask.width, mask.height);
+    setReady(true);
+    hasMarkRef.current = false;
+    setHasMark(false);
+    historyRef.current = [];
+    historyIndexRef.current = -1;
+    setTimeout(() => {
+      pushHistory();
+      paintView();
+    }, 0);
+  };
+
+  useEffect(() => {
+    if (!ready) return;
+    paintView();
+  }, [ready, paintView]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onResize = () => paintView();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [open, paintView]);
+
+  const pointFromClient = (clientX: number, clientY: number) => {
+    const view = viewCanvasRef.current!;
+    const n = naturalSize();
+    const rect = view.getBoundingClientRect();
+    // Map screen → natural image pixel coordinates using actual displayed rect
+    const x = ((clientX - rect.left) / Math.max(rect.width, 1)) * (n?.w ?? view.width);
+    const y = ((clientY - rect.top) / Math.max(rect.height, 1)) * (n?.h ?? view.height);
+    return { x, y };
+  };
+
+  const fillCircleRegion = (cx: number, cy: number, rx: number, ry: number) => {
+    const c = maskCanvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const ms = maskScaleRef.current;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(255,255,255,1)";
+    ctx.beginPath();
+    ctx.ellipse(cx * ms, cy * ms, Math.max(1, rx * ms), Math.max(1, ry * ms), 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (!hasMarkRef.current) {
+      hasMarkRef.current = true;
+      setHasMark(true);
+    }
+  };
+
+  const drawStamp = (px: number, py: number) => {
+    let x = px;
+    let y = py;
+    const c = maskCanvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const ms = maskScaleRef.current;
+    x *= ms;
+    y *= ms;
+    const r = (brush / 2) * ms;
+    const alpha = (opacity / 100) * (tool === "brush" ? 1 : 1);
+
+    if (tool === "brush") {
+      ctx.globalCompositeOperation = "source-over";
+      const inner = Math.max(0, Math.min(1, hardness / 100));
+      const grad = ctx.createRadialGradient(x, y, r * inner, x, y, r + feather * ms);
+      grad.addColorStop(0, `rgba(255,255,255,${alpha})`);
+      grad.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, r + feather * ms, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r + feather * ms, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (!hasMarkRef.current) {
+      hasMarkRef.current = true;
+      setHasMark(true);
+    }
+  };
+
+  const stroke = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dist = Math.hypot(dx, dy);
+    const step = Math.max(1, brush / 6);
+    const n = Math.max(1, Math.ceil(dist / step));
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      drawStamp(from.x + dx * t, from.y + dy * t);
+    }
+    requestPaint();
+  };
+
+  const beginStroke = (clientX: number, clientY: number) => {
+    const p = pointFromClient(clientX, clientY);
+    if (tool === "circle") {
+      circleStartRef.current = p;
+      circleLiveRef.current = { x: p.x, y: p.y, rx: 0, ry: 0 };
+      requestPaint();
+      return;
+    }
+    lastPtRef.current = p;
+    drawStamp(p.x, p.y);
+    requestPaint();
+  };
+  const continueStroke = (clientX: number, clientY: number) => {
+    if (!drawingRef.current) return;
+    const p = pointFromClient(clientX, clientY);
+    if (tool === "circle" && circleStartRef.current) {
+      const s = circleStartRef.current;
+      const rx = Math.abs(p.x - s.x);
+      const ry = Math.abs(p.y - s.y);
+      circleLiveRef.current = { x: (s.x + p.x) / 2, y: (s.y + p.y) / 2, rx, ry };
+      requestPaint();
+      return;
+    }
+    const prev = lastPtRef.current ?? p;
+    stroke(prev, p);
+    lastPtRef.current = p;
+  };
+  const endStroke = () => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    if (tool === "circle" && circleLiveRef.current && circleLiveRef.current.rx > 2 && circleLiveRef.current.ry > 2) {
+      const c = circleLiveRef.current;
+      fillCircleRegion(c.x, c.y, c.rx, c.ry);
+      circleStartRef.current = null;
+      circleLiveRef.current = null;
+      pushHistory();
+      requestPaint();
+      return;
+    }
+    circleStartRef.current = null;
+    circleLiveRef.current = null;
+    lastPtRef.current = null;
+    if (tool !== "circle") pushHistory();
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (applying) return;
+    if (spaceDownRef.current || e.button === 1) {
+      panningRef.current = true;
+      panStartRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
+      (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+      return;
+    }
+    if (e.pointerType === "touch" && e.isPrimary === false) return;
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    drawingRef.current = true;
+    beginStroke(e.clientX, e.clientY);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (applying) return;
+    if (panningRef.current && panStartRef.current) {
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      setOffset({ x: panStartRef.current.ox + dx, y: panStartRef.current.oy + dy });
+      return;
+    }
+    continueStroke(e.clientX, e.clientY);
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      (e.target as HTMLCanvasElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    if (panningRef.current) {
+      panningRef.current = false;
+      panStartRef.current = null;
+      return;
+    }
+    endStroke();
+  };
+
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      setZoom((z) => Math.max(0.25, Math.min(8, z * (e.deltaY < 0 ? 1.1 : 0.9))));
+    } else {
+      setBrush((b) => Math.max(1, Math.min(maxBrush, b + (e.deltaY < 0 ? 2 : -2))));
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.code === "Space") {
+        spaceDownRef.current = true;
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "[") setBrush((b) => Math.max(1, b - 2));
+      if (e.key === "]") setBrush((b) => Math.min(maxBrush, b + 2));
+      if (e.key.toLowerCase() === "b") setTool("brush");
+      if (e.key.toLowerCase() === "e") setTool("erase");
+      if (e.key.toLowerCase() === "c") setTool("circle");
+      if (e.key.toLowerCase() === "m") setShowMask((v) => !v);
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceDownRef.current = false;
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const restoreSnapshot = (snap: ImageData) => {
+    const c = maskCanvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.putImageData(snap, 0, 0);
+    paintView();
+    let any = false;
+    for (let i = 3; i < snap.data.length; i += 4) {
+      if (snap.data[i] > 0) {
+        any = true;
+        break;
+      }
+    }
+    setHasMark(any);
+  };
+
+  const undo = () => {
+    const idx = historyIndexRef.current;
+    if (idx <= 0) return;
+    historyIndexRef.current = idx - 1;
+    restoreSnapshot(historyRef.current[historyIndexRef.current]);
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
+  };
+  const redo = () => {
+    const idx = historyIndexRef.current;
+    if (idx >= historyRef.current.length - 1) return;
+    historyIndexRef.current = idx + 1;
+    restoreSnapshot(historyRef.current[historyIndexRef.current]);
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
+  };
+
+  const clearMask = () => {
+    const c = maskCanvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    ctx?.clearRect(0, 0, c.width, c.height);
+    paintView();
+    hasMarkRef.current = false;
+    setHasMark(false);
+    pushHistory();
+  };
+
+  const invertMask = () => {
+    const c = maskCanvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const img = ctx.getImageData(0, 0, c.width, c.height);
+    for (let i = 0; i < img.data.length; i += 4) {
+      img.data[i] = 255;
+      img.data[i + 1] = 255;
+      img.data[i + 2] = 255;
+      img.data[i + 3] = 255 - img.data[i + 3];
+    }
+    ctx.putImageData(img, 0, 0);
+    paintView();
+    setHasMark(true);
+    pushHistory();
+  };
+
+  const stepZoom = (dir: 1 | -1) => {
+    const i = ZOOM_STEPS.findIndex((v) => Math.abs(v - zoom) < 0.001);
+    if (i === -1) {
+      let nearest = 0;
+      for (let k = 0; k < ZOOM_STEPS.length; k++) {
+        if (Math.abs(ZOOM_STEPS[k] - zoom) < Math.abs(ZOOM_STEPS[nearest] - zoom)) nearest = k;
+      }
+      setZoom(ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, nearest + dir))]);
+    } else {
+      setZoom(ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, i + dir))]);
+    }
+  };
+
+  const apply = async () => {
+    const c = maskCanvasRef.current;
+    const img = imgRef.current;
+    if (!c || !hasMark || !img) return;
+    setApplying(true);
+    try {
+      // Upscale mask to natural image resolution for backend alignment
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      const out = document.createElement("canvas");
+      out.width = nw;
+      out.height = nh;
+      const octx = out.getContext("2d");
+      const mctx = c.getContext("2d");
+      if (!octx || !mctx) return;
+      // Draw mask scaled to natural size
+      octx.fillStyle = "black";
+      octx.fillRect(0, 0, nw, nh);
+      // Build B/W from mask alpha, then scale
+      const tmp = document.createElement("canvas");
+      tmp.width = c.width;
+      tmp.height = c.height;
+      const tctx = tmp.getContext("2d");
+      if (!tctx) return;
+      tctx.fillStyle = "black";
+      tctx.fillRect(0, 0, tmp.width, tmp.height);
+      const src = mctx.getImageData(0, 0, c.width, c.height);
+      const bw = tctx.createImageData(tmp.width, tmp.height);
+      let painted = 0;
+      for (let i = 0; i < src.data.length; i += 4) {
+        const on = src.data[i + 3] >= 24 ? 255 : 0;
+        if (on) painted++;
+        bw.data[i] = on;
+        bw.data[i + 1] = on;
+        bw.data[i + 2] = on;
+        bw.data[i + 3] = 255;
+      }
+      if (painted === 0) {
+        setApplying(false);
+        setHasMark(false);
+        return;
+      }
+      tctx.putImageData(bw, 0, 0);
+      octx.imageSmoothingEnabled = false;
+      octx.drawImage(tmp, 0, 0, nw, nh);
+      onApply(out.toDataURL("image/png"));
+    } catch (e) {
+      console.error("[smart-remove] apply failed:", e);
+      setApplying(false);
+    }
+  };
+
+  if (!open || !imageUrl) return null;
+
+  const n = naturalSize();
+  const dispW = n ? Math.round(n.w * displayScale) : 0;
+  const dispH = n ? Math.round(n.h * displayScale) : 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/85" role="dialog" aria-modal="true">
+      {!isMobile && (
+        <div className="flex items-center justify-between border-b border-white/10 bg-background/95 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold">Circle to Remove</h2>
+            <p className="text-xs text-muted-foreground">
+              Paint what you want gone. Space = pan · [/] = brush size · Ctrl+Z / Ctrl+Y = undo/redo
+            </p>
+          </div>
+          <button onClick={onCancel} className="rounded-md p-2 text-muted-foreground hover:bg-secondary" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {!isMobile && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-background/95 px-4 py-2 text-xs">
+          <div className="inline-flex overflow-hidden rounded-md border border-border">
+            <button
+              onClick={() => setTool("circle")}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 ${tool === "circle" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+              <Circle className="h-3.5 w-3.5" /> Circle
+            </button>
+            <button
+              onClick={() => setTool("brush")}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 ${tool === "brush" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+              <Brush className="h-3.5 w-3.5" /> Brush
+            </button>
+            <button
+              onClick={() => setTool("erase")}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 ${tool === "erase" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+              <Eraser className="h-3.5 w-3.5" /> Erase
+            </button>
+          </div>
+
+          <div className="inline-flex items-center gap-1 rounded-md border border-border px-1">
+            <button onClick={() => stepZoom(-1)} className="p-1.5 hover:bg-secondary" aria-label="Zoom out">
+              <ZoomOut className="h-3.5 w-3.5" />
+            </button>
+            <span className="tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button onClick={() => stepZoom(1)} className="p-1.5 hover:bg-secondary" aria-label="Zoom in">
+              <ZoomIn className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <button onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary">
+            <Move className="h-3.5 w-3.5" /> Fit
+          </button>
+
+          <button onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
+            <Undo2 className="h-3.5 w-3.5" /> Undo
+          </button>
+          <button onClick={redo} disabled={!canRedo} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
+            <Redo2 className="h-3.5 w-3.5" /> Redo
+          </button>
+
+          <button onClick={invertMask} disabled={!hasMark} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
+            <FlipHorizontal2 className="h-3.5 w-3.5" /> Invert
+          </button>
+          <button onClick={clearMask} disabled={!hasMark} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary disabled:opacity-40">
+            <RotateCcw className="h-3.5 w-3.5" /> Clear
+          </button>
+          <button onClick={() => setShowMask((v) => !v)} className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-secondary">
+            {showMask ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {showMask ? "Hide mask" : "Show mask"}
+          </button>
+        </div>
+      )}
+
+      <div
+        ref={viewportRef}
+        className="relative flex-1 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.04),transparent_60%)]"
+        style={{ touchAction: "none" }}
+      >
+        <img
+          ref={imgRef}
+          src={imageUrl}
+          onLoad={onImageLoad}
+          alt=""
+          className="hidden"
+          crossOrigin={imageUrl.startsWith("http") ? "anonymous" : undefined}
+        />
+        <canvas ref={maskCanvasRef} className="hidden" />
+        {ready && n && (
+          <div
+            className="absolute"
+            style={{
+              left: `calc(50% + ${offset.x}px)`,
+              top: `calc(50% + ${offset.y}px)`,
+              transform: "translate(-50%, -50%)",
+              width: dispW,
+              height: dispH,
+            }}
+          >
+            <canvas
+              ref={viewCanvasRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              onWheel={onWheel}
+              className="block h-full w-full"
+              style={{
+                cursor: panningRef.current || spaceDownRef.current ? "grabbing" : tool === "erase" ? "cell" : "crosshair",
+                touchAction: "none",
+                pointerEvents: applying ? "none" : "auto",
+              }}
+            />
+            {applying && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-primary" />
+                <p className="text-sm font-semibold text-white">AI is removing…</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {isMobile ? (
+        <div ref={bottomControlsRef} className="space-y-2 border-t border-white/10 bg-background/95 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="inline-flex overflow-hidden rounded-md border border-border">
+              <button onClick={() => setTool("circle")} className={`inline-flex items-center gap-2 px-3 py-2 ${tool === "circle" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+                <Circle className="h-4 w-4" />
+              </button>
+              <button onClick={() => setTool("brush")} className={`inline-flex items-center gap-2 px-3 py-2 ${tool === "brush" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+                <Brush className="h-4 w-4" />
+              </button>
+              <button onClick={() => setTool("erase")} className={`inline-flex items-center gap-2 px-3 py-2 ${tool === "erase" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+                <Eraser className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 hover:bg-secondary disabled:opacity-40">
+                <Undo2 className="h-4 w-4" />
+              </button>
+              <button onClick={redo} disabled={!canRedo} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 hover:bg-secondary disabled:opacity-40">
+                <Redo2 className="h-4 w-4" />
+              </button>
+              <button onClick={clearMask} disabled={!hasMark} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 hover:bg-secondary disabled:opacity-40">
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">Brush</span>
+            <Slider value={[brush]} min={4} max={maxBrush} step={1} onValueChange={(v) => setBrush(v[0])} />
+            <span className="w-12 text-right tabular-nums text-sm">{brush}px</span>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" onClick={onCancel} disabled={applying}>Cancel</Button>
+            <Button
+              onClick={apply}
+              disabled={!hasMark || applying}
+              className="h-12 w-44 bg-orange-500 text-base font-semibold text-white shadow-lg hover:bg-orange-600 disabled:opacity-60"
+            >
+              {applying ? (
+                <>
+                  <Check className="mr-1.5 h-4 w-4 animate-pulse" /> Removing…
+                </>
+              ) : hasMark ? (
+                <>Remove</>
+              ) : (
+                <>Paint to remove</>
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div ref={bottomControlsRef} className="space-y-3 border-t border-white/10 bg-background/95 p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <SliderRow label="Size" value={brush} min={1} max={maxBrush} onChange={setBrush} suffix="px" />
+            <SliderRow label="Opacity" value={opacity} min={10} max={100} onChange={setOpacity} suffix="%" />
+            <SliderRow label="Hardness" value={hardness} min={0} max={100} onChange={setHardness} suffix="%" />
+            <SliderRow label="Feather" value={feather} min={0} max={20} onChange={setFeather} suffix="px" />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <SliderRow label="Overlay" value={overlayOpacity} min={10} max={100} onChange={setOverlayOpacity} suffix="%" />
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="ghost" onClick={onCancel} disabled={applying}>Cancel</Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+            <Button
+              onClick={apply}
+              disabled={!hasMark || applying}
+              className="btn-animate h-12 w-full bg-orange-500 text-base font-semibold text-white shadow-lg hover:bg-orange-600 disabled:opacity-60"
+            >
+              {applying ? (
+                <>
+                  <Check className="mr-1.5 h-4 w-4 animate-pulse" /> Removing…
+                </>
+              ) : hasMark ? (
+                <>✨ Remove Selected Area</>
+              ) : (
+                <>Paint an area to remove</>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={clearMask}
+              disabled={!hasMark || applying}
+              className="btn-animate h-12 whitespace-nowrap"
+            >
+              <RotateCcw className="mr-1.5 h-4 w-4" /> Clear & Try Again
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SliderRow({
+  label, value, min, max, onChange, suffix,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+  suffix?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      <span className="w-16 shrink-0 text-muted-foreground">{label}</span>
+      <Slider value={[value]} min={min} max={max} step={1} onValueChange={(v) => onChange(v[0])} />
+      <span className="w-12 shrink-0 text-right tabular-nums">{value}{suffix}</span>
+    </div>
+  );
+}
