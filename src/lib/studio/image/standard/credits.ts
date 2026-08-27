@@ -5,6 +5,7 @@
  * Image → Image (single): SD 25, HD 30
  * Multi (total images 2–5): SD 30/35/40/40 → HD +5 = 35/40/45/45
  * Circle to Remove: 25 flat
+ * Circle to Add: 25 flat
  *
  * Aspect ratio = 0 additional credits.
  */
@@ -26,6 +27,7 @@ export const STANDARD_CREDITS = {
   multi3to4: 35,
   multi5: 40,
   circleToRemove: 25,
+  circleToAdd: 25,
 } as const;
 
 export function quoteStandardCredits(opts: {
@@ -41,6 +43,14 @@ export function quoteStandardCredits(opts: {
       credits: STANDARD_CREDITS.circleToRemove,
       mode,
       breakdown: `Circle remove ${STANDARD_CREDITS.circleToRemove}`,
+    };
+  }
+
+  if (mode === "circle_to_add") {
+    return {
+      credits: STANDARD_CREDITS.circleToAdd,
+      mode,
+      breakdown: `Circle add ${STANDARD_CREDITS.circleToAdd}`,
     };
   }
 

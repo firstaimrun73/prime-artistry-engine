@@ -40,8 +40,6 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
   if (!req.imageUrl || !req.imageUrl.startsWith("https://")) {
     throw new Error("Image → Image requires a valid HTTPS source image URL.");
   }
-  // Keep the user's edit instruction clear. Soft anchor only when they did not
-  // already frame it as an edit.
   const raw = req.prompt.trim();
   const prompt =
     /\b(edit|enhance|sharpen|brighten|clear|fix|improve|make|change|remove|add)\b/i.test(raw)
@@ -109,6 +107,30 @@ export function buildCircleRemoveStep(req: StandardValidationOk): StandardFalSte
   };
 }
 
+export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
+  if (!req.imageUrl || !req.maskImageUrl) {
+    throw new Error("Circle add requires original image and mask.");
+  }
+  return {
+    label: "standard circle-to-add (flux inpaint)",
+    model: "fal-ai/flux-general/inpainting",
+    body: {
+      prompt: `${req.prompt}. Edit ONLY the white masked area. Preserve every unmasked pixel.`,
+      image_url: req.imageUrl,
+      mask_url: req.maskImageUrl,
+      strength: 0.86,
+      guidance_scale: 3.5,
+      num_inference_steps: 40,
+      num_images: 1,
+      enable_safety_checker: true,
+      output_format: "png",
+      scheduler: "euler",
+      negative_prompt:
+        "changed unmasked area, distorted background, different face, artifacts, blur",
+    },
+  };
+}
+
 export function buildStandardStep(req: StandardValidationOk): StandardFalStep {
   switch (req.mode) {
     case "text_to_image":
@@ -119,6 +141,8 @@ export function buildStandardStep(req: StandardValidationOk): StandardFalStep {
       return buildMultiImageStep(req);
     case "circle_to_remove":
       return buildCircleRemoveStep(req);
+    case "circle_to_add":
+      return buildCircleAddStep(req);
     default: {
       const _exhaustive: never = req.mode;
       throw new Error(`Unknown Standard mode: ${String(_exhaustive)}`);
