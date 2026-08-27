@@ -1,5 +1,4 @@
 import { Lock, Coins, Info } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/prompt-suggestions";
 import {
@@ -71,6 +70,7 @@ function AspectShape({ id }: { id: string }) {
     "16:9": { w: 20, h: 11 },
     "9:16": { w: 11, h: 18 },
     "3:4": { w: 14, h: 18 },
+    imax: { w: 22, h: 9 },
   };
   const d = dims[id] ?? { w: 16, h: 16 };
   return (
@@ -130,20 +130,25 @@ export function EditorOptionsPanel({
       {!loading && mediaType === "image" && !inputDataUrl && (
         <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
           <p className="text-[11px] font-medium text-muted-foreground">Aspect ratio</p>
-          <div className="grid grid-cols-5 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
+          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
             {ASPECT_RATIOS.filter((a) =>
               aspectRatiosForStudioTier(studioTier).includes(a.id),
             ).map((a) => {
               const active = aspectRatio === a.id;
+              const isImax = a.id === "imax";
               return (
                 <button
                   key={a.id}
                   type="button"
                   onClick={() => setAspectRatio(a.id)}
                   className={`flex min-h-[44px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[10px] font-medium transition-all sm:min-h-[48px] sm:min-w-[52px] sm:rounded-xl sm:px-2.5 sm:py-2 sm:text-[11px] ${
-                    active
-                      ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    active && isImax
+                      ? "border-[#D4AF37] bg-[#D4AF37]/15 text-[#E8C547] ring-1 ring-[#D4AF37]/50"
+                      : active
+                        ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
+                        : isImax
+                          ? "border-[#D4AF37]/35 bg-card text-muted-foreground hover:border-[#D4AF37]/60 hover:text-[#E8C547]"
+                          : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground"
                   }`}
                 >
                   <AspectShape id={a.id} />
@@ -152,6 +157,13 @@ export function EditorOptionsPanel({
               );
             })}
           </div>
+          {aspectRatio === "imax" && (
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              <span className="font-semibold text-[#D4AF37]">IMAX</span>
+              {" — "}
+              Extra-wide cinematic frame (21:9) for immersive presentation.
+            </p>
+          )}
         </div>
       )}
 
