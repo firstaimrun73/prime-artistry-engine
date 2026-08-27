@@ -81,21 +81,39 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-function RootLayout({ children }: { children: ReactNode }) {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+function PageViewTracker() {
+  const router = useRouter();
   useEffect(() => {
-    trackPageView(pathname);
-  }, [pathname]);
+    const unsub = router.subscribe("onResolved", () => {
+      trackPageView(router.state.location.pathname);
+    });
+    return unsub;
+  }, [router]);
+  return null;
+}
+
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const padForTabs = !hideBottomNav(pathname);
 
   return (
-    <>
-      {children}
-      {!hideBottomNav(pathname) && <BottomTabBar />}
-      <GenerationStatusBar />
-      <Toaster />
-      <TranslateWidget />
-      <AdPolicyGate />
-    </>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <PageViewTracker />
+          <AdPolicyGate />
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
+            <Outlet />
+            <GenerationStatusBar />
+            <BottomTabBar />
+          </div>
+          <TranslateWidget />
+          <Toaster richColors position="top-center" />
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -143,21 +161,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
     ],
   }),
-  component: () => {
-    return (
-      <RootDocument>
-        <QueryClientProvider client={Route.useRouteContext().queryClient}>
-          <ThemeProvider>
-            <AuthProvider>
-              <RootLayout>
-                <Outlet />
-              </RootLayout>
-            </AuthProvider>
-          </ThemeProvider>
-        </QueryClientProvider>
-      </RootDocument>
-    );
-  },
+  component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
