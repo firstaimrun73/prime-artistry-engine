@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Motio2edit mark — geometric image-frame + generative spark.
- * Minimal, premium, legible at favicon size. Not a food/gem/biscuit icon.
+ * Motio2edit mark — clean image frame + generative spark.
+ * White/orange brand treatment; legible at favicon and header sizes.
  */
 export function MotioMarkIcon({
   className,
@@ -19,34 +19,36 @@ export function MotioMarkIcon({
       className={cn(animate && "motio-mark-animate", className)}
       aria-hidden
     >
-      {/* Image frame — AI image editor identity */}
+      {/* Soft orange disc — brand presence at small sizes */}
+      <circle cx="16" cy="16" r="15" className="fill-primary/15" />
+      {/* Image frame */}
       <rect
-        x="5"
-        y="6"
-        width="18"
-        height="18"
-        rx="3.5"
+        x="6"
+        y="7"
+        width="16"
+        height="16"
+        rx="3.25"
         className="stroke-primary"
-        strokeWidth="1.75"
+        strokeWidth="2"
         fill="none"
       />
-      {/* Inner crop mark / precision */}
+      {/* Crop / precision corner */}
       <path
-        d="M9 11.5h4M9 11.5v4"
+        d="M10 12h3.5M10 12v3.5"
         className="stroke-primary"
-        strokeWidth="1.4"
+        strokeWidth="1.6"
         strokeLinecap="round"
       />
-      {/* Generative four-point spark (upper-right, outside frame) */}
+      {/* Primary generative spark */}
       <path
-        d="M24 5.5 L25.1 8.2 L28 9.2 L25.1 10.2 L24 12.9 L22.9 10.2 L20 9.2 L22.9 8.2 Z"
+        d="M24.5 5 L25.75 8.1 L29 9.25 L25.75 10.4 L24.5 13.5 L23.25 10.4 L20 9.25 L23.25 8.1 Z"
         className="fill-primary"
       />
-      {/* Small secondary spark — motion / AI */}
+      {/* Secondary spark */}
       <path
-        d="M26.5 14 L27 15.3 L28.4 15.8 L27 16.3 L26.5 17.6 L26 16.3 L24.6 15.8 L26 15.3 Z"
+        d="M27 14.5 L27.55 15.95 L29.1 16.5 L27.55 17.05 L27 18.5 L26.45 17.05 L24.9 16.5 L26.45 15.95 Z"
         className="fill-primary"
-        fillOpacity="0.75"
+        fillOpacity="0.8"
       />
     </svg>
   );
@@ -69,8 +71,9 @@ export function BrandMark({
       : size === "sm"
         ? "text-sm"
         : "text-base sm:text-lg";
+  // ~25% larger than previous h-5/h-7 defaults — visible but not oversized
   const icon =
-    size === "lg" ? "h-7 w-7" : size === "sm" ? "h-4 w-4" : "h-5 w-5";
+    size === "lg" ? "h-8 w-8" : size === "sm" ? "h-5 w-5" : "h-6 w-6 sm:h-7 sm:w-7";
 
   return (
     <span
@@ -91,5 +94,4 @@ export function BrandMark({
   );
 }
 
-/** Plain text brand for titles / meta (no icon). */
 export const BRAND_NAME = "Motio2edit";
