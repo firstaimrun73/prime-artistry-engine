@@ -44,6 +44,7 @@ import {
 } from "@/components/editor";
 import type { EditorBootstrap } from "@/components/editor/editor-bootstrap";
 import { StudioTierSelector } from "@/components/studio/StudioTierSelector";
+import { StandardImageGenerationOverlay } from "@/components/studio/overlays/StandardImageGenerationOverlay";
 import { PremiumImageGenerationOverlay } from "@/components/studio/overlays/PremiumImageGenerationOverlay";
 import { UltraAIImageGenerationOverlay } from "@/components/studio/overlays/UltraAIImageGenerationOverlay";
 import { visibleImageExperiences } from "@/lib/studio/image/image-experience-access";
@@ -52,7 +53,6 @@ import {
   studioShellClass,
   studioTierToImageQuality,
   studioGenerateClass,
-  studioAccentClass,
   studioExperienceLabel,
   imageQualitiesForStudioTier,
   maxImagesForStudioTier,
@@ -63,6 +63,15 @@ import { cn } from "@/lib/utils";
 export type ImageEditorProps = {
   bootstrap?: EditorBootstrap;
 };
+
+function preloadImage(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    img.src = url;
+  });
+}
 
 export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const { profile, refreshProfile } = useAuth();
@@ -110,14 +119,16 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [premiumGenError, setPremiumGenError] = useState<string | null>(null);
   const [ultraCompleteHold, setUltraCompleteHold] = useState(false);
   const [ultraGenError, setUltraGenError] = useState<string | null>(null);
+  const [standardCompleteHold, setStandardCompleteHold] = useState(false);
+  const [standardGenError, setStandardGenError] = useState<string | null>(null);
 
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
   const stages = getEditorStages(!!inputDataUrl);
+  const isStandardExp = studioTier === "standard";
   const isPremiumExp = studioTier === "pro";
   const isUltraExp = studioTier === "premium";
 
-  // Experience-aware max images: Free=1, Standard=5, Premium/Ultra=10 (capped by plan)
   const experienceMax = maxImagesForStudioTier(studioTier);
   const effectiveMaxImages = isAdmin
     ? Math.max(experienceMax, 10)
@@ -195,6 +206,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setUltraCompleteHold(false);
       setUltraGenError(null);
     }
+    if (!isStandardExp) {
+      setStandardCompleteHold(false);
+      setStandardGenError(null);
+    }
     if (isPremiumExp && state === "success") {
       setPremiumGenError(null);
       setPremiumCompleteHold(true);
@@ -210,10 +225,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     if (state === "idle" || state === "blocked") {
       if (isPremiumExp && !premiumGenError) setPremiumCompleteHold(false);
       if (isUltraExp && !ultraGenError) setUltraCompleteHold(false);
+      if (isStandardExp && !standardGenError) setStandardCompleteHold(false);
     }
-  }, [state, isPremiumExp, isUltraExp, premiumGenError, ultraGenError]);
+  }, [state, isPremiumExp, isUltraExp, isStandardExp, premiumGenError, ultraGenError, standardGenError]);
 
-  /** Authoritative pre-generation estimate — must match server charge (Standard / Premium / Ultra). */
   const cost = useMemo(() => {
     const hasSource = !!inputDataUrl;
     const refCount = refImages.length;
@@ -221,9 +236,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     const totalImages = (hasSource ? 1 : 0) + refCount;
 
     if (studioTier === "standard") {
-      if (hasMask) {
-        return quoteStandardCredits({ mode: "circle_to_remove" }).credits;
-      }
+      if (hasMask) return quoteStandardCredits({ mode: "circle_to_remove" }).credits;
       if (totalImages >= 2) {
         return quoteStandardCredits({
           mode: "multi_image_to_image",
@@ -274,9 +287,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           referenceCount: totalImages,
         }).credits;
       }
-      if (hasSource) {
-        return quoteUltraCredits({ mode: "image_to_image", quality }).credits;
-      }
+      if (hasSource) return quoteUltraCredits({ mode: "image_to_image", quality }).credits;
       return quoteUltraCredits({ mode: "text_to_image", quality }).credits;
     }
 
@@ -286,30 +297,22 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   if (!profile) return null;
 
   const noCredits = !isAdmin && profile.credits < cost;
-  const planLimits = isAdmin
-    ? { ...getPlanLimits(profile.plan), maxImages: maxImagesForPlan(profile.plan, true), videoEnabled: true, hd: true }
-    : getPlanLimits(profile.plan);
-  const canAddRefImages = !!inputDataUrl && (effectiveMaxImages > 1 || isFree);
+  const canAddRefImages = !!inputDataUrl && effectiveMaxImages > 1;
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
 
+  const showStandardOverlay =
+    isStandardExp && (loading || standardCompleteHold || !!standardGenError);
   const showPremiumOverlay =
     isPremiumExp && (loading || premiumCompleteHold || !!premiumGenError);
   const showUltraOverlay =
     isUltraExp && (loading || ultraCompleteHold || !!ultraGenError);
 
-  const showInlinePreview =
-    (!isPremiumExp && !isUltraExp) ||
-    (!loading &&
-      !premiumCompleteHold &&
-      !premiumGenError &&
-      !ultraCompleteHold &&
-      !ultraGenError &&
-      !!output);
+  const hideFormDuringGen = showStandardOverlay || showPremiumOverlay || showUltraOverlay;
 
-  // Hide form panels while generation overlay is active (clean generation screen)
-  const hideFormDuringGen = showPremiumOverlay || showUltraOverlay;
+  const showInlinePreview =
+    !hideFormDuringGen && !!output && state === "success";
 
   const activateSlot = (items: GalleryItem[], idx: number) => {
     const item = items[idx];
@@ -416,6 +419,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setPremiumGenError(null);
     setUltraCompleteHold(false);
     setUltraGenError(null);
+    setStandardCompleteHold(false);
+    setStandardGenError(null);
     await new Promise((r) => setTimeout(r, 600));
     if (runId !== runIdRef.current) return;
 
@@ -517,14 +522,28 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       const url = res.outputUrl;
       setProgress(100);
       setStage(stages.length);
+
+      // Hold generation screen until the result image is actually displayable
+      if (isStandardExp) {
+        setStandardCompleteHold(true);
+        setStandardGenError(null);
+        await preloadImage(url);
+        if (runId !== runIdRef.current) return;
+      }
+
       setOutput(url);
       setState("success");
       setPremiumGenError(null);
       setUltraGenError(null);
+      setStandardGenError(null);
       setRemoveMaskDataUrl(null);
       await refreshProfile();
       toast.success("✅ Image ready!");
       endGeneration();
+
+      if (isStandardExp) {
+        window.setTimeout(() => setStandardCompleteHold(false), 600);
+      }
     } catch (err) {
       if (runId !== runIdRef.current) return;
       const msg = err instanceof Error ? err.message : "Failed. Credits not charged.";
@@ -536,6 +555,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         setUltraGenError(msg);
         setState("idle");
       } else {
+        setStandardGenError(msg);
         setState("idle");
       }
       toast.error(`❌ ${msg}`);
@@ -569,6 +589,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setPremiumGenError(null);
     setUltraCompleteHold(false);
     setUltraGenError(null);
+    setStandardCompleteHold(false);
+    setStandardGenError(null);
     toast("Generation stopped.");
   };
 
@@ -581,6 +603,12 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const handleDismissUltraError = () => {
     setUltraGenError(null);
     setUltraCompleteHold(false);
+    setState("idle");
+  };
+
+  const handleDismissStandardError = () => {
+    setStandardGenError(null);
+    setStandardCompleteHold(false);
     setState("idle");
   };
 
@@ -602,6 +630,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setPremiumGenError(null);
     setUltraCompleteHold(false);
     setUltraGenError(null);
+    setStandardCompleteHold(false);
+    setStandardGenError(null);
     setGallery([]);
     setActiveImage(0);
     setContextTags([]);
@@ -679,6 +709,17 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
   const expLabel = studioExperienceLabel(studioTier);
 
+  const standardPhase =
+    standardGenError
+      ? "error"
+      : state === "analyzing"
+        ? "analyzing"
+        : state === "loading"
+          ? "loading"
+          : standardCompleteHold
+            ? "success"
+            : "loading";
+
   const premiumPhase =
     premiumGenError
       ? "error"
@@ -703,6 +744,15 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
   return (
     <div className={cn("min-h-[100dvh] overflow-x-hidden pb-8", studioShellClass(studioTier))}>
+      {showStandardOverlay && (
+        <StandardImageGenerationOverlay
+          phase={standardPhase}
+          error={standardGenError}
+          onRetry={runGenerate}
+          onDismiss={handleDismissStandardError}
+        />
+      )}
+
       {showPremiumOverlay && (
         <PremiumImageGenerationOverlay
           phase={premiumPhase}
@@ -810,7 +860,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 }
                 contextTags={contextTags}
                 onToggleTag={(id) => {
-                  // Chip state only — do NOT mutate prompt text.
                   setContextTags((prev) =>
                     prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
                   );
@@ -884,7 +933,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           </div>
 
           <div className="order-2 min-w-0 space-y-4 lg:sticky lg:top-4 lg:self-start">
-            {showInlinePreview && (loading || output) && (
+            {showInlinePreview && output && (
               <div className={cn("min-w-0 p-3 sm:p-4", studioCardClass(studioTier))}>
                 <EditorPreview
                   state={state}
@@ -907,7 +956,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
             <EditorResult
               output={output}
-              loading={loading || premiumCompleteHold || ultraCompleteHold}
+              loading={loading || standardCompleteHold || premiumCompleteHold || ultraCompleteHold}
               onDownload={handleDownload}
               onRegenerate={runGenerate}
               onEditAgain={handleUseResultAsInput}
@@ -917,7 +966,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               downloaded={downloaded}
             />
 
-            {!loading && !output && !premiumCompleteHold && !premiumGenError && !ultraCompleteHold && !ultraGenError && (
+            {!loading && !output && !standardCompleteHold && !standardGenError && !premiumCompleteHold && !premiumGenError && !ultraCompleteHold && !ultraGenError && (
               <div
                 className={cn(
                   "flex min-h-[100px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground",
