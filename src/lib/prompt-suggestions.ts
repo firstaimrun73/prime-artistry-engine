@@ -1,24 +1,9 @@
 // Prompt intelligence for the editor.
 // Framework-free so it can be unit-tested without React.
-//
-// Two surfaces feed the existing chip UI in the editor:
-//   • EXAMPLE_PROMPTS — shown when the prompt box is empty (a curated tour
-//     of every major editing capability).
-//   • getSmartSuggestions(input) — keyword-triggered follow-ups shown as
-//     the user types, so a one-word idea becomes a great prompt.
-//
-// All presets below produce prompts that the existing FAL routing in
-// src/lib/fal-request.ts already understands (edit intent detection, size
-// classifier, enhancement-only path, inpainting, text-to-image / text-to-
-// video). No new backend endpoints required — the routing picks the right
-// model based on the words in the prompt.
 
 export type Suggestion = { label: string; prompt: string };
 
-// Curated tour of the platform's editing tools, grouped by intent but
-// rendered as a single flat chip list to match the existing UI.
 export const EXAMPLE_PROMPTS: Suggestion[] = [
-  // Core photo edits
   { label: "Remove background", prompt: "Remove the background completely, keep only the main subject with clean, precise edges, transparent or clean white background." },
   { label: "Replace background", prompt: "Replace the background with a clean professional studio backdrop while keeping the subject perfectly sharp and naturally lit." },
   { label: "Sky replacement", prompt: "Replace the sky with a dramatic golden-hour sky and re-light the scene so shadows and color temperature match the new sky." },
@@ -29,8 +14,6 @@ export const EXAMPLE_PROMPTS: Suggestion[] = [
   { label: "Remove watermark", prompt: "Remove all watermarks, text overlays and logos and reconstruct the underlying image cleanly." },
   { label: "Generative fill", prompt: "Extend and fill the empty areas of the image with content that matches the existing scene in style, lighting and perspective." },
   { label: "Expand / outpaint", prompt: "Outpaint and extend the scene beyond the current frame with realistic content that continues the composition, lighting and perspective." },
-
-  // Portrait retouch
   { label: "Face enhance", prompt: "Enhance the face with natural detail, sharpen eyes, restore skin texture and improve overall clarity while preserving identity exactly." },
   { label: "Skin smoothing", prompt: "Smooth the skin naturally, remove blemishes and even out skin tone while keeping realistic texture and preserving identity." },
   { label: "Teeth whitening", prompt: "Whiten the teeth naturally without changing anything else in the image." },
@@ -38,8 +21,6 @@ export const EXAMPLE_PROMPTS: Suggestion[] = [
   { label: "Portrait retouch", prompt: "Professional portrait retouch: even skin tone, subtle skin smoothing with natural texture, enhance eyes and lips, balance lighting, preserve identity." },
   { label: "AI headshot", prompt: "Transform this into a professional corporate headshot with clean studio lighting, neutral background and sharp business attire while preserving the person's exact face and identity." },
   { label: "AI avatar", prompt: "Create a polished stylised profile avatar of the person with clean lighting and a simple background, preserving their exact facial identity." },
-
-  // Quality & restoration
   { label: "Enhance quality", prompt: "Enhance overall quality, sharpness, clarity and fine detail to a professional standard while preserving composition and colors." },
   { label: "AI upscale HD", prompt: "Upscale to HD with peak detail, sharpen and recover fine textures while preserving colors and composition exactly." },
   { label: "Sharpen", prompt: "Sharpen the image with strong smart sharpening, enhance edges and micro-detail without introducing halos or noise." },
@@ -48,24 +29,18 @@ export const EXAMPLE_PROMPTS: Suggestion[] = [
   { label: "Restore old photo", prompt: "Restore this old photo: repair scratches, tears, stains and fading, denoise, recover detail and improve clarity while keeping the original content intact." },
   { label: "Scratch removal", prompt: "Remove scratches, dust, tears and creases from the photo and reconstruct the affected areas naturally." },
   { label: "Colorize", prompt: "Add natural, realistic and historically plausible colors to this image while preserving all original shapes, composition and detail." },
-
-  // Color, light, HDR
   { label: "Color correction", prompt: "Apply professional color correction: fix white balance, exposure and contrast for a clean, natural look." },
   { label: "Color grading", prompt: "Apply cinematic color grading with rich shadows, warm highlights and a filmic contrast curve." },
   { label: "Fix lighting", prompt: "Fix and balance the lighting for a natural, well-exposed result, lift shadows and control highlights." },
   { label: "HDR enhance", prompt: "Apply HDR enhancement: expand dynamic range, recover shadow and highlight detail, boost local contrast for a rich, punchy look." },
   { label: "AI relight", prompt: "Relight the scene with soft, cinematic key lighting from the upper left, gentle fill and a subtle rim light, keeping the subject and composition unchanged." },
   { label: "Make cinematic", prompt: "Make this cinematic with dramatic lighting, rich color grading, film-like depth and a subtle anamorphic feel." },
-
-  // Styles
   { label: "Anime style", prompt: "Transform this into a high-quality anime illustration with clean line art, vibrant colors and expressive shading while preserving the composition." },
   { label: "Cartoon style", prompt: "Transform this into a modern cartoon illustration with bold outlines, flat shading and vibrant colors while preserving the composition." },
   { label: "Pencil sketch", prompt: "Convert this into a detailed hand-drawn pencil sketch with realistic graphite shading, cross-hatching and paper texture." },
   { label: "Oil painting", prompt: "Repaint this as a classical oil painting with rich brush strokes, layered color and canvas texture." },
   { label: "Watercolor", prompt: "Repaint this as a soft watercolor illustration with translucent washes, wet edges and paper texture." },
   { label: "3D render", prompt: "Reimagine this as a stylised 3D render with soft global illumination, subtle subsurface scattering and clean studio lighting." },
-
-  // Generators
   { label: "Sticker", prompt: "Create a die-cut sticker illustration of the subject with a thick white outline, bold flat colors and a transparent background." },
   { label: "Logo", prompt: "Design a clean modern minimalist vector logo based on this concept, centered on a plain background, with strong shape language and balanced negative space." },
   { label: "Product photo", prompt: "Professional e-commerce product photo of this item on a clean white studio background with soft even lighting, subtle shadow and sharp focus." },
@@ -73,9 +48,6 @@ export const EXAMPLE_PROMPTS: Suggestion[] = [
   { label: "Social post", prompt: "Design a polished square social media post based on this scene with balanced composition, vibrant color grading and clean space for a short headline." },
 ];
 
-// Smart, keyword-triggered suggestions. When the user types a trigger word
-// the editor surfaces tailored follow-ups so a single word becomes a strong,
-// specific prompt that routes to the right FAL model.
 const SMART_RULES: { match: RegExp; suggestions: Suggestion[] }[] = [
   {
     match: /\b(remove|erase|delete|clean(up)?|magic)\b/i,
@@ -177,9 +149,7 @@ export function getSmartSuggestions(input: string): Suggestion[] {
   return [];
 }
 
-// ── Aspect ratio (text-to-image) ──────────────────────────────────
-// Standard/Premium: 1:1, 4:3, 16:9, 9:16, 3:4
-// Ultra also supports IMAX (21:9) when UI exposes it.
+// Aspect ratio (text-to-image). Ultra also supports IMAX at 1.43:1.
 export type AspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "imax";
 
 export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
@@ -202,7 +172,8 @@ export function aspectToImageSize(aspect: AspectRatio | undefined): string {
     case "3:4":
       return "portrait_4_3";
     case "imax":
-      return "landscape_16_9"; // closest documented fal size; Ultra may refine server-side
+      // IMAX 1.43:1 — closest fal landscape size; Ultra may refine server-side
+      return "landscape_16_9";
     case "1:1":
     default:
       return "square_hd";
