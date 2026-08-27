@@ -1,6 +1,7 @@
 // Small mic button that uses the browser's Web Speech API (free, no key).
 // Falls back gracefully when the browser doesn't support it.
 // While listening: restrained AI-assistant ring + waveform (respects reduced-motion).
+// Listening UI stays inside the prompt composer (inline, no page-level overlay).
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { toast } from "sonner";
@@ -103,17 +104,16 @@ export function VoiceInputButton({
 
   if (!supported) return null;
 
-  // Listening UI stays inside the prompt composer (inline, no page-level overlay).
   return (
-    <span className="relative inline-flex items-center gap-1.5">
+    <span className="relative inline-flex max-w-full items-center gap-1">
       {listening && (
         <span
           role="status"
           aria-live="polite"
-          className="pointer-events-none inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px]"
+          className="pointer-events-none inline-flex max-w-[7rem] items-center gap-1 truncate rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px]"
         >
           {!reduceMotion && (
-            <span className="flex items-end gap-0.5" aria-hidden>
+            <span className="flex shrink-0 items-end gap-0.5" aria-hidden>
               {[6, 10, 8, 12, 7].map((h, i) => (
                 <span
                   key={i}
@@ -126,7 +126,7 @@ export function VoiceInputButton({
               ))}
             </span>
           )}
-          <span className="font-medium text-primary">Listening</span>
+          <span className="truncate font-medium text-primary">Listening</span>
         </span>
       )}
       <button
