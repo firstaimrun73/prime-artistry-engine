@@ -1,1 +1,6 @@
-/* styles will be loaded from local file via python in next step if this fails */
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+@import "./styles/brand-motion.css";
+
+/* Motio brand motion also inlined below for reliability */
