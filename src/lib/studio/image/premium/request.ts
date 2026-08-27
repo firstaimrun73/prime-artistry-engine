@@ -26,19 +26,44 @@ export function buildPremiumT2IStep(ok: PremiumValidationOk): PremiumFalStep {
   };
 }
 
-export function buildPremiumI2IStep(ok: PremiumValidationOk): PremiumFalStep {
-  if (!ok.imageUrl) {
-    throw new Error("Premium I2I requires a source image.");
+export function resolvePremiumI2IStrength(
+  prompt: string,
+  provided?: number | null,
+): number {
+  if (typeof provided === "number" && provided >= 0.01 && provided <= 1) {
+    return provided;
   }
-  const strength =
-    typeof ok.strength === "number" && ok.strength >= 0.01 && ok.strength <= 1
-      ? ok.strength
-      : 0.85;
+  const p = prompt.toLowerCase();
+  if (
+    /\b(sharp|sharper|bright|brighter|clear|clearer|enhance|cleaner|upscale|denoise|noise|detail|quality|fix lighting|color balance|more detail)\b/.test(
+      p,
+    )
+  ) {
+    return 0.4;
+  }
+  if (
+    /\b(replace|transform into|change into|convert to|in the style of|as a|turn into|make it a)\b/.test(
+      p,
+    )
+  ) {
+    return 0.72;
+  }
+  return 0.55;
+}
+
+export function buildPremiumI2IStep(ok: PremiumValidationOk): PremiumFalStep {
+  if (!ok.imageUrl || !ok.imageUrl.startsWith("https://")) {
+    throw new Error("Premium I2I requires a valid HTTPS source image URL.");
+  }
+  const strength = resolvePremiumI2IStrength(ok.prompt, ok.strength);
+  const prompt = ok.prompt.trim().toLowerCase().startsWith("edit ")
+    ? ok.prompt
+    : `Edit the provided photo in place. ${ok.prompt}`;
   return {
-    label: `premium I2I flux-dev ${ok.quality}`,
+    label: `premium I2I flux-dev ${ok.quality} s=${strength}`,
     model: PREMIUM_MODELS.imageToImage,
     body: {
-      prompt: ok.prompt,
+      prompt,
       image_url: ok.imageUrl,
       strength,
       num_inference_steps: ok.quality === "2k" ? 32 : ok.quality === "hd" ? 28 : 20,

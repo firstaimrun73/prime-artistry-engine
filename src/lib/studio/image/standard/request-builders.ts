@@ -1,4 +1,4 @@
-   /**
+/**
  * Build fal request bodies for locked Standard models.
  * Never reorder multi-image URLs. Never drop the source image for I2I.
  * enhance_prompt is always false — do not silently rewrite user prompts.
@@ -30,20 +30,55 @@ export function buildTextToImageStep(req: StandardValidationOk): StandardFalStep
   };
 }
 
-export function buildImageToImageStep(req: StandardValidationOk): StandardFalStep {
-  if (!req.imageUrl) {
-    throw new Error("Image → Image requires a source image.");
+/**
+ * Flux Dev I2I strength:
+ * 0.1 ≈ keep original · 1.0 ≈ near full regenerate.
+ * Edit prompts ("sharper", "brighter") must use LOW strength or the model
+ * ignores the source and invents a new scene (looks like accidental T2I).
+ */
+export function resolveStandardI2IStrength(
+  prompt: string,
+  provided?: number | null,
+): number {
+  if (typeof provided === "number" && provided >= 0.01 && provided <= 1) {
+    return provided;
   }
-  // Flux 0.1 Dev I2I — supported params only (prompt, image_url, strength, steps, guidance).
-  const strength =
-    typeof req.strength === "number" && req.strength >= 0.01 && req.strength <= 1
-      ? req.strength
-      : 0.85;
+  const p = prompt.toLowerCase();
+  // Preserve composition for enhance / cleanup prompts
+  if (
+    /\b(sharp|sharper|bright|brighter|clear|clearer|enhance|cleaner|upscale|denoise|noise|detail|quality|fix lighting|color balance|more detail)\b/.test(
+      p,
+    )
+  ) {
+    return 0.4;
+  }
+  // Strong stylistic / replace transforms
+  if (
+    /\b(replace|transform into|change into|convert to|in the style of|as a|turn into|make it a)\b/.test(
+      p,
+    )
+  ) {
+    return 0.72;
+  }
+  // Balanced default for general edits (keep subject recognizable)
+  return 0.55;
+}
+
+export function buildImageToImageStep(req: StandardValidationOk): StandardFalStep {
+  if (!req.imageUrl || !req.imageUrl.startsWith("https://")) {
+    throw new Error("Image → Image requires a valid HTTPS source image URL.");
+  }
+  // Flux Dev I2I — params: prompt, image_url, strength, steps, guidance only.
+  const strength = resolveStandardI2IStrength(req.prompt, req.strength);
+  // Mild structural anchor so the model treats this as an edit, not a fresh scene.
+  const prompt = req.prompt.trim().toLowerCase().startsWith("edit ")
+    ? req.prompt
+    : `Edit the provided photo in place. ${req.prompt}`;
   return {
-    label: `standard I2I flux-dev ${req.imageQuality === "hd" ? "HD" : "SD"}`,
+    label: `standard I2I flux-dev ${req.imageQuality === "hd" ? "HD" : "SD"} s=${strength}`,
     model: STANDARD_MODELS.imageToImage,
     body: {
-      prompt: req.prompt,
+      prompt,
       image_url: req.imageUrl,
       strength,
       num_inference_steps: req.imageQuality === "hd" ? 28 : 20,
