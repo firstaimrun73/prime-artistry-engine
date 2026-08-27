@@ -55,9 +55,9 @@ export function StudioTierSelector({
       </p>
       <div
         className={cn(
-          "grid gap-1.5 sm:gap-2.5",
+          "grid min-w-0 gap-2 sm:gap-2.5",
           tiers.length === 1
-            ? "grid-cols-1 max-w-[200px]"
+            ? "mx-auto grid-cols-1 max-w-[280px] sm:max-w-[240px]"
             : tiers.length === 2
               ? "grid-cols-2"
               : "grid-cols-3",
@@ -74,13 +74,13 @@ export function StudioTierSelector({
               type="button"
               onClick={() => onChange(id)}
               className={cn(
-                "relative flex min-h-[72px] min-w-0 flex-col items-start gap-0.5 rounded-xl border px-1.5 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[96px] sm:gap-1 sm:px-2.5 sm:py-2.5 md:min-h-[108px] md:px-3 md:py-3",
+                "relative flex min-h-[76px] min-w-0 flex-col items-start gap-0.5 overflow-hidden rounded-xl border px-2 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[96px] sm:gap-1 sm:px-2.5 sm:py-2.5 md:min-h-[108px] md:px-3 md:py-3",
                 active &&
                   id === "standard" &&
                   "border-primary bg-primary/15 ring-1 ring-primary/40",
                 active &&
                   id === "pro" &&
-                  "border-orange-500 bg-orange-500/15 ring-1 ring-orange-500/40",
+                  "border-orange-500 bg-gradient-to-br from-orange-500/20 via-amber-500/10 to-orange-600/15 ring-1 ring-orange-500/45 shadow-[0_0_20px_-8px_rgba(249,115,22,0.45)]",
                 active &&
                   id === "premium" &&
                   "border-[#D4AF37] bg-[#121C30] ring-1 ring-[#D4AF37]/60 text-[#F8F1D8] shadow-[0_0_22px_-8px_rgba(212,175,55,0.55)]",
@@ -90,7 +90,25 @@ export function StudioTierSelector({
               aria-pressed={active}
               aria-label={`${meta.label} experience`}
             >
-              <div className="flex items-center gap-1.5">
+              {/* Premium subtle energy edge */}
+              {id === "pro" && active && (
+                <span
+                  className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-orange-400 to-transparent opacity-80"
+                  aria-hidden
+                />
+              )}
+              {/* Ultra atmospheric wash */}
+              {id === "premium" && (
+                <span
+                  className={cn(
+                    "pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-[#D4AF37]/10 blur-xl",
+                    active && "bg-[#D4AF37]/20",
+                  )}
+                  aria-hidden
+                />
+              )}
+
+              <div className="relative flex items-center gap-1 sm:gap-1.5">
                 <Icon
                   className={cn(
                     "h-3.5 w-3.5 shrink-0",
@@ -108,10 +126,15 @@ export function StudioTierSelector({
                 >
                   {meta.label}
                 </span>
+                {id === "pro" && (
+                  <span className="text-[11px] leading-none sm:text-xs" aria-hidden>
+                    👑
+                  </span>
+                )}
               </div>
               <p
                 className={cn(
-                  "line-clamp-1 text-[9px] leading-snug sm:text-[10px] md:text-[11px]",
+                  "relative line-clamp-1 text-[9px] leading-snug sm:text-[10px] md:text-[11px]",
                   active && id === "premium" ? "text-[#E2E8F0]" : "text-muted-foreground",
                 )}
               >
@@ -119,8 +142,8 @@ export function StudioTierSelector({
               </p>
               <p
                 className={cn(
-                  "mt-auto line-clamp-2 text-[9px] leading-snug opacity-90 sm:text-[10px] md:text-[11px]",
-                  active && id === "premium" && "text-[#E8C547]",
+                  "relative mt-auto line-clamp-2 text-[9px] leading-snug opacity-90 sm:text-[10px] md:text-[11px]",
+                  active && id === "premium" && "text-[#E8C547]/90",
                 )}
               >
                 {meta.short}
