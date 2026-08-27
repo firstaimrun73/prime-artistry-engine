@@ -81,100 +81,97 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+function RootLayout({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  useEffect(() => {
+    trackPageView(pathname);
+  }, [pathname]);
+
+  return (
+    <>
+      {children}
+      {!hideBottomNav(pathname) && <BottomTabBar />}
+      <GenerationStatusBar />
+      <Toaster />
+      <TranslateWidget />
+      <AdPolicyGate />
+    </>
+  );
+}
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+      },
       { title: "Motio2edit — AI Image, Video & Music Studio by Motion2AI" },
-      { name: "description", content: "Motio2edit, powered by Motion2AI. Edit images, generate videos, and create music with AI — one workspace, three studios." },
+      {
+        name: "description",
+        content:
+          "Motio2edit, powered by Motion2AI. Edit images, generate videos, and create music with AI — one workspace, three studios.",
+      },
       { name: "author", content: "Motion2AI" },
       { property: "og:title", content: "Motio2edit — AI Image, Video & Music Studio by Motion2AI" },
-      { property: "og:description", content: "Edit images, generate videos, and create music with AI — one workspace, three studios." },
+      {
+        property: "og:description",
+        content: "Edit images, generate videos, and create music with AI — one workspace, three studios.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Motio2edit — AI Image, Video & Music Studio by Motion2AI" },
-      { name: "twitter:description", content: "Edit images, generate videos, and create music with AI — one workspace, three studios." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/1IssfTbY1iUB1etzG4012PVyW3P2/social-images/social-1781815143053-file_0000000030e0720789c4ed52cd0751aa.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/1IssfTbY1iUB1etzG4012PVyW3P2/social-images/social-1781815143053-file_0000000030e0720789c4ed52cd0751aa.webp" },
+      {
+        name: "twitter:description",
+        content: "Edit images, generate videos, and create music with AI — one workspace, three studios.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/1IssfTbY1iUB1etzG4012PVyW3P2/social-images/social-1781815143053-file_0000000030e0720789c4ed52cd0751aa.webp",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/1IssfTbY1iUB1etzG4012PVyW3P2/social-images/social-1781815143053-file_0000000030e0720789c4ed52cd0751aa.webp",
+      },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
-      },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
-    scripts: [
-      { src: "https://checkout.razorpay.com/v1/checkout.js", defer: true },
-      { src: "https://www.googletagmanager.com/gtag/js?id=G-3NCVLG63JR", async: true },
-      {
-        children:
-          "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3NCVLG63JR');",
-      },
-      // Monetag vignette/tag scripts are intentionally NOT loaded here.
-      // They are injected only for free non-admin users by <AdPolicyGate />.
+      { rel: "stylesheet", href: appCss },
     ],
   }),
-  shellComponent: RootShell,
-  component: RootComponent,
+  component: () => {
+    return (
+      <RootDocument>
+        <QueryClientProvider client={Route.useRouteContext().queryClient}>
+          <ThemeProvider>
+            <AuthProvider>
+              <RootLayout>
+                <Outlet />
+              </RootLayout>
+            </AuthProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </RootDocument>
+    );
+  },
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
 
- function RootShell({ children }: { children: ReactNode }) {
+function RootDocument({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
-        {/* AdSense + Monetag are injected only by <AdPolicyGate /> when Ads are ON. */}
       </head>
-      <body>
+      <body className="min-h-screen bg-background font-sans antialiased">
         {children}
         <Scripts />
       </body>
     </html>
-  );
-}
-
-function PageViewTracker() {
-  const router = useRouter();
-  useEffect(() => {
-    trackPageView(router.state.location.pathname);
-    const unsub = router.subscribe("onResolved", () => {
-      trackPageView(router.state.location.pathname);
-    });
-    return unsub;
-  }, [router]);
-  return null;
-}
-
-function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const padForTabs = !hideBottomNav(pathname);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <PageViewTracker />
-          <AdPolicyGate />
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
-            <Outlet />
-            <GenerationStatusBar />
-            <BottomTabBar />
-          </div>
-          <TranslateWidget />
-          <Toaster richColors position="top-center" />
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
   );
 }
