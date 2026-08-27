@@ -59,26 +59,50 @@ function HistoryPage() {
   const secureDownload = useServerFn(secureDownloadImage);
   const [gens, setGens] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [active, setActive] = useState<Generation | null>(null);
   const [zoomed, setZoomed] = useState(false);
   const [tab, setTab] = useState<"media" | "music">("media");
 
   const load = () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      setGens([]);
+      setLoadError(null);
+      return;
+    }
     setLoading(true);
+    setLoadError(null);
+    // RLS scopes rows to auth.uid(); explicit user_id keeps the filter clear.
+    // If metadata is missing on older DBs, fall back without it.
     supabase
       .from("generations")
       .select("id, type, prompt, output_url, status, created_at, metadata")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(100)
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
-          console.error("[history] load failed:", error.message);
-          toast.error("Could not load history.");
-          setGens([]);
-        } else if (data) {
-          setGens(data as Generation[]);
+          console.error("[history] load failed:", error.message, error.code, error.details);
+          const fb = await supabase
+            .from("generations")
+            .select("id, type, prompt, output_url, status, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(100);
+          if (fb.error) {
+            console.error("[history] fallback load failed:", fb.error.message);
+            setGens([]);
+            setLoadError(fb.error.message);
+            toast.error("Could not load history.");
+          } else {
+            setGens((fb.data as Generation[]) ?? []);
+            setLoadError(null);
+          }
+        } else {
+          // Successful query: data may be [] — empty history is NOT an error.
+          setGens((data as Generation[]) ?? []);
+          setLoadError(null);
         }
         setLoading(false);
       });
@@ -176,6 +200,14 @@ function HistoryPage() {
         <MusicHistoryList userId={user?.id} />
       ) : loading ? (
         <p className="mt-8 text-sm text-muted-foreground">{t("common.loading")}</p>
+      ) : loadError ? (
+        <div className="mt-8 rounded-xl border border-destructive/40 bg-destructive/5 p-10 text-center">
+          <p className="text-sm font-medium text-foreground">Could not load history</p>
+          <p className="mt-1 text-sm text-muted-foreground">Please refresh and try again.</p>
+          <Button size="sm" className="mt-4" variant="outline" onClick={load}>
+            Retry
+          </Button>
+        </div>
       ) : gens.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-border p-10 text-center">
           <FolderOpen className="mx-auto h-8 w-8 text-muted-foreground" />
