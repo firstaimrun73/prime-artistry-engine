@@ -4,22 +4,22 @@ import {
   STUDIO_TIERS,
   type StudioTier,
 } from "@/lib/studio/studio-tier";
-import { Sparkles, Zap, Circle } from "lucide-react";
+import { Sparkles, Zap, Circle, Crown } from "lucide-react";
 
 const TIER_DETAIL: Record<
   StudioTier,
   { capability: string; Icon: typeof Circle }
 > = {
   standard: {
-    capability: "Essential",
+    capability: "Fast · Clear · Reliable",
     Icon: Circle,
   },
   pro: {
-    capability: "Upgraded",
-    Icon: Zap,
+    capability: "HD+ · Multi-ref",
+    Icon: Crown,
   },
   premium: {
-    capability: "Flagship",
+    capability: "Flagship · Max quality",
     Icon: Sparkles,
   },
 };
@@ -74,7 +74,7 @@ export function StudioTierSelector({
               type="button"
               onClick={() => onChange(id)}
               className={cn(
-                "relative flex min-h-[76px] min-w-0 flex-col items-start gap-0.5 overflow-hidden rounded-xl border px-2 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[96px] sm:gap-1 sm:px-2.5 sm:py-2.5 md:min-h-[108px] md:px-3 md:py-3",
+                "relative flex min-h-[80px] min-w-0 flex-col items-start gap-0.5 overflow-hidden rounded-xl border px-2 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[100px] sm:gap-1 sm:px-2.5 sm:py-2.5 md:min-h-[112px] md:px-3 md:py-3",
                 active &&
                   id === "standard" &&
                   "border-primary bg-primary/15 ring-1 ring-primary/40",
@@ -90,14 +90,12 @@ export function StudioTierSelector({
               aria-pressed={active}
               aria-label={`${meta.label} experience`}
             >
-              {/* Premium subtle energy edge */}
               {id === "pro" && active && (
                 <span
                   className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-orange-400 to-transparent opacity-80"
                   aria-hidden
                 />
               )}
-              {/* Ultra atmospheric wash */}
               {id === "premium" && (
                 <span
                   className={cn(

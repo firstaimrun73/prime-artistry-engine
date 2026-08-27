@@ -177,9 +177,10 @@ export function getSmartSuggestions(input: string): Suggestion[] {
   return [];
 }
 
-// ── Aspect ratio (text-to-image only) ──────────────────────────────────
-// Maps to fal-ai/flux-pro/v1.1 supported `image_size` enum values.
-export type AspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4";
+// ── Aspect ratio (text-to-image) ──────────────────────────────────
+// Standard/Premium: 1:1, 4:3, 16:9, 9:16, 3:4
+// Ultra also supports IMAX (21:9) when UI exposes it.
+export type AspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "imax";
 
 export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
   { id: "1:1", label: "1:1" },
@@ -187,6 +188,7 @@ export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
   { id: "16:9", label: "16:9" },
   { id: "9:16", label: "9:16" },
   { id: "3:4", label: "3:4" },
+  { id: "imax", label: "IMAX" },
 ];
 
 export function aspectToImageSize(aspect: AspectRatio | undefined): string {
@@ -199,6 +201,8 @@ export function aspectToImageSize(aspect: AspectRatio | undefined): string {
       return "portrait_16_9";
     case "3:4":
       return "portrait_4_3";
+    case "imax":
+      return "landscape_16_9"; // closest documented fal size; Ultra may refine server-side
     case "1:1":
     default:
       return "square_hd";

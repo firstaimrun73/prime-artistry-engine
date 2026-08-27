@@ -18,6 +18,7 @@ export const standardGenerateClass =
 export const standardMeta = {
   id: STANDARD_TIER,
   label: "Standard",
-  short: "Essential image creation & editing",
-  blurb: "Fast, reliable generation for everyday image work. Text to Image, Image to Image, and multi-reference editing.",
+  short: "Fast, clear & better",
+  blurb:
+    "Fast generation with clear, reliable results — designed to make your images better, faster.",
 } as const;
