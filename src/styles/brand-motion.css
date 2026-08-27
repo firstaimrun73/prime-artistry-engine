@@ -1,0 +1,123 @@
+/* ── Motio2edit brand motion (interval, not constant noise) ───────────
+ * Loop ~18s: orange rest → spin → red → spin → purple → spin → orange
+ * Respects prefers-reduced-motion.
+ */
+.motio-mark-icon {
+  --motio-gem-hi: #FFF7ED;
+  --motio-gem-mid: #F97316;
+  --motio-gem-lo: #EA580C;
+  --motio-hwy-a: #FFFFFF;
+  --motio-hwy-b: #FED7AA;
+}
+
+.motio-brand-two {
+  color: hsl(var(--primary));
+  display: inline-block;
+  transition: color 0.6s ease, transform 0.6s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .motio-mark-animate.motio-mark-icon {
+    animation: motio-gem-palette 18s ease-in-out infinite;
+  }
+
+  .motio-mark-animate .motio-mark-spin-group {
+    animation: motio-gem-spin 18s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .motio-brand-animate .motio-brand-two {
+    animation: motio-two-pulse 18s ease-in-out infinite;
+  }
+
+  .motio-mark-animate .motio-mark-halo {
+    animation: motio-halo-breathe 18s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motio-mark-animate.motio-mark-icon,
+  .motio-mark-animate .motio-mark-spin-group,
+  .motio-brand-animate .motio-brand-two,
+  .motio-mark-animate .motio-mark-halo {
+    animation: none !important;
+  }
+}
+
+@keyframes motio-gem-palette {
+  0%, 16% {
+    --motio-gem-hi: #FFF7ED;
+    --motio-gem-mid: #F97316;
+    --motio-gem-lo: #EA580C;
+    --motio-hwy-a: #FFFFFF;
+    --motio-hwy-b: #FED7AA;
+  }
+  22%, 38% {
+    --motio-gem-hi: #FEF2F2;
+    --motio-gem-mid: #EF4444;
+    --motio-gem-lo: #B91C1C;
+    --motio-hwy-a: #FFFFFF;
+    --motio-hwy-b: #FECACA;
+  }
+  44%, 60% {
+    --motio-gem-hi: #F5F3FF;
+    --motio-gem-mid: #A855F7;
+    --motio-gem-lo: #7E22CE;
+    --motio-hwy-a: #FFFFFF;
+    --motio-hwy-b: #E9D5FF;
+  }
+  66%, 100% {
+    --motio-gem-hi: #FFF7ED;
+    --motio-gem-mid: #F97316;
+    --motio-gem-lo: #EA580C;
+    --motio-hwy-a: #FFFFFF;
+    --motio-hwy-b: #FED7AA;
+  }
+}
+
+@keyframes motio-gem-spin {
+  0%, 15% { transform: rotate(0deg); }
+  16%, 21% { transform: rotate(180deg); }
+  22%, 37% { transform: rotate(180deg); }
+  38%, 43% { transform: rotate(360deg); }
+  44%, 59% { transform: rotate(360deg); }
+  60%, 65% { transform: rotate(540deg); }
+  66%, 100% { transform: rotate(540deg); }
+}
+
+@keyframes motio-two-pulse {
+  0%, 16% {
+    color: #F97316;
+    transform: translateX(0) scale(1);
+  }
+  18%, 20% {
+    color: #F97316;
+    transform: translateX(-2px) scale(1.12);
+  }
+  22%, 38% {
+    color: #EF4444;
+    transform: translateX(0) scale(1);
+  }
+  40%, 42% {
+    color: #EF4444;
+    transform: translateX(-2px) scale(1.12);
+  }
+  44%, 60% {
+    color: #A855F7;
+    transform: translateX(0) scale(1);
+  }
+  62%, 64% {
+    color: #A855F7;
+    transform: translateX(-2px) scale(1.12);
+  }
+  66%, 100% {
+    color: #F97316;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes motio-halo-breathe {
+  0%, 16%, 22%, 38%, 44%, 60%, 66%, 100% { opacity: 1; }
+  18%, 40%, 62% { opacity: 0.55; }
+}
