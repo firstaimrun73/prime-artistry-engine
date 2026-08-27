@@ -603,6 +603,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     setUltraGenError(null);
     setGallery([]);
     setActiveImage(0);
+    setContextTags([]);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -701,7 +702,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             : "loading";
 
   return (
-    <div className={cn("min-h-[100dvh] pb-8", studioShellClass(studioTier))}>
+    <div className={cn("min-h-[100dvh] overflow-x-hidden pb-8", studioShellClass(studioTier))}>
       {showPremiumOverlay && (
         <PremiumImageGenerationOverlay
           phase={premiumPhase}
@@ -722,17 +723,17 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         />
       )}
 
-      <div className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-10">
-        <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-          <div className="space-y-2 min-w-0">
+      <div className="mx-auto min-w-0 max-w-6xl overflow-x-hidden px-3 py-4 sm:px-4 sm:py-10">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 animate-fade-in sm:gap-3">
+          <div className="min-w-0 space-y-1.5 sm:space-y-2">
             <StudioBackLink />
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight">
+            <h1 className="text-lg font-extrabold tracking-tight leading-tight sm:text-2xl">
               <span className="text-foreground">Image</span>{" "}
               <span className="text-orange-500">Studio</span>
               <span className="mx-1.5 text-muted-foreground/50 font-normal">·</span>
               <span
                 className={cn(
-                  "align-middle text-sm sm:text-base font-semibold tracking-normal",
+                  "align-middle text-sm font-semibold tracking-normal sm:text-base",
                   studioTier === "premium" && "text-[#E8C547]",
                   studioTier === "pro" && "text-orange-600 dark:text-orange-400",
                   studioTier === "standard" && "text-primary",
@@ -741,11 +742,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 {expLabel}
               </span>
             </h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground sm:text-xs">
               Upload · Prompt · Experience · Generate
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <span className="rounded-full border border-border/60 bg-card/80 px-2.5 py-1.5 text-xs font-semibold backdrop-blur-sm sm:px-3">
               {isAdmin ? "∞ credits" : `${profile.credits} credits`}
             </span>
@@ -755,13 +756,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-3 sm:mt-4">
           <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
-          <div className="order-1 space-y-5">
-            <div className={cn("space-y-3 p-4 sm:p-5", studioCardClass(studioTier))}>
+        <div className="mt-4 grid min-w-0 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2 lg:gap-8">
+          <div className="order-1 min-w-0 space-y-4 sm:space-y-5">
+            <div className={cn("min-w-0 space-y-3 p-3 sm:p-5", studioCardClass(studioTier))}>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Image
               </p>
@@ -783,7 +784,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               />
             </div>
 
-            <div className={cn("space-y-3 p-4 sm:p-5", studioCardClass(studioTier))}>
+            <div className={cn("min-w-0 space-y-3 p-3 sm:p-5", studioCardClass(studioTier))}>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Prompt
               </p>
@@ -834,10 +835,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               />
             </div>
 
-            <div className={cn("space-y-4 p-4 sm:p-5", studioCardClass(studioTier))}>
-               <StudioTierSelector
+            <div className={cn("min-w-0 space-y-4 p-3 sm:p-5", studioCardClass(studioTier))}>
+              <StudioTierSelector
                 value={studioTier}
-                experiences={visibleImageExperiences(profile.plan, isAdmin)}
+                visibleTiers={visibleImageExperiences(profile.plan, isAdmin)}
                 onChange={(t) => {
                   setStudioTier(t);
                   const allowed = imageQualitiesForStudioTier(t);
@@ -850,41 +851,41 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 }}
               />
               <div className="border-t border-border/50 pt-4">
-              <EditorOptionsPanel
-                mediaType="image"
-                loading={loading}
-                inputDataUrl={inputDataUrl}
-                aspectRatio={aspectRatio}
-                setAspectRatio={setAspectRatio}
-                imageQuality={imageQuality}
-                setImageQuality={(q) => {
-                  qualityTouchedRef.current = true;
-                  setImageQuality(q);
-                }}
-                strength={strength}
-                setStrength={setStrength}
-                canAddRefImages={canAddRefImages}
-                refImages={refImages}
-                setRefImages={setRefImages}
-                userPlan={profile.plan}
-                videoDuration={noopVideoDuration}
-                setVideoDuration={noopSetVideoDuration as never}
-                videoAspect={noopVideoAspect}
-                setVideoAspect={noopSetVideoAspect as never}
-                videoResolution={noopVideoRes}
-                setVideoResolution={noopSetVideoRes as never}
-                cost={cost}
-                isAdmin={isAdmin}
-                credits={profile.credits}
-                keepWatermark={keepWatermark}
-                setKeepWatermark={setKeepWatermark}
-                isFree={isFree}
-                studioTier={studioTier}
-              />
+                <EditorOptionsPanel
+                  mediaType="image"
+                  loading={loading}
+                  inputDataUrl={inputDataUrl}
+                  aspectRatio={aspectRatio}
+                  setAspectRatio={setAspectRatio}
+                  imageQuality={imageQuality}
+                  setImageQuality={(q) => {
+                    qualityTouchedRef.current = true;
+                    setImageQuality(q);
+                  }}
+                  strength={strength}
+                  setStrength={setStrength}
+                  canAddRefImages={canAddRefImages}
+                  refImages={refImages}
+                  setRefImages={setRefImages}
+                  userPlan={profile.plan}
+                  videoDuration={noopVideoDuration}
+                  setVideoDuration={noopSetVideoDuration as never}
+                  videoAspect={noopVideoAspect}
+                  setVideoAspect={noopSetVideoAspect as never}
+                  videoResolution={noopVideoRes}
+                  setVideoResolution={noopSetVideoRes as never}
+                  cost={cost}
+                  isAdmin={isAdmin}
+                  credits={profile.credits}
+                  keepWatermark={keepWatermark}
+                  setKeepWatermark={setKeepWatermark}
+                  isFree={isFree}
+                  studioTier={studioTier}
+                />
               </div>
             </div>
 
-            <div className={cn("space-y-3 p-4 sm:p-5 ring-1 ring-primary/15", studioCardClass(studioTier))}>
+            <div className={cn("min-w-0 space-y-3 p-3 ring-1 ring-primary/15 sm:p-5", studioCardClass(studioTier))}>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Generate
               </p>
@@ -899,9 +900,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             </div>
           </div>
 
-          <div className="order-2 space-y-4 lg:sticky lg:top-4 lg:self-start">
+          <div className="order-2 min-w-0 space-y-4 lg:sticky lg:top-4 lg:self-start">
             {showInlinePreview && (loading || output) && (
-              <div className={cn("p-3 sm:p-4", studioCardClass(studioTier))}>
+              <div className={cn("min-w-0 p-3 sm:p-4", studioCardClass(studioTier))}>
                 <EditorPreview
                   state={state}
                   loadingMessage={LOADING_MESSAGES[msgIdx]}
