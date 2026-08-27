@@ -74,7 +74,7 @@ export function StudioTierSelector({
               type="button"
               onClick={() => onChange(id)}
               className={cn(
-                "relative flex min-h-[96px] min-w-0 flex-col items-start gap-1 rounded-xl border px-2 py-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[108px] sm:px-3 sm:py-3",
+                "relative flex min-h-[72px] min-w-0 flex-col items-start gap-0.5 rounded-xl border px-1.5 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[96px] sm:gap-1 sm:px-2.5 sm:py-2.5 md:min-h-[108px] md:px-3 md:py-3",
                 active &&
                   id === "standard" &&
                   "border-primary bg-primary/15 ring-1 ring-primary/40",
@@ -102,7 +102,7 @@ export function StudioTierSelector({
                 />
                 <span
                   className={cn(
-                    "text-xs font-bold leading-tight sm:text-sm",
+                    "text-[11px] font-bold leading-tight sm:text-xs md:text-sm",
                     active && id === "premium" && "text-[#E8C547]",
                   )}
                 >
@@ -111,7 +111,7 @@ export function StudioTierSelector({
               </div>
               <p
                 className={cn(
-                  "text-[10px] leading-snug sm:text-[11px]",
+                  "line-clamp-1 text-[9px] leading-snug sm:text-[10px] md:text-[11px]",
                   active && id === "premium" ? "text-[#E2E8F0]" : "text-muted-foreground",
                 )}
               >
@@ -119,7 +119,7 @@ export function StudioTierSelector({
               </p>
               <p
                 className={cn(
-                  "mt-auto text-[10px] leading-snug opacity-90 sm:text-[11px]",
+                  "mt-auto line-clamp-2 text-[9px] leading-snug opacity-90 sm:text-[10px] md:text-[11px]",
                   active && id === "premium" && "text-[#E8C547]",
                 )}
               >
