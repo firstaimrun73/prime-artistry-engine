@@ -54,7 +54,7 @@ export function EditorUpload({
         <button
           onClick={() => fileRef.current?.click()}
           disabled={videoLocked || loading}
-          className="flex min-h-[120px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50 sm:min-h-[140px]"
+          className="flex min-h-[96px] w-full max-w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-card px-3 py-4 text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50 sm:min-h-[120px] sm:gap-2 sm:px-4 sm:py-6 md:min-h-[140px]"
         >
           <Upload className="h-6 w-6" />
           {inputPreview
