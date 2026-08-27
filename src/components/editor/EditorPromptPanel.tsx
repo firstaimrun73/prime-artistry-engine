@@ -174,7 +174,7 @@ export function EditorPromptPanel({
   return (
     <>
       {mediaType === "image" && (
-        <section className="space-y-2">
+        <section className="min-w-0 space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Tools
           </p>
@@ -184,13 +184,13 @@ export function EditorPromptPanel({
             onSelectTool={handleTool}
           />
           {activeToolLabel && (
-            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
-              <span className="font-semibold text-primary">Using: {activeToolLabel}</span>
+            <div className="flex min-w-0 items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+              <span className="min-w-0 truncate font-semibold text-primary">Using: {activeToolLabel}</span>
               {onClearTool && (
                 <button
                   type="button"
                   onClick={onClearTool}
-                  className="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                  className="ml-auto inline-flex shrink-0 items-center gap-1 text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-3 w-3" /> Clear
                 </button>
@@ -201,7 +201,7 @@ export function EditorPromptPanel({
       )}
 
       {mediaType === "video" && (
-        <section className="space-y-2">
+        <section className="min-w-0 space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Quick styles
           </p>
@@ -223,6 +223,7 @@ export function EditorPromptPanel({
 
       <section className="min-w-0 space-y-2">
         <div className="relative min-w-0 overflow-hidden rounded-xl border border-border/70 bg-card/80 shadow-sm ring-1 ring-black/[0.02] dark:ring-white/[0.04]">
+          {/* Context chips only for selected tags — never permanent full tag row */}
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-border/50 px-2.5 py-1.5 sm:px-3 sm:py-2">
             {contextHint && (
               <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium tracking-wide text-muted-foreground sm:text-[11px]">
@@ -277,11 +278,12 @@ export function EditorPromptPanel({
                 }
                 if (e.key === "Escape") setAtMenuOpen(false);
               }}
-              rows={studioTier === "premium" ? 5 : 4}
+              rows={studioTier === "premium" ? 4 : 3}
               disabled={loading}
-              className="min-h-[88px] w-full max-w-full resize-none border-0 bg-transparent p-0 pr-11 text-[15px] leading-relaxed shadow-none focus-visible:ring-0 sm:min-h-[104px] sm:pr-12 sm:text-sm md:min-h-[120px]"
+              className="min-h-[72px] w-full max-w-full resize-none border-0 bg-transparent p-0 pr-12 text-[15px] leading-relaxed shadow-none focus-visible:ring-0 sm:min-h-[96px] sm:pr-12 sm:text-sm md:min-h-[112px]"
             />
-            <div className="absolute right-1.5 top-1.5 sm:right-2 sm:top-2">
+            {/* Mic + listening stay inside composer (absolute, no page float) */}
+            <div className="absolute right-1.5 top-1.5 z-10 flex max-w-[calc(100%-0.75rem)] items-start justify-end sm:right-2 sm:top-2">
               <VoiceInputButton
                 disabled={loading}
                 onTranscript={(txt) =>
@@ -294,7 +296,7 @@ export function EditorPromptPanel({
               <div
                 ref={menuRef}
                 role="listbox"
-                className="absolute left-2 right-12 z-20 mt-0.5 max-h-40 overflow-y-auto rounded-lg border border-border/80 bg-popover p-1 shadow-lg sm:left-3 sm:right-14"
+                className="absolute left-2 right-2 z-20 mt-0.5 max-h-40 overflow-y-auto rounded-lg border border-border/80 bg-popover p-1 shadow-lg sm:left-3 sm:right-14"
               >
                 {atMatches.map((tag) => (
                   <button
@@ -326,8 +328,8 @@ export function EditorPromptPanel({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-2 border-t border-border/40 px-2.5 py-1.5 text-[10px] text-muted-foreground sm:px-3 sm:text-[11px]">
-            <span className="inline-flex items-center gap-1 text-primary/90">
+          <div className="flex min-w-0 items-center justify-between gap-2 border-t border-border/40 px-2.5 py-1.5 text-[10px] text-muted-foreground sm:px-3 sm:text-[11px]">
+            <span className="inline-flex min-w-0 items-center gap-1 text-primary/90">
               <Wand2 className="h-3 w-3 shrink-0" />
               <span className="truncate">Auto-enhanced</span>
             </span>
