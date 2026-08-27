@@ -135,7 +135,7 @@ export function experienceWatermarkLine(tier: StudioTier, planDisplayName: strin
 /**
  * Quality chips exposed per experience (labels only — no credit numbers).
  * Standard: SD, HD only.
- * Premium (pro): SD, HD only.
+ * Premium (pro): SD, HD, 2K (matches PremiumQuality backend).
  * Ultra AI (premium): SD, HD, 2K, 4K, 8K.
  */
 export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
@@ -143,7 +143,8 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
     case "standard":
       return ["sd", "hd"];
     case "pro":
-      return ["sd", "hd"];
+      // Premium backend: sd | hd | 2k (see premium/models.ts PremiumQuality)
+      return ["sd", "hd", "2k"];
     case "premium":
       return ["sd", "hd", "2k", "4k", "8k"];
   }
