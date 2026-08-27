@@ -41,7 +41,7 @@ export function EditorUpload({
         ref={fileRef}
         type="file"
         accept={mediaType === "image" ? "image/*" : "image/*,video/*"}
-        multiple={mediaType === "image"}
+        multiple={mediaType === "image" && maxGalleryImages > 1}
         onChange={onFile}
         className="hidden"
       />
