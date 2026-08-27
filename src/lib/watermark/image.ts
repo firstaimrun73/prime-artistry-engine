@@ -19,10 +19,9 @@ function escapeXml(s: string): string {
 }
 
 /**
- * Build Motio2edit primary pill (+ optional secondary free icon).
+ * Build Motio2edit primary pill (+ optional dense secondary free marks).
  * When `label` is provided (Experience-aware), it replaces the fixed brand text
  * while keeping the orange-dot Motio visual treatment.
- * Format examples: "Motio2edit Standard — Free", "Motio2edit Ultra AI — Pro"
  */
 export function buildImageOverlaySvg(
   w: number,
@@ -35,7 +34,6 @@ export function buildImageOverlaySvg(
     0,
     64,
   );
-  // Slightly smaller type for longer Experience lines so the pill fits.
   const lengthFactor = displayText.length > 18 ? Math.min(1, 18 / displayText.length + 0.35) : 1;
   const fontSize = Math.max(
     11,
@@ -57,20 +55,47 @@ export function buildImageOverlaySvg(
 
   let secondary = "";
   if (mode === "primary+secondary") {
-    const icon = Math.max(18, Math.min(96, Math.round(minDim * SECONDARY_SIZE_RATIO)));
-    const ix = margin;
-    const iy = margin;
-    const cx = ix + icon / 2;
-    const cy = iy + icon / 2;
-    const R = icon * 0.42;
-    const s = icon * 0.28;
-    secondary = `<g opacity="0.78"><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${R.toFixed(1)}" fill="${WATERMARK_BRAND_ORANGE}" fill-opacity="0.88"/><path d="M${cx} ${cy - s} L${cx + s / 3} ${cy} L${cx} ${cy + s} L${cx - s / 3} ${cy} Z" fill="#ffffff"/><path d="M${cx - s} ${cy} L${cx} ${cy - s / 3} L${cx + s} ${cy} L${cx} ${cy + s / 3} Z" fill="#ffffff"/><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${Math.max(2, icon * 0.06).toFixed(1)}" fill="${WATERMARK_BRAND_ORANGE}"/></g>`;
+    // Free plan: ~15 distributed Motio2edit marks at ~65% opacity (pixel composite, not UI overlay).
+    const marks: string[] = [];
+    const cols = 4;
+    const rows = 4;
+    const cellW = w / (cols + 1);
+    const cellH = h / (rows + 1);
+    const secFont = Math.max(9, Math.min(28, Math.round(minDim * 0.018)));
+    let n = 0;
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (n >= 15) break;
+        // Skip bottom-right cell so primary pill stays readable
+        if (row === rows - 1 && col === cols - 1) continue;
+        const mx = cellW * (col + 1) + ((row % 2) * cellW * 0.25);
+        const my = cellH * (row + 1);
+        if (mx < margin || my < margin || mx > w - margin || my > h - margin) continue;
+        marks.push(
+          `<text x="${mx.toFixed(1)}" y="${my.toFixed(1)}" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${secFont}" fill="#ffffff" fill-opacity="0.65" text-anchor="middle">${escapeXml(WATERMARK_BRAND_TEXT)}</text>`,
+        );
+        n++;
+      }
+    }
+    // Ensure at least one larger corner icon if grid produced few marks
+    if (marks.length < 8) {
+      const icon = Math.max(18, Math.min(96, Math.round(minDim * SECONDARY_SIZE_RATIO)));
+      const ix = margin;
+      const iy = margin;
+      const cx = ix + icon / 2;
+      const cy = iy + icon / 2;
+      const R = icon * 0.42;
+      const s = icon * 0.28;
+      marks.push(
+        `<g opacity="0.7"><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${R.toFixed(1)}" fill="${WATERMARK_BRAND_ORANGE}" fill-opacity="0.88"/><path d="M${cx} ${cy - s} L${cx + s / 3} ${cy} L${cx} ${cy + s} L${cx - s / 3} ${cy} Z" fill="#ffffff"/><path d="M${cx - s} ${cy} L${cx} ${cy - s / 3} L${cx + s} ${cy} L${cx} ${cy + s / 3} Z" fill="#ffffff"/></g>`,
+      );
+    }
+    secondary = marks.join("");
   }
 
-  // Prefer Motio2 color split when label starts with Motio2edit; otherwise single white line.
   let brandText: string;
   if (displayText.startsWith("Motio2edit") || displayText === WATERMARK_BRAND_TEXT) {
-    const rest = displayText.slice("Motio2edit".length); // e.g. " Standard — Free"
+    const rest = displayText.slice("Motio2edit".length);
     const motioW = "Motio".length * approxChar;
     const twoW = "2".length * approxChar;
     brandText =

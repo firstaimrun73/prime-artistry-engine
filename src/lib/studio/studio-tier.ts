@@ -143,7 +143,6 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
     case "standard":
       return ["sd", "hd"];
     case "pro":
-      // Premium backend: sd | hd | 2k (see premium/models.ts PremiumQuality)
       return ["sd", "hd", "2k"];
     case "premium":
       return ["sd", "hd", "2k", "4k", "8k"];
@@ -152,13 +151,15 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
 
 /**
  * Aspect ratios for text-to-image per experience.
- * Standard + Premium + Ultra base: all five supported ratios.
- * Ultra also exposes IMAX in the Options UI (not in this list).
+ * Standard + Premium: five core ratios.
+ * Ultra AI: same five + IMAX (21:9).
  */
 export function aspectRatiosForStudioTier(
   tier: StudioTier,
-): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4"> {
-  void tier;
+): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "imax"> {
+  if (tier === "premium") {
+    return ["1:1", "4:3", "16:9", "9:16", "3:4", "imax"];
+  }
   return ["1:1", "4:3", "16:9", "9:16", "3:4"];
 }
 
