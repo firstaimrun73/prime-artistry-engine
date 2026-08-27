@@ -126,11 +126,6 @@ export function StudioTierSelector({
                 >
                   {meta.label}
                 </span>
-                {id === "pro" && (
-                  <span className="text-[11px] leading-none sm:text-xs" aria-hidden>
-                    👑
-                  </span>
-                )}
               </div>
               <p
                 className={cn(
