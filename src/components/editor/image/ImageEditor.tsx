@@ -19,7 +19,7 @@ import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveM
 import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
-import { getPlanLimits, maxImagesForPlan, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
+import { getPlanLimits, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
 import { toast } from "sonner";
@@ -159,8 +159,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     if (adminNow || !profile) return;
     try {
       if (sessionStorage.getItem(LOW_CREDIT_TOAST_KEY) === "1") return;
-      if (creditsNow <= 0) toast.error("🚨 No credits left. Upgrade now.");
-      else if (creditsNow < 30) toast.warning(`⚠️ Low credits: ${creditsNow} remaining`);
+      if (creditsNow <= 0) toast.error("No credits left. Upgrade now.");
+      else if (creditsNow < 30) toast.warning(`Low credits: ${creditsNow} remaining`);
       else return;
       sessionStorage.setItem(LOW_CREDIT_TOAST_KEY, "1");
     } catch {
@@ -310,9 +310,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     isUltraExp && (loading || ultraCompleteHold || !!ultraGenError);
 
   const hideFormDuringGen = showStandardOverlay || showPremiumOverlay || showUltraOverlay;
-
-  const showInlinePreview =
-    !hideFormDuringGen && !!output && state === "success";
+  const showInlinePreview = !hideFormDuringGen && !!output && state === "success";
 
   const activateSlot = (items: GalleryItem[], idx: number) => {
     const item = items[idx];
@@ -396,9 +394,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     const next = [...gallery, ...items];
     setGallery(next);
     activateSlot(next, gallery.length);
-    toast.success(
-      items.length > 1 ? `📁 ${items.length} images uploaded!` : "📁 Upload complete!",
-    );
+    toast.success(items.length > 1 ? `${items.length} images uploaded` : "Upload complete");
   };
 
   const runImageJob = async (opts: {
@@ -425,15 +421,14 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     if (runId !== runIdRef.current) return;
 
     setState("loading");
-    toast(opts.toastStart ?? "🎨 Generating your image...");
+    toast(opts.toastStart ?? "Generating your image…");
     startGeneration("image", "/editor");
     const progressTimers = [
       setTimeout(() => {
-        if (runId === runIdRef.current) toast("⏳ Still working — high quality takes a moment...");
+        if (runId === runIdRef.current) toast("Still working — high quality takes a moment…");
       }, 30_000),
       setTimeout(() => {
-        if (runId === runIdRef.current)
-          toast("🔁 Taking longer than usual — retrying automatically...");
+        if (runId === runIdRef.current) toast("Taking longer than usual — retrying automatically…");
       }, 75_000),
     ];
     try {
@@ -477,7 +472,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       let referenceImageUrls: string[] | undefined;
       if (!maskImageUrl && effectiveMaxImages > 1 && refImages.length > 0) {
         const wanted = refImages.slice(0, Math.max(0, effectiveMaxImages - 1));
-        toast(`📤 Uploading ${wanted.length} reference image${wanted.length > 1 ? "s" : ""}...`);
+        toast(`Uploading ${wanted.length} reference image${wanted.length > 1 ? "s" : ""}…`);
         const uploaded: string[] = [];
         for (const src of wanted) {
           if (src.startsWith("https://")) {
@@ -496,9 +491,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           toast.error("Some reference images could not be uploaded and were skipped.");
         }
         referenceImageUrls = valid.length > 0 ? valid : undefined;
-        if (referenceImageUrls) {
-          toast.success(`✅ Sending ${referenceImageUrls.length + 1} images to the AI`);
-        }
       }
       if (runId !== runIdRef.current) return;
 
@@ -515,6 +507,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           aspectRatio: !mediaUrl ? aspectRatio : undefined,
           imageQuality,
           studioTier,
+          contextTags: contextTags.length > 0 ? contextTags.slice(0, 10) : undefined,
         },
       });
 
@@ -523,7 +516,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setProgress(100);
       setStage(stages.length);
 
-      // Hold generation screen until the result image is actually displayable
       if (isStandardExp) {
         setStandardCompleteHold(true);
         setStandardGenError(null);
@@ -538,7 +530,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setStandardGenError(null);
       setRemoveMaskDataUrl(null);
       await refreshProfile();
-      toast.success("✅ Image ready!");
+      toast.success("Image ready");
       endGeneration();
 
       if (isStandardExp) {
@@ -558,7 +550,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         setStandardGenError(msg);
         setState("idle");
       }
-      toast.error(`❌ ${msg}`);
+      toast.error(msg);
     } finally {
       progressTimers.forEach(clearTimeout);
     }
@@ -575,7 +567,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     await runImageJob({
       jobPrompt: SMART_REMOVE_PROMPT,
       maskDataUrl,
-      toastStart: "✨ Removing selected area…",
+      toastStart: "Removing selected area…",
     });
   };
 
@@ -661,9 +653,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       });
       await triggerBrowserDownload(res.downloadUrl, `motio2edit-${Date.now()}.jpg`);
       setDownloaded(true);
-      toast.success(
-        res.watermarked ? "⬇️ Download started (branded)" : "⬇️ Download started",
-      );
+      toast.success(res.watermarked ? "Download started (branded)" : "Download started");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Download failed. Please try again.");
     }
@@ -686,11 +676,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const handleSelectTool = (tool: { prompt: string; id?: string }) => {
     if (tool.prompt === "__CIRCLE_REMOVE__") {
       try {
-        if (inputDataUrl) {
-          sessionStorage.setItem("circle2edit-preview", inputDataUrl);
-        } else {
-          sessionStorage.removeItem("circle2edit-preview");
-        }
+        if (inputDataUrl) sessionStorage.setItem("circle2edit-preview", inputDataUrl);
+        else sessionStorage.removeItem("circle2edit-preview");
       } catch {
         /* ignore */
       }
@@ -752,7 +739,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           onDismiss={handleDismissStandardError}
         />
       )}
-
       {showPremiumOverlay && (
         <PremiumImageGenerationOverlay
           phase={premiumPhase}
@@ -762,7 +748,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           onDismiss={handleDismissPremiumError}
         />
       )}
-
       {showUltraOverlay && (
         <UltraAIImageGenerationOverlay
           phase={ultraPhase}
@@ -814,9 +799,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         <div className="mt-4 grid min-w-0 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2 lg:gap-8">
           <div className="order-1 min-w-0 space-y-4 sm:space-y-5">
             <div className={cn("min-w-0 space-y-3 p-3 sm:p-5", studioCardClass(studioTier))}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Image
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Image</p>
               <EditorUpload
                 fileRef={fileRef}
                 mediaType="image"
@@ -836,9 +819,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             </div>
 
             <div className={cn("min-w-0 space-y-3 p-3 sm:p-5", studioCardClass(studioTier))}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Prompt
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
               <EditorPromptPanel
                 mediaType="image"
                 loading={loading}
@@ -851,17 +832,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 onSelectTool={handleSelectTool}
                 studioTier={studioTier}
                 referenceCount={refImages.length}
-                maxChars={
-                  studioTier === "premium"
-                    ? 10000
-                    : studioTier === "pro"
-                      ? 4000
-                      : 2000
-                }
+                maxChars={studioTier === "premium" ? 10000 : studioTier === "pro" ? 4000 : 2000}
                 contextTags={contextTags}
                 onToggleTag={(id) => {
                   setContextTags((prev) =>
-                    prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
+                    prev.includes(id) ? prev.filter((t) => t !== id) : prev.length >= 10 ? prev : [...prev, id],
                   );
                 }}
               />
@@ -875,11 +850,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   setStudioTier(t);
                   const allowed = imageQualitiesForStudioTier(t);
                   const preferred = studioTierToImageQuality(t);
-                  if (!qualityTouchedRef.current) {
-                    setImageQuality(preferred);
-                  } else if (!allowed.includes(imageQuality)) {
-                    setImageQuality(preferred);
-                  }
+                  if (!qualityTouchedRef.current) setImageQuality(preferred);
+                  else if (!allowed.includes(imageQuality)) setImageQuality(preferred);
                 }}
               />
               <div className="border-t border-border/50 pt-4">
@@ -918,9 +890,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             </div>
 
             <div className={cn("min-w-0 space-y-3 p-3 ring-1 ring-primary/15 sm:p-5", studioCardClass(studioTier))}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Generate
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Generate</p>
               <EditorGenerationControls
                 loading={loading}
                 onGenerate={runGenerate}
@@ -967,11 +937,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             />
 
             {!loading && !output && !standardCompleteHold && !standardGenError && !premiumCompleteHold && !premiumGenError && !ultraCompleteHold && !ultraGenError && (
-              <div
-                className={cn(
-                  "flex min-h-[100px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground",
-                )}
-              >
+              <div className="flex min-h-[100px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
                 Result appears here after Generate.
               </div>
             )}
