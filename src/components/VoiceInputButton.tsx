@@ -103,8 +103,32 @@ export function VoiceInputButton({
 
   if (!supported) return null;
 
+  // Listening UI stays inside the prompt composer (inline, no page-level overlay).
   return (
-    <>
+    <span className="relative inline-flex items-center gap-1.5">
+      {listening && (
+        <span
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px]"
+        >
+          {!reduceMotion && (
+            <span className="flex items-end gap-0.5" aria-hidden>
+              {[6, 10, 8, 12, 7].map((h, i) => (
+                <span
+                  key={i}
+                  className="voice-wave-bar w-0.5 rounded-full bg-primary"
+                  style={{
+                    height: `${h}px`,
+                    animationDelay: `${i * 0.12}s`,
+                  }}
+                />
+              ))}
+            </span>
+          )}
+          <span className="font-medium text-primary">Listening</span>
+        </span>
+      )}
       <button
         type="button"
         onClick={toggle}
@@ -112,7 +136,7 @@ export function VoiceInputButton({
         aria-label={listening ? "Stop voice input" : "Start voice input"}
         title={listening ? "Stop voice input" : "Speak your prompt"}
         className={
-          "relative grid h-9 w-9 place-items-center rounded-full border transition " +
+          "relative grid h-9 w-9 shrink-0 place-items-center rounded-full border transition " +
           (listening
             ? "border-primary/60 bg-primary/15 text-primary shadow-[0_0_0_3px_rgba(249,115,22,0.12)]"
             : "border-border bg-background/70 text-muted-foreground hover:text-foreground hover:border-primary/50") +
@@ -134,30 +158,6 @@ export function VoiceInputButton({
         )}
         {listening ? <MicOff className="relative z-[1] h-4 w-4" /> : <Mic className="h-4 w-4" />}
       </button>
-
-      {listening && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none absolute -left-1 top-full z-10 mt-1 flex items-center gap-1.5 rounded-md border border-primary/30 bg-background/95 px-2 py-1 text-[10px] shadow-sm"
-        >
-          {!reduceMotion && (
-            <div className="flex items-end gap-0.5" aria-hidden>
-              {[8, 12, 10, 14, 9].map((h, i) => (
-                <span
-                  key={i}
-                  className="voice-wave-bar w-0.5 rounded-full bg-primary"
-                  style={{
-                    height: `${h}px`,
-                    animationDelay: `${i * 0.12}s`,
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          <span className="font-medium text-primary">Listening</span>
-        </div>
-      )}
-    </>
+    </span>
   );
 }
