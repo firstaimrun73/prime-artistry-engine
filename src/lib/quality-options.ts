@@ -5,9 +5,36 @@
 //
 // SD/HD = generation path with no Topaz upscale.
 // 2K/4K/8K = Topaz upscale after generation (existing pipeline).
+//
+// Dimension labels match ultraDeliveryDimensions long-side targets
+// (src/lib/studio/image/ultra/model.ts) for 1:1 reference display.
 
 export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k";
 export type VideoResolution = "720p" | "1080p" | "4k";
+
+/** Long-side targets used for UI labels (aligned with Ultra delivery map). */
+export const IMAGE_QUALITY_LONG_SIDE: Record<ImageQuality, number> = {
+  sd: 512,
+  hd: 1024,
+  "2k": 1440,
+  "4k": 2160,
+  "8k": 4320,
+};
+
+export function imageQualityDimensionLabel(q: ImageQuality, aspect = "1:1"): string {
+  const long = IMAGE_QUALITY_LONG_SIDE[q];
+  const ar = aspect === "imax" ? "21:9" : aspect;
+  const map: Record<string, [number, number]> = {
+    "1:1": [long, long],
+    "4:3": [long, Math.round((long * 3) / 4)],
+    "3:4": [Math.round((long * 3) / 4), long],
+    "16:9": [long, Math.round((long * 9) / 16)],
+    "9:16": [Math.round((long * 9) / 16), long],
+    "21:9": [long, Math.round((long * 9) / 21)],
+  };
+  const [w, h] = map[ar] ?? map["1:1"];
+  return `${w} × ${h}`;
+}
 
 export const IMAGE_QUALITY_OPTIONS: {
   id: ImageQuality;
@@ -26,7 +53,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "Standard Definition",
     credits: 0,
     upscaleFactor: 1,
-    hint: "Fast generation · compact output · ~0.25 MP",
+    hint: `Fast · ${imageQualityDimensionLabel("sd")} (1:1)`,
   },
   {
     id: "hd",
@@ -34,7 +61,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "High Definition",
     credits: 0,
     upscaleFactor: 1,
-    hint: "Higher detail · ~1 MP",
+    hint: `Higher detail · ${imageQualityDimensionLabel("hd")} (1:1)`,
   },
   {
     id: "2k",
@@ -42,7 +69,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "2K",
     credits: 0,
     upscaleFactor: 2,
-    hint: "2K-class detail",
+    hint: `2K delivery · ${imageQualityDimensionLabel("2k")} (1:1)`,
   },
   {
     id: "4k",
@@ -50,7 +77,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "4K",
     credits: 0,
     upscaleFactor: 4,
-    hint: "4K delivery via enhancement",
+    hint: `4K delivery · ${imageQualityDimensionLabel("4k")} (1:1)`,
   },
   {
     id: "8k",
@@ -58,7 +85,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "8K",
     credits: 0,
     upscaleFactor: 8,
-    hint: "8K delivery via enhancement",
+    hint: `8K delivery · ${imageQualityDimensionLabel("8k")} (1:1)`,
   },
 ];
 
