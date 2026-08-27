@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { EditorToolCategories } from "@/components/EditorToolCategories";
@@ -30,6 +30,8 @@ const CONTEXT_TAGS = [
   { id: "object", label: "@Object", color: "bg-orange-500/15 text-orange-700 border-orange-400/40 dark:text-orange-300" },
 ] as const;
 
+type ContextTagId = (typeof CONTEXT_TAGS)[number]["id"];
+
 interface EditorPromptPanelProps {
   mediaType: "image" | "video";
   loading: boolean;
@@ -59,6 +61,14 @@ const IMAGE_IDEAS = [
 
 const COMPACT_IDEAS = EXAMPLE_PROMPTS.slice(0, 3);
 
+/** Detect trailing @query in the prompt for contextual tag autocomplete. */
+function extractAtQuery(text: string): { query: string; start: number } | null {
+  const m = text.match(/(^|[\s([{])@([a-zA-Z]*)$/);
+  if (!m || m.index === undefined) return null;
+  const atIndex = m.index + (m[1] ? m[1].length : 0);
+  return { query: (m[2] ?? "").toLowerCase(), start: atIndex };
+}
+
 export function EditorPromptPanel({
   mediaType,
   loading,
@@ -79,18 +89,71 @@ export function EditorPromptPanel({
   onToggleTag,
 }: EditorPromptPanelProps) {
   const [cropOpen, setCropOpen] = useState(false);
+  const [atMenuOpen, setAtMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const cropSrc = inputPreview || inputDataUrl;
   const limit = Math.max(200, Math.min(maxChars, 10000));
   const totalImages = (inputDataUrl ? 1 : 0) + Math.max(0, referenceCount);
 
-  const operationLabel =
+  // Subtle context — never a mode selector / never "Text to image"
+  const contextHint =
     mediaType !== "image"
-      ? "Prompt"
+      ? null
       : totalImages >= 2
-        ? `Image to image · ${totalImages} references`
+        ? `Using ${totalImages} image references`
         : totalImages === 1
-          ? "Image to image editing"
-          : "Text to image";
+          ? "Editing 1 image"
+          : "Create";
+
+  const atQuery = useMemo(() => extractAtQuery(prompt), [prompt]);
+
+  const atMatches = useMemo(() => {
+    if (!atQuery) return [];
+    const q = atQuery.query;
+    return CONTEXT_TAGS.filter(
+      (t) => t.id.startsWith(q) || t.label.toLowerCase().includes(`@${q}`),
+    );
+  }, [atQuery]);
+
+  useEffect(() => {
+    setAtMenuOpen(!!atQuery && atMatches.length > 0 && mediaType === "image");
+  }, [atQuery, atMatches.length, mediaType]);
+
+  const insertTag = (tagId: ContextTagId) => {
+    const tag = CONTEXT_TAGS.find((c) => c.id === tagId);
+    if (!tag) return;
+
+    setPrompt((prev) => {
+      const info = extractAtQuery(prev);
+      if (info) {
+        const before = prev.slice(0, info.start);
+        const after = prev.slice(info.start + 1 + info.query.length);
+        const needsSpace = before.length > 0 && !/\s$/.test(before);
+        return `${before}${needsSpace ? " " : ""}${tag.label} ${after}`.slice(0, limit);
+      }
+      const base = prev.trim();
+      return (base ? `${base} ${tag.label} ` : `${tag.label} `).slice(0, limit);
+    });
+
+    if (onToggleTag && !contextTags.includes(tagId)) {
+      onToggleTag(tagId);
+    }
+    setAtMenuOpen(false);
+    requestAnimationFrame(() => taRef.current?.focus());
+  };
+
+  const removeChip = (id: string) => {
+    const tag = CONTEXT_TAGS.find((c) => c.id === id);
+    if (tag) {
+      setPrompt((p) =>
+        p
+          .replace(new RegExp(`${tag.label}\\s?`, "gi"), "")
+          .replace(/\s{2,}/g, " ")
+          .trim(),
+      );
+    }
+    onToggleTag?.(id);
+  };
 
   const handleTool = (tool: ToolPayload) => {
     if (tool.prompt === "__CROP__" || tool.id === "crop") {
@@ -158,15 +221,17 @@ export function EditorPromptPanel({
         </section>
       )}
 
-      <section className="space-y-2">
-        <div className="relative overflow-hidden rounded-xl border border-border/70 bg-card/80 shadow-sm ring-1 ring-black/[0.02] dark:ring-white/[0.04]">
-          <div className="flex flex-wrap items-center gap-2 border-b border-border/50 px-3 py-2">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-foreground/90">
-              <span className="text-primary" aria-hidden>
-                ✦
+      <section className="min-w-0 space-y-2">
+        <div className="relative min-w-0 overflow-hidden rounded-xl border border-border/70 bg-card/80 shadow-sm ring-1 ring-black/[0.02] dark:ring-white/[0.04]">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-border/50 px-2.5 py-1.5 sm:px-3 sm:py-2">
+            {contextHint && (
+              <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium tracking-wide text-muted-foreground sm:text-[11px]">
+                <span className="text-primary/80" aria-hidden>
+                  ✦
+                </span>
+                {contextHint}
               </span>
-              {operationLabel}
-            </span>
+            )}
             {contextTags.map((id) => {
               const tag = CONTEXT_TAGS.find((c) => c.id === id);
               if (!tag) return null;
@@ -174,65 +239,49 @@ export function EditorPromptPanel({
                 <span
                   key={id}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                    "inline-flex max-w-full items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold sm:px-2",
                     tag.color,
                   )}
                 >
                   {tag.label}
-                  {onToggleTag && (
-                    <button
-                      type="button"
-                      className="opacity-70 hover:opacity-100"
-                      onClick={() => onToggleTag(id)}
-                      aria-label={`Remove ${tag.label}`}
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="opacity-70 hover:opacity-100"
+                    onClick={() => removeChip(id)}
+                    aria-label={`Remove ${tag.label}`}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
                 </span>
               );
             })}
+            <span className="ml-auto hidden text-[10px] text-muted-foreground/70 sm:inline">
+              Type @ for tags
+            </span>
           </div>
 
-          {mediaType === "image" && onToggleTag && (
-            <div className="flex gap-1.5 overflow-x-auto border-b border-border/40 px-3 py-1.5 scrollbar-none">
-              {CONTEXT_TAGS.map((tag) => {
-                const active = contextTags.includes(tag.id);
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => onToggleTag(tag.id)}
-                    className={cn(
-                      "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors",
-                      active
-                        ? tag.color
-                        : "border-border/60 bg-transparent text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                    )}
-                  >
-                    {tag.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="relative px-3 pt-2 pb-2">
+          <div className="relative min-w-0 px-2.5 pt-2 pb-1.5 sm:px-3 sm:pt-2 sm:pb-2">
             <Textarea
               ref={taRef}
               placeholder={
                 totalImages >= 1
-                  ? "Describe the edit…"
-                  : "Describe what you want to create…"
+                  ? "Describe the edit… (type @ for tags)"
+                  : "Describe what you want to create… (type @ for tags)"
               }
               value={prompt}
               onChange={(e) => setPrompt(e.target.value.slice(0, limit))}
-              rows={studioTier === "premium" ? 6 : studioTier === "pro" ? 5 : 4}
+              onKeyDown={(e) => {
+                if (atMenuOpen && atMatches.length > 0 && (e.key === "Enter" || e.key === "Tab")) {
+                  e.preventDefault();
+                  insertTag(atMatches[0].id);
+                }
+                if (e.key === "Escape") setAtMenuOpen(false);
+              }}
+              rows={studioTier === "premium" ? 5 : 4}
               disabled={loading}
-              className="min-h-[100px] resize-none border-0 bg-transparent p-0 pr-12 text-base leading-relaxed shadow-none focus-visible:ring-0 sm:min-h-[112px] sm:text-sm"
+              className="min-h-[88px] w-full max-w-full resize-none border-0 bg-transparent p-0 pr-11 text-[15px] leading-relaxed shadow-none focus-visible:ring-0 sm:min-h-[104px] sm:pr-12 sm:text-sm md:min-h-[120px]"
             />
-            <div className="absolute right-2 top-2">
+            <div className="absolute right-1.5 top-1.5 sm:right-2 sm:top-2">
               <VoiceInputButton
                 disabled={loading}
                 onTranscript={(txt) =>
@@ -240,25 +289,62 @@ export function EditorPromptPanel({
                 }
               />
             </div>
+
+            {atMenuOpen && atMatches.length > 0 && (
+              <div
+                ref={menuRef}
+                role="listbox"
+                className="absolute left-2 right-12 z-20 mt-0.5 max-h-40 overflow-y-auto rounded-lg border border-border/80 bg-popover p-1 shadow-lg sm:left-3 sm:right-14"
+              >
+                {atMatches.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    role="option"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      insertTag(tag.id);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-semibold transition-colors hover:bg-muted",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "rounded-full border px-1.5 py-0.5 text-[10px]",
+                        tag.color,
+                      )}
+                    >
+                      {tag.label}
+                    </span>
+                    <span className="text-[10px] font-normal text-muted-foreground">
+                      Add context
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-[11px] text-muted-foreground">
+
+          <div className="flex items-center justify-between gap-2 border-t border-border/40 px-2.5 py-1.5 text-[10px] text-muted-foreground sm:px-3 sm:text-[11px]">
             <span className="inline-flex items-center gap-1 text-primary/90">
-              <Wand2 className="h-3 w-3" /> Auto-enhanced
+              <Wand2 className="h-3 w-3 shrink-0" />
+              <span className="truncate">Auto-enhanced</span>
             </span>
-            <span className="tabular-nums">
+            <span className="shrink-0 tabular-nums">
               {prompt.length}/{limit}
             </span>
           </div>
         </div>
 
         {!loading && suggestions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 scrollbar-none">
             {suggestions.slice(0, 3).map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => setPrompt(s.prompt)}
-                className="min-h-[32px] rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
+                className="min-h-[32px] shrink-0 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
               >
                 {s.label}
               </button>
@@ -267,16 +353,16 @@ export function EditorPromptPanel({
         )}
 
         {!loading && !prompt.trim() && !activeToolLabel && mediaType === "image" && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Sparkles className="h-3 w-3 text-primary" /> Try an idea:
+          <div className="-mx-0.5 flex items-center gap-1.5 overflow-x-auto px-0.5 pb-0.5 scrollbar-none">
+            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+              <Sparkles className="h-3 w-3 text-primary" /> Try:
             </span>
             {IMAGE_IDEAS.map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => setPrompt(s.prompt)}
-                className="min-h-[30px] rounded-full border border-border/80 bg-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                className="min-h-[30px] shrink-0 rounded-full border border-border/80 bg-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
               >
                 {s.label}
               </button>
@@ -285,16 +371,16 @@ export function EditorPromptPanel({
         )}
 
         {!loading && !prompt.trim() && !activeToolLabel && mediaType !== "image" && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Sparkles className="h-3 w-3 text-primary" /> Try an idea:
+          <div className="-mx-0.5 flex items-center gap-1.5 overflow-x-auto px-0.5 pb-0.5 scrollbar-none">
+            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+              <Sparkles className="h-3 w-3 text-primary" /> Try:
             </span>
             {COMPACT_IDEAS.map((s) => (
               <button
                 key={s.label}
                 type="button"
                 onClick={() => setPrompt(s.prompt)}
-                className="min-h-[30px] rounded-full border border-border/80 bg-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                className="min-h-[30px] shrink-0 rounded-full border border-border/80 bg-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
               >
                 {s.label}
               </button>
