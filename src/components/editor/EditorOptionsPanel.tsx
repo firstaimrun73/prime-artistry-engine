@@ -4,6 +4,7 @@ import { ASPECT_RATIOS, type AspectRatio } from "@/lib/prompt-suggestions";
 import {
   IMAGE_QUALITY_OPTIONS,
   VIDEO_RESOLUTION_OPTIONS,
+  imageQualityDimensionLabel,
   type ImageQuality,
   type VideoResolution,
 } from "@/lib/quality-options";
@@ -63,16 +64,17 @@ interface EditorOptionsPanelProps {
   studioTier?: StudioTier;
 }
 
+/** Compact shape preview — IMAX uses 1.43:1 proportions (not ultra-wide). */
 function AspectShape({ id }: { id: string }) {
   const dims: Record<string, { w: number; h: number }> = {
-    "1:1": { w: 16, h: 16 },
-    "4:3": { w: 18, h: 14 },
-    "16:9": { w: 20, h: 11 },
-    "9:16": { w: 11, h: 18 },
-    "3:4": { w: 14, h: 18 },
-    imax: { w: 22, h: 9 },
+    "1:1": { w: 12, h: 12 },
+    "4:3": { w: 14, h: 11 },
+    "16:9": { w: 15, h: 9 },
+    "9:16": { w: 9, h: 15 },
+    "3:4": { w: 11, h: 14 },
+    imax: { w: 14, h: 10 }, // ~1.43:1
   };
-  const d = dims[id] ?? { w: 16, h: 16 };
+  const d = dims[id] ?? { w: 12, h: 12 };
   return (
     <span
       aria-hidden
@@ -112,11 +114,14 @@ export function EditorOptionsPanel({
 }: EditorOptionsPanelProps) {
   const [costOpen, setCostOpen] = useState(false);
   const expLabel = studioExperienceLabel(studioTier);
-  const qualityLabel =
-    IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.label ?? imageQuality.toUpperCase();
+  const qualityOpt = IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality);
+  const qualityLabel = qualityOpt?.label ?? imageQuality.toUpperCase();
+  const aspectForDims =
+    !inputDataUrl && aspectRatio ? aspectRatio : "1:1";
+  const outputDims = imageQualityDimensionLabel(imageQuality, aspectForDims);
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-3">
       {mediaType === "image" ? (
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Format & quality
@@ -128,9 +133,10 @@ export function EditorOptionsPanel({
       )}
 
       {!loading && mediaType === "image" && !inputDataUrl && (
-        <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
+        <div className="space-y-1.5 rounded-xl border border-border/60 bg-background/40 p-2.5">
           <p className="text-[11px] font-medium text-muted-foreground">Aspect ratio</p>
-          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
+          {/* Single horizontal row — never wrap to two rows */}
+          <div className="flex flex-nowrap items-stretch gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {ASPECT_RATIOS.filter((a) =>
               aspectRatiosForStudioTier(studioTier).includes(a.id),
             ).map((a) => {
@@ -141,29 +147,27 @@ export function EditorOptionsPanel({
                   key={a.id}
                   type="button"
                   onClick={() => setAspectRatio(a.id)}
-                  className={`flex min-h-[44px] min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-1.5 text-[10px] font-medium transition-all sm:min-h-[48px] sm:min-w-[52px] sm:rounded-xl sm:px-2.5 sm:py-2 sm:text-[11px] ${
+                  className={`flex min-h-[40px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1 text-[9px] font-medium transition-all sm:min-h-[42px] sm:min-w-[48px] sm:text-[10px] ${
                     active && isImax
-                      ? "border-[#D4AF37] bg-[#D4AF37]/15 text-[#E8C547] ring-1 ring-[#D4AF37]/50"
+                      ? "border-[#D4AF37] bg-[#D4AF37]/15 text-[#E8C547] ring-1 ring-[#D4AF37]/40"
                       : active
                         ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
                         : isImax
-                          ? "border-[#D4AF37]/35 bg-card text-muted-foreground hover:border-[#D4AF37]/60 hover:text-[#E8C547]"
+                          ? "border-[#D4AF37]/30 bg-card text-muted-foreground hover:border-[#D4AF37]/50"
                           : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground"
                   }`}
                 >
                   <AspectShape id={a.id} />
-                  <span className="tabular-nums">{a.label}</span>
+                  <span className="tabular-nums leading-none">
+                    {isImax ? "IMAX" : a.label}
+                  </span>
+                  {isImax && (
+                    <span className="text-[8px] leading-none opacity-80">1.43:1</span>
+                  )}
                 </button>
               );
             })}
           </div>
-          {aspectRatio === "imax" && (
-            <p className="text-[11px] leading-snug text-muted-foreground">
-              <span className="font-semibold text-[#D4AF37]">IMAX</span>
-              {" — "}
-              Extra-wide cinematic frame (21:9) for immersive presentation.
-            </p>
-          )}
         </div>
       )}
 
@@ -171,9 +175,9 @@ export function EditorOptionsPanel({
         const allowed = imageQualitiesForStudioTier(studioTier);
         const visible = IMAGE_QUALITY_OPTIONS.filter((q) => allowed.includes(q.id));
         return (
-          <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
+          <div className="space-y-1.5 rounded-xl border border-border/60 bg-background/40 p-2.5">
             <p className="text-[11px] font-medium text-muted-foreground">Quality</p>
-            <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {visible.map((q) => {
                 const active = imageQuality === q.id;
                 const is4k = q.id === "4k";
@@ -183,15 +187,15 @@ export function EditorOptionsPanel({
                   <button
                     key={q.id}
                     type="button"
-                    title={q.hint}
+                    title={q.title}
                     onClick={() => setImageQuality(q.id)}
-                    className={`min-h-[36px] shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-all sm:min-h-[40px] sm:px-3.5 sm:py-1.5 sm:text-xs ${
+                    className={`min-h-[32px] shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-wide transition-all sm:min-h-[34px] sm:px-3 sm:text-xs ${
                       ultraAura && active && is8k
-                        ? "border-[#D4AF37]/80 bg-[#D4AF37]/15 text-[#E8C547] shadow-[0_0_14px_-2px_rgba(212,175,55,0.55)]"
+                        ? "border-[#D4AF37]/80 bg-[#D4AF37]/15 text-[#E8C547]"
                         : ultraAura && active && is4k
-                          ? "border-[#D4AF37]/55 bg-[#D4AF37]/10 text-[#D4AF37] shadow-[0_0_10px_-3px_rgba(212,175,55,0.35)]"
+                          ? "border-[#D4AF37]/55 bg-[#D4AF37]/10 text-[#D4AF37]"
                           : ultraAura && !active
-                            ? "border-[#D4AF37]/25 bg-card text-muted-foreground hover:border-[#D4AF37]/50 hover:text-[#E8C547]"
+                            ? "border-[#D4AF37]/25 bg-card text-muted-foreground hover:border-[#D4AF37]/50"
                             : active
                               ? "border-primary bg-primary/10 text-primary"
                               : "border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
@@ -202,24 +206,29 @@ export function EditorOptionsPanel({
                 );
               })}
             </div>
-            {(() => {
-              const opt = IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality);
-              if (!opt) return null;
-              return (
-                <p className="text-[11px] leading-snug text-muted-foreground">
-                  <span className="font-medium text-foreground/80">{opt.label}</span>
+            {qualityOpt && (
+              <div className="text-[11px] leading-snug text-muted-foreground">
+                <p>
+                  <span className="font-medium text-foreground/85">{qualityOpt.label}</span>
                   {" — "}
-                  {opt.title ?? opt.label}
-                  <span className="mt-0.5 block opacity-90">{opt.hint}</span>
+                  {qualityOpt.title}
                 </p>
-              );
-            })()}
+                <p className="mt-0.5 tabular-nums">
+                  Output: {outputDims}
+                </p>
+                {!inputDataUrl && aspectRatio && (
+                  <p className="mt-0.5 text-[10px] opacity-80">
+                    Aspect ratio: {aspectRatio === "imax" ? "IMAX 1.43:1" : aspectRatio}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}
 
       {mediaType === "image" && inputDataUrl && studioTier !== "standard" && (
-        <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
+        <div className="space-y-1.5 rounded-xl border border-border/60 bg-background/40 p-2.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span className="font-medium">Edit strength</span>
             <span>{Math.round(strength * 100)}%</span>
@@ -239,13 +248,13 @@ export function EditorOptionsPanel({
       )}
 
       {mediaType === "image" && canAddRefImages && (
-        <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
+        <div className="space-y-1.5 rounded-xl border border-border/60 bg-background/40 p-2.5">
           <p className="text-[11px] font-medium text-muted-foreground">
             Reference images
             {studioTier === "premium"
               ? " · multi-image intelligence"
               : studioTier === "standard"
-                ? " · up to plan limit (Standard uses 2–5)"
+                ? " · up to plan limit"
                 : " (optional)"}
           </p>
           <MultiImageInput
@@ -357,7 +366,7 @@ export function EditorOptionsPanel({
       )}
 
       {mediaType === "image" && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2">
           <span className="text-xs font-medium text-muted-foreground">Generation cost</span>
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-semibold tabular-nums text-foreground">
@@ -400,7 +409,7 @@ export function EditorOptionsPanel({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2">
         <span className="text-xs font-medium text-muted-foreground">Watermark</span>
         {isFree ? (
           <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
