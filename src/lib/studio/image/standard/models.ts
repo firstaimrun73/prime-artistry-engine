@@ -1,12 +1,13 @@
- /**
+/**
  * LOCKED Standard Image Studio models — do not substitute without product approval.
  *
  * T2I SD  → fal-ai/flux-2/klein/4b
  * T2I HD  → fal-ai/flux-2/klein/9b
- * Single I2I → fal-ai/flux/dev/image-to-image (Flux 0.1 Dev)
+ * Single I2I → fal-ai/flux-pro/kontext (instruction edit; preserves scene)
  * Multi (2–5 total images) → openai/gpt-image-2/edit @ quality low only
  *
- * Never route Standard through Schnell, Flux Pro 1.1, Kontext, Seedream, or Ultra.
+ * Never route Standard through Schnell, Seedream, or Ultra.
+ * Single I2I uses Kontext (not Flux Dev style-transfer).
  */
 
 import { GPT_IMAGE_2_EDIT_MODEL } from "@/lib/studio/image/gpt-image-2";
@@ -16,8 +17,8 @@ export const STANDARD_MODELS = {
   textToImageSd: "fal-ai/flux-2/klein/4b",
   /** T2I HD (\~1 MP target via image_size presets). */
   textToImageHd: "fal-ai/flux-2/klein/9b",
-  /** Single-image I2I only (never multi). */
-  imageToImage: "fal-ai/flux/dev/image-to-image",
+  /** Single-image instruction edit only (never multi). FLUX.1 Kontext [pro]. */
+  imageToImage: "fal-ai/flux-pro/kontext",
   /** Multi-reference only (2–5 total images). Never for 0–1 image. */
   multiImageToImage: GPT_IMAGE_2_EDIT_MODEL,
   circleToRemove: "fal-ai/flux-pro/v1/erase",

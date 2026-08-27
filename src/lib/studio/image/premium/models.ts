@@ -2,15 +2,16 @@
  * LOCKED Premium (studioTier "pro") models — isolated from Ultra.
  *
  * T2I → fal-ai/flux-2-pro
- * Single I2I → fal-ai/flux/dev/image-to-image (Flux 0.1 Dev)
+ * Single I2I → fal-ai/flux-pro/kontext (instruction edit; preserves scene)
  * Multi → openai/gpt-image-2/edit (handled in multi-image.ts)
  *
- * Never route Premium through Ultra, Seedream, or Kontext.
+ * Never route Premium through Ultra or Seedream.
+ * Single I2I uses Kontext (not Flux Dev style-transfer).
  */
 
 export const PREMIUM_MODELS = {
   textToImage: "fal-ai/flux-2-pro",
-  imageToImage: "fal-ai/flux/dev/image-to-image",
+  imageToImage: "fal-ai/flux-pro/kontext",
 } as const;
 
 export type PremiumModelId = (typeof PREMIUM_MODELS)[keyof typeof PREMIUM_MODELS];
