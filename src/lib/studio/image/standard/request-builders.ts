@@ -31,61 +31,34 @@ export function buildTextToImageStep(req: StandardValidationOk): StandardFalStep
 }
 
 /**
- * Flux Dev I2I strength:
- * 0.1 ≈ keep original · 1.0 ≈ near full regenerate.
- * Edit prompts ("sharper", "brighter") must use LOW strength or the model
- * ignores the source and invents a new scene (looks like accidental T2I).
+ * Standard single-image edit via FLUX.1 Kontext [pro].
+ * This is an instruction-following editor (not Flux Dev denoise/style-transfer).
+ * Do NOT use strength — Kontext does not take a denoise strength parameter.
+ * Always send the real HTTPS image_url.
  */
-export function resolveStandardI2IStrength(
-  prompt: string,
-  provided?: number | null,
-): number {
-  if (typeof provided === "number" && provided >= 0.01 && provided <= 1) {
-    return provided;
-  }
-  const p = prompt.toLowerCase();
-  // Preserve composition for enhance / cleanup prompts
-  if (
-    /\b(sharp|sharper|bright|brighter|clear|clearer|enhance|cleaner|upscale|denoise|noise|detail|quality|fix lighting|color balance|more detail)\b/.test(
-      p,
-    )
-  ) {
-    return 0.4;
-  }
-  // Strong stylistic / replace transforms
-  if (
-    /\b(replace|transform into|change into|convert to|in the style of|as a|turn into|make it a)\b/.test(
-      p,
-    )
-  ) {
-    return 0.72;
-  }
-  // Balanced default for general edits (keep subject recognizable)
-  return 0.55;
-}
-
 export function buildImageToImageStep(req: StandardValidationOk): StandardFalStep {
   if (!req.imageUrl || !req.imageUrl.startsWith("https://")) {
     throw new Error("Image → Image requires a valid HTTPS source image URL.");
   }
-  // Flux Dev I2I — params: prompt, image_url, strength, steps, guidance only.
-  const strength = resolveStandardI2IStrength(req.prompt, req.strength);
-  // Mild structural anchor so the model treats this as an edit, not a fresh scene.
-  const prompt = req.prompt.trim().toLowerCase().startsWith("edit ")
-    ? req.prompt
-    : `Edit the provided photo in place. ${req.prompt}`;
+  // Keep the user's edit instruction clear. Soft anchor only when they did not
+  // already frame it as an edit.
+  const raw = req.prompt.trim();
+  const prompt =
+    /\b(edit|enhance|sharpen|brighten|clear|fix|improve|make|change|remove|add)\b/i.test(raw)
+      ? raw
+      : `Edit this photo: ${raw}. Keep the same scene, layout, and subjects.`;
+
   return {
-    label: `standard I2I flux-dev ${req.imageQuality === "hd" ? "HD" : "SD"} s=${strength}`,
+    label: `standard I2I kontext-pro ${req.imageQuality === "hd" ? "HD" : "SD"}`,
     model: STANDARD_MODELS.imageToImage,
     body: {
       prompt,
       image_url: req.imageUrl,
-      strength,
-      num_inference_steps: req.imageQuality === "hd" ? 28 : 20,
       guidance_scale: 3.5,
       num_images: 1,
-      enable_safety_checker: true,
       output_format: "png",
+      safety_tolerance: "2",
+      enhance_prompt: false,
     },
   };
 }
