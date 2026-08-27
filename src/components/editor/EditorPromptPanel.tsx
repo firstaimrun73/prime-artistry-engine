@@ -21,16 +21,63 @@ type ToolPayload = {
   uiOnly?: boolean;
 };
 
-const CONTEXT_TAGS = [
-  { id: "outfit", label: "@Outfit", color: "bg-violet-500/15 text-violet-700 border-violet-400/40 dark:text-violet-300" },
-  { id: "background", label: "@Background", color: "bg-sky-500/15 text-sky-700 border-sky-400/40 dark:text-sky-300" },
-  { id: "color", label: "@Color", color: "bg-rose-500/15 text-rose-700 border-rose-400/40 dark:text-rose-300" },
-  { id: "lighting", label: "@Lighting", color: "bg-amber-500/15 text-amber-800 border-amber-400/40 dark:text-amber-300" },
-  { id: "style", label: "@Style", color: "bg-emerald-500/15 text-emerald-700 border-emerald-400/40 dark:text-emerald-300" },
-  { id: "object", label: "@Object", color: "bg-orange-500/15 text-orange-700 border-orange-400/40 dark:text-orange-300" },
+/** Structured context tags — chips only; not counted in character limit. */
+export const CONTEXT_TAGS = [
+  { id: "outfit", label: "@Outfit", color: "bg-violet-500/15 text-violet-700 border-violet-400/40 dark:text-violet-300", guidance: "Focus edit on clothing and outfit." },
+  { id: "clothing", label: "@Clothing", color: "bg-violet-500/15 text-violet-700 border-violet-400/40 dark:text-violet-300", guidance: "Adjust garments and fabric." },
+  { id: "accessories", label: "@Accessories", color: "bg-fuchsia-500/15 text-fuchsia-700 border-fuchsia-400/40 dark:text-fuchsia-300", guidance: "Edit accessories (jewelry, bags, hats)." },
+  { id: "hair", label: "@Hair", color: "bg-pink-500/15 text-pink-700 border-pink-400/40 dark:text-pink-300", guidance: "Edit hair style and color." },
+  { id: "face", label: "@Face", color: "bg-rose-500/15 text-rose-700 border-rose-400/40 dark:text-rose-300", guidance: "Preserve identity; refine facial features." },
+  { id: "skin", label: "@Skin", color: "bg-orange-500/15 text-orange-700 border-orange-400/40 dark:text-orange-300", guidance: "Natural skin tone and texture." },
+  { id: "pose", label: "@Pose", color: "bg-amber-500/15 text-amber-800 border-amber-400/40 dark:text-amber-300", guidance: "Adjust body pose if requested." },
+  { id: "body", label: "@Body", color: "bg-amber-500/15 text-amber-800 border-amber-400/40 dark:text-amber-300", guidance: "Body proportions stay natural." },
+  { id: "object", label: "@Object", color: "bg-orange-500/15 text-orange-700 border-orange-400/40 dark:text-orange-300", guidance: "Focus on object changes." },
+  { id: "person", label: "@Person", color: "bg-rose-500/15 text-rose-700 border-rose-400/40 dark:text-rose-300", guidance: "Primary subject is the person." },
+  { id: "background", label: "@Background", color: "bg-sky-500/15 text-sky-700 border-sky-400/40 dark:text-sky-300", guidance: "Edit or replace background." },
+  { id: "environment", label: "@Environment", color: "bg-sky-500/15 text-sky-700 border-sky-400/40 dark:text-sky-300", guidance: "Environment and setting context." },
+  { id: "sky", label: "@Sky", color: "bg-cyan-500/15 text-cyan-700 border-cyan-400/40 dark:text-cyan-300", guidance: "Sky and atmospheric background." },
+  { id: "lighting", label: "@Lighting", color: "bg-amber-500/15 text-amber-800 border-amber-400/40 dark:text-amber-300", guidance: "Adjust lighting and shadows." },
+  { id: "color", label: "@Color", color: "bg-rose-500/15 text-rose-700 border-rose-400/40 dark:text-rose-300", guidance: "Color grading and palette." },
+  { id: "style", label: "@Style", color: "bg-emerald-500/15 text-emerald-700 border-emerald-400/40 dark:text-emerald-300", guidance: "Artistic style treatment." },
+  { id: "texture", label: "@Texture", color: "bg-lime-500/15 text-lime-700 border-lime-400/40 dark:text-lime-300", guidance: "Surface texture detail." },
+  { id: "material", label: "@Material", color: "bg-lime-500/15 text-lime-700 border-lime-400/40 dark:text-lime-300", guidance: "Material appearance." },
+  { id: "composition", label: "@Composition", color: "bg-teal-500/15 text-teal-700 border-teal-400/40 dark:text-teal-300", guidance: "Framing and composition." },
+  { id: "camera", label: "@Camera", color: "bg-teal-500/15 text-teal-700 border-teal-400/40 dark:text-teal-300", guidance: "Camera angle and lens feel." },
+  { id: "depth", label: "@Depth", color: "bg-indigo-500/15 text-indigo-700 border-indigo-400/40 dark:text-indigo-300", guidance: "Depth of field." },
+  { id: "blur", label: "@Blur", color: "bg-indigo-500/15 text-indigo-700 border-indigo-400/40 dark:text-indigo-300", guidance: "Background or motion blur." },
+  { id: "mood", label: "@Mood", color: "bg-purple-500/15 text-purple-700 border-purple-400/40 dark:text-purple-300", guidance: "Emotional mood of the scene." },
+  { id: "weather", label: "@Weather", color: "bg-cyan-500/15 text-cyan-700 border-cyan-400/40 dark:text-cyan-300", guidance: "Weather conditions." },
+  { id: "architecture", label: "@Architecture", color: "bg-slate-500/15 text-slate-700 border-slate-400/40 dark:text-slate-300", guidance: "Buildings and structures." },
+  { id: "furniture", label: "@Furniture", color: "bg-stone-500/15 text-stone-700 border-stone-400/40 dark:text-stone-300", guidance: "Furniture elements." },
+  { id: "vehicle", label: "@Vehicle", color: "bg-zinc-500/15 text-zinc-700 border-zinc-400/40 dark:text-zinc-300", guidance: "Vehicles." },
+  { id: "animal", label: "@Animal", color: "bg-emerald-500/15 text-emerald-700 border-emerald-400/40 dark:text-emerald-300", guidance: "Animals." },
+  { id: "product", label: "@Product", color: "bg-blue-500/15 text-blue-700 border-blue-400/40 dark:text-blue-300", guidance: "Product photography focus." },
+  { id: "scene", label: "@Scene", color: "bg-sky-500/15 text-sky-700 border-sky-400/40 dark:text-sky-300", guidance: "Overall scene." },
+  { id: "time", label: "@Time", color: "bg-amber-500/15 text-amber-800 border-amber-400/40 dark:text-amber-300", guidance: "Time of day." },
+  { id: "season", label: "@Season", color: "bg-green-500/15 text-green-700 border-green-400/40 dark:text-green-300", guidance: "Seasonal context." },
+  { id: "atmosphere", label: "@Atmosphere", color: "bg-violet-500/15 text-violet-700 border-violet-400/40 dark:text-violet-300", guidance: "Atmospheric effects." },
+  { id: "reflection", label: "@Reflection", color: "bg-cyan-500/15 text-cyan-700 border-cyan-400/40 dark:text-cyan-300", guidance: "Reflections." },
+  { id: "shadow", label: "@Shadow", color: "bg-slate-500/15 text-slate-700 border-slate-400/40 dark:text-slate-300", guidance: "Shadows." },
+  { id: "details", label: "@Details", color: "bg-emerald-500/15 text-emerald-700 border-emerald-400/40 dark:text-emerald-300", guidance: "Fine detail enhancement." },
+  { id: "restoration", label: "@Restoration", color: "bg-amber-500/15 text-amber-800 border-amber-400/40 dark:text-amber-300", guidance: "Photo restoration." },
+  { id: "enhance", label: "@Enhance", color: "bg-primary/15 text-primary border-primary/40", guidance: "General quality enhancement." },
+  { id: "remove", label: "@Remove", color: "bg-destructive/10 text-destructive border-destructive/30", guidance: "Removal / inpainting." },
+  { id: "replace", label: "@Replace", color: "bg-orange-500/15 text-orange-700 border-orange-400/40 dark:text-orange-300", guidance: "Replace elements." },
+  { id: "add", label: "@Add", color: "bg-green-500/15 text-green-700 border-green-400/40 dark:text-green-300", guidance: "Add new elements." },
 ] as const;
 
-type ContextTagId = (typeof CONTEXT_TAGS)[number]["id"];
+export type ContextTagId = (typeof CONTEXT_TAGS)[number]["id"];
+
+export const MAX_CONTEXT_TAGS = 10;
+
+/** Build structured prompt suffix from selected tag ids (frontend composition). */
+export function composeTagGuidance(tagIds: string[]): string {
+  const parts = tagIds
+    .map((id) => CONTEXT_TAGS.find((t) => t.id === id)?.guidance)
+    .filter(Boolean) as string[];
+  if (parts.length === 0) return "";
+  return `Context focus: ${parts.join(" ")}`;
+}
 
 interface EditorPromptPanelProps {
   mediaType: "image" | "video";
@@ -53,15 +100,14 @@ interface EditorPromptPanelProps {
 }
 
 const IMAGE_IDEAS = [
-  { label: "Remove background", prompt: "Remove the background cleanly and replace with a transparent or pure white backdrop, keeping the subject sharp and natural." },
-  { label: "Replace background", prompt: "Replace the background with a clean professional studio backdrop while preserving the subject, lighting, and edges." },
-  { label: "Sky replacement", prompt: "Replace the sky with a dramatic natural sky and re-light the scene so shadows and color temperature match." },
-  { label: "Enhance lighting", prompt: "Improve lighting and color balance for a polished, natural look while preserving identity and composition." },
+  { label: "Remove people", prompt: "Remove every visible person from the image and reconstruct the background naturally." },
+  { label: "Remove object", prompt: "Remove the unwanted object and inpaint the area so it blends with the surroundings." },
+  { label: "Change background", prompt: "Replace the background with a clean professional studio backdrop while preserving the subject." },
+  { label: "Enhance lighting", prompt: "Improve lighting and color balance for a polished natural look while preserving identity." },
 ] as const;
 
 const COMPACT_IDEAS = EXAMPLE_PROMPTS.slice(0, 3);
 
-/** Detect trailing @query in the prompt for contextual tag autocomplete. */
 function extractAtQuery(text: string): { query: string; start: number } | null {
   const m = text.match(/(^|[\s([{])@([a-zA-Z]*)$/);
   if (!m || m.index === undefined) return null;
@@ -95,15 +141,14 @@ export function EditorPromptPanel({
   const limit = Math.max(200, Math.min(maxChars, 10000));
   const totalImages = (inputDataUrl ? 1 : 0) + Math.max(0, referenceCount);
 
-  // Subtle context — never a mode selector / never "Text to image"
   const contextHint =
     mediaType !== "image"
       ? null
       : totalImages >= 2
-        ? `Using ${totalImages} image references`
+        ? `Editing ${totalImages} reference images`
         : totalImages === 1
           ? "Editing 1 image"
-          : "Create";
+          : "Create from prompt";
 
   const atQuery = useMemo(() => extractAtQuery(prompt), [prompt]);
 
@@ -111,28 +156,33 @@ export function EditorPromptPanel({
     if (!atQuery) return [];
     const q = atQuery.query;
     return CONTEXT_TAGS.filter(
-      (t) => t.id.startsWith(q) || t.label.toLowerCase().includes(`@${q}`),
-    );
-  }, [atQuery]);
+      (t) =>
+        !contextTags.includes(t.id) &&
+        (t.id.startsWith(q) || t.label.toLowerCase().includes(`@${q}`)),
+    ).slice(0, 8);
+  }, [atQuery, contextTags]);
 
   useEffect(() => {
     setAtMenuOpen(!!atQuery && atMatches.length > 0 && mediaType === "image");
   }, [atQuery, atMatches.length, mediaType]);
 
-  const insertTag = (tagId: ContextTagId) => {
+  /** Select tag → floating chip only; strip @query from text; do not insert @Label into prompt. */
+  const insertTag = (tagId: string) => {
     const tag = CONTEXT_TAGS.find((c) => c.id === tagId);
     if (!tag) return;
 
+    if (!contextTags.includes(tagId) && contextTags.length >= MAX_CONTEXT_TAGS) {
+      toast.message(`Maximum ${MAX_CONTEXT_TAGS} tags`);
+      return;
+    }
+
+    // Remove trailing @query from the typed prompt
     setPrompt((prev) => {
       const info = extractAtQuery(prev);
-      if (info) {
-        const before = prev.slice(0, info.start);
-        const after = prev.slice(info.start + 1 + info.query.length);
-        const needsSpace = before.length > 0 && !/\s$/.test(before);
-        return `${before}${needsSpace ? " " : ""}${tag.label} ${after}`.slice(0, limit);
-      }
-      const base = prev.trim();
-      return (base ? `${base} ${tag.label} ` : `${tag.label} `).slice(0, limit);
+      if (!info) return prev;
+      const before = prev.slice(0, info.start);
+      const after = prev.slice(info.start + 1 + info.query.length);
+      return `${before}${after}`.replace(/\s{2,}/g, " ");
     });
 
     if (onToggleTag && !contextTags.includes(tagId)) {
@@ -143,15 +193,6 @@ export function EditorPromptPanel({
   };
 
   const removeChip = (id: string) => {
-    const tag = CONTEXT_TAGS.find((c) => c.id === id);
-    if (tag) {
-      setPrompt((p) =>
-        p
-          .replace(new RegExp(`${tag.label}\\s?`, "gi"), "")
-          .replace(/\s{2,}/g, " ")
-          .trim(),
-      );
-    }
     onToggleTag?.(id);
   };
 
@@ -223,8 +264,8 @@ export function EditorPromptPanel({
 
       <section className="min-w-0 space-y-2">
         <div className="relative min-w-0 overflow-hidden rounded-xl border border-border/70 bg-card/80 shadow-sm ring-1 ring-black/[0.02] dark:ring-white/[0.04]">
-          {/* Context chips only for selected tags — never permanent full tag row */}
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-border/50 px-2.5 py-1.5 sm:px-3 sm:py-2">
+          {/* Floating selected tags + mode hint — no permanent tag library row */}
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2">
             {contextHint && (
               <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-medium tracking-wide text-muted-foreground sm:text-[11px]">
                 <span className="text-primary/80" aria-hidden>
@@ -261,7 +302,7 @@ export function EditorPromptPanel({
             </span>
           </div>
 
-          <div className="relative min-w-0 px-2.5 pt-2 pb-1.5 sm:px-3 sm:pt-2 sm:pb-2">
+          <div className="relative min-w-0 px-2.5 pt-1 pb-1.5 sm:px-3 sm:pb-2">
             <Textarea
               ref={taRef}
               placeholder={
@@ -282,7 +323,6 @@ export function EditorPromptPanel({
               disabled={loading}
               className="min-h-[72px] w-full max-w-full resize-none border-0 bg-transparent p-0 pr-12 text-[15px] leading-relaxed shadow-none focus-visible:ring-0 sm:min-h-[96px] sm:pr-12 sm:text-sm md:min-h-[112px]"
             />
-            {/* Mic + listening stay inside composer (absolute, no page float) */}
             <div className="absolute right-1.5 top-1.5 z-10 flex max-w-[calc(100%-0.75rem)] items-start justify-end sm:right-2 sm:top-2">
               <VoiceInputButton
                 disabled={loading}
@@ -296,7 +336,7 @@ export function EditorPromptPanel({
               <div
                 ref={menuRef}
                 role="listbox"
-                className="absolute left-2 right-2 z-20 mt-0.5 max-h-40 overflow-y-auto rounded-lg border border-border/80 bg-popover p-1 shadow-lg sm:left-3 sm:right-14"
+                className="absolute left-2 right-2 z-20 mt-0.5 max-h-44 overflow-y-auto rounded-lg border border-border/80 bg-popover p-1 shadow-lg sm:left-3 sm:right-14"
               >
                 {atMatches.map((tag) => (
                   <button
@@ -307,20 +347,13 @@ export function EditorPromptPanel({
                       e.preventDefault();
                       insertTag(tag.id);
                     }}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-semibold transition-colors hover:bg-muted",
-                    )}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-semibold transition-colors hover:bg-muted"
                   >
-                    <span
-                      className={cn(
-                        "rounded-full border px-1.5 py-0.5 text-[10px]",
-                        tag.color,
-                      )}
-                    >
+                    <span className={cn("rounded-full border px-1.5 py-0.5 text-[10px]", tag.color)}>
                       {tag.label}
                     </span>
-                    <span className="text-[10px] font-normal text-muted-foreground">
-                      Add context
+                    <span className="truncate text-[10px] font-normal text-muted-foreground">
+                      {tag.guidance}
                     </span>
                   </button>
                 ))}
