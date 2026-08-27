@@ -87,10 +87,10 @@ export function EditorPromptPanel({
     mediaType !== "image"
       ? "Prompt"
       : totalImages >= 2
-        ? `Image → Image · Reference (${totalImages})`
+        ? `Image to image · ${totalImages} references`
         : totalImages === 1
-          ? "Image → Image"
-          : "Text → Image";
+          ? "Image to image editing"
+          : "Text to image";
 
   const handleTool = (tool: ToolPayload) => {
     if (tool.prompt === "__CROP__" || tool.id === "crop") {
