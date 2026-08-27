@@ -7,7 +7,8 @@ export type StandardImageMode =
   | "text_to_image"
   | "image_to_image"
   | "multi_image_to_image"
-  | "circle_to_remove";
+  | "circle_to_remove"
+  | "circle_to_add";
 
 /** SD / HD only where the model genuinely supports a size control (Text→Image). */
 export type StandardImageQuality = "sd" | "hd";
@@ -24,7 +25,7 @@ export type StandardImageRequest = {
    * Order must never be sorted or shuffled.
    */
   referenceImageUrls?: string[];
-  /** Mask aligned to ORIGINAL image pixel dimensions (circle erase). */
+  /** Mask aligned to ORIGINAL image pixel dimensions (circle erase/add). */
   maskImageUrl?: string | null;
   aspectRatio?: StandardAspectRatio | null;
   /** Only applied for Text→Image (Schnell). I2I/multi do not invent HD premium. */
