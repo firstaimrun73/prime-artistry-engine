@@ -48,8 +48,8 @@ export function validatePremiumImageRequest(
   raw: PremiumImageRequest,
 ): PremiumValidationResult {
   const prompt = typeof raw.prompt === "string" ? raw.prompt.trim() : "";
-  if (!prompt || prompt.length > 2000) {
-    return { ok: false, error: "Enter a prompt between 1 and 2000 characters." };
+  if (!prompt || prompt.length > 4000) {
+    return { ok: false, error: "Enter a prompt between 1 and 4000 characters." };
   }
 
   const imageUrl = isHttps(raw.imageUrl) ? raw.imageUrl : undefined;

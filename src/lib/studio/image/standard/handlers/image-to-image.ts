@@ -21,7 +21,7 @@ export async function handleImageToImage(
   if (outputUrl === input.imageUrl) {
     throw new Error("Image → Image returned the original image. Credits not charged.");
   }
-  const quote = quoteStandardCredits({ mode: "image_to_image" });
+  const quote = quoteStandardCredits({ mode: "image_to_image", imageQuality: input.imageQuality });
   return {
     outputUrl,
     mode: "image_to_image",
