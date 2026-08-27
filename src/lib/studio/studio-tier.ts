@@ -101,7 +101,6 @@ export function studioTierToMusicQuality(tier: StudioTier): "standard" | "premiu
 
 /** Default quality preference when switching experience (before manual override). */
 export function studioTierToImageQuality(tier: StudioTier): ImageQuality {
-  // Default for all experiences is SD; user must explicitly raise quality.
   void tier;
   return "sd";
 }
@@ -136,7 +135,7 @@ export function experienceWatermarkLine(tier: StudioTier, planDisplayName: strin
 /**
  * Quality chips exposed per experience (labels only — no credit numbers).
  * Standard: SD, HD only.
- * Premium (pro): SD, HD, 2K only — 4K/8K are Ultra AI exclusive.
+ * Premium (pro): SD, HD only.
  * Ultra AI (premium): SD, HD, 2K, 4K, 8K.
  */
 export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
@@ -144,21 +143,35 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
     case "standard":
       return ["sd", "hd"];
     case "pro":
-      return ["sd", "hd", "2k"];
+      return ["sd", "hd"];
     case "premium":
       return ["sd", "hd", "2k", "4k", "8k"];
   }
 }
 
-/** Aspect ratios for text-to-image per experience. */
+/**
+ * Aspect ratios for text-to-image per experience.
+ * Standard + Premium + Ultra base: all five supported ratios.
+ * Ultra also exposes IMAX in the Options UI (not in this list).
+ */
 export function aspectRatiosForStudioTier(
   tier: StudioTier,
 ): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4"> {
+  void tier;
+  return ["1:1", "4:3", "16:9", "9:16", "3:4"];
+}
+
+/**
+ * Max reference/source images by experience.
+ * Call sites: Math.min(planMax, maxImagesForStudioTier(tier)); Free plan stays 1.
+ */
+export function maxImagesForStudioTier(tier: StudioTier): number {
   switch (tier) {
     case "standard":
-      return ["1:1", "16:9", "9:16"];
+      return 5;
     case "pro":
+      return 10;
     case "premium":
-      return ["1:1", "4:3", "16:9", "9:16", "3:4"];
+      return 10;
   }
 }
