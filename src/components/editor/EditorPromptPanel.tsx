@@ -7,6 +7,7 @@ import { Sparkles, Wand2, X } from "lucide-react";
 import { EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
 import { VIDEO_QUICK_STYLES } from "@/lib/editor/editor.constants";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface Suggestion {
   label: string;
@@ -20,27 +21,33 @@ type ToolPayload = {
   uiOnly?: boolean;
 };
 
+const CONTEXT_TAGS = [
+  { id: "outfit", label: "@Outfit", color: "bg-violet-500/15 text-violet-700 border-violet-400/40 dark:text-violet-300" },
+  { id: "background", label: "@Background", color: "bg-sky-500/15 text-sky-700 border-sky-400/40 dark:text-sky-300" },
+  { id: "color", label: "@Color", color: "bg-rose-500/15 text-rose-700 border-rose-400/40 dark:text-rose-300" },
+  { id: "lighting", label: "@Lighting", color: "bg-amber-500/15 text-amber-800 border-amber-400/40 dark:text-amber-300" },
+  { id: "style", label: "@Style", color: "bg-emerald-500/15 text-emerald-700 border-emerald-400/40 dark:text-emerald-300" },
+  { id: "object", label: "@Object", color: "bg-orange-500/15 text-orange-700 border-orange-400/40 dark:text-orange-300" },
+] as const;
+
 interface EditorPromptPanelProps {
   mediaType: "image" | "video";
   loading: boolean;
   inputDataUrl: string | null;
-  /** Optional preview for crop (falls back to inputDataUrl). */
   inputPreview?: string | null;
   prompt: string;
   setPrompt: React.Dispatch<React.SetStateAction<string>>;
   taRef: React.RefObject<HTMLTextAreaElement>;
   suggestions: Suggestion[];
-  /** Legacy + primary: parent handles circle-remove; panel handles crop locally. */
   onSelectTool: (tool: ToolPayload) => void;
-  /** When provided, crop Apply updates the working image without generation. */
   onCropApplied?: (croppedDataUrl: string) => void;
-  /**
-   * When true, non-UI tools are reported via onSelectTool but the parent is
-   * expected to store internal instructions separately (not force them into
-   * the visible prompt). Panel shows an optional active chip if activeToolLabel is set.
-   */
   activeToolLabel?: string | null;
   onClearTool?: () => void;
+  studioTier?: "standard" | "pro" | "premium";
+  referenceCount?: number;
+  maxChars?: number;
+  contextTags?: string[];
+  onToggleTag?: (tag: string) => void;
 }
 
 const IMAGE_IDEAS = [
@@ -65,9 +72,25 @@ export function EditorPromptPanel({
   onCropApplied,
   activeToolLabel,
   onClearTool,
+  studioTier = "standard",
+  referenceCount = 0,
+  maxChars = 2000,
+  contextTags = [],
+  onToggleTag,
 }: EditorPromptPanelProps) {
   const [cropOpen, setCropOpen] = useState(false);
   const cropSrc = inputPreview || inputDataUrl;
+  const limit = Math.max(200, Math.min(maxChars, 10000));
+  const totalImages = (inputDataUrl ? 1 : 0) + Math.max(0, referenceCount);
+
+  const operationLabel =
+    mediaType !== "image"
+      ? "Prompt"
+      : totalImages >= 2
+        ? `Image → Image · Reference (${totalImages})`
+        : totalImages === 1
+          ? "Image → Image"
+          : "Text → Image";
 
   const handleTool = (tool: ToolPayload) => {
     if (tool.prompt === "__CROP__" || tool.id === "crop") {
@@ -135,35 +158,96 @@ export function EditorPromptPanel({
         </section>
       )}
 
-      <section className="space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Prompt
-        </p>
-        <div className="relative">
-          <Textarea
-            ref={taRef}
-            placeholder={
-              activeToolLabel
-                ? "Optional: add extra direction…"
-                : "Describe what you want…"
-            }
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value.slice(0, 2000))}
-            rows={4}
-            disabled={loading}
-            className="min-h-[112px] resize-none pr-12 text-base leading-relaxed sm:text-sm"
-          />
-          <div className="absolute right-2 top-2">
-            <VoiceInputButton
-              disabled={loading}
-              onTranscript={(t) => setPrompt((p) => (p ? `${p} ${t}` : t).slice(0, 2000))}
-            />
-          </div>
-          <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1 text-primary/90">
-              <Wand2 className="h-3 w-3" /> Auto-enhanced before generating
+      <section className="space-y-2">
+        <div className="relative overflow-hidden rounded-xl border border-border/70 bg-card/80 shadow-sm ring-1 ring-black/[0.02] dark:ring-white/[0.04]">
+          <div className="flex flex-wrap items-center gap-2 border-b border-border/50 px-3 py-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-foreground/90">
+              <span className="text-primary" aria-hidden>
+                ✦
+              </span>
+              {operationLabel}
             </span>
-            <span className="tabular-nums">{prompt.length}/2000</span>
+            {contextTags.map((id) => {
+              const tag = CONTEXT_TAGS.find((c) => c.id === id);
+              if (!tag) return null;
+              return (
+                <span
+                  key={id}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                    tag.color,
+                  )}
+                >
+                  {tag.label}
+                  {onToggleTag && (
+                    <button
+                      type="button"
+                      className="opacity-70 hover:opacity-100"
+                      onClick={() => onToggleTag(id)}
+                      aria-label={`Remove ${tag.label}`}
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+
+          {mediaType === "image" && onToggleTag && (
+            <div className="flex gap-1.5 overflow-x-auto border-b border-border/40 px-3 py-1.5 scrollbar-none">
+              {CONTEXT_TAGS.map((tag) => {
+                const active = contextTags.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => onToggleTag(tag.id)}
+                    className={cn(
+                      "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-colors",
+                      active
+                        ? tag.color
+                        : "border-border/60 bg-transparent text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                    )}
+                  >
+                    {tag.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="relative px-3 pt-2 pb-2">
+            <Textarea
+              ref={taRef}
+              placeholder={
+                totalImages >= 1
+                  ? "Describe the edit…"
+                  : "Describe what you want to create…"
+              }
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value.slice(0, limit))}
+              rows={studioTier === "premium" ? 6 : studioTier === "pro" ? 5 : 4}
+              disabled={loading}
+              className="min-h-[100px] resize-none border-0 bg-transparent p-0 pr-12 text-base leading-relaxed shadow-none focus-visible:ring-0 sm:min-h-[112px] sm:text-sm"
+            />
+            <div className="absolute right-2 top-2">
+              <VoiceInputButton
+                disabled={loading}
+                onTranscript={(txt) =>
+                  setPrompt((p) => (p ? `${p} ${txt}` : txt).slice(0, limit))
+                }
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 text-primary/90">
+              <Wand2 className="h-3 w-3" /> Auto-enhanced
+            </span>
+            <span className="tabular-nums">
+              {prompt.length}/{limit}
+            </span>
           </div>
         </div>
 
