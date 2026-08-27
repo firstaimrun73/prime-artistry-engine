@@ -4,7 +4,7 @@ import {
   STUDIO_TIERS,
   type StudioTier,
 } from "@/lib/studio/studio-tier";
-import { Sparkles, Zap, Circle, Crown } from "lucide-react";
+import { Sparkles, Circle, Crown } from "lucide-react";
 
 const TIER_DETAIL: Record<
   StudioTier,
@@ -28,17 +28,13 @@ export function StudioTierSelector({
   value,
   onChange,
   className,
-  /** Explicit list of experiences to show. Preferred over showPremiumTiers. */
   visibleTiers,
-  /** @deprecated Prefer visibleTiers from plan access matrix. */
   showPremiumTiers = false,
 }: {
   value: StudioTier;
   onChange: (t: StudioTier) => void;
   className?: string;
-  /** Allowed experiences for this plan/admin — inaccessible tiers are hidden, not locked. */
   visibleTiers?: readonly StudioTier[];
-  /** When true and visibleTiers omitted, show all three experiences (legacy admin path). */
   showPremiumTiers?: boolean;
 }) {
   const tiers: readonly StudioTier[] =
@@ -57,7 +53,7 @@ export function StudioTierSelector({
         className={cn(
           "grid min-w-0 gap-2 sm:gap-2.5",
           tiers.length === 1
-            ? "mx-auto grid-cols-1 max-w-[280px] sm:max-w-[240px]"
+            ? "mx-auto grid-cols-1 max-w-[300px] sm:max-w-[280px]"
             : tiers.length === 2
               ? "grid-cols-2"
               : "grid-cols-3",
@@ -74,10 +70,10 @@ export function StudioTierSelector({
               type="button"
               onClick={() => onChange(id)}
               className={cn(
-                "relative flex min-h-[80px] min-w-0 flex-col items-start gap-0.5 overflow-hidden rounded-xl border px-2 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[100px] sm:gap-1 sm:px-2.5 sm:py-2.5 md:min-h-[112px] md:px-3 md:py-3",
+                "relative flex min-h-[88px] min-w-0 flex-col items-start gap-0.5 overflow-hidden rounded-xl border px-2.5 py-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[104px] sm:gap-1 sm:px-3 sm:py-3 md:min-h-[112px]",
                 active &&
                   id === "standard" &&
-                  "border-primary bg-primary/15 ring-1 ring-primary/40",
+                  "border-primary bg-primary/15 ring-2 ring-primary/35 shadow-[0_0_0_1px_hsl(var(--primary)/0.2)]",
                 active &&
                   id === "pro" &&
                   "border-orange-500 bg-gradient-to-br from-orange-500/20 via-amber-500/10 to-orange-600/15 ring-1 ring-orange-500/45 shadow-[0_0_20px_-8px_rgba(249,115,22,0.45)]",
@@ -90,6 +86,24 @@ export function StudioTierSelector({
               aria-pressed={active}
               aria-label={`${meta.label} experience`}
             >
+              {id === "standard" && (
+                <span
+                  className={cn(
+                    "pointer-events-none absolute right-2 top-2 h-7 w-7 rounded-full border-2",
+                    active
+                      ? "border-primary/50 bg-primary/10"
+                      : "border-border/60 bg-muted/40",
+                  )}
+                  aria-hidden
+                >
+                  <span
+                    className={cn(
+                      "absolute inset-1.5 rounded-full",
+                      active ? "bg-primary/40" : "bg-muted-foreground/20",
+                    )}
+                  />
+                </span>
+              )}
               {id === "pro" && active && (
                 <span
                   className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-orange-400 to-transparent opacity-80"
@@ -106,24 +120,39 @@ export function StudioTierSelector({
                 />
               )}
 
-              <div className="relative flex items-center gap-1 sm:gap-1.5">
-                <Icon
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0",
-                    active && id === "standard" && "text-primary",
-                    active && id === "pro" && "text-orange-500",
-                    active && id === "premium" && "text-[#E8C547]",
-                    !active && "text-muted-foreground",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "text-[11px] font-bold leading-tight sm:text-xs md:text-sm",
-                    active && id === "premium" && "text-[#E8C547]",
-                  )}
-                >
-                  {meta.label}
-                </span>
+              <div className="relative flex items-center gap-1.5">
+                {id === "pro" ? (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                      active
+                        ? "bg-orange-500/20 text-orange-600 dark:text-orange-400"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    <Crown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span>Premium</span>
+                  </span>
+                ) : (
+                  <>
+                    <Icon
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        active && id === "standard" && "text-primary",
+                        active && id === "premium" && "text-[#E8C547]",
+                        !active && "text-muted-foreground",
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "text-[11px] font-bold leading-tight sm:text-xs md:text-sm",
+                        active && id === "premium" && "text-[#E8C547]",
+                      )}
+                    >
+                      {meta.label}
+                    </span>
+                  </>
+                )}
               </div>
               <p
                 className={cn(
