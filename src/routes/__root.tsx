@@ -81,42 +81,6 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-function PageViewTracker() {
-  const router = useRouter();
-  useEffect(() => {
-    const unsub = router.subscribe("onResolved", () => {
-      trackPageView(router.state.location.pathname);
-    });
-    return unsub;
-  }, [router]);
-  return null;
-}
-
-function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const padForTabs = !hideBottomNav(pathname);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <PageViewTracker />
-          <AdPolicyGate />
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
-            <Outlet />
-            <GenerationStatusBar />
-            <BottomTabBar />
-          </div>
-          <TranslateWidget />
-          <Toaster richColors position="top-center" />
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
-}
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -158,24 +122,78 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
+      },
+      {
+        rel: "stylesheet",
+        href: appCss,
+      },
+    ],
+    scripts: [
+      { src: "https://checkout.razorpay.com/v1/checkout.js", defer: true },
+      { src: "https://www.googletagmanager.com/gtag/js?id=G-3NCVLG63JR", async: true },
+      {
+        children:
+          "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3NCVLG63JR');",
+      },
     ],
   }),
+  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
 
-function RootDocument({ children }: { children: ReactNode }) {
+function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <head>
         <HeadContent />
       </head>
-      <body className="min-h-screen bg-background font-sans antialiased">
+      <body>
         {children}
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function PageViewTracker() {
+  const router = useRouter();
+  useEffect(() => {
+    trackPageView(router.state.location.pathname);
+    const unsub = router.subscribe("onResolved", () => {
+      trackPageView(router.state.location.pathname);
+    });
+    return unsub;
+  }, [router]);
+  return null;
+}
+
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const padForTabs = !hideBottomNav(pathname);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <PageViewTracker />
+          <AdPolicyGate />
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
+            <Outlet />
+            <GenerationStatusBar />
+            <BottomTabBar />
+          </div>
+          <TranslateWidget />
+          <Toaster richColors position="top-center" />
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
