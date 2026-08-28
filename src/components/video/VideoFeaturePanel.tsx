@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-registry";
-import { VIDEO_STYLE_MODIFIERS } from "@/lib/video-model-registry";
+import {
+  VIDEO_STYLE_MODIFIERS,
+  PRODUCT_VIDEO_DURATIONS,
+  is4kDurationLocked,
+  MAX_4K_DURATION_SEC,
+  resolutionUiLabel,
+} from "@/lib/video-model-registry";
 
 function ChipGroup<T extends string>({
   label,
@@ -11,7 +17,7 @@ function ChipGroup<T extends string>({
   disabled,
 }: {
   label: string;
-  options: { id: T; label: string; node?: ReactNode }[];
+  options: { id: T; label: string; node?: ReactNode; locked?: boolean }[];
   value: T;
   onChange: (v: T) => void;
   disabled?: boolean;
@@ -25,18 +31,21 @@ function ChipGroup<T extends string>({
           <button
             key={o.id}
             type="button"
-            disabled={disabled}
-            onClick={() => onChange(o.id)}
+            disabled={disabled || o.locked}
+            onClick={() => {
+              if (!o.locked) onChange(o.id);
+            }}
             className={cn(
               "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
               value === o.id
                 ? "border-red-500 bg-red-500 text-white"
                 : "border-border bg-background text-muted-foreground hover:border-red-400/50",
-              disabled && "opacity-40",
+              (disabled || o.locked) && "opacity-40",
             )}
           >
             {o.node}
             {o.label}
+            {o.locked ? " 🔒" : ""}
           </button>
         ))}
       </div>
@@ -75,8 +84,6 @@ const ASPECT_LABELS: Partial<Record<VideoAspect, string>> = {
   "21:9": "21:9",
 };
 
-export type VideoSizeOption = "small" | "medium" | "large";
-
 export function VideoFeaturePanel({
   tier,
   setTier,
@@ -84,15 +91,12 @@ export function VideoFeaturePanel({
   onPremiumLockedClick,
   aspects,
   resolutions,
-  durations,
   aspect,
   setAspect,
   resolution,
   setResolution,
   duration,
   setDuration,
-  size,
-  setSize,
   soundOn,
   setSoundOn,
   styleId,
@@ -105,15 +109,12 @@ export function VideoFeaturePanel({
   onPremiumLockedClick?: () => void;
   aspects: VideoAspect[];
   resolutions: VideoResolution[];
-  durations: number[];
   aspect: VideoAspect;
   setAspect: (v: VideoAspect) => void;
   resolution: VideoResolution;
   setResolution: (v: VideoResolution) => void;
   duration: number;
   setDuration: (v: number) => void;
-  size: VideoSizeOption;
-  setSize: (v: VideoSizeOption) => void;
   soundOn: boolean;
   setSoundOn: (v: boolean) => void;
   styleId: string;
@@ -122,7 +123,12 @@ export function VideoFeaturePanel({
 }) {
   const safeAspect = (aspects.includes(aspect) ? aspect : aspects[0] ?? "16:9") as VideoAspect;
   const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
-  const durationOpts = durations.length ? durations : [5, 8, 10];
+
+  const durationOpts = PRODUCT_VIDEO_DURATIONS.map((d) => ({
+    id: String(d) as `${number}`,
+    label: `${d}s`,
+    locked: is4kDurationLocked(d, safeRes),
+  }));
 
   return (
     <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
@@ -227,32 +233,35 @@ export function VideoFeaturePanel({
         label="Quality"
         options={resolutions.map((r) => ({
           id: r,
-          label: r === "4k" ? "4K" : r === "2k" ? "2K" : r,
+          label: resolutionUiLabel(r),
+          locked: r === "4k" && tier !== "premium",
         }))}
         value={safeRes}
-        onChange={setResolution}
-        disabled={disabled}
-      />
-
-      <ChipGroup
-        label="Size"
-        options={[
-          { id: "small" as VideoSizeOption, label: "Small" },
-          { id: "medium" as VideoSizeOption, label: "Medium" },
-          { id: "large" as VideoSizeOption, label: "Large" },
-        ]}
-        value={size}
-        onChange={setSize}
+        onChange={(v) => {
+          if (v === "4k" && tier !== "premium") return;
+          setResolution(v);
+          if (is4kDurationLocked(duration, v)) setDuration(MAX_4K_DURATION_SEC);
+        }}
         disabled={disabled}
       />
 
       <ChipGroup
         label="Duration"
-        options={durationOpts.map((d) => ({ id: String(d) as `${number}`, label: `${d}s` }))}
+        options={durationOpts}
         value={String(duration) as `${number}`}
-        onChange={(v) => setDuration(parseInt(v, 10))}
+        onChange={(v) => {
+          const d = parseInt(v, 10);
+          if (is4kDurationLocked(d, safeRes)) return;
+          setDuration(d);
+        }}
         disabled={disabled}
       />
+
+      {safeRes === "4k" && (
+        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+          4K is limited to {MAX_4K_DURATION_SEC}s maximum (Premium).
+        </p>
+      )}
 
       <div>
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style</p>

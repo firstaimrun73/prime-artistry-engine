@@ -25,6 +25,25 @@ export const MIN_VIDEO_CREDITS = 125;
 /** Extra floor for video→video (base models still cost more than T2V/I2V). */
 export const MIN_VIDEO_TO_VIDEO_CREDITS = 180;
 
+/** Product-facing duration chips (UI). Model maxDuration still gates selection. */
+export const PRODUCT_VIDEO_DURATIONS = [5, 10, 15, 20, 30] as const;
+
+/** 4K is only available for clips ≤ this many seconds (Premium). */
+export const MAX_4K_DURATION_SEC = 10;
+
+export function is4kDurationLocked(durationSec: number, resolution: VideoResolution): boolean {
+  return resolution === "4k" && durationSec > MAX_4K_DURATION_SEC;
+}
+
+export function resolutionUiLabel(r: VideoResolution): string {
+  if (r === "4k") return "4K";
+  if (r === "2k") return "2K";
+  if (r === "1080p") return "HD";
+  if (r === "720p") return "SD";
+  if (r === "480p") return "480p";
+  return r;
+}
+
 export type VideoModelDef = {
   id: string;
   name: string;
