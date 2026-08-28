@@ -2,18 +2,26 @@ import { useRef } from "react";
 import { X } from "lucide-react";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 
+/** Standard video prompts: 3,000 chars. Premium: 10,000 chars. */
+export const STANDARD_VIDEO_PROMPT_MAX = 3000;
+export const PREMIUM_VIDEO_PROMPT_MAX = 10000;
+
 export function VideoPromptBar({
   value,
   onChange,
   disabled,
   placeholder,
+  maxLength = STANDARD_VIDEO_PROMPT_MAX,
 }: {
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Enforced on input; server also validates. */
+  maxLength?: number;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const limit = Math.max(1, maxLength);
 
   return (
     <div className="space-y-2">
@@ -23,8 +31,8 @@ export function VideoPromptBar({
           value={value}
           disabled={disabled}
           rows={4}
-          maxLength={2000}
-          onChange={(e) => onChange(e.target.value.slice(0, 2000))}
+          maxLength={limit}
+          onChange={(e) => onChange(e.target.value.slice(0, limit))}
           placeholder={placeholder ?? "Describe what you want to create…"}
           className="w-full resize-y rounded-2xl bg-transparent px-3 py-3 pr-20 text-sm outline-none disabled:opacity-60"
         />
@@ -43,12 +51,14 @@ export function VideoPromptBar({
             disabled={disabled}
             onTranscript={(t) => {
               const next = value.trim() ? `${value.trim()} ${t}` : t;
-              onChange(next.slice(0, 2000));
+              onChange(next.slice(0, limit));
             }}
           />
         </div>
       </div>
-      <p className="text-right text-[11px] text-muted-foreground">{value.length}/2000</p>
+      <p className="text-right text-[11px] text-muted-foreground">
+        {value.length}/{limit}
+      </p>
     </div>
   );
 }
