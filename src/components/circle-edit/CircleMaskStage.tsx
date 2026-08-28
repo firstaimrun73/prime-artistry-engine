@@ -57,12 +57,21 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const pathClosedRef = useRef(false);
   const panningRef = useRef(false);
   const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-  const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
+  const pinchRef = useRef<{
+    dist: number;
+    zoom: number;
+    cx: number;
+    cy: number;
+    ox: number;
+    oy: number;
+  } | null>(null);
   const historyRef = useRef<ImageData[]>([]);
   const historyIndexRef = useRef(-1);
   const rafRef = useRef<number | null>(null);
   const hasMarkRef = useRef(false);
   const naturalRef = useRef<Size | null>(null);
+  const zoomRef = useRef(1);
+  const offsetRef = useRef({ x: 0, y: 0 });
   const liveRef = useRef({
     tool: tool as MaskTool,
     brush: brushSize,
@@ -88,6 +97,14 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   useEffect(() => {
     liveRef.current = { ...liveRef.current, tool, brush: brushSize };
   }, [tool, brushSize]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
 
   const fitScale = useMemo(() => {
     const vp = viewportRef.current;
@@ -251,11 +268,24 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     return len;
   };
 
+  /** Shoelace area in natural px² — rejects degenerate / near-zero fills. */
+  const pathAreaNatural = (pts: Point[]) => {
+    if (pts.length < 3) return 0;
+    let a = 0;
+    for (let i = 0, n = pts.length; i < n; i++) {
+      const j = (i + 1) % n;
+      a += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+    }
+    return Math.abs(a) / 2;
+  };
+
   const tryClosePath = (current: Point): boolean => {
     const start = pathStartRef.current;
     const path = pathRef.current;
     if (!start || path.length < MIN_PATH_POINTS) return false;
     if (pathLengthNatural(path) < MIN_PATH_LENGTH_NATURAL) return false;
+    // Reject accidental tiny loops / near-line strokes that would flood-fill wrongly.
+    if (pathAreaNatural([...path, start]) < 120) return false;
     const view = viewCanvasRef.current;
     if (!view) return false;
     const rect = view.getBoundingClientRect();
@@ -345,7 +375,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     if (disabled) return;
     e.preventDefault();
     if (e.pointerType === "touch" && e.isPrimary === false) return;
-    if (e.button === 1) {
+    // Middle or right mouse button → pan (desktop). Touch pan is two-finger.
+    if (e.button === 1 || e.button === 2) {
       panningRef.current = true;
       panStartRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
       (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
@@ -406,19 +437,44 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     if (!el) return;
     const onTouchStart = (ev: TouchEvent) => {
       if (ev.touches.length === 2) {
+        // Cancel any in-progress draw; two-finger = pan + pinch only.
         drawingRef.current = false;
-        const dx = ev.touches[0].clientX - ev.touches[1].clientX;
-        const dy = ev.touches[0].clientY - ev.touches[1].clientY;
-        pinchRef.current = { dist: Math.hypot(dx, dy), zoom };
+        pathRef.current = [];
+        pathStartRef.current = null;
+        const t0 = ev.touches[0];
+        const t1 = ev.touches[1];
+        const dx = t0.clientX - t1.clientX;
+        const dy = t0.clientY - t1.clientY;
+        const cx = (t0.clientX + t1.clientX) / 2;
+        const cy = (t0.clientY + t1.clientY) / 2;
+        const off = offsetRef.current;
+        pinchRef.current = {
+          dist: Math.hypot(dx, dy),
+          zoom: zoomRef.current,
+          cx,
+          cy,
+          ox: off.x,
+          oy: off.y,
+        };
       }
     };
     const onTouchMove = (ev: TouchEvent) => {
       if (ev.touches.length === 2 && pinchRef.current) {
-        const dx = ev.touches[0].clientX - ev.touches[1].clientX;
-        const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+        const t0 = ev.touches[0];
+        const t1 = ev.touches[1];
+        const dx = t0.clientX - t1.clientX;
+        const dy = t0.clientY - t1.clientY;
         const dist = Math.hypot(dx, dy);
+        const cx = (t0.clientX + t1.clientX) / 2;
+        const cy = (t0.clientY + t1.clientY) / 2;
         const ratio = dist / Math.max(1, pinchRef.current.dist);
-        setZoom(Math.max(0.5, Math.min(6, pinchRef.current.zoom * ratio)));
+        const nextZoom = Math.max(0.5, Math.min(6, pinchRef.current.zoom * ratio));
+        setZoom(nextZoom);
+        // Pan by centroid delta (works even when zoom ratio ~ 1).
+        setOffset({
+          x: pinchRef.current.ox + (cx - pinchRef.current.cx),
+          y: pinchRef.current.oy + (cy - pinchRef.current.cy),
+        });
       }
     };
     const onTouchEnd = () => {
@@ -427,12 +483,14 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     el.addEventListener("touchstart", onTouchStart, { passive: true });
     el.addEventListener("touchmove", onTouchMove, { passive: true });
     el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
     return () => {
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [zoom]);
+  }, [ready]);
 
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -506,6 +564,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
               if (!drawingRef.current) setCursorPos(null);
             }}
             onWheel={onWheel}
+            onContextMenu={(e) => e.preventDefault()}
             className="block h-full w-full rounded-xl"
             style={{
               cursor:
