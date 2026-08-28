@@ -18,6 +18,7 @@ type NavItem = { to: any; label: string };
 const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
+  { to: "/about", label: "About" },
   { to: "/studio", label: "Studio" },
   { to: "/pricing", label: "Pricing" },
   { to: "/faq", label: "FAQs" },
@@ -60,19 +61,17 @@ export function Header() {
           aria-label="Motio2edit home"
         >
           <BrandMark />
-          <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground xl:inline">
-            <span className="notranslate" translate="no">by Motion2AI</span>
-          </span>
+          <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-5 text-sm font-medium text-muted-foreground lg:flex">
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 lg:flex">
           {links.map((l) => (
             <Link
               key={l.to}
               to={l.to}
               activeProps={{ className: "text-foreground" }}
               activeOptions={l.to === "/" ? { exact: true } : undefined}
-              className="transition-colors hover:text-foreground"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               {l.label}
             </Link>
@@ -80,75 +79,57 @@ export function Header() {
           {user && admin && (
             <Link
               to="/admin"
-              className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80"
+              className="ml-1 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-secondary"
             >
-              <ShieldCheck className="h-3.5 w-3.5" /> Admin
+              <ShieldCheck className="h-4 w-4" /> Admin
             </Link>
           )}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-          <div className="notranslate shrink-0" translate="no" data-no-translate>
-            <GoogleLanguageSelect className="shrink-0" />
-          </div>
-
+        <div className="flex items-center gap-2 sm:gap-3">
+          <GoogleLanguageSelect />
           {user ? (
             <>
-              {profile &&
-                (() => {
-                  const c = profile.credits;
-                  const tone = admin
-                    ? ""
-                    : c <= 0
-                      ? "text-destructive font-bold animate-pulse"
-                      : c < 10
-                        ? "text-destructive animate-pulse"
-                        : c <= 30
-                          ? "text-amber-500"
-                          : "";
-                  return (
-                    <Link
-                      to="/dashboard"
-                      className={`hidden items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold sm:inline-flex ${tone}`}
-                    >
-                      <Coins className="h-3.5 w-3.5" />
-                      {admin ? "∞" : c.toLocaleString()}
-                    </Link>
-                  );
-                })()}
-              <Link to="/dashboard" className="hidden sm:block">
-                <Button variant="ghost" size="sm" className="gap-1.5">
-                  <CrownBadge plan={profile?.plan ?? "free"} />
-                  <span className="text-xs text-muted-foreground">Dashboard</span>
-                </Button>
-              </Link>
-              <Link to="/profile" className="shrink-0">
-                <Avatar className="h-8 w-8 border border-border">
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/dashboard" })}
+                className="hidden items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold text-foreground sm:inline-flex"
+              >
+                <Coins className="h-3.5 w-3.5 text-amber-500" />
+                {(profile?.credits ?? 0).toLocaleString()}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/profile" })}
+                className="relative"
+                aria-label="Profile"
+              >
+                <Avatar className="h-9 w-9 border border-border">
                   <AvatarImage src={profile?.avatar_url ?? undefined} alt="" />
-                  <AvatarFallback className="text-xs">
-                    {(profile?.email ?? user.email ?? "U").slice(0, 2).toUpperCase()}
+                  <AvatarFallback>
+                    {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-              </Link>
+                {isPaidPlan(profile?.plan) && (
+                  <span className="absolute -right-1 -top-1">
+                    <CrownBadge />
+                  </span>
+                )}
+              </button>
             </>
           ) : (
-            <>
+            <div className="hidden items-center gap-2 sm:flex">
               <Button
                 variant="ghost"
                 size="sm"
-                className="hidden sm:inline-flex"
                 onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}
               >
                 Sign in
               </Button>
-              <Button
-                size="sm"
-                className="hidden sm:inline-flex"
-                onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}
-              >
+              <Button size="sm" onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}>
                 Get started
               </Button>
-            </>
+            </div>
           )}
 
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
