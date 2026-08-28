@@ -4,7 +4,8 @@
  * One persistent canvas — never recreated on pointermove.
  * Brush adds selection (source-over white with radial falloff).
  * Eraser removes selection (destination-out).
- * Circle fills an ellipse solidly.
+ * Circle: freehand closed path → fill interior.
+ * Ellipse helper retained for compatibility.
  *
  * Export produces hard B/W PNG at exact naturalWidth × naturalHeight.
  */
@@ -112,6 +113,7 @@ export function strokeBetween(
 
 /**
  * Fill an ellipse defined by two opposite corners in natural space.
+ * Retained for compatibility; primary Circle tool uses fillClosedPath.
  */
 export function fillEllipse(
   mask: WorkingMask,
@@ -131,6 +133,33 @@ export function fillEllipse(
   ctx.fillStyle = "rgba(255,255,255,1)";
   ctx.beginPath();
   ctx.ellipse(cx, cy, Math.max(rx, 1), Math.max(ry, 1), 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Fill the interior of a freehand closed path (natural coordinates).
+ * Used by Circle tool: user draws outline A→…→B near A → interior becomes mask.
+ */
+export function fillClosedPath(
+  mask: WorkingMask,
+  points: Point[],
+): void {
+  if (points.length < 3) return;
+  const ctx = mask.canvas.getContext("2d");
+  if (!ctx) return;
+  const s = mask.scale;
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "rgba(255,255,255,1)";
+  ctx.beginPath();
+  const first = toWorking(points[0], s);
+  ctx.moveTo(first.x, first.y);
+  for (let i = 1; i < points.length; i++) {
+    const p = toWorking(points[i], s);
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.closePath();
   ctx.fill();
   ctx.restore();
 }
@@ -167,7 +196,6 @@ export function maskHasPaint(mask: WorkingMask, threshold = 16): boolean {
 /**
  * Export hard B/W PNG at EXACT natural resolution.
  * WHITE = selected, BLACK = unselected.
- * Uses toBlob path internally via data URL for compatibility with existing callers.
  */
 export function exportMaskNatural(mask: WorkingMask): string | null {
   const ctx = mask.canvas.getContext("2d");
@@ -200,7 +228,6 @@ export function exportMaskNatural(mask: WorkingMask): string | null {
     return tmp.toDataURL("image/png");
   }
 
-  // Upscale to natural with nearest-neighbor (preserve hard edges)
   const out = document.createElement("canvas");
   out.width = nw;
   out.height = nh;
