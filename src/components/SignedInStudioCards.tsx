@@ -68,8 +68,8 @@ export function SignedInStudioCards() {
     { to: "/history", labelKey: "home.viewHistory", descKey: "home.recentHistory" },
   ];
 
-  const popular: { to: "/editor" | "/studio/image"; titleKey: string; descKey: string }[] = [
-    { to: "/editor", titleKey: "feat.circleRemove", descKey: "feat.circleRemoveDesc" },
+  const popular: { to: "/editor" | "/studio/image" | "/studio/image/circle-remove"; titleKey: string; descKey: string }[] = [
+    { to: "/studio/image/circle-remove", titleKey: "feat.circleRemove", descKey: "feat.circleRemoveDesc" },
     { to: "/studio/image", titleKey: "feat.removeObject", descKey: "feat.removeObjectDesc" },
     { to: "/studio/image", titleKey: "feat.removeBg", descKey: "feat.removeBgDesc" },
     { to: "/studio/image", titleKey: "feat.replaceBg", descKey: "feat.replaceBgDesc" },
