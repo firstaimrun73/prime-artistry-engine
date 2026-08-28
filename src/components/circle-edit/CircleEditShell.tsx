@@ -65,7 +65,7 @@ export function CircleEditShell({
         <button
           type="button"
           onClick={onBack}
-          aria-label="Back to Image Studio"
+          aria-label="Back to Studio"
           className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[#2E3140] text-[#9AA0B0] transition-colors hover:border-[#A89BFF] hover:text-[#F2F2F5]"
         >
           <ArrowLeft className="h-4 w-4" />
