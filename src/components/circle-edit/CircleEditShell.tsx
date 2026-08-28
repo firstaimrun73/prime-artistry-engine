@@ -2,18 +2,18 @@
  * Circle 2edit product shell — design from circle-edit.html prototype.
  * Violet #8B7CFF · Teal #5CE0C0 · no Motio orange.
  * Layout: header → flex-1 stage → contextual controls → action bar → bottom modes.
+ * Modes: Remove | Add only (Crop disconnected from this tool).
  */
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
-  Crop,
   Eraser,
   Plus,
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type CircleEditMode = "remove" | "add" | "crop";
+export type CircleEditMode = "remove" | "add";
 
 type Props = {
   creditsLabel: string;
@@ -92,7 +92,6 @@ export function CircleEditShell({
           </h1>
         </div>
 
-        {/* Real credit balance only — no M / infinity badge */}
         <span
           className="ml-auto flex shrink-0 items-center rounded-full border border-[#2E3140] bg-[#22252F] px-3 py-1.5 text-[12px] font-medium text-[#E8E9ED]"
           title="Credits"
@@ -123,7 +122,6 @@ export function CircleEditShell({
           [
             { id: "remove" as const, label: "Remove", Icon: Eraser },
             { id: "add" as const, label: "Add", Icon: Plus },
-            { id: "crop" as const, label: "Crop", Icon: Crop },
           ] as const
         ).map(({ id, label, Icon }) => {
           const active = mode === id;
@@ -351,12 +349,12 @@ export function CircleDrawToolbar({
           );
         })}
       </div>
-      {tool === "brush" && (
+      {(tool === "brush" || tool === "eraser") && (
         <div className="flex items-center gap-2.5 px-0.5">
           <span className="shrink-0 text-[11px] font-medium text-[#9AA0B0]">Size</span>
           <input
             type="range"
-            min={1}
+            min={4}
             max={50}
             value={brushSize}
             onChange={(e) => onBrushSize(Number(e.target.value))}
