@@ -39,7 +39,7 @@ function isChildProductRoute(pathname: string): boolean {
 
 /**
  * Image Studio landing for exact /studio/image.
- * Child routes (Auto Edit, Circle Remove, Multi, Tools) render themselves via Outlet.
+ * Child routes (Auto Edit, Circle 2edit, Multi, Tools) render themselves via Outlet.
  */
 function ImageStudio() {
   const { user, profile } = useAuth();
@@ -107,8 +107,7 @@ function ImageStudio() {
               Image <span className="text-primary">Studio</span>
             </h1>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              Upload a photo, pick a tool, describe the change, generate. Crop, Circle to Remove,
-              enhance, and style — all in the editor.
+              Upload a photo, describe the change, and generate. Enhance, restyle, and create — all in the editor.
             </p>
             <Button size="lg" className="mt-8" onClick={openEditor}>
               {t("studio.openEditor")}
