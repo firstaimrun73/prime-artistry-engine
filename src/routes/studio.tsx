@@ -69,22 +69,22 @@ function StudioHub() {
 
           <Link
             to="/studio/image/circle-remove"
-            className="group relative flex min-h-[200px] flex-col justify-end overflow-hidden rounded-3xl border border-[#2E3140] bg-[#181A22] p-6 transition-transform hover:scale-[1.01] sm:min-h-[240px]"
+            className="group relative flex min-h-[200px] flex-col justify-end overflow-hidden rounded-3xl border border-[#7B6FE0]/35 bg-card p-6 transition-transform hover:scale-[1.01] dark:border-[#7B6FE0]/40 dark:bg-[#181A22] sm:min-h-[240px]"
           >
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#A89BFF]/25 via-transparent to-transparent" />
-            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[#A89BFF]/20 blur-3xl" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#7B6FE0]/20 via-transparent to-transparent" />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[#7B6FE0]/18 blur-3xl" />
             <div className="relative">
-              <div className="mb-4 inline-flex items-center justify-center rounded-2xl border border-[#A89BFF]/40 bg-[#22252F] p-3 shadow-lg">
+              <div className="mb-4 inline-flex items-center justify-center rounded-2xl border border-[#7B6FE0]/45 bg-white/80 p-3 shadow-lg dark:bg-[#22252F]">
                 <span className="relative grid h-7 w-7 place-items-center">
-                  <span className="absolute inset-0 rounded-full border-2 border-[#A89BFF]/80" />
+                  <span className="absolute inset-0 rounded-full border-2 border-[#7B6FE0]" />
                 </span>
               </div>
-              <h2 className="text-2xl font-extrabold text-[#F2F2F5]">
-                <span className="text-[#A89BFF]">Circle</span>
-                <span className="font-medium text-[#E8E9ED]"> 2edit</span>
+              <h2 className="text-2xl font-extrabold text-foreground">
+                <span className="text-[#7B6FE0]">Circle</span>
+                <span className="font-medium text-foreground/90"> 2edit</span>
               </h2>
-              <p className="mt-1 text-sm text-[#9AA0B0]">Remove · Add · Crop</p>
-              <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#A89BFF]">
+              <p className="mt-1 text-sm text-muted-foreground">Remove · Add · mask edit</p>
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#7B6FE0]">
                 Open
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </span>
