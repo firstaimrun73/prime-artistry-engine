@@ -18,6 +18,7 @@ export const premiumGenerateClass =
 export const premiumMeta = {
   id: PREMIUM_TIER,
   label: "Ultra AI",
-  short: "Maximum quality path",
-  blurb: "Flagship generation, multi-reference intelligence, and high-resolution delivery.",
+  short: "Maximum quality",
+  blurb:
+    "The highest-quality experience for demanding edits and generations where maximum visual refinement is the priority.",
 } as const;

@@ -20,5 +20,5 @@ export const standardMeta = {
   label: "Standard",
   short: "Everyday edits",
   blurb:
-    "Fast generation with clear, reliable results — designed to make your images better, faster.",
+    "Fast and reliable image creation for everyday edits, enhancements, restyling, and creative generation.",
 } as const;

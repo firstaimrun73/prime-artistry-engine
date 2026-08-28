@@ -18,6 +18,7 @@ export const proGenerateClass =
 export const proMeta = {
   id: PRO_TIER,
   label: "Premium",
-  short: "Advanced HD+ editing",
-  blurb: "Higher detail, 2K options, and multi-reference intelligence for professional results.",
+  short: "Advanced editing",
+  blurb:
+    "More advanced image creation and editing with stronger detail, richer results, and support for reference-based workflows.",
 } as const;
