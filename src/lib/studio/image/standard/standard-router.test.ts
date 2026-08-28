@@ -115,6 +115,7 @@ describe("validateStandardImageRequest", () => {
       prompt: "remove",
       imageUrl: "https://cdn.example/base.png",
       maskImageUrl: "https://cdn.example/mask.png",
+      circleInstant: true,
     });
     assert.equal(good.ok, true);
     if (good.ok) assert.equal(good.mode, "circle_to_remove");
@@ -199,7 +200,7 @@ describe("buildStandardStep models", () => {
       referenceImageUrls: [],
       imageQuality: "sd",
     } as StandardValidationOk);
-    assert.equal(t2i.model, STANDARD_MODELS.textToImage);
+    assert.equal(t2i.model, STANDARD_MODELS.textToImageSd);
 
     const i2i = buildStandardStep({
       ok: true,

@@ -8,7 +8,7 @@
  * Standard multi (total images 2–5):
  *   2 → 30 SD / 35 HD
  *   3 → 35 SD / 40 HD
- *   4 → 40 SD / 45 HD
+ *   4 → 35 SD / 40 HD
  *   5 → 40 SD / 45 HD
  *
  * Premium multi (total images 2–9, optional 10):
@@ -21,7 +21,7 @@ import type { GptImage2Experience, GptImage2OutputClass } from "./model";
 const STANDARD_SD: Record<number, number> = {
   2: 30,
   3: 35,
-  4: 40,
+  4: 35,
   5: 40,
 };
 
@@ -29,13 +29,13 @@ const STANDARD_SD: Record<number, number> = {
 const PREMIUM_SD: Record<number, number> = {
   2: 35,
   3: 35,
-  4: 40,
+  4: 42,
   5: 45,
   6: 45,
   7: 50,
   8: 55,
   9: 60,
-  10: 65,
+  10: 66,
 };
 
 /** +5 per quality step above SD (HD +5, 2K +10). */
