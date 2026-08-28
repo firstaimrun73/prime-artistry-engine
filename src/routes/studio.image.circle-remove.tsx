@@ -1,7 +1,6 @@
 /**
  * Circle 2edit — /studio/image/circle-remove
- * Remove: SmartRemoveModal → generateMedia → flux erase
- * Add: mask region → inpaint insertion
+ * ONE canvas for Remove + Add. Circle/Brush/Eraser. No Crop in this tool.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,8 +12,7 @@ import {
   Share2,
   Image as ImageIcon,
 } from "lucide-react";
-import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
-import { ImageCropModal } from "@/components/ImageCropModal";
+import { SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { generateMedia } from "@/lib/generate.functions";
@@ -32,6 +30,11 @@ import {
   type CircleEditMode,
   type CircleDrawTool,
 } from "@/components/circle-edit/CircleEditShell";
+import {
+  CircleMaskStage,
+  type CircleMaskStageHandle,
+} from "@/components/circle-edit/CircleMaskStage";
+import type { MaskTool } from "@/components/circle-edit/mask/types";
 import { cn } from "@/lib/utils";
 
 function readKeepWatermarkPref(): boolean {
@@ -47,7 +50,6 @@ function readKeepWatermarkPref(): boolean {
 
 export const CIRCLE_INSTANT_CREDITS = 25;
 
-/** Wait until remote image is loadable before showing result (never flash original as result). */
 function waitForImageLoadable(url: string, timeoutMs = 45_000): Promise<void> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -84,26 +86,23 @@ const OBJECT_CATEGORIES = [
   { id: "food", label: "Food", items: [["Coffee", "☕"], ["Pizza", "🍕"], ["Cake", "🍰"]] as const },
 ];
 
-const CROP_RATIOS = [
-  { id: "free", label: "Free" },
-  { id: "1:1", label: "1:1" },
-  { id: "4:3", label: "4:3" },
-  { id: "3:4", label: "3:4" },
-  { id: "16:9", label: "16:9" },
-  { id: "9:16", label: "9:16" },
-] as const;
-
 export const Route = createFileRoute("/studio/image/circle-remove")({
   head: () => ({
     meta: [
       { title: "Circle 2edit — MOTIO2EDIT" },
-      { name: "description", content: "Circle 2edit — roughly mark to remove or add objects." },
+      { name: "description", content: "Circle 2edit — circle to remove or add objects." },
     ],
   }),
   component: CircleRemovePage,
 });
 
 type Phase = "upload" | "select" | "generating" | "result";
+
+function drawToolToMaskTool(t: CircleDrawTool): MaskTool {
+  if (t === "eraser") return "erase";
+  if (t === "brush") return "brush";
+  return "circle";
+}
 
 function CircleRemovePage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -112,6 +111,7 @@ function CircleRemovePage() {
   const secureDl = useServerFn(secureDownloadImage);
   const fileRef = useRef<HTMLInputElement>(null);
   const generatingLockRef = useRef(false);
+  const maskStageRef = useRef<CircleMaskStageHandle>(null);
 
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -119,16 +119,14 @@ function CircleRemovePage() {
   const [output, setOutput] = useState<string | null>(null);
   const [stageIdx, setStageIdx] = useState(0);
   const [progressPct, setProgressPct] = useState(0);
-  const [maskOpen, setMaskOpen] = useState(false);
   const [mode, setMode] = useState<CircleEditMode>("remove");
   const [addPrompt, setAddPrompt] = useState("");
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState(OBJECT_CATEGORIES[0].id);
-  const [cropRatio, setCropRatio] = useState<string>("free");
   const [drawTool, setDrawTool] = useState<CircleDrawTool>("circle");
   const [brushSize, setBrushSize] = useState(24);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
-  const [cropOpen, setCropOpen] = useState(false);
+  const [hasMask, setHasMask] = useState(false);
 
   useEffect(() => {
     try {
@@ -177,6 +175,7 @@ function CircleRemovePage() {
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setOutput(null);
+    setHasMask(false);
     setPhase("select");
   };
 
@@ -193,54 +192,90 @@ function CircleRemovePage() {
     return data.signedUrl;
   };
 
-  const runRemove = useCallback(
-    async (maskDataUrl: string) => {
+  const runWithMask = useCallback(
+    async (kind: "remove" | "add") => {
       if (!file || !preview || generatingLockRef.current) return;
-      if (!isAdmin && (profile?.credits ?? 0) < CIRCLE_INSTANT_CREDITS) {
-        toast.error(`Not enough credits (${CIRCLE_INSTANT_CREDITS} required).`);
-        setPhase("select");
-        setMaskOpen(true);
+      const maskDataUrl = maskStageRef.current?.exportMask() ?? null;
+      if (!maskDataUrl) {
+        toast.error("Circle or paint an area first.");
         return;
       }
+      if (!isAdmin && (profile?.credits ?? 0) < CIRCLE_INSTANT_CREDITS) {
+        toast.error(`Not enough credits (${CIRCLE_INSTANT_CREDITS} required).`);
+        return;
+      }
+
+      if (kind === "add") {
+        const desc = addPrompt.trim() || (addObjectId ? addObjectId.split(":")[1] ?? addObjectId : "");
+        if (!desc) {
+          setAddDrawerOpen(true);
+          toast.message("Describe what to add, or pick an asset.");
+          return;
+        }
+      }
+
       generatingLockRef.current = true;
-      setMaskOpen(false);
       setPhase("generating");
       try {
         const imageUrl = await upload(file, file.name || "src.jpg");
-        const maskRes = await fetch(maskDataUrl);
-        const maskBlob = await maskRes.blob();
-        const maskUrl = await upload(maskBlob, "mask.png");
-        const res = await generate({
-          data: {
-            prompt: SMART_REMOVE_PROMPT,
-            type: "image",
-            imageUrl,
-            sourceKind: "image",
-            maskImageUrl: maskUrl,
-            imageQuality: "hd",
-            circleInstant: true,
-            keepWatermark: readKeepWatermarkPref(),
-          },
-        });
-        setProgressPct(100);
-        if (!res.outputUrl || res.outputUrl === imageUrl) {
-          throw new Error("Generation returned invalid result.");
+        const maskBlob = await (await fetch(maskDataUrl)).blob();
+        const maskUrl = await upload(maskBlob, kind === "add" ? "mask-add.png" : "mask.png");
+
+        if (kind === "remove") {
+          const res = await generate({
+            data: {
+              prompt: SMART_REMOVE_PROMPT,
+              type: "image",
+              imageUrl,
+              sourceKind: "image",
+              maskImageUrl: maskUrl,
+              imageQuality: "hd",
+              circleInstant: true,
+              keepWatermark: readKeepWatermarkPref(),
+            },
+          });
+          setProgressPct(100);
+          if (!res.outputUrl || res.outputUrl === imageUrl) {
+            throw new Error("Generation returned invalid result.");
+          }
+          await waitForImageLoadable(res.outputUrl);
+          setOutput(res.outputUrl);
+          setPhase("result");
+          await refreshProfile();
+          toast.success("Object removed");
+        } else {
+          const desc = addPrompt.trim() || (addObjectId ? addObjectId.split(":")[1] ?? addObjectId : "");
+          const prompt = `In the white masked region only, add ${desc}. Match perspective, lighting, scale, shadows, and surrounding colors. Blend naturally. Do not change unmasked pixels.`;
+          const res = await generate({
+            data: {
+              prompt,
+              type: "image",
+              imageUrl,
+              sourceKind: "image",
+              maskImageUrl: maskUrl,
+              imageQuality: "hd",
+              keepWatermark: readKeepWatermarkPref(),
+            },
+          });
+          setProgressPct(100);
+          if (!res.outputUrl || res.outputUrl === imageUrl) {
+            throw new Error("Generation returned invalid result.");
+          }
+          await waitForImageLoadable(res.outputUrl);
+          setOutput(res.outputUrl);
+          setPhase("result");
+          await refreshProfile();
+          toast.success("Object added");
         }
-        await waitForImageLoadable(res.outputUrl);
-        setOutput(res.outputUrl);
-        setPhase("result");
-        await refreshProfile();
-        toast.success("Object removed");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed");
         setPhase("select");
-        setMaskOpen(true);
       } finally {
         generatingLockRef.current = false;
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [file, preview, isAdmin, profile?.credits, generate, refreshProfile],
+    [file, preview, isAdmin, profile?.credits, generate, refreshProfile, addPrompt, addObjectId],
   );
 
   const shareResult = async () => {
@@ -273,65 +308,44 @@ function CircleRemovePage() {
     setFile(null);
     setOutput(null);
     setPhase("upload");
-    setMaskOpen(false);
     setAddPrompt("");
     setAddObjectId(null);
     setAddDrawerOpen(false);
-    setCropOpen(false);
+    setHasMask(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
   const onModeChange = (m: CircleEditMode) => {
     if (phase === "generating") return;
     setMode(m);
-    setMaskOpen(false);
     setAddDrawerOpen(false);
-    setCropOpen(false);
   };
 
   const statusForMode = () => {
     if (!preview) return "Upload a photo to begin";
-    if (mode === "remove") return "Roughly circle the object, then tap Remove Object";
-    if (mode === "add") return "Mark area, describe object, then Add Object";
-    return "Adjust crop, then Apply Crop";
+    if (mode === "remove") return "Circle the object, then Remove Object";
+    return "Mark region, pick asset, then Add Object";
   };
 
   const onPrimaryCta = () => {
+    if (!preview) {
+      fileRef.current?.click();
+      return;
+    }
     if (mode === "remove") {
-      if (!preview) {
-        fileRef.current?.click();
-        return;
-      }
-      setMaskOpen(true);
+      void runWithMask("remove");
       return;
     }
-    if (mode === "add") {
-      if (!preview) {
-        fileRef.current?.click();
-        return;
-      }
-      const desc = addPrompt.trim() || (addObjectId ? addObjectId.split(":")[1] ?? addObjectId : "");
-      if (!desc) {
-        setAddDrawerOpen(true);
-        toast.message("Describe what to add, or pick an asset.");
-        return;
-      }
-      setMaskOpen(true);
-      return;
-    }
-    if (mode === "crop") {
-      if (!preview) {
-        fileRef.current?.click();
-        return;
-      }
-      setCropOpen(true);
-    }
+    void runWithMask("add");
   };
 
-  const ctaLabel =
-    mode === "remove" ? "Remove Object" : mode === "add" ? "Add Object" : "Apply Crop";
-  const ctaCost = mode === "crop" ? undefined : `${CIRCLE_INSTANT_CREDITS} credits`;
-  const ctaVariant = mode === "crop" ? ("teal" as const) : ("violet" as const);
+  const onClearMask = () => {
+    maskStageRef.current?.clear();
+    setHasMask(false);
+  };
+
+  const ctaLabel = mode === "remove" ? "Remove Object" : "Add Object";
+  const ctaCost = `${CIRCLE_INSTANT_CREDITS} credits`;
 
   if (phase === "generating") {
     return (
@@ -359,7 +373,15 @@ function CircleRemovePage() {
             <Button variant="outline" className="h-11 border-[#2E3140] bg-transparent text-[#F2F2F5]" onClick={() => void shareResult()}>
               <Share2 className="mr-1.5 h-4 w-4" /> Share
             </Button>
-            <Button variant="outline" className="h-11 border-[#2E3140] bg-transparent text-[#F2F2F5]" onClick={() => { setPhase("select"); setOutput(null); setMaskOpen(true); }}>
+            <Button
+              variant="outline"
+              className="h-11 border-[#2E3140] bg-transparent text-[#F2F2F5]"
+              onClick={() => {
+                setPhase("select");
+                setOutput(null);
+                setHasMask(false);
+              }}
+            >
               <Pencil className="mr-1.5 h-4 w-4" /> Edit again
             </Button>
             <Button variant="secondary" className="h-11 bg-[#22252F] text-[#F2F2F5]" onClick={resetPhoto}>
@@ -386,15 +408,17 @@ function CircleRemovePage() {
   const controls =
     phase === "select" || phase === "upload" ? (
       mode === "remove" ? (
-        <section className="flex shrink-0 flex-col gap-1.5 border-t border-[#2A2E3A] bg-[#1A1C24] px-3 py-2.5 sm:px-4">
+        <section className="flex shrink-0 flex-col gap-1.5">
           {drawToolsBar}
-          <p className="text-center text-[11px] text-[#9AA0B0]">Roughly circle the object you want to remove</p>
+          <p className="text-center text-[11px] text-[#9AA0B0]">
+            Draw a circle around the object — the inside becomes selected
+          </p>
         </section>
-      ) : mode === "add" ? (
-        <section className="flex shrink-0 flex-col gap-2 border-t border-[#2A2E3A] bg-[#1A1C24] px-3 py-2.5 sm:px-4">
+      ) : (
+        <section className="flex shrink-0 flex-col gap-2">
           {drawToolsBar}
           <div className="flex items-center gap-2">
-            <p className="min-w-0 flex-1 text-[11px] text-[#9AA0B0]">Mark the area, then open Assets</p>
+            <p className="min-w-0 flex-1 text-[11px] text-[#9AA0B0]">Mark the placement region, then open Assets</p>
             <button
               type="button"
               onClick={() => setAddDrawerOpen((v) => !v)}
@@ -408,25 +432,7 @@ function CircleRemovePage() {
             </button>
           </div>
         </section>
-      ) : mode === "crop" ? (
-        <section className="flex shrink-0 flex-col gap-1.5 border-t border-[#2A2E3A] bg-[#1A1C24] px-3 py-2.5 sm:px-4">
-          <div className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {CROP_RATIOS.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setCropRatio(r.id)}
-                className={cn(
-                  "shrink-0 rounded-full border px-3.5 py-2 text-[12.5px] font-medium",
-                  cropRatio === r.id ? "border-[#A89BFF] bg-[#A89BFF] text-[#12141A]" : "border-[#2E3140] bg-[#22252F] text-[#9AA0B0] hover:text-[#F2F2F5]",
-                )}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null
+      )
     ) : null;
 
   const addSheet =
@@ -502,107 +508,32 @@ function CircleRemovePage() {
       sheet={addSheet}
       actionBar={
         <CircleEditActionBar
-          onClear={preview ? resetPhoto : undefined}
+          onClear={preview ? (hasMask ? onClearMask : resetPhoto) : undefined}
           statusText={statusForMode()}
           ctaLabel={!preview ? "Upload photo" : ctaLabel}
           ctaCost={!preview ? undefined : ctaCost}
-          ctaDisabled={false}
+          ctaDisabled={!!preview && !hasMask}
           onCta={onPrimaryCta}
-          ctaVariant={!preview ? "violet" : ctaVariant}
+          ctaVariant="violet"
         />
       }
     >
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-[18px] py-3">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {!preview ? (
-          <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
-        ) : (
-          <div className="relative flex max-h-full max-w-full flex-col items-center">
-            <div className="relative max-h-full max-w-full overflow-hidden rounded-xl">
-              <img src={preview} alt="Source" className="max-h-[min(62vh,680px)] max-w-full rounded-xl object-contain" />
-            </div>
+          <div className="flex flex-1 items-center justify-center px-[18px] py-3">
+            <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
           </div>
+        ) : (
+          <CircleMaskStage
+            ref={maskStageRef}
+            imageUrl={preview}
+            tool={drawToolToMaskTool(drawTool)}
+            brushSize={brushSize}
+            onMaskChange={setHasMask}
+          />
         )}
       </div>
-      <SmartRemoveModal
-        open={maskOpen && !!preview && (mode === "remove" || mode === "add")}
-        imageUrl={preview}
-        initialTool={drawTool === "eraser" ? "erase" : drawTool === "brush" ? "brush" : "circle"}
-        onCancel={() => setMaskOpen(false)}
-        onApply={(maskDataUrl) => {
-          if (mode === "add") {
-            const desc = addPrompt.trim() || (addObjectId ? addObjectId.split(":")[1] ?? addObjectId : "");
-            if (!desc) {
-              toast.error("Describe what to add.");
-              return;
-            }
-            void (async () => {
-              if (!file || generatingLockRef.current) return;
-              if (!isAdmin && (profile?.credits ?? 0) < CIRCLE_INSTANT_CREDITS) {
-                toast.error(`Not enough credits (${CIRCLE_INSTANT_CREDITS} required).`);
-                return;
-              }
-              generatingLockRef.current = true;
-              setMaskOpen(false);
-              setPhase("generating");
-              try {
-                const imageUrl = await upload(file, file.name || "src.jpg");
-                const maskBlob = await (await fetch(maskDataUrl)).blob();
-                const maskUrl = await upload(maskBlob, "mask-add.png");
-                const prompt = `In the white masked region only, add ${desc}. Match perspective, lighting, scale, shadows, and surrounding colors. Blend naturally. Do not change unmasked pixels.`;
-                const res = await generate({
-                  data: {
-                    prompt,
-                    type: "image",
-                    imageUrl,
-                    sourceKind: "image",
-                    maskImageUrl: maskUrl,
-                    imageQuality: "hd",
-                    keepWatermark: readKeepWatermarkPref(),
-                  },
-                });
-                setProgressPct(100);
-                if (!res.outputUrl || res.outputUrl === imageUrl) {
-                  throw new Error("Generation returned invalid result.");
-                }
-                await waitForImageLoadable(res.outputUrl);
-                setOutput(res.outputUrl);
-                setPhase("result");
-                await refreshProfile();
-                toast.success("Object added");
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Failed");
-                setPhase("select");
-              } finally {
-                generatingLockRef.current = false;
-              }
-            })();
-          } else {
-            void runRemove(maskDataUrl);
-          }
-        }}
-      />
-      <ImageCropModal
-        open={cropOpen && !!preview}
-        imageSrc={preview ?? ""}
-        onClose={() => setCropOpen(false)}
-        onApply={(croppedDataUrl) => {
-          if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
-          setPreview(croppedDataUrl);
-          void (async () => {
-            try {
-              const res = await fetch(croppedDataUrl);
-              const blob = await res.blob();
-              const f = new File([blob], file?.name || "cropped.jpg", { type: blob.type || "image/jpeg" });
-              setFile(f);
-              toast.success("Crop applied");
-            } catch {
-              toast.error("Could not apply crop");
-            }
-          })();
-          setCropOpen(false);
-        }}
-      />
     </CircleEditShell>
   );
 }
