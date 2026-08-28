@@ -6,20 +6,26 @@ import {
 } from "@/lib/studio/studio-tier";
 import { Sparkles, Zap, Crown } from "lucide-react";
 
+/**
+ * User-facing experience copy only — never model/provider names.
+ */
 const TIER_DETAIL: Record<
   StudioTier,
   { capability: string; Icon: typeof Zap }
 > = {
   standard: {
-    capability: "Fast · Clear · Reliable",
+    capability:
+      "Fast, dependable everyday image creation and editing with a balanced quality/speed experience.",
     Icon: Zap,
   },
   pro: {
-    capability: "HD+ · Multi-ref",
+    capability:
+      "Higher-quality image creation and editing with stronger detail and support for more advanced workflows.",
     Icon: Crown,
   },
   premium: {
-    capability: "Flagship · Max quality",
+    capability:
+      "Highest-tier image creation and editing for users who want the strongest available visual quality and refinement.",
     Icon: Sparkles,
   },
 };
@@ -51,12 +57,12 @@ export function StudioTierSelector({
       </p>
       <div
         className={cn(
-          "grid min-w-0 gap-2",
+          "grid min-w-0 gap-2.5",
           tiers.length === 1
-            ? "mx-auto grid-cols-1 max-w-[280px]"
+            ? "mx-auto grid-cols-1 max-w-[320px]"
             : tiers.length === 2
-              ? "grid-cols-2"
-              : "grid-cols-3",
+              ? "grid-cols-1 sm:grid-cols-2"
+              : "grid-cols-1 sm:grid-cols-3",
         )}
       >
         {tiers.map((id) => {
@@ -70,7 +76,7 @@ export function StudioTierSelector({
               type="button"
               onClick={() => onChange(id)}
               className={cn(
-                "relative flex min-h-[64px] min-w-0 flex-col items-start gap-0.5 rounded-xl border px-2 py-2 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[72px] sm:px-2.5 sm:py-2.5",
+                "relative flex min-h-[88px] min-w-0 flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[100px] sm:px-3.5 sm:py-3",
                 active &&
                   id === "standard" &&
                   "border-primary bg-primary/15 ring-1 ring-primary/35",
@@ -88,7 +94,7 @@ export function StudioTierSelector({
             >
               <span
                 className={cn(
-                  "pointer-events-none absolute right-2 top-2 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2",
+                  "pointer-events-none absolute right-2.5 top-2.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2",
                   active
                     ? id === "premium"
                       ? "border-[#E8C547]"
@@ -113,10 +119,10 @@ export function StudioTierSelector({
                 )}
               </span>
 
-              <div className="relative flex items-center gap-1 pr-5">
+              <div className="relative flex items-center gap-1.5 pr-6">
                 <Icon
                   className={cn(
-                    "h-3.5 w-3.5 shrink-0",
+                    "h-4 w-4 shrink-0",
                     active && id === "standard" && "text-primary",
                     active && id === "pro" && "text-orange-500",
                     active && id === "premium" && "text-[#E8C547]",
@@ -126,7 +132,7 @@ export function StudioTierSelector({
                 />
                 <span
                   className={cn(
-                    "text-[11px] font-bold leading-tight sm:text-xs",
+                    "text-xs font-bold leading-tight sm:text-sm",
                     active && id === "premium" && "text-[#E8C547]",
                   )}
                 >
@@ -135,7 +141,7 @@ export function StudioTierSelector({
               </div>
               <p
                 className={cn(
-                  "relative mt-auto line-clamp-2 text-[9px] leading-snug sm:text-[10px]",
+                  "relative mt-0.5 text-[11px] leading-snug sm:text-xs",
                   active && id === "premium" ? "text-[#E2E8F0]" : "text-muted-foreground",
                 )}
               >

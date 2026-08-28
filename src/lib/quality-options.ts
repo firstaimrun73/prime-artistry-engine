@@ -63,7 +63,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "Standard Definition",
     credits: 0,
     upscaleFactor: 1,
-    hint: "Standard Definition",
+    hint: "Standard Definition · up to 512px",
   },
   {
     id: "hd",
@@ -71,7 +71,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "High Definition",
     credits: 0,
     upscaleFactor: 1,
-    hint: "High Definition",
+    hint: "High Definition · up to 1024px",
   },
   {
     id: "2k",
@@ -79,7 +79,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "2K Resolution",
     credits: 0,
     upscaleFactor: 2,
-    hint: "2K Resolution",
+    hint: "2K · up to 1440px long side",
   },
   {
     id: "4k",
@@ -87,7 +87,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "4K Resolution",
     credits: 0,
     upscaleFactor: 4,
-    hint: "4K Resolution",
+    hint: "4K · up to 2160px long side",
   },
   {
     id: "8k",
@@ -95,7 +95,7 @@ export const IMAGE_QUALITY_OPTIONS: {
     title: "8K Resolution",
     credits: 0,
     upscaleFactor: 8,
-    hint: "8K Resolution",
+    hint: "8K · up to 4320px long side",
   },
 ];
 
