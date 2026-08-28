@@ -22,6 +22,7 @@ import { WhyChoose } from "@/components/home/WhyChoose";
 import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
+import { DiscoveryFeed } from "@/components/discover/DiscoveryFeed";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,7 +50,6 @@ function Index() {
   return <SignedOutHome />;
 }
 
-/** Post-login home: no site Footer (avoids repeated resource strip). */
 function SignedInHome() {
   return (
     <div className="min-h-screen bg-background">
@@ -64,6 +64,9 @@ function SignedOutHome() {
     <div className="min-h-screen bg-background">
       <Header />
       <HomeHero />
+      <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-12">
+        <DiscoveryFeed isSignedIn={false} />
+      </section>
       <BeforeAfterShowcase />
       <SampleShowcase />
       <SampleGallery />
@@ -228,7 +231,6 @@ function StudioShowcase() {
                 {locked ? "Upgrade to unlock" : "Open studio"}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </div>
-
               {locked && (
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl bg-background/70 backdrop-blur-sm">
                   <div className="rounded-full border border-border bg-card p-2.5">
