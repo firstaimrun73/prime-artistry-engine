@@ -19,8 +19,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { cn } from "@/lib/utils";
 import { VideoModeSelector } from "@/components/video/VideoModeSelector";
-import { VideoPromptBar } from "@/components/video/VideoPromptBar";
-import { VideoFeaturePanel, type VideoSizeOption } from "@/components/video/VideoFeaturePanel";
+import { VideoPromptBar, STANDARD_VIDEO_PROMPT_MAX, PREMIUM_VIDEO_PROMPT_MAX } from "@/components/video/VideoPromptBar";
+import { VideoFeaturePanel } from "@/components/video/VideoFeaturePanel";
 import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
 import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
 import { VideoOutputView } from "@/components/video/VideoOutputView";
@@ -32,6 +32,8 @@ import {
   estimateRequestCredits,
   availableMaxDurationFor,
   MIN_VIDEO_CREDITS,
+  is4kDurationLocked,
+  MAX_4K_DURATION_SEC,
   type VideoGenMode,
   type VideoAspect,
   type VideoResolution,
@@ -55,6 +57,12 @@ function planAllowsPremium(plan: string | null | undefined, admin: boolean): boo
   return p.includes("pro") || p.includes("premium") || p.includes("business") || p.includes("studio");
 }
 
+function isPaidPlan(plan: string | null | undefined, admin: boolean): boolean {
+  if (admin) return true;
+  const p = (plan ?? "free").toLowerCase();
+  return p !== "free" && p.length > 0;
+}
+
 function VideoStudioPage() {
   const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
@@ -67,6 +75,7 @@ function VideoStudioPage() {
     isAdmin: admin,
   });
   const premiumAllowed = planAllowsPremium(profile?.plan, admin);
+  const paid = isPaidPlan(profile?.plan, admin);
 
   const [mode, setMode] = useState<VideoGenMode>("text");
   const [tier, setTier] = useState<VideoTier>("standard");
@@ -74,9 +83,9 @@ function VideoStudioPage() {
   const [duration, setDuration] = useState(5);
   const [aspect, setAspect] = useState<VideoAspect>("16:9");
   const [resolution, setResolution] = useState<VideoResolution>("1080p");
-  const [size, setSize] = useState<VideoSizeOption>("medium");
   const [soundOn, setSoundOn] = useState(false);
   const [styleId, setStyleId] = useState("");
+  const [keepWatermark, setKeepWatermark] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,29 +94,35 @@ function VideoStudioPage() {
 
   const caps = useMemo(() => capabilitiesForTier(tier, mode), [tier, mode]);
   const availableMax = useMemo(() => availableMaxDurationFor(tier, mode), [tier, mode]);
+  const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
 
   useEffect(() => {
     if (!caps.aspects.includes(aspect)) setAspect(caps.aspects[0] ?? "16:9");
     if (!caps.resolutions.includes(resolution)) {
       setResolution(caps.resolutions.includes("1080p") ? "1080p" : (caps.resolutions[0] ?? "720p"));
     }
-    if (caps.durations.length && !caps.durations.includes(duration)) {
-      setDuration(caps.durations[0] ?? 5);
+    if (duration > availableMax && availableMax > 0) setDuration(Math.min(duration, availableMax));
+  }, [caps, aspect, resolution, duration, availableMax]);
+
+  useEffect(() => {
+    if (is4kDurationLocked(duration, resolution)) {
+      setDuration(MAX_4K_DURATION_SEC);
     }
-  }, [caps, aspect, resolution, duration]);
+  }, [duration, resolution]);
 
   const cost = useMemo(() => {
-    const base = estimateRequestCredits({
-      mode,
-      tier,
-      durationSec: duration,
-      resolution,
-      aspect,
-      soundOn,
-    });
-    const sizeMult = size === "large" ? 1.15 : size === "small" ? 0.95 : 1;
-    return Math.max(MIN_VIDEO_CREDITS, Math.ceil(base * sizeMult));
-  }, [mode, tier, duration, resolution, aspect, soundOn, size]);
+    return Math.max(
+      MIN_VIDEO_CREDITS,
+      estimateRequestCredits({
+        mode,
+        tier,
+        durationSec: duration,
+        resolution,
+        aspect,
+        soundOn,
+      }),
+    );
+  }, [mode, tier, duration, resolution, aspect, soundOn]);
 
   const selected = useMemo(
     () =>
@@ -140,12 +155,13 @@ function VideoStudioPage() {
 
   const canGenerate = useMemo(() => {
     if (duration < 1 || duration > availableMax) return false;
+    if (is4kDurationLocked(duration, resolution)) return false;
     if (mode === "video") return !!mediaFile;
     if (!prompt.trim()) return false;
     if (mode === "image" && !mediaFile) return false;
     if (!selected) return false;
     return true;
-  }, [prompt, mode, mediaFile, duration, availableMax, selected]);
+  }, [prompt, mode, mediaFile, duration, availableMax, selected, resolution]);
 
   if (user && profile && !allowed) {
     return (
@@ -203,6 +219,10 @@ function VideoStudioPage() {
 
     if (duration > availableMax) {
       toast.error(`Maximum available for these settings is ${availableMax}s.`);
+      return;
+    }
+    if (is4kDurationLocked(duration, resolution)) {
+      toast.error(`4K is limited to ${MAX_4K_DURATION_SEC}s maximum.`);
       return;
     }
 
@@ -271,6 +291,7 @@ function VideoStudioPage() {
           videoModelId: model.id,
           videoGenerateAudio: soundOn && model.nativeAudio,
           videoStyleId: styleId || undefined,
+          keepWatermark: paid ? keepWatermark : true,
         },
       });
 
@@ -284,7 +305,7 @@ function VideoStudioPage() {
           | "9:16"
           | "1:1",
         quality: resolution === "720p" ? "720p" : "1080p",
-        size,
+        size: "medium",
         soundRequested: soundOn && model.nativeAudio,
         creditsUsed: cost,
         sourcePreview: mediaPreview,
@@ -360,6 +381,7 @@ function VideoStudioPage() {
           value={prompt}
           onChange={setPrompt}
           disabled={busy}
+          maxLength={promptMax}
           placeholder={
             mode === "image"
               ? "Describe the motion: slow push-in, orbit, product turn…"
@@ -378,21 +400,51 @@ function VideoStudioPage() {
           onPremiumLockedClick={() => navigate({ to: "/pricing" })}
           aspects={caps.aspects}
           resolutions={caps.resolutions.filter((r) => r !== "480p")}
-          durations={caps.durations}
           aspect={aspect}
           setAspect={setAspect}
           resolution={resolution}
           setResolution={setResolution}
           duration={duration}
           setDuration={setDuration}
-          size={size}
-          setSize={setSize}
           soundOn={soundOn}
           setSoundOn={setSoundOn}
           styleId={styleId}
           setStyleId={setStyleId}
           disabled={busy}
         />
+      </div>
+
+      <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card/80 px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">Watermark</p>
+          <p className="text-[11px] text-muted-foreground">
+            {paid
+              ? keepWatermark
+                ? "Keep Motio2edit watermark on output"
+                : "Remove watermark (paid)"
+              : "Upgrade to remove watermark"}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={paid ? keepWatermark : true}
+          aria-label="Keep watermark"
+          disabled={busy || !paid}
+          onClick={() => paid && setKeepWatermark(!keepWatermark)}
+          className={cn(
+            "relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-out",
+            paid && keepWatermark ? "bg-red-500" : paid ? "bg-muted" : "bg-muted opacity-50",
+            !paid && "cursor-not-allowed",
+          )}
+        >
+          <span
+            className={cn(
+              "pointer-events-none absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ease-out",
+              (paid ? keepWatermark : true) && "translate-x-5",
+            )}
+          />
+        </button>
       </div>
 
       {busy && (
