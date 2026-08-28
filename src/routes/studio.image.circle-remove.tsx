@@ -11,6 +11,7 @@ import {
   Pencil,
   Share2,
   Image as ImageIcon,
+  Columns2,
 } from "lucide-react";
 import { SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ import {
 } from "@/components/circle-edit/CircleMaskStage";
 import type { MaskTool } from "@/components/circle-edit/mask/types";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/lib/theme";
 
 function readKeepWatermarkPref(): boolean {
   try {
@@ -71,13 +73,16 @@ function waitForImageLoadable(url: string, timeoutMs = 45_000): Promise<void> {
 }
 
 const GEN_STAGES = [
-  "Analysing selection",
-  "Understanding image",
-  "Preparing edit",
-  "Launching Motion2AI",
-  "Refining result",
-  "Finalising",
+  "Preparing your edit…",
+  "Understanding the selected area…",
+  "Sending to AI…",
+  "Applying the edit…",
+  "Refining result…",
+  "Finalising…",
 ];
+
+/** Monotonic stage → progress floors (never regress). */
+const STAGE_PROGRESS = [8, 22, 40, 58, 76, 90];
 
 const OBJECT_CATEGORIES = [
   { id: "animals", label: "Animals", items: [["Dog", "🐕"], ["Cat", "🐈"], ["Bird", "🐦"], ["Horse", "🐴"], ["Rabbit", "🐇"]] as const },
@@ -107,11 +112,14 @@ function drawToolToMaskTool(t: CircleDrawTool): MaskTool {
 function CircleRemovePage() {
   const { user, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const generate = useServerFn(generateMedia);
   const secureDl = useServerFn(secureDownloadImage);
   const fileRef = useRef<HTMLInputElement>(null);
   const generatingLockRef = useRef(false);
   const maskStageRef = useRef<CircleMaskStageHandle>(null);
+  const progressTimersRef = useRef<{ stage?: number; tick?: number }>({});
 
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -127,6 +135,14 @@ function CircleRemovePage() {
   const [brushSize, setBrushSize] = useState(24);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [hasMask, setHasMask] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+
+  const clearProgressTimers = useCallback(() => {
+    const t = progressTimersRef.current;
+    if (t.stage) window.clearInterval(t.stage);
+    if (t.tick) window.clearInterval(t.tick);
+    progressTimersRef.current = {};
+  }, []);
 
   useEffect(() => {
     try {
@@ -141,24 +157,47 @@ function CircleRemovePage() {
   }, []);
 
   useEffect(() => {
-    if (phase !== "generating") return;
+    if (phase !== "generating") {
+      clearProgressTimers();
+      return;
+    }
     setStageIdx(0);
-    setProgressPct(8);
-    const stageTimer = setInterval(() => setStageIdx((i) => Math.min(i + 1, GEN_STAGES.length - 1)), 4500);
-    const pctTimer = setInterval(() => setProgressPct((p) => Math.min(92, p + 3 + Math.random() * 4)), 1200);
-    return () => {
-      clearInterval(stageTimer);
-      clearInterval(pctTimer);
-    };
-  }, [phase]);
+    setProgressPct(STAGE_PROGRESS[0]);
+    clearProgressTimers();
+
+    progressTimersRef.current.stage = window.setInterval(() => {
+      setStageIdx((i) => {
+        const next = Math.min(i + 1, GEN_STAGES.length - 1);
+        setProgressPct((p) => Math.max(p, STAGE_PROGRESS[next] ?? p));
+        return next;
+      });
+    }, 4200);
+
+    // Gentle monotonic creep toward stage ceiling (never past 94 until complete)
+    progressTimersRef.current.tick = window.setInterval(() => {
+      setProgressPct((p) => {
+        if (p >= 94) return p;
+        return Math.min(94, p + 1);
+      });
+    }, 900);
+
+    return () => clearProgressTimers();
+  }, [phase, clearProgressTimers]);
 
   const isAdmin = isAdminEmail(profile?.email);
   const creditsLabel = `${(profile?.credits ?? 0).toLocaleString()} credits`;
 
   if (!user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#12141A] px-4 text-[#F2F2F5]">
-        <p className="text-sm text-[#9AA0B0]">Sign in to use Circle 2edit.</p>
+      <div
+        className={cn(
+          "flex min-h-screen flex-col items-center justify-center px-4",
+          isDark ? "bg-[#12141A] text-[#F2F2F5]" : "bg-[#F4F5F8] text-[#1A1C24]",
+        )}
+      >
+        <p className={cn("text-sm", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+          Sign in to use Circle 2edit.
+        </p>
         <Button asChild className="mt-4 bg-[#A89BFF] text-[#12141A] hover:bg-[#9688EE]">
           <Link to="/auth">Sign in</Link>
         </Button>
@@ -176,6 +215,7 @@ function CircleRemovePage() {
     setPreview(URL.createObjectURL(f));
     setOutput(null);
     setHasMask(false);
+    setShowCompare(false);
     setPhase("select");
   };
 
@@ -234,12 +274,15 @@ function CircleRemovePage() {
               keepWatermark: readKeepWatermarkPref(),
             },
           });
+          clearProgressTimers();
           setProgressPct(100);
+          setStageIdx(GEN_STAGES.length - 1);
           if (!res.outputUrl || res.outputUrl === imageUrl) {
             throw new Error("Generation returned invalid result.");
           }
           await waitForImageLoadable(res.outputUrl);
           setOutput(res.outputUrl);
+          setShowCompare(false);
           setPhase("result");
           await refreshProfile();
           toast.success("Object removed");
@@ -257,17 +300,21 @@ function CircleRemovePage() {
               keepWatermark: readKeepWatermarkPref(),
             },
           });
+          clearProgressTimers();
           setProgressPct(100);
+          setStageIdx(GEN_STAGES.length - 1);
           if (!res.outputUrl || res.outputUrl === imageUrl) {
             throw new Error("Generation returned invalid result.");
           }
           await waitForImageLoadable(res.outputUrl);
           setOutput(res.outputUrl);
+          setShowCompare(false);
           setPhase("result");
           await refreshProfile();
           toast.success("Object added");
         }
       } catch (err) {
+        clearProgressTimers();
         toast.error(err instanceof Error ? err.message : "Failed");
         setPhase("select");
       } finally {
@@ -275,7 +322,7 @@ function CircleRemovePage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [file, preview, isAdmin, profile?.credits, generate, refreshProfile, addPrompt, addObjectId],
+    [file, preview, isAdmin, profile?.credits, generate, refreshProfile, addPrompt, addObjectId, clearProgressTimers],
   );
 
   const shareResult = async () => {
@@ -312,6 +359,7 @@ function CircleRemovePage() {
     setAddObjectId(null);
     setAddDrawerOpen(false);
     setHasMask(false);
+    setShowCompare(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -322,9 +370,9 @@ function CircleRemovePage() {
   };
 
   const statusForMode = () => {
-    if (!preview) return "Upload a photo to begin";
-    if (mode === "remove") return "Circle the object, then Remove Object";
-    return "Mark region, pick asset, then Add Object";
+    if (!preview) return "Upload an image to begin";
+    if (mode === "remove") return "Select area, then remove";
+    return "Select region, choose asset, then add";
   };
 
   const onPrimaryCta = () => {
@@ -349,8 +397,20 @@ function CircleRemovePage() {
 
   if (phase === "generating") {
     return (
-      <CircleEditShell creditsLabel={creditsLabel} mode={mode} onModeChange={onModeChange} generating onBack={() => toast.message("Generation is in progress.")}>
-        <CircleEditGenOverlay caption={GEN_STAGES[stageIdx]} progressPct={progressPct} stageCount={GEN_STAGES.length} activeStage={stageIdx} />
+      <CircleEditShell
+        creditsLabel={creditsLabel}
+        mode={mode}
+        onModeChange={onModeChange}
+        generating
+        hideModeToggle
+        onBack={() => toast.message("Generation is in progress.")}
+      >
+        <CircleEditGenOverlay
+          caption={GEN_STAGES[stageIdx]}
+          progressPct={progressPct}
+          stageCount={GEN_STAGES.length}
+          activeStage={stageIdx}
+        />
       </CircleEditShell>
     );
   }
@@ -361,39 +421,117 @@ function CircleRemovePage() {
         creditsLabel={creditsLabel}
         mode={mode}
         onModeChange={onModeChange}
+        hideModeToggle
         onBack={() => {
           setPhase("select");
           setOutput(null);
+          setShowCompare(false);
         }}
         actionBar={
-          <footer className="flex shrink-0 flex-wrap items-center gap-2 border-t border-[#2A2E3A] bg-[#181A22] px-3 py-3 sm:gap-3 sm:px-4">
-            <Button className="h-11 bg-[#A89BFF] text-[#12141A] hover:bg-[#9688EE]" onClick={() => void downloadResult()}>
+          <footer
+            className={cn(
+              "flex shrink-0 flex-wrap items-center gap-2 border-t px-3 py-3 sm:gap-2.5 sm:px-4",
+              isDark ? "border-white/8 bg-[#181A22]/95" : "border-black/6 bg-white/90",
+            )}
+          >
+            <Button
+              className="h-10 bg-[#A89BFF] text-[#12141A] hover:bg-[#9688EE]"
+              onClick={() => void downloadResult()}
+            >
               <Download className="mr-1.5 h-4 w-4" /> Download
             </Button>
-            <Button variant="outline" className="h-11 border-[#2E3140] bg-transparent text-[#F2F2F5]" onClick={() => void shareResult()}>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-10",
+                isDark
+                  ? "border-white/10 bg-transparent text-[#F2F2F5]"
+                  : "border-black/10 bg-transparent text-[#1A1C24]",
+              )}
+              onClick={() => void shareResult()}
+            >
               <Share2 className="mr-1.5 h-4 w-4" /> Share
             </Button>
             <Button
               variant="outline"
-              className="h-11 border-[#2E3140] bg-transparent text-[#F2F2F5]"
+              className={cn(
+                "h-10",
+                isDark
+                  ? "border-white/10 bg-transparent text-[#F2F2F5]"
+                  : "border-black/10 bg-transparent text-[#1A1C24]",
+              )}
               onClick={() => {
                 setPhase("select");
                 setOutput(null);
                 setHasMask(false);
+                setShowCompare(false);
               }}
             >
               <Pencil className="mr-1.5 h-4 w-4" /> Edit again
             </Button>
-            <Button variant="secondary" className="h-11 bg-[#22252F] text-[#F2F2F5]" onClick={resetPhoto}>
+            <Button
+              variant="secondary"
+              className={cn(
+                "h-10",
+                isDark ? "bg-[#22252F] text-[#F2F2F5]" : "bg-[#EEF0F4] text-[#1A1C24]",
+              )}
+              onClick={resetPhoto}
+            >
               <ImageIcon className="mr-1.5 h-4 w-4" /> Another photo
             </Button>
           </footer>
         }
       >
-        <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-2 overflow-auto px-3 py-4">
-          <div className="overflow-hidden rounded-xl border border-[#2E3140] bg-[#1A1C24] p-1.5">
-            <CompareSlider before={preview} after={output} />
+        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 overflow-auto px-3 py-4">
+          <div className="flex items-center justify-between gap-2">
+            <p
+              className={cn(
+                "text-[12px] font-semibold uppercase tracking-[0.06em]",
+                isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
+              )}
+            >
+              {showCompare ? "Compare" : "Output"}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowCompare((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                showCompare
+                  ? "border-[#A89BFF]/50 bg-[#A89BFF]/15 text-[#A89BFF]"
+                  : isDark
+                    ? "border-white/10 text-[#9AA0B0] hover:text-[#F2F2F5]"
+                    : "border-black/10 text-[#5C6170] hover:text-[#1A1C24]",
+              )}
+            >
+              <Columns2 className="h-3.5 w-3.5" />
+              {showCompare ? "Show output" : "Compare"}
+            </button>
           </div>
+
+          {showCompare ? (
+            <div
+              className={cn(
+                "overflow-hidden rounded-xl border p-1.5",
+                isDark ? "border-white/10 bg-[#1A1C24]" : "border-black/8 bg-white shadow-sm",
+              )}
+            >
+              <CompareSlider before={preview} after={output} />
+            </div>
+          ) : (
+            <div
+              className={cn(
+                "flex flex-1 items-center justify-center overflow-hidden rounded-xl border p-2",
+                isDark ? "border-white/10 bg-[#1A1C24]" : "border-black/8 bg-white shadow-sm",
+              )}
+            >
+              <img
+                src={output}
+                alt="Result"
+                className="max-h-[min(70dvh,640px)] w-full object-contain"
+              />
+            </div>
+          )}
         </div>
       </CircleEditShell>
     );
@@ -406,28 +544,33 @@ function CircleRemovePage() {
   );
 
   const controls =
-    phase === "select" || phase === "upload" ? (
+    phase === "select" && preview ? (
       mode === "remove" ? (
-        <section className="flex shrink-0 flex-col gap-1.5">
-          {drawToolsBar}
-          <p className="text-center text-[11px] text-[#9AA0B0]">
-            Draw a circle around the object — the inside becomes selected
-          </p>
-        </section>
+        <section className="flex shrink-0 flex-col gap-1">{drawToolsBar}</section>
       ) : (
         <section className="flex shrink-0 flex-col gap-2">
           {drawToolsBar}
           <div className="flex items-center gap-2">
-            <p className="min-w-0 flex-1 text-[11px] text-[#9AA0B0]">Mark the placement region, then open Assets</p>
+            <p
+              className={cn(
+                "min-w-0 flex-1 text-[11px]",
+                isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
+              )}
+            >
+              Mark placement region, then open Assets
+            </p>
             <button
               type="button"
               onClick={() => setAddDrawerOpen((v) => !v)}
               className={cn(
-                "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-[12px] font-semibold transition-colors",
-                addDrawerOpen ? "bg-[#A89BFF] text-[#12141A]" : "border border-[#2E3140] bg-[#22252F] text-[#E8E9ED] hover:border-[#A89BFF]/50",
+                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold transition-colors",
+                addDrawerOpen
+                  ? "bg-[#A89BFF] text-[#12141A]"
+                  : isDark
+                    ? "border border-white/10 bg-white/5 text-[#E8E9ED] hover:border-[#A89BFF]/40"
+                    : "border border-black/10 bg-white text-[#1A1C24] hover:border-[#7B6FE0]/35",
               )}
             >
-              <span className="text-base leading-none">+</span>
               Assets
             </button>
           </div>
@@ -438,12 +581,41 @@ function CircleRemovePage() {
   const addSheet =
     mode === "add" && addDrawerOpen ? (
       <div className="relative z-30 shrink-0">
-        <button type="button" aria-label="Close assets" className="absolute inset-x-0 bottom-full h-28 bg-black/30" onClick={() => setAddDrawerOpen(false)} />
-        <div className="max-h-[42vh] overflow-y-auto rounded-t-2xl border-t border-[#2E3140] bg-[#1E212B] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_28px_rgba(0,0,0,0.35)] sm:px-4">
-          <div className="mx-auto mb-2.5 h-1 w-10 rounded-full bg-[#3A3E4C]" />
+        <button
+          type="button"
+          aria-label="Close assets"
+          className="absolute inset-x-0 bottom-full h-28 bg-black/25"
+          onClick={() => setAddDrawerOpen(false)}
+        />
+        <div
+          className={cn(
+            "max-h-[42vh] overflow-y-auto rounded-t-2xl border-t px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_28px_rgba(0,0,0,0.2)] sm:px-4",
+            isDark ? "border-white/10 bg-[#1E212B]" : "border-black/8 bg-white",
+          )}
+        >
+          <div
+            className={cn(
+              "mx-auto mb-2.5 h-1 w-10 rounded-full",
+              isDark ? "bg-[#3A3E4C]" : "bg-[#D8DAE0]",
+            )}
+          />
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-[13px] font-semibold text-[#F2F2F5]">Add Object</p>
-            <button type="button" onClick={() => setAddDrawerOpen(false)} className="rounded-lg px-2 py-1 text-[12px] font-medium text-[#9AA0B0] hover:text-[#F2F2F5]">
+            <p
+              className={cn(
+                "text-[13px] font-semibold",
+                isDark ? "text-[#F2F2F5]" : "text-[#1A1C24]",
+              )}
+            >
+              Add Object
+            </p>
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(false)}
+              className={cn(
+                "rounded-lg px-2 py-1 text-[12px] font-medium",
+                isDark ? "text-[#9AA0B0] hover:text-[#F2F2F5]" : "text-[#5C6170] hover:text-[#1A1C24]",
+              )}
+            >
               Close
             </button>
           </div>
@@ -455,7 +627,12 @@ function CircleRemovePage() {
             }}
             rows={1}
             placeholder="Describe what to add…"
-            className="mb-2.5 min-h-[42px] max-h-[72px] w-full resize-none rounded-xl border border-[#2E3140] bg-[#22252F] px-3 py-2.5 text-[13px] text-[#F2F2F5] placeholder:text-[#6B7080] focus:border-[#A89BFF] focus:outline-none"
+            className={cn(
+              "mb-2.5 min-h-[42px] max-h-[72px] w-full resize-none rounded-lg border px-3 py-2.5 text-[13px] focus:border-[#A89BFF] focus:outline-none",
+              isDark
+                ? "border-white/10 bg-[#22252F] text-[#F2F2F5] placeholder:text-[#6B7080]"
+                : "border-black/10 bg-[#F4F5F8] text-[#1A1C24] placeholder:text-[#8A90A0]",
+            )}
           />
           <div className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {OBJECT_CATEGORIES.map((c) => (
@@ -465,7 +642,11 @@ function CircleRemovePage() {
                 onClick={() => setActiveCat(c.id)}
                 className={cn(
                   "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
-                  activeCat === c.id ? "border-[#A89BFF] bg-[rgba(168,155,255,0.18)] text-[#A89BFF]" : "border-[#2E3140] bg-[#22252F] text-[#9AA0B0]",
+                  activeCat === c.id
+                    ? "border-[#A89BFF] bg-[rgba(168,155,255,0.18)] text-[#A89BFF]"
+                    : isDark
+                      ? "border-white/10 bg-white/5 text-[#9AA0B0]"
+                      : "border-black/8 bg-[#F4F5F8] text-[#5C6170]",
                 )}
               >
                 {c.label}
@@ -486,10 +667,26 @@ function CircleRemovePage() {
                   }}
                   className="flex w-[60px] shrink-0 flex-col items-center gap-1"
                 >
-                  <span className={cn("grid h-12 w-12 place-items-center rounded-[12px] border text-xl", selected ? "border-[#A89BFF] bg-[rgba(168,155,255,0.14)]" : "border-[#2E3140] bg-[#22252F]")}>
+                  <span
+                    className={cn(
+                      "grid h-12 w-12 place-items-center rounded-[12px] border text-xl",
+                      selected
+                        ? "border-[#A89BFF] bg-[rgba(168,155,255,0.14)]"
+                        : isDark
+                          ? "border-white/10 bg-white/5"
+                          : "border-black/8 bg-[#F4F5F8]",
+                    )}
+                  >
                     {glyph}
                   </span>
-                  <span className={cn("text-[10px]", selected ? "text-[#A89BFF]" : "text-[#9AA0B0]")}>{name}</span>
+                  <span
+                    className={cn(
+                      "text-[10px]",
+                      selected ? "text-[#A89BFF]" : isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
+                    )}
+                  >
+                    {name}
+                  </span>
                 </button>
               );
             })}
@@ -510,7 +707,7 @@ function CircleRemovePage() {
         <CircleEditActionBar
           onClear={preview ? (hasMask ? onClearMask : resetPhoto) : undefined}
           statusText={statusForMode()}
-          ctaLabel={!preview ? "Upload photo" : ctaLabel}
+          ctaLabel={!preview ? "Choose image" : ctaLabel}
           ctaCost={!preview ? undefined : ctaCost}
           ctaDisabled={!!preview && !hasMask}
           onCta={onPrimaryCta}
