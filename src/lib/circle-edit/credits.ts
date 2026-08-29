@@ -1,21 +1,28 @@
 /**
  * Authoritative Circle 2edit credit calculator.
- * Client may display estimates; server always recalculates from this module.
- * Never trust client-supplied credit totals.
+ * Total Circle Add = Input Image Credit + Selected Object Credit.
+ * Server always recalculates — never trust client totals.
  */
 
 export const CIRCLE_REMOVE_CREDITS = 25 as const;
 
-/** Provider ~$0.075/MP for inpaint — banded base protects margin without tiny steps. */
+/**
+ * Input image processing bands (product rule from Circle Add spec).
+ * Ceiling: 8 MP → 180 credits.
+ */
 export const CIRCLE_ADD_BASE_BY_MP: readonly { maxMp: number; credits: number }[] = [
-  { maxMp: 2, credits: 25 },
-  { maxMp: 4, credits: 30 },
-  { maxMp: 6, credits: 40 },
-  { maxMp: 8.5, credits: 50 },
+  { maxMp: 1, credits: 25 },
+  { maxMp: 2, credits: 45 },
+  { maxMp: 3, credits: 65 },
+  { maxMp: 4, credits: 85 },
+  { maxMp: 5, credits: 105 },
+  { maxMp: 6, credits: 125 },
+  { maxMp: 7, credits: 145 },
+  { maxMp: 8, credits: 180 },
 ] as const;
 
 /** Hard cap on processing resolution (MP) sent to provider. */
-export const CIRCLE_ADD_MAX_PROCESSING_MP = 8.5;
+export const CIRCLE_ADD_MAX_PROCESSING_MP = 8;
 
 /** Max edge length for processing (preserves aspect). */
 export const CIRCLE_ADD_MAX_EDGE = 4096;
@@ -30,6 +37,8 @@ export type CircleAddCreditInput = {
 
 export type CircleAddCreditQuote = {
   baseCredits: number;
+  /** Alias for input image credits */
+  inputCredits: number;
   assetCredits: number;
   totalCredits: number;
   sourceWidth: number;
@@ -46,10 +55,6 @@ export function megapixels(w: number, h: number): number {
   return (w * h) / 1_000_000;
 }
 
-/**
- * Normalize large sources down for provider cost control.
- * Preserves aspect ratio. Does not reject 8K — scales processing size.
- */
 export function normalizeCircleAddProcessingSize(
   sourceWidth: number,
   sourceHeight: number,
@@ -77,7 +82,7 @@ export function normalizeCircleAddProcessingSize(
 }
 
 export function baseCreditsForProcessingMP(mp: number): number {
-  const m = Number.isFinite(mp) && mp > 0 ? mp : 1;
+  const m = Number.isFinite(mp) && mp > 0 ? mp : 0.5;
   for (const band of CIRCLE_ADD_BASE_BY_MP) {
     if (m <= band.maxMp) return band.credits;
   }
@@ -109,6 +114,7 @@ export function estimateCircleAddCredits(input: CircleAddCreditInput): CircleAdd
 
   return {
     baseCredits,
+    inputCredits: baseCredits,
     assetCredits,
     totalCredits,
     sourceWidth: sw || 1024,
@@ -117,6 +123,6 @@ export function estimateCircleAddCredits(input: CircleAddCreditInput): CircleAdd
     processingWidth: pw,
     processingHeight: ph,
     processingMP: Math.round(processingMP * 100) / 100,
-    breakdown: `Base ${baseCredits} + asset ${assetCredits} = ${totalCredits}`,
+    breakdown: `Input ${baseCredits} + object ${assetCredits} = ${totalCredits}`,
   };
 }
