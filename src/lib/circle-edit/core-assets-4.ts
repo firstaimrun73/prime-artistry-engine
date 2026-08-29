@@ -1,2 +1,2 @@
 /** Compatibility stub — catalog lives in add-assets.ts */
-export const CORE_ASSETS_0 = [] as const;
+export const CORE_ASSETS_4 = [] as const;
