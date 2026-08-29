@@ -1,12 +1,12 @@
 /**
  * Circle 2edit — 500 core Add assets (PDF seed catalog).
- * Data: core-assets-0..4.json — creditCost persisted, never randomized.
+ * Data modules: core-assets-0..4.ts — creditCost persisted, never randomized.
  */
-import core0 from "@/lib/circle-edit/core-assets-0.json";
-import core1 from "@/lib/circle-edit/core-assets-1.json";
-import core2 from "@/lib/circle-edit/core-assets-2.json";
-import core3 from "@/lib/circle-edit/core-assets-3.json";
-import core4 from "@/lib/circle-edit/core-assets-4.json";
+import { CORE_ASSETS_0 } from "@/lib/circle-edit/core-assets-0";
+import { CORE_ASSETS_1 } from "@/lib/circle-edit/core-assets-1";
+import { CORE_ASSETS_2 } from "@/lib/circle-edit/core-assets-2";
+import { CORE_ASSETS_3 } from "@/lib/circle-edit/core-assets-3";
+import { CORE_ASSETS_4 } from "@/lib/circle-edit/core-assets-4";
 
 export type CircleAddAsset = {
   id: string;
@@ -104,12 +104,12 @@ function finalize(r: Seed, sortOrder: number): CircleAddAsset {
   };
 }
 
-const ALL_SEEDS = [
-  ...(core0 as Seed[]),
-  ...(core1 as Seed[]),
-  ...(core2 as Seed[]),
-  ...(core3 as Seed[]),
-  ...(core4 as Seed[]),
+const ALL_SEEDS: Seed[] = [
+  ...(CORE_ASSETS_0 as unknown as Seed[]),
+  ...(CORE_ASSETS_1 as unknown as Seed[]),
+  ...(CORE_ASSETS_2 as unknown as Seed[]),
+  ...(CORE_ASSETS_3 as unknown as Seed[]),
+  ...(CORE_ASSETS_4 as unknown as Seed[]),
 ];
 
 export const ADD_ASSETS: CircleAddAsset[] = ALL_SEEDS.map((s, i) => finalize(s, i + 1));
