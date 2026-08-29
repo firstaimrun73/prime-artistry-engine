@@ -1,32 +1,38 @@
+/**
+ * Circle 2edit — /studio/image/circle-remove
+ * Remove: circleInstant → flux-pro/v1/erase
+ * Add: circleInstant:false → flux-general/inpainting
+ * Drawing: CircleMaskStage (freehand circle, brush, eraser) — do not replace.
+ */
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
-import { useProfile } from "@/hooks/useProfile";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
-import { useGenerateMedia } from "@/hooks/useGenerateMedia";
-import { useSecureDownload } from "@/hooks/useSecureDownload";
+import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
+import { generateMedia } from "@/lib/generate.functions";
+import { secureDownloadImage } from "@/lib/download.functions";
+import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { supabase } from "@/integrations/supabase/client";
-import { isAdminClaims } from "@/lib/admin";
 import { readKeepWatermarkPref } from "@/lib/watermark-pref";
 import { SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
 import {
   CircleEditShell,
   CircleEditUploadZone,
   CircleEditActionBar,
-  CircleEditToolRow,
-  CircleEditGeneratingOverlay,
+  CircleDrawToolbar,
+  CircleEditGenOverlay,
+  type CircleDrawTool,
 } from "@/components/circle-edit/CircleEditShell";
 import {
   CircleMaskStage,
   type CircleMaskStageHandle,
 } from "@/components/circle-edit/CircleMaskStage";
 import { CircleAddDrawer } from "@/components/circle-edit/CircleAddDrawer";
-import { CompareSlider } from "@/components/circle-edit/CompareSlider";
+import { CompareSlider } from "@/components/CompareSlider";
 import { findAddAsset, buildAddPrompt } from "@/lib/circle-edit/add-assets";
 import type { MaskTool } from "@/components/circle-edit/mask/types";
+import { useTheme } from "@/lib/theme";
 
 export const Route = createFileRoute("/studio/image/circle-remove")({
   ssr: false,
@@ -44,9 +50,8 @@ const GEN_STAGES = ["Uploading", "Preparing mask", "Generating", "Finalizing"] a
 
 type Phase = "select" | "generating" | "result";
 type Mode = "remove" | "add";
-type DrawTool = "circle" | "brush" | "eraser";
 
-function drawToolToMaskTool(t: DrawTool): MaskTool {
+function drawToolToMaskTool(t: CircleDrawTool): MaskTool {
   if (t === "eraser") return "erase";
   if (t === "brush") return "brush";
   return "circle";
@@ -63,12 +68,12 @@ async function waitForImageLoadable(url: string): Promise<void> {
 
 function Circle2editPage() {
   const navigate = Route.useNavigate();
-  const { user } = useAuth();
-  const { profile, refreshProfile } = useProfile();
-  const isAdmin = useIsAdmin() || isAdminClaims({ email: profile?.email ?? undefined });
-  const { generate } = useGenerateMedia();
-  const { secureDl } = useSecureDownload();
-  const queryClient = useQueryClient();
+  const { user, profile, refreshProfile } = useAuth();
+  const isAdmin = isAdminEmail(profile?.email);
+  const generate = useServerFn(generateMedia);
+  const secureDl = useServerFn(secureDownloadImage);
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const fileRef = useRef<HTMLInputElement>(null);
   const maskStageRef = useRef<CircleMaskStageHandle>(null);
   const generatingLockRef = useRef(false);
@@ -79,11 +84,12 @@ function Circle2editPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [hasMask, setHasMask] = useState(false);
-  const [drawTool, setDrawTool] = useState<DrawTool>("circle");
+  const [drawTool, setDrawTool] = useState<CircleDrawTool>("circle");
   const [brushSize, setBrushSize] = useState(24);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
   const [addPrompt, setAddPrompt] = useState("");
+  const [activeCat, setActiveCat] = useState<string | null>(null);
   const [progressPct, setProgressPct] = useState(0);
   const [stageIdx, setStageIdx] = useState(0);
   const [showCompare, setShowCompare] = useState(false);
@@ -216,7 +222,7 @@ function Circle2editPage() {
         } else {
           const asset = findAddAsset(addObjectId);
           const prompt = buildAddPrompt({ asset, userDetail: addPrompt });
-          // circleInstant:true → circle_to_remove (erase). false → circle_to_add (inpaint insert).
+          // circleInstant:true → erase. false → circle_to_add inpaint.
           const res = await generate({
             data: {
               prompt,
@@ -270,8 +276,11 @@ function Circle2editPage() {
   const downloadResult = async () => {
     if (!output) return;
     try {
-      const res = await secureDl({ data: { imageUrl: output, keepWatermark: readKeepWatermarkPref() } });
-      if (res?.url) window.open(res.url, "_blank");
+      const res = await secureDl({
+        data: { imageUrl: output, keepWatermark: readKeepWatermarkPref() },
+      });
+      await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
+      toast.success("Download started");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Download failed");
     }
@@ -284,7 +293,8 @@ function Circle2editPage() {
 
   const statusForMode = () => {
     if (!preview) return "Upload an image to begin";
-    if (!hasMask) return mode === "remove" ? "Circle or paint the object to remove" : "Circle or paint where to add";
+    if (!hasMask)
+      return mode === "remove" ? "Circle or paint the object to remove" : "Circle or paint where to add";
     if (mode === "add") {
       const asset = findAddAsset(addObjectId);
       if (asset) return `Add ${asset.label} into selection`;
@@ -306,32 +316,30 @@ function Circle2editPage() {
     void runWithMask(mode);
   };
 
-  const creditsLabel =
-    isAdmin ? "Admin" : `${profile?.credits ?? 0} credits`;
+  const creditsLabel = isAdmin ? "Admin" : `${profile?.credits ?? 0} credits`;
   const ctaLabel = mode === "remove" ? "Remove Object" : "Add Object";
-  const ctaCost = CIRCLE_INSTANT_CREDITS;
+  const ctaCost = `${CIRCLE_INSTANT_CREDITS} credits`;
 
   const controls = preview ? (
-    <CircleEditToolRow
-      drawTool={drawTool}
-      onDrawTool={setDrawTool}
+    <CircleDrawToolbar
+      tool={drawTool}
+      onTool={setDrawTool}
       brushSize={brushSize}
       onBrushSize={setBrushSize}
-      mode={mode}
     />
   ) : null;
 
   const addSheet = (
     <CircleAddDrawer
+      isDark={isDark}
       open={mode === "add" && addDrawerOpen}
-      onOpenChange={setAddDrawerOpen}
+      onClose={() => setAddDrawerOpen(false)}
       addObjectId={addObjectId}
-      onSelectAsset={(id) => {
-        setAddObjectId(id);
-        setAddDrawerOpen(false);
-      }}
+      setAddObjectId={setAddObjectId}
       addPrompt={addPrompt}
-      onAddPrompt={setAddPrompt}
+      setAddPrompt={setAddPrompt}
+      activeCat={activeCat}
+      setActiveCat={setActiveCat}
     />
   );
 
@@ -344,7 +352,7 @@ function Circle2editPage() {
         onBack={() => navigate({ to: "/studio" })}
         controls={null}
         actionBar={
-          <div className="flex w-full gap-2">
+          <div className="flex w-full flex-wrap gap-2">
             <button
               type="button"
               onClick={() => {
@@ -395,6 +403,7 @@ function Circle2editPage() {
       creditsLabel={creditsLabel}
       mode={mode}
       onModeChange={onModeChange}
+      generating={phase === "generating"}
       onBack={() => navigate({ to: "/studio" })}
       controls={controls}
       sheet={addSheet}
@@ -411,7 +420,12 @@ function Circle2editPage() {
       }
     >
       {phase === "generating" && (
-        <CircleEditGeneratingOverlay progressPct={progressPct} stage={GEN_STAGES[stageIdx]} />
+        <CircleEditGenOverlay
+          progressPct={progressPct}
+          activeStage={stageIdx}
+          stageCount={GEN_STAGES.length}
+          caption={GEN_STAGES[stageIdx]}
+        />
       )}
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
