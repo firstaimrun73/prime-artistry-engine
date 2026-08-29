@@ -4,7 +4,7 @@
  */
 import { isFreePlan } from "@/lib/policy";
 import { estimateCircleAddCredits, CIRCLE_REMOVE_CREDITS } from "@/lib/circle-edit/credits";
-import { getAssetCreditCost } from "@/lib/circle-edit/add-assets";
+import { getAssetCreditCost } from "@/lib/circle-edit/add-assets-pricing";
 
 export function assertCircleAddAllowed(opts: {
   isAdmin: boolean;
