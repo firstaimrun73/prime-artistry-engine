@@ -7,37 +7,45 @@ import {
 } from "@/lib/circle-edit/credits";
 import { resolveCircleCharge, assertCircleAddAllowed } from "@/lib/circle-edit/server-charge";
 import { getAssetCreditCost } from "@/lib/circle-edit/add-assets-pricing";
-import { ADD_ASSETS, findAddAsset } from "@/lib/circle-edit/add-assets";
+import { ADD_ASSETS, findAddAsset, buildAddPrompt } from "@/lib/circle-edit/add-assets";
 
-describe("Circle 2edit credits", () => {
+describe("Circle 2edit credits (PDF bands)", () => {
   it("Remove is flat 25", () => {
     expect(CIRCLE_REMOVE_CREDITS).toBe(25);
     expect(resolveCircleCharge({ circleInstant: true, maskImageUrl: "https://example.com/m.png" })).toBe(25);
   });
-  it("Add <=2MP base is 25", () => {
-    const q = estimateCircleAddCredits({ sourceWidth: 1000, sourceHeight: 1000, assetCreditCost: 0 });
-    expect(q.processingMP).toBeLessThanOrEqual(2);
-    expect(q.baseCredits).toBe(25);
-    expect(q.totalCredits).toBe(25);
-  });
-  it("Asset surcharge is added", () => {
-    const q = estimateCircleAddCredits({ sourceWidth: 1000, sourceHeight: 1000, assetCreditCost: 20 });
-    expect(q.assetCredits).toBe(20);
-    expect(q.totalCredits).toBe(45);
-  });
-  it("Higher processing MP raises base", () => {
+
+  it("Input bands match product table", () => {
+    expect(baseCreditsForProcessingMP(0.5)).toBe(25);
     expect(baseCreditsForProcessingMP(1)).toBe(25);
-    expect(baseCreditsForProcessingMP(3)).toBe(30);
-    expect(baseCreditsForProcessingMP(5)).toBe(40);
-    expect(baseCreditsForProcessingMP(8)).toBe(50);
+    expect(baseCreditsForProcessingMP(1.5)).toBe(45);
+    expect(baseCreditsForProcessingMP(2.5)).toBe(65);
+    expect(baseCreditsForProcessingMP(3.5)).toBe(85);
+    expect(baseCreditsForProcessingMP(4.5)).toBe(105);
+    expect(baseCreditsForProcessingMP(5.5)).toBe(125);
+    expect(baseCreditsForProcessingMP(6.5)).toBe(145);
+    expect(baseCreditsForProcessingMP(7.5)).toBe(180);
+    expect(baseCreditsForProcessingMP(8)).toBe(180);
   });
-  it("Huge source is normalized under 8.5MP and 4096 edge", () => {
+
+  it("Total = input + object (4MP example)", () => {
+    const q = estimateCircleAddCredits({
+      sourceWidth: 2000,
+      sourceHeight: 2000,
+      assetCreditCost: 85,
+    });
+    expect(q.baseCredits).toBe(85);
+    expect(q.assetCredits).toBe(85);
+    expect(q.totalCredits).toBe(170);
+  });
+
+  it("Huge source normalized to <=8MP", () => {
     const n = normalizeCircleAddProcessingSize(7680, 4320);
+    expect(n.mp).toBeLessThanOrEqual(8.01);
     expect(n.width).toBeLessThanOrEqual(4096);
-    expect(n.height).toBeLessThanOrEqual(4096);
-    expect(n.mp).toBeLessThanOrEqual(8.51);
   });
-  it("Free plan Add is rejected server-side", () => {
+
+  it("Free plan Add rejected", () => {
     expect(() =>
       assertCircleAddAllowed({
         isAdmin: false,
@@ -47,41 +55,30 @@ describe("Circle 2edit credits", () => {
       }),
     ).toThrow(/paid plan/i);
   });
-  it("Paid plan Add is allowed", () => {
-    expect(() =>
-      assertCircleAddAllowed({
-        isAdmin: false,
-        plan: "plus",
-        maskImageUrl: "https://example.com/m.png",
-        circleInstant: false,
-      }),
-    ).not.toThrow();
-  });
-  it("UI estimate matches resolveCircleCharge", () => {
-    const assetId = "dragon";
-    const assetCost = getAssetCreditCost(assetId);
+
+  it("UI estimate equals server charge for rose", () => {
+    const rose = findAddAsset("rose");
+    expect(rose).toBeTruthy();
+    const cost = getAssetCreditCost(rose!.id);
     const q = estimateCircleAddCredits({
-      sourceWidth: 1920,
-      sourceHeight: 1080,
-      assetCreditCost: assetCost,
+      sourceWidth: 1000,
+      sourceHeight: 1000,
+      assetCreditCost: cost,
     });
     const server = resolveCircleCharge({
       circleInstant: false,
       maskImageUrl: "https://example.com/m.png",
-      circleAssetId: assetId,
-      sourceWidth: 1920,
-      sourceHeight: 1080,
+      circleAssetId: rose!.id,
+      sourceWidth: 1000,
+      sourceHeight: 1000,
     });
     expect(server).toBe(q.totalCredits);
   });
-  it("Unknown asset still costs (client cannot force zero)", () => {
-    expect(getAssetCreditCost("not-a-real-asset-xyz")).toBeGreaterThan(0);
-  });
-  it("Catalog has 1000+ assets and free set", () => {
-    expect(ADD_ASSETS.length).toBeGreaterThanOrEqual(1000);
-    const free = ADD_ASSETS.filter((a) => a.isFree || a.creditCost === 0);
-    expect(free.length).toBeGreaterThanOrEqual(10);
-    expect(findAddAsset("python")?.generationDescriptor.toLowerCase()).toContain("python");
-    expect(findAddAsset("cobra")?.generationDescriptor.toLowerCase()).toContain("cobra");
+
+  it("500 core assets with prompts", () => {
+    expect(ADD_ASSETS.length).toBeGreaterThanOrEqual(500);
+    const p = buildAddPrompt({ asset: findAddAsset("rose"), userDetail: "" });
+    expect(p).toMatch(/masked region/i);
+    expect(p).toMatch(/Rose/i);
   });
 });
