@@ -5,18 +5,8 @@
 import { ADD_ASSETS, findAddAsset, type CircleAddAsset } from "@/lib/circle-edit/add-assets";
 
 export const FREE_CIRCLE_ADD_ASSET_IDS = [
-  "flower",
-  "butterfly",
-  "bird",
-  "dog",
-  "cat",
-  "leaf",
-  "balloon",
-  "heart",
-  "star",
-  "cloud",
-  "plant",
-  "apple",
+  "flower", "butterfly", "bird", "dog", "cat", "leaf",
+  "balloon", "heart", "star", "cloud", "plant", "apple",
 ] as const;
 
 const DEFAULT_PAID = 20;
