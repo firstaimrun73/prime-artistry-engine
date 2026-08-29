@@ -1,7 +1,9 @@
 /**
- * Circle 2edit — curated launch Add catalog (50 high-quality assets).
- * Each asset has its own backendPrompt. creditCost is persisted (never randomized).
- * Frontend sends assetId only; backend resolves prompt + price.
+ * Circle 2edit Add — CONTROLLED 5-ASSET REGISTRY (test phase).
+ *
+ * Frontend browsing metadata + server-authoritative backendPrompt.
+ * Frontend MUST send assetId only; server resolves prompt via resolveCircleAddPrompt.
+ * DO NOT expand beyond these 5 until Giraffe/Sunflower/Dog/Car/Butterfly all pass.
  */
 
 export type CircleAddAsset = {
@@ -20,137 +22,206 @@ export type CircleAddAsset = {
   sortOrder: number;
   objectSpecificDescription: string;
   generationDescriptor: string;
+  /** Server-authoritative generation instructions. */
   backendPrompt: string;
+  /** Server-side negative prompt for inpaint. */
+  negativePrompt: string;
   visualType: "svg";
+  /** Unique per-asset SVG path (viewBox 0 0 64 64). */
   iconPath: string;
+  /** Emoji fallback for rail recognition. */
+  emoji: string;
   mark?: string;
 };
 
 export type AddAsset = CircleAddAsset;
 
-/** Strict mask-preserving template — used for every asset. */
-const maskPreserve = (name: string, appearance: string) =>
-  [
-    `Add exactly one realistic ${name} inside the user-selected masked region.`,
-    `The ${name} must be naturally integrated into the existing scene.`,
-    "Preserve the original image outside the mask.",
-    "Do not modify, remove, replace, repaint, or regenerate any unmasked area.",
-    "Preserve the existing architecture, railing, walls, floor, lighting, camera perspective, colors, textures, and all unrelated objects.",
-    "Match the perspective, scale, lighting, shadows, depth of field, and color temperature of the original photograph.",
-    `Only generate the requested ${name} inside the selected region.`,
-    "Do not add any additional animals, people, objects, structures, furniture, railings, scenery, or decorative elements.",
-    `Object-specific appearance: ${appearance}.`,
-    "Edit ONLY the white masked area. Preserve every unmasked pixel exactly.",
-  ].join(" ");
+/** Unique silhouette paths — one distinct shape per asset. */
+const ICON = {
+  giraffe:
+    "M28 8c2 0 4 2 5 6l2 10 3-2 2 3-4 3v8l4 18h-5l-3-12-2 12h-5l2-14v-8c-4 0-6-4-5-8 1-4 4-6 6-6z M33 14c1 0 2 1 2 2s-1 2-2 2",
+  sunflower:
+    "M32 18c-2 0-4 2-4 4 0 1 .5 2 1 3h-6c-2 0-3 2-2 4l2 2c-2 1-3 3-2 5l3 1c-1 2 0 4 2 5l2-1v6h4v-6l2 1c2-1 3-3 2-5l3-1c1-2 0-4-2-5l2-2c1-2 0-4-2-4h-6c.5-1 1-2 1-3 0-2-2-4-4-4zm0 14a4 4 0 110-8 4 4 0 010 8z",
+  dog: "M18 28c0-6 4-10 10-10h4c4 0 6 2 8 5l4-3 2 3-3 4v6c0 6-4 12-10 12s-10-4-12-10l-2 2-3-2 2-4v-3zm8 4a2 2 0 110-4 2 2 0 010 4z",
+  car: "M12 36l6-12h28l6 12v8H12v-8zm8 10a4 4 0 110-8 4 4 0 010 8zm24 0a4 4 0 110-8 4 4 0 010 8zM20 28h24l-2-6H22l-2 6z",
+  butterfly:
+    "M32 32c-6-10-16-14-20-8-3 5 2 12 10 14-4 6-2 12 4 10 4-1 6-6 6-10 0 4 2 9 6 10 6 2 8-4 4-10 8-2 13-9 10-14-4-6-14-2-20 8z",
+} as const;
 
-const CAT_ICON: Record<string, string> = {
-  animals: "M20 28c0-6 4-10 12-10s12 4 12 10v8c0 8-5 14-12 14s-12-6-12-14v-8z",
-  birds: "M12 32c8-12 20-16 28-8 4 4 6 12 2 18-8 4-18 2-24-4l-6-6z",
-  nature: "M32 8c-6 10-18 18-18 32a18 18 0 0036 0c0-14-12-22-18-32z",
-  objects: "M14 34h36v6H14v-6zm4-16h28v16H18V18z",
-  food: "M16 28h32v4c0 12-7 20-16 20s-16-8-16-20v-4z",
-  vehicles: "M10 36l6-12h32l6 12v8H10v-8zm8 10a4 4 0 110-8 4 4 0 010 8zm28 0a4 4 0 110-8 4 4 0 010 8z",
-};
+const PRESERVE =
+  "Preserve the source image composition and modify only the white masked region. Match perspective, scale, depth, lighting, shadows, color temperature, camera characteristics and environmental conditions. Do not alter the person's face, body, clothing, hair, hands, architecture, railing, floor, wall, background or any unmasked region. Do not regenerate the entire scene. Edit ONLY the white mask; leave every black pixel unchanged.";
 
-type Seed = {
-  id: string;
-  name: string;
-  category: string;
-  categoryLabel: string;
-  creditCost: number;
-  appearance: string;
-};
+const NEG_BASE =
+  "extra objects, multiple copies, duplicated object, changed person, changed face, changed clothing, changed architecture, changed railing, changed background, scene regeneration, unrelated objects, artifacts, blur, watermark, text";
 
-/** Exactly the 50 launch objects from product spec. */
-const SEEDS: Seed[] = [
-  { id: "giraffe", name: "Giraffe", category: "animals", categoryLabel: "Animals", creditCost: 35, appearance: "one full-body realistic giraffe with long neck, distinctive coat pattern, natural posture, correct scale for the scene" },
-  { id: "elephant", name: "Elephant", category: "animals", categoryLabel: "Animals", creditCost: 40, appearance: "one realistic African elephant with wrinkled skin, large ears, and tusks" },
-  { id: "lion", name: "Lion", category: "animals", categoryLabel: "Animals", creditCost: 35, appearance: "one realistic adult lion with full mane and natural feline posture" },
-  { id: "tiger", name: "Tiger", category: "animals", categoryLabel: "Animals", creditCost: 40, appearance: "one realistic tiger with orange coat and black stripes" },
-  { id: "panda", name: "Panda", category: "animals", categoryLabel: "Animals", creditCost: 30, appearance: "one realistic giant panda with black-and-white fur" },
-  { id: "bear", name: "Bear", category: "animals", categoryLabel: "Animals", creditCost: 30, appearance: "one realistic brown bear with thick fur" },
-  { id: "wolf", name: "Wolf", category: "animals", categoryLabel: "Animals", creditCost: 30, appearance: "one realistic grey wolf standing naturally" },
-  { id: "fox", name: "Fox", category: "animals", categoryLabel: "Animals", creditCost: 25, appearance: "one realistic red fox with bushy tail" },
-  { id: "deer", name: "Deer", category: "animals", categoryLabel: "Animals", creditCost: 30, appearance: "one realistic deer with antlers" },
-  { id: "horse", name: "Horse", category: "animals", categoryLabel: "Animals", creditCost: 30, appearance: "one realistic horse standing in natural pose" },
-  { id: "zebra", name: "Zebra", category: "animals", categoryLabel: "Animals", creditCost: 35, appearance: "one realistic zebra with black-and-white stripes" },
-  { id: "cow", name: "Cow", category: "animals", categoryLabel: "Animals", creditCost: 25, appearance: "one realistic dairy cow" },
-  { id: "dog", name: "Dog", category: "animals", categoryLabel: "Animals", creditCost: 20, appearance: "one realistic medium-sized dog" },
-  { id: "cat", name: "Cat", category: "animals", categoryLabel: "Animals", creditCost: 15, appearance: "one realistic domestic cat" },
-  { id: "rabbit", name: "Rabbit", category: "animals", categoryLabel: "Animals", creditCost: 15, appearance: "one realistic rabbit with soft fur" },
-  { id: "eagle", name: "Eagle", category: "birds", categoryLabel: "Birds", creditCost: 30, appearance: "one realistic eagle with spread wings or perched" },
-  { id: "parrot", name: "Parrot", category: "birds", categoryLabel: "Birds", creditCost: 25, appearance: "one realistic colorful parrot" },
-  { id: "owl", name: "Owl", category: "birds", categoryLabel: "Birds", creditCost: 25, appearance: "one realistic owl with large eyes" },
-  { id: "flamingo", name: "Flamingo", category: "birds", categoryLabel: "Birds", creditCost: 30, appearance: "one realistic pink flamingo" },
-  { id: "peacock", name: "Peacock", category: "birds", categoryLabel: "Birds", creditCost: 35, appearance: "one realistic peacock with open tail feathers" },
-  { id: "rose", name: "Rose", category: "nature", categoryLabel: "Nature", creditCost: 10, appearance: "one realistic single red rose with natural petals and stem" },
-  { id: "sunflower", name: "Sunflower", category: "nature", categoryLabel: "Nature", creditCost: 10, appearance: "one realistic sunflower with large yellow petals and dark center" },
-  { id: "lotus", name: "Lotus", category: "nature", categoryLabel: "Nature", creditCost: 12, appearance: "one realistic lotus flower" },
-  { id: "palm-tree", name: "Palm Tree", category: "nature", categoryLabel: "Nature", creditCost: 15, appearance: "one realistic palm tree" },
-  { id: "bonsai", name: "Bonsai", category: "nature", categoryLabel: "Nature", creditCost: 20, appearance: "one realistic bonsai tree in miniature form" },
-  { id: "cactus", name: "Cactus", category: "nature", categoryLabel: "Nature", creditCost: 10, appearance: "one realistic cactus plant" },
-  { id: "mushroom", name: "Mushroom", category: "nature", categoryLabel: "Nature", creditCost: 10, appearance: "one realistic mushroom" },
-  { id: "leafy-plant", name: "Large Leafy Plant", category: "nature", categoryLabel: "Nature", creditCost: 12, appearance: "one realistic large leafy green plant" },
-  { id: "chair", name: "Chair", category: "objects", categoryLabel: "Objects", creditCost: 15, appearance: "one realistic wooden or modern chair" },
-  { id: "table", name: "Table", category: "objects", categoryLabel: "Objects", creditCost: 18, appearance: "one realistic table" },
-  { id: "lamp", name: "Lamp", category: "objects", categoryLabel: "Objects", creditCost: 12, appearance: "one realistic table or floor lamp" },
-  { id: "mirror", name: "Mirror", category: "objects", categoryLabel: "Objects", creditCost: 15, appearance: "one realistic mirror with frame" },
-  { id: "vase", name: "Vase", category: "objects", categoryLabel: "Objects", creditCost: 10, appearance: "one realistic decorative vase" },
-  { id: "clock", name: "Clock", category: "objects", categoryLabel: "Objects", creditCost: 12, appearance: "one realistic wall or table clock" },
-  { id: "bicycle", name: "Bicycle", category: "objects", categoryLabel: "Objects", creditCost: 20, appearance: "one realistic bicycle" },
-  { id: "suitcase", name: "Suitcase", category: "objects", categoryLabel: "Objects", creditCost: 15, appearance: "one realistic travel suitcase" },
-  { id: "backpack", name: "Backpack", category: "objects", categoryLabel: "Objects", creditCost: 12, appearance: "one realistic backpack" },
-  { id: "umbrella", name: "Umbrella", category: "objects", categoryLabel: "Objects", creditCost: 10, appearance: "one realistic open or closed umbrella" },
-  { id: "apple", name: "Apple", category: "food", categoryLabel: "Food", creditCost: 8, appearance: "one realistic red apple" },
-  { id: "orange", name: "Orange", category: "food", categoryLabel: "Food", creditCost: 8, appearance: "one realistic orange fruit" },
-  { id: "strawberry", name: "Strawberry", category: "food", categoryLabel: "Food", creditCost: 8, appearance: "one realistic strawberry" },
-  { id: "watermelon", name: "Watermelon", category: "food", categoryLabel: "Food", creditCost: 12, appearance: "one realistic watermelon" },
-  { id: "pizza", name: "Pizza", category: "food", categoryLabel: "Food", creditCost: 15, appearance: "one realistic pizza slice or whole pizza" },
-  { id: "sports-car", name: "Sports Car", category: "vehicles", categoryLabel: "Vehicles", creditCost: 45, appearance: "one realistic sports car" },
-  { id: "motorcycle", name: "Motorcycle", category: "vehicles", categoryLabel: "Vehicles", creditCost: 35, appearance: "one realistic motorcycle" },
-  { id: "scooter", name: "Scooter", category: "vehicles", categoryLabel: "Vehicles", creditCost: 25, appearance: "one realistic scooter" },
-  { id: "vintage-car", name: "Vintage Car", category: "vehicles", categoryLabel: "Vehicles", creditCost: 40, appearance: "one realistic vintage classic car" },
-  { id: "pickup-truck", name: "Pickup Truck", category: "vehicles", categoryLabel: "Vehicles", creditCost: 40, appearance: "one realistic pickup truck" },
-  { id: "small-boat", name: "Small Boat", category: "vehicles", categoryLabel: "Vehicles", creditCost: 35, appearance: "one realistic small boat" },
-  { id: "city-bike", name: "City Bike", category: "vehicles", categoryLabel: "Vehicles", creditCost: 20, appearance: "one realistic city bicycle" },
+/** Exactly five controlled test assets. */
+const REGISTRY: CircleAddAsset[] = [
+  {
+    id: "animal_giraffe",
+    name: "Giraffe",
+    slug: "animal_giraffe",
+    label: "Giraffe",
+    category: "animals",
+    categoryLabel: "Animals",
+    tags: ["animals"],
+    keywords: ["giraffe", "animal", "wildlife", "safari", "zoo"],
+    creditCost: 35,
+    isFree: false,
+    isPremium: false,
+    isActive: true,
+    sortOrder: 1,
+    objectSpecificDescription: "one full-body realistic giraffe",
+    generationDescriptor: "one full-body realistic giraffe",
+    backendPrompt: [
+      "Add exactly one realistic giraffe inside the user-selected masked region.",
+      "The giraffe must have a long neck, distinctive coat pattern, natural posture, and correct scale for the scene.",
+      "The giraffe must remain entirely within or naturally intersect the selected editable region.",
+      "Do not add any additional animal or object.",
+      PRESERVE,
+    ].join(" "),
+    negativePrompt: `multiple giraffes, extra animals, ${NEG_BASE}`,
+    visualType: "svg",
+    iconPath: ICON.giraffe,
+    emoji: "🦒",
+    mark: "GI",
+  },
+  {
+    id: "flower_sunflower",
+    name: "Sunflower",
+    slug: "flower_sunflower",
+    label: "Sunflower",
+    category: "nature",
+    categoryLabel: "Nature",
+    tags: ["nature", "flower"],
+    keywords: ["sunflower", "flower", "plant", "yellow", "nature"],
+    creditCost: 10,
+    isFree: false,
+    isPremium: false,
+    isActive: true,
+    sortOrder: 2,
+    objectSpecificDescription: "one realistic sunflower",
+    generationDescriptor: "one realistic sunflower",
+    backendPrompt: [
+      "Add exactly one realistic sunflower inside the user-selected masked region.",
+      "The sunflower must have large yellow petals and a dark center, natural stem if space allows, correct scale for the scene.",
+      "The sunflower must remain entirely within or naturally intersect the selected editable region.",
+      "Do not add any additional flowers or objects.",
+      PRESERVE,
+    ].join(" "),
+    negativePrompt: `multiple sunflowers, extra flowers, ${NEG_BASE}`,
+    visualType: "svg",
+    iconPath: ICON.sunflower,
+    emoji: "🌻",
+    mark: "SF",
+  },
+  {
+    id: "animal_dog",
+    name: "Dog",
+    slug: "animal_dog",
+    label: "Dog",
+    category: "animals",
+    categoryLabel: "Animals",
+    tags: ["animals"],
+    keywords: ["dog", "puppy", "pet", "animal", "canine"],
+    creditCost: 20,
+    isFree: false,
+    isPremium: false,
+    isActive: true,
+    sortOrder: 3,
+    objectSpecificDescription: "one realistic medium-sized dog",
+    generationDescriptor: "one realistic medium-sized dog",
+    backendPrompt: [
+      "Add exactly one realistic medium-sized dog inside the user-selected masked region.",
+      "Natural posture, correct scale for the scene, realistic fur and proportions.",
+      "The dog must remain entirely within or naturally intersect the selected editable region.",
+      "Do not add any additional animals or objects.",
+      PRESERVE,
+    ].join(" "),
+    negativePrompt: `multiple dogs, extra animals, cats, ${NEG_BASE}`,
+    visualType: "svg",
+    iconPath: ICON.dog,
+    emoji: "🐕",
+    mark: "DG",
+  },
+  {
+    id: "vehicle_car",
+    name: "Car",
+    slug: "vehicle_car",
+    label: "Car",
+    category: "vehicles",
+    categoryLabel: "Vehicles",
+    tags: ["vehicles"],
+    keywords: ["car", "vehicle", "auto", "automobile", "sedan"],
+    creditCost: 40,
+    isFree: false,
+    isPremium: false,
+    isActive: true,
+    sortOrder: 4,
+    objectSpecificDescription: "one realistic passenger car",
+    generationDescriptor: "one realistic passenger car",
+    backendPrompt: [
+      "Add exactly one realistic passenger car inside the user-selected masked region.",
+      "Correct perspective, scale, and ground contact for the scene; natural reflections and shadows.",
+      "The car must remain entirely within or naturally intersect the selected editable region.",
+      "Do not add any additional vehicles or objects.",
+      PRESERVE,
+    ].join(" "),
+    negativePrompt: `multiple cars, trucks, motorcycles, ${NEG_BASE}`,
+    visualType: "svg",
+    iconPath: ICON.car,
+    emoji: "🚗",
+    mark: "CR",
+  },
+  {
+    id: "insect_butterfly",
+    name: "Butterfly",
+    slug: "insect_butterfly",
+    label: "Butterfly",
+    category: "animals",
+    categoryLabel: "Animals",
+    tags: ["animals", "insect"],
+    keywords: ["butterfly", "insect", "wing", "moth", "nature"],
+    creditCost: 10,
+    isFree: false,
+    isPremium: false,
+    isActive: true,
+    sortOrder: 5,
+    objectSpecificDescription: "one realistic butterfly",
+    generationDescriptor: "one realistic butterfly",
+    backendPrompt: [
+      "Add exactly one realistic butterfly inside the user-selected masked region.",
+      "Open or partially open wings, natural colors, correct scale for the scene.",
+      "The butterfly must remain entirely within or naturally intersect the selected editable region.",
+      "Do not add any additional insects or objects.",
+      PRESERVE,
+    ].join(" "),
+    negativePrompt: `multiple butterflies, extra insects, birds, ${NEG_BASE}`,
+    visualType: "svg",
+    iconPath: ICON.butterfly,
+    emoji: "🦋",
+    mark: "BF",
+  },
 ];
 
-function buildAsset(seed: Seed, idx: number): CircleAddAsset {
-  const isFree = seed.creditCost === 0;
-  const creditCost = isFree ? 0 : Math.max(5, Math.min(100, seed.creditCost));
-  const isPremium = !isFree && creditCost >= 55;
-  return {
-    id: seed.id,
-    name: seed.name,
-    slug: seed.id,
-    label: seed.name,
-    category: seed.category,
-    categoryLabel: seed.categoryLabel,
-    tags: [seed.category, ...(isFree ? ["free"] : []), ...(isPremium ? ["premium"] : [])],
-    keywords: [seed.name.toLowerCase(), seed.category, seed.id.replace(/-/g, " ")],
-    creditCost,
-    isFree,
-    isPremium,
-    isActive: true,
-    sortOrder: idx + 1,
-    objectSpecificDescription: seed.appearance,
-    generationDescriptor: seed.appearance,
-    backendPrompt: maskPreserve(seed.name, seed.appearance),
-    visualType: "svg",
-    iconPath: CAT_ICON[seed.category] ?? CAT_ICON.nature!,
-    mark: seed.name.slice(0, 2).toUpperCase(),
-  };
-}
-
-export const ADD_ASSETS: CircleAddAsset[] = SEEDS.map(buildAsset);
+export const ADD_ASSETS: CircleAddAsset[] = REGISTRY;
 
 export const ADD_ASSET_CATEGORIES = Array.from(
   new Map(ADD_ASSETS.map((a) => [a.category, a.categoryLabel])).entries(),
 ).map(([id, label]) => ({ id, label }));
 
+/** Stable IDs only — also accepts legacy short ids from earlier tests. */
+const LEGACY_ID_MAP: Record<string, string> = {
+  giraffe: "animal_giraffe",
+  sunflower: "flower_sunflower",
+  dog: "animal_dog",
+  car: "vehicle_car",
+  butterfly: "insect_butterfly",
+};
+
 export function findAddAsset(id: string | null | undefined): CircleAddAsset | null {
   if (!id) return null;
-  return ADD_ASSETS.find((a) => a.id === id || a.slug === id) ?? null;
+  const key = LEGACY_ID_MAP[id] ?? id;
+  return ADD_ASSETS.find((a) => a.id === key || a.slug === key) ?? null;
 }
 
 export function searchAddAssets(query: string, categoryId?: string | null): CircleAddAsset[] {
@@ -168,16 +239,18 @@ export function searchAddAssets(query: string, categoryId?: string | null): Circ
   );
 }
 
+/** Client display helper only — server must use resolveCircleAddPrompt. */
 export function buildAddPrompt(opts: {
   asset: CircleAddAsset | null;
   userDetail: string;
 }): string {
   const detail = opts.userDetail.trim();
   if (opts.asset) {
-    const base = opts.asset.backendPrompt;
-    if (detail) return `${base} Additional detail from user: ${detail}`;
-    return base;
+    if (detail) return `${opts.asset.backendPrompt} Additional detail from user: ${detail}`;
+    return opts.asset.backendPrompt;
   }
-  if (detail) return maskPreserve(detail, `a realistic ${detail}`);
-  return maskPreserve("the requested object", "a realistic object matching the user request");
+  if (detail) {
+    return `Add exactly one realistic ${detail} inside the user-selected masked region. ${PRESERVE}`;
+  }
+  return `Add exactly one requested object inside the user-selected masked region. ${PRESERVE}`;
 }
