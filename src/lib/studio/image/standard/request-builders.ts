@@ -108,33 +108,28 @@ export function buildCircleRemoveStep(req: StandardValidationOk): StandardFalSte
 }
 
 /**
- * Circle Add — flux-general/inpainting.
- * MUST use source image + user mask + asset backend prompt.
- * MUST NOT regenerate the full scene. White mask = edit region only.
+ * Circle Add — flux-general/inpainting ONLY (do not change Remove path).
+ * White mask = edit region. Strength moderate so unmasked pixels stay intact.
  */
 export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
   if (!req.imageUrl || !req.maskImageUrl) {
     throw new Error("Circle add requires original image and mask.");
   }
   const userPrompt = (req.prompt || "").trim();
-  const prompt = [
-    userPrompt,
-    "Edit ONLY the white masked region.",
-    "Preserve every unmasked pixel exactly as in the source photograph.",
-    "Do not change architecture, railings, walls, floors, faces, clothing, or background outside the mask.",
-    "Do not regenerate the full image. Inpaint the mask only.",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  // Keep prompt focused: asset backend prompt already has mask rules
+  const prompt = userPrompt
+    ? `${userPrompt} Inpaint only the white mask. Leave every black (unmasked) pixel unchanged.`
+    : "Inpaint only the white mask with the requested object. Leave every black pixel unchanged.";
 
   if (process.env.NODE_ENV !== "production") {
-    console.log("[circle-add] modelRequestCreated", {
+    console.log("[CIRCLE ADD] modelRequest", {
       operation: "circle_add",
-      promptPresent: prompt.length > 0,
       promptLen: prompt.length,
+      promptHead: prompt.slice(0, 120),
       imageUrlPresent: !!req.imageUrl,
       maskUrlPresent: !!req.maskImageUrl,
       model: "fal-ai/flux-general/inpainting",
+      strength: 0.78,
     });
   }
 
@@ -145,15 +140,15 @@ export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
       prompt,
       image_url: req.imageUrl,
       mask_url: req.maskImageUrl,
-      strength: 0.88,
-      guidance_scale: 4.0,
-      num_inference_steps: 42,
+      strength: 0.78,
+      guidance_scale: 3.5,
+      num_inference_steps: 36,
       num_images: 1,
       enable_safety_checker: true,
       output_format: "png",
       scheduler: "euler",
       negative_prompt:
-        "changed unmasked area, altered railing, modified architecture, different face, different background, full scene regeneration, artifacts, blur, extra objects outside mask, watermark, text",
+        "changed unmasked area, altered railing, modified architecture, different face, different clothing, different background, full scene regeneration, extra objects outside mask, artifacts, blur, watermark, text",
     },
   };
 }
