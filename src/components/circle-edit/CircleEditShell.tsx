@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 
 export type CircleEditMode = "remove" | "add";
+export type CircleDrawTool = "circle" | "brush" | "eraser";
 
 type Props = {
   creditsLabel: string;
@@ -21,6 +22,8 @@ type Props = {
   actionBar?: React.ReactNode;
   sheet?: React.ReactNode;
   hideModeToggle?: boolean;
+  /** When true, Add mode is visually locked (Free plan). */
+  addLocked?: boolean;
 };
 
 export function CircleEditShell({
@@ -34,6 +37,7 @@ export function CircleEditShell({
   actionBar,
   sheet,
   hideModeToggle,
+  addLocked,
 }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -84,68 +88,28 @@ export function CircleEditShell({
         </button>
 
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <span aria-hidden className="relative grid h-[22px] w-[22px] shrink-0 place-items-center">
-            <span
-              className={cn(
-                "absolute inset-0 rounded-full border-2 border-[#7B6FE0]/70 transition-shadow duration-500",
-                brandPulse &&
-                  "animate-[ceRing_2s_ease-in-out] border-[#7B6FE0] shadow-[0_0_12px_2px_rgba(123,111,224,0.5)]",
-              )}
-            />
-          </span>
-          <h1
-            className={cn(
-              "truncate text-[15px] font-medium tracking-[-0.02em]",
-              isDark ? "text-[#F2F2F5]" : "text-[#1A1C24]",
-              brandPulse && "animate-[ceBrand_2s_ease-in-out]",
-            )}
-          >
-            <span className="font-semibold text-[#7B6FE0]">Circle</span>
-            <span className={cn("font-medium", isDark ? "text-[#E8E9ED]" : "text-[#3A3E4C]")}>
-              {" "}
-              2edit
-            </span>
-          </h1>
-        </div>
-
-        <span
-          className={cn(
-            "ml-auto flex shrink-0 items-center rounded-full border px-3 py-1.5 text-[12px] font-medium",
-            isDark
-              ? "border-white/10 bg-white/5 text-[#E8E9ED]"
-              : "border-black/8 bg-white/90 text-[#3A3E4C] shadow-sm",
-          )}
-          title="Credits"
-        >
-          <span className="tabular-nums font-semibold text-[#7B6FE0]">{creditsLabel}</span>
-        </span>
-      </header>
-
-      <main
-        className={cn(
-          "relative flex min-h-0 flex-1 flex-col overflow-hidden",
-          isDark
-            ? "bg-[radial-gradient(120%_100%_at_50%_0%,#1A1D26_0%,#12141A_60%)]"
-            : "bg-[radial-gradient(120%_100%_at_50%_0%,#FFFFFF_0%,#F0F1F5_70%)]",
-        )}
-      >
-        {children}
-      </main>
-
-      {!hideModeToggle && !generating ? (
-        <div
-          className={cn(
-            "flex shrink-0 items-center justify-center border-t px-3 py-2 sm:px-4",
-            isDark ? "border-white/8 bg-[#181A22]/95" : "border-black/6 bg-white/85 backdrop-blur-md",
-          )}
-        >
           <div
             className={cn(
-              "inline-flex rounded-lg border p-0.5",
-              isDark ? "border-white/10 bg-white/5" : "border-black/8 bg-black/[0.03]",
+              "grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#7B6FE0] text-[11px] font-bold text-white transition-shadow",
+              brandPulse && "shadow-[0_0_16px_rgba(123,111,224,0.55)]",
             )}
-            role="tablist"
-            aria-label="Edit operation"
+          >
+            C2
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-semibold tracking-tight">Circle 2edit</p>
+            <p className={cn("truncate text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+              {creditsLabel}
+            </p>
+          </div>
+        </div>
+
+        {!hideModeToggle && (
+          <div
+            className={cn(
+              "flex shrink-0 rounded-lg border p-0.5",
+              isDark ? "border-white/10 bg-white/5" : "border-black/8 bg-white",
+            )}
           >
             {(
               [
@@ -158,9 +122,8 @@ export function CircleEditShell({
                 <button
                   key={id}
                   type="button"
-                  role="tab"
                   aria-selected={active}
-                  disabled={!!generating}
+                  disabled={!!generating || (id === "add" && !!addLocked)}
                   onClick={() => onModeChange(id)}
                   className={cn(
                     "min-w-[88px] rounded-md px-4 py-1.5 text-[12px] font-semibold transition-all",
@@ -169,22 +132,25 @@ export function CircleEditShell({
                       : isDark
                         ? "text-[#9AA0B0] hover:text-[#F2F2F5]"
                         : "text-[#5C6170] hover:text-[#1A1C24]",
-                    generating && "opacity-50",
+                    (generating || (id === "add" && addLocked)) && "opacity-50",
+                    id === "add" && addLocked && "cursor-not-allowed",
                   )}
                 >
-                  {label}
+                  {id === "add" && addLocked ? "Add 🔒" : label}
                 </button>
               );
             })}
           </div>
-        </div>
-      ) : null}
+        )}
+      </header>
+
+      <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
 
       {controls ? (
         <div
           className={cn(
             "shrink-0 border-t px-3 py-2.5 sm:px-4",
-            isDark ? "border-white/8 bg-[#181A22]/95" : "border-black/6 bg-white/85 backdrop-blur-md",
+            isDark ? "border-white/8 bg-[#181A22]/90" : "border-black/6 bg-white/90",
           )}
         >
           {controls}
@@ -192,66 +158,30 @@ export function CircleEditShell({
       ) : null}
 
       {actionBar}
-
       {sheet}
-
-      <div
-        className={cn(
-          "shrink-0 pb-[max(0.25rem,env(safe-area-inset-bottom))]",
-          isDark ? "bg-[#181A22]" : "bg-white/85",
-        )}
-      />
-
-      <style>{`
-        @keyframes ceRing {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(123,111,224,0); transform: scale(1); }
-          40% { box-shadow: 0 0 14px 3px rgba(123,111,224,0.45); transform: scale(1.08); }
-        }
-        @keyframes ceBrand {
-          0%, 100% { opacity: 1; }
-          40% { opacity: 0.85; }
-        }
-      `}</style>
     </div>
   );
 }
 
-export function CircleEditUploadZone({
-  onPick,
-  disabled,
-}: {
-  onPick: () => void;
-  disabled?: boolean;
-}) {
+export function CircleEditUploadZone({ onPick }: { onPick: () => void }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-
   return (
     <button
       type="button"
-      disabled={disabled}
       onClick={onPick}
       className={cn(
-        "mx-auto flex w-full max-w-sm flex-col items-center justify-center gap-4 rounded-2xl border border-dashed px-6 py-14 text-center transition-all disabled:opacity-50",
+        "flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 transition-colors",
         isDark
-          ? "border-white/12 bg-white/[0.03] hover:border-[#7B6FE0]/40 hover:bg-white/[0.05]"
-          : "border-black/10 bg-white/70 shadow-sm hover:border-[#7B6FE0]/35 hover:bg-white",
+          ? "border-white/15 bg-white/5 hover:border-[#7B6FE0]/50"
+          : "border-black/12 bg-white hover:border-[#7B6FE0]/40",
       )}
     >
-      <span
-        className={cn(
-          "grid h-12 w-12 place-items-center rounded-xl border",
-          isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-[#F4F5F8]",
-        )}
-      >
-        <Upload className="h-5 w-5 text-[#7B6FE0]" />
-      </span>
-      <div>
-        <p className={cn("text-sm font-semibold", isDark ? "text-[#F2F2F5]" : "text-[#1A1C24]")}>
-          Upload an image
-        </p>
+      <Upload className="h-8 w-8 text-[#7B6FE0]" />
+      <div className="text-center">
+        <p className="text-sm font-semibold">Upload an image</p>
         <p className={cn("mt-1 text-xs", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-          Tap to choose from device
+          Circle or paint an area, then Remove or Add
         </p>
       </div>
     </button>
@@ -272,7 +202,6 @@ export function CircleEditGenOverlay({
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const pct = Math.max(0, Math.min(100, Math.round(progressPct)));
-
   return (
     <div
       className={cn(
@@ -283,68 +212,24 @@ export function CircleEditGenOverlay({
       <div className="flex flex-col items-center gap-4 px-6">
         <div className="relative grid h-24 w-24 place-items-center">
           <svg className="absolute inset-0 -rotate-90" viewBox="0 0 96 96" aria-hidden>
-            <circle
-              cx="48"
-              cy="48"
-              r="40"
-              fill="none"
-              stroke={isDark ? "#2E3140" : "#D8DAE0"}
-              strokeWidth="4"
-            />
+            <circle cx="48" cy="48" r="40" fill="none" stroke="currentColor" strokeWidth="6" className="opacity-20" />
             <circle
               cx="48"
               cy="48"
               r="40"
               fill="none"
               stroke="#7B6FE0"
-              strokeWidth="4"
+              strokeWidth="6"
               strokeLinecap="round"
-              strokeDasharray={2 * Math.PI * 40}
-              strokeDashoffset={2 * Math.PI * 40 * (1 - pct / 100)}
-              className="transition-[stroke-dashoffset] duration-700 ease-out"
+              strokeDasharray={`${(pct / 100) * 251} 251`}
             />
           </svg>
-          <span
-            className="absolute inset-[18px] rounded-full border-2 border-[#7B6FE0]/60 animate-[ceRing_2s_ease-in-out_infinite]"
-            aria-hidden
-          />
-          <span
-            className={cn(
-              "relative z-[1] font-mono text-sm font-semibold tabular-nums",
-              isDark ? "text-[#F2F2F5]" : "text-[#1A1C24]",
-            )}
-          >
-            {pct}%
-          </span>
+          <span className="text-sm font-semibold tabular-nums">{pct}%</span>
         </div>
-        <div
-          className={cn(
-            "min-h-5 text-center text-sm font-medium tracking-tight",
-            isDark ? "text-[#F2F2F5]" : "text-[#1A1C24]",
-          )}
-        >
-          {caption}
-        </div>
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#7B6FE0]/90">
-          Circle 2edit
-        </div>
-        <div className="flex gap-1.5">
-          {Array.from({ length: stageCount }).map((_, i) => (
-            <span
-              key={i}
-              className={cn(
-                "h-[5px] w-[5px] rounded-full transition-all",
-                i < activeStage
-                  ? "bg-[#7B6FE0]/40"
-                  : i === activeStage
-                    ? "scale-150 bg-[#7B6FE0]"
-                    : isDark
-                      ? "bg-[#2E3140]"
-                      : "bg-[#D8DAE0]",
-              )}
-            />
-          ))}
-        </div>
+        <p className="text-center text-sm font-medium">{caption}</p>
+        <p className={cn("text-center text-xs", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+          Stage {Math.min(activeStage + 1, stageCount)} of {stageCount}
+        </p>
       </div>
     </div>
   );
@@ -371,7 +256,8 @@ export function CircleEditActionBar({
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-
+  const ctaBg =
+    ctaVariant === "teal" ? "bg-teal-600" : ctaVariant === "muted" ? "bg-[#5C6170]" : "bg-[#7B6FE0]";
   return (
     <footer
       className={cn(
@@ -384,55 +270,41 @@ export function CircleEditActionBar({
           type="button"
           onClick={onClear}
           className={cn(
-            "rounded-lg border px-3.5 py-2.5 text-[13px] font-medium transition-colors",
-            isDark
-              ? "border-white/10 text-[#9AA0B0] hover:border-white/20 hover:text-[#F2F2F5]"
-              : "border-black/10 text-[#5C6170] hover:border-black/20 hover:text-[#1A1C24]",
+            "rounded-lg border px-3 py-2.5 text-sm font-medium",
+            isDark ? "border-white/10 text-[#C5C7D0]" : "border-black/10 text-[#3A3E4C]",
           )}
         >
           Clear
         </button>
       )}
-      {statusText ? (
-        <span
-          className={cn(
-            "hidden max-w-[40%] truncate text-xs sm:block",
-            isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
-          )}
-        >
-          {statusText}
-        </span>
-      ) : null}
-      {extra}
+      <div className="min-w-0 flex-1">
+        {statusText ? (
+          <p className={cn("truncate text-[12px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+            {statusText}
+          </p>
+        ) : null}
+        {extra}
+      </div>
       <button
         type="button"
         disabled={ctaDisabled}
         onClick={onCta}
         className={cn(
-          "ml-auto flex min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-5",
-          ctaVariant === "violet" && "bg-[#7B6FE0] text-white hover:bg-[#6A5FD0]",
-          ctaVariant === "teal" && "bg-[#5CE0C0] text-[#12141A] hover:brightness-110",
-          ctaVariant === "muted" &&
-            (isDark
-              ? "border border-white/10 bg-white/5 text-[#F2F2F5] hover:border-white/20"
-              : "border border-black/10 bg-black/[0.03] text-[#1A1C24] hover:border-black/20"),
+          "rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50",
+          ctaBg,
         )}
       >
-        <span className="truncate">{ctaLabel}</span>
-        {ctaCost ? (
-          <span className="shrink-0 font-mono text-[11.5px] font-medium opacity-75">· {ctaCost}</span>
-        ) : null}
+        {ctaLabel}
+        {ctaCost ? <span className="ml-1.5 opacity-90">· {ctaCost}</span> : null}
       </button>
     </footer>
   );
 }
 
-export type CircleDrawTool = "circle" | "brush" | "eraser";
-
 const TOOL_HINTS: Record<CircleDrawTool, string> = {
-  circle: "Draw around an object to select it",
-  brush: "Paint areas into the selection",
-  eraser: "Remove areas from the selection",
+  circle: "Draw freehand and close the path to select an area",
+  brush: "Paint the area to edit",
+  eraser: "Erase part of your selection",
 };
 
 export function CircleDrawToolbar({
@@ -472,36 +344,17 @@ export function CircleDrawToolbar({
                     : "border border-black/8 bg-white text-[#3A3E4C] hover:border-[#7B6FE0]/35",
               )}
             >
-              {id === "circle" && (
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-current" />
-              )}
-              {id === "brush" && (
-                <span className="h-3.5 w-3.5 rounded-full bg-current opacity-80" />
-              )}
-              {id === "eraser" && (
-                <span className="h-3 w-3.5 rounded-sm border border-current bg-transparent" />
-              )}
               {label}
             </button>
           );
         })}
       </div>
-      <p
-        className={cn(
-          "text-center text-[11px] leading-snug",
-          isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
-        )}
-      >
+      <p className={cn("text-center text-[11px] leading-snug", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
         {TOOL_HINTS[tool]}
       </p>
       {(tool === "brush" || tool === "eraser") && (
         <div className="flex items-center gap-2.5 px-0.5">
-          <span
-            className={cn(
-              "shrink-0 text-[11px] font-medium",
-              isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
-            )}
-          >
+          <span className={cn("shrink-0 text-[11px] font-medium", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
             Size
           </span>
           <input
