@@ -109,17 +109,35 @@ export function buildCircleRemoveStep(req: StandardValidationOk): StandardFalSte
 
 /**
  * Circle Add — flux-general/inpainting ONLY (do not change Remove path).
- * White mask = edit region. Strength moderate so unmasked pixels stay intact.
+ * WHITE = edit region. BLACK = preserve. Strength moderate so unmasked pixels stay intact.
+ * Prompt is server-resolved from asset registry (never trust client object identity).
  */
 export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
   if (!req.imageUrl || !req.maskImageUrl) {
     throw new Error("Circle add requires original image and mask.");
   }
   const userPrompt = (req.prompt || "").trim();
-  // Keep prompt focused: asset backend prompt already has mask rules
   const prompt = userPrompt
-    ? `${userPrompt} Inpaint only the white mask. Leave every black (unmasked) pixel unchanged.`
-    : "Inpaint only the white mask with the requested object. Leave every black pixel unchanged.";
+    ? `${userPrompt} Inpaint only the white mask. Leave every black (unmasked) pixel unchanged. Add exactly one object.`
+    : "Inpaint only the white mask with exactly one requested object. Leave every black pixel unchanged.";
+
+  const negativePrompt = [
+    "extra objects",
+    "multiple copies",
+    "duplicated object",
+    "changed unmasked area",
+    "altered railing",
+    "modified architecture",
+    "different face",
+    "different clothing",
+    "different background",
+    "full scene regeneration",
+    "extra objects outside mask",
+    "artifacts",
+    "blur",
+    "watermark",
+    "text",
+  ].join(", ");
 
   if (process.env.NODE_ENV !== "production") {
     console.log("[CIRCLE ADD] modelRequest", {
@@ -147,8 +165,7 @@ export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
       enable_safety_checker: true,
       output_format: "png",
       scheduler: "euler",
-      negative_prompt:
-        "changed unmasked area, altered railing, modified architecture, different face, different clothing, different background, full scene regeneration, extra objects outside mask, artifacts, blur, watermark, text",
+      negative_prompt: negativePrompt,
     },
   };
 }
