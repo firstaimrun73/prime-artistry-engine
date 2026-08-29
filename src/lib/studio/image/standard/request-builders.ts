@@ -107,26 +107,53 @@ export function buildCircleRemoveStep(req: StandardValidationOk): StandardFalSte
   };
 }
 
+/**
+ * Circle Add — flux-general/inpainting.
+ * MUST use source image + user mask + asset backend prompt.
+ * MUST NOT regenerate the full scene. White mask = edit region only.
+ */
 export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
   if (!req.imageUrl || !req.maskImageUrl) {
     throw new Error("Circle add requires original image and mask.");
   }
+  const userPrompt = (req.prompt || "").trim();
+  const prompt = [
+    userPrompt,
+    "Edit ONLY the white masked region.",
+    "Preserve every unmasked pixel exactly as in the source photograph.",
+    "Do not change architecture, railings, walls, floors, faces, clothing, or background outside the mask.",
+    "Do not regenerate the full image. Inpaint the mask only.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[circle-add] modelRequestCreated", {
+      operation: "circle_add",
+      promptPresent: prompt.length > 0,
+      promptLen: prompt.length,
+      imageUrlPresent: !!req.imageUrl,
+      maskUrlPresent: !!req.maskImageUrl,
+      model: "fal-ai/flux-general/inpainting",
+    });
+  }
+
   return {
     label: "standard circle-to-add (flux inpaint)",
     model: "fal-ai/flux-general/inpainting",
     body: {
-      prompt: `${req.prompt}. Edit ONLY the white masked area. Preserve every unmasked pixel.`,
+      prompt,
       image_url: req.imageUrl,
       mask_url: req.maskImageUrl,
-      strength: 0.86,
-      guidance_scale: 3.5,
-      num_inference_steps: 40,
+      strength: 0.88,
+      guidance_scale: 4.0,
+      num_inference_steps: 42,
       num_images: 1,
       enable_safety_checker: true,
       output_format: "png",
       scheduler: "euler",
       negative_prompt:
-        "changed unmasked area, distorted background, different face, artifacts, blur",
+        "changed unmasked area, altered railing, modified architecture, different face, different background, full scene regeneration, artifacts, blur, extra objects outside mask, watermark, text",
     },
   };
 }
