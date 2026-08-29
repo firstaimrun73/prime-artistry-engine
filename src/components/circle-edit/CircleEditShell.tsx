@@ -2,8 +2,8 @@
  * Circle 2edit product shell — one professional editor.
  * Layout: header → stage → compact Remove/Add + tools → action bar.
  * Theme-aware (light/dark). No bottom mode nav. No Crop.
+ * Brand mark: subtle Meta-style blinking dashed ring (not a spinner).
  */
-import { useEffect, useState } from "react";
 import { ArrowLeft, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -41,20 +41,6 @@ export function CircleEditShell({
 }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [brandPulse, setBrandPulse] = useState(false);
-
-  useEffect(() => {
-    if (generating) {
-      setBrandPulse(false);
-      return;
-    }
-    const tick = () => {
-      setBrandPulse(true);
-      window.setTimeout(() => setBrandPulse(false), 2000);
-    };
-    const id = window.setInterval(tick, 10_000);
-    return () => window.clearInterval(id);
-  }, [generating]);
 
   return (
     <div
@@ -88,12 +74,11 @@ export function CircleEditShell({
         </button>
 
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          {/* Meta-style subtle blink: dashed ring + soft pulse glow — NOT a spinner */}
           <div
-            className={cn(
-              "relative grid h-8 w-8 shrink-0 place-items-center transition-shadow",
-              brandPulse && "shadow-[0_0_16px_rgba(123,111,224,0.45)]",
-            )}
+            className="relative grid h-8 w-8 shrink-0 place-items-center"
             aria-hidden
+            data-circle-brand-mark="true"
           >
             <svg viewBox="0 0 32 32" className="h-8 w-8">
               <circle
@@ -102,21 +87,39 @@ export function CircleEditShell({
                 r="12"
                 fill="none"
                 stroke="#7B6FE0"
-                strokeWidth="2.2"
-                strokeDasharray="6 4"
-                className={cn(brandPulse ? "opacity-100" : "opacity-80", "transition-opacity")}
-              >
-                <animateTransform
-                  attributeName="transform"
-                  type="rotate"
-                  from="0 16 16"
-                  to="360 16 16"
-                  dur="8s"
-                  repeatCount="indefinite"
-                />
-              </circle>
-              <circle cx="16" cy="16" r="5" fill="none" stroke="#7B6FE0" strokeWidth="1.6" opacity="0.9" />
+                strokeWidth="2"
+                strokeDasharray="5 3.5"
+                className="origin-center"
+                style={{
+                  animation: generating
+                    ? "none"
+                    : "circle2edit-ring-breathe 2.8s ease-in-out infinite",
+                }}
+              />
+              <circle
+                cx="16"
+                cy="16"
+                r="5"
+                fill="none"
+                stroke="#7B6FE0"
+                strokeWidth="1.5"
+                style={{
+                  animation: generating
+                    ? "none"
+                    : "circle2edit-dot-pulse 2.8s ease-in-out infinite",
+                }}
+              />
             </svg>
+            <style>{`
+              @keyframes circle2edit-ring-breathe {
+                0%, 100% { opacity: 0.55; filter: drop-shadow(0 0 0 rgba(123,111,224,0)); }
+                50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(123,111,224,0.55)); }
+              }
+              @keyframes circle2edit-dot-pulse {
+                0%, 100% { opacity: 0.7; }
+                50% { opacity: 1; }
+              }
+            `}</style>
           </div>
           <div className="min-w-0">
             <p className="truncate text-[13px] font-semibold tracking-tight">Circle 2edit</p>
@@ -136,7 +139,7 @@ export function CircleEditShell({
         </div>
       </header>
 
-      {!hideModeToggle ? (
+      {!hideModeToggle && !generating ? (
         <div className="flex shrink-0 items-center justify-center gap-2 border-b px-3 py-2 sm:px-4">
           {(["remove", "add"] as const).map((id) => {
             const active = mode === id;
@@ -166,7 +169,7 @@ export function CircleEditShell({
 
       <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
 
-      {controls ? (
+      {controls && !generating ? (
         <div
           className={cn(
             "shrink-0 border-t px-3 py-2.5 sm:px-4",
@@ -177,8 +180,8 @@ export function CircleEditShell({
         </div>
       ) : null}
 
-      {actionBar}
-      {sheet}
+      {!generating ? actionBar : null}
+      {!generating ? sheet : null}
     </div>
   );
 }
@@ -280,6 +283,7 @@ export function CircleEditActionBar({
         "flex shrink-0 items-center gap-2 border-t px-3 py-2.5 sm:px-4",
         isDark ? "border-white/8 bg-[#181A22]/95" : "border-black/6 bg-white/90 backdrop-blur-md",
       )}
+      style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }}
     >
       {onClear ? (
         <button
