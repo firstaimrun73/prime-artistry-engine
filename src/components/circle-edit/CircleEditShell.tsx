@@ -1,1 +1,418 @@
-PLACEHOLDER
+/**
+ * Circle 2edit product shell — one professional editor.
+ * Layout: header → stage → compact Remove/Add + tools → action bar.
+ * Theme-aware (light/dark). No bottom mode nav. No Crop.
+ * Brand mark: subtle Meta-style blinking dashed ring (not a spinner).
+ */
+import { ArrowLeft, Upload } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useTheme } from "@/lib/theme";
+
+export type CircleEditMode = "remove" | "add";
+export type CircleDrawTool = "circle" | "brush" | "eraser";
+
+type Props = {
+  creditsLabel: string;
+  mode: CircleEditMode;
+  onModeChange: (m: CircleEditMode) => void;
+  generating?: boolean;
+  onBack: () => void;
+  children: React.ReactNode;
+  controls?: React.ReactNode;
+  actionBar?: React.ReactNode;
+  sheet?: React.ReactNode;
+  hideModeToggle?: boolean;
+  /** When true, Add mode is visually locked (Free plan). */
+  addLocked?: boolean;
+};
+
+export function CircleEditShell({
+  creditsLabel,
+  mode,
+  onModeChange,
+  generating,
+  onBack,
+  children,
+  controls,
+  actionBar,
+  sheet,
+  hideModeToggle,
+  addLocked,
+}: Props) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
+  return (
+    <div
+      className={cn(
+        "flex h-[100dvh] flex-col overflow-hidden",
+        isDark ? "bg-[#12141A] text-[#F2F2F5]" : "bg-[#F4F5F8] text-[#1A1C24]",
+      )}
+      data-circle-2edit="true"
+      data-theme={theme}
+    >
+      <header
+        className={cn(
+          "flex shrink-0 items-center gap-2.5 border-b px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3",
+          isDark
+            ? "border-white/8 bg-[#181A22]/95 backdrop-blur-md"
+            : "border-black/6 bg-white/80 backdrop-blur-md shadow-[0_1px_0_rgba(0,0,0,0.04)]",
+        )}
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back to Studio"
+          className={cn(
+            "grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors",
+            isDark
+              ? "border-white/10 text-[#9AA0B0] hover:border-[#7B6FE0]/50 hover:text-[#F2F2F5]"
+              : "border-black/8 text-[#5C6170] hover:border-[#7B6FE0]/40 hover:text-[#1A1C24]",
+          )}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          {/* Meta-style subtle blink: dashed ring + soft pulse glow — NOT a spinner */}
+          <div
+            className="relative grid h-8 w-8 shrink-0 place-items-center"
+            aria-hidden
+            data-circle-brand-mark="true"
+          >
+            <svg viewBox="0 0 32 32" className="h-8 w-8">
+              <circle
+                cx="16"
+                cy="16"
+                r="12"
+                fill="none"
+                stroke="#7B6FE0"
+                strokeWidth="2"
+                strokeDasharray="5 3.5"
+                className="origin-center"
+                style={{
+                  animation: generating
+                    ? "none"
+                    : "circle2edit-ring-breathe 2.8s ease-in-out infinite",
+                }}
+              />
+              <circle
+                cx="16"
+                cy="16"
+                r="5"
+                fill="none"
+                stroke="#7B6FE0"
+                strokeWidth="1.5"
+                style={{
+                  animation: generating
+                    ? "none"
+                    : "circle2edit-dot-pulse 2.8s ease-in-out infinite",
+                }}
+              />
+            </svg>
+            <style>{`
+              @keyframes circle2edit-ring-breathe {
+                0%, 100% { opacity: 0.55; filter: drop-shadow(0 0 0 rgba(123,111,224,0)); }
+                50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(123,111,224,0.55)); }
+              }
+              @keyframes circle2edit-dot-pulse {
+                0%, 100% { opacity: 0.7; }
+                50% { opacity: 1; }
+              }
+            `}</style>
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-semibold tracking-tight">Circle 2edit</p>
+            <p className={cn("truncate text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+              Mark an area · Remove or Add
+            </p>
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            "shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-medium tabular-nums",
+            isDark ? "border-white/10 bg-white/5" : "border-black/8 bg-white",
+          )}
+        >
+          {creditsLabel}
+        </div>
+      </header>
+
+      {!hideModeToggle && !generating ? (
+        <div className="flex shrink-0 items-center justify-center gap-2 border-b px-3 py-2 sm:px-4">
+          {(["remove", "add"] as const).map((id) => {
+            const active = mode === id;
+            const locked = id === "add" && !!addLocked;
+            return (
+              <button
+                key={id}
+                type="button"
+                disabled={!!generating || locked}
+                onClick={() => onModeChange(id)}
+                className={cn(
+                  "rounded-full border px-4 py-1.5 text-[12px] font-semibold transition-colors",
+                  active
+                    ? "border-[#7B6FE0] bg-[#7B6FE0] text-white shadow-sm"
+                    : isDark
+                      ? "border-white/10 text-[#9AA0B0] hover:border-[#7B6FE0]/40"
+                      : "border-black/10 text-[#5C6170] hover:border-[#7B6FE0]/40",
+                  (generating || locked) && "opacity-50",
+                )}
+              >
+                {id === "remove" ? "Remove" : locked ? "Add 🔒" : "Add"}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
+
+      {controls && !generating ? (
+        <div
+          className={cn(
+            "shrink-0 border-t px-3 py-2.5 sm:px-4",
+            isDark ? "border-white/8 bg-[#181A22]/90" : "border-black/6 bg-white/90",
+          )}
+        >
+          {controls}
+        </div>
+      ) : null}
+
+      {!generating ? actionBar : null}
+      {!generating ? sheet : null}
+    </div>
+  );
+}
+
+export function CircleEditUploadZone({ onPick }: { onPick: () => void }) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className={cn(
+        "flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 transition-colors",
+        isDark
+          ? "border-white/15 bg-white/5 hover:border-[#7B6FE0]/50"
+          : "border-black/12 bg-white hover:border-[#7B6FE0]/40",
+      )}
+    >
+      <Upload className="h-8 w-8 text-[#7B6FE0]" />
+      <div className="text-center">
+        <p className="text-sm font-semibold">Upload an image</p>
+        <p className={cn("mt-1 text-xs", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+          Circle or paint an area, then Remove or Add
+        </p>
+      </div>
+    </button>
+  );
+}
+
+/**
+ * Full-screen generation state — Meta-style dashed breathing ring (NOT a spinner).
+ * progressPct / stages are kept for API compatibility but the visual is calm pulse.
+ */
+export function CircleEditGenOverlay({
+  progressPct: _progressPct,
+  activeStage,
+  stageCount,
+  caption,
+}: {
+  progressPct: number;
+  activeStage: number;
+  stageCount: number;
+  caption: string;
+}) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  return (
+    <div
+      className={cn(
+        "absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 px-6",
+        isDark ? "bg-[#12141A]/94" : "bg-[#F4F5F8]/94",
+      )}
+      data-circle-generating="true"
+    >
+      {/* Meta-style: dashed violet ring + soft glow, 2.8s breathe — never continuous spin */}
+      <div className="relative grid h-28 w-28 place-items-center text-[#7B6FE0]" aria-hidden>
+        <svg viewBox="0 0 112 112" className="h-full w-full">
+          <circle
+            cx="56"
+            cy="56"
+            r="48"
+            fill="none"
+            stroke="#7B6FE0"
+            strokeWidth="2.5"
+            strokeDasharray="7 5"
+            style={{
+              animation: "circle2edit-gen-ring 2.8s ease-in-out infinite",
+              transformOrigin: "56px 56px",
+            }}
+          />
+          <circle
+            cx="56"
+            cy="56"
+            r="18"
+            fill="none"
+            stroke="#7B6FE0"
+            strokeWidth="1.75"
+            style={{
+              animation: "circle2edit-gen-dot 2.8s ease-in-out infinite",
+            }}
+          />
+        </svg>
+        <style>{`
+          @keyframes circle2edit-gen-ring {
+            0%, 100% { opacity: 0.45; filter: drop-shadow(0 0 2px rgba(123,111,224,0.25)); }
+            50% { opacity: 1; filter: drop-shadow(0 0 14px rgba(123,111,224,0.65)); }
+          }
+          @keyframes circle2edit-gen-dot {
+            0%, 100% { opacity: 0.55; }
+            50% { opacity: 1; }
+          }
+        `}</style>
+      </div>
+      <p className="text-center text-[15px] font-semibold tracking-tight">Circle 2edit</p>
+      <p className="text-center text-sm font-medium text-[#7B6FE0]">{caption || "Generating…"}</p>
+      <p className={cn("text-center text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+        Preparing selected area · Applying asset · Generating
+      </p>
+      <p className={cn("text-center text-[10px] tabular-nums", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>
+        Stage {Math.min(activeStage + 1, stageCount)} of {stageCount}
+      </p>
+    </div>
+  );
+}
+
+export function CircleEditActionBar({
+  onClear,
+  statusText,
+  ctaLabel,
+  ctaCost,
+  ctaDisabled,
+  onCta,
+  ctaVariant = "violet",
+}: {
+  onClear?: () => void;
+  statusText: string;
+  ctaLabel: string;
+  ctaCost?: string;
+  ctaDisabled?: boolean;
+  onCta: () => void;
+  ctaVariant?: "violet" | "neutral";
+}) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center gap-2 border-t px-3 py-2.5 sm:px-4",
+        isDark ? "border-white/8 bg-[#181A22]/95" : "border-black/6 bg-white/90 backdrop-blur-md",
+      )}
+      style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }}
+    >
+      {onClear ? (
+        <button
+          type="button"
+          onClick={onClear}
+          className={cn(
+            "rounded-lg border px-3 py-2 text-[12px] font-medium",
+            isDark ? "border-white/10 text-[#9AA0B0]" : "border-black/10 text-[#5C6170]",
+          )}
+        >
+          Clear
+        </button>
+      ) : (
+        <span className="w-[52px]" />
+      )}
+      <p className={cn("min-w-0 flex-1 truncate text-center text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+        {statusText}
+      </p>
+      <button
+        type="button"
+        disabled={ctaDisabled}
+        onClick={onCta}
+        className={cn(
+          "shrink-0 rounded-lg px-4 py-2 text-[12px] font-semibold transition-opacity disabled:opacity-40",
+          ctaVariant === "violet"
+            ? "bg-[#7B6FE0] text-white"
+            : isDark
+              ? "bg-white/10 text-[#F2F2F5]"
+              : "bg-black/80 text-white",
+        )}
+      >
+        {ctaLabel}
+        {ctaCost ? <span className="ml-1.5 opacity-80">{ctaCost}</span> : null}
+      </button>
+    </div>
+  );
+}
+
+const TOOL_HINTS: Record<CircleDrawTool, string> = {
+  circle: "Draw a circle around the area",
+  brush: "Paint the area",
+  eraser: "Erase part of the mask",
+};
+
+export function CircleDrawToolbar({
+  tool,
+  onTool,
+  brushSize,
+  onBrushSize,
+}: {
+  tool: CircleDrawTool;
+  onTool: (t: CircleDrawTool) => void;
+  brushSize: number;
+  onBrushSize: (n: number) => void;
+}) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const items: { id: CircleDrawTool; label: string }[] = [
+    { id: "circle", label: "Circle" },
+    { id: "brush", label: "Brush" },
+    { id: "eraser", label: "Eraser" },
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-center gap-1.5">
+        {items.map((it) => (
+          <button
+            key={it.id}
+            type="button"
+            onClick={() => onTool(it.id)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-[11px] font-semibold",
+              tool === it.id
+                ? "border-[#7B6FE0] bg-[rgba(123,111,224,0.16)] text-[#7B6FE0]"
+                : isDark
+                  ? "border-white/10 text-[#9AA0B0]"
+                  : "border-black/8 text-[#5C6170]",
+            )}
+          >
+            {it.label}
+          </button>
+        ))}
+      </div>
+      {(tool === "brush" || tool === "eraser") && (
+        <div className="flex items-center gap-2 px-1">
+          <span className={cn("text-[10px]", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>Size</span>
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={brushSize}
+            onChange={(e) => onBrushSize(Number(e.target.value))}
+            className="flex-1"
+          />
+          <span className="w-7 text-right text-[10px] tabular-nums">{brushSize}</span>
+        </div>
+      )}
+      <p className={cn("text-center text-[10px]", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>
+        {TOOL_HINTS[tool]}
+      </p>
+    </div>
+  );
+}
