@@ -8,6 +8,7 @@ import {
 import { resolveCircleCharge, assertCircleAddAllowed } from "@/lib/circle-edit/server-charge";
 import { getAssetCreditCost } from "@/lib/circle-edit/add-assets-pricing";
 import { ADD_ASSETS, findAddAsset, buildAddPrompt } from "@/lib/circle-edit/add-assets";
+import { resolveCircleAddPrompt } from "@/lib/circle-edit/resolve-circle-add-prompt";
 
 describe("Circle 2edit credits (PDF bands)", () => {
   it("Remove is flat 25", () => {
@@ -56,10 +57,46 @@ describe("Circle 2edit credits (PDF bands)", () => {
     ).toThrow(/paid plan/i);
   });
 
-  it("UI estimate equals server charge for rose", () => {
-    const rose = findAddAsset("rose");
-    expect(rose).toBeTruthy();
-    const cost = getAssetCreditCost(rose!.id);
+  it("exactly 5 controlled test assets", () => {
+    expect(ADD_ASSETS.length).toBe(5);
+    const ids = ADD_ASSETS.map((a) => a.id).sort();
+    expect(ids).toEqual([
+      "animal_dog",
+      "animal_giraffe",
+      "flower_sunflower",
+      "insect_butterfly",
+      "vehicle_car",
+    ].sort());
+  });
+
+  it("giraffe resolves by stable id and legacy short id", () => {
+    const g1 = findAddAsset("animal_giraffe");
+    const g2 = findAddAsset("giraffe");
+    expect(g1?.id).toBe("animal_giraffe");
+    expect(g2?.id).toBe("animal_giraffe");
+    expect(g1!.creditCost).toBe(35);
+    expect(g1!.emoji).toBe("🦒");
+  });
+
+  it("server prompt resolve is authoritative", () => {
+    const r = resolveCircleAddPrompt({ circleAssetId: "animal_giraffe", clientPrompt: "ignored client garbage" });
+    expect(r.assetId).toBe("animal_giraffe");
+    expect(r.assetName).toBe("Giraffe");
+    expect(r.creditCost).toBe(35);
+    expect(r.prompt.toLowerCase()).toContain("giraffe");
+    expect(r.prompt.toLowerCase()).toMatch(/mask|masked/);
+    expect(r.prompt.toLowerCase()).not.toContain("ignored client garbage");
+  });
+
+  it("unknown assetId is rejected", () => {
+    expect(() => resolveCircleAddPrompt({ circleAssetId: "animal_unicorn" })).toThrow(/unknown/i);
+  });
+
+  it("UI estimate equals server charge for giraffe", () => {
+    const giraffe = findAddAsset("animal_giraffe");
+    expect(giraffe).toBeTruthy();
+    const cost = getAssetCreditCost(giraffe!.id);
+    expect(cost).toBe(35);
     const q = estimateCircleAddCredits({
       sourceWidth: 1000,
       sourceHeight: 1000,
@@ -68,28 +105,21 @@ describe("Circle 2edit credits (PDF bands)", () => {
     const server = resolveCircleCharge({
       circleInstant: false,
       maskImageUrl: "https://example.com/m.png",
-      circleAssetId: rose!.id,
+      circleAssetId: giraffe!.id,
       sourceWidth: 1000,
       sourceHeight: 1000,
     });
     expect(server).toBe(q.totalCredits);
   });
 
-  it("curated launch assets with mask-preserving prompts", () => {
-    expect(ADD_ASSETS.length).toBeGreaterThanOrEqual(50);
-    expect(ADD_ASSETS.length).toBeLessThanOrEqual(120);
-    const giraffe = findAddAsset("giraffe");
-    expect(giraffe).toBeTruthy();
-    expect(giraffe!.creditCost).toBe(35);
-    const p = buildAddPrompt({ asset: giraffe, userDetail: "" });
-    expect(p.toLowerCase()).toContain("giraffe");
-    expect(p.toLowerCase()).toMatch(/mask|masked region/);
-    const roseP = buildAddPrompt({ asset: findAddAsset("rose"), userDetail: "" });
-    expect(roseP).toMatch(/masked region/i);
-    expect(roseP).toMatch(/Rose/i);
-    // User detail is appended, not inventing asset
-    const withUser = buildAddPrompt({ asset: giraffe, userDetail: "sunset lighting" });
-    expect(withUser.toLowerCase()).toContain("giraffe");
-    expect(withUser.toLowerCase()).toContain("sunset lighting");
+  it("all five have unique emojis and backend prompts", () => {
+    const emojis = new Set(ADD_ASSETS.map((a) => a.emoji));
+    expect(emojis.size).toBe(5);
+    for (const a of ADD_ASSETS) {
+      expect(a.backendPrompt.length).toBeGreaterThan(80);
+      expect(a.negativePrompt.length).toBeGreaterThan(20);
+      const p = buildAddPrompt({ asset: a, userDetail: "" });
+      expect(p.toLowerCase()).toMatch(/mask|masked/);
+    }
   });
 });
