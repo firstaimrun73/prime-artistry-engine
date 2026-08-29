@@ -1,8 +1,7 @@
 /**
  * Circle 2edit — /studio/image/circle-remove
- * Remove: circleInstant → flux-pro/v1/erase
- * Add: circleInstant:false → flux-general/inpainting
- * Drawing: CircleMaskStage (freehand circle, brush, eraser) — do not replace.
+ * Remove: circleInstant true (unchanged)
+ * Add: circleInstant false → inpaint; asset rail opens only on explicit Browse
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -28,7 +27,7 @@ import {
   CircleMaskStage,
   type CircleMaskStageHandle,
 } from "@/components/circle-edit/CircleMaskStage";
-import { CircleAddDrawer } from "@/components/circle-edit/CircleAddDrawer";
+import { CircleAddAssetRail } from "@/components/circle-edit/CircleAddAssetRail";
 import { CompareSlider } from "@/components/CompareSlider";
 import { findAddAsset, buildAddPrompt } from "@/lib/circle-edit/add-assets";
 import type { MaskTool } from "@/components/circle-edit/mask/types";
@@ -57,12 +56,6 @@ const GEN_STAGES = [
   "Blending the result",
   "Finalizing your image",
 ] as const;
-
-const BRUSH_PRESETS = [
-  { id: "S" as const, size: 14, label: "S" },
-  { id: "M" as const, size: 24, label: "M" },
-  { id: "L" as const, size: 40, label: "L" },
-];
 
 type Phase = "select" | "generating" | "result";
 type Mode = "remove" | "add";
@@ -106,8 +99,6 @@ function Circle2editPage() {
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
   const [addPrompt, setAddPrompt] = useState("");
-  const [activeCat, setActiveCat] = useState<string | null>(null);
-  const [assetQuery, setAssetQuery] = useState("");
   const [progressPct, setProgressPct] = useState(0);
   const [stageIdx, setStageIdx] = useState(0);
   const [showCompare, setShowCompare] = useState(false);
@@ -121,6 +112,16 @@ function Circle2editPage() {
   }, []);
 
   useEffect(() => {
+    if (!preview) return;
+    const img = new Image();
+    img.onload = () => {
+      setSourceWidth(img.naturalWidth || 0);
+      setSourceHeight(img.naturalHeight || 0);
+    };
+    img.src = preview;
+  }, [preview]);
+
+  useEffect(() => {
     if (phase !== "generating") {
       clearProgressTimers();
       return;
@@ -130,10 +131,10 @@ function Circle2editPage() {
     const steps = [
       { ms: 700, pct: 14, idx: 1 },
       { ms: 1600, pct: 28, idx: 2 },
-      { ms: 2800, pct: 42, idx: 3 },
-      { ms: 4200, pct: 58, idx: 4 },
-      { ms: 6000, pct: 72, idx: 5 },
-      { ms: 8000, pct: 86, idx: 6 },
+      { ms: 2800, pct: 45, idx: 3 },
+      { ms: 4200, pct: 62, idx: 4 },
+      { ms: 6000, pct: 78, idx: 5 },
+      { ms: 8000, pct: 90, idx: 6 },
     ];
     progressTimers.current = steps.map((s) =>
       window.setTimeout(() => {
@@ -149,18 +150,11 @@ function Circle2editPage() {
     if (!f) return;
     if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
     setFile(f);
-    const url = URL.createObjectURL(f);
-    setPreview(url);
+    setPreview(URL.createObjectURL(f));
     setOutput(null);
     setHasMask(false);
     setPhase("select");
     setShowCompare(false);
-    const probe = new Image();
-    probe.onload = () => {
-      setSourceWidth(probe.naturalWidth || 0);
-      setSourceHeight(probe.naturalHeight || 0);
-    };
-    probe.src = url;
   };
 
   const resetPhoto = () => {
@@ -204,6 +198,10 @@ function Circle2editPage() {
         toast.error("Circle Add requires a paid plan.");
         return;
       }
+      if (kind === "add" && !file) {
+        toast.error("Upload an image before using Circle Add.");
+        return;
+      }
       const assetCost = kind === "add" ? getAssetCreditCost(addObjectId) : 0;
       const needed =
         kind === "remove"
@@ -223,7 +221,7 @@ function Circle2editPage() {
         const desc = addPrompt.trim() || asset?.generationDescriptor || "";
         if (!desc) {
           setAddDrawerOpen(true);
-          toast.message("Describe what to add, or pick an asset.");
+          toast.message("Pick an object or describe what to add.");
           return;
         }
       }
@@ -253,9 +251,7 @@ function Circle2editPage() {
           clearProgressTimers();
           setProgressPct(100);
           setStageIdx(GEN_STAGES.length - 1);
-          if (!res.outputUrl || res.outputUrl === imageUrl) {
-            throw new Error("Generation returned invalid result.");
-          }
+          if (!res.outputUrl || res.outputUrl === imageUrl) throw new Error("Generation returned invalid result.");
           await waitForImageLoadable(res.outputUrl);
           setOutput(res.outputUrl);
           setShowCompare(false);
@@ -283,9 +279,7 @@ function Circle2editPage() {
           clearProgressTimers();
           setProgressPct(100);
           setStageIdx(GEN_STAGES.length - 1);
-          if (!res.outputUrl || res.outputUrl === imageUrl) {
-            throw new Error("Generation returned invalid result.");
-          }
+          if (!res.outputUrl || res.outputUrl === imageUrl) throw new Error("Generation returned invalid result.");
           await waitForImageLoadable(res.outputUrl);
           setOutput(res.outputUrl);
           setShowCompare(false);
@@ -301,34 +295,9 @@ function Circle2editPage() {
         generatingLockRef.current = false;
       }
     },
-    [file, preview, isAdmin, profile?.credits, generate, refreshProfile, addPrompt, addObjectId, clearProgressTimers, sourceWidth, sourceHeight, addLocked],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [file, preview, isAdmin, profile?.credits, generate, refreshProfile, addPrompt, addObjectId, clearProgressTimers, addLocked, sourceWidth, sourceHeight],
   );
-
-  const shareResult = async () => {
-    if (!output) return;
-    try {
-      if (navigator.share) await navigator.share({ title: "Motio2edit result", url: output });
-      else {
-        await navigator.clipboard.writeText(output);
-        toast.success("Link copied");
-      }
-    } catch {
-      /* cancelled */
-    }
-  };
-
-  const downloadResult = async () => {
-    if (!output) return;
-    try {
-      const res = await secureDl({
-        data: { imageUrl: output, keepWatermark: readKeepWatermarkPref() },
-      });
-      await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
-      toast.success("Download started");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Download failed");
-    }
-  };
 
   const onModeChange = (m: Mode) => {
     if (m === "add" && addLocked) {
@@ -336,7 +305,7 @@ function Circle2editPage() {
       return;
     }
     setMode(m);
-    if (m === "add") setAddDrawerOpen(true);
+    if (m !== "add") setAddDrawerOpen(false);
   };
 
   const statusForMode = () => {
@@ -347,7 +316,7 @@ function Circle2editPage() {
       const asset = findAddAsset(addObjectId);
       if (asset) return `Add ${asset.label} into selection`;
       if (addPrompt.trim()) return "Ready to add";
-      return "Pick an asset or describe what to add";
+      return "Browse objects or describe what to add";
     }
     return "Ready to remove";
   };
@@ -392,49 +361,45 @@ function Circle2editPage() {
         brushSize={brushSize}
         onBrushSize={setBrushSize}
       />
-      <div className="flex items-center justify-center gap-1.5">
-        {BRUSH_PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => setBrushSize(p.size)}
-            className={
-              brushSize === p.size
-                ? "rounded-md bg-[#7B6FE0] px-2.5 py-1 text-[11px] font-semibold text-white"
-                : "rounded-md border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#3A3E4C] dark:border-white/10 dark:bg-white/5 dark:text-[#C5C7D0]"
-            }
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
       {mode === "add" && addQuote && !addLocked ? (
-        <p className="text-center text-[11px] text-[#5C6170] dark:text-[#9AA0B0]">
-          Base {addQuote.baseCredits}
-          {addQuote.assetCredits > 0 ? ` + asset ${addQuote.assetCredits}` : ""} = {addQuote.totalCredits} credits
-        </p>
+        <div className="rounded-lg border border-black/8 bg-white/80 px-3 py-2 text-[11px] tabular-nums dark:border-white/10 dark:bg-white/5">
+          <div className="flex justify-between gap-2 text-[#5C6170] dark:text-[#9AA0B0]">
+            <span>Input image</span><span>{addQuote.baseCredits} credits</span>
+          </div>
+          <div className="flex justify-between gap-2 text-[#5C6170] dark:text-[#9AA0B0]">
+            <span>Object</span><span>{addQuote.assetCredits} credits</span>
+          </div>
+          <div className="mt-1 flex justify-between gap-2 border-t border-black/5 pt-1 font-semibold dark:border-white/10">
+            <span>Total</span><span>{addQuote.totalCredits} credits</span>
+          </div>
+        </div>
       ) : null}
       {mode === "add" && addLocked ? (
-        <p className="text-center text-[11px] font-medium text-[#7B6FE0]">Add requires a paid plan</p>
+        <p className="text-center text-[11px] font-medium text-[#7B6FE0]">Add requires a paid plan 🔒</p>
+      ) : null}
+      {mode === "add" && !addLocked && preview ? (
+        <button
+          type="button"
+          onClick={() => setAddDrawerOpen(true)}
+          className="rounded-lg border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0]"
+        >
+          {addObjectId ? "Change object" : "Browse objects"}
+        </button>
       ) : null}
     </div>
   ) : null;
 
-  const addSheet = (
-    <CircleAddDrawer
-      isDark={isDark}
-      open={mode === "add" && addDrawerOpen}
-      onClose={() => setAddDrawerOpen(false)}
-      addObjectId={addObjectId}
-      setAddObjectId={setAddObjectId}
-      addPrompt={addPrompt}
-      setAddPrompt={setAddPrompt}
-      activeCat={activeCat}
-      setActiveCat={setActiveCat}
-      assetQuery={assetQuery}
-      setAssetQuery={setAssetQuery}
-    />
-  );
+  const addSheet =
+    mode === "add" ? (
+      <CircleAddAssetRail
+        isDark={isDark}
+        open={addDrawerOpen}
+        onClose={() => setAddDrawerOpen(false)}
+        addObjectId={addObjectId}
+        onSelect={(id) => setAddObjectId(id)}
+        disabled={addLocked || !preview}
+      />
+    ) : null;
 
   if (phase === "result" && output && preview) {
     return (
@@ -442,37 +407,25 @@ function Circle2editPage() {
         creditsLabel={creditsLabel}
         mode={mode}
         onModeChange={onModeChange}
+        addLocked={addLocked}
         onBack={() => navigate({ to: "/studio" })}
         controls={null}
         actionBar={
           <div className="flex w-full flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setPhase("select");
-                setOutput(null);
-              }}
-              className="rounded-lg border px-4 py-2.5 text-sm font-medium"
-            >
-              Edit again
-            </button>
-            <button type="button" onClick={() => void shareResult()} className="rounded-lg border px-4 py-2.5 text-sm font-medium">
-              Share
-            </button>
-            <button
-              type="button"
-              onClick={() => void downloadResult()}
-              className="ml-auto rounded-lg bg-[#7B6FE0] px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              Download
-            </button>
+            <button type="button" onClick={() => { setPhase("select"); setOutput(null); }} className="rounded-lg border px-4 py-2.5 text-sm font-medium">Edit again</button>
+            <button type="button" onClick={() => void (async () => {
+              try {
+                const res = await secureDl({ data: { imageUrl: output, keepWatermark: readKeepWatermarkPref() } });
+                await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "Download failed");
+              }
+            })()} className="ml-auto rounded-lg bg-[#7B6FE0] px-4 py-2.5 text-sm font-semibold text-white">Download</button>
           </div>
         }
       >
         <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center p-3">
-          {showCompare ? (
-            <CompareSlider before={preview} after={output} />
-          ) : (
+          {showCompare ? <CompareSlider before={preview} after={output} /> : (
             <img src={output} alt="Result" className="max-h-full max-w-full rounded-xl object-contain" />
           )}
           <button type="button" onClick={() => setShowCompare((v) => !v)} className="mt-3 text-xs font-medium text-[#7B6FE0]">
@@ -488,12 +441,9 @@ function Circle2editPage() {
       creditsLabel={creditsLabel}
       mode={mode}
       onModeChange={onModeChange}
+      addLocked={addLocked}
       generating={phase === "generating"}
-      onBack={
-        phase === "generating"
-          ? () => toast.message("Please wait until generation finishes.")
-          : () => navigate({ to: "/studio" })
-      }
+      onBack={() => navigate({ to: "/studio" })}
       controls={controls}
       sheet={addSheet}
       actionBar={
@@ -502,7 +452,7 @@ function Circle2editPage() {
           statusText={statusForMode()}
           ctaLabel={!preview ? "Choose image" : ctaLabel}
           ctaCost={!preview ? undefined : ctaCost}
-          ctaDisabled={!!preview && (!hasMask || (mode === "add" && addLocked))}
+          ctaDisabled={!!preview && !hasMask}
           onCta={onPrimaryCta}
           ctaVariant="violet"
         />
