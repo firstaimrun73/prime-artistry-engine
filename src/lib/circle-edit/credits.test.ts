@@ -75,10 +75,21 @@ describe("Circle 2edit credits (PDF bands)", () => {
     expect(server).toBe(q.totalCredits);
   });
 
-  it("500 core assets with prompts", () => {
-    expect(ADD_ASSETS.length).toBeGreaterThanOrEqual(500);
-    const p = buildAddPrompt({ asset: findAddAsset("rose"), userDetail: "" });
-    expect(p).toMatch(/masked region/i);
-    expect(p).toMatch(/Rose/i);
+  it("curated launch assets with mask-preserving prompts", () => {
+    expect(ADD_ASSETS.length).toBeGreaterThanOrEqual(50);
+    expect(ADD_ASSETS.length).toBeLessThanOrEqual(120);
+    const giraffe = findAddAsset("giraffe");
+    expect(giraffe).toBeTruthy();
+    expect(giraffe!.creditCost).toBe(35);
+    const p = buildAddPrompt({ asset: giraffe, userDetail: "" });
+    expect(p.toLowerCase()).toContain("giraffe");
+    expect(p.toLowerCase()).toMatch(/mask|masked region/);
+    const roseP = buildAddPrompt({ asset: findAddAsset("rose"), userDetail: "" });
+    expect(roseP).toMatch(/masked region/i);
+    expect(roseP).toMatch(/Rose/i);
+    // User detail is appended, not inventing asset
+    const withUser = buildAddPrompt({ asset: giraffe, userDetail: "sunset lighting" });
+    expect(withUser.toLowerCase()).toContain("giraffe");
+    expect(withUser.toLowerCase()).toContain("sunset lighting");
   });
 });
