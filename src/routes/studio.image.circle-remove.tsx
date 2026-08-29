@@ -90,6 +90,7 @@ function Circle2editPage() {
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
   const [addPrompt, setAddPrompt] = useState("");
   const [activeCat, setActiveCat] = useState<string | null>(null);
+  const [assetQuery, setAssetQuery] = useState("");
   const [progressPct, setProgressPct] = useState(0);
   const [stageIdx, setStageIdx] = useState(0);
   const [showCompare, setShowCompare] = useState(false);
@@ -222,7 +223,6 @@ function Circle2editPage() {
         } else {
           const asset = findAddAsset(addObjectId);
           const prompt = buildAddPrompt({ asset, userDetail: addPrompt });
-          // circleInstant:true → erase. false → circle_to_add inpaint.
           const res = await generate({
             data: {
               prompt,
@@ -340,6 +340,8 @@ function Circle2editPage() {
       setAddPrompt={setAddPrompt}
       activeCat={activeCat}
       setActiveCat={setActiveCat}
+      assetQuery={assetQuery}
+      setAssetQuery={setAssetQuery}
     />
   );
 
