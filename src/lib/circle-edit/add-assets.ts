@@ -1,9 +1,12 @@
 /**
  * Circle 2edit — 500 core Add assets (PDF seed catalog).
- * Data split across core-assets-a/b.json — creditCost persisted, never randomized.
+ * Data: core-assets-0..4.json — creditCost persisted, never randomized.
  */
-import coreAssetsA from "@/lib/circle-edit/core-assets-a.json";
-import coreAssetsB from "@/lib/circle-edit/core-assets-b.json";
+import core0 from "@/lib/circle-edit/core-assets-0.json";
+import core1 from "@/lib/circle-edit/core-assets-1.json";
+import core2 from "@/lib/circle-edit/core-assets-2.json";
+import core3 from "@/lib/circle-edit/core-assets-3.json";
+import core4 from "@/lib/circle-edit/core-assets-4.json";
 
 export type CircleAddAsset = {
   id: string;
@@ -101,7 +104,13 @@ function finalize(r: Seed, sortOrder: number): CircleAddAsset {
   };
 }
 
-const ALL_SEEDS = [...(coreAssetsA as Seed[]), ...(coreAssetsB as Seed[])];
+const ALL_SEEDS = [
+  ...(core0 as Seed[]),
+  ...(core1 as Seed[]),
+  ...(core2 as Seed[]),
+  ...(core3 as Seed[]),
+  ...(core4 as Seed[]),
+];
 
 export const ADD_ASSETS: CircleAddAsset[] = ALL_SEEDS.map((s, i) => finalize(s, i + 1));
 
