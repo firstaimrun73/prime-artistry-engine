@@ -8,6 +8,10 @@ import {
   ArrowRight,
   Sparkles,
   Lock,
+  Search,
+  Circle,
+  Aperture,
+  Filter,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -27,11 +31,22 @@ type RecentGen = {
   created_at: string;
 };
 
+const QUICK_CREATE = [
+  { to: "/studio/image" as const, label: "Image", icon: ImageIcon },
+  { to: "/studio/video" as const, label: "Video", icon: Video },
+  { to: "/studio/music" as const, label: "Music", icon: Music },
+  { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
+  { to: "/studio/image/auto-edit" as const, label: "Auto Edit", icon: Sparkles },
+  { to: "/studio/image" as const, label: "Filters", icon: Filter },
+  { to: "/studio/image" as const, label: "Lenses", icon: Aperture },
+] as const;
+
 export function SignedInHomeBody() {
   const { user, profile } = useAuth();
   const { t } = useI18n();
   const isAdmin = isAdminEmail(profile?.email);
   const [recent, setRecent] = useState<RecentGen[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -64,12 +79,53 @@ export function SignedInHomeBody() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full"
+            aria-label="Search"
+            onClick={() => setSearchOpen((v) => !v)}
+          >
+            <Search className="h-4 w-4" />
+          </Button>
           <CrownBadge plan={planId} showLabel size="md" />
           <span className="rounded-full border border-border/80 bg-card/80 px-2.5 py-0.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
             {credits} credits
           </span>
+          <Button asChild variant="outline" size="sm" className="rounded-full">
+            <Link to="/profile">Profile</Link>
+          </Button>
         </div>
       </div>
+
+      <section className="mt-6">
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+          Quick create
+        </h2>
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {QUICK_CREATE.map((q) => {
+            const Icon = q.icon;
+            const locked =
+              (q.label === "Video" && !videoOk) || (q.label === "Music" && !musicOk);
+            return (
+              <Link
+                key={q.label}
+                to={locked ? "/pricing" : q.to}
+                className="flex shrink-0 flex-col items-center gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
+              >
+                <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                  {locked && (
+                    <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
+                  )}
+                </span>
+                <span className="text-[11px] font-semibold">{q.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       <Link
         to="/studio/image/auto-edit"
@@ -88,7 +144,7 @@ export function SignedInHomeBody() {
       </Link>
 
       <div className="mt-8">
-        <DiscoveryFeed isSignedIn compact />
+        <DiscoveryFeed isSignedIn compact forceSearchOpen={searchOpen} />
       </div>
 
       <section className="mt-12 space-y-3">
@@ -104,7 +160,7 @@ export function SignedInHomeBody() {
             <p className="text-lg font-bold">Image Studio</p>
           </div>
           <p className="relative mt-1 text-xs text-muted-foreground">
-            Edit, enhance, remove, restore
+            Edit, enhance, remove, restore · recipes from the feed
           </p>
           <span className="relative mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary">
             Open <ArrowRight className="h-4 w-4" />
@@ -132,6 +188,13 @@ export function SignedInHomeBody() {
             icon={Sparkles}
             locked={false}
             href="/studio/image/circle-remove"
+          />
+          <StudioMiniCard
+            title="Auto Edit"
+            desc="One photo · AI decides"
+            icon={Sparkles}
+            locked={false}
+            href="/studio/image/auto-edit"
           />
         </div>
       </section>
@@ -182,6 +245,26 @@ export function SignedInHomeBody() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="mt-14 rounded-2xl border border-border bg-card/60 p-5 sm:p-6">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
+          How Motio2edit works
+        </h2>
+        <ol className="mt-4 grid gap-3 text-sm sm:grid-cols-5">
+          {[
+            ["Understand", "Your idea & inputs"],
+            ["Plan", "Recipe & settings"],
+            ["Create", "Generate"],
+            ["Refine", "Edit & iterate"],
+            ["Deliver", "Download & share"],
+          ].map(([title, body]) => (
+            <li key={title} className="rounded-xl border border-border/80 bg-background/50 p-3">
+              <p className="font-bold">{title}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{body}</p>
+            </li>
+          ))}
+        </ol>
       </section>
     </main>
   );
