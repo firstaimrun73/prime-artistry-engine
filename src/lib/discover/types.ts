@@ -57,6 +57,10 @@ export type DiscoverItem = {
   styleLabel?: string;
   /** Smart remove path in Image Editor */
   smartRemove?: boolean;
+  /** Circle Add asset id — must match server registry (e.g. vehicle_car) */
+  circleAssetId?: string;
+  /** Optional tags for search / discovery */
+  tags?: string[];
   /** Curation flags — not live trend scores */
   isFeatured?: boolean;
   isStaffPick?: boolean;
