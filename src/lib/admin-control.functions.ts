@@ -1,7 +1,7 @@
 // Admin control panel — privileged server functions.
 //
-// Every function here is locked to the ADMIN_EMAIL account through
-// assertAdmin(), which also writes an audit row to admin_access_log.
+// Every function here is locked to the sole admin (firstaimrun89@gmail.com)
+// through assertAdmin(), which also writes an audit row to admin_access_log.
 // Public/read-only settings used by the pricing page and ad components live
 // in getPublicSettings(), which is intentionally unauthenticated-safe.
 
@@ -32,7 +32,6 @@ export type AppSettings = { planVisibility: PlanVisibility; ads: AdSettings };
 /**
  * Fail-closed defaults: if app_settings is missing or unreadable,
  * ads stay OFF until Admin successfully persists a row.
- * (Previously enabled:true caused ads to keep showing when the table was absent.)
  */
 export const DEFAULT_SETTINGS: AppSettings = {
   planVisibility: { free: true, lite: true, plus: true, pro: true, studio: true, business: true },
@@ -53,7 +52,6 @@ function normalizeSettings(row: { plan_visibility?: unknown; ad_settings?: unkno
       PLAN_IDS.map((p) => [p, pv[p] !== false]),
     ) as PlanVisibility,
     ads: {
-      // Explicit boolean: only true when stored value is exactly true
       enabled: ad.enabled === true,
       target: (AD_TARGETS as readonly string[]).includes(String(ad.target)) ? (ad.target as AdTarget) : "all",
       placements: Object.fromEntries(
@@ -61,6 +59,22 @@ function normalizeSettings(row: { plan_visibility?: unknown; ad_settings?: unkno
       ) as Record<AdPlacement, boolean>,
     },
   };
+}
+
+function formatSettingsError(error: { message?: string; code?: string; details?: string; hint?: string }): string {
+  const msg = String(error.message ?? "");
+  const code = String(error.code ?? "");
+  if (code === "PGRST205" || /schema cache/i.test(msg) || /could not find the table/i.test(msg)) {
+    return (
+      "app_settings table is missing or not visible to PostgREST. " +
+      "In Supabase SQL Editor run the app_settings ensure script, then NOTIFY pgrst, 'reload schema';"
+    );
+  }
+  if (code === "42501" || /permission denied/i.test(msg)) {
+    return "Permission denied writing app_settings. Check service_role grants and RLS (writes must use service role)."
+  }
+  const parts = [msg, error.details, error.hint].filter(Boolean);
+  return parts.join(" — ") || "Could not save app_settings.";
 }
 
 /** Public: pricing page + ad components read this. No auth required. */
@@ -117,7 +131,6 @@ export const saveAppSettings = createServerFn({ method: "POST" })
     const { assertAdmin } = await import("./admin-guard.server");
     await assertAdmin(context.claims, "/admin/settings");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Upsert so first save works even if the singleton row was never inserted.
     const { error } = await (supabaseAdmin as any)
       .from("app_settings")
       .upsert(
@@ -130,11 +143,8 @@ export const saveAppSettings = createServerFn({ method: "POST" })
         { onConflict: "id" },
       );
     if (error) {
-      throw new Error(
-        error.message?.includes("schema cache") || error.code === "PGRST205"
-          ? "app_settings table is missing in the database. Apply the Supabase migration for public.app_settings, then save again."
-          : error.message,
-      );
+      console.error("[settings] saveAppSettings failed:", error);
+      throw new Error(formatSettingsError(error));
     }
     return { ok: true };
   });

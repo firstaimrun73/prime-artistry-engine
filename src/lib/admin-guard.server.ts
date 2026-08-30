@@ -3,28 +3,28 @@
 // Single source of truth for "is this caller the administrator?". Every admin
 // server function must call assertAdmin() before touching privileged data.
 // Every attempt (allowed or denied) is written to public.admin_access_log.
+//
+// SOLE ADMINISTRATOR: firstaimrun89@gmail.com only.
+// No ADMIN_EMAILS lists, no legacy second admins, no client flags.
 
 type Claims = { sub?: string; email?: string } & Record<string, unknown>;
 
+/** The only account that may receive admin privileges. */
+export const SOLE_ADMIN_EMAIL = "firstaimrun89@gmail.com";
+
 export function adminEmail(): string {
-  return (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+  return SOLE_ADMIN_EMAIL;
 }
 
-/** All accepted admin emails (ADMIN_EMAIL + optional ADMIN_EMAILS comma list + known ops). */
+/** @deprecated Prefer isAdminClaims / assertAdmin. Kept as single-element for any residual callers. */
 export function adminEmails(): string[] {
-  const primary = adminEmail();
-  const extra = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-  const known = ["firstaimrun89@gmail.com", "firstaimrun73@gmail.com"];
-  return Array.from(new Set([primary, ...extra, ...known].filter(Boolean)));
+  return [SOLE_ADMIN_EMAIL];
 }
 
 export function isAdminClaims(claims: Claims | null | undefined): boolean {
   const caller = String(claims?.email ?? "").trim().toLowerCase();
   if (!caller) return false;
-  return adminEmails().includes(caller);
+  return caller === SOLE_ADMIN_EMAIL;
 }
 
 async function logAttempt(claims: Claims | null | undefined, path: string, allowed: boolean) {
@@ -42,7 +42,7 @@ async function logAttempt(claims: Claims | null | undefined, path: string, allow
 }
 
 /**
- * Throws when the caller is not the configured administrator.
+ * Throws when the caller is not the sole administrator.
  * Always records the attempt for auditing.
  */
 export async function assertAdmin(claims: Claims | null | undefined, path: string): Promise<void> {
