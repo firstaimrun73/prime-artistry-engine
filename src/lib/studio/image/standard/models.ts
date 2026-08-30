@@ -22,6 +22,8 @@ export const STANDARD_MODELS = {
   /** Multi-reference only (2–5 total images). Never for 0–1 image. */
   multiImageToImage: GPT_IMAGE_2_EDIT_MODEL,
   circleToRemove: "fal-ai/flux-pro/v1/erase",
+  /** Circle Add — mask-native fill (WHITE=edit). Sibling of erase; not flux-general. */
+  circleToAdd: "fal-ai/flux-pro/v1/fill",
 } as const;
 
 export type StandardModelId = (typeof STANDARD_MODELS)[keyof typeof STANDARD_MODELS];
