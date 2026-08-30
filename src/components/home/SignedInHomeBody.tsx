@@ -37,8 +37,8 @@ const QUICK_CREATE = [
   { to: "/studio/music" as const, label: "Music", icon: Music },
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
   { to: "/studio/image/auto-edit" as const, label: "Auto Edit", icon: Sparkles },
-  { to: "/studio/image" as const, label: "Filters", icon: Filter },
-  { to: "/studio/image" as const, label: "Lenses", icon: Aperture },
+  { to: "/studio/image/filters" as const, label: "Filters", icon: Filter },
+  { to: "/studio/image/lenses" as const, label: "Lenses", icon: Aperture },
 ] as const;
 
 export function SignedInHomeBody() {
@@ -111,7 +111,7 @@ export function SignedInHomeBody() {
             return (
               <Link
                 key={q.label}
-                to={locked ? "/pricing" : q.to}
+                to={(locked ? "/pricing" : q.to) as "/pricing" | "/studio/image" | "/studio/video" | "/studio/music" | "/studio/image/circle-remove" | "/studio/image/auto-edit" | "/studio/image/filters" | "/studio/image/lenses"}
                 className="flex shrink-0 flex-col items-center gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
                 <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -285,7 +285,7 @@ function StudioMiniCard({
 }) {
   return (
     <Link
-      to={href}
+      to={href as "/studio/video" | "/studio/music" | "/studio/image/circle-remove" | "/studio/image/auto-edit" | "/pricing"}
       className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
     >
       <div className="flex items-center gap-2">
