@@ -21,6 +21,7 @@ import { getAdminStats } from "@/lib/admin-stats.functions";
 import { listFeedbackAdmin, updateFeedbackStatus } from "@/lib/feedback.functions";
 import { AdminGate } from "@/components/admin/AdminGate";
 import { AdminControlPanel } from "@/components/admin/AdminControlPanel";
+import { TrafficSection } from "@/components/admin/TrafficSection";
 import {
   Users,
   UserPlus,
@@ -232,6 +233,7 @@ function AdminPage() {
         </table>
       </div>
 
+      <TrafficSection />
       <AdminControlPanel />
       <AdminFeedbackSection />
     </div>
@@ -362,7 +364,7 @@ function AdminFeedbackSection() {
               <span className="text-xs text-muted-foreground">{new Date(f.createdAt).toLocaleString()}</span>
             </div>
             <p className="mt-2 text-sm">{f.message}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
               <span>{f.userName}</span>
               {f.userEmail && <span>· {f.userEmail}</span>}
               {f.pageUrl && <span className="truncate">· {f.pageUrl}</span>}
@@ -495,4 +497,3 @@ function PopupControl() {
     </section>
   );
 }
-
