@@ -1,6 +1,6 @@
 // Admin dashboard stats — privileged server function.
 //
-// Gated to the configured ADMIN_EMAIL. Uses the service-role client (loaded
+// Gated to the sole admin firstaimrun89@gmail.com. Uses the service-role client (loaded
 // inside the handler) to aggregate platform-wide data the normal RLS policies
 // would otherwise hide. Returns plain DTOs only.
 
@@ -55,9 +55,7 @@ function dayKey(d: string | Date) {
 export const getAdminStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminStats> => {
-    const adminEmail = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
-    const callerEmail = (context.claims?.email ?? "").toLowerCase();
-
+    const callerEmail = String(context.claims?.email ?? "").trim().toLowerCase();
     const empty: AdminStats = {
       isAdmin: false,
       realtime: { onlineNow: 0, signupsToday: 0, revenueTodayInr: 0, revenueAllTimeInr: 0, activeSubscriptions: 0 },
@@ -67,7 +65,8 @@ export const getAdminStats = createServerFn({ method: "GET" })
       charts: { revenueDaily: [], signupsDaily: [], popularPlans: [] },
     };
 
-    if (!adminEmail || callerEmail !== adminEmail) return empty;
+    // Sole admin only — firstaimrun89@gmail.com
+    if (callerEmail !== "firstaimrun89@gmail.com") return empty;
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -89,15 +88,13 @@ export const getAdminStats = createServerFn({ method: "GET" })
     const profileById = new Map(profiles.map((p) => [p.id, p]));
     const today = dayKey(new Date());
 
-    // ── Users ──
     const total = profiles.length;
     const free = profiles.filter((p) => (p.plan ?? "free") === "free").length;
     const paid = total - free;
 
-    // ── Revenue (completed payments, normalised to INR-ish display) ──
     const completed = payments.filter((p) => p.payment_status === "completed");
     const toInr = (amt: number, cur: string) =>
-      cur?.toUpperCase() === "INR" ? amt : Math.round(amt * 85); // rough display conversion
+      cur?.toUpperCase() === "INR" ? amt : Math.round(amt * 85);
     const revenueAllTimeInr = completed.reduce((s, p) => s + toInr(Number(p.amount) || 0, p.currency), 0);
     const revenueTodayInr = completed
       .filter((p) => dayKey(p.created_at) === today)
@@ -106,20 +103,17 @@ export const getAdminStats = createServerFn({ method: "GET" })
     const signupsToday = profiles.filter((p) => dayKey(p.created_at) === today).length;
     const activeSubscriptions = subs.filter((s) => s.status === "active").length;
 
-    // ── Storage / generations ──
     const images = gens.filter((g) => g.type === "image").length;
     const videos = gens.filter((g) => g.type === "video").length;
-    // Approximate: 2.5MB per image, 12MB per video.
     const usedGb = Math.round(((images * 2.5 + videos * 12) / 1024) * 100) / 100;
-    const perUserMap = new Map<string, number>();
+    const perUserMap = new Map();
     for (const g of gens) perUserMap.set(g.user_id, (perUserMap.get(g.user_id) ?? 0) + 1);
     const perUser = [...perUserMap.entries()]
       .map(([uid, count]) => ({ email: profileById.get(uid)?.email ?? "unknown", count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // ── Purchases table ──
-    const purchases: AdminPurchase[] = payments.slice(0, 200).map((p) => {
+    const purchases = payments.slice(0, 200).map((p) => {
       const prof = profileById.get(p.user_id);
       return {
         transactionId: p.transaction_id ?? "—",
@@ -134,8 +128,7 @@ export const getAdminStats = createServerFn({ method: "GET" })
       };
     });
 
-    // ── Charts (last 14 days) ──
-    const days: string[] = [];
+    const days = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -144,20 +137,20 @@ export const getAdminStats = createServerFn({ method: "GET" })
     const revByDay = new Map(days.map((d) => [d, 0]));
     for (const p of completed) {
       const k = dayKey(p.created_at);
-      if (revByDay.has(k)) revByDay.set(k, revByDay.get(k)! + toInr(Number(p.amount) || 0, p.currency));
+      if (revByDay.has(k)) revByDay.set(k, revByDay.get(k) + toInr(Number(p.amount) || 0, p.currency));
     }
     const signByDay = new Map(days.map((d) => [d, 0]));
     for (const p of profiles) {
       const k = dayKey(p.created_at);
-      if (signByDay.has(k)) signByDay.set(k, signByDay.get(k)! + 1);
+      if (signByDay.has(k)) signByDay.set(k, signByDay.get(k) + 1);
     }
-    const planCountMap = new Map<string, number>();
+    const planCountMap = new Map();
     for (const p of profiles) planCountMap.set(p.plan ?? "free", (planCountMap.get(p.plan ?? "free") ?? 0) + 1);
 
     return {
       isAdmin: true,
       realtime: {
-        onlineNow: 0, // populated client-side via presence if available
+        onlineNow: 0,
         signupsToday,
         revenueTodayInr,
         revenueAllTimeInr,
