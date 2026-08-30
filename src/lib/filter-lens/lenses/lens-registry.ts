@@ -1,0 +1,51 @@
+/**
+ * lenses/lens-registry.ts
+ */
+import { LensDefinition, LensSpecialty } from './lens-types';
+import { LENSES_001_010 } from './lenses-001-010';
+import { LENSES_011_020 } from './lenses-011-020';
+
+export const ALL_LENSES: LensDefinition[] = [...LENSES_001_010, ...LENSES_011_020];
+
+export function getLensById(id: string): LensDefinition | undefined {
+  return ALL_LENSES.find((l) => l.id === id);
+}
+
+export function getLensesBySpecialty(specialty: LensSpecialty): LensDefinition[] {
+  return ALL_LENSES.filter((l) => l.specialty === specialty);
+}
+
+export function listLensSpecialties(): LensSpecialty[] {
+  return Array.from(new Set(ALL_LENSES.map((l) => l.specialty)));
+}
+
+export function getFreeLenses(): LensDefinition[] {
+  return ALL_LENSES.filter((l) => l.unlock.isFree);
+}
+
+export interface RegistryValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+export function validateLensRegistry(): RegistryValidationResult {
+  const errors: string[] = [];
+  if (ALL_LENSES.length !== 20) {
+    errors.push(`Expected exactly 20 lenses, found ${ALL_LENSES.length}`);
+  }
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  for (const l of ALL_LENSES) {
+    if (ids.has(l.id)) errors.push(`Duplicate lens id: ${l.id}`);
+    ids.add(l.id);
+    if (names.has(l.name)) errors.push(`Duplicate lens name: ${l.name}`);
+    names.add(l.name);
+    if (!l.processingProfile || Object.keys(l.processingProfile).length === 0) {
+      errors.push(`Lens ${l.id} has an empty processing profile`);
+    }
+    if (l.supportsCamera !== true) {
+      errors.push(`Lens ${l.id} must expose camera capability`);
+    }
+  }
+  return { valid: errors.length === 0, errors };
+}
