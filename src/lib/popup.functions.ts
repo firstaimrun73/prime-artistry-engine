@@ -55,9 +55,8 @@ export const saveAdminPopup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => saveSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const adminEmail = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
-    const callerEmail = (context.claims?.email ?? "").toLowerCase();
-    if (!adminEmail || callerEmail !== adminEmail) throw new Error("Forbidden");
+    const { assertAdmin } = await import("./admin-guard.server");
+    await assertAdmin(context.claims, "/admin/popup");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin

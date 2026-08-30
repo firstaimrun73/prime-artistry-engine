@@ -1,6 +1,6 @@
 // Admin control panel — user management, plan visibility, ad control,
 // broadcasts. Rendered only inside /admin, which is itself gated both
-// client-side (VITE_ADMIN_EMAIL) and server-side (ADMIN_EMAIL).
+// client-side and server-side (sole admin: firstaimrun89@gmail.com).
 
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -274,7 +274,7 @@ function SettingsControl() {
     try {
       await save({ data: next });
       qc.setQueryData(["app-settings"], next);
-      toast.success("Settings saved.");
+      toast.success("Ad settings saved.");
     } catch (err) {
       setDraft(data ?? null);
       toast.error(err instanceof Error ? err.message : "Could not save settings.");
