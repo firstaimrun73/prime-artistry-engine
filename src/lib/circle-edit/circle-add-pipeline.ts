@@ -77,7 +77,7 @@ export function preflightCircleAdd(opts: {
   let credits: CircleAddPreflightOk["credits"];
   try {
     credits = quoteCircleAddCharge({
-      circleAssetId: resolved.assetId,
+      circleAssetId: resolved.assetId || opts.circleAssetId || "",
       sourceWidth: opts.sourceWidth,
       sourceHeight: opts.sourceHeight,
     });
@@ -87,11 +87,11 @@ export function preflightCircleAdd(opts: {
 
   const audit: CircleAddAuditRecord = {
     operation: "circle_add",
-    assetId: resolved.assetId,
-    assetName: resolved.assetName,
-    seed: resolved.seed,
-    variationStyle: resolved.style,
-    variationColor: resolved.color,
+    assetId: resolved.assetId || credits.assetId,
+    assetName: resolved.assetName || credits.assetName,
+    seed: resolved.seed ?? 0,
+    variationStyle: resolved.variationStyle,
+    variationColor: resolved.variationColor,
     model: CIRCLE_ADD_MODEL,
     imageWidth: mask.imageWidth,
     imageHeight: mask.imageHeight,
@@ -135,8 +135,8 @@ export function buildCircleAddHistoryMeta(preflight: CircleAddPreflightOk): Reco
     circle_asset_id: preflight.resolved.assetId,
     circle_asset_name: preflight.resolved.assetName,
     circle_seed: preflight.resolved.seed,
-    circle_variation_style: preflight.resolved.style,
-    circle_variation_color: preflight.resolved.color,
+    circle_variation_style: preflight.resolved.variationStyle,
+    circle_variation_color: preflight.resolved.variationColor,
     circle_model: preflight.model,
     circle_source_width: preflight.mask.imageWidth,
     circle_source_height: preflight.mask.imageHeight,
