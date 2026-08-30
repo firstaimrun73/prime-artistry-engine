@@ -3,8 +3,9 @@ import type { StandardExecuteInput, StandardExecuteResult } from "../types";
 import { quoteStandardCredits } from "../credits";
 
 /**
- * Uses fal-ai/flux-general/inpainting with original image + mask.
- * Inserts content only in the white masked region.
+ * Uses fal-ai/flux-pro/v1/fill with original image + mask.
+ * WHITE = edit region, BLACK = preserve (same polarity as Remove's erase mask).
+ * Do not touch the Remove handler.
  */
 export async function handleCircleToAdd(
   input: StandardExecuteInput,
