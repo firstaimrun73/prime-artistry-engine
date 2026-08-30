@@ -22,7 +22,6 @@ import { WhyChoose } from "@/components/home/WhyChoose";
 import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
-import { DiscoveryFeed } from "@/components/discover/DiscoveryFeed";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -64,9 +63,6 @@ function SignedOutHome() {
     <div className="min-h-screen bg-background">
       <Header />
       <HomeHero />
-      <section className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-12">
-        <DiscoveryFeed isSignedIn={false} />
-      </section>
       <BeforeAfterShowcase />
       <SampleShowcase />
       <SampleGallery />
@@ -272,7 +268,7 @@ const LOOP_SLIDES: LoopSlide[] = [
     bg: "linear-gradient(135deg,#fee2e2 0%,#f87171 45%,#dc2626 100%)",
   },
   {
-    label: "Music Studio",
+    name: "Music Studio",
     tagline: "Sunset aura soundtracks",
     icon: Music,
     bg: "linear-gradient(135deg,#4B0082 0%,#8B008B 50%,#FF69B4 100%)",
