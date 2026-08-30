@@ -29,6 +29,8 @@ const CHILD_PRODUCT_PREFIXES = [
   "/studio/image/circle-remove",
   "/studio/image/multi",
   "/studio/image/tools",
+  "/studio/image/filters",
+  "/studio/image/lenses",
 ] as const;
 
 function isChildProductRoute(pathname: string): boolean {
@@ -39,7 +41,7 @@ function isChildProductRoute(pathname: string): boolean {
 
 /**
  * Image Studio landing for exact /studio/image.
- * Child routes (Auto Edit, Circle 2edit, Multi, Tools) render themselves via Outlet.
+ * Child routes (Auto Edit, Circle 2edit, Multi, Tools, Filters, Lenses) render via Outlet.
  */
 function ImageStudio() {
   const { user, profile } = useAuth();
@@ -61,7 +63,7 @@ function ImageStudio() {
   };
 
   // Exact /studio/image only: signed-in users go into the Image Editor.
-  // Never redirect Auto Edit / Circle / Multi / Tools.
+  // Never redirect child product routes.
   useEffect(() => {
     if (isChild) return;
     if (!user) return;
