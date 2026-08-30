@@ -268,7 +268,7 @@ const LOOP_SLIDES: LoopSlide[] = [
     bg: "linear-gradient(135deg,#fee2e2 0%,#f87171 45%,#dc2626 100%)",
   },
   {
-    name: "Music Studio",
+    label: "Music Studio",
     tagline: "Sunset aura soundtracks",
     icon: Music,
     bg: "linear-gradient(135deg,#4B0082 0%,#8B008B 50%,#FF69B4 100%)",
