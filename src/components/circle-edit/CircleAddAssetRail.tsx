@@ -9,6 +9,7 @@ import {
   searchAddAssets,
   type CircleAddAsset,
 } from "@/lib/circle-edit/add-assets";
+import { AssetIcon } from "@/components/circle-edit/AssetIcon";
 
 type Props = {
   isDark: boolean;
@@ -30,11 +31,10 @@ function AssetThumb({ asset, selected, isDark }: { asset: CircleAddAsset; select
             ? "border-white/12 bg-white/8"
             : "border-black/8 bg-white/70",
       )}
-      aria-hidden
+      title={asset.name}
+      aria-label={asset.name}
     >
-      <span className="text-[22px] leading-none" title={asset.name}>
-        {asset.emoji}
-      </span>
+      <AssetIcon asset={asset} size={30} isDark={isDark} />
       {selected ? (
         <span className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full bg-[#7B6FE0] text-[9px] font-bold text-white">
           ✓
