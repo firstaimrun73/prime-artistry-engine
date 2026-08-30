@@ -7,7 +7,7 @@ import {
 } from "@/lib/circle-edit/credits";
 import { resolveCircleCharge, assertCircleAddAllowed } from "@/lib/circle-edit/server-charge";
 import { getAssetCreditCost } from "@/lib/circle-edit/add-assets-pricing";
-import { ADD_ASSETS, findAddAsset, buildAddPrompt } from "@/lib/circle-edit/add-assets";
+import { ADD_ASSETS, findAddAsset, buildAddPrompt, resolveAssetVariation } from "@/lib/circle-edit/add-assets";
 import { resolveCircleAddPrompt } from "@/lib/circle-edit/resolve-circle-add-prompt";
 
 describe("Circle 2edit credits (PDF bands)", () => {
@@ -121,5 +121,46 @@ describe("Circle 2edit credits (PDF bands)", () => {
       const p = buildAddPrompt({ asset: a, userDetail: "" });
       expect(p.toLowerCase()).toMatch(/mask|masked/);
     }
+  });
+
+  it("car has variation profile with styles and colors", () => {
+    const car = findAddAsset("vehicle_car");
+    expect(car).toBeTruthy();
+    expect(car!.variationProfile.enabled).toBe(true);
+    expect(car!.variationProfile.styles.length).toBeGreaterThan(5);
+    expect(car!.variationProfile.colors.length).toBeGreaterThan(5);
+    expect(car!.backendPrompt.toLowerCase()).toMatch(/ground|tire|perspective|lighting/);
+  });
+
+  it("same seed yields same car style/color; different seed can differ", () => {
+    const car = findAddAsset("vehicle_car")!;
+    const a = resolveAssetVariation(car, 42);
+    const b = resolveAssetVariation(car, 42);
+    const c = resolveAssetVariation(car, 99);
+    expect(a.style).toBe(b.style);
+    expect(a.color).toBe(b.color);
+    expect(a.seed).toBe(42);
+    const same = a.style === c.style && a.color === c.color;
+    expect(same).toBe(false);
+  });
+
+  it("server resolve includes variation fields for car", () => {
+    const r1 = resolveCircleAddPrompt({ circleAssetId: "vehicle_car", seed: 7 });
+    const r2 = resolveCircleAddPrompt({ circleAssetId: "vehicle_car", seed: 7 });
+    expect(r1.seed).toBe(7);
+    expect(r2.seed).toBe(7);
+    expect(r1.variationStyle).toBe(r2.variationStyle);
+    expect(r1.variationColor).toBe(r2.variationColor);
+    expect(r1.prompt.toLowerCase()).toMatch(/vehicle|car/);
+    expect(r1.prompt).toContain("Controlled variation");
+    expect(r1.prompt.toLowerCase()).toMatch(/not a sticker|not a line drawing|photographed/);
+  });
+
+  it("dog variation is controlled not identical across seeds", () => {
+    const dog = findAddAsset("animal_dog")!;
+    const styles = new Set(
+      [1, 2, 3, 4, 5, 6, 7, 8].map((s) => resolveAssetVariation(dog, s).style),
+    );
+    expect(styles.size).toBeGreaterThan(1);
   });
 });
