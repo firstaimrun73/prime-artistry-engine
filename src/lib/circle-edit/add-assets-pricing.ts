@@ -1,5 +1,6 @@
 /**
  * Server-authoritative Circle Add asset pricing from persisted catalog creditCost.
+ * Unknown / missing assetId returns 0 — callers must fail closed via preflight.
  */
 import { ADD_ASSETS, findAddAsset, type CircleAddAsset } from "@/lib/circle-edit/add-assets";
 
@@ -7,12 +8,10 @@ export const FREE_CIRCLE_ADD_ASSET_IDS = ADD_ASSETS.filter((a) => a.isFree || a.
   (a) => a.id,
 );
 
-const DEFAULT_PAID = 15;
-
 export function getAssetCreditCost(assetId: string | null | undefined): number {
   if (!assetId) return 0;
   const a = findAddAsset(assetId);
-  if (!a) return DEFAULT_PAID;
+  if (!a || !a.isActive) return 0;
   if (a.isFree || a.creditCost === 0) return 0;
   return Math.max(5, Math.min(100, Math.round(a.creditCost)));
 }
