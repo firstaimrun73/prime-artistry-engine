@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 type Props = {
   isSignedIn: boolean;
   compact?: boolean;
+  /** When true, show search field even in compact (post-login icon-first) mode */
+  forceSearchOpen?: boolean;
 };
 
 function SectionRail({
@@ -60,11 +62,14 @@ function SectionRail({
   );
 }
 
-export function DiscoveryFeed({ isSignedIn, compact }: Props) {
+export function DiscoveryFeed({ isSignedIn, compact, forceSearchOpen }: Props) {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<DiscoverItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  /** Post-login: icon-first — only show search field when forceSearchOpen or not compact */
+  const showSearch = !compact || !!forceSearchOpen || query.trim().length > 0;
 
   const featured = useMemo(() => getFeaturedDiscover(), []);
 
@@ -117,26 +122,29 @@ export function DiscoveryFeed({ isSignedIn, compact }: Props) {
         </div>
       )}
 
-      <div className="relative mt-4">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search ideas — portrait, product, cinematic…"
-          className="h-11 rounded-xl border-border bg-card pl-9 pr-9"
-          aria-label="Search creative ideas"
-        />
-        {query && (
-          <button
-            type="button"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-            onClick={() => setQuery("")}
-            aria-label="Clear search"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+      {showSearch && (
+        <div className="relative mt-4">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search ideas — portrait, product, cinematic…"
+            className="h-11 rounded-xl border-border bg-card pl-9 pr-9"
+            aria-label="Search creative ideas"
+            autoFocus={!!forceSearchOpen}
+          />
+          {query && (
+            <button
+              type="button"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {!searchResults && (
         <div className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-none">
