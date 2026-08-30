@@ -9,7 +9,8 @@ export const Route = createFileRoute("/studio/image/lenses")({
       { title: "AI Lenses — Motio2edit Image Studio" },
       {
         name: "description",
-        content: "20 original Motio2edit AI Lenses — computational photography transforms for your photos.",
+        content:
+          "20 original Motio2edit AI Lenses — computational photography transforms for your photos.",
       },
     ],
   }),

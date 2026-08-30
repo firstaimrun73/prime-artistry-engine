@@ -9,7 +9,8 @@ export const Route = createFileRoute("/studio/image/filters")({
       { title: "Filters — Motio2edit Image Studio" },
       {
         name: "description",
-        content: "100 original Motio2edit photographic filters — programmatic, deterministic image processing.",
+        content:
+          "100 original Motio2edit photographic filters — programmatic, deterministic image processing.",
       },
     ],
   }),
