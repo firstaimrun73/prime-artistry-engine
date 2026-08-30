@@ -34,8 +34,25 @@ export function validateStandardImageRequest(
   raw: StandardImageRequest,
 ): StandardValidationResult {
   const prompt = typeof raw.prompt === "string" ? raw.prompt.trim() : "";
-  if (!prompt || prompt.length > 2000) {
-    return { ok: false, error: "Enter a prompt between 1 and 2000 characters." };
+  // Circle Add/Remove prompts are server-composed (asset + integrate + variation)
+  // and legitimately exceed the normal T2I 2000 cap.
+  const isCirclePath = !!(raw.maskImageUrl || raw.circleInstant);
+  const maxPromptChars = isCirclePath ? 4000 : 2000;
+  if (!prompt) {
+    return {
+      ok: false,
+      error: isCirclePath
+        ? "Image not generated. Please select an object and mark an area, then try again."
+        : "Please enter a prompt (1–2000 characters).",
+    };
+  }
+  if (prompt.length > maxPromptChars) {
+    return {
+      ok: false,
+      error: isCirclePath
+        ? `Image not generated. Prompt is too long (max ${maxPromptChars} characters).`
+        : "Prompt is too long. Maximum 2000 characters.",
+    };
   }
 
   const imageUrl = isHttpsUrl(raw.imageUrl) ? raw.imageUrl : undefined;
