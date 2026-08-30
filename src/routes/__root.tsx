@@ -164,9 +164,14 @@ function RootShell({ children }: { children: ReactNode }) {
 function PageViewTracker() {
   const router = useRouter();
   useEffect(() => {
-    trackPageView(router.state.location.pathname);
+    const send = (path: string) => {
+      trackPageView(path);
+      // First-party traffic (admin dashboard). Fire-and-forget.
+      void import("@/lib/traffic-client").then((m) => m.reportPageView(path));
+    };
+    send(router.state.location.pathname);
     const unsub = router.subscribe("onResolved", () => {
-      trackPageView(router.state.location.pathname);
+      send(router.state.location.pathname);
     });
     return unsub;
   }, [router]);
