@@ -108,8 +108,14 @@ export function buildCircleRemoveStep(req: StandardValidationOk): StandardFalSte
 }
 
 /**
- * Circle Add — flux-general/inpainting ONLY (do not change Remove path).
- * WHITE = edit region. BLACK = preserve. Strength moderate so unmasked pixels stay intact.
+ * Circle Add — fal-ai/flux-pro/v1/fill ONLY (do not change Remove path).
+ *
+ * WHY NOT flux-general/inpainting:
+ *   that endpoint takes a global `strength` (0=keep, 1=remake whole image) and does not
+ *   hard-lock edits to the mask. Users saw garbage outside / instead of the painted region.
+ *
+ * flux-pro/v1/fill is the mask-native sibling of flux-pro/v1/erase (Remove):
+ *   WHITE = inpaint / edit, BLACK = preserve, mask dims must match image dims.
  * Prompt is server-resolved from asset registry (never trust client object identity).
  */
 export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
@@ -117,55 +123,34 @@ export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
     throw new Error("Circle add requires original image and mask.");
   }
   const userPrompt = (req.prompt || "").trim();
+  // Keep prompt focused on WHAT to put in the white region; WHERE is the mask.
   const prompt = userPrompt
-    ? `${userPrompt} Inpaint only the white mask. Leave every black (unmasked) pixel unchanged. Add exactly one object.`
-    : "Inpaint only the white mask with exactly one requested object. Leave every black pixel unchanged.";
-
-  const negativePrompt = [
-    "extra objects",
-    "multiple copies",
-    "duplicated object",
-    "changed unmasked area",
-    "altered railing",
-    "modified architecture",
-    "different face",
-    "different clothing",
-    "different background",
-    "full scene regeneration",
-    "extra objects outside mask",
-    "artifacts",
-    "blur",
-    "watermark",
-    "text",
-  ].join(", ");
+    ? userPrompt
+    : "Fill the white masked region with exactly one realistic object that fits the scene. Leave every black pixel unchanged.";
 
   if (process.env.NODE_ENV !== "production") {
     console.log("[CIRCLE ADD] modelRequest", {
       operation: "circle_add",
+      model: STANDARD_MODELS.circleToAdd,
       promptLen: prompt.length,
-      promptHead: prompt.slice(0, 120),
+      promptHead: prompt.slice(0, 160),
       imageUrlPresent: !!req.imageUrl,
       maskUrlPresent: !!req.maskImageUrl,
-      model: "fal-ai/flux-general/inpainting",
-      strength: 0.78,
+      note: "WHITE=edit BLACK=preserve; no strength param (mask-native fill)",
     });
   }
 
   return {
-    label: "standard circle-to-add (flux inpaint)",
-    model: "fal-ai/flux-general/inpainting",
+    label: "standard circle-to-add (flux-pro fill)",
+    model: STANDARD_MODELS.circleToAdd,
     body: {
       prompt,
       image_url: req.imageUrl,
       mask_url: req.maskImageUrl,
-      strength: 0.78,
-      guidance_scale: 3.5,
-      num_inference_steps: 36,
       num_images: 1,
-      enable_safety_checker: true,
       output_format: "png",
-      scheduler: "euler",
-      negative_prompt: negativePrompt,
+      safety_tolerance: "2",
+      enhance_prompt: false,
     },
   };
 }
