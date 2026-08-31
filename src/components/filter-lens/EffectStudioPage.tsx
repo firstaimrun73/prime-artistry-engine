@@ -285,9 +285,9 @@ export function EffectStudioPage({ kind, title, subtitle, items, categories, pag
       <main className={cn("mx-auto flex max-w-6xl flex-col gap-3 px-3 pt-3 sm:px-4", selected ? "pb-56 sm:pb-12" : "pb-24 sm:pb-12")}>
         <div className="flex items-center gap-2">
           <Link
-            to="/studio/image/tools"
+            to="/studio/image"
             className={cn("grid h-9 w-9 place-items-center rounded-lg border", isDark ? "border-white/10" : "border-black/8")}
-            aria-label="Back"
+            aria-label="Back to Image Studio"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
