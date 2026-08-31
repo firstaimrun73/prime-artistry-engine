@@ -75,8 +75,27 @@ function StudioHub() {
             <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[#7B6FE0]/18 blur-3xl" />
             <div className="relative">
               <div className="mb-4 inline-flex items-center justify-center rounded-2xl border border-[#7B6FE0]/45 bg-white/80 p-3 shadow-lg dark:bg-[#22252F]">
-                <span className="relative grid h-7 w-7 place-items-center">
-                  <span className="absolute inset-0 rounded-full border-2 border-[#7B6FE0]" />
+                <span className="relative grid h-7 w-7 place-items-center" aria-hidden data-circle-studio-mark="true">
+                  <svg viewBox="0 0 28 28" className="h-7 w-7 overflow-visible">
+                    <defs>
+                      <linearGradient id="studioCircleRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#A8A0F0" />
+                        <stop offset="50%" stopColor="#7B6FE0" />
+                        <stop offset="100%" stopColor="#C8C4E8" />
+                      </linearGradient>
+                    </defs>
+                    <circle
+                      cx="14"
+                      cy="14"
+                      r="10"
+                      fill="none"
+                      stroke="url(#studioCircleRing)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      className="origin-center motion-safe:animate-[spin_8s_linear_infinite]"
+                    />
+                    <circle cx="14" cy="14" r="3.5" fill="none" stroke="#7B6FE0" strokeWidth="1.4" opacity="0.9" />
+                  </svg>
                 </span>
               </div>
               <h2 className="text-2xl font-extrabold text-foreground">
