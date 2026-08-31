@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Image as ImageIcon, Video, Music, Zap, Play, X, ArrowRight, Upload, Wand2, Download } from "lucide-react";
 
-const DEMO_VIDEO = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
+const DEMO_VIDEO = "/demo/video/motio2edit-demo.mp4";
 const DEMO_POSTER = "/demo/video/poster-landscape.jpg";
 
 const VALUE_PROPS = [
@@ -58,19 +58,16 @@ export function HomeHero() {
             </Button>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground lg:justify-start">
             {VALUE_PROPS.map(({ icon: Icon, label }) => (
-              <span
-                key={label}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground"
-              >
-                <Icon className="h-3.5 w-3.5 text-primary" />
+              <span key={label} className="inline-flex items-center gap-1.5">
+                <Icon className="h-4 w-4 text-primary" />
                 {label}
               </span>
             ))}
           </div>
 
-          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground lg:justify-start">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs font-medium text-muted-foreground lg:justify-start">
             {STEPS.map(({ icon: Icon, label }, i) => (
               <span key={label} className="inline-flex items-center gap-1.5">
                 {i > 0 && <span className="mx-1 text-border">→</span>}
@@ -120,12 +117,18 @@ export function HomeHero() {
               <X className="h-5 w-5" />
             </button>
             <video
+              key={demoOpen ? "demo-open" : "demo-closed"}
               src={DEMO_VIDEO}
               poster={DEMO_POSTER}
               controls
               autoPlay
-              className="aspect-video w-full"
-            />
+              playsInline
+              preload="metadata"
+              className="w-full max-h-[min(70vh,720px)] object-contain bg-black"
+            >
+              <source src={DEMO_VIDEO} type="video/mp4" />
+              Your browser does not support this demo video.
+            </video>
           </div>
         </div>
       )}
