@@ -1,7 +1,7 @@
 /**
  * Circle 2edit — /studio/image/circle-remove
  * Remove: circleInstant true
- * Add: circleInstant false → flux-pro fill; asset rail + factors
+ * Add: circleInstant false → flux-pro fill; asset rail + factors + confirm
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -37,6 +37,8 @@ import { useTheme } from "@/lib/theme";
 import { isFreePlan } from "@/lib/policy";
 import { CIRCLE_REMOVE_CREDITS, estimateCircleAddCredits } from "@/lib/circle-edit/credits";
 import { getAssetCreditCost } from "@/lib/circle-edit/add-assets-pricing";
+import { AssetIcon } from "@/components/circle-edit/AssetIcon";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/studio/image/circle-remove")({
   ssr: false,
@@ -102,6 +104,8 @@ function Circle2editPage() {
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
   const [factorSelection, setFactorSelection] = useState<Record<string, string>>({});
+  const [addConfirmed, setAddConfirmed] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
   const [stageIdx, setStageIdx] = useState(0);
   const [showCompare, setShowCompare] = useState(true);
@@ -207,6 +211,10 @@ function Circle2editPage() {
         toast.error("Circle Add requires a paid plan.");
         return;
       }
+      if (kind === "add" && !addConfirmed) {
+        toast.message("Confirm the object first.");
+        return;
+      }
       const assetCost = kind === "add" ? getAssetCreditCost(addObjectId) : 0;
       const needed =
         kind === "remove"
@@ -231,6 +239,7 @@ function Circle2editPage() {
       }
 
       setAddDrawerOpen(false);
+      setConfirmOpen(false);
       generatingLockRef.current = true;
       setPhase("generating");
       try {
@@ -314,6 +323,7 @@ function Circle2editPage() {
       addLocked,
       sourceWidth,
       sourceHeight,
+      addConfirmed,
     ],
   );
 
@@ -324,22 +334,24 @@ function Circle2editPage() {
     }
     setMode(m);
     if (m === "add") {
-      // Add mode: hide Circle tool; paint placement with brush
       setDrawTool("brush");
+      setAddConfirmed(false);
+      setConfirmOpen(false);
     } else {
       setAddDrawerOpen(false);
+      setConfirmOpen(false);
     }
   };
 
   const statusForMode = () => {
     if (!preview) return "Upload an image to begin";
-    if (!hasMask)
-      return mode === "remove" ? "Circle or paint the object to remove" : "Circle or paint where to add";
     if (mode === "add") {
-      const asset = findAddAsset(addObjectId);
-      if (asset) return `Ready to add ${asset.label ?? asset.name}`;
-      return "Browse objects to add";
+      if (!addObjectId) return "Browse objects to add";
+      if (!addConfirmed) return "Confirm object & options";
+      if (!hasMask) return "Paint where to add";
+      return `Ready to add ${findAddAsset(addObjectId)?.name ?? "object"}`;
     }
+    if (!hasMask) return "Circle or paint the object to remove";
     return "Ready to remove";
   };
 
@@ -370,28 +382,30 @@ function Circle2editPage() {
   const canGenerate =
     !!preview &&
     hasMask &&
-    (mode === "remove" || (!addLocked && !!findAddAsset(addObjectId)));
+    (mode === "remove" || (!addLocked && !!findAddAsset(addObjectId) && addConfirmed));
 
   const selectedAsset = findAddAsset(addObjectId);
 
+  // Painting locked in Add until asset is confirmed
+  const paintLocked = phase === "generating" || (mode === "add" && !addConfirmed);
+
   const controls = preview ? (
     <div className="flex flex-col gap-2">
-      <CircleDrawToolbar
-        tool={drawTool}
-        onTool={setDrawTool}
-        brushSize={brushSize}
-        onBrushSize={setBrushSize}
-        hideCircle={mode === "add"}
-      />
+      {mode === "remove" || addConfirmed ? (
+        <CircleDrawToolbar
+          tool={drawTool}
+          onTool={setDrawTool}
+          brushSize={brushSize}
+          onBrushSize={setBrushSize}
+          hideCircle={mode === "add"}
+        />
+      ) : null}
       {mode === "add" && !addLocked ? (
         <>
-          {selectedAsset ? (
+          {addConfirmed && selectedAsset ? (
             <div className="flex items-center gap-2 rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.10)] px-2.5 py-1.5">
-              <span
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[rgba(123,111,224,0.18)] text-[11px] font-bold text-[#7B6FE0]"
-                aria-hidden
-              >
-                {(selectedAsset.name ?? "?").slice(0, 2).toUpperCase()}
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[rgba(123,111,224,0.18)]">
+                <AssetIcon asset={selectedAsset} size={20} isDark={isDark} selected />
               </span>
               <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#7B6FE0]">
                 {selectedAsset.name}
@@ -402,6 +416,10 @@ function Circle2editPage() {
                 onClick={() => {
                   setAddObjectId(null);
                   setFactorSelection({});
+                  setAddConfirmed(false);
+                  setConfirmOpen(false);
+                  maskStageRef.current?.clear();
+                  setHasMask(false);
                 }}
                 className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[13px] font-bold text-[#7B6FE0]/80 hover:bg-[rgba(123,111,224,0.15)]"
               >
@@ -409,7 +427,10 @@ function Circle2editPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setAddDrawerOpen(true)}
+                onClick={() => {
+                  setAddConfirmed(false);
+                  setConfirmOpen(true);
+                }}
                 className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-medium text-[#7B6FE0]/90"
               >
                 Change
@@ -424,14 +445,6 @@ function Circle2editPage() {
               Browse objects
             </button>
           )}
-          {selectedAsset ? (
-            <CircleFactorPicker
-              asset={selectedAsset}
-              selection={factorSelection}
-              onChange={setFactorSelection}
-              isDark={isDark}
-            />
-          ) : null}
         </>
       ) : null}
       {mode === "add" && addLocked ? (
@@ -450,9 +463,84 @@ function Circle2editPage() {
         onSelect={(id) => {
           setAddObjectId(id);
           setFactorSelection({});
+          setAddConfirmed(false);
+          setAddDrawerOpen(false);
+          setConfirmOpen(true);
         }}
         disabled={addLocked || !preview}
       />
+    ) : null;
+
+  const confirmSheet =
+    mode === "add" && confirmOpen && selectedAsset && !addConfirmed ? (
+      <>
+        <button
+          type="button"
+          aria-label="Close confirmation"
+          className="fixed inset-0 z-[45] bg-black/25"
+          onClick={() => {
+            setConfirmOpen(false);
+            setAddObjectId(null);
+            setFactorSelection({});
+          }}
+        />
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-[50] max-h-[50vh] overflow-y-auto border-t px-3 py-3 shadow-[0_-8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:px-4",
+            isDark ? "border-white/10 bg-[#181A22]/96" : "border-black/6 bg-white/96",
+          )}
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          role="dialog"
+          aria-label="Confirm object to add"
+        >
+          <div className="mb-2 flex items-center gap-2">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[rgba(123,111,224,0.18)]">
+              <AssetIcon asset={selectedAsset} size={28} isDark={isDark} selected />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-[#7B6FE0]">{selectedAsset.name}</p>
+              <p className={cn("text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+                Choose options, then confirm to paint placement
+              </p>
+            </div>
+          </div>
+          <CircleFactorPicker
+            asset={selectedAsset}
+            selection={factorSelection}
+            onChange={setFactorSelection}
+            isDark={isDark}
+          />
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmOpen(false);
+                setAddObjectId(null);
+                setFactorSelection({});
+                setAddConfirmed(false);
+              }}
+              className={cn(
+                "flex-1 rounded-xl border px-3 py-2.5 text-[13px] font-semibold",
+                isDark ? "border-white/12 text-[#9AA0B0]" : "border-black/10 text-[#5C6170]",
+              )}
+            >
+              ✕ Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAddConfirmed(true);
+                setConfirmOpen(false);
+                setDrawTool("brush");
+                toast.message(`Ready to place ${selectedAsset.name}`);
+              }}
+              className="flex-1 rounded-xl bg-[#7B6FE0] px-3 py-2.5 text-[13px] font-semibold text-white"
+            >
+              ✓ Confirm
+            </button>
+          </div>
+        </div>
+      </>
     ) : null;
 
   if (phase === "result" && output && preview) {
@@ -524,18 +612,25 @@ function Circle2editPage() {
       generating={phase === "generating"}
       onBack={() => navigate({ to: "/studio" })}
       controls={controls}
-      sheet={addSheet}
+      sheet={
+        <>
+          {addSheet}
+          {confirmSheet}
+        </>
+      }
       onGenerate={() => void runWithMask(mode)}
       generateDisabled={!canGenerate}
       generateLabel={mode === "remove" ? "Remove Object" : "Add Object"}
       generateHint={
         !preview
           ? "Upload an image first"
-          : !hasMask
-            ? "Select an area first"
-            : mode === "add" && !addObjectId
-              ? "Choose an object first"
-              : undefined
+          : mode === "add" && !addObjectId
+            ? "Choose an object first"
+            : mode === "add" && !addConfirmed
+              ? "Confirm object first"
+              : !hasMask
+                ? "Select an area first"
+                : undefined
       }
       actionBar={
         <CircleEditActionBar
@@ -563,13 +658,13 @@ function Circle2editPage() {
             <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
           </div>
         ) : (
-          <div className="relative flex min-h-[42vh] flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
             <CircleMaskStage
               ref={maskStageRef}
               imageUrl={preview}
               tool={drawToolToMaskTool(drawTool)}
               brushSize={brushSize}
-              disabled={phase === "generating"}
+              disabled={paintLocked}
               onMaskChange={setHasMask}
             />
           </div>
