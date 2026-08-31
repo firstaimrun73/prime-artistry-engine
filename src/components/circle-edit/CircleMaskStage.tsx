@@ -1,4 +1,4 @@
-/** Circle 2edit: sharp img + SVG freehand Circle/Brush/Eraser + source WorkingMask */
+/** Circle 2edit: sharp img + freehand Circle (A→B close) / Brush / Eraser + WorkingMask */
 
 import {
   useCallback,
@@ -14,7 +14,6 @@ import {
   stampBrush,
   strokeBetween,
   fillClosedPath,
-  fillEllipse,
   clearMask as clearWorkingMask,
   maskHasPaint,
   exportMaskNatural,
@@ -45,9 +44,11 @@ type Props = {
 
 const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 6;
+/** Screen CSS px — close when B is within this of A (scaled by DPR / zoom via display scale). */
 const CLOSE_TOLERANCE_CSS_PX = 28;
 const MIN_PATH_POINTS = 4;
 const MIN_PATH_LENGTH_NATURAL = 20;
+/** Min distance between successive sampled path points (natural px). */
 const PATH_SAMPLE_NATURAL = 2.5;
 const BRAND = "123, 111, 224";
 
@@ -84,6 +85,24 @@ function containSize(natural: Size, vw: number, vh: number, pad = 16): { w: numb
   };
 }
 
+/** Smooth SVG path from natural points (quadratic midpoints). */
+function smoothPathD(pts: Point[]): string {
+  if (pts.length === 0) return "";
+  if (pts.length === 1) return `M${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  if (pts.length === 2) {
+    return `M${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)} L${pts[1].x.toFixed(1)} ${pts[1].y.toFixed(1)}`;
+  }
+  let d = `M${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const midX = (pts[i].x + pts[i + 1].x) / 2;
+    const midY = (pts[i].y + pts[i + 1].y) / 2;
+    d += ` Q${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)} ${midX.toFixed(1)} ${midY.toFixed(1)}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L${last.x.toFixed(1)} ${last.y.toFixed(1)}`;
+  return d;
+}
+
 export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function CircleMaskStage(
   { imageUrl, tool, brushSize, disabled, onMaskChange },
   ref,
@@ -91,6 +110,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const viewportRef = useRef<HTMLDivElement>(null);
   const hitRef = useRef<HTMLDivElement>(null);
   const maskVisRef = useRef<HTMLCanvasElement>(null);
+  /** Reused tint canvas — avoid allocate-on-every-frame */
+  const tintCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const naturalRef = useRef<Size | null>(null);
   const maskRef = useRef<WorkingMask | null>(null);
@@ -104,10 +125,18 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const pathStartRef = useRef<Point | null>(null);
   const pathPtsRef = useRef<Point[]>([]);
   const strokePtsRef = useRef<Point[]>([]);
+  const activePointerIdRef = useRef<number | null>(null);
 
   const panningRef = useRef(false);
   const panStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
-  const pinchRef = useRef<{ dist: number; zoom: number; midX?: number; midY?: number; panX?: number; panY?: number } | null>(null);
+  const pinchRef = useRef<{
+    dist: number;
+    zoom: number;
+    midX?: number;
+    midY?: number;
+    panX?: number;
+    panY?: number;
+  } | null>(null);
 
   const historyRef = useRef<ImageData[]>([]);
   const historyIdxRef = useRef(-1);
@@ -127,7 +156,34 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const [pathNearClose, setPathNearClose] = useState(false);
   const [liveStroke, setLiveStroke] = useState<Point[]>([]);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
-  const [diag, setDiag] = useState<string>("");
+
+  const cancelRafs = useCallback(() => {
+    if (rafVisRef.current != null) {
+      cancelAnimationFrame(rafVisRef.current);
+      rafVisRef.current = null;
+    }
+    if (liveStrokeRafRef.current != null) {
+      cancelAnimationFrame(liveStrokeRafRef.current);
+      liveStrokeRafRef.current = null;
+    }
+    if (cursorRafRef.current != null) {
+      cancelAnimationFrame(cursorRafRef.current);
+      cursorRafRef.current = null;
+    }
+  }, []);
+
+  const abortDrawing = useCallback(() => {
+    drawingRef.current = false;
+    pathStartRef.current = null;
+    pathPtsRef.current = [];
+    strokePtsRef.current = [];
+    lastSrcRef.current = null;
+    activePointerIdRef.current = null;
+    pendingStrokeRef.current = null;
+    setLivePath([]);
+    setPathNearClose(false);
+    setLiveStroke([]);
+  }, []);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -137,16 +193,18 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   }, [pan]);
   useEffect(() => {
     toolRef.current = tool;
-    drawingRef.current = false;
-    pathStartRef.current = null;
-    pathPtsRef.current = [];
-    setLivePath([]);
-    setPathNearClose(false);
-    setLiveStroke([]);
-  }, [tool]);
+    abortDrawing();
+  }, [tool, abortDrawing]);
   useEffect(() => {
     brushSizeRef.current = brushSize;
   }, [brushSize]);
+
+  useEffect(() => {
+    return () => {
+      cancelRafs();
+      abortDrawing();
+    };
+  }, [cancelRafs, abortDrawing]);
 
   useEffect(() => {
     const el = viewportRef.current;
@@ -184,6 +242,12 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     return hit.getBoundingClientRect().width / nat.width;
   }, []);
 
+  /** Close radius in natural pixels — responsive to zoom/display scale. */
+  const closeRadiusNatural = useCallback((): number => {
+    const scale = screenToNaturalScale();
+    return CLOSE_TOLERANCE_CSS_PX / Math.max(scale, 0.001);
+  }, [screenToNaturalScale]);
+
   const paintMaskVis = useCallback(() => {
     const canvas = maskVisRef.current;
     const mask = maskRef.current;
@@ -203,16 +267,26 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, bw, bh);
     if (!mask || !maskHasPaint(mask)) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const tmp = document.createElement("canvas");
-    tmp.width = mask.width;
-    tmp.height = mask.height;
+
+    // Reuse tint canvas sized to working mask
+    let tmp = tintCanvasRef.current;
+    if (!tmp || tmp.width !== mask.width || tmp.height !== mask.height) {
+      tmp = document.createElement("canvas");
+      tmp.width = mask.width;
+      tmp.height = mask.height;
+      tintCanvasRef.current = tmp;
+    }
     const tctx = tmp.getContext("2d");
     if (!tctx) return;
+    tctx.setTransform(1, 0, 0, 1, 0, 0);
+    tctx.clearRect(0, 0, tmp.width, tmp.height);
     tctx.drawImage(mask.canvas, 0, 0);
     tctx.globalCompositeOperation = "source-in";
-    tctx.fillStyle = `rgba(${BRAND}, 0.5)`;
+    tctx.fillStyle = `rgba(${BRAND}, 0.42)`;
     tctx.fillRect(0, 0, tmp.width, tmp.height);
+    tctx.globalCompositeOperation = "source-over";
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.drawImage(tmp, 0, 0, cssW, cssH);
   }, [fitBox.w, fitBox.h]);
 
@@ -242,13 +316,10 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       setReady(true);
       setZoom(1);
       setPan({ x: 0, y: 0 });
-      setLivePath([]);
-      setPathNearClose(false);
-      setLiveStroke([]);
-      setDiag(`src ${nat.width}×${nat.height}`);
+      abortDrawing();
       scheduleMaskVis();
     },
-    [onMaskChange, scheduleMaskVis],
+    [onMaskChange, scheduleMaskVis, abortDrawing],
   );
 
   useEffect(() => {
@@ -256,6 +327,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     setNatural(null);
     naturalRef.current = null;
     maskRef.current = null;
+    tintCanvasRef.current = null;
     let cancelled = false;
     const img = new Image();
     if (imageUrl.startsWith("http")) img.crossOrigin = "anonymous";
@@ -295,11 +367,9 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     clearWorkingMask(mask);
     hasMarkRef.current = false;
     onMaskChange?.(false);
-    setLivePath([]);
-    setPathNearClose(false);
-    setLiveStroke([]);
+    abortDrawing();
     scheduleMaskVis();
-  }, [onMaskChange, pushHistory, scheduleMaskVis]);
+  }, [onMaskChange, pushHistory, scheduleMaskVis, abortDrawing]);
 
   const undo = useCallback(() => {
     const mask = maskRef.current;
@@ -355,6 +425,30 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     [onMaskChange, screenToNaturalScale],
   );
 
+  const scheduleLivePath = useCallback((pts: Point[]) => {
+    pendingStrokeRef.current = pts;
+    if (liveStrokeRafRef.current == null) {
+      liveStrokeRafRef.current = requestAnimationFrame(() => {
+        liveStrokeRafRef.current = null;
+        if (pendingStrokeRef.current) {
+          setLivePath(pendingStrokeRef.current.slice());
+        }
+      });
+    }
+  }, []);
+
+  const scheduleLiveStroke = useCallback((pts: Point[]) => {
+    pendingStrokeRef.current = pts;
+    if (liveStrokeRafRef.current == null) {
+      liveStrokeRafRef.current = requestAnimationFrame(() => {
+        liveStrokeRafRef.current = null;
+        if (pendingStrokeRef.current) {
+          setLiveStroke(pendingStrokeRef.current.slice());
+        }
+      });
+    }
+  }, []);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (disabled) return;
@@ -369,6 +463,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
           py: panRef.current.y,
         };
         hit.setPointerCapture(e.pointerId);
+        activePointerIdRef.current = e.pointerId;
         return;
       }
       if (e.button !== 0) return;
@@ -376,9 +471,12 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       const src = screenToSource(e.clientX, e.clientY);
       if (!src) return;
       hit.setPointerCapture(e.pointerId);
+      activePointerIdRef.current = e.pointerId;
       drawingRef.current = true;
       lastSrcRef.current = src;
+
       if (toolRef.current === "circle") {
+        // Terminal A = first point
         pathStartRef.current = src;
         pathPtsRef.current = [src];
         setLivePath([src]);
@@ -386,6 +484,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
         setLiveStroke([]);
         return;
       }
+
+      // Brush / Eraser — paint immediately into working mask
       pushHistory();
       strokePtsRef.current = [src];
       setLiveStroke([src]);
@@ -415,35 +515,53 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
         return;
       }
       if (!drawingRef.current || pinchRef.current) return;
+      if (
+        activePointerIdRef.current != null &&
+        e.pointerId !== activePointerIdRef.current
+      ) {
+        return;
+      }
+
       const src = screenToSource(e.clientX, e.clientY);
       if (!src) return;
+
       if (toolRef.current === "circle") {
         const start = pathStartRef.current;
         if (!start) return;
-        pathPtsRef.current = [start, src];
-        pendingStrokeRef.current = [start, src];
-        if (liveStrokeRafRef.current == null) {
-          liveStrokeRafRef.current = requestAnimationFrame(() => {
-            liveStrokeRafRef.current = null;
-            if (pendingStrokeRef.current) setLivePath(pendingStrokeRef.current.slice());
-          });
+        const pts = pathPtsRef.current;
+        const last = pts[pts.length - 1];
+        // Sample path — do not force ellipse
+        if (!last || distNatural(last, src) >= PATH_SAMPLE_NATURAL) {
+          pts.push(src);
+        } else {
+          // Update last point for smooth endpoint tracking
+          pts[pts.length - 1] = src;
         }
-        setPathNearClose(false);
+        pathPtsRef.current = pts;
+        scheduleLivePath(pts);
+
+        const near =
+          pts.length >= MIN_PATH_POINTS &&
+          distNatural(src, start) <= closeRadiusNatural();
+        setPathNearClose(near);
         return;
       }
+
+      // Brush / Eraser continuous stroke
       strokePtsRef.current.push(src);
-      pendingStrokeRef.current = strokePtsRef.current;
-      if (liveStrokeRafRef.current == null) {
-        liveStrokeRafRef.current = requestAnimationFrame(() => {
-          liveStrokeRafRef.current = null;
-          if (pendingStrokeRef.current) setLiveStroke(pendingStrokeRef.current.slice());
-        });
-      }
+      scheduleLiveStroke(strokePtsRef.current);
       applyBrush(src, lastSrcRef.current);
       lastSrcRef.current = src;
       scheduleMaskVis();
     },
-    [screenToSource, applyBrush, scheduleMaskVis],
+    [
+      screenToSource,
+      applyBrush,
+      scheduleMaskVis,
+      scheduleLivePath,
+      scheduleLiveStroke,
+      closeRadiusNatural,
+    ],
   );
 
   const endPointer = useCallback(
@@ -451,44 +569,87 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       if (panningRef.current) {
         panningRef.current = false;
         panStartRef.current = null;
+        activePointerIdRef.current = null;
+        try {
+          (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+        } catch {
+          /* ignore */
+        }
         return;
       }
       if (!drawingRef.current) return;
       drawingRef.current = false;
+
       if (toolRef.current === "circle") {
         const start = pathStartRef.current;
         const mask = maskRef.current;
-        const end = screenToSource(e.clientX, e.clientY) ?? pathPtsRef.current[1] ?? null;
-        const minSize = 8;
-        if (mask && start && end) {
-          const dx = Math.abs(end.x - start.x);
-          const dy = Math.abs(end.y - start.y);
-          if (dx >= minSize || dy >= minSize) {
+        const pts = pathPtsRef.current.slice();
+        const end =
+          screenToSource(e.clientX, e.clientY) ?? pts[pts.length - 1] ?? null;
+
+        let committed = false;
+        if (mask && start && end && pts.length >= MIN_PATH_POINTS) {
+          // Snap B to A if near close
+          const near = distNatural(end, start) <= closeRadiusNatural() * 1.15;
+          const len = pathLengthNatural(pts);
+          if (near && len >= MIN_PATH_LENGTH_NATURAL) {
+            // Ensure closed: last point = A
+            if (distNatural(pts[pts.length - 1], start) > 0.5) {
+              pts.push(start);
+            } else {
+              pts[pts.length - 1] = start;
+            }
             pushHistory();
-            fillEllipse(mask, start, end);
+            fillClosedPath(mask, pts);
             hasMarkRef.current = maskHasPaint(mask);
             onMaskChange?.(hasMarkRef.current);
             scheduleMaskVis();
+            committed = true;
           }
         }
+
+        // Always clear temporary overlay (committed or discarded)
         pathStartRef.current = null;
         pathPtsRef.current = [];
         setLivePath([]);
         setPathNearClose(false);
+        if (!committed) {
+          // incomplete path discarded cleanly
+        }
       } else {
         setLiveStroke([]);
         strokePtsRef.current = [];
         scheduleMaskVis();
       }
+
       lastSrcRef.current = null;
+      activePointerIdRef.current = null;
       try {
         (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
       } catch {
         /* ignore */
       }
     },
-    [screenToSource, pushHistory, onMaskChange, scheduleMaskVis],
+    [screenToSource, pushHistory, onMaskChange, scheduleMaskVis, closeRadiusNatural],
   );
+
+  const onLostPointerCapture = useCallback(() => {
+    if (drawingRef.current) {
+      // Treat as cancel — discard incomplete circle path
+      if (toolRef.current === "circle") {
+        abortDrawing();
+      } else {
+        drawingRef.current = false;
+        setLiveStroke([]);
+        strokePtsRef.current = [];
+        lastSrcRef.current = null;
+        activePointerIdRef.current = null;
+        scheduleMaskVis();
+      }
+    }
+    panningRef.current = false;
+    panStartRef.current = null;
+  }, [abortDrawing, scheduleMaskVis]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -503,6 +664,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       if (ev.touches.length === 2) {
         drawingRef.current = false;
         panningRef.current = false;
+        abortDrawing();
         const a = ev.touches[0];
         const b = ev.touches[1];
         pinchRef.current = {
@@ -525,14 +687,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
         setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchRef.current.zoom * ratio)));
         const midX = (a.clientX + b.clientX) / 2;
         const midY = (a.clientY + b.clientY) / 2;
-        const prev = pinchRef.current as {
-          dist: number;
-          zoom: number;
-          midX?: number;
-          midY?: number;
-          panX?: number;
-          panY?: number;
-        };
+        const prev = pinchRef.current;
         if (prev.midX != null && prev.midY != null && prev.panX != null && prev.panY != null) {
           setPan({
             x: prev.panX + (midX - prev.midX),
@@ -554,25 +709,20 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       el.removeEventListener("touchend", te);
       el.removeEventListener("touchcancel", te);
     };
-  }, []);
+  }, [abortDrawing]);
 
-  const ellipsePreview =
-    livePath.length >= 2
-      ? (() => {
-          const a = livePath[0];
-          const b = livePath[livePath.length - 1];
-          const cx = (a.x + b.x) / 2;
-          const cy = (a.y + b.y) / 2;
-          const rx = Math.abs(b.x - a.x) / 2;
-          const ry = Math.abs(b.y - a.y) / 2;
-          return { cx, cy, rx: Math.max(rx, 1), ry: Math.max(ry, 1) };
-        })()
-      : null;
-
+  const pathD = livePath.length > 0 ? smoothPathD(livePath) : "";
   const strokeD =
     liveStroke.length > 1
-      ? liveStroke.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ")
+      ? liveStroke
+          .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+          .join(" ")
       : "";
+
+  const terminalA = livePath.length > 0 ? livePath[0] : null;
+  const terminalB = livePath.length > 1 ? livePath[livePath.length - 1] : null;
+  const strokeW = Math.max(1.5, natural ? natural.width / Math.max(fitBox.w, 1) * 1.25 : 2);
+  const markerR = Math.max(4, strokeW * 2.5);
 
   return (
     <div
@@ -614,23 +764,119 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
             viewBox={`0 0 ${natural.width} ${natural.height}`}
             preserveAspectRatio="none"
           >
-            {ellipsePreview && (
-              <ellipse
-                cx={ellipsePreview.cx}
-                cy={ellipsePreview.cy}
-                rx={ellipsePreview.rx}
-                ry={ellipsePreview.ry}
-                fill={`rgba(${BRAND}, 0.28)`}
-                stroke={`rgba(${BRAND}, 0.95)`}
-                strokeWidth={Math.max(2, natural.width / Math.max(fitBox.w, 1))}
+            <defs>
+              <filter id="circle2edit-path-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation={strokeW * 0.8} result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* Freehand outline while drawing — no solid fill until closed+committed */}
+            {pathD && (
+              <>
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke={`rgba(${BRAND}, 0.35)`}
+                  strokeWidth={strokeW * 2.2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter="url(#circle2edit-path-glow)"
+                />
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke={
+                    pathNearClose
+                      ? `rgba(255,255,255,0.95)`
+                      : `rgba(${BRAND}, 0.95)`
+                  }
+                  strokeWidth={strokeW}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {/* Subtle preview fill only when near-close (not committed yet) */}
+                {pathNearClose && livePath.length >= MIN_PATH_POINTS && (
+                  <path
+                    d={`${pathD} Z`}
+                    fill={`rgba(${BRAND}, 0.18)`}
+                    stroke="none"
+                  />
+                )}
+              </>
+            )}
+
+            {/* Terminal A */}
+            {terminalA && (
+              <g>
+                {pathNearClose && (
+                  <circle
+                    cx={terminalA.x}
+                    cy={terminalA.y}
+                    r={markerR * 2.2}
+                    fill="none"
+                    stroke={`rgba(${BRAND}, 0.55)`}
+                    strokeWidth={strokeW * 0.6}
+                    opacity={0.9}
+                  >
+                    <animate
+                      attributeName="r"
+                      values={`${markerR * 1.8};${markerR * 2.6};${markerR * 1.8}`}
+                      dur="1.1s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.7;0.25;0.7"
+                      dur="1.1s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                )}
+                <circle
+                  cx={terminalA.x}
+                  cy={terminalA.y}
+                  r={markerR}
+                  fill={`rgba(${BRAND}, 0.95)`}
+                  stroke="rgba(255,255,255,0.95)"
+                  strokeWidth={strokeW * 0.45}
+                />
+              </g>
+            )}
+
+            {/* Terminal B */}
+            {terminalB && (
+              <circle
+                cx={terminalB.x}
+                cy={terminalB.y}
+                r={pathNearClose ? markerR * 1.15 : markerR * 0.85}
+                fill={
+                  pathNearClose
+                    ? "rgba(255,255,255,0.95)"
+                    : `rgba(${BRAND}, 0.85)`
+                }
+                stroke={
+                  pathNearClose
+                    ? `rgba(${BRAND}, 0.95)`
+                    : "rgba(255,255,255,0.9)"
+                }
+                strokeWidth={strokeW * 0.4}
               />
             )}
+
+            {/* Brush live stroke preview */}
             {strokeD && (
               <path
                 d={strokeD}
                 fill="none"
                 stroke={`rgba(${BRAND}, 0.55)`}
-                strokeWidth={Math.max(2, brushSize / Math.max(screenToNaturalScale(), 0.001))}
+                strokeWidth={Math.max(
+                  2,
+                  brushSize / Math.max(screenToNaturalScale(), 0.001),
+                )}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -656,6 +902,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
             onPointerMove={onPointerMove}
             onPointerUp={endPointer}
             onPointerCancel={endPointer}
+            onLostPointerCapture={onLostPointerCapture}
             onPointerLeave={() => {
               if (!drawingRef.current) setCursor(null);
             }}
@@ -672,8 +919,10 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
             top: cursor.y - brushSize / 2,
             width: brushSize,
             height: brushSize,
-            borderColor: tool === "erase" ? "rgba(255,255,255,0.95)" : `rgba(${BRAND}, 0.95)`,
-            background: tool === "erase" ? "rgba(255,255,255,0.15)" : `rgba(${BRAND}, 0.22)`,
+            borderColor:
+              tool === "erase" ? "rgba(255,255,255,0.95)" : `rgba(${BRAND}, 0.95)`,
+            background:
+              tool === "erase" ? "rgba(255,255,255,0.15)" : `rgba(${BRAND}, 0.22)`,
             boxShadow: "0 0 0 1px rgba(0,0,0,0.4)",
           }}
         />
