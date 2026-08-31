@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { executeStandaloneAutoEdit } from "./execute";
+import { executeStandaloneAutoEdit } from "./auto-edit.executor.server";
 
 type AutoEditProfileRow = {
   plan: string;
@@ -54,3 +54,6 @@ export const runAutoEdit = createServerFn({ method: "POST" })
       isAdmin,
     });
   });
+
+/** Alias expected by Auto Edit studio route. */
+export const runStandaloneAutoEdit = runAutoEdit;

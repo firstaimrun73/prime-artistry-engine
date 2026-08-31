@@ -103,3 +103,56 @@ export const resolveRefundRequest = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/** Thin UI wrappers — map requestId/note to resolveRefundRequest shape. */
+export const approveRefund = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        requestId: z.string().uuid(),
+        note: z.string().max(2000).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    if (!isAdmin(context.claims?.email)) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("refund_requests")
+      .update({
+        status: "approved",
+        admin_note: data.note ?? null,
+        resolved_at: new Date().toISOString(),
+        resolved_by: context.userId,
+      })
+      .eq("id", data.requestId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const rejectRefund = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        requestId: z.string().uuid(),
+        note: z.string().max(2000).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    if (!isAdmin(context.claims?.email)) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("refund_requests")
+      .update({
+        status: "rejected",
+        admin_note: data.note ?? null,
+        resolved_at: new Date().toISOString(),
+        resolved_by: context.userId,
+      })
+      .eq("id", data.requestId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
