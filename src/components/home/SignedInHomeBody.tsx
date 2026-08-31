@@ -127,6 +127,63 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
+      {/* Circle 2edit feature — before → mark → after */}
+      <section className="mt-6">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Circle 2edit
+          </h2>
+          <Link
+            to="/studio/image/circle-info"
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            How it works
+          </Link>
+        </div>
+        <Link
+          to="/studio/image/circle-info"
+          className="group block overflow-hidden rounded-2xl border border-[#7B6FE0]/35 bg-gradient-to-br from-[rgba(123,111,224,0.12)] via-card to-card p-4 shadow-md transition-all hover:border-[#7B6FE0]/60 hover:shadow-[0_8px_28px_rgba(123,111,224,0.2)] sm:p-5"
+        >
+          <div className="flex items-start gap-3">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#7B6FE0]/18 text-[#7B6FE0]">
+              <Circle className="h-6 w-6" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-bold tracking-tight">
+                Circle <span className="italic text-[#7B6FE0]">2</span>edit
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Mark · Remove · Add — match lighting & perspective
+              </p>
+            </div>
+            <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-[#7B6FE0] transition-transform group-hover:translate-x-1" />
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="overflow-hidden rounded-xl border border-border/80 bg-muted/40">
+              <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-muted to-muted/60 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Before
+              </div>
+              <p className="px-1.5 py-1 text-center text-[9px] text-muted-foreground">Photo</p>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)]">
+              <div className="flex aspect-video items-center justify-center text-[10px] font-semibold uppercase tracking-wide text-[#7B6FE0]">
+                Mark
+              </div>
+              <p className="px-1.5 py-1 text-center text-[9px] text-[#7B6FE0]/80">A→B · Brush</p>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-border/80 bg-muted/40">
+              <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-primary/20 to-muted/60 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                After
+              </div>
+              <p className="px-1.5 py-1 text-center text-[9px] text-muted-foreground">Result</p>
+            </div>
+          </div>
+          <p className="mt-3 text-center text-[11px] font-semibold text-[#7B6FE0]">
+            Open info → try Circle 2edit
+          </p>
+        </Link>
+      </section>
+
       <Link
         to="/studio/image/auto-edit"
         className="group mt-5 flex items-center gap-4 overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-4 shadow-md transition-all duration-300 hover:scale-[1.015] hover:border-primary/70 hover:shadow-[0_8px_32px_hsl(24_95%_53%/0.25)] active:scale-[0.99] sm:p-5"
