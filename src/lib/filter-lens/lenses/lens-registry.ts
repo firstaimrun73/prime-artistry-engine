@@ -4,8 +4,9 @@
 import { LensDefinition, LensSpecialty } from './lens-types';
 import { LENSES_001_010 } from './lenses-001-010';
 import { LENSES_011_020 } from './lenses-011-020';
+import { LENSES_021_040 } from './lenses-021-040';
 
-export const ALL_LENSES: LensDefinition[] = [...LENSES_001_010, ...LENSES_011_020];
+export const ALL_LENSES: LensDefinition[] = [...LENSES_001_010, ...LENSES_011_020, ...LENSES_021_040];
 
 export function getLensById(id: string): LensDefinition | undefined {
   return ALL_LENSES.find((l) => l.id === id);
@@ -30,8 +31,8 @@ export interface RegistryValidationResult {
 
 export function validateLensRegistry(): RegistryValidationResult {
   const errors: string[] = [];
-  if (ALL_LENSES.length !== 20) {
-    errors.push(`Expected exactly 20 lenses, found ${ALL_LENSES.length}`);
+  if (ALL_LENSES.length !== 40) {
+    errors.push(`Expected exactly 40 lenses, found ${ALL_LENSES.length}`);
   }
   const ids = new Set<string>();
   const names = new Set<string>();
