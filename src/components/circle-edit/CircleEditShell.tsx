@@ -4,7 +4,7 @@
  * Continuous Meta-style ring (not dashed). Separate Clear Mask / Clear Image.
  * NO floating pull-down generation lever.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Info, Upload, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -118,6 +118,102 @@ function ContinuousMetaRing({
   );
 }
 
+/** Title with paint-splash "2" — orange flash every ~12s, paused while generating. Ring untouched. */
+function Circle2editTitle({
+  isDark,
+  generating,
+  mode,
+}: {
+  isDark: boolean;
+  generating?: boolean;
+  mode: CircleEditMode;
+}) {
+  const [paintFlash, setPaintFlash] = useState(false);
+
+  useEffect(() => {
+    if (generating) {
+      setPaintFlash(false);
+      return;
+    }
+    const first = window.setTimeout(() => setPaintFlash(true), 1800);
+    const interval = window.setInterval(() => setPaintFlash(true), 12500);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(interval);
+    };
+  }, [generating]);
+
+  useEffect(() => {
+    if (!paintFlash) return;
+    const hold = window.setTimeout(() => setPaintFlash(false), 1600);
+    return () => window.clearTimeout(hold);
+  }, [paintFlash]);
+
+  const baseTwo = isDark ? "#C8C4E8" : "#7B6FE0";
+
+  return (
+    <div className="min-w-0">
+      <p
+        className="flex items-baseline gap-0 truncate text-[14px] font-bold tracking-tight sm:text-[15px]"
+        style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" }}
+      >
+        <span className={isDark ? "text-[#F2F2F5]" : "text-[#1A1C24]"}>Circle </span>
+        <span
+          className="relative inline-flex items-center justify-center px-[0.12em]"
+          style={{
+            fontWeight: 800,
+            fontStyle: "italic",
+            letterSpacing: "-0.04em",
+            color: paintFlash && !generating ? "#F97316" : baseTwo,
+            textShadow:
+              paintFlash && !generating
+                ? "0 0 10px rgba(249,115,22,0.55), 0 1px 0 rgba(249,115,22,0.25)"
+                : isDark
+                  ? "0 0 6px rgba(123,111,224,0.35)"
+                  : "0 1px 0 rgba(123,111,224,0.15)",
+            transition: "color 0.45s ease, text-shadow 0.45s ease, transform 0.45s ease",
+            transform: paintFlash && !generating ? "scale(1.12) rotate(-4deg)" : "scale(1) rotate(0deg)",
+            display: "inline-block",
+            lineHeight: 1,
+          }}
+        >
+          2
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2"
+            style={{
+              width: "1.35em",
+              height: "1.15em",
+              borderRadius: "42% 58% 55% 45% / 48% 42% 58% 52%",
+              background:
+                paintFlash && !generating
+                  ? "radial-gradient(ellipse at 40% 40%, rgba(249,115,22,0.55), rgba(249,115,22,0.12) 70%, transparent)"
+                  : isDark
+                    ? "radial-gradient(ellipse at 40% 40%, rgba(123,111,224,0.28), transparent 72%)"
+                    : "radial-gradient(ellipse at 40% 40%, rgba(123,111,224,0.18), transparent 72%)",
+              opacity: paintFlash && !generating ? 1 : 0.65,
+              transition: "opacity 0.4s ease, background 0.4s ease",
+              transform: paintFlash && !generating ? "scale(1.2)" : "scale(1)",
+            }}
+          />
+        </span>
+        <span className={isDark ? "text-[#F2F2F5]" : "text-[#1A1C24]"}>edit</span>
+      </p>
+      <p
+        className={cn(
+          "truncate text-[10px] font-medium leading-tight tracking-wide",
+          isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
+        )}
+      >
+        powered by Motion2AI
+      </p>
+      <p className={cn("truncate text-[11px]", isDark ? "text-[#7A8090]" : "text-[#6B7080]")}>
+        {mode === "remove" ? "Circle · Remove" : "Circle · Add"}
+      </p>
+    </div>
+  );
+}
+
 /** Compact premium glass generate control — replaces the floating pull-down lever. */
 export function CircleGenerateControl({
   disabled,
@@ -198,7 +294,6 @@ export function CircleCreditsInfo({
       {open ? (
         <>
           <button type="button" className="fixed inset-0 z-[60]" aria-label="Close" onClick={() => setOpen(false)} />
-          {/* Fixed layer so popup is never clipped by overflow-hidden parents / bottom nav */}
           <div
             className={cn(
               "fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] right-3 z-[70] w-56 rounded-xl border p-3 text-[11px] shadow-xl backdrop-blur-xl",
@@ -285,12 +380,7 @@ export function CircleEditShell({
 
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <ContinuousMetaRing size={32} generating={generating} isDark={isDark} />
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold tracking-tight">Circle 2edit</p>
-            <p className={cn("truncate text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-              {mode === "remove" ? "Circle · Remove" : "Circle · Add"}
-            </p>
-          </div>
+          <Circle2editTitle isDark={isDark} generating={generating} mode={mode} />
         </div>
 
         <div
@@ -419,7 +509,12 @@ export function CircleEditGenOverlay({
       data-circle-generating="true"
     >
       <ContinuousMetaRing size={96} generating isDark={isDark} />
-      <p className="text-center text-[15px] font-semibold tracking-tight">Circle 2edit</p>
+      <p className="text-center text-[15px] font-bold tracking-tight">
+        Circle <span style={{ color: "#7B6FE0", fontStyle: "italic" }}>2</span>edit
+      </p>
+      <p className="text-center text-[10px] font-medium tracking-wide text-[#9AA0B0]">
+        powered by Motion2AI
+      </p>
       <p className="text-center text-sm font-medium text-[#7B6FE0]">{caption || "Generating…"}</p>
       <p className={cn("text-center text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
         Preparing selection · Matching scene · Applying AI
