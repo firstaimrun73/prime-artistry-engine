@@ -7,6 +7,7 @@ import { resolveCircleAddPrompt, type CircleAddResolved } from "@/lib/circle-edi
 import { validateCircleAddMask, type ClientMaskStats, type MaskValidationOk } from "@/lib/circle-edit/mask-validate";
 import { quoteCircleAddCharge } from "@/lib/circle-edit/server-charge";
 import type { CircleAddCreditQuote } from "@/lib/circle-edit/credits";
+import type { MaskStatsPayload } from "@/lib/circle-edit/mask-stats";
 
 export const CIRCLE_ADD_MODEL = "fal-ai/flux-pro/v1/fill" as const;
 
@@ -55,6 +56,7 @@ export function preflightCircleAdd(opts: {
   sourceHeight?: number | null;
   clientMaskStats?: ClientMaskStats | null;
   factorSelection?: Record<string, string> | null;
+  maskStats?: MaskStatsPayload | null;
 }): CircleAddPreflightResult {
   let resolved: CircleAddResolved;
   try {
@@ -63,6 +65,7 @@ export function preflightCircleAdd(opts: {
       clientPrompt: opts.clientPrompt,
       seed: opts.seed,
       factorSelection: opts.factorSelection,
+      maskStats: opts.maskStats ?? null,
     });
   } catch (e) {
     return { ok: false, reason: (e as Error).message };
@@ -147,6 +150,7 @@ export function buildCircleAddHistoryMeta(preflight: CircleAddPreflightOk): Reco
     circle_source_width: preflight.mask.imageWidth,
     circle_source_height: preflight.mask.imageHeight,
     circle_mask_coverage_percent: preflight.mask.maskCoveragePercent,
+    circle_mask_bbox: preflight.mask.maskBoundingBox,
     circle_input_processing_credits: preflight.credits.baseCredits,
     circle_asset_credits: preflight.credits.assetCredits,
     credits_charged: preflight.credits.totalCredits,

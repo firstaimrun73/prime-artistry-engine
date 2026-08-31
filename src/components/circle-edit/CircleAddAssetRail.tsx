@@ -3,6 +3,7 @@
  * Opens only when parent sets open=true after explicit user action.
  */
 import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import {
   ADD_ASSET_CATEGORIES,
@@ -55,7 +56,7 @@ export function CircleAddAssetRail({
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string | null>(null);
 
-  const assets = useMemo(() => searchAddAssets(query, cat), [query, cat]);
+  const assets = useMemo(() => searchAddAssets(query, cat).slice(0, 24), [query, cat]);
 
   if (!open) return null;
 
@@ -75,7 +76,7 @@ export function CircleAddAssetRail({
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search assets…"
+          placeholder="Search…"
           disabled={disabled}
           className={cn(
             "min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-[12px] outline-none focus:border-[#7B6FE0]",
@@ -84,6 +85,12 @@ export function CircleAddAssetRail({
               : "border-black/10 bg-white/60 text-[#1A1C24] placeholder:text-[#8A90A0]",
           )}
         />
+        <Link
+          to="/studio/image/circle-add-discover"
+          className="shrink-0 text-[11px] font-semibold text-[#7B6FE0]"
+        >
+          More
+        </Link>
         <button
           type="button"
           onClick={onClose}
@@ -137,16 +144,7 @@ export function CircleAddAssetRail({
               key={asset.id}
               type="button"
               disabled={disabled}
-              onClick={() => {
-                onSelect(asset.id);
-                if (process.env.NODE_ENV !== "production") {
-                  console.log("[CIRCLE ADD] assetSelected", {
-                    assetId: asset.id,
-                    assetName: asset.name,
-                    creditCost: asset.creditCost,
-                  });
-                }
-              }}
+              onClick={() => onSelect(asset.id)}
               className="flex w-[76px] shrink-0 flex-col items-center gap-1"
             >
               <AssetThumb asset={asset} selected={selected} isDark={isDark} />
@@ -166,7 +164,7 @@ export function CircleAddAssetRail({
         })}
         {assets.length === 0 ? (
           <p className={cn("py-3 text-[12px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-            No assets match “{query}”.
+            No assets match.
           </p>
         ) : null}
       </div>

@@ -5,6 +5,7 @@ export function hideBottomNav(pathname: string): boolean {
   if (pathname === "/music" || pathname.startsWith("/music/")) return true;
   if (pathname.startsWith("/studio/music")) return true;
   if (pathname.startsWith("/studio/image/circle-remove")) return true;
+  if (pathname.startsWith("/studio/image/circle-add-discover")) return true;
   if (pathname.startsWith("/studio/image/auto-edit")) return true;
   // Dedicated filter/lens editor surfaces — never cover intensity/Apply controls
   if (pathname.startsWith("/studio/image/filters")) return true;
