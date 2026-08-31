@@ -2,6 +2,7 @@
  * Compact horizontal asset rail for Circle Add.
  * Opens only when parent sets open=true after explicit user action.
  * Overlay bottom sheet — does NOT shrink the image canvas viewport.
+ * First release: PDF-canonical 21 assets only.
  */
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -26,7 +27,7 @@ function AssetThumb({ asset, selected, isDark }: { asset: CircleAddAsset; select
   return (
     <span
       className={cn(
-        "relative grid h-14 w-14 place-items-center rounded-[14px] border backdrop-blur-md",
+        "relative grid h-14 w-14 place-items-center rounded-[14px] border backdrop-blur-md transition-transform duration-200 motion-safe:hover:-translate-y-0.5",
         selected
           ? "border-[#7B6FE0] bg-[rgba(123,111,224,0.22)] shadow-[0_0_12px_rgba(123,111,224,0.35)]"
           : isDark
@@ -36,7 +37,7 @@ function AssetThumb({ asset, selected, isDark }: { asset: CircleAddAsset; select
       title={asset.name}
       aria-label={asset.name}
     >
-      <AssetIcon asset={asset} size={30} isDark={isDark} />
+      <AssetIcon asset={asset} size={30} isDark={isDark} selected={selected} />
       {selected ? (
         <span className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full bg-[#7B6FE0] text-[9px] font-bold text-white">
           ✓
@@ -57,13 +58,13 @@ export function CircleAddAssetRail({
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string | null>(null);
 
-  const assets = useMemo(() => searchAddAssets(query, cat).slice(0, 24), [query, cat]);
+  // Full PDF set is 21 — show all when unfiltered
+  const assets = useMemo(() => searchAddAssets(query, cat), [query, cat]);
 
   if (!open) return null;
 
   return (
     <>
-      {/* Scrim — closes rail; does not sit over canvas permanently when closed */}
       <button
         type="button"
         aria-label="Close object picker"
