@@ -15,6 +15,7 @@ export async function resolveCircleAddForGenerate(opts: {
   sourceWidth?: number | null;
   sourceHeight?: number | null;
   seed?: number | null;
+  factorSelection?: Record<string, string> | null;
 }): Promise<{ modelPrompt: string; historyMeta: Record<string, unknown> }> {
   const pre = preflightCircleAdd({
     circleAssetId: opts.circleAssetId,
@@ -24,6 +25,7 @@ export async function resolveCircleAddForGenerate(opts: {
     sourceWidth: opts.sourceWidth,
     sourceHeight: opts.sourceHeight,
     seed: opts.seed,
+    factorSelection: opts.factorSelection,
   });
   if (!pre.ok) {
     throw new Error(pre.reason);
@@ -33,6 +35,7 @@ export async function resolveCircleAddForGenerate(opts: {
       assetId: pre.resolved.assetId,
       assetName: pre.resolved.assetName,
       seed: pre.resolved.seed,
+      factors: pre.resolved.factorSelection,
       model: pre.model,
       totalCredits: pre.credits.totalCredits,
       promptLen: pre.modelPrompt.length,

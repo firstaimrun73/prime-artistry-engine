@@ -17,6 +17,7 @@ export type CircleAddAuditRecord = {
   seed: number;
   variationStyle: string | null;
   variationColor: string | null;
+  factors: Record<string, string>;
   model: typeof CIRCLE_ADD_MODEL;
   imageWidth: number;
   imageHeight: number;
@@ -53,6 +54,7 @@ export function preflightCircleAdd(opts: {
   sourceWidth?: number | null;
   sourceHeight?: number | null;
   clientMaskStats?: ClientMaskStats | null;
+  factorSelection?: Record<string, string> | null;
 }): CircleAddPreflightResult {
   let resolved: CircleAddResolved;
   try {
@@ -60,6 +62,7 @@ export function preflightCircleAdd(opts: {
       circleAssetId: opts.circleAssetId,
       clientPrompt: opts.clientPrompt,
       seed: opts.seed,
+      factorSelection: opts.factorSelection,
     });
   } catch (e) {
     return { ok: false, reason: (e as Error).message };
@@ -92,6 +95,7 @@ export function preflightCircleAdd(opts: {
     seed: resolved.seed ?? 0,
     variationStyle: resolved.variationStyle,
     variationColor: resolved.variationColor,
+    factors: resolved.factorSelection,
     model: CIRCLE_ADD_MODEL,
     imageWidth: mask.imageWidth,
     imageHeight: mask.imageHeight,
@@ -109,6 +113,7 @@ export function preflightCircleAdd(opts: {
     operation: audit.operation,
     assetId: audit.assetId,
     seed: audit.seed,
+    factors: audit.factors,
     model: audit.model,
     imageWidth: audit.imageWidth,
     imageHeight: audit.imageHeight,
@@ -137,6 +142,7 @@ export function buildCircleAddHistoryMeta(preflight: CircleAddPreflightOk): Reco
     circle_seed: preflight.resolved.seed,
     circle_variation_style: preflight.resolved.variationStyle,
     circle_variation_color: preflight.resolved.variationColor,
+    circle_factors: preflight.resolved.factorSelection,
     circle_model: preflight.model,
     circle_source_width: preflight.mask.imageWidth,
     circle_source_height: preflight.mask.imageHeight,

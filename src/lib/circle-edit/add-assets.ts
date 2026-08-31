@@ -1,44 +1,17 @@
 /**
- * Circle 2edit Add — production registry: CORE (5) + seed catalog (400+).
- * Client sends assetId only; server resolves prompt. Variation is server-side.
+ * Circle 2edit Add — production registry.
+ * Initial release: curated ~50 assets with factors (server-authoritative).
+ * Large seed catalog kept available for future expansion via USE_FULL_SEED.
  */
 import { parseSeedAssets } from "./add-assets-seed";
+import { CURATED_ADD_ASSETS } from "./curated-assets";
+import type { CircleAddAsset, AssetVariationProfile } from "./add-assets-types";
 
-export type AssetVariationProfile = {
-  enabled: boolean;
-  styles: string[];
-  colors: string[];
-  sceneAdaptation: boolean;
-  scaleAdaptation: boolean;
-  lightingAdaptation: boolean;
-};
+export type { CircleAddAsset, AssetVariationProfile, AssetFactor, AssetFactorOption, Motion2AIMode } from "./add-assets-types";
+export type { AddAsset } from "./add-assets-types";
 
-export type CircleAddAsset = {
-  id: string;
-  name: string;
-  slug: string;
-  label: string;
-  category: string;
-  categoryLabel: string;
-  tags: string[];
-  keywords: string[];
-  creditCost: number;
-  isFree: boolean;
-  isPremium: boolean;
-  isActive: boolean;
-  sortOrder: number;
-  objectSpecificDescription: string;
-  generationDescriptor: string;
-  backendPrompt: string;
-  negativePrompt: string;
-  variationProfile: AssetVariationProfile;
-  visualType: "svg";
-  iconPath: string;
-  emoji: string;
-  mark?: string;
-};
-
-export type AddAsset = CircleAddAsset;
+/** When true, merges legacy 400+ seed (not recommended for initial UX). */
+const USE_FULL_SEED = false;
 
 const INTEGRATE =
   "Match camera angle, perspective, depth of field, and sharpness of the source photograph. " +
@@ -49,73 +22,12 @@ const INTEGRATE =
   "Edit only the white mask; leave every black pixel unchanged. " +
   "Do not regenerate the scene or add extra copies. The object must look photographed in the original scene, not like a sticker or cutout.";
 
-const NEG =
-  "extra objects, multiple copies, sticker, cutout, floating, wrong perspective, text, watermark, artifacts";
-
-const ICON = {
-  giraffe: "M28 8c2 0 4 2 5 6l2 10 3-2 2 3-4 3v8l4 18h-5l-3-12-2 12h-5l2-14v-8c-4 0-6-4-5-8 1-4 4-6 6-6z",
-  sunflower: "M32 18c-2 0-4 2-4 4 0 1 .5 2 1 3h-6c-2 0-3 2-2 4l2 2c-2 1-3 3-2 5l3 1c-1 2 0 4 2 5l2-1v6h4v-6z",
-  dog: "M18 28c0-6 4-10 10-10h4c4 0 6 2 8 5l4-3 2 3-3 4v6c0 6-4 12-10 12s-10-4-12-10z",
-  car: "M12 36l6-12h28l6 12v8H12v-8zm8 10a4 4 0 110-8 4 4 0 010 8zm24 0a4 4 0 110-8 4 4 0 010 8z",
-  butterfly: "M32 32c-6-10-16-14-20-8-3 5 2 12 10 14-4 6-2 12 4 10 4-1 6-6 6-10z",
-} as const;
-
-function coreAsset(
-  id: string,
-  name: string,
-  category: string,
-  categoryLabel: string,
-  creditCost: number,
-  desc: string,
-  styles: string[],
-  colors: string[],
-  iconPath: string,
-  mark: string,
-  sortOrder: number,
-): CircleAddAsset {
-  return {
-    id, name, slug: id, label: name, category, categoryLabel,
-    tags: [category], keywords: [name.toLowerCase(), id.replace(/_/g, " ")],
-    creditCost, isFree: false, isPremium: creditCost >= 40, isActive: true, sortOrder,
-    objectSpecificDescription: desc, generationDescriptor: desc,
-    backendPrompt:
-      `Add exactly one realistic ${name.toLowerCase()} inside the user-selected masked region. ${desc} ` + INTEGRATE,
-    negativePrompt: `multiple ${name.toLowerCase()}s, ${NEG}`,
-    variationProfile: {
-      enabled: true, styles, colors,
-      sceneAdaptation: true, scaleAdaptation: true, lightingAdaptation: true,
-    },
-    visualType: "svg", iconPath, emoji: "", mark,
-  };
-}
-
-const REGISTRY: CircleAddAsset[] = [
-  coreAsset("animal_giraffe", "Giraffe", "animals", "Animals", 35,
-    "Long neck, distinctive coat pattern, natural posture, anatomically correct proportions, scene-correct scale.",
-    ["adult giraffe standing", "adult giraffe with slight neck curve"],
-    ["classic tan and brown pattern", "warmer amber pattern"], ICON.giraffe, "GI", 1),
-  coreAsset("flower_sunflower", "Sunflower", "nature", "Nature", 10,
-    "Large petals, dark seed center, natural stem if space allows, botanically plausible proportions.",
-    ["single bloom facing camera", "three-quarter bloom"],
-    ["bright yellow petals dark center", "golden-yellow petals"], ICON.sunflower, "SF", 2),
-  coreAsset("animal_dog", "Dog", "animals", "Animals", 20,
-    "Natural posture, realistic fur, correct anatomy, photographic realism, scale from scene.",
-    ["small companion dog", "medium retriever-type dog", "shepherd-type dog"],
-    ["black coat", "golden coat", "brown coat", "white coat"], ICON.dog, "DG", 3),
-  coreAsset("vehicle_car", "Car", "vehicles", "Vehicles", 40,
-    "Photographed passenger vehicle with ground contact, tire shadows, body reflections, correct road perspective. No brand logos.",
-    ["modern sedan", "hatchback", "compact SUV", "luxury sedan"],
-    ["black", "white", "silver", "dark blue", "red"], ICON.car, "CR", 4),
-  coreAsset("insect_butterfly", "Butterfly", "animals", "Animals", 10,
-    "Natural wing pattern, correct insect proportions, delicate scale matching the scene.",
-    ["wings partially open", "wings fully open"],
-    ["orange and black", "blue and black", "yellow and black"], ICON.butterfly, "BF", 5),
-];
-
 function mergeAddRegistry(): CircleAddAsset[] {
   const byId = new Map<string, CircleAddAsset>();
-  for (const a of parseSeedAssets()) byId.set(a.id, a);
-  for (const a of REGISTRY) byId.set(a.id, a);
+  if (USE_FULL_SEED) {
+    for (const a of parseSeedAssets()) byId.set(a.id, a);
+  }
+  for (const a of CURATED_ADD_ASSETS) byId.set(a.id, a);
   return Array.from(byId.values()).sort(
     (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
   );
@@ -132,8 +44,12 @@ export const ADD_ASSET_CATEGORIES = Array.from(
 ).map(([id, label]) => ({ id, label }));
 
 const LEGACY_ID_MAP: Record<string, string> = {
-  giraffe: "animal_giraffe", sunflower: "flower_sunflower", dog: "animal_dog",
-  car: "vehicle_car", butterfly: "insect_butterfly",
+  giraffe: "animal_giraffe",
+  sunflower: "nature_sunflower",
+  dog: "animal_dog",
+  car: "vehicle_car",
+  butterfly: "insect_butterfly",
+  cat: "animal_cat",
 };
 
 export function findAddAsset(id: string | null | undefined): CircleAddAsset | null {
@@ -149,8 +65,10 @@ export function searchAddAssets(query: string, categoryId?: string | null): Circ
   if (!q) return list;
   return list.filter(
     (a) =>
-      a.name.toLowerCase().includes(q) || a.id.includes(q) ||
-      a.keywords.some((k) => k.includes(q)) || a.tags.some((t) => t.includes(q)) ||
+      a.name.toLowerCase().includes(q) ||
+      a.id.includes(q) ||
+      a.keywords.some((k) => k.includes(q)) ||
+      a.tags.some((t) => t.includes(q)) ||
       a.categoryLabel.toLowerCase().includes(q),
   );
 }
@@ -193,18 +111,55 @@ export function resolveAssetVariation(asset: CircleAddAsset, seed?: number | nul
   return { seed: s, style, color, variationLine };
 }
 
+/** Resolve factor option prompts server-side from selection map. */
+export function resolveFactorPromptLines(
+  asset: CircleAddAsset,
+  factorSelection?: Record<string, string> | null,
+): string[] {
+  const lines: string[] = [];
+  if (!factorSelection) return lines;
+  const factors = asset.factors ?? [];
+  for (const factor of factors) {
+    const optionId = factorSelection[factor.id];
+    if (!optionId) continue;
+    const opt = factor.options.find((o) => o.id === optionId);
+    if (opt?.prompt) lines.push(opt.prompt);
+  }
+  const motion = factorSelection["motion2ai"];
+  if (motion && asset.motionModes?.includes(motion as never)) {
+    const motionPrompts: Record<string, string> = {
+      static: "neutral static pose appropriate for a still photograph",
+      walking: "natural walking pose mid-stride",
+      running: "natural running pose",
+      sitting: "natural sitting posture",
+      moving: "subtle sense of forward motion appropriate for a still frame",
+      wind: "foliage or form gently affected by wind",
+      flying: "natural in-flight posture for a still photograph",
+    };
+    const mp = motionPrompts[motion];
+    if (mp) lines.push(`Motion2AI characterization: ${mp}`);
+  }
+  return lines;
+}
+
 export function buildAddPrompt(opts: {
   asset: CircleAddAsset | null;
   userDetail: string;
   variation?: ResolvedVariation | null;
+  factorSelection?: Record<string, string> | null;
 }): string {
   const detail = opts.userDetail.trim();
   if (opts.asset) {
     const chunks = [opts.asset.backendPrompt];
+    const factorLines = resolveFactorPromptLines(opts.asset, opts.factorSelection);
+    if (factorLines.length) chunks.push(`Object characterization: ${factorLines.join("; ")}.`);
     if (opts.variation?.variationLine) chunks.push(opts.variation.variationLine);
-    if (detail) chunks.push(`Additional detail from user: ${detail}`);
+    // Intentionally do not append free-form client object identity as authoritative
+    if (detail && detail !== "circle-add") chunks.push(`Additional scene hint (non-authoritative): ${detail.slice(0, 200)}`);
     return chunks.join(" ");
   }
-  if (detail) return `Add exactly one realistic ${detail} inside the user-selected masked region. ${INTEGRATE}`;
+  if (detail && detail !== "circle-add") {
+    return `Add exactly one realistic ${detail} inside the user-selected masked region. ${INTEGRATE}`;
+  }
   return `Add exactly one requested object inside the user-selected masked region. ${INTEGRATE}`;
 }
