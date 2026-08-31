@@ -1,10 +1,11 @@
 /**
  * Circle 2edit product shell — premium glass mobile editor.
- * Layout: header → stage → mode tools → floating generation lever.
+ * Layout: header → stage → tools → compact generate control.
  * Continuous Meta-style ring (not dashed). Separate Clear Mask / Clear Image.
+ * NO floating pull-down generation lever.
  */
-import { useCallback, useRef, useState } from "react";
-import { ArrowLeft, Info, Upload, X } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Info, Upload, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 
@@ -23,10 +24,10 @@ type Props = {
   sheet?: React.ReactNode;
   hideModeToggle?: boolean;
   addLocked?: boolean;
-  /** Floating generation lever — preferred over actionBar CTA */
   onGenerate?: () => void;
   generateDisabled?: boolean;
   generateHint?: string;
+  generateLabel?: string;
 };
 
 function ContinuousMetaRing({
@@ -59,7 +60,6 @@ function ContinuousMetaRing({
             <stop offset="100%" stopColor="#5C6170" />
           </linearGradient>
         </defs>
-        {/* Continuous ring — no dasharray */}
         <circle
           cx="16"
           cy="16"
@@ -75,7 +75,6 @@ function ContinuousMetaRing({
               : "circle2edit-ring-spin 8s linear infinite",
           }}
         />
-        {/* Soft arc highlight for depth */}
         <circle
           cx="16"
           cy="16"
@@ -119,108 +118,54 @@ function ContinuousMetaRing({
   );
 }
 
-/** Glass generation lever — pull downward to generate (not a standard button). */
-export function CircleGenerationLever({
+/** Compact premium glass generate control — replaces the floating pull-down lever. */
+export function CircleGenerateControl({
   disabled,
   onCommit,
-  label = "Pull to generate",
+  label,
+  hint,
 }: {
   disabled?: boolean;
   onCommit: () => void;
-  label?: string;
+  label: string;
+  hint?: string;
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [pull, setPull] = useState(0);
-  const startY = useRef<number | null>(null);
-  const committed = useRef(false);
-  const THRESHOLD = 48;
-
-  const endGesture = useCallback(() => {
-    if (committed.current) {
-      committed.current = false;
-      setPull(0);
-      startY.current = null;
-      return;
-    }
-    if (pull >= THRESHOLD && !disabled) {
-      committed.current = true;
-      onCommit();
-    }
-    setPull(0);
-    startY.current = null;
-  }, [pull, disabled, onCommit]);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (disabled) return;
-    committed.current = false;
-    startY.current = e.clientY;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (startY.current == null || disabled) return;
-    const dy = Math.max(0, Math.min(72, e.clientY - startY.current));
-    setPull(dy);
-  };
-
-  const ready = pull >= THRESHOLD;
-
   return (
-    <div
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pb-[max(1rem,env(safe-area-inset-bottom))]"
-      data-circle-lever="true"
-    >
-      <div
+    <div className="flex flex-col items-center gap-1">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled) onCommit();
+        }}
+        aria-label={label}
         className={cn(
-          "pointer-events-auto flex flex-col items-center gap-1 rounded-2xl border px-4 py-2.5 shadow-lg backdrop-blur-xl",
+          "group flex h-11 items-center gap-2 rounded-2xl border px-4 shadow-md backdrop-blur-xl transition-all active:scale-[0.97]",
+          disabled
+            ? "cursor-not-allowed opacity-45"
+            : "hover:shadow-lg",
           isDark
-            ? "border-white/12 bg-[#1A1C24]/75 shadow-black/40"
-            : "border-white/60 bg-white/55 shadow-[0_8px_32px_rgba(26,28,36,0.12)]",
-          disabled && "opacity-45",
+            ? "border-[#7B6FE0]/45 bg-gradient-to-b from-[#7B6FE0]/35 to-[#5C54C0]/25 text-[#F2F2F5]"
+            : "border-[#7B6FE0]/35 bg-gradient-to-b from-white/90 to-[#F0EEFA] text-[#1A1C24] shadow-[0_4px_20px_rgba(123,111,224,0.18)]",
         )}
       >
-        <p className={cn("text-[10px] font-medium tracking-wide", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-          {ready ? "Release to generate" : label}
+        <span
+          className={cn(
+            "grid h-7 w-7 place-items-center rounded-full",
+            isDark ? "bg-[#7B6FE0]/40" : "bg-[#7B6FE0]/15",
+          )}
+        >
+          <Sparkles className="h-3.5 w-3.5 text-[#7B6FE0]" />
+        </span>
+        <span className="text-[13px] font-semibold tracking-tight">{label}</span>
+      </button>
+      {hint ? (
+        <p className={cn("max-w-[14rem] text-center text-[10px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+          {hint}
         </p>
-        <div className="relative h-14 w-11">
-          <div
-            className={cn(
-              "absolute inset-x-1 top-0 bottom-0 rounded-full border",
-              isDark ? "border-white/15 bg-white/5" : "border-black/8 bg-black/[0.04]",
-            )}
-          />
-          <button
-            type="button"
-            disabled={disabled}
-            aria-label="Generation lever — pull down to generate"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={endGesture}
-            onPointerCancel={endGesture}
-            className={cn(
-              "absolute left-1/2 top-1 z-[1] h-9 w-9 -translate-x-1/2 touch-none rounded-full border shadow-md transition-[box-shadow] select-none",
-              ready
-                ? "border-[#7B6FE0] bg-[#7B6FE0] shadow-[0_0_16px_rgba(123,111,224,0.55)]"
-                : isDark
-                  ? "border-white/20 bg-gradient-to-b from-white/25 to-white/10"
-                  : "border-white/80 bg-gradient-to-b from-white to-[#F0F1F5]",
-            )}
-            style={{ transform: `translate(-50%, ${pull}px)` }}
-          >
-            <span
-              className={cn(
-                "mx-auto mt-3 block h-0.5 w-3 rounded-full",
-                ready ? "bg-white/90" : isDark ? "bg-white/50" : "bg-[#7B6FE0]/70",
-              )}
-            />
-            <span className={cn("mx-auto mt-1 block h-0.5 w-2 rounded-full", ready ? "bg-white/70" : isDark ? "bg-white/35" : "bg-[#7B6FE0]/45")} />
-          </button>
-        </div>
-        <svg width="14" height="10" viewBox="0 0 14 10" className={cn(isDark ? "text-[#7B6FE0]" : "text-[#7B6FE0]")} aria-hidden>
-          <path d="M7 9L1 2h12L7 9z" fill="currentColor" opacity={ready ? 1 : 0.55} />
-        </svg>
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -295,9 +240,12 @@ export function CircleEditShell({
   onGenerate,
   generateDisabled,
   generateHint,
+  generateLabel,
 }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const genLabel =
+    generateLabel || (mode === "remove" ? "Remove Object" : "Add Object");
 
   return (
     <div
@@ -402,11 +350,20 @@ export function CircleEditShell({
       {!generating ? sheet : null}
 
       {onGenerate && !generating ? (
-        <CircleGenerationLever
-          disabled={generateDisabled}
-          onCommit={onGenerate}
-          label={generateHint || "Pull down to generate"}
-        />
+        <div
+          className={cn(
+            "flex shrink-0 justify-center border-t px-3 py-3 backdrop-blur-xl",
+            isDark ? "border-white/8 bg-[#181A22]/85" : "border-black/[0.05] bg-white/70",
+          )}
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <CircleGenerateControl
+            disabled={generateDisabled}
+            onCommit={onGenerate}
+            label={genLabel}
+            hint={generateHint}
+          />
+        </div>
       ) : null}
     </div>
   );
@@ -489,47 +446,75 @@ export function CircleEditActionBar({
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const [confirmClear, setConfirmClear] = useState(false);
+
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center gap-2 border-t px-3 py-2.5 backdrop-blur-xl sm:px-4",
+        "flex shrink-0 flex-col gap-2 border-t px-3 py-2.5 backdrop-blur-xl sm:px-4",
         isDark ? "border-white/8 bg-[#181A22]/80" : "border-black/[0.05] bg-white/65",
       )}
-      style={{ paddingBottom: "max(4.5rem, calc(env(safe-area-inset-bottom) + 3.75rem))" }}
     >
-      <div className="flex shrink-0 gap-1.5">
-        {hasImage ? (
-          <button
-            type="button"
-            onClick={onClearMask}
-            disabled={!hasMask}
-            title={hasMask ? "Clear selection mask only" : "No mask to clear"}
-            className={cn(
-              "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium disabled:opacity-35",
-              isDark ? "border-white/10 text-[#9AA0B0]" : "border-black/10 text-[#5C6170]",
-            )}
-          >
-            Clear mask
-          </button>
-        ) : null}
-        {hasImage ? (
-          <button
-            type="button"
-            onClick={onClearImage}
-            title="Remove uploaded image"
-            className={cn(
-              "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium",
-              isDark ? "border-white/10 text-[#9AA0B0]" : "border-black/10 text-[#5C6170]",
-            )}
-          >
-            Clear image
-          </button>
-        ) : null}
+      <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap gap-1.5">
+          {hasImage ? (
+            <button
+              type="button"
+              onClick={onClearMask}
+              disabled={!hasMask}
+              title={hasMask ? "Clear selection mask only" : "No mask to clear"}
+              className={cn(
+                "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium disabled:opacity-35",
+                isDark ? "border-white/10 text-[#9AA0B0]" : "border-black/10 text-[#5C6170]",
+              )}
+            >
+              Clear mask
+            </button>
+          ) : null}
+          {hasImage ? (
+            confirmClear ? (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmClear(false);
+                    onClearImage?.();
+                  }}
+                  className="rounded-lg border border-red-400/50 bg-red-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-red-500"
+                >
+                  Confirm clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClear(false)}
+                  className={cn(
+                    "rounded-lg border px-2 py-1.5 text-[11px]",
+                    isDark ? "border-white/10 text-[#9AA0B0]" : "border-black/10 text-[#5C6170]",
+                  )}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmClear(true)}
+                title="Remove uploaded image"
+                className={cn(
+                  "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium",
+                  isDark ? "border-white/10 text-[#9AA0B0]" : "border-black/10 text-[#5C6170]",
+                )}
+              >
+                Clear image
+              </button>
+            )
+          ) : null}
+        </div>
+        <p className={cn("min-w-0 flex-1 truncate text-center text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+          {statusText}
+        </p>
+        {infoSlot ?? <span className="w-8" />}
       </div>
-      <p className={cn("min-w-0 flex-1 truncate text-center text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-        {statusText}
-      </p>
-      {infoSlot ?? <span className="w-8" />}
     </div>
   );
 }
