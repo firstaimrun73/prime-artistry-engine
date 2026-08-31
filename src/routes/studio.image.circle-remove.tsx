@@ -1,7 +1,7 @@
 /**
  * Circle 2edit — /studio/image/circle-remove
- * Remove: circleInstant true (unchanged)
- * Add: circleInstant false → inpaint; asset rail opens only on explicit Browse
+ * Remove: circleInstant true
+ * Add: circleInstant false → flux-pro fill; asset rail + factors
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -21,6 +21,7 @@ import {
   CircleEditActionBar,
   CircleDrawToolbar,
   CircleEditGenOverlay,
+  CircleCreditsInfo,
   type CircleDrawTool,
 } from "@/components/circle-edit/CircleEditShell";
 import {
@@ -28,8 +29,9 @@ import {
   type CircleMaskStageHandle,
 } from "@/components/circle-edit/CircleMaskStage";
 import { CircleAddAssetRail } from "@/components/circle-edit/CircleAddAssetRail";
+import { CircleFactorPicker } from "@/components/circle-edit/CircleFactorPicker";
 import { CompareSlider } from "@/components/CompareSlider";
-import { findAddAsset, buildAddPrompt } from "@/lib/circle-edit/add-assets";
+import { findAddAsset } from "@/lib/circle-edit/add-assets";
 import type { MaskTool } from "@/components/circle-edit/mask/types";
 import { useTheme } from "@/lib/theme";
 import { isFreePlan } from "@/lib/policy";
@@ -48,13 +50,14 @@ export const Route = createFileRoute("/studio/image/circle-remove")({
 });
 
 const GEN_STAGES = [
-  "Analyzing your image",
-  "Reading the selected area",
-  "Understanding the object",
-  "Matching lighting and perspective",
-  "Building the edit",
-  "Blending the result",
-  "Finalizing your image",
+  "Preparing selection",
+  "Understanding image",
+  "Understanding object",
+  "Matching perspective",
+  "Matching lighting",
+  "Building object",
+  "Applying AI",
+  "Finalising",
 ] as const;
 
 type Phase = "select" | "generating" | "result";
@@ -98,10 +101,11 @@ function Circle2editPage() {
   const [brushSize, setBrushSize] = useState(24);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
-  const [addPrompt, setAddPrompt] = useState("");
+  /** factorId → optionId — server resolves prompt fragments */
+  const [factorSelection, setFactorSelection] = useState<Record<string, string>>({});
   const [progressPct, setProgressPct] = useState(0);
   const [stageIdx, setStageIdx] = useState(0);
-  const [showCompare, setShowCompare] = useState(false);
+  const [showCompare, setShowCompare] = useState(true);
   const [sourceWidth, setSourceWidth] = useState(0);
   const [sourceHeight, setSourceHeight] = useState(0);
   const progressTimers = useRef<number[]>([]);
@@ -129,12 +133,13 @@ function Circle2editPage() {
     setProgressPct(6);
     setStageIdx(0);
     const steps = [
-      { ms: 700, pct: 14, idx: 1 },
-      { ms: 1600, pct: 28, idx: 2 },
-      { ms: 2800, pct: 45, idx: 3 },
-      { ms: 4200, pct: 62, idx: 4 },
-      { ms: 6000, pct: 78, idx: 5 },
-      { ms: 8000, pct: 90, idx: 6 },
+      { ms: 600, pct: 12, idx: 1 },
+      { ms: 1400, pct: 24, idx: 2 },
+      { ms: 2400, pct: 38, idx: 3 },
+      { ms: 3600, pct: 52, idx: 4 },
+      { ms: 5000, pct: 68, idx: 5 },
+      { ms: 6800, pct: 82, idx: 6 },
+      { ms: 8600, pct: 92, idx: 7 },
     ];
     progressTimers.current = steps.map((s) =>
       window.setTimeout(() => {
@@ -154,7 +159,7 @@ function Circle2editPage() {
     setOutput(null);
     setHasMask(false);
     setPhase("select");
-    setShowCompare(false);
+    setShowCompare(true);
   };
 
   const resetPhoto = () => {
@@ -168,6 +173,10 @@ function Circle2editPage() {
   };
 
   const onClearMask = () => {
+    if (!hasMask) {
+      toast.message("No mask to clear");
+      return;
+    }
     maskStageRef.current?.clear();
     setHasMask(false);
   };
@@ -198,10 +207,6 @@ function Circle2editPage() {
         toast.error("Circle Add requires a paid plan.");
         return;
       }
-      if (kind === "add" && !file) {
-        toast.error("Upload an image before using Circle Add.");
-        return;
-      }
       const assetCost = kind === "add" ? getAssetCreditCost(addObjectId) : 0;
       const needed =
         kind === "remove"
@@ -218,14 +223,13 @@ function Circle2editPage() {
 
       if (kind === "add") {
         const asset = findAddAsset(addObjectId);
-        if (!asset && !addPrompt.trim()) {
+        if (!asset) {
           setAddDrawerOpen(true);
-          toast.message("Pick an object or describe what to add.");
+          toast.message("Pick an object to add.");
           return;
         }
       }
 
-      // Close asset rail before generation so the full editor generation state is visible
       setAddDrawerOpen(false);
       generatingLockRef.current = true;
       setPhase("generating");
@@ -255,16 +259,15 @@ function Circle2editPage() {
           if (!res.outputUrl || res.outputUrl === imageUrl) throw new Error("Generation returned invalid result.");
           await waitForImageLoadable(res.outputUrl);
           setOutput(res.outputUrl);
-          setShowCompare(false);
+          setShowCompare(true);
           setPhase("result");
           await refreshProfile();
           toast.success("Object removed");
         } else {
-          const asset = findAddAsset(addObjectId);
-          const prompt = buildAddPrompt({ asset, userDetail: addPrompt });
+          // Placeholder prompt for schema only — server resolves from assetId + factors
           const res = await generate({
             data: {
-              prompt,
+              prompt: "circle-add",
               type: "image",
               imageUrl,
               sourceKind: "image",
@@ -272,6 +275,7 @@ function Circle2editPage() {
               imageQuality: "hd",
               circleInstant: false,
               circleAssetId: addObjectId || undefined,
+              circleFactors: factorSelection,
               sourceWidth: sourceWidth || undefined,
               sourceHeight: sourceHeight || undefined,
               keepWatermark: readKeepWatermarkPref(),
@@ -283,7 +287,7 @@ function Circle2editPage() {
           if (!res.outputUrl || res.outputUrl === imageUrl) throw new Error("Generation returned invalid result.");
           await waitForImageLoadable(res.outputUrl);
           setOutput(res.outputUrl);
-          setShowCompare(false);
+          setShowCompare(true);
           setPhase("result");
           await refreshProfile();
           toast.success("Object added");
@@ -297,7 +301,20 @@ function Circle2editPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [file, preview, isAdmin, profile?.credits, generate, refreshProfile, addPrompt, addObjectId, clearProgressTimers, addLocked, sourceWidth, sourceHeight],
+    [
+      file,
+      preview,
+      isAdmin,
+      profile?.credits,
+      generate,
+      refreshProfile,
+      addObjectId,
+      factorSelection,
+      clearProgressTimers,
+      addLocked,
+      sourceWidth,
+      sourceHeight,
+    ],
   );
 
   const onModeChange = (m: Mode) => {
@@ -315,28 +332,13 @@ function Circle2editPage() {
       return mode === "remove" ? "Circle or paint the object to remove" : "Circle or paint where to add";
     if (mode === "add") {
       const asset = findAddAsset(addObjectId);
-      if (asset) return `Add ${asset.label} into selection`;
-      if (addPrompt.trim()) return "Ready to add";
-      return "Browse objects or describe what to add";
+      if (asset) return `Add ${asset.label} · pull lever`;
+      return "Browse objects to add";
     }
-    return "Ready to remove";
-  };
-
-  const onPrimaryCta = () => {
-    if (!preview) {
-      fileRef.current?.click();
-      return;
-    }
-    if (!hasMask) {
-      toast.message(mode === "remove" ? "Select an area first" : "Select where to add first");
-      return;
-    }
-    void runWithMask(mode);
+    return "Ready · pull lever to remove";
   };
 
   const creditsLabel = isAdmin ? "Admin" : `${profile?.credits ?? 0} credits`;
-  const ctaLabel =
-    mode === "remove" ? "Remove Object" : addLocked ? "Add locked" : "Add Object";
   const addQuote =
     mode === "add"
       ? estimateCircleAddCredits({
@@ -345,14 +347,27 @@ function Circle2editPage() {
           assetCreditCost: getAssetCreditCost(addObjectId),
         })
       : null;
-  const ctaCost =
+
+  const creditInfoLines =
     mode === "remove"
-      ? `${CIRCLE_REMOVE_CREDITS} credits`
-      : addLocked
-        ? "Paid plan"
-        : addQuote
-          ? `${addQuote.totalCredits} credits`
-          : "";
+      ? [
+          { label: "Operation", value: "Circle Remove" },
+          { label: "Cost", value: `${CIRCLE_REMOVE_CREDITS} credits` },
+          { label: "Note", value: "Server-authoritative" },
+        ]
+      : [
+          { label: "Operation", value: "Circle Add" },
+          { label: "Image", value: `${addQuote?.baseCredits ?? "—"} credits` },
+          { label: "Object", value: `${addQuote?.assetCredits ?? 0} credits` },
+          { label: "Total", value: `${addQuote?.totalCredits ?? "—"} credits` },
+        ];
+
+  const canGenerate =
+    !!preview &&
+    hasMask &&
+    (mode === "remove" || (!addLocked && !!findAddAsset(addObjectId)));
+
+  const selectedAsset = findAddAsset(addObjectId);
 
   const controls = preview ? (
     <div className="flex flex-col gap-2">
@@ -362,30 +377,27 @@ function Circle2editPage() {
         brushSize={brushSize}
         onBrushSize={setBrushSize}
       />
-      {mode === "add" && addQuote && !addLocked ? (
-        <div className="rounded-lg border border-black/8 bg-white/80 px-3 py-2 text-[11px] tabular-nums dark:border-white/10 dark:bg-white/5">
-          <div className="flex justify-between gap-2 text-[#5C6170] dark:text-[#9AA0B0]">
-            <span>Input image</span><span>{addQuote.baseCredits} credits</span>
-          </div>
-          <div className="flex justify-between gap-2 text-[#5C6170] dark:text-[#9AA0B0]">
-            <span>Object</span><span>{addQuote.assetCredits} credits</span>
-          </div>
-          <div className="mt-1 flex justify-between gap-2 border-t border-black/5 pt-1 font-semibold dark:border-white/10">
-            <span>Total</span><span>{addQuote.totalCredits} credits</span>
-          </div>
-        </div>
+      {mode === "add" && !addLocked ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setAddDrawerOpen(true)}
+            className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+          >
+            {addObjectId ? `Selected: ${selectedAsset?.name ?? addObjectId}` : "Browse objects"}
+          </button>
+          {selectedAsset ? (
+            <CircleFactorPicker
+              asset={selectedAsset}
+              selection={factorSelection}
+              onChange={setFactorSelection}
+              isDark={isDark}
+            />
+          ) : null}
+        </>
       ) : null}
       {mode === "add" && addLocked ? (
-        <p className="text-center text-[11px] font-medium text-[#7B6FE0]">Add requires a paid plan 🔒</p>
-      ) : null}
-      {mode === "add" && !addLocked && preview ? (
-        <button
-          type="button"
-          onClick={() => setAddDrawerOpen(true)}
-          className="rounded-lg border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0]"
-        >
-          {addObjectId ? "Change object" : "Browse objects"}
-        </button>
+        <p className="text-center text-[11px] font-medium text-[#7B6FE0]">Add requires a paid plan</p>
       ) : null}
     </div>
   ) : null;
@@ -397,7 +409,10 @@ function Circle2editPage() {
         open={addDrawerOpen}
         onClose={() => setAddDrawerOpen(false)}
         addObjectId={addObjectId}
-        onSelect={(id) => setAddObjectId(id)}
+        onSelect={(id) => {
+          setAddObjectId(id);
+          setFactorSelection({});
+        }}
         disabled={addLocked || !preview}
       />
     ) : null;
@@ -412,26 +427,51 @@ function Circle2editPage() {
         onBack={() => navigate({ to: "/studio" })}
         controls={null}
         actionBar={
-          <div className="flex w-full flex-wrap gap-2">
-            <button type="button" onClick={() => { setPhase("select"); setOutput(null); }} className="rounded-lg border px-4 py-2.5 text-sm font-medium">Edit again</button>
-            <button type="button" onClick={() => void (async () => {
-              try {
-                const res = await secureDl({ data: { imageUrl: output, keepWatermark: readKeepWatermarkPref() } });
-                await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
-              } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Download failed");
+          <div className="flex w-full flex-wrap items-center justify-center gap-2 px-3 py-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setPhase("select");
+                setOutput(null);
+              }}
+              className="rounded-xl border px-4 py-2.5 text-sm font-medium backdrop-blur-md"
+            >
+              Edit again
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCompare((v) => !v)}
+              className="rounded-xl border px-4 py-2.5 text-sm font-medium text-[#7B6FE0]"
+            >
+              {showCompare ? "Show result only" : "Compare"}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                void (async () => {
+                  try {
+                    const res = await secureDl({
+                      data: { imageUrl: output, keepWatermark: readKeepWatermarkPref() },
+                    });
+                    await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Download failed");
+                  }
+                })()
               }
-            })()} className="rounded-lg bg-[#7B6FE0] px-4 py-2.5 text-sm font-semibold text-white">Download</button>
+              className="rounded-xl bg-[#7B6FE0] px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              Download
+            </button>
           </div>
         }
       >
         <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center p-3">
-          {showCompare ? <CompareSlider before={preview} after={output} /> : (
+          {showCompare ? (
+            <CompareSlider before={preview} after={output} />
+          ) : (
             <img src={output} alt="Result" className="max-h-full max-w-full rounded-xl object-contain" />
           )}
-          <button type="button" onClick={() => setShowCompare((v) => !v)} className="mt-3 text-xs font-medium text-[#7B6FE0]">
-            {showCompare ? "Hide compare" : "Compare before / after"}
-          </button>
         </div>
       </CircleEditShell>
     );
@@ -447,15 +487,25 @@ function Circle2editPage() {
       onBack={() => navigate({ to: "/studio" })}
       controls={controls}
       sheet={addSheet}
+      onGenerate={() => void runWithMask(mode)}
+      generateDisabled={!canGenerate}
+      generateHint={
+        !preview
+          ? "Upload an image first"
+          : !hasMask
+            ? "Select an area first"
+            : mode === "add" && !addObjectId
+              ? "Choose an object first"
+              : "Pull down to generate"
+      }
       actionBar={
         <CircleEditActionBar
-          onClear={preview ? (hasMask ? onClearMask : resetPhoto) : undefined}
+          hasImage={!!preview}
+          hasMask={hasMask}
+          onClearMask={onClearMask}
+          onClearImage={resetPhoto}
           statusText={statusForMode()}
-          ctaLabel={!preview ? "Choose image" : ctaLabel}
-          ctaCost={!preview ? undefined : ctaCost}
-          ctaDisabled={!!preview && !hasMask}
-          onCta={onPrimaryCta}
-          ctaVariant="violet"
+          infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}
         />
       }
     >
@@ -482,9 +532,6 @@ function Circle2editPage() {
               brushSize={brushSize}
               onMaskChange={setHasMask}
             />
-            <p className="pointer-events-none absolute bottom-2 left-0 right-0 z-[5] text-center text-[11px] font-medium text-[#5C6170]/95 dark:text-[#9AA0B0]/90">
-              You can zoom and pan the image to make precise selections
-            </p>
           </div>
         )}
       </div>
