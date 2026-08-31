@@ -334,10 +334,10 @@ function Circle2editPage() {
       return mode === "remove" ? "Circle or paint the object to remove" : "Circle or paint where to add";
     if (mode === "add") {
       const asset = findAddAsset(addObjectId);
-      if (asset) return `Add ${asset.label} · pull lever`;
+      if (asset) return `Ready to add ${asset.label ?? asset.name}`;
       return "Browse objects to add";
     }
-    return "Ready · pull lever to remove";
+    return "Ready to remove";
   };
 
   const creditsLabel = isAdmin ? "Admin" : `${profile?.credits ?? 0} credits`;
@@ -491,6 +491,7 @@ function Circle2editPage() {
       sheet={addSheet}
       onGenerate={() => void runWithMask(mode)}
       generateDisabled={!canGenerate}
+      generateLabel={mode === "remove" ? "Remove Object" : "Add Object"}
       generateHint={
         !preview
           ? "Upload an image first"
@@ -498,7 +499,7 @@ function Circle2editPage() {
             ? "Select an area first"
             : mode === "add" && !addObjectId
               ? "Choose an object first"
-              : "Pull down to generate"
+              : undefined
       }
       actionBar={
         <CircleEditActionBar
