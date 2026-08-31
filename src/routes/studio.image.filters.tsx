@@ -10,19 +10,20 @@ export const Route = createFileRoute("/studio/image/filters")({
       {
         name: "description",
         content:
-          "100 original Motio2edit photographic filters — programmatic, deterministic image processing.",
+          "Browse 100 original Motio2edit photographic filters — search, categories, and free/premium catalog.",
       },
     ],
   }),
-  component: FiltersPage,
+  component: FiltersDiscoveryPage,
 });
 
-function FiltersPage() {
+function FiltersDiscoveryPage() {
   const items = ALL_FILTERS.map(filterToCatalogItem);
   const categories = listFilterCategories();
   return (
     <EffectStudioPage
       kind="filter"
+      pageMode="discover"
       title="Filters"
       subtitle={`${ALL_FILTERS.length} original Motio2edit filters · first 10 free`}
       items={items}
