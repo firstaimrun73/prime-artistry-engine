@@ -203,6 +203,7 @@ function Circle2editPage() {
         toast.error("Circle or paint an area first.");
         return;
       }
+      const maskStats = kind === "add" ? maskStageRef.current?.exportMaskStats() ?? null : null;
       if (kind === "add" && addLocked) {
         toast.error("Circle Add requires a paid plan.");
         return;
@@ -264,7 +265,7 @@ function Circle2editPage() {
           await refreshProfile();
           toast.success("Object removed");
         } else {
-          // Placeholder prompt for schema only — server resolves from assetId + factors
+          // Placeholder prompt for schema only — server resolves from assetId + factors + maskStats
           const res = await generate({
             data: {
               prompt: "circle-add",
@@ -276,6 +277,7 @@ function Circle2editPage() {
               circleInstant: false,
               circleAssetId: addObjectId || undefined,
               circleFactors: factorSelection,
+              circleMaskStats: maskStats ?? undefined,
               sourceWidth: sourceWidth || undefined,
               sourceHeight: sourceHeight || undefined,
               keepWatermark: readKeepWatermarkPref(),
