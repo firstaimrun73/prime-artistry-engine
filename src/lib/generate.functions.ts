@@ -116,6 +116,8 @@ const inputSchema = z.object({
   circleInstant: z.boolean().optional(),
   circlePrepCredits: z.number().int().min(0).max(100).optional(),
   circleAssetId: z.string().max(80).optional(),
+  /** factorId → optionId; server resolves prompt fragments (never trust client prompts) */
+  circleFactors: z.record(z.string().max(40)).optional(),
   sourceWidth: z.number().int().min(1).max(30000).optional(),
   sourceHeight: z.number().int().min(1).max(30000).optional(),
   contextTags: z.array(z.string().max(40)).max(10).optional(),
@@ -163,6 +165,7 @@ export const generateMedia = createServerFn({ method: "POST" })
         maskImageUrl: data.maskImageUrl,
         sourceWidth: data.sourceWidth,
         sourceHeight: data.sourceHeight,
+        factorSelection: data.circleFactors ?? null,
       });
       modelPrompt = add.modelPrompt;
       circleAddHistoryMeta = add.historyMeta;
