@@ -21,9 +21,13 @@ import {
   restoreSnapshot,
   type WorkingMask,
 } from "@/components/circle-edit/mask/maskCanvas";
+import { computeMaskStats } from "@/components/circle-edit/mask/maskStatsCompute";
+import type { MaskStatsPayload } from "@/lib/circle-edit/mask-stats";
 
 export type CircleMaskStageHandle = {
   exportMask: () => string | null;
+  /** Natural-resolution bbox/coverage for Circle Add position prompts (server-validated). */
+  exportMaskStats: () => MaskStatsPayload | null;
   clear: () => void;
   hasMask: () => boolean;
   undo: () => void;
@@ -319,6 +323,11 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
         const mask = maskRef.current;
         if (!mask || !maskHasPaint(mask)) return null;
         return exportMaskNatural(mask);
+      },
+      exportMaskStats: () => {
+        const mask = maskRef.current;
+        if (!mask || !maskHasPaint(mask)) return null;
+        return computeMaskStats(mask);
       },
       clear,
       hasMask: () => !!maskRef.current && hasMarkRef.current && maskHasPaint(maskRef.current),

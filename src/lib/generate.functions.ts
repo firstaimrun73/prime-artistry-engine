@@ -95,6 +95,26 @@ async function runFalStepResilient(step: FalStep, falKey: string, opts: { timeou
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
+const maskStatsSchema = z
+  .object({
+    width: z.number().int().min(1).max(30000),
+    height: z.number().int().min(1).max(30000),
+    coveragePercent: z.number().min(0).max(100),
+    paintedPixels: z.number().int().min(0),
+    totalPixels: z.number().int().min(1),
+    boundingBox: z
+      .object({
+        x: z.number().int().min(0),
+        y: z.number().int().min(0),
+        width: z.number().int().min(1),
+        height: z.number().int().min(1),
+      })
+      .nullable(),
+    centerX: z.number().min(0).max(1),
+    centerY: z.number().min(0).max(1),
+  })
+  .optional();
+
 const inputSchema = z.object({
   type: z.enum(["image", "video"]),
   prompt: z.string().min(1).max(10_000),
@@ -118,6 +138,8 @@ const inputSchema = z.object({
   circleAssetId: z.string().max(80).optional(),
   /** factorId → optionId; server resolves prompt fragments (never trust client prompts) */
   circleFactors: z.record(z.string().max(40)).optional(),
+  /** Client-computed mask geometry; server builds position prompt + validates (never trusts coverage alone for charge). */
+  circleMaskStats: maskStatsSchema,
   sourceWidth: z.number().int().min(1).max(30000).optional(),
   sourceHeight: z.number().int().min(1).max(30000).optional(),
   contextTags: z.array(z.string().max(40)).max(10).optional(),
@@ -166,6 +188,7 @@ export const generateMedia = createServerFn({ method: "POST" })
         sourceWidth: data.sourceWidth,
         sourceHeight: data.sourceHeight,
         factorSelection: data.circleFactors ?? null,
+        maskStats: data.circleMaskStats ?? null,
       });
       modelPrompt = add.modelPrompt;
       circleAddHistoryMeta = add.historyMeta;
