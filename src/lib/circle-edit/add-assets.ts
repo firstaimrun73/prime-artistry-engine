@@ -1,6 +1,6 @@
 /**
  * Circle 2edit Add — production registry.
- * Initial release: curated ~50 assets with factors (server-authoritative).
+ * First release: PDF-canonical 21 curated assets (server-authoritative).
  * Large seed catalog kept available for future expansion via USE_FULL_SEED.
  */
 import { parseSeedAssets } from "./add-assets-seed";
@@ -43,13 +43,27 @@ export const ADD_ASSET_CATEGORIES = Array.from(
   new Map(ADD_ASSETS.map((a) => [a.category, a.categoryLabel])).entries(),
 ).map(([id, label]) => ({ id, label }));
 
+/** Map pre-PDF / alternate IDs → canonical PDF §4 IDs */
 const LEGACY_ID_MAP: Record<string, string> = {
-  giraffe: "animal_giraffe",
-  sunflower: "nature_sunflower",
+  giraffe: "animal_deer",
+  sunflower: "nature_tree",
   dog: "animal_dog",
   car: "vehicle_car",
-  butterfly: "insect_butterfly",
+  butterfly: "animal_bird",
   cat: "animal_cat",
+  lifestyle_shoes: "obj_shoe",
+  lifestyle_hat: "obj_hat",
+  lifestyle_glasses: "obj_glasses",
+  food_cake: "obj_cake",
+  decor_vase: "obj_vase",
+  object_bag: "obj_shoe",
+  vehicle_truck: "vehicle_car",
+  nature_flower: "nature_tree",
+  nature_plant: "nature_tree",
+  nature_bush: "nature_tree",
+  nature_rock: "nature_tree",
+  nature_cactus: "nature_tree",
+  nature_sunflower: "nature_tree",
 };
 
 export function findAddAsset(id: string | null | undefined): CircleAddAsset | null {
@@ -127,17 +141,18 @@ export function resolveFactorPromptLines(
   }
   const motion = factorSelection["motion2ai"];
   if (motion && asset.motionModes?.includes(motion as never)) {
+    // Still-image pose / state guidance only — not video generation
     const motionPrompts: Record<string, string> = {
       static: "neutral static pose appropriate for a still photograph",
-      walking: "natural walking pose mid-stride",
-      running: "natural running pose",
+      walking: "natural walking pose mid-stride for a still photograph",
+      running: "natural running pose frozen in a still frame",
       sitting: "natural sitting posture",
       moving: "subtle sense of forward motion appropriate for a still frame",
-      wind: "foliage or form gently affected by wind",
+      wind: "foliage or form gently affected by wind in a still photograph",
       flying: "natural in-flight posture for a still photograph",
     };
     const mp = motionPrompts[motion];
-    if (mp) lines.push(`Motion2AI characterization: ${mp}`);
+    if (mp) lines.push(`Motion2AI pose guidance (still image only, not video): ${mp}`);
   }
   return lines;
 }
@@ -154,8 +169,10 @@ export function buildAddPrompt(opts: {
     const factorLines = resolveFactorPromptLines(opts.asset, opts.factorSelection);
     if (factorLines.length) chunks.push(`Object characterization: ${factorLines.join("; ")}.`);
     if (opts.variation?.variationLine) chunks.push(opts.variation.variationLine);
-    // Intentionally do not append free-form client object identity as authoritative
-    if (detail && detail !== "circle-add") chunks.push(`Additional scene hint (non-authoritative): ${detail.slice(0, 200)}`);
+    // Free-form client text is never authoritative for asset identity
+    if (detail && detail !== "circle-add") {
+      chunks.push(`Additional scene hint (non-authoritative): ${detail.slice(0, 200)}`);
+    }
     return chunks.join(" ");
   }
   if (detail && detail !== "circle-add") {
