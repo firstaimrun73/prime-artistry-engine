@@ -1,6 +1,6 @@
 /**
  * Server-authoritative Circle Add prompt resolution.
- * Frontend sends assetId + factor selection IDs only.
+ * Frontend sends assetId + factor selection IDs + optional mask stats.
  * DOES NOT affect Circle Remove.
  */
 import {
@@ -10,6 +10,7 @@ import {
   resolveFactorPromptLines,
   type ResolvedVariation,
 } from "@/lib/circle-edit/add-assets";
+import { buildMaskPositionPrompt, type MaskStatsPayload } from "@/lib/circle-edit/mask-stats";
 
 export type CircleAddResolved = {
   prompt: string;
@@ -22,17 +23,19 @@ export type CircleAddResolved = {
   variationColor: string | null;
   factorSelection: Record<string, string>;
   factorPromptLines: string[];
+  positionPrompt: string;
 };
 
 export function resolveCircleAddPrompt(opts: {
   circleAssetId?: string | null;
   clientPrompt?: string | null;
   seed?: number | null;
-  /** factorId → optionId from client; prompts resolved server-side */
   factorSelection?: Record<string, string> | null;
+  maskStats?: MaskStatsPayload | null;
 }): CircleAddResolved {
   const id = (opts.circleAssetId || "").trim();
   const factorSelection = sanitizeFactorSelection(opts.factorSelection);
+  const positionPrompt = buildMaskPositionPrompt(opts.maskStats ?? null);
 
   if (id) {
     const asset = findAddAsset(id);
@@ -42,12 +45,13 @@ export function resolveCircleAddPrompt(opts: {
     const validatedFactors = validateFactorsForAsset(asset.id, factorSelection);
     const variation: ResolvedVariation = resolveAssetVariation(asset, opts.seed);
     const factorPromptLines = resolveFactorPromptLines(asset, validatedFactors);
-    const prompt = buildAddPrompt({
+    const base = buildAddPrompt({
       asset,
       userDetail: "",
       variation,
       factorSelection: validatedFactors,
     });
+    const prompt = `${base} ${positionPrompt}`;
 
     if (process.env.NODE_ENV !== "production") {
       console.log("[CIRCLE ADD] serverAssetResolved", {
@@ -57,6 +61,7 @@ export function resolveCircleAddPrompt(opts: {
         seed: variation.seed,
         factors: validatedFactors,
         factorPromptLines,
+        coverage: opts.maskStats?.coveragePercent,
         promptLength: prompt.length,
         promptHead: prompt.slice(0, 160),
       });
@@ -73,6 +78,7 @@ export function resolveCircleAddPrompt(opts: {
       variationColor: variation.color,
       factorSelection: validatedFactors,
       factorPromptLines,
+      positionPrompt,
     };
   }
 
@@ -81,7 +87,7 @@ export function resolveCircleAddPrompt(opts: {
     throw new Error("Circle Add requires a selected object from the catalog.");
   }
   return {
-    prompt: buildAddPrompt({ asset: null, userDetail: detail }),
+    prompt: `${buildAddPrompt({ asset: null, userDetail: detail })} ${positionPrompt}`,
     negativePrompt:
       "extra objects, changed person, changed architecture, scene regeneration, artifacts",
     assetId: null,
@@ -92,6 +98,7 @@ export function resolveCircleAddPrompt(opts: {
     variationColor: null,
     factorSelection: {},
     factorPromptLines: [],
+    positionPrompt,
   };
 }
 
