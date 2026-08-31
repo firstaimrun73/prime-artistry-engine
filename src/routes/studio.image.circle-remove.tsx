@@ -101,7 +101,6 @@ function Circle2editPage() {
   const [brushSize, setBrushSize] = useState(24);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
-  /** factorId → optionId — server resolves prompt fragments */
   const [factorSelection, setFactorSelection] = useState<Record<string, string>>({});
   const [progressPct, setProgressPct] = useState(0);
   const [stageIdx, setStageIdx] = useState(0);
@@ -265,7 +264,6 @@ function Circle2editPage() {
           await refreshProfile();
           toast.success("Object removed");
         } else {
-          // Placeholder prompt for schema only — server resolves from assetId + factors + maskStats
           const res = await generate({
             data: {
               prompt: "circle-add",
@@ -325,7 +323,12 @@ function Circle2editPage() {
       return;
     }
     setMode(m);
-    if (m !== "add") setAddDrawerOpen(false);
+    if (m === "add") {
+      // Add mode: hide Circle tool; paint placement with brush
+      setDrawTool("brush");
+    } else {
+      setAddDrawerOpen(false);
+    }
   };
 
   const statusForMode = () => {
@@ -378,16 +381,49 @@ function Circle2editPage() {
         onTool={setDrawTool}
         brushSize={brushSize}
         onBrushSize={setBrushSize}
+        hideCircle={mode === "add"}
       />
       {mode === "add" && !addLocked ? (
         <>
-          <button
-            type="button"
-            onClick={() => setAddDrawerOpen(true)}
-            className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
-          >
-            {addObjectId ? `Selected: ${selectedAsset?.name ?? addObjectId}` : "Browse objects"}
-          </button>
+          {selectedAsset ? (
+            <div className="flex items-center gap-2 rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.10)] px-2.5 py-1.5">
+              <span
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[rgba(123,111,224,0.18)] text-[11px] font-bold text-[#7B6FE0]"
+                aria-hidden
+              >
+                {(selectedAsset.name ?? "?").slice(0, 2).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#7B6FE0]">
+                {selectedAsset.name}
+              </span>
+              <button
+                type="button"
+                aria-label="Clear selected object"
+                onClick={() => {
+                  setAddObjectId(null);
+                  setFactorSelection({});
+                }}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[13px] font-bold text-[#7B6FE0]/80 hover:bg-[rgba(123,111,224,0.15)]"
+              >
+                ×
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddDrawerOpen(true)}
+                className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-medium text-[#7B6FE0]/90"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(true)}
+              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+            >
+              Browse objects
+            </button>
+          )}
           {selectedAsset ? (
             <CircleFactorPicker
               asset={selectedAsset}
@@ -533,6 +569,7 @@ function Circle2editPage() {
               imageUrl={preview}
               tool={drawToolToMaskTool(drawTool)}
               brushSize={brushSize}
+              disabled={phase === "generating"}
               onMaskChange={setHasMask}
             />
           </div>
