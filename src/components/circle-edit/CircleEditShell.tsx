@@ -28,6 +28,8 @@ type Props = {
   generateDisabled?: boolean;
   generateHint?: string;
   generateLabel?: string;
+  /** When true, Add button shows a short energy/charge blink before commit */
+  energyBlink?: boolean;
 };
 
 function ContinuousMetaRing({
@@ -214,32 +216,61 @@ function Circle2editTitle({
   );
 }
 
-/** Compact premium glass generate control — replaces the floating pull-down lever. */
+/** Compact premium glass generate control — energy blink on press for Add. */
 export function CircleGenerateControl({
   disabled,
   onCommit,
   label,
   hint,
+  energyBlink,
 }: {
   disabled?: boolean;
   onCommit: () => void;
   label: string;
   hint?: string;
+  energyBlink?: boolean;
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const [blinking, setBlinking] = useState(false);
+
+  const handleClick = () => {
+    if (disabled) return;
+    if (!energyBlink) {
+      onCommit();
+      return;
+    }
+    setBlinking(true);
+    // 2–3 charge flashes (~450ms) then commit
+    window.setTimeout(() => {
+      setBlinking(false);
+      onCommit();
+    }, 480);
+  };
+
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="relative flex flex-col items-center gap-1">
+      {blinking ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-10 rounded-2xl"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent 0%, rgba(123,111,224,0.45) 30%, rgba(200,190,255,0.5) 50%, rgba(123,111,224,0.45) 70%, transparent 100%)",
+            backgroundSize: "200% 100%",
+            animation: "circle2edit-charge-blink 0.16s ease-in-out 3",
+            opacity: 0.48,
+          }}
+        />
+      ) : null}
       <button
         type="button"
-        disabled={disabled}
-        onClick={() => {
-          if (!disabled) onCommit();
-        }}
+        disabled={disabled || blinking}
+        onClick={handleClick}
         aria-label={label}
         className={cn(
-          "group flex h-11 items-center gap-2 rounded-2xl border px-4 shadow-md backdrop-blur-xl transition-all active:scale-[0.97]",
-          disabled
+          "group relative flex h-11 items-center gap-2 overflow-hidden rounded-2xl border px-4 shadow-md backdrop-blur-xl transition-all active:scale-[0.97]",
+          disabled || blinking
             ? "cursor-not-allowed opacity-45"
             : "hover:shadow-lg",
           isDark
@@ -262,6 +293,13 @@ export function CircleGenerateControl({
           {hint}
         </p>
       ) : null}
+      <style>{`
+        @keyframes circle2edit-charge-blink {
+          0% { opacity: 0.15; background-position: 100% 0; }
+          50% { opacity: 0.55; background-position: 0% 0; }
+          100% { opacity: 0.2; background-position: -100% 0; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -339,6 +377,7 @@ export function CircleEditShell({
   generateDisabled,
   generateHint,
   generateLabel,
+  energyBlink,
 }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -455,6 +494,7 @@ export function CircleEditShell({
             onCommit={onGenerate}
             label={genLabel}
             hint={generateHint}
+            energyBlink={energyBlink ?? mode === "add"}
           />
         </div>
       ) : null}
@@ -634,34 +674,65 @@ function ToolIconCircle({ active }: { active: boolean }) {
   );
 }
 
+/** Classic paint brush — bristles + handle (not a pen). */
 function ToolIconBrush({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
       <path
-        d="M7 16c1.5-1 3-1.2 4.5-.3L18 9.5 14.5 6 7.8 12.7C6.7 14 6.2 15.2 7 16z"
+        d="M14.5 3.5c.8-.8 2.1-.8 2.9 0l3.1 3.1c.8.8.8 2.1 0 2.9L12 18l-4.2 1.2L9 15 14.5 3.5z"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="1.7"
         strokeLinejoin="round"
         opacity={active ? 1 : 0.85}
       />
-      <path d="M6.5 17.5c.8.9 2.2 1 3 .2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path
+        d="M4.5 19.5c1.2-1.8 3.2-2.2 4.8-1.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+      />
+      <path
+        d="M5 20.2h4.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        opacity={0.75}
+      />
     </svg>
   );
 }
 
+/** Classic rectangular eraser (rubber block), not a brush. */
 function ToolIconEraser({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
       <path
-        d="M8 15l5.5-5.5 4 4L12 19H8v-4z"
+        d="M5.5 14.5 12 8l5.5 5.5L14 17H7.5L5.5 14.5z"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.75"
         strokeLinejoin="round"
         opacity={active ? 1 : 0.85}
       />
-      <path d="M12.5 8.5l2-2 3.5 3.5-2 2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path
+        d="M9.2 17h7.3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 8l2.2-2.2 3.3 3.3-2.2 2.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.8}
+      />
     </svg>
   );
 }
@@ -671,19 +742,27 @@ export function CircleDrawToolbar({
   onTool,
   brushSize,
   onBrushSize,
+  hideCircle,
 }: {
   tool: CircleDrawTool;
   onTool: (t: CircleDrawTool) => void;
   brushSize: number;
   onBrushSize: (n: number) => void;
+  /** Add mode: no circle tool — user paints the placement region */
+  hideCircle?: boolean;
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const items: { id: CircleDrawTool; label: string; Icon: typeof ToolIconCircle }[] = [
-    { id: "circle", label: "Circle", Icon: ToolIconCircle },
-    { id: "brush", label: "Brush", Icon: ToolIconBrush },
-    { id: "eraser", label: "Eraser", Icon: ToolIconEraser },
-  ];
+  const items: { id: CircleDrawTool; label: string; Icon: typeof ToolIconCircle }[] = hideCircle
+    ? [
+        { id: "brush", label: "Brush", Icon: ToolIconBrush },
+        { id: "eraser", label: "Eraser", Icon: ToolIconEraser },
+      ]
+    : [
+        { id: "circle", label: "Circle", Icon: ToolIconCircle },
+        { id: "brush", label: "Brush", Icon: ToolIconBrush },
+        { id: "eraser", label: "Eraser", Icon: ToolIconEraser },
+      ];
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-center gap-2">
