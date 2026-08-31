@@ -1,4 +1,4 @@
-/** Shared Circle Add asset types — scalable registry (1000+ ready). */
+/** Shared Circle Add asset types — curated registry + expandable. */
 
 export type AssetVariationProfile = {
   enabled: boolean;
@@ -8,6 +8,22 @@ export type AssetVariationProfile = {
   scaleAdaptation: boolean;
   lightingAdaptation: boolean;
 };
+
+export type AssetFactorOption = {
+  id: string;
+  label: string;
+  /** Server-only prompt fragment appended when this option is selected */
+  prompt: string;
+};
+
+export type AssetFactor = {
+  id: string;
+  label: string;
+  options: AssetFactorOption[];
+};
+
+/** Still-image pose/action characterization — not video generation. */
+export type Motion2AIMode = "static" | "walking" | "running" | "sitting" | "moving" | "wind" | "flying";
 
 export type CircleAddAsset = {
   id: string;
@@ -33,6 +49,11 @@ export type CircleAddAsset = {
   /** Deprecated — leave empty; UI uses mark/iconPath, never emoji stickers */
   emoji: string;
   mark?: string;
+  /** Structured factor hierarchy (server resolves prompts) */
+  factors?: AssetFactor[];
+  /** Motion2AI metadata for pose/action in still generation */
+  motionModes?: Motion2AIMode[];
+  motionCapable?: boolean;
 };
 
 export type AddAsset = CircleAddAsset;
