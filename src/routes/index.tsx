@@ -17,7 +17,6 @@ import { MusicSamples } from "@/components/MusicSamples";
 import { VideoSamples } from "@/components/VideoSamples";
 import { HomeHero } from "@/components/home/HomeHero";
 import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
-import { Circle2editSampleGallery } from "@/components/home/Circle2editSampleGallery";
 import { TrustSection } from "@/components/home/TrustSection";
 import { WhyChoose } from "@/components/home/WhyChoose";
 import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
@@ -65,7 +64,6 @@ function SignedOutHome() {
       <Header />
       <HomeHero />
       <BeforeAfterShowcase />
-      <Circle2editSampleGallery />
       <SampleShowcase />
       <SampleGallery />
       <MusicSamples />
