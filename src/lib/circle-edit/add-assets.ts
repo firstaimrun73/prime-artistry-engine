@@ -1,10 +1,11 @@
 /**
  * Circle 2edit Add — production registry.
- * First release: PDF-canonical 21 curated assets (server-authoritative).
+ * First release: PDF-canonical 21 curated assets + expanded emoji assets (free + paid).
  * Large seed catalog kept available for future expansion via USE_FULL_SEED.
  */
 import { parseSeedAssets } from "./add-assets-seed";
 import { CURATED_ADD_ASSETS } from "./curated-assets";
+import { EXTRA_ADD_ASSETS } from "./curated-assets-extra";
 import type { CircleAddAsset, AssetVariationProfile } from "./add-assets-types";
 
 export type { CircleAddAsset, AssetVariationProfile, AssetFactor, AssetFactorOption, Motion2AIMode } from "./add-assets-types";
@@ -28,6 +29,7 @@ function mergeAddRegistry(): CircleAddAsset[] {
     for (const a of parseSeedAssets()) byId.set(a.id, a);
   }
   for (const a of CURATED_ADD_ASSETS) byId.set(a.id, a);
+  for (const a of EXTRA_ADD_ASSETS) byId.set(a.id, a);
   return Array.from(byId.values()).sort(
     (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
   );
@@ -57,13 +59,13 @@ const LEGACY_ID_MAP: Record<string, string> = {
   food_cake: "obj_cake",
   decor_vase: "obj_vase",
   object_bag: "obj_shoe",
-  vehicle_truck: "vehicle_car",
-  nature_flower: "nature_tree",
-  nature_plant: "nature_tree",
+  vehicle_truck: "vehicle_truck",
+  nature_flower: "obj_flower",
+  nature_plant: "obj_plant",
   nature_bush: "nature_tree",
   nature_rock: "nature_tree",
   nature_cactus: "nature_tree",
-  nature_sunflower: "nature_tree",
+  nature_sunflower: "obj_flower",
 };
 
 export function findAddAsset(id: string | null | undefined): CircleAddAsset | null {
@@ -141,7 +143,6 @@ export function resolveFactorPromptLines(
   }
   const motion = factorSelection["motion2ai"];
   if (motion && asset.motionModes?.includes(motion as never)) {
-    // Still-image pose / state guidance only — not video generation
     const motionPrompts: Record<string, string> = {
       static: "neutral static pose appropriate for a still photograph",
       walking: "natural walking pose mid-stride for a still photograph",
@@ -169,7 +170,6 @@ export function buildAddPrompt(opts: {
     const factorLines = resolveFactorPromptLines(opts.asset, opts.factorSelection);
     if (factorLines.length) chunks.push(`Object characterization: ${factorLines.join("; ")}.`);
     if (opts.variation?.variationLine) chunks.push(opts.variation.variationLine);
-    // Free-form client text is never authoritative for asset identity
     if (detail && detail !== "circle-add") {
       chunks.push(`Additional scene hint (non-authoritative): ${detail.slice(0, 200)}`);
     }
