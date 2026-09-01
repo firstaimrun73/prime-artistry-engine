@@ -27,6 +27,7 @@ const PUBLIC_LINKS: NavItem[] = [
 
 /** Auth users: app navigation (not marketing page links). */
 const AUTH_LINKS_BASE: NavItem[] = [
+  { to: "/", label: "Home" },
   { to: "/studio", label: "Studio" },
   { to: "/history", label: "History" },
   { to: "/dashboard", label: "Dashboard" },
@@ -45,7 +46,7 @@ export function Header() {
   const authLinks: NavItem[] = showChat
     ? [...AUTH_LINKS_BASE, CHAT_LINK]
     : AUTH_LINKS_BASE;
-  // Signed-in: application nav only (Studio, History, optional Chat).
+  // Signed-in: application nav only (Home, Studio, History, optional Chat).
   // Pre-login: full marketing links.
   const links: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 
