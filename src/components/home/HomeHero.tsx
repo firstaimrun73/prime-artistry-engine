@@ -41,7 +41,7 @@ export function HomeHero() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
             <Button asChild size="lg" className="gap-2">
               <Link to="/studio/image/circle-info">
-                Try Circle 2edit <ArrowRight className="h-4 w-4" />
+                Try Now <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="gap-2">
