@@ -1,8 +1,7 @@
 /**
  * Compact horizontal asset rail for Circle Add.
- * Opens only when parent sets open=true after explicit user action.
  * Overlay bottom sheet — does NOT shrink the image canvas viewport.
- * First release: PDF-canonical 21 assets only.
+ * Gallery size control (S/M/L) affects thumbs only — never MaskStage/canvas.
  */
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -14,6 +13,15 @@ import {
 } from "@/lib/circle-edit/add-assets";
 import { AssetIcon } from "@/components/circle-edit/AssetIcon";
 
+type GallerySize = "small" | "medium" | "large";
+
+const SIZE_PX: Record<GallerySize, number> = { small: 22, medium: 30, large: 40 };
+const THUMB_BOX: Record<GallerySize, string> = {
+  small: "h-11 w-11",
+  medium: "h-14 w-14",
+  large: "h-[4.5rem] w-[4.5rem]",
+};
+
 type Props = {
   isDark: boolean;
   open: boolean;
@@ -23,11 +31,22 @@ type Props = {
   disabled?: boolean;
 };
 
-function AssetThumb({ asset, selected, isDark }: { asset: CircleAddAsset; selected: boolean; isDark: boolean }) {
+function AssetThumb({
+  asset,
+  selected,
+  isDark,
+  gallerySize,
+}: {
+  asset: CircleAddAsset;
+  selected: boolean;
+  isDark: boolean;
+  gallerySize: GallerySize;
+}) {
   return (
     <span
       className={cn(
-        "relative grid h-14 w-14 place-items-center rounded-[14px] border backdrop-blur-md transition-transform duration-200 motion-safe:hover:-translate-y-0.5",
+        "relative grid place-items-center rounded-[14px] border backdrop-blur-md transition-transform duration-200 motion-safe:hover:-translate-y-0.5",
+        THUMB_BOX[gallerySize],
         selected
           ? "border-[#7B6FE0] bg-[rgba(123,111,224,0.22)] shadow-[0_0_12px_rgba(123,111,224,0.35)]"
           : isDark
@@ -37,7 +56,7 @@ function AssetThumb({ asset, selected, isDark }: { asset: CircleAddAsset; select
       title={asset.name}
       aria-label={asset.name}
     >
-      <AssetIcon asset={asset} size={30} isDark={isDark} selected={selected} />
+      <AssetIcon asset={asset} size={SIZE_PX[gallerySize]} isDark={isDark} selected={selected} />
       {selected ? (
         <span className="absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full bg-[#7B6FE0] text-[9px] font-bold text-white">
           ✓
@@ -57,8 +76,8 @@ export function CircleAddAssetRail({
 }: Props) {
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string | null>(null);
+  const [gallerySize, setGallerySize] = useState<GallerySize>("medium");
 
-  // Full PDF set is 21 — show all when unfiltered
   const assets = useMemo(() => searchAddAssets(query, cat), [query, cat]);
 
   if (!open) return null;
@@ -113,6 +132,52 @@ export function CircleAddAssetRail({
           </button>
         </div>
 
+        <div className="mb-2 flex items-center justify-center gap-1" data-testid="asset-gallery-size">
+          <button
+            type="button"
+            aria-label="Smaller icons"
+            onClick={() =>
+              setGallerySize((s) => (s === "large" ? "medium" : s === "medium" ? "small" : "small"))
+            }
+            className={cn(
+              "grid h-7 w-7 place-items-center rounded-lg border text-[14px] font-bold",
+              isDark ? "border-white/10 text-[#9AA0B0]" : "border-black/8 text-[#5C6170]",
+            )}
+          >
+            −
+          </button>
+          {(["small", "medium", "large"] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setGallerySize(id)}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase",
+                gallerySize === id
+                  ? "border-[#7B6FE0] bg-[rgba(123,111,224,0.18)] text-[#7B6FE0]"
+                  : isDark
+                    ? "border-white/10 text-[#9AA0B0]"
+                    : "border-black/8 text-[#5C6170]",
+              )}
+            >
+              {id === "small" ? "Small" : id === "medium" ? "Medium" : "Large"}
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-label="Larger icons"
+            onClick={() =>
+              setGallerySize((s) => (s === "small" ? "medium" : s === "medium" ? "large" : "large"))
+            }
+            className={cn(
+              "grid h-7 w-7 place-items-center rounded-lg border text-[14px] font-bold",
+              isDark ? "border-white/10 text-[#9AA0B0]" : "border-black/8 text-[#5C6170]",
+            )}
+          >
+            +
+          </button>
+        </div>
+
         {ADD_ASSET_CATEGORIES.length > 1 ? (
           <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
@@ -163,7 +228,12 @@ export function CircleAddAssetRail({
                 }}
                 className="flex w-[76px] shrink-0 flex-col items-center gap-1"
               >
-                <AssetThumb asset={asset} selected={selected} isDark={isDark} />
+                <AssetThumb
+                  asset={asset}
+                  selected={selected}
+                  isDark={isDark}
+                  gallerySize={gallerySize}
+                />
                 <span
                   className={cn(
                     "w-full truncate text-center text-[10px] font-medium",
@@ -172,7 +242,12 @@ export function CircleAddAssetRail({
                 >
                   {asset.name}
                 </span>
-                <span className={cn("text-[9px] tabular-nums font-medium", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>
+                <span
+                  className={cn(
+                    "text-[9px] font-medium tabular-nums",
+                    isDark ? "text-[#6B7080]" : "text-[#8A90A0]",
+                  )}
+                >
                   {asset.isFree || asset.creditCost === 0 ? "Free" : `${asset.creditCost} credits`}
                 </span>
               </button>
