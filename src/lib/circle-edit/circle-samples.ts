@@ -3,8 +3,6 @@
  * Photographic pairs: optimized static assets under src/assets.
  * Try Now preserves assetId for ADD samples.
  */
-import circleBefore from "@/assets/circle-sample-butterfly-before.jpg";
-import circleAfter from "@/assets/circle-sample-butterfly-after.jpg";
 import objectBefore from "@/assets/sample-object-before.jpg";
 import objectAfter from "@/assets/sample-object-after.jpg";
 import removalBefore from "@/assets/sample-removal-before.jpg";
@@ -141,8 +139,8 @@ export const CIRCLE_SAMPLES: CircleSample[] = [
     "Remove a butterfly from a flower",
     "Nature",
     "SAMPLE",
-    circleBefore,
-    circleAfter,
+    restoreBefore,
+    restoreAfter,
     "10:15 AM",
     "Remove an unwanted butterfly from a detailed flower photograph while preserving the flower, background depth, lighting, and natural composition.",
   ),
@@ -215,8 +213,8 @@ export const CIRCLE_SAMPLES: CircleSample[] = [
     "Remove a flower",
     "Nature",
     "NATURE",
-    circleBefore,
-    circleAfter,
+    restoreBefore,
+    restoreAfter,
     "11:08 AM",
     "Remove a flower element while keeping the rest of the botanical scene intact.",
   ),
