@@ -113,9 +113,9 @@ export function SignedInHomeBody() {
               <Link
                 key={q.label}
                 to={(locked ? "/pricing" : q.to) as "/pricing" | "/studio/image" | "/studio/video" | "/studio/music" | "/studio/image/circle-remove" | "/studio/image/auto-edit" | "/studio/image/filters" | "/studio/image/lenses"}
-                className="flex shrink-0 flex-col items-center gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
+                className="flex shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40 min-w-[72px]"
               >
-                <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <span className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
                   {locked && (
                     <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
@@ -128,7 +128,7 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* POST-LOGIN ONLY — 25+ Circle sample cards (never on pre-login home) */}
+      {/* POST-LOGIN ONLY — Circle feature cards (never on pre-login home) */}
       <CircleSampleGallery />
 
       <Link
