@@ -1,5 +1,1 @@
-/**
- * Circle 2edit — /studio/image/circle-remove
- * Remove: circleInstant true
- * Add: circleInstant false → flux-pro fill; asset rail + factors + confirm
- */
+RESTORE_FROM_LOCAL_FILE_FAILED_USE_ARTIFACT
