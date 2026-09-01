@@ -1,11 +1,12 @@
 /**
  * Circle 2edit Add — production registry.
- * Curated 21 + expanded extras + clothing + costume. Synonym-aware search.
+ * Curated 21 + extras + clothing + 20 more objects. Synonym-aware search.
  */
 import { parseSeedAssets } from "./add-assets-seed";
 import { CURATED_ADD_ASSETS } from "./curated-assets";
 import { EXTRA_ADD_ASSETS } from "./curated-assets-extra";
 import { CLOTHING_ADD_ASSETS } from "./curated-assets-clothing";
+import { MORE_ADD_ASSETS } from "./curated-assets-more";
 import type { CircleAddAsset, AssetVariationProfile } from "./add-assets-types";
 
 export type { CircleAddAsset, AssetVariationProfile, AssetFactor, AssetFactorOption, Motion2AIMode } from "./add-assets-types";
@@ -30,6 +31,7 @@ function mergeAddRegistry(): CircleAddAsset[] {
   for (const a of CURATED_ADD_ASSETS) byId.set(a.id, a);
   for (const a of EXTRA_ADD_ASSETS) byId.set(a.id, a);
   for (const a of CLOTHING_ADD_ASSETS) byId.set(a.id, a);
+  for (const a of MORE_ADD_ASSETS) byId.set(a.id, a);
   return Array.from(byId.values()).sort(
     (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
   );
@@ -75,14 +77,17 @@ const SEARCH_SYNONYMS: Record<string, string[]> = {
   phone: ["mobile", "smartphone", "iphone", "cellphone"],
   mobile: ["phone", "smartphone"],
   smartphone: ["phone", "mobile"],
-  bag: ["backpack", "rucksack", "travel bag", "luggage", "handbag", "purse"],
+  bag: ["backpack", "rucksack", "travel bag", "luggage", "handbag", "purse", "suitcase"],
   backpack: ["bag", "rucksack", "travel"],
+  suitcase: ["luggage", "travel bag", "bag"],
   cake: ["dessert", "birthday", "pastry"],
   dessert: ["cake", "icecream", "ice cream"],
   dog: ["puppy", "canine"],
   cat: ["kitten", "feline"],
-  flower: ["bloom", "rose", "floral"],
-  plant: ["houseplant", "pot", "succulent"],
+  flower: ["bloom", "rose", "floral", "bouquet", "flowers"],
+  flowers: ["flower", "bouquet", "floral"],
+  bouquet: ["flowers", "flower", "floral"],
+  plant: ["houseplant", "pot", "succulent", "plant pot"],
   coffee: ["cup", "latte", "espresso"],
   costume: ["outfit", "clothes", "clothing", "apparel"],
   outfit: ["costume", "clothes", "clothing"],
@@ -90,11 +95,30 @@ const SEARCH_SYNONYMS: Record<string, string[]> = {
   female: ["women", "woman", "womens"],
   guitar: ["instrument", "music"],
   headphones: ["earphones", "headset", "audio"],
+  headset: ["headphones", "earphones"],
   football: ["soccer", "ball", "sport"],
+  basketball: ["ball", "sport", "hoops"],
   sofa: ["couch", "furniture"],
   gift: ["present", "box"],
   teddy: ["bear", "plush", "toy"],
-  // Clothing / fashion
+  laptop: ["notebook", "computer", "pc"],
+  tablet: ["ipad", "slate"],
+  television: ["tv", "screen", "monitor"],
+  tv: ["television", "screen"],
+  speaker: ["audio", "bluetooth"],
+  microphone: ["mic", "podcast"],
+  mic: ["microphone"],
+  skateboard: ["board", "skate"],
+  helmet: ["bike helmet", "cycling"],
+  bottle: ["water bottle", "flask", "drink"],
+  candle: ["wax", "flame"],
+  mirror: ["looking glass", "vanity"],
+  table: ["desk", "furniture"],
+  pillow: ["cushion", "bedding"],
+  balloon: ["party", "helium"],
+  tripod: ["stand", "camera stand"],
+  wallet: ["billfold"],
+  key: ["keys", "lock"],
   clothing: ["clothes", "fashion", "apparel", "outfit", "wear"],
   clothes: ["clothing", "fashion", "apparel"],
   fashion: ["clothing", "clothes", "apparel"],
