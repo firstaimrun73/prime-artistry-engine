@@ -1,4 +1,4 @@
-/** Extra Circle 2edit filled 3D visuals — used by AssetVisual. */
+/** Extra Circle 2edit filled 3D visuals — used by AssetVisual. Includes clothing. */
 import type { ReactNode } from "react";
 
 export function ExtraAssetVisual({ id }: { id: string }): ReactNode | null {
@@ -263,6 +263,126 @@ export function ExtraAssetVisual({ id }: { id: string }): ReactNode | null {
           <path d="M22 18h20v6l-6 8v18H28V32l-6-8V18z" fill="#E07090" />
           <path d="M24 18c0-6 4-10 8-10s8 4 8 10" fill="#D4A574" />
           <path d="M22 32h20l-4 18H26z" fill="#C05070" />
+        </g>
+      );
+    /* —— Clothing —— */
+    case "cloth_tshirt":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M16 18l8 6h16l8-6 6 4-6 6v24H16V28l-6-6z" fill="#5B8DEF" />
+          <path d="M24 18c0-4 3-8 8-8s8 4 8 8" fill="none" stroke="#3D7AB0" strokeWidth="2" />
+        </g>
+      );
+    case "cloth_shirt":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M14 16l10 8h16l10-8 4 6-6 4v26H16V26l-6-4z" fill="#F2F2F5" stroke="#C8C4E8" strokeWidth="1" />
+          <path d="M28 24v28 M32 16l-4 8h8z" fill="none" stroke="#A39AE8" strokeWidth="1.5" />
+        </g>
+      );
+    case "cloth_jacket":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M12 18l10 8h20l10-8 6 6-6 6v24H18V30l-6-6z" fill="#3A3E4C" />
+          <path d="M32 26v28" stroke="#8A90A0" strokeWidth="2" />
+          <circle cx="28" cy="36" r="1.5" fill="#C8C4E8" />
+          <circle cx="28" cy="42" r="1.5" fill="#C8C4E8" />
+        </g>
+      );
+    case "cloth_hoodie":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M16 22l8 6h16l8-6 4 4-4 6v24H20V32l-4-6z" fill="#7B6FE0" />
+          <path d="M22 16c0-6 4-10 10-10s10 4 10 10v8H22v-8z" fill="#9B93F0" />
+          <rect x="24" y="36" width="16" height="10" rx="2" fill="#5C54C0" />
+        </g>
+      );
+    case "cloth_dress":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M24 14h16v8l8 28H16l8-28V14z" fill="#E07090" />
+          <path d="M24 14c0-4 3-6 8-6s8 2 8 6" fill="none" stroke="#C05070" strokeWidth="2" />
+        </g>
+      );
+    case "cloth_jeans":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M18 12h28v8l-4 36h-8V36h-4v20h-8L18 20z" fill="#3D7AB0" />
+          <path d="M28 20v16 M36 20v16" stroke="#2A5A90" strokeWidth="1.5" />
+        </g>
+      );
+    case "cloth_shorts":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M16 20h32v8l-4 16H20L16 28z" fill="#5B8DEF" />
+          <path d="M32 28v16" stroke="#3D7AB0" strokeWidth="1.5" />
+        </g>
+      );
+    case "cloth_skirt":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M20 18h24l6 28H14z" fill="#E07090" />
+          <rect x="22" y="14" width="20" height="6" rx="1" fill="#C05070" />
+        </g>
+      );
+    case "cloth_sneakers":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M8 38c2-8 8-12 18-12h18c6 0 12 4 16 10l2 6H10z" fill="#F2F2F5" />
+          <path d="M10 42h44c0 2-2 4-5 4H14c-3 0-4-2-4-4z" fill="#2A2A32" />
+          <path d="M20 30c2-2 5-3 8-3" fill="none" stroke="#5B8DEF" strokeWidth="2" strokeLinecap="round" />
+        </g>
+      );
+    case "cloth_boots":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M14 16h16v28l8 8H10l4-8V16z" fill="#5C4A32" />
+          <path d="M14 44h24l2 6H12z" fill="#3A2E1E" />
+        </g>
+      );
+    case "cloth_cap":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M16 36c2-12 10-18 16-18s14 6 16 18H16z" fill="#5B8DEF" />
+          <ellipse cx="32" cy="38" rx="22" ry="5" fill="#3D7AB0" />
+        </g>
+      );
+    case "cloth_handbag":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M14 26h36v26c0 3-4 5-18 5s-18-2-18-5V26z" fill="#C8955A" />
+          <path d="M22 20c0-6 4-10 10-10s10 4 10 10" fill="none" stroke="#8B6914" strokeWidth="3" />
+          <rect x="26" y="34" width="12" height="8" rx="1" fill="#A07830" />
+        </g>
+      );
+    case "cloth_scarf":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M12 20c8-8 20-8 28 0l8 8-6 6-10-6c-4-4-10-4-14 0l-10 6z" fill="#E05050" />
+          <path d="M20 34l-4 20h8l4-16 M40 34l4 20h-8l-4-16" fill="#C04040" />
+        </g>
+      );
+    case "cloth_tie":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M28 8h8l-2 8H30z" fill="#5B4FC7" />
+          <path d="M26 16h12l-4 40h-4z" fill="#7B6FE0" />
+          <path d="M28 16l4 6 4-6" fill="#9B93F0" />
+        </g>
+      );
+    case "cloth_coat":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M10 14l12 10h20l12-10 4 8-6 6v28H16V28l-6-6z" fill="#5C4A32" />
+          <path d="M32 24v34" stroke="#8B6914" strokeWidth="2" />
+        </g>
+      );
+    case "cloth_suit":
+      return (
+        <g filter="url(#c2shadow)">
+          <path d="M14 16l10 8h16l10-8 4 6-6 6v26H16V28l-6-6z" fill="#2A2A32" />
+          <path d="M28 24l4 8 4-8" fill="#F2F2F5" />
+          <path d="M32 32v26" stroke="#8A90A0" strokeWidth="1.5" />
         </g>
       );
     default:
