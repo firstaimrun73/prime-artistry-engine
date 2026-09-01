@@ -79,7 +79,7 @@ const GEN_STAGES = [
 ] as const;
 
 type Phase = "select" | "generating" | "result";
- type Mode = "remove" | "add";
+type Mode = "remove" | "add";
 
 function drawToolToMaskTool(t: CircleDrawTool): MaskTool {
   if (t === "eraser") return "erase";
@@ -102,6 +102,7 @@ function Circle2editPage() {
   const { user, profile, refreshProfile } = useAuth();
   const isAdmin = isAdminEmail(profile?.email);
   const addLocked = !isAdmin && isFreePlan(profile?.plan);
+  const watermarkLocked = !isAdmin && isFreePlan(profile?.plan);
   const generate = useServerFn(generateMedia);
   const secureDl = useServerFn(secureDownloadImage);
   const { theme } = useTheme();
@@ -146,8 +147,12 @@ function Circle2editPage() {
   }, []);
 
   useEffect(() => {
+    if (watermarkLocked) {
+      setKeepCircleWatermark(true);
+      return;
+    }
     setKeepCircleWatermark(readCircleKeepWatermarkPref());
-  }, []);
+  }, [watermarkLocked]);
 
   useEffect(() => {
     if (tryNowHydratedRef.current) return;
@@ -326,7 +331,7 @@ function Circle2editPage() {
               circleInstant: true,
               sourceWidth: sourceWidth || undefined,
               sourceHeight: sourceHeight || undefined,
-              keepWatermark: keepCircleWatermark,
+              keepWatermark: watermarkLocked ? true : keepCircleWatermark,
             },
           });
           clearProgressTimers();
@@ -354,7 +359,7 @@ function Circle2editPage() {
               circleMaskStats: maskStats ?? undefined,
               sourceWidth: sourceWidth || undefined,
               sourceHeight: sourceHeight || undefined,
-              keepWatermark: keepCircleWatermark,
+              keepWatermark: watermarkLocked ? true : keepCircleWatermark,
             },
           });
           clearProgressTimers();
@@ -391,6 +396,7 @@ function Circle2editPage() {
       sourceHeight,
       addConfirmed,
       keepCircleWatermark,
+      watermarkLocked,
     ],
   );
 
@@ -454,37 +460,50 @@ function Circle2editPage() {
   const selectedAsset = findAddAsset(addObjectId);
   const paintLocked = phase === "generating" || (mode === "add" && !addConfirmed);
 
+  // Free: watermark enforced + locked control. Paid/Admin: compact On/Off toggle.
   const watermarkToggle = (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-[#7B6FE0]/30 bg-[rgba(123,111,224,0.08)] px-2.5 py-1.5">
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold text-[#7B6FE0]">Circle watermark · Motio 2 Edit</p>
-        <p className={cn("text-[10px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-          {keepCircleWatermark ? "On for this output" : "Off (paid plans)"}
-        </p>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={keepCircleWatermark}
-        aria-label="Toggle Circle watermark"
-        onClick={() => {
-          const next = !keepCircleWatermark;
-          setKeepCircleWatermark(next);
-          writeCircleKeepWatermarkPref(next);
-          toast.message(next ? "Circle watermark on" : "Circle watermark off");
-        }}
-        className={cn(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-          keepCircleWatermark ? "bg-[#7B6FE0]" : isDark ? "bg-white/20" : "bg-black/20",
-        )}
-      >
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-lg border px-2 py-1",
+        isDark ? "border-white/10 bg-white/[0.03]" : "border-black/8 bg-black/[0.02]",
+      )}
+    >
+      <span className="text-[10px] font-medium text-[#7B6FE0]">⭕ Motio 2 Edit</span>
+      {watermarkLocked ? (
         <span
           className={cn(
-            "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all",
-            keepCircleWatermark ? "left-5" : "left-0.5",
+            "ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold",
+            isDark ? "bg-white/10 text-[#C5C7D0]" : "bg-black/5 text-[#3A3E4C]",
           )}
-        />
-      </button>
+          title="Required on Free plan"
+        >
+          Locked
+        </span>
+      ) : (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={keepCircleWatermark}
+          aria-label="Toggle Circle watermark"
+          onClick={() => {
+            const next = !keepCircleWatermark;
+            setKeepCircleWatermark(next);
+            writeCircleKeepWatermarkPref(next);
+            toast.message(next ? "Circle watermark on" : "Circle watermark off");
+          }}
+          className={cn(
+            "relative ml-auto h-5 w-9 shrink-0 rounded-full transition-colors",
+            keepCircleWatermark ? "bg-[#7B6FE0]" : isDark ? "bg-white/20" : "bg-black/20",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
+              keepCircleWatermark ? "left-4" : "left-0.5",
+            )}
+          />
+        </button>
+      )}
     </div>
   );
 
@@ -683,7 +702,7 @@ function Circle2editPage() {
                 void (async () => {
                   try {
                     const res = await secureDl({
-                      data: { imageUrl: output, keepWatermark: keepCircleWatermark },
+                      data: { imageUrl: output, keepWatermark: watermarkLocked ? true : keepCircleWatermark },
                     });
                     await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
                   } catch (e) {
