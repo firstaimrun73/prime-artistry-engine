@@ -1,5 +1,6 @@
-/** Extra Circle 2edit filled 3D visuals — used by AssetVisual. Includes clothing. */
+/** Extra Circle 2edit filled 3D visuals — used by AssetVisual. Includes clothing + more. */
 import type { ReactNode } from "react";
+import { MoreAssetVisual } from "./asset-visuals-more";
 
 export function ExtraAssetVisual({ id }: { id: string }): ReactNode | null {
   switch (id) {
@@ -265,7 +266,6 @@ export function ExtraAssetVisual({ id }: { id: string }): ReactNode | null {
           <path d="M22 32h20l-4 18H26z" fill="#C05070" />
         </g>
       );
-    /* —— Clothing —— */
     case "cloth_tshirt":
       return (
         <g filter="url(#c2shadow)">
@@ -386,6 +386,6 @@ export function ExtraAssetVisual({ id }: { id: string }): ReactNode | null {
         </g>
       );
     default:
-      return null;
+      return MoreAssetVisual({ id });
   }
 }
