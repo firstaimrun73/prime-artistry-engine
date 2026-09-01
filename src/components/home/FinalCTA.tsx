@@ -18,8 +18,8 @@ export function FinalCTA() {
         </p>
         <div className="relative mt-7 flex flex-col items-stretch justify-center gap-3 sm:flex-row">
           <Button asChild size="lg" className="btn-animate">
-            <Link to="/studio/image">
-              Start Editing <ArrowRight className="ml-1.5 h-4 w-4" />
+            <Link to="/studio/image/circle-info">
+              Try Circle 2edit <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline" className="btn-animate">
