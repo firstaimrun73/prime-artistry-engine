@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import type { WatermarkMode } from "./types";
+import type { WatermarkMode, WatermarkBrand } from "./types";
 import {
   WATERMARK_BRAND_TEXT,
   WATERMARK_BRAND_ORANGE,
@@ -8,6 +8,7 @@ import {
   SECONDARY_SIZE_RATIO,
   EDGE_MARGIN_RATIO,
 } from "@/lib/watermark-config";
+import { buildCircleWatermarkSvg } from "@/lib/circle-edit/circle-watermark";
 
 function escapeXml(s: string): string {
   return s
@@ -20,15 +21,19 @@ function escapeXml(s: string): string {
 
 /**
  * Build Motio2edit primary pill (+ optional dense secondary free marks).
- * When `label` is provided (Experience-aware), it replaces the fixed brand text
- * while keeping the orange-dot Motio visual treatment.
+ * When brand is circle, use Circle 2edit purple-ring mark instead.
  */
 export function buildImageOverlaySvg(
   w: number,
   h: number,
   mode: Exclude<WatermarkMode, "none">,
   label?: string,
+  brand: WatermarkBrand = "generic",
 ): string {
+  if (brand === "circle") {
+    return buildCircleWatermarkSvg(w, h);
+  }
+
   const minDim = Math.min(w, h);
   const displayText = (label && label.trim().length > 0 ? label.trim() : WATERMARK_BRAND_TEXT).slice(
     0,
@@ -55,7 +60,6 @@ export function buildImageOverlaySvg(
 
   let secondary = "";
   if (mode === "primary+secondary") {
-    // Free plan: ~15 distributed Motio2edit marks at ~65% opacity (pixel composite, not UI overlay).
     const marks: string[] = [];
     const cols = 4;
     const rows = 4;
@@ -66,7 +70,6 @@ export function buildImageOverlaySvg(
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         if (n >= 15) break;
-        // Skip bottom-right cell so primary pill stays readable
         if (row === rows - 1 && col === cols - 1) continue;
         const mx = cellW * (col + 1) + ((row % 2) * cellW * 0.25);
         const my = cellH * (row + 1);
@@ -77,7 +80,6 @@ export function buildImageOverlaySvg(
         n++;
       }
     }
-    // Ensure at least one larger corner icon if grid produced few marks
     if (marks.length < 8) {
       const icon = Math.max(18, Math.min(96, Math.round(minDim * SECONDARY_SIZE_RATIO)));
       const ix = margin;
@@ -106,14 +108,15 @@ export function buildImageOverlaySvg(
     brandText = `<text x="${textX}" y="${textY}" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml(displayText)}</text>`;
   }
 
-  const brand = `<rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" rx="8" ry="8" fill="rgba(0,0,0,0.78)"/><circle cx="${dotCx}" cy="${dotCy}" r="${dotR}" fill="${WATERMARK_BRAND_ORANGE}"/>${brandText}`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" data-ratio="${detectWatermarkRatioKey(w, h)}">${secondary}${brand}</svg>`;
+  const brandSvg = `<rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" rx="8" ry="8" fill="rgba(0,0,0,0.78)"/><circle cx="${dotCx}" cy="${dotCy}" r="${dotR}" fill="${WATERMARK_BRAND_ORANGE}"/>${brandText}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" data-ratio="${detectWatermarkRatioKey(w, h)}">${secondary}${brandSvg}</svg>`;
 }
 
 export async function renderImageWatermark(
   input: Buffer,
   mode: WatermarkMode,
   label?: string,
+  brand: WatermarkBrand = "generic",
 ): Promise<Buffer> {
   if (mode === "none") {
     return sharp(input, { failOn: "none" }).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
@@ -124,7 +127,7 @@ export async function renderImageWatermark(
   const h = meta.height ?? 0;
   if (w < 8 || h < 8) throw new Error("Image too small to watermark.");
   return image
-    .composite([{ input: Buffer.from(buildImageOverlaySvg(w, h, mode, label)), top: 0, left: 0 }])
+    .composite([{ input: Buffer.from(buildImageOverlaySvg(w, h, mode, label, brand)), top: 0, left: 0 }])
     .jpeg({ quality: 92, mozjpeg: true })
     .toBuffer();
 }

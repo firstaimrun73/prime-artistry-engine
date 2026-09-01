@@ -8,6 +8,7 @@ import {
   type FinalizeMediaInput,
   type FinalizeMediaResult,
   type WatermarkStudioTier,
+  type WatermarkBrand,
 } from "./types";
 
 export const PREPARE_FAILED = "Could not prepare your media. Please try again.";
@@ -33,11 +34,6 @@ function normalizeStudioTier(raw: unknown): WatermarkStudioTier {
   return "standard";
 }
 
-/**
- * Server-authoritative watermark line.
- * Plan display name from plans registry; Experience from validated internal id.
- * Never trusts client-supplied free-text watermark strings.
- */
 export function resolveExperienceWatermarkLabel(
   studioTier: WatermarkStudioTier | undefined,
   planId: string | null | undefined,
@@ -50,6 +46,7 @@ export function resolveExperienceWatermarkLabel(
 
 export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<FinalizeMediaResult> {
   const t0 = Date.now();
+  const brand: WatermarkBrand = input.watermarkBrand === "circle" ? "circle" : "generic";
   const policy = resolveWatermarkPolicy({
     plan: input.plan,
     email: input.email,
@@ -59,12 +56,12 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
     alreadyFinalizedHint: input.alreadyFinalizedHint,
   });
   console.log(
-    "[WATERMARK_FINALIZE] policy=%s reason=%s media=%s alreadyFinalized=%s tier=%s",
+    "[WATERMARK_FINALIZE] policy=%s reason=%s media=%s brand=%s alreadyFinalized=%s",
     policy.mode,
     policy.reason,
     input.mediaKind,
+    brand,
     policy.alreadyFinalized,
-    input.studioTier ?? "standard",
   );
 
   if (policy.alreadyFinalized && policyRequiresStamp(policy.mode)) {
@@ -105,7 +102,7 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
   }
 
   const label =
-    input.mediaKind === "image"
+    input.mediaKind === "image" && brand === "generic"
       ? resolveExperienceWatermarkLabel(input.studioTier, input.plan)
       : undefined;
 
@@ -115,7 +112,7 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
     stamped =
       input.mediaKind === "video"
         ? await renderVideoWatermark(buffer, policy.mode)
-        : await renderImageWatermark(buffer, policy.mode, label);
+        : await renderImageWatermark(buffer, policy.mode, label, brand);
   } catch (e) {
     console.error("[WATERMARK_FINALIZE] render failed:", e);
     throw new Error(PREPARE_FAILED);
@@ -131,10 +128,10 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
   });
   const storeMs = Date.now() - ts;
   console.log(
-    "[WATERMARK_FINALIZE] ok media=%s mode=%s label=%s fetchMs=%s renderMs=%s storeMs=%s totalMs=%s",
+    "[WATERMARK_FINALIZE] ok media=%s mode=%s brand=%s fetchMs=%s renderMs=%s storeMs=%s totalMs=%s",
     input.mediaKind,
     policy.mode,
-    label ?? "-",
+    brand,
     fetchMs ?? 0,
     renderMs,
     storeMs,
@@ -150,10 +147,33 @@ async function storeAndSign(opts: {
   watermarked: boolean;
   mode: FinalizeMediaResult["mode"];
 }): Promise<FinalizeMediaResult> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const marker = opts.mediaKind === "video" ? FINALIZED_VIDEO_MARKER : FINALIZED_PATH_MARKER;
   const ext = opts.mediaKind === "video" ? "mp4" : "jpg";
   const contentType = opts.mediaKind === "video" ? "video/mp4" : "image/jpeg";
+  const key = `users/${opts.userId}/outputs/${marker}${Date.now()}.${ext}`;
+
+  // Prefer R2 when configured
+  try {
+    const { isR2Configured, r2PutObject, r2ResolveDeliveryUrl } = await import("@/lib/r2.server");
+    if (isR2Configured()) {
+      await r2PutObject({ key, body: opts.buffer, contentType });
+      const url = await r2ResolveDeliveryUrl(key);
+      if (url) {
+        return {
+          finalUrl: url,
+          watermarked: opts.watermarked,
+          mode: opts.mode,
+          storagePath: key,
+          skippedAsFinalized: false,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("[WATERMARK_FINALIZE] R2 store failed, falling back to Supabase storage:", e);
+  }
+
+  // Fallback: Supabase storage (legacy)
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const path = `${opts.userId}/${marker}${Date.now()}.${ext}`;
   const { error: upErr } = await supabaseAdmin.storage
     .from("uploads")

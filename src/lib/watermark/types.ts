@@ -5,6 +5,9 @@ export type MediaKind = "image" | "video";
 /** Internal Experience ids (Image Studio). Client may request; server validates. */
 export type WatermarkStudioTier = "standard" | "pro" | "premium";
 
+/** Brand variant: generic Motio2edit vs Circle 2edit purple ring. */
+export type WatermarkBrand = "generic" | "circle";
+
 export type WatermarkPolicy = {
   mode: WatermarkMode;
   primary: boolean;
@@ -28,6 +31,8 @@ export type FinalizeMediaInput = {
    * Server maps to user-facing watermark label; never trusts client-supplied free text.
    */
   studioTier?: WatermarkStudioTier;
+  /** Circle 2edit uses purple-ring brand; default generic. */
+  watermarkBrand?: WatermarkBrand;
 };
 
 export type FinalizeMediaResult = {
