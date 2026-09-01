@@ -40,6 +40,27 @@ these on your host (e.g. Vercel → Project → Settings → Environment Variabl
 
 `FRONTEND_URL`, `BACKEND_URL`, `ADMIN_EMAIL`, `GOOGLE_ANALYTICS_ID`
 
+## Cloudflare R2 (media delivery + Circle sample binaries)
+
+Server-only secrets (never expose to the browser / never prefix with `VITE_`):
+
+| Variable | Where used | Notes |
+|---|---|---|
+| `CLOUDFLARE_ACCOUNT_ID` | server | R2 S3 endpoint |
+| `CLOUDFLARE_R2_ACCESS_KEY_ID` | server | API token access key |
+| `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | server | API token secret |
+| `CLOUDFLARE_R2_BUCKET_NAME` | server | Bucket name |
+
+Public delivery (safe for browser when it is a public/custom domain base URL only):
+
+| Variable | Where used | Notes |
+|---|---|---|
+| `VITE_R2_PUBLIC_URL` | browser + server | Preferred public base, no trailing slash. Sample cards resolve as `{VITE_R2_PUBLIC_URL}/{r2Key}` |
+| `CLOUDFLARE_R2_PUBLIC_URL` | server fallback | Same public base if `VITE_R2_PUBLIC_URL` is unset |
+
+Circle sample object key prefixes: `circle/samples/add/`, `circle/samples/remove/`, `circle/samples/info/`.
+User outputs: `users/{userId}/outputs/`. Do not store sample binaries in Supabase or Git.
+
 ## Post-setup in your Supabase project
 
 1. Run `migration/schema.sql` in the SQL editor.
