@@ -73,7 +73,7 @@ function AboutPage() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button asChild>
-              <Link to="/studio">Open Studio</Link>
+              <Link to="/features">Explore features</Link>
             </Button>
             <Button asChild variant="outline">
               <Link to="/pricing">View pricing</Link>
@@ -249,10 +249,10 @@ function AboutPage() {
 
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           <Button asChild>
-            <Link to="/studio/image">Image Studio</Link>
+            <Link to="/features">Image Studio</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to="/studio/image/circle-remove">Circle 2edit</Link>
+            <Link to="/studio/image/circle-info">Circle 2edit</Link>
           </Button>
           <Button asChild variant="outline">
             <Link to="/features">All features</Link>
