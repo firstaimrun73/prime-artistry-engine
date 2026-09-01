@@ -157,7 +157,6 @@ function Circle2editTitle({
         </span>
         <span className={isDark ? "text-[#F2F2F5]" : "text-[#1A1C24]"}>edit</span>
       </p>
-      <p className={cn("truncate text-[10px] font-medium leading-tight tracking-wide", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>powered by Motion2AI</p>
       <p className={cn("truncate text-[11px]", isDark ? "text-[#7A8090]" : "text-[#6B7080]")}>{mode === "remove" ? "Circle · Remove" : "Circle · Add"}</p>
     </div>
   );
@@ -247,7 +246,6 @@ export function CircleEditGenOverlay({ progressPct: _progressPct, activeStage, s
     <div className={cn("absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 px-6 backdrop-blur-md", isDark ? "bg-[#12141A]/88" : "bg-[#F4F5F8]/88")} data-circle-generating="true">
       <ContinuousMetaRing size={96} generating isDark={isDark} />
       <p className="text-center text-[15px] font-bold tracking-tight">Circle <span style={{ color: "#7B6FE0", fontStyle: "italic" }}>2</span>edit</p>
-      <p className="text-center text-[10px] font-medium tracking-wide text-[#9AA0B0]">powered by Motion2AI</p>
       <p className="text-center text-sm font-medium text-[#7B6FE0]">{caption || "Generating…"}</p>
       <p className={cn("text-center text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>Preparing selection · Matching scene · Applying AI</p>
       <p className={cn("text-center text-[10px] tabular-nums", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>Stage {Math.min(activeStage + 1, stageCount)} of {stageCount}</p>
