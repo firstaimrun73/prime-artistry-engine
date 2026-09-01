@@ -1,10 +1,11 @@
 /**
  * Circle 2edit Add — production registry.
- * Curated 21 + expanded extras + costume. Synonym-aware search.
+ * Curated 21 + expanded extras + clothing + costume. Synonym-aware search.
  */
 import { parseSeedAssets } from "./add-assets-seed";
 import { CURATED_ADD_ASSETS } from "./curated-assets";
 import { EXTRA_ADD_ASSETS } from "./curated-assets-extra";
+import { CLOTHING_ADD_ASSETS } from "./curated-assets-clothing";
 import type { CircleAddAsset, AssetVariationProfile } from "./add-assets-types";
 
 export type { CircleAddAsset, AssetVariationProfile, AssetFactor, AssetFactorOption, Motion2AIMode } from "./add-assets-types";
@@ -28,6 +29,7 @@ function mergeAddRegistry(): CircleAddAsset[] {
   }
   for (const a of CURATED_ADD_ASSETS) byId.set(a.id, a);
   for (const a of EXTRA_ADD_ASSETS) byId.set(a.id, a);
+  for (const a of CLOTHING_ADD_ASSETS) byId.set(a.id, a);
   return Array.from(byId.values()).sort(
     (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
   );
@@ -73,7 +75,7 @@ const SEARCH_SYNONYMS: Record<string, string[]> = {
   phone: ["mobile", "smartphone", "iphone", "cellphone"],
   mobile: ["phone", "smartphone"],
   smartphone: ["phone", "mobile"],
-  bag: ["backpack", "rucksack", "travel bag", "luggage"],
+  bag: ["backpack", "rucksack", "travel bag", "luggage", "handbag", "purse"],
   backpack: ["bag", "rucksack", "travel"],
   cake: ["dessert", "birthday", "pastry"],
   dessert: ["cake", "icecream", "ice cream"],
@@ -92,6 +94,26 @@ const SEARCH_SYNONYMS: Record<string, string[]> = {
   sofa: ["couch", "furniture"],
   gift: ["present", "box"],
   teddy: ["bear", "plush", "toy"],
+  // Clothing / fashion
+  clothing: ["clothes", "fashion", "apparel", "outfit", "wear"],
+  clothes: ["clothing", "fashion", "apparel"],
+  fashion: ["clothing", "clothes", "apparel"],
+  shirt: ["tshirt", "t-shirt", "tee", "blouse"],
+  tshirt: ["shirt", "t-shirt", "tee"],
+  "t-shirt": ["shirt", "tshirt", "tee"],
+  jacket: ["coat", "blazer", "outerwear"],
+  hoodie: ["sweatshirt", "hooded"],
+  coat: ["jacket", "overcoat", "trench"],
+  jeans: ["denim", "pants", "trousers"],
+  sneakers: ["shoes", "trainers", "kicks"],
+  boots: ["shoes", "footwear"],
+  cap: ["hat", "baseball"],
+  hat: ["cap", "beanie"],
+  dress: ["gown", "frock"],
+  suit: ["blazer", "formal"],
+  handbag: ["purse", "bag", "tote"],
+  scarf: ["wrap", "shawl"],
+  tie: ["necktie", "bowtie"],
 };
 
 export function findAddAsset(id: string | null | undefined): CircleAddAsset | null {
@@ -117,7 +139,6 @@ function matchesQuery(a: CircleAddAsset, q: string): boolean {
   for (const syn of expanded) {
     if (hay.includes(syn)) return true;
   }
-  // reverse: query synonym of a keyword
   for (const [term, syns] of Object.entries(SEARCH_SYNONYMS)) {
     if (syns.includes(q) && hay.includes(term)) return true;
   }
