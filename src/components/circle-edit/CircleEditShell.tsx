@@ -217,7 +217,7 @@ export function CircleEditShell({ creditsLabel, mode, onModeChange, generating, 
         </div>
       ) : null}
       <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
-      {controls && !generating ? <div className={cn("shrink-0 border-t px-3 py-2.5 backdrop-blur-xl sm:px-4", isDark ? "border-white/8 bg-[#181A22]/75" : "border-black/[0.05] bg-white/60")}>{controls}</div> : null}
+      {controls && !generating ? <div className={cn("shrink-0 border-t px-3 py-2.5 backdrop-blur-xl sm:px-4", isDark ? "border-white/8 bg-[#181A22]/75" : "border-black/[0.05] bg-white/60")} data-circle-toolbar="true">{controls}</div> : null}
       {!generating ? actionBar : null}
       {!generating ? sheet : null}
       {onGenerate && !generating ? (
@@ -339,10 +339,38 @@ export function CircleDrawToolbar({
     { id: "black", label: "Black", swatch: "#1A1C24" },
   ];
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" data-circle-draw-toolbar="true">
       <div className="flex items-center justify-center gap-1.5 flex-wrap">
-        <button type="button" aria-label="Undo" title="Undo" disabled={!canUndo} onClick={() => onUndo?.()} className={cn("flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-semibold backdrop-blur-md disabled:opacity-35", isDark ? "border-white/10 bg-white/5 text-[#9AA0B0]" : "border-black/8 bg-white/60 text-[#5C6170]")}>Undo</button>
-        <button type="button" aria-label="Redo" title="Redo" disabled={!canRedo} onClick={() => onRedo?.()} className={cn("flex h-10 w-10 items-center justify-center rounded-xl border text-[11px] font-semibold backdrop-blur-md disabled:opacity-35", isDark ? "border-white/10 bg-white/5 text-[#9AA0B0]" : "border-black/8 bg-white/60 text-[#5C6170]")}>Redo</button>
+        <button
+          type="button"
+          aria-label="Undo"
+          title="Undo"
+          disabled={!canUndo}
+          onClick={() => onUndo?.()}
+          data-testid="circle-undo"
+          className={cn(
+            "flex h-10 min-w-[2.75rem] items-center justify-center gap-0.5 rounded-xl border px-2 text-[12px] font-bold backdrop-blur-md disabled:opacity-35",
+            isDark ? "border-white/10 bg-white/5 text-[#C8C4E8]" : "border-black/8 bg-white/70 text-[#5C6170]",
+          )}
+        >
+          <span aria-hidden className="text-[15px] leading-none">↶</span>
+          <span className="text-[10px] font-semibold">Undo</span>
+        </button>
+        <button
+          type="button"
+          aria-label="Redo"
+          title="Redo"
+          disabled={!canRedo}
+          onClick={() => onRedo?.()}
+          data-testid="circle-redo"
+          className={cn(
+            "flex h-10 min-w-[2.75rem] items-center justify-center gap-0.5 rounded-xl border px-2 text-[12px] font-bold backdrop-blur-md disabled:opacity-35",
+            isDark ? "border-white/10 bg-white/5 text-[#C8C4E8]" : "border-black/8 bg-white/70 text-[#5C6170]",
+          )}
+        >
+          <span aria-hidden className="text-[15px] leading-none">↷</span>
+          <span className="text-[10px] font-semibold">Redo</span>
+        </button>
         {items.map((it) => {
           const active = tool === it.id;
           return (
@@ -353,10 +381,21 @@ export function CircleDrawToolbar({
         })}
       </div>
       {(tool === "brush" || tool === "eraser" || tool === "circle") && onInkColor ? (
-        <div className="flex items-center justify-center gap-2">
-          <span className={cn("text-[10px]", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>Ink</span>
+        <div className="flex items-center justify-center gap-2" data-testid="circle-ink">
+          <span className={cn("text-[10px] font-medium", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>Ink</span>
           {inkColors.map((c) => (
-            <button key={c.id} type="button" aria-label={c.label} title={c.label} onClick={() => onInkColor(c.id)} className={cn("h-7 w-7 rounded-full border-2 shadow-sm", inkColor === c.id ? "border-[#7B6FE0] scale-110" : isDark ? "border-white/20" : "border-black/15")} style={{ background: c.swatch }} />
+            <button
+              key={c.id}
+              type="button"
+              aria-label={c.label}
+              title={c.label}
+              onClick={() => onInkColor(c.id)}
+              className={cn(
+                "h-7 w-7 rounded-full border-2 shadow-sm transition-transform",
+                inkColor === c.id ? "border-[#7B6FE0] scale-110 ring-2 ring-[#7B6FE0]/30" : isDark ? "border-white/20" : "border-black/15",
+              )}
+              style={{ background: c.swatch }}
+            />
           ))}
         </div>
       ) : null}
