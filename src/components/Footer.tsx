@@ -3,13 +3,12 @@ import { BrandMark, BRAND_NAME } from "@/components/BrandMark";
 import { useAuth } from "@/lib/auth";
 
 const LINKS: { label: string; to: string }[] = [
-  { label: "FAQ", to: "/faq" },
-  { label: "Support Center", to: "/support" },
-  { label: "Tickets", to: "/tickets" },
+  { label: "Privacy", to: "/privacy" },
+  { label: "Terms", to: "/terms" },
   { label: "Security", to: "/security" },
   { label: "Contact", to: "/support" },
-  { label: "Terms of Service", to: "/terms" },
-  { label: "Privacy Policy", to: "/privacy" },
+  { label: "Support", to: "/support" },
+  { label: "Help", to: "/faq" },
 ];
 
 /**

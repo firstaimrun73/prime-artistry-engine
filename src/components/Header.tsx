@@ -19,12 +19,10 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
   { to: "/about", label: "About" },
-  { to: "/studio", label: "Studio" },
   { to: "/pricing", label: "Pricing" },
   { to: "/faq", label: "FAQs" },
   { to: "/security", label: "Security" },
   { to: "/support", label: "Support" },
-  { to: "/tickets", label: "Tickets" },
 ];
 
 /** Auth users: app navigation (not marketing page links). */
