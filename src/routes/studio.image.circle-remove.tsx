@@ -23,6 +23,7 @@ import {
   CircleEditGenOverlay,
   CircleCreditsInfo,
   type CircleDrawTool,
+  type InkColor,
 } from "@/components/circle-edit/CircleEditShell";
 import {
   CircleMaskStage,
@@ -101,6 +102,9 @@ function Circle2editPage() {
   const [hasMask, setHasMask] = useState(false);
   const [drawTool, setDrawTool] = useState<CircleDrawTool>("circle");
   const [brushSize, setBrushSize] = useState(24);
+  const [inkColor, setInkColor] = useState<InkColor>("purple");
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [addObjectId, setAddObjectId] = useState<string | null>(null);
   const [factorSelection, setFactorSelection] = useState<Record<string, string>>({});
@@ -116,6 +120,11 @@ function Circle2editPage() {
   const clearProgressTimers = useCallback(() => {
     progressTimers.current.forEach((id) => window.clearTimeout(id));
     progressTimers.current = [];
+  }, []);
+
+  const onHistoryChange = useCallback((u: boolean, r: boolean) => {
+    setCanUndo(u);
+    setCanRedo(r);
   }, []);
 
   useEffect(() => {
@@ -161,6 +170,8 @@ function Circle2editPage() {
     setPreview(URL.createObjectURL(f));
     setOutput(null);
     setHasMask(false);
+    setCanUndo(false);
+    setCanRedo(false);
     setPhase("select");
     setShowCompare(true);
   };
@@ -171,6 +182,8 @@ function Circle2editPage() {
     setPreview(null);
     setOutput(null);
     setHasMask(false);
+    setCanUndo(false);
+    setCanRedo(false);
     setPhase("select");
     maskStageRef.current?.clear();
   };
@@ -398,6 +411,12 @@ function Circle2editPage() {
           brushSize={brushSize}
           onBrushSize={setBrushSize}
           hideCircle={mode === "add"}
+          onUndo={() => maskStageRef.current?.undo()}
+          onRedo={() => maskStageRef.current?.redo()}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          inkColor={inkColor}
+          onInkColor={setInkColor}
         />
       ) : null}
       {mode === "add" && !addLocked ? (
@@ -666,6 +685,8 @@ function Circle2editPage() {
               brushSize={brushSize}
               disabled={paintLocked}
               onMaskChange={setHasMask}
+              inkColor={inkColor}
+              onHistoryChange={onHistoryChange}
             />
           </div>
         )}
