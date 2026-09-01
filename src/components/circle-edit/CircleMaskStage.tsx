@@ -286,6 +286,14 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     [natural, fitBox.w, fitBox.h],
   );
 
+  /** Cursor ring position relative to container (not client/viewport). */
+  const clientToContainer = useCallback((clientX: number, clientY: number): { x: number; y: number } | null => {
+    const el = containerRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }, []);
+
   const pushHistory = useCallback(() => {
     const mask = maskRef.current;
     if (!mask) return;
@@ -350,14 +358,16 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
         applyBrush(src, null);
         scheduleMaskVis();
       }
-      setCursor({ x: e.clientX, y: e.clientY });
+      const c = clientToContainer(e.clientX, e.clientY);
+      if (c) setCursor(c);
     },
-    [disabled, screenToSource, pushHistory, applyBrush, scheduleMaskVis],
+    [disabled, screenToSource, pushHistory, applyBrush, scheduleMaskVis, clientToContainer],
   );
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
-      setCursor({ x: e.clientX, y: e.clientY });
+      const c = clientToContainer(e.clientX, e.clientY);
+      if (c) setCursor(c);
 
       if (panningRef.current && panStartRef.current) {
         const dx = e.clientX - panStartRef.current.x;
@@ -394,7 +404,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       lastSrcRef.current = src;
       scheduleMaskVis();
     },
-    [screenToSource, applyBrush, scheduleMaskVis, closeRadiusNatural],
+    [screenToSource, applyBrush, scheduleMaskVis, closeRadiusNatural, clientToContainer],
   );
 
   const endPointer = useCallback(
@@ -661,16 +671,14 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
         <div
           className="pointer-events-none absolute z-20 rounded-full border-2"
           style={{
-            left: cursor.x - brushSize / 2,
-            top: cursor.y - brushSize / 2,
+            left: cursor.x,
+            top: cursor.y,
             width: brushSize,
             height: brushSize,
             borderColor: tool === "erase" ? "rgba(255,255,255,0.95)" : `rgba(${INK_RGB[inkColor] ?? INK_RGB.purple}, 0.95)`,
             background: tool === "erase" ? "rgba(255,255,255,0.15)" : `rgba(${INK_RGB[inkColor] ?? INK_RGB.purple}, 0.22)`,
             boxShadow: "0 0 0 1px rgba(0,0,0,0.4)",
             transform: "translate(-50%, -50%)",
-            marginLeft: brushSize / 2,
-            marginTop: brushSize / 2,
           }}
         />
       )}
