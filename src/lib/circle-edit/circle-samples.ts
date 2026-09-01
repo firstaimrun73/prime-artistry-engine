@@ -51,7 +51,7 @@ export const CIRCLE_SAMPLES: CircleSample[] = [
   { id: "add-bike", title: "Add a bicycle", description: "Correct geometry, ground contact.", mode: "add", assetId: "vehicle_bicycle", category: "vehicles", r2Key: `${ADD}/bicycle.jpg`, sortOrder: 31, active: true },
   { id: "add-scooter", title: "Add a scooter", description: "Compact scale, side profile.", mode: "add", assetId: "vehicle_scooter", category: "vehicles", r2Key: `${ADD}/scooter.jpg`, sortOrder: 32, active: true },
   { id: "add-motorcycle", title: "Add a motorcycle", description: "Engine mass and wheel contact.", mode: "add", assetId: "vehicle_motorcycle", category: "vehicles", r2Key: `${ADD}/motorcycle.jpg`, sortOrder: 33, active: true },
-  { id: "add-tree", title: "Add a tree", description: "Canopy and trunk scale to the scene.", mode: "add", assetId: "nature_tree", category: "animals", r2Key: `${ADD}/tree.jpg`, sortOrder: 40, active: true },
+  { id: "add-tree", title: "Add a tree", description: "Canopy and trunk scale to the scene.", mode: "add", assetId: "nature_tree", category: "nature", r2Key: `${ADD}/tree.jpg`, sortOrder: 40, active: true },
   { id: "add-squirrel", title: "Add a squirrel", description: "Bushy tail, small wildlife scale.", mode: "add", assetId: "animal_squirrel", category: "animals", r2Key: `${ADD}/squirrel.jpg`, sortOrder: 41, active: true },
   { id: "add-bus", title: "Add a bus", description: "Transit proportions, ground contact.", mode: "add", assetId: "vehicle_bus", category: "vehicles", r2Key: `${ADD}/bus.jpg`, sortOrder: 42, active: true },
 ];
