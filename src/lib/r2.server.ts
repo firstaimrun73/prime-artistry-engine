@@ -38,9 +38,15 @@ function bucket(): string {
   return b;
 }
 
-/** Public delivery base (custom domain or r2.dev). No trailing slash. */
+/**
+ * Public delivery base (custom domain or r2.dev). No trailing slash.
+ * Production architecture (one system):
+ *   Browser samples: VITE_R2_PUBLIC_URL + key  (Vite inlines at build)
+ *   Server outputs:  VITE_R2_PUBLIC_URL || CLOUDFLARE_R2_PUBLIC_URL || R2_PUBLIC_BASE_URL
+ * Secrets (CLOUDFLARE_R2_ACCESS_KEY_ID / SECRET) never leave the server.
+ */
 export function r2PublicBaseUrl(): string | null {
-  const u = env("CLOUDFLARE_R2_PUBLIC_URL") || env("R2_PUBLIC_BASE_URL");
+  const u = env("VITE_R2_PUBLIC_URL") || env("CLOUDFLARE_R2_PUBLIC_URL") || env("R2_PUBLIC_BASE_URL");
   if (!u) return null;
   return u.replace(/\/$/, "");
 }
