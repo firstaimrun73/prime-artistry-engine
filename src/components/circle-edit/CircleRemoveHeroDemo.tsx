@@ -2,8 +2,8 @@
  * Premium Circle Remove visual demo — Giza people-removal sequence.
  * CSS/React only (no canvas). Used inside RemoveHeroCard image area.
  *
- * Media: VITE_R2_PUBLIC_URL + circle/samples/remove/giza-{before,mark,after}.jpg
- * (same R2 prefix as other Circle remove samples). No parallel demo/ media tree.
+ * Media: absolute public URLs on assets.motio2edit.com (circle-2edit sample set).
+ * Wired directly into the homepage Remove hero card animation.
  */
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
@@ -43,42 +43,19 @@ const ORDER: DemoPhase[] = [
   "result",
 ];
 
-/** R2 keys — same prefix as other Circle remove samples (see circle-samples.ts / R2_PREFIX). */
-const R2_KEYS = {
-  stage1: "circle/samples/remove/giza-before.jpg",
-  stage2: "circle/samples/remove/giza-mark.jpg",
-  stage3: "circle/samples/remove/giza-after.jpg",
-} as const;
-
 /**
- * Fallbacks only when VITE_R2_PUBLIC_URL is unset (local/dev).
- * Production must serve these from R2 — do not invent a parallel demo/ media tree.
+ * Homepage Circle 2edit Remove hero card media (public assets.motio2edit.com).
+ * Sequence: original → marked selection → clean result → loop.
+ * These absolute URLs are the source of truth for the card animation.
  */
-const PUBLIC_FALLBACK = {
-  stage1: "",
-  stage2: "",
-  stage3: "",
+const DEMO_STAGE_URLS = {
+  stage1:
+    "https://assets.motio2edit.com/samples/circle-2edit/file_0000000091d081f585ff54de9335198f.png",
+  stage2:
+    "https://assets.motio2edit.com/samples/circle-2edit/file_00000000ab9082089ae984430379abed.png",
+  stage3:
+    "https://assets.motio2edit.com/samples/circle-2edit/file_000000004e6481faa6caad771de9c84c.png",
 } as const;
-
-function r2PublicBase(): string {
-  try {
-    const base =
-      (typeof import.meta !== "undefined" &&
-        (import.meta as { env?: Record<string, string> }).env?.VITE_R2_PUBLIC_URL) ||
-      "";
-    return String(base || "").replace(/\/$/, "");
-  } catch {
-    return "";
-  }
-}
-
-function resolveDemoUrl(key: string, fallback: string): string {
-  const base = r2PublicBase();
-  if (base && key) return `${base}/${key.replace(/^\//, "")}`;
-  if (fallback) return fallback;
-  // Dev-only empty: production expects R2 objects at circle/samples/remove/giza-*.jpg
-  return "";
-}
 
 const PAINT_PATH: { x: number; y: number; r: number }[] = [
   { x: 22, y: 78, r: 11 },
@@ -288,9 +265,9 @@ export function CircleRemoveHeroDemo() {
 
   const urls = useMemo(
     () => ({
-      stage1: resolveDemoUrl(R2_KEYS.stage1, PUBLIC_FALLBACK.stage1),
-      stage2: resolveDemoUrl(R2_KEYS.stage2, PUBLIC_FALLBACK.stage2),
-      stage3: resolveDemoUrl(R2_KEYS.stage3, PUBLIC_FALLBACK.stage3),
+      stage1: DEMO_STAGE_URLS.stage1,
+      stage2: DEMO_STAGE_URLS.stage2,
+      stage3: DEMO_STAGE_URLS.stage3,
     }),
     [],
   );
