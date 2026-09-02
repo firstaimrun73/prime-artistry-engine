@@ -3,7 +3,6 @@
  * Route: /studio/image/circle-info
  * Optional search: ?sampleId=rm-butterfly | add-dog | …
  * Generic product page when no sampleId; dedicated SAMPLE detail when sampleId is present.
- * ⓘ on a sample MUST open this with that sampleId (never generic Image Studio / editor).
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -125,13 +124,13 @@ function StageFrame({
   );
 }
 
-function RemoveBlockDiagram({ isDark }: { isDark: boolean }) {
+function RemoveBlockDiagram({ objectLabel, isDark }: { objectLabel: string; isDark: boolean }) {
   const steps = [
-    { n: "1", title: "Upload Image", body: "Flower + Butterfly" },
+    { n: "1", title: "Upload Image", body: `Scene with ${objectLabel}` },
     { n: "2", title: "Mark Object", body: "Purple circle + shaded selection" },
     { n: "3", title: "AI Analyses", body: "Understands the selected region" },
     { n: "4", title: "AI Removes", body: "Reconstructs the selected area" },
-    { n: "5", title: "Final Result", body: "Butterfly removed" },
+    { n: "5", title: "Final Result", body: `${objectLabel} removed` },
   ];
   return (
     <section className="space-y-3">
@@ -175,10 +174,15 @@ function FeatureDetail({
   user: unknown;
   onStart: () => void;
 }) {
-  const src = useMemo(() => resolveCircleSampleMediaUrl(sample), [sample]);
+  const beforeSrc = useMemo(() => resolveCircleSampleMediaUrl(sample, { stage: "before" }), [sample]);
+  const markSrc = useMemo(() => resolveCircleSampleMediaUrl(sample, { stage: "mark" }), [sample]);
+  const outlineSrc = useMemo(() => resolveCircleSampleMediaUrl(sample, { stage: "outline" }), [sample]);
+  const afterSrc = useMemo(() => resolveCircleSampleMediaUrl(sample, { stage: "after" }), [sample]);
   const asset = sample.assetId ? findAddAsset(sample.assetId) : null;
   const tryHref = circleSampleTryHref(sample, "sample");
   const isRemove = sample.mode === "remove";
+  const midSrc = isRemove ? markSrc : outlineSrc;
+  const hasDistinctAfter = !!(sample.afterUrl || sample.afterR2Key);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 px-4 py-8">
@@ -205,19 +209,20 @@ function FeatureDetail({
             </span>
           ) : null}
         </div>
-        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{sample.title}</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+          {isRemove ? `Remove ${sample.objectLabel} with Circle 2edit` : sample.title}
+        </h1>
         <p className={cn("text-[14px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
           {sample.description}
         </p>
       </section>
 
-      {/* Three stages of the SAME scene */}
       <section className="space-y-4">
         <h2 className="text-[15px] font-bold tracking-tight">Visual demonstration</h2>
         <StageFrame
           label="1 · Before"
           caption={isRemove ? "Original scene with the object present" : "Environment without the target object"}
-          src={src}
+          src={beforeSrc}
           isDark={isDark}
         />
         <div className="flex justify-center">
@@ -228,10 +233,10 @@ function FeatureDetail({
           caption={
             isRemove
               ? "Same photo · purple circular selection · translucent shade"
-              : "Explanatory black outline of the selected object"
+              : "Explanatory outline of the selected object"
           }
-          src={src}
-          showMark
+          src={midSrc}
+          showMark={isRemove && !sample.markUrl}
           isDark={isDark}
         />
         {isRemove ? (
@@ -256,17 +261,18 @@ function FeatureDetail({
           label="3 · After"
           caption={
             isRemove
-              ? "Same composition · object completely removed"
+              ? hasDistinctAfter
+                ? "Same composition · object completely removed"
+                : "Result stage — upload butterfly-after.jpg to R2 for verified media"
               : "Same environment · selected object realistically added"
           }
-          src={src}
+          src={afterSrc}
           isDark={isDark}
         />
       </section>
 
-      {isRemove ? <RemoveBlockDiagram isDark={isDark} /> : null}
+      {isRemove ? <RemoveBlockDiagram objectLabel={sample.objectLabel} isDark={isDark} /> : null}
 
-      {/* Technical details from registry — no prompt exposure */}
       <section
         className={cn(
           "rounded-2xl border p-4",
@@ -277,36 +283,28 @@ function FeatureDetail({
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
           <div>
             <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Object</dt>
-            <dd className="font-semibold">{sample.objectLabel ?? sample.title}</dd>
+            <dd className="font-semibold">{sample.objectLabel}</dd>
           </div>
           <div>
             <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Action</dt>
             <dd className="font-semibold">{isRemove ? "Remove" : "Add"}</dd>
           </div>
-          {sample.quality ? (
-            <div>
-              <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Quality</dt>
-              <dd className="font-semibold">{sample.quality}</dd>
-            </div>
-          ) : null}
-          {sample.aspectRatio ? (
-            <div>
-              <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Aspect ratio</dt>
-              <dd className="font-semibold">{sample.aspectRatio}</dd>
-            </div>
-          ) : null}
-          {sample.generationMode ? (
-            <div>
-              <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Generation mode</dt>
-              <dd className="font-semibold">{sample.generationMode}</dd>
-            </div>
-          ) : null}
-          {sample.buildDuration ? (
-            <div>
-              <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Build duration</dt>
-              <dd className="font-semibold">{sample.buildDuration}</dd>
-            </div>
-          ) : null}
+          <div>
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Quality</dt>
+            <dd className="font-semibold">{sample.quality}</dd>
+          </div>
+          <div>
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Aspect ratio</dt>
+            <dd className="font-semibold">{sample.aspectRatio}</dd>
+          </div>
+          <div>
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Generation mode</dt>
+            <dd className="font-semibold">{sample.generationMode}</dd>
+          </div>
+          <div>
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Build duration</dt>
+            <dd className="font-semibold">{sample.buildDuration}</dd>
+          </div>
           <div className="col-span-2">
             <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>AI operation</dt>
             <dd className="font-semibold">
@@ -336,7 +334,7 @@ function FeatureDetail({
           ) : (
             <>
               <li>Upload a photo</li>
-              <li>Select the object (or use this preset)</li>
+              <li>Object is preselected from this sample</li>
               <li>Paint the placement region</li>
               <li>Confirm — AI integrates the object</li>
             </>
