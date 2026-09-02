@@ -2,6 +2,7 @@
  * Circle 2edit — /studio/image/circle-remove
  * Remove: circleInstant true
  * Add: circleInstant false → flux-pro fill; asset rail + factors + confirm
+ * Exit/Back respects from=home|info|sample so Homepage → Editor → Exit returns Homepage.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -43,20 +44,30 @@ import { CIRCLE_REMOVE_CREDITS, estimateCircleAddCredits } from "@/lib/circle-ed
 import { getAssetCreditCost } from "@/lib/circle-edit/add-assets-pricing";
 import { AssetIcon } from "@/components/circle-edit/AssetIcon";
 import { cn } from "@/lib/utils";
+import { resolveCircleBackTarget } from "@/lib/circle-edit/circle-samples";
 
 type CircleSearch = {
   mode?: "add" | "remove";
   assetId?: string;
   sampleId?: string;
+  from?: "home" | "info" | "sample";
 };
 
 export const Route = createFileRoute("/studio/image/circle-remove")({
   ssr: false,
   validateSearch: (raw: Record<string, unknown>): CircleSearch => {
     const mode = raw.mode === "add" || raw.mode === "remove" ? raw.mode : undefined;
-    const assetId = typeof raw.assetId === "string" && raw.assetId.length > 0 && raw.assetId.length <= 80 ? raw.assetId : undefined;
-    const sampleId = typeof raw.sampleId === "string" && raw.sampleId.length > 0 && raw.sampleId.length <= 80 ? raw.sampleId : undefined;
-    return { mode, assetId, sampleId };
+    const assetId =
+      typeof raw.assetId === "string" && raw.assetId.length > 0 && raw.assetId.length <= 80
+        ? raw.assetId
+        : undefined;
+    const sampleId =
+      typeof raw.sampleId === "string" && raw.sampleId.length > 0 && raw.sampleId.length <= 80
+        ? raw.sampleId
+        : undefined;
+    const from =
+      raw.from === "home" || raw.from === "info" || raw.from === "sample" ? raw.from : undefined;
+    return { mode, assetId, sampleId, from };
   },
   component: Circle2editPage,
   head: () => ({
@@ -135,6 +146,11 @@ function Circle2editPage() {
   const [sourceHeight, setSourceHeight] = useState(0);
   const [keepCircleWatermark, setKeepCircleWatermark] = useState(true);
   const progressTimers = useRef<number[]>([]);
+
+  const goBack = useCallback(() => {
+    const target = resolveCircleBackTarget(search.from, search.sampleId);
+    navigate({ to: target as "/" });
+  }, [navigate, search.from, search.sampleId]);
 
   const clearProgressTimers = useCallback(() => {
     progressTimers.current.forEach((id) => window.clearTimeout(id));
@@ -460,7 +476,6 @@ function Circle2editPage() {
   const selectedAsset = findAddAsset(addObjectId);
   const paintLocked = phase === "generating" || (mode === "add" && !addConfirmed);
 
-  // Free: watermark enforced + locked control. Paid/Admin: compact On/Off toggle.
   const watermarkToggle = (
     <div
       className={cn(
@@ -675,7 +690,7 @@ function Circle2editPage() {
         mode={mode}
         onModeChange={onModeChange}
         addLocked={addLocked}
-        onBack={() => navigate({ to: "/studio/image/circle-info" })}
+        onBack={goBack}
         controls={null}
         actionBar={
           <div className="flex w-full flex-wrap items-center justify-center gap-2 px-3 py-2.5">
@@ -735,7 +750,7 @@ function Circle2editPage() {
       onModeChange={onModeChange}
       addLocked={addLocked}
       generating={phase === "generating"}
-      onBack={() => navigate({ to: "/studio/image/circle-info" })}
+      onBack={goBack}
       controls={controls}
       sheet={
         <>
