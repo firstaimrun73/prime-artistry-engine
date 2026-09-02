@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
 import { DiscoveryFeed } from "@/components/discover/DiscoveryFeed";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
+import { ImagineGallery } from "@/components/home/ImagineGallery";
 
 type RecentGen = {
   id: string;
@@ -128,8 +129,11 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* POST-LOGIN ONLY — Circle feature cards (never on pre-login home) */}
+      {/* POST-LOGIN ONLY — Circle feature cards */}
       <CircleSampleGallery />
+
+      {/* POST-LOGIN ONLY — Imagine (distinct from Circle; no Try Now) */}
+      <ImagineGallery />
 
       <Link
         to="/studio/image/auto-edit"
