@@ -239,7 +239,8 @@ export function CircleSampleGallery() {
   const removeDemos = useMemo(() => getRemoveDemoSamples(), []);
   const addSamples = useMemo(() => samples.filter((s) => s.mode === "add"), [samples]);
   const { theme } = useTheme();
-  const isDark = theme === "dark\n
+  const isDark = theme === "dark";
+
   return (
     <section className="mt-8 space-y-7" data-circle-samples="post-login-only">
       <div className="flex flex-wrap items-end justify-between gap-2">
