@@ -215,19 +215,21 @@ function LocalizedMaskReveal({
   paintT: number;
   fullyVisible: boolean;
 }) {
+  // Single bitmap reused via CSS background (not N full multi-MB <img> nodes — avoids mobile OOM).
   const activeCount = fullyVisible
     ? PAINT_PATH.length
     : Math.min(PAINT_PATH.length, Math.floor(paintT * PAINT_PATH.length + 0.35));
 
   return (
-    <>
+    <div className="pointer-events-none absolute inset-0">
       {PAINT_PATH.map((dab, i) => {
         const on = i < activeCount;
         const justOn = i === activeCount - 1 && !fullyVisible;
+        if (!on && !justOn) return null;
         return (
           <div
             key={i}
-            className="pointer-events-none absolute overflow-hidden rounded-full"
+            className="absolute overflow-hidden rounded-full"
             style={{
               left: `${dab.x}%`,
               top: `${dab.y}%`,
@@ -237,24 +239,14 @@ function LocalizedMaskReveal({
               opacity: on ? 1 : 0,
               transition: justOn ? "opacity 0.18s ease-out" : "opacity 0.12s linear",
               boxShadow: on ? "0 0 10px rgba(123,111,224,0.35)" : undefined,
+              backgroundImage: `url(${stage2Src})`,
+              backgroundSize: `${10000 / (dab.r * 2)}% ${10000 / (dab.r * 2)}%`,
+              backgroundPosition: `${dab.x}% ${dab.y}%`,
             }}
-          >
-            <img
-              src={stage2Src}
-              alt=""
-              draggable={false}
-              className="absolute max-w-none object-cover"
-              style={{
-                width: `${10000 / (dab.r * 2)}%`,
-                height: `${10000 / (dab.r * 2)}%`,
-                left: `${-dab.x * (100 / (dab.r * 2)) + 50}%`,
-                top: `${-dab.y * (100 / (dab.r * 2)) + 50}%`,
-              }}
-            />
-          </div>
+          />
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -364,6 +356,7 @@ export function CircleRemoveHeroDemo() {
           showResult ? "opacity-0" : "opacity-100",
         )}
         draggable={false}
+        decoding="async"
       />
 
       {showPaint && !showResult ? (
@@ -378,6 +371,7 @@ export function CircleRemoveHeroDemo() {
           showResult ? "opacity-100" : "opacity-0",
         )}
         draggable={false}
+        decoding="async"
       />
 
       {phase === "paint" && (

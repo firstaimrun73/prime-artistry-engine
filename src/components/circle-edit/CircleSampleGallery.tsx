@@ -8,7 +8,7 @@
  */
 import { Link } from "@tanstack/react-router";
 import { Info, Sparkles } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Component, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import {
   getActiveCircleSamples,
   getRemoveDemoSamples,
@@ -22,6 +22,30 @@ import { AssetIcon } from "@/components/circle-edit/AssetIcon";
 import { CircleRemoveHeroDemo } from "@/components/circle-edit/CircleRemoveHeroDemo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+
+/** Isolates demo render failures so the rest of the signed-in homepage stays up. */
+class DemoErrorBoundary extends Component<
+  { children: ReactNode; fallback?: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[CircleRemoveHeroDemo]", error, info);
+  }
+  render() {
+    if (this.state.failed) {
+      return this.props.fallback ?? (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#7B6FE0]/20 to-transparent">
+          <p className="px-4 text-center text-xs font-semibold text-[#7B6FE0]">Circle Remove preview</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function RemoveHeroCard({ samples }: { samples: CircleSample[] }) {
   const { theme } = useTheme();
@@ -42,7 +66,9 @@ function RemoveHeroCard({ samples }: { samples: CircleSample[] }) {
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
         {/* Premium animated Giza demo — original → paint → process → clean result */}
-        <CircleRemoveHeroDemo />
+        <DemoErrorBoundary>
+          <CircleRemoveHeroDemo />
+        </DemoErrorBoundary>
 
         <Link
           to={infoHref as "/studio/image/circle-info"}
@@ -213,8 +239,7 @@ export function CircleSampleGallery() {
   const removeDemos = useMemo(() => getRemoveDemoSamples(), []);
   const addSamples = useMemo(() => samples.filter((s) => s.mode === "add"), [samples]);
   const { theme } = useTheme();
-  const isDark = theme === "dark";
-
+  const isDark = theme === "dark\n
   return (
     <section className="mt-8 space-y-7" data-circle-samples="post-login-only">
       <div className="flex flex-wrap items-end justify-between gap-2">
