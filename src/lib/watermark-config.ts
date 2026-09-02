@@ -5,7 +5,7 @@
  * The AI provider is never instructed to draw Motio2edit branding.
  *
  * Brand text (primary): exactly "Motio2edit" (only the digit 2 is brand-highlighted).
- * Secondary: small icon mark (top-left) — free/non-premium protection only.
+ * Secondary: dense text marks + corner icon — free/non-premium protection.
  */
 
 export const WATERMARK_BRAND_TEXT = "Motio2edit" as const;
@@ -70,12 +70,12 @@ export function detectWatermarkRatioKey(
   return best;
 }
 
-/** Relative size of primary pill vs min(image width, height). */
-export const PRIMARY_SIZE_RATIO = 0.028;
+/** Relative size of primary pill vs min(image width, height). Bumped for visibility. */
+export const PRIMARY_SIZE_RATIO = 0.038;
 /** Relative size of secondary icon vs min(image width, height). */
-export const SECONDARY_SIZE_RATIO = 0.055;
+export const SECONDARY_SIZE_RATIO = 0.06;
 /** Safe margin from edges as fraction of min dimension. */
-export const EDGE_MARGIN_RATIO = 0.015;
+export const EDGE_MARGIN_RATIO = 0.018;
 
 export function primaryAssetName(key: WatermarkRatioKey): string {
   return `watermark-primary-${key}.png`;

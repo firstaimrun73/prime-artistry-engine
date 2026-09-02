@@ -10,6 +10,7 @@ import {
   type WatermarkStudioTier,
   type WatermarkBrand,
 } from "./types";
+import { WATERMARK_BRAND_TEXT } from "@/lib/watermark-config";
 
 export const PREPARE_FAILED = "Could not prepare your media. Please try again.";
 
@@ -34,14 +35,21 @@ function normalizeStudioTier(raw: unknown): WatermarkStudioTier {
   return "standard";
 }
 
+/**
+ * Primary watermark label. Keep short so the pill stays large and readable.
+ * Long "Motio2edit Standard — Free" strings were shrinking the font via lengthFactor.
+ */
 export function resolveExperienceWatermarkLabel(
   studioTier: WatermarkStudioTier | undefined,
   planId: string | null | undefined,
 ): string {
   const tier = normalizeStudioTier(studioTier);
   const exp = experienceLabelFromTier(tier);
-  const planName = findPlan(planId)?.name ?? (planId ? String(planId) : "Free");
-  return `Motio2edit ${exp} — ${planName}`;
+  // Prefer compact brand; append experience only for paid-looking tiers
+  if (tier === "standard") return WATERMARK_BRAND_TEXT;
+  const planName = findPlan(planId)?.name;
+  if (planName && planName.length <= 12) return `${WATERMARK_BRAND_TEXT} · ${exp}`;
+  return `${WATERMARK_BRAND_TEXT} · ${exp}`;
 }
 
 export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<FinalizeMediaResult> {

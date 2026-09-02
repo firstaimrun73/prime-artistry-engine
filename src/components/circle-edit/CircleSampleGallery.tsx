@@ -3,7 +3,7 @@
  * ONE Remove hero card with premium Giza people-removal animated demo.
  * Add cards: compact horizontal row.
  * ⓘ → sample detail (circle-info?sampleId=)
- * How it works → generic product info
+ * How it works → /about#circle-2edit (About Product, same page scroll)
  * Try Now → editor with from=home + mode/assetId/sampleId
  */
 import { Link } from "@tanstack/react-router";
@@ -232,7 +232,8 @@ export function CircleSampleGallery() {
           </p>
         </div>
         <Link
-          to="/studio/image/circle-info"
+          to="/about"
+          hash="circle-2edit"
           className="text-[12px] font-semibold text-[#7B6FE0] hover:underline"
         >
           How it works
