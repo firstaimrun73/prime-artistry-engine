@@ -1,8 +1,9 @@
 /**
- * Circle 2edit information + feature-specific detail page.
+ * Circle 2edit information + per-sample detail page.
  * Route: /studio/image/circle-info
- * Optional search: ?sampleId=rm-object | add-cat | …
- * Generic page when no sampleId; dedicated feature page when sampleId is present.
+ * Optional search: ?sampleId=rm-butterfly | add-dog | …
+ * Generic product page when no sampleId; dedicated SAMPLE detail when sampleId is present.
+ * ⓘ on a sample MUST open this with that sampleId (never generic Image Studio / editor).
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -21,6 +22,7 @@ import { useTheme } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import {
   getActiveCircleSamples,
+  getCircleSampleById,
   resolveCircleSampleMediaUrl,
   circleSampleTryHref,
   type CircleSample,
@@ -81,6 +83,87 @@ const FAQ = [
   },
 ] as const;
 
+function StageFrame({
+  label,
+  caption,
+  src,
+  showMark,
+  isDark,
+}: {
+  label: string;
+  caption: string;
+  src: string;
+  showMark?: boolean;
+  isDark: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="overflow-hidden rounded-2xl border border-[#7B6FE0]/25">
+        <div className="relative aspect-[4/5] w-full max-h-[280px] bg-black/10">
+          <img src={src} alt={label} className="h-full w-full object-cover" />
+          {showMark ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div
+                className="relative h-[42%] w-[42%] rounded-full border-[3px] border-[#7B6FE0]"
+                style={{
+                  boxShadow:
+                    "0 0 0 9999px rgba(123,111,224,0.2), 0 0 22px rgba(123,111,224,0.4)",
+                  background: "rgba(123,111,224,0.16)",
+                }}
+              >
+                <span className="absolute inset-[16%] rounded-full border-2 border-dashed border-white/70" />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div>
+        <p className="text-[12px] font-bold text-[#7B6FE0]">{label}</p>
+        <p className={cn("text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>{caption}</p>
+      </div>
+    </div>
+  );
+}
+
+function RemoveBlockDiagram({ isDark }: { isDark: boolean }) {
+  const steps = [
+    { n: "1", title: "Upload Image", body: "Flower + Butterfly" },
+    { n: "2", title: "Mark Object", body: "Purple circle + shaded selection" },
+    { n: "3", title: "AI Analyses", body: "Understands the selected region" },
+    { n: "4", title: "AI Removes", body: "Reconstructs the selected area" },
+    { n: "5", title: "Final Result", body: "Butterfly removed" },
+  ];
+  return (
+    <section className="space-y-3">
+      <h2 className="text-[15px] font-bold tracking-tight">How Circle 2edit Removes an Object</h2>
+      <div className="space-y-2">
+        {steps.map((s, i) => (
+          <div key={s.n}>
+            <div
+              className={cn(
+                "rounded-2xl border px-4 py-3",
+                isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/90",
+              )}
+            >
+              <p className="text-[12px] font-bold text-[#7B6FE0]">
+                {s.n}. {s.title}
+              </p>
+              <p className={cn("mt-0.5 text-[12px]", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
+                {s.body}
+              </p>
+            </div>
+            {i < steps.length - 1 ? (
+              <div className="flex justify-center py-1">
+                <span className="text-[#7B6FE0]">↓</span>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function FeatureDetail({
   sample,
   isDark,
@@ -94,13 +177,16 @@ function FeatureDetail({
 }) {
   const src = useMemo(() => resolveCircleSampleMediaUrl(sample), [sample]);
   const asset = sample.assetId ? findAddAsset(sample.assetId) : null;
-  const tryHref = circleSampleTryHref(sample);
+  const tryHref = circleSampleTryHref(sample, "sample");
   const isRemove = sample.mode === "remove";
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 px-4 py-8">
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-[rgba(123,111,224,0.15)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#7B6FE0]">
+            Circle 2edit
+          </span>
           <span
             className={cn(
               "rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
@@ -113,9 +199,9 @@ function FeatureDetail({
           >
             {isRemove ? "Remove" : "Add"}
           </span>
-          {sample.category ? (
+          {sample.objectLabel ? (
             <span className={cn("text-[11px] font-medium", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-              {sample.category}
+              Object: {sample.objectLabel}
             </span>
           ) : null}
         </div>
@@ -125,48 +211,117 @@ function FeatureDetail({
         </p>
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-[#7B6FE0]/30 bg-gradient-to-br from-[rgba(123,111,224,0.12)] to-transparent">
-        <div className="relative aspect-[4/5] w-full max-h-[420px]">
-          <img
-            src={src}
-            alt={sample.title}
-            className="h-full w-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div
-              className="relative h-[40%] w-[40%] rounded-full border-[3px] border-white/90"
-              style={{
-                boxShadow: "0 0 0 9999px rgba(255,255,255,0.18), 0 0 20px rgba(123,111,224,0.3)",
-              }}
-            >
-              <span className="absolute inset-[18%] rounded-full border-2 border-dashed border-white/70" />
+      {/* Three stages of the SAME scene */}
+      <section className="space-y-4">
+        <h2 className="text-[15px] font-bold tracking-tight">Visual demonstration</h2>
+        <StageFrame
+          label="1 · Before"
+          caption={isRemove ? "Original scene with the object present" : "Environment without the target object"}
+          src={src}
+          isDark={isDark}
+        />
+        <div className="flex justify-center">
+          <span className="text-[#7B6FE0]">↓</span>
+        </div>
+        <StageFrame
+          label={isRemove ? "2 · Mark" : "2 · Outline"}
+          caption={
+            isRemove
+              ? "Same photo · purple circular selection · translucent shade"
+              : "Explanatory black outline of the selected object"
+          }
+          src={src}
+          showMark
+          isDark={isDark}
+        />
+        {isRemove ? (
+          <div className="flex flex-col items-center gap-2 py-2">
+            <div className="flex items-center gap-6">
+              {["Analyse", "Removing", "Generating"].map((lab) => (
+                <div key={lab} className="flex flex-col items-center gap-1.5">
+                  <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-[#7B6FE0] bg-[rgba(123,111,224,0.15)]">
+                    <span className="h-2 w-2 rounded-full bg-[#7B6FE0]" />
+                  </span>
+                  <span className="text-[10px] font-semibold text-[#7B6FE0]">{lab}</span>
+                </div>
+              ))}
             </div>
           </div>
-          {asset ? (
-            <span className="absolute bottom-3 left-3 grid h-12 w-12 place-items-center rounded-2xl bg-black/40 backdrop-blur-md">
-              <AssetIcon asset={asset} size={28} isDark selected />
-            </span>
+        ) : (
+          <div className="flex justify-center">
+            <span className="text-[#7B6FE0]">↓</span>
+          </div>
+        )}
+        <StageFrame
+          label="3 · After"
+          caption={
+            isRemove
+              ? "Same composition · object completely removed"
+              : "Same environment · selected object realistically added"
+          }
+          src={src}
+          isDark={isDark}
+        />
+      </section>
+
+      {isRemove ? <RemoveBlockDiagram isDark={isDark} /> : null}
+
+      {/* Technical details from registry — no prompt exposure */}
+      <section
+        className={cn(
+          "rounded-2xl border p-4",
+          isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/90",
+        )}
+      >
+        <h2 className="mb-3 text-[14px] font-bold tracking-tight">Sample details</h2>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
+          <div>
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Object</dt>
+            <dd className="font-semibold">{sample.objectLabel ?? sample.title}</dd>
+          </div>
+          <div>
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Action</dt>
+            <dd className="font-semibold">{isRemove ? "Remove" : "Add"}</dd>
+          </div>
+          {sample.quality ? (
+            <div>
+              <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Quality</dt>
+              <dd className="font-semibold">{sample.quality}</dd>
+            </div>
           ) : null}
-        </div>
-        <div className="grid grid-cols-3 gap-2 p-3 text-center text-[11px] font-medium">
-          <div className={cn("rounded-xl border px-2 py-2", isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/80")}>
-            <p className="font-bold text-[#7B6FE0]">1 · Before</p>
-            <p className={cn("mt-0.5", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>Original photo</p>
+          {sample.aspectRatio ? (
+            <div>
+              <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Aspect ratio</dt>
+              <dd className="font-semibold">{sample.aspectRatio}</dd>
+            </div>
+          ) : null}
+          {sample.generationMode ? (
+            <div>
+              <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Generation mode</dt>
+              <dd className="font-semibold">{sample.generationMode}</dd>
+            </div>
+          ) : null}
+          {sample.buildDuration ? (
+            <div>
+              <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Build duration</dt>
+              <dd className="font-semibold">{sample.buildDuration}</dd>
+            </div>
+          ) : null}
+          <div className="col-span-2">
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>AI operation</dt>
+            <dd className="font-semibold">
+              {isRemove ? "Object removal / generative reconstruction" : "Object insertion / scene match"}
+            </dd>
           </div>
-          <div className={cn("rounded-xl border px-2 py-2", isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/80")}>
-            <p className="font-bold text-[#7B6FE0]">2 · Mark</p>
-            <p className={cn("mt-0.5", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>Circle / brush</p>
-          </div>
-          <div className={cn("rounded-xl border px-2 py-2", isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/80")}>
-            <p className="font-bold text-[#7B6FE0]">3 · After</p>
-            <p className={cn("mt-0.5", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-              {isRemove ? "Removed" : "Added"}
-            </p>
-          </div>
-        </div>
+          {asset ? (
+            <div className="col-span-2 flex items-center gap-2 pt-1">
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-[rgba(123,111,224,0.15)]">
+                <AssetIcon asset={asset} size={22} isDark={isDark} selected />
+              </span>
+              <span className="text-[12px] font-semibold">{asset.name}</span>
+            </div>
+          ) : null}
+        </dl>
       </section>
 
       <section className="space-y-2">
@@ -187,24 +342,6 @@ function FeatureDetail({
             </>
           )}
         </ol>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-[15px] font-bold tracking-tight">Supported behavior</h2>
-        <ul className={cn("space-y-1.5 text-[13px]", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
-          <li className="flex gap-2">
-            <Circle className="mt-0.5 h-4 w-4 shrink-0 text-[#7B6FE0]" />
-            Freehand circle (A→B) and brush/eraser with undo/redo
-          </li>
-          <li className="flex gap-2">
-            <Layers className="mt-0.5 h-4 w-4 shrink-0 text-[#7B6FE0]" />
-            {isRemove ? "Clean removal with background reconstruction" : "Lighting- and perspective-matched placement"}
-          </li>
-          <li className="flex gap-2">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#7B6FE0]" />
-            Circle-specific Motio 2 Edit watermark on outputs (required on Free)
-          </li>
-        </ul>
       </section>
 
       <Link
@@ -239,15 +376,15 @@ function Circle2editInfoPage() {
 
   const sample = useMemo(() => {
     if (!sampleId) return null;
-    return getActiveCircleSamples().find((s) => s.id === sampleId) ?? null;
+    return getCircleSampleById(sampleId) ?? getActiveCircleSamples().find((s) => s.id === sampleId) ?? null;
   }, [sampleId]);
 
   const start = () => {
     if (user) {
       if (sample) {
-        navigate({ to: circleSampleTryHref(sample) as "/studio/image/circle-remove" });
+        navigate({ to: circleSampleTryHref(sample, sampleId ? "sample" : "info") as "/studio/image/circle-remove" });
       } else {
-        navigate({ to: "/studio/image/circle-remove" });
+        navigate({ to: "/studio/image/circle-remove?from=info" as "/studio/image/circle-remove" });
       }
     } else {
       navigate({ to: "/auth" as "/auth" });
