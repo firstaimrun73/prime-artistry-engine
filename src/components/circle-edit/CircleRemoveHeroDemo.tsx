@@ -1,12 +1,12 @@
 /**
  * Premium Circle Remove visual demo — Giza people-removal sequence.
  * CSS/React only (no canvas). Used inside RemoveHeroCard image area.
+ *
+ * Media: prefers R2 public URL (VITE_R2_PUBLIC_URL + key) when configured,
+ * falls back to /public/demo/circle-remove/*.jpg shipped with the deploy.
  */
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
-import stage1 from "@/lib/circle-edit/demo-media/giza-stage1";
-import stage2 from "@/lib/circle-edit/demo-media/giza-stage2";
-import stage3 from "@/lib/circle-edit/demo-media/giza-stage3";
 
 type DemoPhase =
   | "intro"
@@ -20,15 +20,15 @@ type DemoPhase =
   | "result";
 
 const PHASE_MS: Record<DemoPhase, number> = {
-  intro: 1600,
-  tools: 900,
-  selectBrush: 1100,
-  paint: 3200,
-  selectErase: 1000,
-  analysing: 1600,
-  removing: 1600,
-  generating: 1600,
-  result: 3200,
+  intro: 1400,
+  tools: 800,
+  selectBrush: 1000,
+  paint: 3600,
+  selectErase: 900,
+  analysing: 1500,
+  removing: 1500,
+  generating: 1500,
+  result: 2800,
 };
 
 const ORDER: DemoPhase[] = [
@@ -41,6 +41,47 @@ const ORDER: DemoPhase[] = [
   "removing",
   "generating",
   "result",
+];
+
+const R2_KEYS = {
+  stage1: "circle/samples/demo/giza-stage1.jpg",
+  stage2: "circle/samples/demo/giza-stage2.jpg",
+  stage3: "circle/samples/demo/giza-stage3.jpg",
+} as const;
+
+const PUBLIC_FALLBACK = {
+  stage1: "/demo/circle-remove/giza-stage1.jpg",
+  stage2: "/demo/circle-remove/giza-stage2.jpg",
+  stage3: "/demo/circle-remove/giza-stage3.jpg",
+} as const;
+
+function r2PublicBase(): string {
+  try {
+    const base =
+      (typeof import.meta !== "undefined" &&
+        (import.meta as { env?: Record<string, string> }).env?.VITE_R2_PUBLIC_URL) ||
+      "";
+    return String(base || "").replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+function resolveDemoUrl(key: string, fallback: string): string {
+  const base = r2PublicBase();
+  if (base && key) return `${base}/${key.replace(/^\//, "")}`;
+  return fallback;
+}
+
+const PAINT_PATH: { x: number; y: number; r: number }[] = [
+  { x: 22, y: 78, r: 11 },
+  { x: 30, y: 74, r: 12 },
+  { x: 38, y: 80, r: 13 },
+  { x: 46, y: 72, r: 12 },
+  { x: 54, y: 76, r: 13 },
+  { x: 62, y: 70, r: 11 },
+  { x: 70, y: 78, r: 12 },
+  { x: 78, y: 74, r: 11 },
 ];
 
 function ToolIcon({
@@ -181,10 +222,71 @@ function ProcessCenter({
   );
 }
 
+function LocalizedMaskReveal({
+  stage2Src,
+  paintT,
+  fullyVisible,
+}: {
+  stage2Src: string;
+  paintT: number;
+  fullyVisible: boolean;
+}) {
+  const activeCount = fullyVisible
+    ? PAINT_PATH.length
+    : Math.min(PAINT_PATH.length, Math.floor(paintT * PAINT_PATH.length + 0.35));
+
+  return (
+    <>
+      {PAINT_PATH.map((dab, i) => {
+        const on = i < activeCount;
+        const justOn = i === activeCount - 1 && !fullyVisible;
+        return (
+          <div
+            key={i}
+            className="pointer-events-none absolute overflow-hidden rounded-full"
+            style={{
+              left: `${dab.x}%`,
+              top: `${dab.y}%`,
+              width: `${dab.r * 2}%`,
+              height: `${dab.r * 2}%`,
+              transform: "translate(-50%, -50%)",
+              opacity: on ? 1 : 0,
+              transition: justOn ? "opacity 0.18s ease-out" : "opacity 0.12s linear",
+              boxShadow: on ? "0 0 10px rgba(123,111,224,0.35)" : undefined,
+            }}
+          >
+            <img
+              src={stage2Src}
+              alt=""
+              draggable={false}
+              className="absolute max-w-none object-cover"
+              style={{
+                width: `${10000 / (dab.r * 2)}%`,
+                height: `${10000 / (dab.r * 2)}%`,
+                left: `${-dab.x * (100 / (dab.r * 2)) + 50}%`,
+                top: `${-dab.y * (100 / (dab.r * 2)) + 50}%`,
+              }}
+            />
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 export function CircleRemoveHeroDemo() {
   const [phase, setPhase] = useState<DemoPhase>("intro");
   const [pct, setPct] = useState(0);
   const [paintT, setPaintT] = useState(0);
+
+  const urls = useMemo(
+    () => ({
+      stage1: resolveDemoUrl(R2_KEYS.stage1, PUBLIC_FALLBACK.stage1),
+      stage2: resolveDemoUrl(R2_KEYS.stage2, PUBLIC_FALLBACK.stage2),
+      stage3: resolveDemoUrl(R2_KEYS.stage3, PUBLIC_FALLBACK.stage3),
+    }),
+    [],
+  );
 
   useEffect(() => {
     const ms = PHASE_MS[phase];
@@ -237,12 +339,22 @@ export function CircleRemoveHeroDemo() {
   const showHand = phase === "selectBrush" || phase === "paint" || phase === "selectErase";
   const showProcess = phase === "analysing" || phase === "removing" || phase === "generating";
   const showResult = phase === "result";
+  const showPaint =
+    phase === "paint" || phase === "selectErase" || phase === "analysing" || phase === "removing" || phase === "generating";
+  const paintFull = phase !== "paint" && showPaint;
+
+  const pathIndex = Math.min(PAINT_PATH.length - 1, Math.floor(paintT * (PAINT_PATH.length - 0.01)));
+  const pathPt = PAINT_PATH[pathIndex];
+  const nextPt = PAINT_PATH[Math.min(PAINT_PATH.length - 1, pathIndex + 1)];
+  const segT = paintT * (PAINT_PATH.length - 1) - pathIndex;
+  const handX = pathPt.x + (nextPt.x - pathPt.x) * segT;
+  const handY = pathPt.y + (nextPt.y - pathPt.y) * segT;
 
   const handPos =
     phase === "selectBrush"
       ? { left: "72%", top: "18%" }
       : phase === "paint"
-        ? { left: `${18 + paintT * 55}%`, top: `${55 + Math.sin(paintT * Math.PI * 2) * 8}%` }
+        ? { left: `${handX}%`, top: `${handY}%` }
         : phase === "selectErase"
           ? { left: "86%", top: "18%" }
           : { left: "50%", top: "50%" };
@@ -251,8 +363,6 @@ export function CircleRemoveHeroDemo() {
     phase === "analysing" ? "analysing" : phase === "removing" ? "removing" : "generating";
   const processLabel =
     phase === "analysing" ? "ANALYSING" : phase === "removing" ? "REMOVING" : "GENERATING";
-
-  const maskReveal = phase === "paint" ? paintT : phase === "selectErase" || showProcess ? 1 : 0;
 
   return (
     <div className="absolute inset-0 overflow-hidden" data-circle-remove-demo="giza">
@@ -263,7 +373,7 @@ export function CircleRemoveHeroDemo() {
       `}</style>
 
       <img
-        src={stage1}
+        src={urls.stage1}
         alt="Original scene"
         className={cn(
           "absolute inset-0 h-full w-full object-cover transition-opacity duration-700",
@@ -272,27 +382,12 @@ export function CircleRemoveHeroDemo() {
         draggable={false}
       />
 
-      <img
-        src={stage2}
-        alt="Masked selection"
-        className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity duration-500",
-          showResult ? "opacity-0" : "opacity-100",
-        )}
-        style={{
-          clipPath:
-            maskReveal <= 0
-              ? "inset(100% 0 0 0)"
-              : phase === "paint"
-                ? `inset(${Math.max(0, 55 - paintT * 45)}% ${Math.max(0, 20 - paintT * 15)}% ${Math.max(0, 5 - paintT * 5)}% ${Math.max(0, 5 - paintT * 5)}%)`
-                : "inset(0 0 0 0)",
-          transition: phase === "paint" ? "none" : "clip-path 0.4s ease",
-        }}
-        draggable={false}
-      />
+      {showPaint && !showResult ? (
+        <LocalizedMaskReveal stage2Src={urls.stage2} paintT={paintT} fullyVisible={paintFull} />
+      ) : null}
 
       <img
-        src={stage3}
+        src={urls.stage3}
         alt="People removed"
         className={cn(
           "absolute inset-0 h-full w-full object-cover transition-opacity duration-700",
@@ -324,7 +419,7 @@ export function CircleRemoveHeroDemo() {
 
       {showHand && (
         <HandCursor
-          className="transition-all duration-500 ease-out"
+          className="transition-all duration-200 ease-out"
           style={{
             left: handPos.left,
             top: handPos.top,
