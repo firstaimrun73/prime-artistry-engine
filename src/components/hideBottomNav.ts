@@ -14,5 +14,7 @@ export function hideBottomNav(pathname: string): boolean {
   if (pathname.startsWith("/studio/image/filter-editor")) return true;
   if (pathname.startsWith("/studio/image/lens-editor")) return true;
   if (pathname.startsWith("/studio/image/age")) return true;
+  // About Product — editorial page; hide app bottom nav on mobile (Part 6)
+  if (pathname === "/about" || pathname.startsWith("/about/")) return true;
   return false;
 }
