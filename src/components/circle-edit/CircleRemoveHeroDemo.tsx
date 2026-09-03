@@ -45,7 +45,7 @@ const ORDER: DemoPhase[] = [
 
 /**
  * Homepage Circle 2edit Remove hero card media (public assets.motio2edit.com).
- * Sequence: original → marked selection → clean result (plays once, then stops).
+ * Sequence: original → marked selection → clean result → continuous loop.
  * These absolute URLs are the source of truth for the card animation.
  */
 const DEMO_STAGE_URLS = {
@@ -277,13 +277,11 @@ export function CircleRemoveHeroDemo() {
   );
 
   useEffect(() => {
-    // Play once: advance through phases, then stop on "result" (no loop / restart).
-    if (phase === "result") return;
+    // Continuous loop: Image 1 → paint/reveal → Image 2 → process → Image 3 → repeat.
     const ms = PHASE_MS[phase];
     const t = window.setTimeout(() => {
       const i = ORDER.indexOf(phase);
-      if (i < 0) return;
-      if (i < ORDER.length - 1) setPhase(ORDER[i + 1]);
+      setPhase(ORDER[(i + 1) % ORDER.length]);
     }, ms);
     return () => window.clearTimeout(t);
   }, [phase]);
