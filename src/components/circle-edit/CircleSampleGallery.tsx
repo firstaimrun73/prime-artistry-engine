@@ -2,9 +2,6 @@
  * Post-login only Circle 2edit feature presentation.
  * ONE Remove hero card with premium Giza people-removal animated demo.
  * Add cards: compact horizontal row.
- * ⓘ → sample detail (circle-info?sampleId=)
- * How it works → /about#circle-2edit (About Product, same page scroll)
- * Try Now → editor with from=home + mode/assetId/sampleId
  */
 import { Link } from "@tanstack/react-router";
 import { Info, Sparkles } from "lucide-react";
@@ -18,7 +15,6 @@ import {
   type CircleSample,
 } from "@/lib/circle-edit/circle-samples";
 import { findAddAsset } from "@/lib/circle-edit/add-assets";
-import { AssetIcon } from "@/components/circle-edit/AssetIcon";
 import { CircleRemoveHeroDemo } from "@/components/circle-edit/CircleRemoveHeroDemo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -38,9 +34,10 @@ class DemoErrorBoundary extends Component<
   render() {
     if (this.state.failed) {
       return this.props.fallback ?? (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#7B6FE0]/20 to-transparent">
-          <p className="px-4 text-center text-xs font-semibold text-[#7B6FE0]">Circle Remove preview</p>
-        </div>
+        <div
+          className="h-full w-full animate-pulse bg-gradient-to-br from-[#E8E4FF] via-[#F4F1FF] to-[#DDD6FE]"
+          aria-label="Loading preview"
+        />
       );
     }
     return this.props.children;
@@ -50,7 +47,6 @@ class DemoErrorBoundary extends Component<
 function RemoveHeroCard({ samples }: { samples: CircleSample[] }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  // Prefer a people-removal sample for title/desc if available, else first
   const sample = samples.find((s) => /people|crowd|tourist/i.test(s.title + s.id)) ?? samples[0];
   const tryHref = sample ? circleSampleTryHref(sample, "home") : "/studio/image/circle-remove?from=home";
   const infoHref = sample ? circleInfoHref(sample.id) : circleInfoHref();
@@ -65,7 +61,6 @@ function RemoveHeroCard({ samples }: { samples: CircleSample[] }) {
       )}
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
-        {/* Premium animated Giza demo — original → paint → process → clean result */}
         <DemoErrorBoundary>
           <CircleRemoveHeroDemo />
         </DemoErrorBoundary>
@@ -73,12 +68,12 @@ function RemoveHeroCard({ samples }: { samples: CircleSample[] }) {
         <Link
           to={infoHref as "/studio/image/circle-info"}
           className={cn(
-            "absolute right-2.5 top-2.5 z-50 grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md transition active:scale-95",
+            "absolute right-2.5 top-2.5 z-10 grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md transition active:scale-95",
             isDark
               ? "border-white/15 bg-black/40 text-white hover:bg-black/55"
               : "border-black/10 bg-white/80 text-[#1A1C24] hover:bg-white",
           )}
-          aria-label={`About ${sample.title}`}
+          aria-label="About this sample"
           onClick={(e) => e.stopPropagation()}
         >
           <Info className="h-4 w-4" strokeWidth={2.25} />
@@ -86,7 +81,7 @@ function RemoveHeroCard({ samples }: { samples: CircleSample[] }) {
 
         <span
           className={cn(
-            "absolute left-2.5 top-2.5 z-50 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+            "absolute left-2.5 top-2.5 z-10 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
             isDark ? "bg-white/15 text-white backdrop-blur-sm" : "bg-black/60 text-white",
           )}
         >
@@ -96,9 +91,9 @@ function RemoveHeroCard({ samples }: { samples: CircleSample[] }) {
 
       <div className="flex flex-1 flex-col gap-2 p-3.5 sm:p-4">
         <div className="min-w-0">
-          <h3 className="text-[15px] font-bold leading-tight tracking-tight">{sample.title}</h3>
+          <h3 className="text-[15px] font-bold leading-tight tracking-tight">Clear a crowded view</h3>
           <p className={cn("mt-0.5 line-clamp-2 text-[12px] leading-snug", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-            {sample.description}
+            Mark people and clutter in cultural scenes — keep the landmark, open the frame.
           </p>
         </div>
         <Link
@@ -120,7 +115,6 @@ function AddFeatureCard({ sample }: { sample: CircleSample }) {
   const [imgFailed, setImgFailed] = useState(false);
   const leaveTimer = useRef<number | null>(null);
   const src = useMemo(() => resolveCircleSampleMediaUrl(sample), [sample]);
-  const asset = sample.assetId ? findAddAsset(sample.assetId) : null;
   const tryHref = circleSampleTryHref(sample, "home");
   const infoHref = circleInfoHref(sample.id);
 
@@ -191,20 +185,16 @@ function AddFeatureCard({ sample }: { sample: CircleSample }) {
             </div>
           </>
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4">
-            {asset ? (
-              <span className="grid h-16 w-16 place-items-center rounded-3xl bg-[rgba(123,111,224,0.18)]">
-                <AssetIcon asset={asset} size={40} isDark={isDark} selected />
-              </span>
-            ) : null}
-            <p className="text-center text-xs font-semibold text-[#7B6FE0]">{sample.title}</p>
-          </div>
+          <div
+            className="h-full w-full animate-pulse bg-gradient-to-br from-[#E8E4FF] via-[#F4F1FF] to-[#DDD6FE]"
+            aria-label="Loading sample"
+          />
         )}
 
         <Link
           to={infoHref as "/studio/image/circle-info"}
           className={cn(
-            "absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md",
+            "absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md",
             isDark
               ? "border-white/15 bg-black/40 text-white"
               : "border-black/10 bg-white/80 text-[#1A1C24]",
@@ -215,7 +205,7 @@ function AddFeatureCard({ sample }: { sample: CircleSample }) {
           <Info className="h-3.5 w-3.5" strokeWidth={2.25} />
         </Link>
 
-        <span className="absolute left-2 top-2 rounded-full bg-[#7B6FE0] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+        <span className="absolute left-2 top-2 z-10 rounded-full bg-[#7B6FE0] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
           Add
         </span>
       </div>
@@ -266,7 +256,6 @@ export function CircleSampleGallery() {
         </Link>
       </div>
 
-      {/* ONE Remove hero with premium animation */}
       <div className="space-y-3">
         <div className="px-0.5">
           <h3 className="text-[15px] font-bold tracking-tight">Remove</h3>
@@ -279,7 +268,6 @@ export function CircleSampleGallery() {
         </div>
       </div>
 
-      {/* Compact Add row */}
       <div className="space-y-3">
         <div className="px-0.5">
           <h3 className="text-[15px] font-bold tracking-tight">Add</h3>
