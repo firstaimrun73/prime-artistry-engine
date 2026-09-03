@@ -28,7 +28,7 @@ const PHASE_MS: Record<DemoPhase, number> = {
   analysing: 1500,
   removing: 1500,
   generating: 1500,
-  result: 2800,
+  result: 4000,
 };
 
 const ORDER: DemoPhase[] = [
@@ -266,6 +266,7 @@ export function CircleRemoveHeroDemo() {
   const [phase, setPhase] = useState<DemoPhase>("intro");
   const [pct, setPct] = useState(0);
   const [paintT, setPaintT] = useState(0);
+  const [ready, setReady] = useState(false);
 
   const urls = useMemo(
     () => ({
@@ -275,6 +276,35 @@ export function CircleRemoveHeroDemo() {
     }),
     [],
   );
+
+  // Preload stage images so the card never sits blank; shimmer until ready.
+  useEffect(() => {
+    let cancelled = false;
+    let loaded = 0;
+    const mark = () => {
+      loaded += 1;
+      if (!cancelled && loaded >= 3) setReady(true);
+    };
+    const imgs = [urls.stage1, urls.stage2, urls.stage3].map((src) => {
+      const im = new Image();
+      im.decoding = "async";
+      im.onload = mark;
+      im.onerror = mark;
+      im.src = src;
+      return im;
+    });
+    const fallback = window.setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, 6000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallback);
+      imgs.forEach((im) => {
+        im.onload = null;
+        im.onerror = null;
+      });
+    };
+  }, [urls.stage1, urls.stage2, urls.stage3]);
 
   useEffect(() => {
     // Continuous loop: Image 1 → paint/reveal → Image 2 → process → Image 3 → repeat.
@@ -332,12 +362,15 @@ export function CircleRemoveHeroDemo() {
     phase === "paint" || phase === "selectErase" || phase === "analysing" || phase === "removing" || phase === "generating";
   const paintFull = phase !== "paint" && showPaint;
 
-  const pathIndex = Math.min(PAINT_PATH.length - 1, Math.floor(paintT * (PAINT_PATH.length - 0.01)));
-  const pathPt = PAINT_PATH[pathIndex];
-  const nextPt = PAINT_PATH[Math.min(PAINT_PATH.length - 1, pathIndex + 1)];
-  const segT = paintT * (PAINT_PATH.length - 1) - pathIndex;
-  const handX = pathPt.x + (nextPt.x - pathPt.x) * segT;
-  const handY = pathPt.y + (nextPt.y - pathPt.y) * segT;
+  const pathIndex = Math.min(
+    Math.max(0, PAINT_PATH.length - 1),
+    Math.max(0, Math.floor(paintT * (PAINT_PATH.length - 0.01))),
+  );
+  const pathPt = PAINT_PATH[pathIndex] ?? PAINT_PATH[0];
+  const nextPt = PAINT_PATH[Math.min(PAINT_PATH.length - 1, pathIndex + 1)] ?? pathPt;
+  const segT = paintT * Math.max(1, PAINT_PATH.length - 1) - pathIndex;
+  const handX = (pathPt?.x ?? 50) + ((nextPt?.x ?? 50) - (pathPt?.x ?? 50)) * segT;
+  const handY = (pathPt?.y ?? 50) + ((nextPt?.y ?? 50) - (pathPt?.y ?? 50)) * segT;
 
   const handPos =
     phase === "selectBrush"
@@ -360,6 +393,13 @@ export function CircleRemoveHeroDemo() {
         @keyframes c2d-pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
         @keyframes c2d-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
       `}</style>
+
+      {!ready && (
+        <div
+          className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#E8E4FF] via-[#F4F1FF] to-[#DDD6FE]"
+          aria-hidden
+        />
+      )}
 
       <img
         src={urls.stage1}
