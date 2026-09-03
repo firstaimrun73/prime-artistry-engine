@@ -75,7 +75,7 @@ export function Dashboard() {
   ];
 
   const resources = [
-    { to: "/about" as const, icon: BookOpen, title: "About Product", body: "How Image Studio, Circle, Maluto, Filters & Lenses work" },
+    { to: "/about" as const, icon: BookOpen, title: "About Product", body: "Product overview — studios, tools, credits, and how editing works" },
     { to: "/pricing" as const, icon: Crown, title: t("nav.pricing"), body: "Plans and credits" },
     { to: "/faq" as const, icon: HelpCircle, title: "FAQ", body: "Common questions" },
     { to: "/security" as const, icon: Shield, title: "Security", body: "How we protect your data" },
