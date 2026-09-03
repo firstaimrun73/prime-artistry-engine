@@ -45,7 +45,7 @@ const ORDER: DemoPhase[] = [
 
 /**
  * Homepage Circle 2edit Remove hero card media (public assets.motio2edit.com).
- * Sequence: original → marked selection → clean result → loop.
+ * Sequence: original → marked selection → clean result (plays once, then stops).
  * These absolute URLs are the source of truth for the card animation.
  */
 const DEMO_STAGE_URLS = {
@@ -215,13 +215,14 @@ function LocalizedMaskReveal({
   paintT: number;
   fullyVisible: boolean;
 }) {
-  // Single bitmap reused via CSS background (not N full multi-MB <img> nodes — avoids mobile OOM).
+  // Approved visual: circular windows into stage2 with exact crop positioning.
+  // Memory: only mount active dabs (inactive were opacity 0 — same visual, fewer nodes).
   const activeCount = fullyVisible
     ? PAINT_PATH.length
     : Math.min(PAINT_PATH.length, Math.floor(paintT * PAINT_PATH.length + 0.35));
 
   return (
-    <div className="pointer-events-none absolute inset-0">
+    <>
       {PAINT_PATH.map((dab, i) => {
         const on = i < activeCount;
         const justOn = i === activeCount - 1 && !fullyVisible;
@@ -229,7 +230,7 @@ function LocalizedMaskReveal({
         return (
           <div
             key={i}
-            className="absolute overflow-hidden rounded-full"
+            className="pointer-events-none absolute overflow-hidden rounded-full"
             style={{
               left: `${dab.x}%`,
               top: `${dab.y}%`,
@@ -239,14 +240,25 @@ function LocalizedMaskReveal({
               opacity: on ? 1 : 0,
               transition: justOn ? "opacity 0.18s ease-out" : "opacity 0.12s linear",
               boxShadow: on ? "0 0 10px rgba(123,111,224,0.35)" : undefined,
-              backgroundImage: `url(${stage2Src})`,
-              backgroundSize: `${10000 / (dab.r * 2)}% ${10000 / (dab.r * 2)}%`,
-              backgroundPosition: `${dab.x}% ${dab.y}%`,
             }}
-          />
+          >
+            <img
+              src={stage2Src}
+              alt=""
+              draggable={false}
+              decoding="async"
+              className="absolute max-w-none object-cover"
+              style={{
+                width: `${10000 / (dab.r * 2)}%`,
+                height: `${10000 / (dab.r * 2)}%`,
+                left: `${-dab.x * (100 / (dab.r * 2)) + 50}%`,
+                top: `${-dab.y * (100 / (dab.r * 2)) + 50}%`,
+              }}
+            />
+          </div>
         );
       })}
-    </div>
+    </>
   );
 }
 
@@ -265,10 +277,13 @@ export function CircleRemoveHeroDemo() {
   );
 
   useEffect(() => {
+    // Play once: advance through phases, then stop on "result" (no loop / restart).
+    if (phase === "result") return;
     const ms = PHASE_MS[phase];
     const t = window.setTimeout(() => {
       const i = ORDER.indexOf(phase);
-      setPhase(ORDER[(i + 1) % ORDER.length]);
+      if (i < 0) return;
+      if (i < ORDER.length - 1) setPhase(ORDER[i + 1]);
     }, ms);
     return () => window.clearTimeout(t);
   }, [phase]);
