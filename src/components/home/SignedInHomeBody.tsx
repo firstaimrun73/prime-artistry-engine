@@ -43,6 +43,14 @@ const QUICK_CREATE = [
   { to: "/studio/image/lenses" as const, label: "Lenses", icon: Aperture },
 ] as const;
 
+const AUTO_EDIT_FLOW = [
+  "Input",
+  "AI analysis",
+  "One click",
+  "Editing",
+  "Output",
+] as const;
+
 export function SignedInHomeBody() {
   const { user, profile } = useAuth();
   const { t } = useI18n();
@@ -113,7 +121,17 @@ export function SignedInHomeBody() {
             return (
               <Link
                 key={q.label}
-                to={(locked ? "/pricing" : q.to) as "/pricing" | "/studio/image" | "/studio/video" | "/studio/music" | "/studio/image/circle-remove" | "/studio/image/auto-edit" | "/studio/image/filters" | "/studio/image/lenses"}
+                to={
+                  (locked ? "/pricing" : q.to) as
+                    | "/pricing"
+                    | "/studio/image"
+                    | "/studio/video"
+                    | "/studio/music"
+                    | "/studio/image/circle-remove"
+                    | "/studio/image/auto-edit"
+                    | "/studio/image/filters"
+                    | "/studio/image/lenses"
+                }
                 className="flex shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40 min-w-[72px]"
               >
                 <span className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -129,26 +147,51 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* POST-LOGIN ONLY — Circle feature cards */}
+      {/* WHAT'S NEW — Circle 2edit */}
       <CircleSampleGallery />
 
-      {/* POST-LOGIN ONLY — Imagine (distinct from Circle; no Try Now) */}
+      {/* Imagine (R2 assets) */}
       <ImagineGallery />
 
+      {/* Auto Edit — premium flow diagram */}
       <Link
         to="/studio/image/auto-edit"
-        className="group mt-5 flex items-center gap-4 overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-4 shadow-md transition-all duration-300 hover:scale-[1.015] hover:border-primary/70 hover:shadow-[0_8px_32px_hsl(24_95%_53%/0.25)] active:scale-[0.99] sm:p-5"
+        className="group relative mt-6 block overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-4 shadow-md transition-all duration-300 hover:scale-[1.01] hover:border-primary/70 hover:shadow-[0_8px_32px_hsl(24_95%_53%/0.22)] active:scale-[0.99] sm:p-5"
       >
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary text-lg font-black text-primary-foreground shadow-[0_0_24px_hsl(24_95%_53%/0.45)] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-[-3deg]">
-          A✦
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-bold sm:text-lg">Auto Edit</p>
-          <p className="text-xs text-muted-foreground sm:text-sm">
-            One photo · no prompt · Motio2AI decides
-          </p>
+        <div className="flex items-center gap-4">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-base font-black text-primary-foreground shadow-[0_0_20px_hsl(24_95%_53%/0.4)] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-[-3deg] sm:h-14 sm:w-14 sm:text-lg">
+            A✦
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold sm:text-lg">Auto Edit</p>
+            <p className="text-xs text-muted-foreground sm:text-sm">
+              One photo · no prompt · Motio2AI decides
+            </p>
+          </div>
+          <ArrowRight className="h-5 w-5 shrink-0 text-primary transition-transform duration-300 group-hover:translate-x-1" />
         </div>
-        <ArrowRight className="h-5 w-5 shrink-0 text-primary transition-transform duration-300 group-hover:translate-x-1" />
+
+        {/* Compact flow diagram */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+          {AUTO_EDIT_FLOW.map((step, i) => (
+            <div key={step} className="flex items-center gap-1.5 sm:gap-2">
+              <span className="rounded-full border border-primary/30 bg-background/70 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-foreground/90 shadow-sm backdrop-blur-sm sm:text-[11px]">
+                {step}
+              </span>
+              {i < AUTO_EDIT_FLOW.length - 1 && (
+                <span
+                  className="hidden h-px w-3 border-t border-dashed border-primary/40 sm:block sm:w-4"
+                  aria-hidden
+                />
+              )}
+              {i < AUTO_EDIT_FLOW.length - 1 && (
+                <span className="text-[10px] text-primary/50 sm:hidden" aria-hidden>
+                  →
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       </Link>
 
       <div className="mt-8">
@@ -293,7 +336,15 @@ function StudioMiniCard({
 }) {
   return (
     <Link
-      to={href as "/studio/video" | "/studio/music" | "/studio/image/circle-remove" | "/studio/image/auto-edit" | "/studio/image/circle-info" | "/pricing"}
+      to={
+        href as
+          | "/studio/video"
+          | "/studio/music"
+          | "/studio/image/circle-remove"
+          | "/studio/image/auto-edit"
+          | "/studio/image/circle-info"
+          | "/pricing"
+      }
       className="relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
     >
       <div className="flex items-center gap-2">
