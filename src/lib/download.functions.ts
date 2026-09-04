@@ -6,6 +6,8 @@ const inputSchema = z.object({
   imageUrl: z.string().url().max(15_000_000),
   keepWatermark: z.boolean().optional(),
   studioTier: z.enum(["standard", "pro", "premium"]).optional(),
+  /** Circle 2edit uses purple-ring two-line brand; default generic Motio2edit. */
+  watermarkBrand: z.enum(["generic", "circle"]).optional(),
 });
 
 export const secureDownloadImage = createServerFn({ method: "POST" })
@@ -32,6 +34,7 @@ export const secureDownloadImage = createServerFn({ method: "POST" })
       keepWatermark: data.keepWatermark === true,
       userId,
       studioTier: data.studioTier,
+      watermarkBrand: data.watermarkBrand === "circle" ? "circle" : "generic",
     });
     return {
       downloadUrl: result.finalUrl,
