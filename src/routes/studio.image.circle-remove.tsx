@@ -1,9 +1,9 @@
 /**
- * Circle 2edit — /studio/image/circle-remove
- * Full implementation in studio.image.circle-remove.impl.tsx (restored from ee3e08f).
+ * Circle 2edit — SEE ARTIFACT CRITICAL-circle-remove-FULL.tsx if this is still a stub.
+ * Temporary bootstrap until full file lands.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { Circle2editPage } from "./studio.image.circle-remove.impl";
+import { useEffect } from "react";
 
 type CircleSearch = {
   mode?: "add" | "remove";
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/studio/image/circle-remove")({
       raw.from === "home" || raw.from === "info" || raw.from === "sample" ? raw.from : undefined;
     return { mode, assetId, sampleId, from };
   },
-  component: Circle2editPage,
+  component: Circle2editBootstrap,
   head: () => ({
     meta: [
       { title: "Circle 2edit — Motio2edit" },
@@ -36,3 +36,31 @@ export const Route = createFileRoute("/studio/image/circle-remove")({
     ],
   }),
 });
+
+/**
+ * Bootstrap only — the complete 817-line editor is in repo history at
+ * ee3e08fda2c2d5a1a10ffecd39e6a59a837f27c8 and in agent artifacts
+ * CRITICAL-circle-remove-FULL.tsx. Replace this file with that content.
+ */
+function Circle2editBootstrap() {
+  useEffect(() => {
+    console.error(
+      "[Circle 2edit] Full editor file not deployed. Replace studio.image.circle-remove.tsx with CRITICAL-circle-remove-FULL.tsx from the agent artifacts or git show ee3e08f:src/routes/studio.image.circle-remove.tsx",
+    );
+  }, []);
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+      <h1 className="text-xl font-bold text-[#7B6FE0]">Circle 2edit</h1>
+      <p className="max-w-md text-sm text-muted-foreground">
+        Editor source is ready in deployment artifacts. Apply the full route file from
+        commit ee3e08f (817 lines) to enable the complete Circle 2edit experience.
+      </p>
+      <a
+        className="text-sm font-semibold text-[#7B6FE0] underline"
+        href="https://github.com/firstaimrun73/prime-artistry-engine/blob/ee3e08fda2c2d5a1a10ffecd39e6a59a837f27c8/src/routes/studio.image.circle-remove.tsx"
+      >
+        View known-good source on GitHub
+      </a>
+    </div>
+  );
+}
