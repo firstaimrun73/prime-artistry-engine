@@ -217,6 +217,8 @@ function LocalizedMaskReveal({
 }) {
   // Approved visual: circular windows into stage2 with exact crop positioning.
   // Memory: only mount active dabs (inactive were opacity 0 — same visual, fewer nodes).
+  // Card is aspect-[4/5]; equal width%/height% would make ellipses, so scale height by aspect.
+  const CARD_ASPECT = 4 / 5; // width / height of the hero image area
   const activeCount = fullyVisible
     ? PAINT_PATH.length
     : Math.min(PAINT_PATH.length, Math.floor(paintT * PAINT_PATH.length + 0.35));
@@ -227,6 +229,8 @@ function LocalizedMaskReveal({
         const on = i < activeCount;
         const justOn = i === activeCount - 1 && !fullyVisible;
         if (!on && !justOn) return null;
+        const diamW = dab.r * 2; // % of parent width
+        const diamH = dab.r * 2 * CARD_ASPECT; // % of parent height → true circle in px
         return (
           <div
             key={i}
@@ -234,8 +238,8 @@ function LocalizedMaskReveal({
             style={{
               left: `${dab.x}%`,
               top: `${dab.y}%`,
-              width: `${dab.r * 2}%`,
-              height: `${dab.r * 2}%`,
+              width: `${diamW}%`,
+              height: `${diamH}%`,
               transform: "translate(-50%, -50%)",
               opacity: on ? 1 : 0,
               transition: justOn ? "opacity 0.18s ease-out" : "opacity 0.12s linear",
@@ -249,10 +253,10 @@ function LocalizedMaskReveal({
               decoding="async"
               className="absolute max-w-none object-cover"
               style={{
-                width: `${10000 / (dab.r * 2)}%`,
-                height: `${10000 / (dab.r * 2)}%`,
-                left: `${-dab.x * (100 / (dab.r * 2)) + 50}%`,
-                top: `${-dab.y * (100 / (dab.r * 2)) + 50}%`,
+                width: `${10000 / diamW}%`,
+                height: `${10000 / diamH}%`,
+                left: `${-dab.x * (100 / diamW) + 50}%`,
+                top: `${-dab.y * (100 / diamH) + 50}%`,
               }}
             />
           </div>
@@ -387,7 +391,7 @@ export function CircleRemoveHeroDemo() {
     phase === "analysing" ? "ANALYSING" : phase === "removing" ? "REMOVING" : "GENERATING";
 
   return (
-    <div className="absolute inset-0 overflow-hidden" data-circle-remove-demo="giza">
+    <div className="absolute inset-0 z-0 overflow-hidden" data-circle-remove-demo="giza">
       <style>{`
         @keyframes c2d-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes c2d-pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
