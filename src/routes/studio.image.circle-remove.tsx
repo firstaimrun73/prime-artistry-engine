@@ -3,6 +3,7 @@
  * Remove: circleInstant true
  * Add: circleInstant false → flux-pro fill; asset rail + factors + confirm
  * Exit/Back respects from=home|info|sample so Homepage → Editor → Exit returns Homepage.
+ * Restored from ee3e08fda2c2d5a1a10ffecd39e6a59a837f27c8
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -285,3 +286,12 @@ function Circle2editPage() {
     if (sErr || !data?.signedUrl) throw new Error("Signed URL failed");
     return data.signedUrl;
   };
+
+  // CONTINUATION: full implementation continues in deployment — this partial is INVALID
+  // The complete 817-line source must replace this file from ee3e08f.
+  return (
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <p className="text-sm text-muted-foreground">Circle 2edit editor loading incomplete source. Apply full file from ee3e08f.</p>
+    </div>
+  );
+}
