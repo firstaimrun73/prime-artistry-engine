@@ -8,7 +8,6 @@ import {
   ArrowRight,
   Sparkles,
   Lock,
-  Search,
   Circle,
   Aperture,
   Filter,
@@ -21,9 +20,9 @@ import type { PlanId } from "@/lib/plans";
 import { canAccessMusic, canAccessVideo } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
-import { DiscoveryFeed } from "@/components/discover/DiscoveryFeed";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
 import { ImagineGallery } from "@/components/home/ImagineGallery";
+import { VideoStudioGallery } from "@/components/home/VideoStudioGallery";
 
 type RecentGen = {
   id: string;
@@ -56,7 +55,6 @@ export function SignedInHomeBody() {
   const { t } = useI18n();
   const isAdmin = isAdminEmail(profile?.email);
   const [recent, setRecent] = useState<RecentGen[]>([]);
-  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -89,16 +87,6 @@ export function SignedInHomeBody() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 rounded-full"
-            aria-label="Search"
-            onClick={() => setSearchOpen((v) => !v)}
-          >
-            <Search className="h-4 w-4" />
-          </Button>
           <CrownBadge plan={planId} showLabel size="md" />
           <span className="rounded-full border border-border/80 bg-card/80 px-2.5 py-0.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
             {credits} credits
@@ -147,13 +135,12 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* WHAT'S NEW — Circle 2edit */}
       <CircleSampleGallery />
 
-      {/* Imagine (R2 assets) */}
       <ImagineGallery />
 
-      {/* Auto Edit — premium flow diagram */}
+      <VideoStudioGallery />
+
       <Link
         to="/studio/image/auto-edit"
         className="group relative mt-6 block overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-4 shadow-md transition-all duration-300 hover:scale-[1.01] hover:border-primary/70 hover:shadow-[0_8px_32px_hsl(24_95%_53%/0.22)] active:scale-[0.99] sm:p-5"
@@ -171,7 +158,6 @@ export function SignedInHomeBody() {
           <ArrowRight className="h-5 w-5 shrink-0 text-primary transition-transform duration-300 group-hover:translate-x-1" />
         </div>
 
-        {/* Compact flow diagram */}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
           {AUTO_EDIT_FLOW.map((step, i) => (
             <div key={step} className="flex items-center gap-1.5 sm:gap-2">
@@ -194,16 +180,12 @@ export function SignedInHomeBody() {
         </div>
       </Link>
 
-      <div className="mt-8">
-        <DiscoveryFeed isSignedIn compact forceSearchOpen={searchOpen} />
-      </div>
-
       <section className="mt-12 space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Studios</h2>
 
         <Link
           to="/studio/image"
-          className="relative flex min-h-[128px] flex-col justify-end overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-md transition-transform hover:scale-[1.01] hover:border-primary/40"
+          className="relative flex min-h-[112px] flex-col justify-end overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-md transition-transform hover:scale-[1.01] hover:border-primary/40"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/25 via-transparent to-transparent" />
           <div className="relative flex items-center gap-2">
@@ -211,7 +193,7 @@ export function SignedInHomeBody() {
             <p className="text-lg font-bold">Image Studio</p>
           </div>
           <p className="relative mt-1 text-xs text-muted-foreground">
-            Edit, enhance, remove, restore · recipes from the feed
+            Edit, enhance, remove, restore
           </p>
           <span className="relative mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary">
             Open <ArrowRight className="h-4 w-4" />
@@ -296,26 +278,6 @@ export function SignedInHomeBody() {
             ))}
           </div>
         )}
-      </section>
-
-      <section className="mt-14 rounded-2xl border border-border bg-card/60 p-5 sm:p-6">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-          How Motio2edit works
-        </h2>
-        <ol className="mt-4 grid gap-3 text-sm sm:grid-cols-5">
-          {[
-            ["Understand", "Your idea & inputs"],
-            ["Plan", "Recipe & settings"],
-            ["Create", "Generate"],
-            ["Refine", "Edit & iterate"],
-            ["Deliver", "Download & share"],
-          ].map(([title, body]) => (
-            <li key={title} className="rounded-xl border border-border/80 bg-background/50 p-3">
-              <p className="font-bold">{title}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{body}</p>
-            </li>
-          ))}
-        </ol>
       </section>
     </main>
   );
