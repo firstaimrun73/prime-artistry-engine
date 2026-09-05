@@ -22,6 +22,7 @@ import { ImagineGallery } from "@/components/home/ImagineGallery";
 import { VideoStudioGallery } from "@/components/home/VideoStudioGallery";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
+import { WatchDemoSection } from "@/components/home/WatchDemoSection";
 
 const QUICK_CREATE = [
   { to: "/studio/image" as const, label: "Image", icon: ImageIcon },
@@ -187,6 +188,9 @@ export function SignedInHomeBody() {
           ))}
         </div>
       </Link>
+
+      {/* Watch Demo — post-login only, intentionally low discoverability */}
+      <WatchDemoSection variant="quiet" />
     </main>
   );
 }
