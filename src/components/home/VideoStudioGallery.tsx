@@ -3,12 +3,11 @@
  * Each video owns its native-ratio card (16:9 wide, 9:16 portrait).
  * No black letterbox, no crop, no forced uniform height.
  * Muted one-at-a-time preview. Click → /sample/$id.
- * Tiny SAMPLE label only — no caption, no Info overlay.
+ * No SAMPLE caption — media is the card.
  */
 import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { getActiveR2VideoSamples, HOMEPAGE_WATCH_DEMO, type R2Sample } from "@/lib/r2-catalog";
-import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 function isPortraitRatio(aspectRatio: string): boolean {
@@ -22,12 +21,10 @@ function isPortraitRatio(aspectRatio: string): boolean {
 
 function VideoCard({
   sample,
-  isDark,
   onActivate,
   onDeactivate,
 }: {
   sample: R2Sample;
-  isDark: boolean;
   onActivate: (el: HTMLVideoElement) => void;
   onDeactivate: (el: HTMLVideoElement) => void;
 }) {
@@ -72,7 +69,8 @@ function VideoCard({
     <article
       className={cn(
         "group overflow-hidden rounded-3xl",
-        portrait ? "sm:col-span-1" : "col-span-1 sm:col-span-2",
+        // Section 5 / 9: portrait half-width side-by-side; landscape full-row on sm+
+        portrait ? "col-span-1" : "col-span-1 sm:col-span-2",
       )}
     >
       <Link
@@ -97,14 +95,6 @@ function VideoCard({
           className="pointer-events-none h-full w-full object-contain"
         />
       </Link>
-      <p
-        className={cn(
-          "px-1.5 pt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
-          isDark ? "text-white/45" : "text-black/40",
-        )}
-      >
-        Sample
-      </p>
     </article>
   );
 }
@@ -126,8 +116,6 @@ export function VideoStudioGallery() {
     });
     return unique;
   }, []);
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
   const activeRef = useRef<HTMLVideoElement | null>(null);
 
   const onActivate = useCallback((el: HTMLVideoElement) => {
@@ -151,7 +139,6 @@ export function VideoStudioGallery() {
           <VideoCard
             key={s.id}
             sample={s}
-            isDark={isDark}
             onActivate={onActivate}
             onDeactivate={onDeactivate}
           />
