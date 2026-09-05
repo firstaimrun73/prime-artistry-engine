@@ -17,12 +17,29 @@ export type R2Feature =
   | "video-generation"
   | "auto-edit";
 
+/** Homepage discovery category — explicit only; do not infer from feature alone */
+export type HomepageCategory =
+  | "samples"
+  | "try-now"
+  | "trend"
+  | "before-after"
+  | "new"
+  | "popular"
+  | "featured"
+  | "inspiration"
+  | "video"
+  | "music";
+
 export type R2Sample = {
   id: string;
   title: string;
   description: string;
   studio: R2Studio;
   feature: R2Feature;
+  /** Explicit homepage category. Defaults to samples for images / video for videos. */
+  homepageCategory?: HomepageCategory;
+  /** Real studio route for TRY NOW cards only */
+  tryNowRoute?: string;
   url: string;
   beforeUrl?: string;
   afterUrl?: string;
@@ -67,6 +84,7 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Black-and-white portrait with soft bokeh.",
     studio: "image",
     feature: "portrait",
+    homepageCategory: "trend",
     url: img("3F_Tc0vT1g0V5JYhA3RAp.png"),
     width: 1600,
     height: 1200,
@@ -169,6 +187,7 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Tall editorial frame with strong subject presence.",
     studio: "image",
     feature: "image-generation",
+    homepageCategory: "trend",
     url: img("H9hV_GxLVXAD_eQrKM7MK.png"),
     width: 1200,
     height: 1600,
@@ -237,6 +256,7 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Widescreen still suitable for thumbnails and hero frames.",
     studio: "image",
     feature: "image-generation",
+    homepageCategory: "trend",
     url: img("JNAxa2b4OCiSvBFg3sNO0_dAODEa8l.png"),
     width: 1024,
     height: 576,
@@ -383,6 +403,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Circle 2edit Add — forest clearing, deer placed with matched light.",
     studio: "circle",
     feature: "circle-add",
+    homepageCategory: "try-now",
+    tryNowRoute: "/studio/image/circle-remove?mode=add&from=home",
     url: CIRCLE_ADD_DEER.after,
     beforeUrl: CIRCLE_ADD_DEER.before,
     afterUrl: CIRCLE_ADD_DEER.after,
@@ -402,6 +424,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Circle 2edit Remove — tourists cleared from the pyramid scene.",
     studio: "circle",
     feature: "circle-remove",
+    homepageCategory: "try-now",
+    tryNowRoute: "/studio/image/circle-remove?mode=remove&from=home",
     url: CIRCLE_REMOVE_GIZA.after,
     beforeUrl: CIRCLE_REMOVE_GIZA.before,
     intermediateUrl: CIRCLE_REMOVE_GIZA.mark,
