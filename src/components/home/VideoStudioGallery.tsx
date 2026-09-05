@@ -167,10 +167,17 @@ function VideoCard({ sample, isDark }: { sample: R2Sample; isDark: boolean }) {
           isPortrait ? "w-[min(100%,200px)]" : "w-[min(100%,340px)]",
         )}
       >
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setDetail(true)}
-          className={cn("relative w-full overflow-hidden bg-black text-left", ar)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setDetail(true);
+            }
+          }}
+          className={cn("relative w-full cursor-pointer overflow-hidden bg-black text-left", ar)}
           aria-label={`Open ${sample.title}`}
         >
           <video
@@ -206,7 +213,7 @@ function VideoCard({ sample, isDark }: { sample: R2Sample; isDark: boolean }) {
               <Share2 className="h-3 w-3" strokeWidth={2.25} />
             </CompactAction>
           </div>
-        </button>
+        </div>
         <div className="px-2.5 py-2">
           <h3 className="text-[12px] font-semibold leading-tight line-clamp-1">{sample.title}</h3>
         </div>
