@@ -1,26 +1,23 @@
 /**
  * VIDEO gallery — Motion2AI Creation.
- * Large native-aspect hero cards. Muted hover/touch preview (one at a time).
- * Click → /sample/$id. No Download/Share on homepage.
+ * Each video owns its native-ratio card (16:9 wide, 9:16 portrait).
+ * No black letterbox, no crop, no forced uniform height.
+ * Muted one-at-a-time preview. Click → /sample/$id.
+ * Tiny SAMPLE label only — no caption, no Info overlay.
  */
-import { useMemo, useRef, useCallback } from "react";
+import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { Info } from "lucide-react";
 import { getActiveR2VideoSamples, HOMEPAGE_WATCH_DEMO, type R2Sample } from "@/lib/r2-catalog";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-function aspectStyle(s: R2Sample): React.CSSProperties {
-  if (s.width && s.height) return { aspectRatio: `${s.width} / ${s.height}` };
-  const map: Record<string, string> = {
-    "16:9": "16 / 9",
-    "9:16": "9 / 16",
-    "1:1": "1 / 1",
-    "4:5": "4 / 5",
-    "3:4": "3 / 4",
-    "21:9": "21 / 9",
-  };
-  return { aspectRatio: map[s.aspectRatio] ?? "16 / 9" };
+function isPortraitRatio(aspectRatio: string): boolean {
+  return (
+    aspectRatio === "9:16" ||
+    aspectRatio === "4:5" ||
+    aspectRatio === "3:4" ||
+    aspectRatio === "2:3"
+  );
 }
 
 function VideoCard({
@@ -35,10 +32,26 @@ function VideoCard({
   onDeactivate: (el: HTMLVideoElement) => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const isPortrait =
-    sample.aspectRatio === "9:16" ||
-    sample.aspectRatio === "4:5" ||
-    sample.aspectRatio === "3:4";
+  const catalogPortrait = isPortraitRatio(sample.aspectRatio);
+  const [ratio, setRatio] = useState<string>(() => {
+    if (sample.width && sample.height) return `${sample.width} / ${sample.height}`;
+    return sample.aspectRatio.replace(":", " / ");
+  });
+  const [portrait, setPortrait] = useState(catalogPortrait);
+
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    const onMeta = () => {
+      if (v.videoWidth > 0 && v.videoHeight > 0) {
+        setRatio(`${v.videoWidth} / ${v.videoHeight}`);
+        setPortrait(v.videoHeight > v.videoWidth);
+      }
+    };
+    v.addEventListener("loadedmetadata", onMeta);
+    if (v.readyState >= 1) onMeta();
+    return () => v.removeEventListener("loadedmetadata", onMeta);
+  }, []);
 
   const startPreview = useCallback(() => {
     const v = ref.current;
@@ -59,16 +72,14 @@ function VideoCard({
     <article
       className={cn(
         "group overflow-hidden rounded-3xl",
-        isDark ? "bg-white/[0.03]" : "bg-black/[0.03]",
-        /* Landscape videos take full row on sm+ so they feel large */
-        isPortrait ? "sm:col-span-1" : "sm:col-span-2",
+        portrait ? "sm:col-span-1" : "col-span-1 sm:col-span-2",
       )}
     >
       <Link
         to="/sample/$id"
         params={{ id: sample.id }}
-        className="relative block w-full overflow-hidden bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        style={aspectStyle(sample)}
+        className="relative block w-full overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        style={{ aspectRatio: ratio }}
         aria-label={`Open ${sample.title}`}
         onMouseEnter={startPreview}
         onMouseLeave={stopPreview}
@@ -85,23 +96,15 @@ function VideoCard({
           preload="metadata"
           className="pointer-events-none h-full w-full object-contain"
         />
-        <span
-          className={cn(
-            "pointer-events-none absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
-            isDark
-              ? "border-white/15 bg-black/40 text-white/90"
-              : "border-white/60 bg-white/70 text-[#1A1C24]",
-          )}
-          aria-hidden
-        >
-          <Info className="h-3.5 w-3.5" strokeWidth={2.25} />
-        </span>
       </Link>
-      <div className="px-3 py-2">
-        <h3 className="text-[12px] font-medium leading-tight tracking-tight line-clamp-1 text-foreground/90">
-          {sample.title}
-        </h3>
-      </div>
+      <p
+        className={cn(
+          "px-1.5 pt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
+          isDark ? "text-white/45" : "text-black/40",
+        )}
+      >
+        Sample
+      </p>
     </article>
   );
 }
@@ -143,7 +146,6 @@ export function VideoStudioGallery() {
   return (
     <section className="space-y-4" data-creation-section="video">
       <h3 className="text-[14px] font-bold tracking-tight">Video</h3>
-      {/* 1 col mobile (full-width hero), 2 col desktop — landscape spans both */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
         {samples.map((s) => (
           <VideoCard
