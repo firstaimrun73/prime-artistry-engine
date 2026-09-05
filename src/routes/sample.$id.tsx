@@ -1,7 +1,7 @@
 /**
  * Canonical media detail page — image / video / music.
  * Download & Share live here (not on homepage cards).
- * No provider/model names. No original prompts. No Audio/Source meta.
+ * Exactly ONE Back control. No provider/model names. No original prompts.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -10,7 +10,6 @@ import {
   Download,
   Share2,
   Info,
-  X,
   Play,
   Pause,
   Volume2,
@@ -26,11 +25,26 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 function categoryLabel(s: R2Sample | null, isMusic: boolean): string {
-  if (isMusic) return "Sample";
+  if (isMusic) return "Music";
   if (!s) return "Sample";
   if (s.homepageCategory === "try-now") return "Try Now";
   if (s.homepageCategory === "trend") return "Trend";
   return "Sample";
+}
+
+/** Section 8 — studio identity, never generic "Motio2edit" or model/provider IDs. */
+function editorLabel(s: R2Sample | null, kind: "image" | "video" | "music"): string {
+  if (kind === "music") return "Music Studio";
+  if (!s) return "Image Studio";
+  if (s.studio === "circle" || s.feature === "circle-add" || s.feature === "circle-remove") {
+    return "Circle 2edit";
+  }
+  if (s.studio === "auto-edit" || s.feature === "auto-edit") return "Maluto AI";
+  if (s.studio === "video" || kind === "video") return "Video Studio";
+  // Image tiers only if quality is known; otherwise plain Image Studio
+  if (s.quality === "Ultra") return "Image Studio Ultra AI";
+  if (s.quality === "Premium" || s.quality === "High") return "Image Studio Premium";
+  return "Image Studio";
 }
 
 function mediaKind(s: R2Sample | null, id: string): "image" | "video" | "music" {
@@ -66,6 +80,14 @@ function SampleDetailPage() {
   const kind = mediaKind(sample, id);
   const [showInfo, setShowInfo] = useState(true);
 
+  const goBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      void navigate({ to: "/" });
+    }
+  };
+
   const musicMeta =
     kind === "music"
       ? {
@@ -80,10 +102,10 @@ function SampleDetailPage() {
                   : "Music sample",
           description:
             id === "music-neon-skyline"
-              ? "A cinematic electronic bed from Motio2edit Music Studio — suitable for motion and trailers."
+              ? "A cinematic electronic bed from Music Studio — suitable for motion and trailers."
               : id === "music-golden-hour"
-                ? "A lo-fi chill track with soft pads from Motio2edit Music Studio."
-                : "An orchestral strings-forward mood track from Motio2edit Music Studio.",
+                ? "A lo-fi chill track with soft pads from Music Studio."
+                : "An orchestral strings-forward mood track from Music Studio.",
           cover:
             id === "music-neon-skyline"
               ? "/demo/music/cover-vinyl.jpg"
@@ -97,27 +119,35 @@ function SampleDetailPage() {
   if (!sample && kind !== "music") {
     return (
       <div className="min-h-screen bg-background">
-        <header className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-          <button type="button" onClick={() => navigate({ to: "/" })} className="grid h-10 w-10 place-items-center rounded-full border border-border" aria-label="Back">
+        <header className="flex items-center gap-3 border-b border-border/60 px-4 py-3">
+          <button
+            type="button"
+            onClick={goBack}
+            className="grid h-10 w-10 place-items-center rounded-full border border-border"
+            aria-label="Back"
+          >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <span className="text-sm font-semibold">Motio2edit</span>
-          <button type="button" onClick={() => navigate({ to: "/" })} className="grid h-10 w-10 place-items-center rounded-full border border-border" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
         </header>
         <main className="mx-auto max-w-lg px-4 py-16 text-center">
           <h1 className="text-xl font-bold">Sample not found</h1>
-          <Link to="/" className="mt-4 inline-block text-primary text-sm font-semibold">Back to home</Link>
+          <Link to="/" className="mt-4 inline-block text-sm font-semibold text-primary">
+            Back to home
+          </Link>
         </main>
       </div>
     );
   }
 
   const title = sample?.title ?? musicMeta?.title ?? "Sample";
-  const description = sample?.description ?? musicMeta?.description ?? "A Motio2edit media sample.";
+  const description =
+    sample?.description ?? musicMeta?.description ?? "A Motio2edit media sample.";
   const mediaUrl = sample?.url ?? "";
-  const detailPath = typeof window !== "undefined" ? `${window.location.origin}/sample/${id}` : `/sample/${id}`;
+  const detailPath =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/sample/${id}`
+      : `/sample/${id}`;
 
   const onDownload = async () => {
     if (!mediaUrl) {
@@ -130,7 +160,12 @@ function SampleDetailPage() {
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      const ext = kind === "video" ? "mp4" : sample?.format?.toLowerCase() === "jpeg" ? "jpg" : "png";
+      const ext =
+        kind === "video"
+          ? "mp4"
+          : sample?.format?.toLowerCase() === "jpeg"
+            ? "jpg"
+            : "png";
       a.download = `motio2edit-${id}.${ext}`;
       a.click();
       URL.revokeObjectURL(blobUrl);
@@ -143,7 +178,11 @@ function SampleDetailPage() {
   const onShare = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: `${title} — Motio2edit`, text: description, url: detailPath });
+        await navigator.share({
+          title: `${title} — Motio2edit`,
+          text: description,
+          url: detailPath,
+        });
       } else {
         await navigator.clipboard.writeText(detailPath);
         toast.message("Link copied");
@@ -155,42 +194,70 @@ function SampleDetailPage() {
 
   return (
     <div className={cn("min-h-screen", isDark ? "bg-[#0F1117]" : "bg-background")}>
-      <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-border/50 bg-background/90 px-3 py-2.5 backdrop-blur-md">
-        <button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else void navigate({ to: "/" }); }} className="grid h-10 w-10 place-items-center rounded-full border border-border/80" aria-label="Back">
+      {/* Exactly ONE Back control — Audit D */}
+      <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-border/50 bg-background/90 px-3 py-2.5 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={goBack}
+          className="grid h-10 w-10 place-items-center rounded-full border border-border/80"
+          aria-label="Back"
+        >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-semibold tracking-tight">Motio2edit</span>
-        <button type="button" onClick={() => void navigate({ to: "/" })} className="grid h-10 w-10 place-items-center rounded-full border border-border/80" aria-label="Close">
-          <X className="h-4 w-4" />
-        </button>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
         {kind === "video" && sample ? (
-          <VideoPlayer url={sample.url} title={title} aspectRatio={sample.aspectRatio} width={sample.width} height={sample.height} />
+          <VideoPlayer
+            url={sample.url}
+            title={title}
+            aspectRatio={sample.aspectRatio}
+            width={sample.width}
+            height={sample.height}
+          />
         ) : kind === "music" ? (
           <MusicPlayer title={title} cover={musicMeta?.cover} trackId={id} />
         ) : sample ? (
-          <div className="overflow-hidden rounded-2xl bg-black/5">
+          <div className="overflow-hidden rounded-2xl bg-transparent">
             <img
               src={sample.url}
               alt={title}
               className="mx-auto max-h-[72vh] w-full object-contain"
-              style={sample.width && sample.height ? { aspectRatio: `${sample.width} / ${sample.height}` } : undefined}
+              style={
+                sample.width && sample.height
+                  ? { aspectRatio: `${sample.width} / ${sample.height}` }
+                  : sample.aspectRatio
+                    ? { aspectRatio: sample.aspectRatio.replace(":", " / ") }
+                    : undefined
+              }
             />
           </div>
         ) : null}
 
         <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
           {kind !== "music" ? (
-            <button type="button" onClick={() => void onDownload()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium">
+            <button
+              type="button"
+              onClick={() => void onDownload()}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium"
+            >
               <Download className="h-4 w-4" /> Download
             </button>
           ) : null}
-          <button type="button" onClick={() => void onShare()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => void onShare()}
+            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium"
+          >
             <Share2 className="h-4 w-4" /> Share
           </button>
-          <button type="button" onClick={() => setShowInfo((v) => !v)} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium" aria-pressed={showInfo}>
+          <button
+            type="button"
+            onClick={() => setShowInfo((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium"
+            aria-pressed={showInfo}
+          >
             <Info className="h-4 w-4" /> Info
           </button>
         </div>
@@ -206,7 +273,7 @@ function SampleDetailPage() {
             <dl className="grid gap-2 text-sm">
               <div>
                 <dt className="text-muted-foreground">Editor</dt>
-                <dd className="font-semibold">Motio2edit</dd>
+                <dd className="font-semibold">{editorLabel(sample, kind)}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Category</dt>
@@ -214,12 +281,23 @@ function SampleDetailPage() {
               </div>
             </dl>
             <div>
-              <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Description</h2>
-              <p className={cn("mt-1 text-[14px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>{description}</p>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Description
+              </h2>
+              <p
+                className={cn(
+                  "mt-1 text-[14px] leading-relaxed",
+                  isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]",
+                )}
+              >
+                {description}
+              </p>
             </div>
             {sample ? (
               <div>
-                <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Details</h2>
+                <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Details
+                </h2>
                 <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
                   {sample.quality ? (
                     <div>
@@ -234,7 +312,9 @@ function SampleDetailPage() {
                   {sample.width && sample.height ? (
                     <div>
                       <dt className="text-muted-foreground">Dimensions</dt>
-                      <dd className="font-semibold">{sample.width}×{sample.height}</dd>
+                      <dd className="font-semibold">
+                        {sample.width}×{sample.height}
+                      </dd>
                     </div>
                   ) : null}
                   <div>
@@ -288,7 +368,8 @@ function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
     const onMeta = () => {
-      if (v.videoWidth > 0 && v.videoHeight > 0) setRatio(`${v.videoWidth} / ${v.videoHeight}`);
+      if (v.videoWidth > 0 && v.videoHeight > 0)
+        setRatio(`${v.videoWidth} / ${v.videoHeight}`);
     };
     v.addEventListener("loadedmetadata", onMeta);
     return () => v.removeEventListener("loadedmetadata", onMeta);
@@ -324,30 +405,81 @@ function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
     if (v.requestFullscreen) void v.requestFullscreen();
-    else if ((v as HTMLVideoElement & { webkitEnterFullscreen?: () => void }).webkitEnterFullscreen) {
-      (v as HTMLVideoElement & { webkitEnterFullscreen: () => void }).webkitEnterFullscreen();
+    else if (
+      (v as HTMLVideoElement & { webkitEnterFullscreen?: () => void })
+        .webkitEnterFullscreen
+    ) {
+      (
+        v as HTMLVideoElement & { webkitEnterFullscreen: () => void }
+      ).webkitEnterFullscreen();
     }
   };
 
   return (
     <div className="space-y-3">
-      <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl bg-black" style={{ aspectRatio: ratio }}>
-        <video ref={videoRef} src={url} playsInline className="h-full w-full object-contain" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} aria-label={title} />
+      <div
+        className="mx-auto max-w-3xl overflow-hidden rounded-2xl bg-transparent"
+        style={{ aspectRatio: ratio }}
+      >
+        <video
+          ref={videoRef}
+          src={url}
+          playsInline
+          className="h-full w-full object-contain"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          aria-label={title}
+        />
       </div>
       <div className="flex flex-wrap items-center justify-center gap-2">
-        <button type="button" onClick={togglePlay} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium" aria-label={playing ? "Pause" : "Play"}>
-          {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />} {playing ? "Pause" : "Play"}
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium"
+          aria-label={playing ? "Pause" : "Play"}
+        >
+          {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}{" "}
+          {playing ? "Pause" : "Play"}
         </button>
-        <button type="button" onClick={() => setPlayback(1)} className={cn("rounded-full border px-3 py-1.5 text-sm font-medium", rate === 1 ? "border-primary bg-primary/10 text-primary" : "border-border")}>
+        <button
+          type="button"
+          onClick={() => setPlayback(1)}
+          className={cn(
+            "rounded-full border px-3 py-1.5 text-sm font-medium",
+            rate === 1
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border",
+          )}
+        >
           1x
         </button>
-        <button type="button" onClick={() => setPlayback(2)} className={cn("rounded-full border px-3 py-1.5 text-sm font-medium", rate === 2 ? "border-primary bg-primary/10 text-primary" : "border-border")}>
+        <button
+          type="button"
+          onClick={() => setPlayback(2)}
+          className={cn(
+            "rounded-full border px-3 py-1.5 text-sm font-medium",
+            rate === 2
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border",
+          )}
+        >
           2x
         </button>
-        <button type="button" onClick={toggleMute} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium" aria-label={muted ? "Unmute" : "Mute"}>
-          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />} Sound
+        <button
+          type="button"
+          onClick={toggleMute}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium"
+          aria-label={muted ? "Unmute" : "Mute"}
+        >
+          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}{" "}
+          Sound
         </button>
-        <button type="button" onClick={goFullscreen} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium" aria-label="Fullscreen">
+        <button
+          type="button"
+          onClick={goFullscreen}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium"
+          aria-label="Fullscreen"
+        >
           <Maximize className="h-4 w-4" /> Fullscreen
         </button>
       </div>
@@ -355,7 +487,15 @@ function VideoPlayer({
   );
 }
 
-function MusicPlayer({ title, cover, trackId }: { title: string; cover?: string; trackId: string }) {
+function MusicPlayer({
+  title,
+  cover,
+  trackId,
+}: {
+  title: string;
+  cover?: string;
+  trackId: string;
+}) {
   const urlMap: Record<string, string> = {
     "music-neon-skyline": track1.url as string,
     "music-golden-hour": track2.url as string,
@@ -364,8 +504,10 @@ function MusicPlayer({ title, cover, trackId }: { title: string; cover?: string;
   const src = urlMap[trackId];
   return (
     <div className="mx-auto max-w-sm space-y-4 text-center">
-      <div className="overflow-hidden rounded-2xl aspect-square bg-muted">
-        {cover ? <img src={cover} alt={`${title} cover`} className="h-full w-full object-cover" /> : null}
+      <div className="aspect-square overflow-hidden rounded-2xl bg-muted">
+        {cover ? (
+          <img src={cover} alt={`${title} cover`} className="h-full w-full object-cover" />
+        ) : null}
       </div>
       {src ? (
         <audio controls src={src} className="mx-auto w-full max-w-xs" preload="metadata">
