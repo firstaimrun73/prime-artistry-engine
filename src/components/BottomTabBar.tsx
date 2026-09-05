@@ -9,10 +9,11 @@ import { hideBottomNav } from "@/components/hideBottomNav";
 export { hideBottomNav };
 
 /**
- * Center Auto mark — motion: rest → travel → AI spark → settle (~1.5s) → rest.
+ * Center + mark — motion: rest → travel → AI spark → settle (~1.5s) → rest.
  * Gemini-like multi-star during pulse. Cycle every 10 seconds.
  * Navigation is parent Link only; animation never blocks clicks.
  * Respects prefers-reduced-motion.
+ * No visible "Auto" text label under the icon.
  */
 function AutoCenterIcon({ active }: { active?: boolean }) {
   const [phase, setPhase] = useState<"rest" | "travel" | "spark" | "hold">("rest");
@@ -142,49 +143,6 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
   );
 }
 
-function AutoTabLabel({ active }: { active?: boolean }) {
-  const [pulse, setPulse] = useState(false);
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    const onChange = () => setReduced(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-
-  useEffect(() => {
-    if (reduced) return;
-    let cancelled = false;
-    const run = () => {
-      if (cancelled) return;
-      setPulse(true);
-      window.setTimeout(() => {
-        if (!cancelled) setPulse(false);
-      }, 2200);
-    };
-    const first = window.setTimeout(run, 3000);
-    const id = window.setInterval(run, 10_000);
-    return () => {
-      cancelled = true;
-      clearTimeout(first);
-      clearInterval(id);
-    };
-  }, [reduced]);
-
-  return (
-    <span
-      className={cn(
-        "-mt-1 max-w-[4.5rem] truncate text-center transition-all duration-300",
-        pulse || active ? "font-bold text-primary" : "",
-      )}
-    >
-      {pulse ? "Auto edit" : "Auto"}
-    </span>
-  );
-}
-
 export function BottomTabBar() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -250,12 +208,12 @@ export function BottomTabBar() {
             to="/studio/image/auto-edit"
             aria-label="Auto Edit"
             className={cn(
-              "flex flex-col items-center text-[10px] font-semibold",
+              "flex flex-col items-center justify-end pb-2",
               autoActive ? "text-primary" : "text-muted-foreground",
             )}
           >
             <AutoCenterIcon active={autoActive} />
-            <AutoTabLabel active={autoActive} />
+            {/* No visible "Auto" text — center action is icon-only */}
           </Link>
         </li>
 
