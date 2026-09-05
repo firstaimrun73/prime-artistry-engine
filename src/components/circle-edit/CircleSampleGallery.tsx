@@ -4,6 +4,7 @@
  * Circle to Add: CircleAddHeroDemo (deer sequence).
  * Try Now deep-links: mode=remove|add & from=home.
  * Info (i) goes to detail page, not slider.
+ * Visual-first: short captions, tiny CIRCLE 2EDIT label, no large badges.
  */
 import { Link } from "@tanstack/react-router";
 import { Info, Sparkles } from "lucide-react";
@@ -58,6 +59,15 @@ function RemoveCard() {
           <CircleRemoveHeroDemo />
         </DemoErrorBoundary>
 
+        <span
+          className={cn(
+            "absolute left-2.5 top-2.5 z-10 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] backdrop-blur-md",
+            isDark ? "bg-black/40 text-white/90" : "bg-white/75 text-[#3A3E4C]",
+          )}
+        >
+          Circle 2edit
+        </span>
+
         <Link
           to={infoHref as "/studio/image/circle-info"}
           className={cn(
@@ -71,15 +81,6 @@ function RemoveCard() {
         >
           <Info className="h-4 w-4" strokeWidth={2.25} />
         </Link>
-
-        <span
-          className={cn(
-            "absolute left-2.5 top-2.5 z-10 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-            isDark ? "bg-white/15 text-white backdrop-blur-sm" : "bg-black/60 text-white",
-          )}
-        >
-          Remove
-        </span>
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-3.5 sm:p-4">
@@ -87,11 +88,11 @@ function RemoveCard() {
           <h3 className="text-[15px] font-bold leading-tight tracking-tight">Circle to Remove</h3>
           <p
             className={cn(
-              "mt-0.5 line-clamp-2 text-[12px] leading-snug",
+              "mt-0.5 line-clamp-1 text-[12px] leading-snug",
               isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
             )}
           >
-            Paint over people, objects, or clutter you want removed. Circle 2edit reconstructs the scene while preserving the surrounding image.
+            Mark what goes. Keep the rest.
           </p>
         </div>
         <Link
@@ -124,6 +125,15 @@ function AddCard() {
           <CircleAddHeroDemo />
         </DemoErrorBoundary>
 
+        <span
+          className={cn(
+            "absolute left-2.5 top-2.5 z-10 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] backdrop-blur-md",
+            isDark ? "bg-black/40 text-white/90" : "bg-white/75 text-[#3A3E4C]",
+          )}
+        >
+          Circle 2edit
+        </span>
+
         <Link
           to={infoHref as "/studio/image/circle-info"}
           className={cn(
@@ -144,11 +154,11 @@ function AddCard() {
           <h3 className="text-[15px] font-bold leading-tight tracking-tight">Circle to Add</h3>
           <p
             className={cn(
-              "mt-0.5 line-clamp-2 text-[12px] leading-snug",
+              "mt-0.5 line-clamp-1 text-[12px] leading-snug",
               isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
             )}
           >
-            Paint where the new object should sit. AI matches lighting, scale, perspective, and scene integration.
+            Place new objects that match the scene.
           </p>
         </div>
         <Link
@@ -172,21 +182,21 @@ export function CircleSampleGallery() {
           Circle 2edit
         </h2>
         <p className="mt-1 max-w-xl text-[13px] leading-snug text-white/70">
-          New ways to remove and add objects — mark a region, generate, keep the rest of the frame.
+          Mark a region — remove clutter or add objects that belong.
         </p>
       </div>
 
       <div
         className={cn(
           "mt-4 flex flex-col gap-4",
-          "sm:flex-row sm:gap-4 sm:overflow-x-auto sm:pb-2",
-          "sm:snap-x sm:snap-mandatory",
+          "md:flex-row md:gap-4 md:overflow-x-auto md:pb-2",
+          "md:snap-x md:snap-mandatory",
         )}
       >
-        <div className="sm:snap-start sm:w-[min(100%,340px)] sm:shrink-0">
+        <div className="md:snap-start md:w-[min(100%,340px)] md:shrink-0">
           <RemoveCard />
         </div>
-        <div className="sm:snap-start sm:w-[min(100%,340px)] sm:shrink-0">
+        <div className="md:snap-start md:w-[min(100%,340px)] md:shrink-0">
           <AddCard />
         </div>
       </div>
