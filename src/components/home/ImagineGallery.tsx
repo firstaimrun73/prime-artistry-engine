@@ -1,25 +1,42 @@
 /**
  * IMAGE gallery — Motion2AI Creation.
- * Visual-only cards: media + tiny SAMPLE label. No caption, no Info overlay.
- * Native aspect from the image itself. Click → /sample/$id.
+ * Visual-only cards: media defines the card. No SAMPLE caption, no title block,
+ * no Info/Download/Share on the card. Native aspect. Click → /sample/$id.
  */
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { getImagineOnlySamples, type R2Sample } from "@/lib/r2-catalog";
-import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-function ImageCard({ sample, isDark }: { sample: R2Sample; isDark: boolean }) {
-  const isWide =
-    sample.aspectRatio === "16:9" ||
-    sample.aspectRatio === "21:9" ||
-    sample.aspectRatio === "3:2";
+function isPortrait(aspectRatio: string): boolean {
+  return (
+    aspectRatio === "9:16" ||
+    aspectRatio === "4:5" ||
+    aspectRatio === "3:4" ||
+    aspectRatio === "2:3" ||
+    aspectRatio === "11:15"
+  );
+}
+
+function isLandscape(aspectRatio: string): boolean {
+  return (
+    aspectRatio === "16:9" ||
+    aspectRatio === "21:9" ||
+    aspectRatio === "3:2" ||
+    aspectRatio === "4:3"
+  );
+}
+
+function ImageCard({ sample }: { sample: R2Sample }) {
+  const portrait = isPortrait(sample.aspectRatio);
+  const landscape = isLandscape(sample.aspectRatio);
 
   return (
     <article
       className={cn(
         "group overflow-hidden rounded-3xl",
-        isWide && "sm:col-span-2",
+        // Grid-span rule (Section 5): landscape/ultrawide span wider; portrait/square stay narrow
+        landscape ? "col-span-2 sm:col-span-2 lg:col-span-2" : portrait ? "col-span-1" : "col-span-1",
       )}
     >
       <Link
@@ -33,16 +50,15 @@ function ImageCard({ sample, isDark }: { sample: R2Sample; isDark: boolean }) {
           alt={sample.title}
           className="block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.015]"
           loading="lazy"
+          style={
+            sample.width && sample.height
+              ? { aspectRatio: `${sample.width} / ${sample.height}` }
+              : sample.aspectRatio
+                ? { aspectRatio: sample.aspectRatio.replace(":", " / ") }
+                : undefined
+          }
         />
       </Link>
-      <p
-        className={cn(
-          "px-1.5 pt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
-          isDark ? "text-white/45" : "text-black/40",
-        )}
-      >
-        Sample
-      </p>
     </article>
   );
 }
@@ -56,8 +72,6 @@ export function ImagineGallery() {
       return true;
     });
   }, []);
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
 
   if (samples.length === 0) return null;
 
@@ -66,7 +80,7 @@ export function ImagineGallery() {
       <h3 className="text-[14px] font-bold tracking-tight">Image</h3>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 lg:gap-5">
         {samples.map((s) => (
-          <ImageCard key={s.id} sample={s} isDark={isDark} />
+          <ImageCard key={s.id} sample={s} />
         ))}
       </div>
     </section>
