@@ -69,9 +69,20 @@ function SignedOutHome() {
 
       <div className="mx-auto w-full max-w-6xl px-4">
         <CircleSampleGallery />
-        <ImagineGallery />
-        <VideoStudioGallery />
-        <MusicStudioGallery />
+        <section className="mt-10 space-y-6" data-motion2ai-creation>
+          <div>
+            <h2 className="text-[17px] font-extrabold tracking-tight">
+              Motion<span className="text-primary">2</span>AI Creation{" "}
+              <span aria-hidden>💎</span>
+            </h2>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
+              Image, video, and music samples from Motio2edit.
+            </p>
+          </div>
+          <ImagineGallery />
+          <VideoStudioGallery />
+          <MusicStudioGallery />
+        </section>
       </div>
 
       <StudioShowcase />
@@ -179,7 +190,7 @@ function StudioShowcase() {
                 <div className="rounded-xl border border-border bg-background/60 p-2.5">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
-                <h3 className="text-lg font-bold">{c.name}</h3>
+                <h3 className={"text-lg font-bold"}>{c.name}</h3>
                 {c.freeAllowed && (
                   <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                     Free
