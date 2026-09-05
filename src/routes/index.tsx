@@ -19,6 +19,7 @@ import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGaller
 import { ImagineGallery } from "@/components/home/ImagineGallery";
 import { VideoStudioGallery } from "@/components/home/VideoStudioGallery";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
+import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -57,8 +58,6 @@ function SignedInHome() {
 
 /**
  * Signed-out homepage — single coherent premium flow.
- * Removed stacked legacy SampleShowcase / SampleGallery / MusicSamples /
- * VideoSamples / StudioLoopingShowcase / MusicHomeSection marketing blocks.
  */
 function SignedOutHome() {
   return (
@@ -70,12 +69,23 @@ function SignedOutHome() {
       <div className="mx-auto w-full max-w-6xl px-4">
         <CircleSampleGallery />
         <section className="mt-10 space-y-6" data-motion2ai-creation>
-          <div>
-            <h2 className="text-[17px] font-extrabold tracking-tight">
-              Motion<span className="text-primary">2</span>AI Creation{" "}
-              <span aria-hidden>💎</span>
+          <div className="space-y-1">
+            <h2 className="flex items-center gap-2 text-[20px] font-extrabold tracking-tight sm:text-[22px]">
+              <span>
+                Motion<span className="text-primary">2</span>AI Creation
+              </span>
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6"
+                fill="currentColor"
+              >
+                <path d="M12 2l1.2 6.3L19.5 9 13.2 10.7 12 17l-1.2-6.3L4.5 9l6.3-.7L12 2z" />
+                <path d="M18.5 14l.6 2.6 2.4.6-2.4.6-.6 2.6-.6-2.6-2.4-.6 2.4-.6.6-2.6z" opacity="0.85" />
+                <path d="M5.2 15.5l.45 1.9 1.8.45-1.8.45-.45 1.9-.45-1.9-1.8-.45 1.8-.45.45-1.9z" opacity="0.7" />
+              </svg>
             </h2>
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground">
               Image, video, and music samples from Motio2edit.
             </p>
           </div>
@@ -83,6 +93,7 @@ function SignedOutHome() {
           <VideoStudioGallery />
           <MusicStudioGallery />
         </section>
+        <FilterLensHomeSection />
       </div>
 
       <StudioShowcase />
@@ -190,7 +201,7 @@ function StudioShowcase() {
                 <div className="rounded-xl border border-border bg-background/60 p-2.5">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
-                <h3 className={"text-lg font-bold"}>{c.name}</h3>
+                <h3 className="text-lg font-bold">{c.name}</h3>
                 {c.freeAllowed && (
                   <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                     Free
