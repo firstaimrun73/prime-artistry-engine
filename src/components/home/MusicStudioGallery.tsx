@@ -48,7 +48,7 @@ function MusicCard({ t }: { t: TrackCard }) {
   return (
     <article
       className={cn(
-        "group w-full max-w-[280px] overflow-hidden rounded-2xl border border-border/50 bg-transparent",
+        "group w-full max-w-[280px] self-start overflow-hidden rounded-2xl border border-border/50 bg-transparent",
         "transition-[transform,opacity] duration-200 ease-out",
         "hover:scale-[1.01] active:scale-[0.98] active:opacity-90",
       )}
@@ -83,7 +83,7 @@ export function MusicStudioGallery() {
         <Music className="h-4 w-4" />
         Music
       </h3>
-      <div className="mx-auto grid max-w-[1200px] grid-cols-2 justify-items-center gap-3 sm:grid-cols-3 sm:gap-5">
+      <div className="mx-auto grid max-w-[1200px] grid-cols-2 items-start justify-items-center gap-3 sm:grid-cols-3 sm:gap-5">
         {tracks.map((t) => (
           <MusicCard key={t.id} t={t} />
         ))}
