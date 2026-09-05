@@ -2,6 +2,7 @@
  * Central R2 sample catalog — production public URLs only.
  * Domain: https://assets.motio2edit.com
  * Do not invent filenames. Do not use Unsplash for these entries.
+ * Titles/descriptions describe the actual media content (visual inspection).
  */
 
 export const R2_PUBLIC = "https://assets.motio2edit.com" as const;
@@ -79,8 +80,8 @@ export const CIRCLE_ADD_DEER = {
 export const R2_IMAGE_SAMPLES: R2Sample[] = [
   {
     id: "img-portrait-bw",
-    title: "Portrait study",
-    description: "Black-and-white portrait with soft bokeh.",
+    title: "Smiling woman, black-and-white",
+    description: "Black-and-white close-up of a young woman smiling outdoors with soft circular bokeh behind her.",
     studio: "image",
     feature: "portrait",
     url: img("3F_Tc0vT1g0V5JYhA3RAp.png"),
@@ -96,8 +97,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-christ-redeemer",
-    title: "Christ the Redeemer",
-    description: "Dramatic sunset over Rio — image generation.",
+    title: "Christ the Redeemer at sunset",
+    description: "Aerial view of the Rio statue with arms open above the city as the sun sets in orange cloud.",
     studio: "image",
     feature: "image-generation",
     url: img("file_0000000000cc81fa86915dca20ae5d72.png"),
@@ -113,8 +114,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-butterfly",
-    title: "Butterfly on zinnia",
-    description: "Macro wildlife detail with natural bokeh.",
+    title: "Painted lady on pink zinnia",
+    description: "Close-up of a painted lady butterfly feeding on a pink zinnia with soft green-pink bokeh.",
     studio: "image",
     feature: "image-generation",
     url: img("file_0000000012708211a41f45bc2940893a.png"),
@@ -130,8 +131,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-peacock-final",
-    title: "Peacock cityscape",
-    description: "Full-colour peacock integrated into a wet city street at sunset.",
+    title: "Peacock on wet neon street",
+    description: "Blue peacock with open train standing on a rain-slick city street under a vivid sunset sky.",
     studio: "image",
     feature: "image-generation",
     url: img("file_00000000234c82088edca4a78fe13fe9.png"),
@@ -147,8 +148,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-horses-barn",
-    title: "Barn horses",
-    description: "Golden-hour stable scene with natural light.",
+    title: "Horses under open wooden barn",
+    description: "Several horses standing and feeding under a long open-air wooden barn at golden hour.",
     studio: "image",
     feature: "image-generation",
     url: img("file_0000000039b482069b96b2d43e05a3be.png"),
@@ -164,8 +165,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-portrait-soft",
-    title: "Soft portrait",
-    description: "Vertical portrait study with gentle lighting.",
+    title: "Angel girl with flower hairpins",
+    description: "Anime-style girl in a white lace dress with feathered wings and plumeria in her hair against a teal wall.",
     studio: "image",
     feature: "portrait",
     url: img("BKM9xW1knxqG07FllyyPF.png"),
@@ -181,8 +182,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-fashion-tall",
-    title: "Editorial fashion",
-    description: "Tall editorial frame with strong subject presence.",
+    title: "Spaghetti plate with lemon and sauces",
+    description: "Overhead plate of noodles with fried pieces, yellow berries, halved lemon, tomato, and two side sauces on wood.",
     studio: "image",
     feature: "image-generation",
     url: img("H9hV_GxLVXAD_eQrKM7MK.png"),
@@ -198,8 +199,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-square-detail",
-    title: "Square detail study",
-    description: "High-resolution square generation for social and print.",
+    title: "Bride with white roses and companion",
+    description: "Studio portrait of a seated bride in lace holding white roses, embraced by a standing woman in beige.",
     studio: "image",
     feature: "image-generation",
     url: img("WYmIb-cK7FGW-CLbvZoYB.png"),
@@ -215,8 +216,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-landscape-a",
-    title: "Golden landscape",
-    description: "Wide natural landscape with balanced exposure.",
+    title: "White horse feeding in open barn",
+    description: "Dappled white horse at a wooden rail eating hay inside a sunlit open-air stable.",
     studio: "image",
     feature: "image-generation",
     url: img("file_0000000045dc8209ba455a694f339832.png"),
@@ -232,8 +233,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-landscape-b",
-    title: "Coastal light",
-    description: "Seaside atmosphere with layered depth.",
+    title: "Fox in wheat field at purple dusk",
+    description: "A red fox sitting alone in a golden wheat field under a purple-pink evening sky and distant hills.",
     studio: "image",
     feature: "image-generation",
     url: img("file_00000000483c8206bf252418131277ae.png"),
@@ -249,8 +250,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-wide-cinematic",
-    title: "Cinematic wide",
-    description: "Widescreen still suitable for thumbnails and hero frames.",
+    title: "Viking on dragon-prow longship",
+    description: "Woman in fur and chainmail standing at the carved prow of a longship on a misty fjord at low sun.",
     studio: "image",
     feature: "image-generation",
     url: img("JNAxa2b4OCiSvBFg3sNO0_dAODEa8l.png"),
@@ -266,8 +267,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-vertical-story",
-    title: "Vertical story frame",
-    description: "Tall composition for stories and reels stills.",
+    title: "Elderly woman in kimono under sakura",
+    description: "Older woman in a pale pink kimono seated on a wooden veranda as cherry petals fall, pagoda in the mist beyond.",
     studio: "image",
     feature: "image-generation",
     url: img("M4wsUG3TjuqM_K50IXT4S_8VLXCl8F.png"),
@@ -283,8 +284,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-wa0010",
-    title: "Warm still",
-    description: "Everyday photographic still from Image Studio.",
+    title: "Pixel aviator with goggles",
+    description: "Pixel-art portrait of a pilot in a leather helmet and goggles against a peach sky.",
     studio: "image",
     feature: "image-generation",
     url: img("IMG-20260711-WA0010.jpg"),
@@ -297,8 +298,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-230101",
-    title: "Evening frame",
-    description: "Vertical photographic composition.",
+    title: "Cat on alley brick wall",
+    description: "Orange-and-white cat walking along a high brick wall above a dumpster in a city alley.",
     studio: "image",
     feature: "image-generation",
     url: img("IMG_20260903_230101.jpg"),
@@ -311,8 +312,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-222049",
-    title: "Street light",
-    description: "Urban still with natural colour.",
+    title: "Gold-leaf mythical creature mural",
+    description: "Aged gold-and-blue mural showing dragons, a phoenix, a winged sphinx, and a bull among clouds.",
     studio: "image",
     feature: "image-generation",
     url: img("IMG_20260904_222049.jpg"),
@@ -325,12 +326,12 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-wwvr",
-    title: "Horizon study",
-    description: "Wide environmental still.",
+    title: "Black radial sun glyph",
+    description: "Minimal black graphic of a twelve-ray sun with a dotted center on a white field.",
     studio: "image",
     feature: "image-generation",
     url: img("WWvr9qel7CjvgVp0HzJtM.jpg"),
-    aspectRatio: "3:2",
+    aspectRatio: "1:1",
     format: "JPEG",
     quality: "High",
     label: "Image Studio",
@@ -339,12 +340,12 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-wk1cg",
-    title: "Quiet detail",
-    description: "Close environmental frame.",
+    title: "Wedding couple on the lawn",
+    description: "Bride in a white gown and groom in a black tuxedo walking hand-in-hand across a grassy field.",
     studio: "image",
     feature: "image-generation",
     url: img("Wk1cgQpX2qJQQE_wcS5Du.jpg"),
-    aspectRatio: "3:4",
+    aspectRatio: "1:1",
     format: "JPEG",
     quality: "High",
     label: "Image Studio",
@@ -353,12 +354,12 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-alfd",
-    title: "Soft colour",
-    description: "Gentle colour study from Image Studio.",
+    title: "Crystal chandelier",
+    description: "Large crystal chandelier with candle bulbs glowing against a dark coffered ceiling.",
     studio: "image",
     feature: "image-generation",
     url: img("aLfd5AieQ8uc6ntdUaTZX_Jio09RJG.jpg"),
-    aspectRatio: "3:4",
+    aspectRatio: "1:1",
     format: "JPEG",
     quality: "High",
     label: "Image Studio",
@@ -367,8 +368,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-file-4fb4",
-    title: "Open field",
-    description: "Landscape generation sample.",
+    title: "1990s world peak infographic",
+    description: "Vintage-styled world map poster titled The World at Its Peak — 1990s with decade statistics.",
     studio: "image",
     feature: "image-generation",
     url: img("file_000000004fb48208ae6536fd4f4c1457.png"),
@@ -381,8 +382,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
   {
     id: "img-file-5020",
-    title: "Atmospheric still",
-    description: "Generated atmospheric scene.",
+    title: "1928 Ford Model A on museum floor",
+    description: "Black 1928 Ford Model A with cream wire wheels displayed in a museum next to a period poster.",
     studio: "image",
     feature: "image-generation",
     url: img("file_0000000050208211a62053c5d548c946.png"),
@@ -439,7 +440,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-mountains-sun",
     title: "Mountains & sun",
-    description: "A cinematic mountain landscape with warm sunlight and gentle air motion — Motio2edit Video Studio demo.",
+    description: "A cinematic mountain landscape with warm sunlight and gentle air motion.",
     studio: "video",
     feature: "video-generation",
     url: vid("VID_20260904_015459.mp4"),
@@ -455,7 +456,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-001",
     title: "Cinematic motion",
-    description: "A short cinematic motion sample from Motio2edit Video Studio.",
+    description: "A short cinematic motion sample from Video Studio.",
     studio: "video",
     feature: "video-generation",
     url: vid("VID_20260831_005156.mp4"),
@@ -469,7 +470,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-002",
     title: "Evening motion",
-    description: "An evening motion sample demonstrating Motio2edit video generation.",
+    description: "An evening motion sample from Video Studio.",
     studio: "video",
     feature: "video-generation",
     url: vid("VID_20260831_005653.mp4"),
@@ -483,7 +484,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-003",
     title: "Cinematic motion 3",
-    description: "Motio2edit Video Studio sample.",
+    description: "Video Studio sample.",
     studio: "video",
     feature: "video-generation",
     url: vid("VID_20260904_015459.mp4"),
@@ -497,7 +498,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-minimax-1",
     title: "Golden peak drift",
-    description: "A soft aerial drift over sunlit mountain ridges, showcasing Motio2edit motion quality.",
+    description: "A soft aerial drift over sunlit mountain ridges.",
     studio: "video",
     feature: "video-generation",
     url: vid("FvqkmmA0-CWpisklacI7v_minimax-h3.mp4"),
@@ -511,7 +512,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-minimax-2",
     title: "Valley light sweep",
-    description: "Warm light moving across a quiet valley — a Motio2edit video generation sample.",
+    description: "Warm light moving across a quiet valley.",
     studio: "video",
     feature: "video-generation",
     url: vid("GK7zgoY3v5k41taWDWqY-_minimax-h3.mp4"),
@@ -525,7 +526,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-minimax-3",
     title: "Horizon pulse",
-    description: "A calm horizon with subtle atmospheric motion from Motio2edit Video Studio.",
+    description: "A calm horizon with subtle atmospheric motion.",
     studio: "video",
     feature: "video-generation",
     url: vid("P3l2PNIS1nSRhgSrmV-Rh_minimax-h3.mp4"),
@@ -539,7 +540,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-output",
     title: "Studio export",
-    description: "A finished Video Studio export sample from Motio2edit.",
+    description: "A finished Video Studio export sample.",
     studio: "video",
     feature: "video-generation",
     url: vid("IgKXDxT5M9nXeMaDcRzXy_output.mp4"),
