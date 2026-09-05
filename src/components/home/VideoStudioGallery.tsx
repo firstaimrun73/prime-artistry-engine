@@ -1,6 +1,6 @@
 /**
  * VIDEO gallery — Motion2AI Creation.
- * Large native-aspect cards. Muted hover/touch preview.
+ * Large native-aspect hero cards. Muted hover/touch preview (one at a time).
  * Click → /sample/$id. No Download/Share on homepage.
  */
 import { useMemo, useRef, useCallback } from "react";
@@ -35,7 +35,10 @@ function VideoCard({
   onDeactivate: (el: HTMLVideoElement) => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const isPortrait = sample.aspectRatio === "9:16" || sample.aspectRatio === "4:5" || sample.aspectRatio === "3:4";
+  const isPortrait =
+    sample.aspectRatio === "9:16" ||
+    sample.aspectRatio === "4:5" ||
+    sample.aspectRatio === "3:4";
 
   const startPreview = useCallback(() => {
     const v = ref.current;
@@ -55,8 +58,9 @@ function VideoCard({
   return (
     <article
       className={cn(
-        "group overflow-hidden rounded-2xl",
+        "group overflow-hidden rounded-3xl",
         isDark ? "bg-white/[0.03]" : "bg-black/[0.03]",
+        /* Landscape videos take full row on sm+ so they feel large */
         isPortrait ? "sm:col-span-1" : "sm:col-span-2",
       )}
     >
@@ -83,18 +87,18 @@ function VideoCard({
         />
         <span
           className={cn(
-            "pointer-events-none absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md",
+            "pointer-events-none absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
             isDark
               ? "border-white/15 bg-black/40 text-white/90"
               : "border-white/60 bg-white/70 text-[#1A1C24]",
           )}
           aria-hidden
         >
-          <Info className="h-3 w-3" strokeWidth={2.25} />
+          <Info className="h-3.5 w-3.5" strokeWidth={2.25} />
         </span>
       </Link>
-      <div className="px-2 py-1.5">
-        <h3 className="text-[11px] font-medium leading-tight tracking-tight line-clamp-1 text-foreground/90">
+      <div className="px-3 py-2">
+        <h3 className="text-[12px] font-medium leading-tight tracking-tight line-clamp-1 text-foreground/90">
           {sample.title}
         </h3>
       </div>
@@ -137,9 +141,10 @@ export function VideoStudioGallery() {
   if (samples.length === 0) return null;
 
   return (
-    <section className="space-y-3" data-creation-section="video">
-      <h3 className="text-[13px] font-bold tracking-tight">Video</h3>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="space-y-4" data-creation-section="video">
+      <h3 className="text-[14px] font-bold tracking-tight">Video</h3>
+      {/* 1 col mobile (full-width hero), 2 col desktop — landscape spans both */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
         {samples.map((s) => (
           <VideoCard
             key={s.id}
