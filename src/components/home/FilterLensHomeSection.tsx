@@ -2,6 +2,7 @@
  * Homepage discovery for Filters + Lenses.
  * Links to real studio routes. Media-first, compact, no fake controls.
  */
+import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import { Aperture, Filter, ArrowRight } from "lucide-react";
 import { ALL_FILTERS } from "@/lib/filter-lens/filters/filter-registry";
@@ -41,15 +42,38 @@ const LENS_CSS: Record<string, string> = {
   night: "brightness(0.8) contrast(1.25) saturate(0.75)",
 };
 
-/** Varied local demo backgrounds (repo-hosted, not R2). */
-const PREVIEW_BG = [
-  "/demo/video/poster-landscape.jpg",
-  "/demo/video/poster-portrait.jpg",
-  "/demo/video/poster-tech.jpg",
-  "/demo/music/cover-vinyl.jpg",
-  "/demo/music/cover-waveform.jpg",
-  "/demo/music/cover-studio.jpg",
+/**
+ * Distinct preview backgrounds per entry — no shared image across two names.
+ * CSS gradients so Filters and Lenses never duplicate thumbnails.
+ */
+const PREVIEW_GRADIENTS = [
+  "linear-gradient(135deg, #1e3a5f 0%, #0f766e 50%, #134e4a 100%)",
+  "linear-gradient(160deg, #4c1d95 0%, #7c3aed 45%, #c4b5fd 100%)",
+  "linear-gradient(145deg, #7c2d12 0%, #ea580c 40%, #fbbf24 100%)",
+  "linear-gradient(120deg, #0c4a6e 0%, #0284c7 50%, #7dd3fc 100%)",
+  "linear-gradient(150deg, #1a1a1a 0%, #525252 40%, #a3a3a3 100%)",
+  "linear-gradient(135deg, #831843 0%, #db2777 45%, #fbcfe8 100%)",
+  "linear-gradient(160deg, #14532d 0%, #16a34a 45%, #86efac 100%)",
+  "linear-gradient(140deg, #1e1b4b 0%, #4338ca 40%, #a5b4fc 100%)",
+  "linear-gradient(125deg, #78350f 0%, #d97706 50%, #fde68a 100%)",
+  "linear-gradient(155deg, #164e63 0%, #0891b2 45%, #a5f3fc 100%)",
+  "linear-gradient(130deg, #3b0764 0%, #9333ea 40%, #e9d5ff 100%)",
+  "linear-gradient(170deg, #450a0a 0%, #dc2626 45%, #fecaca 100%)",
 ];
+
+function hashId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function uniquePreviewStyle(id: string, cssFilter: string): CSSProperties {
+  const g = PREVIEW_GRADIENTS[hashId(id) % PREVIEW_GRADIENTS.length];
+  return {
+    backgroundImage: g,
+    filter: cssFilter,
+  };
+}
 
 function previewCssForFilter(category: string): string {
   return FILTER_CSS[category] ?? "contrast(1.08) saturate(1.05)";
@@ -92,7 +116,7 @@ export function FilterLensHomeSection() {
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {featuredFilters.map((f, i) => (
+          {featuredFilters.map((f) => (
             <Link
               key={f.id}
               to="/studio/image/filters"
@@ -104,12 +128,10 @@ export function FilterLensHomeSection() {
               )}
             >
               <div className="relative aspect-[4/5] overflow-hidden bg-muted/40">
-                <img
-                  src={PREVIEW_BG[i % PREVIEW_BG.length]}
-                  alt=""
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                  style={{ filter: previewCssForFilter(f.category) }}
-                  loading="lazy"
+                <div
+                  className="h-full w-full transition duration-300 group-hover:scale-[1.03]"
+                  style={uniquePreviewStyle(f.id, previewCssForFilter(f.category))}
+                  aria-hidden
                 />
               </div>
               <div className="px-2.5 py-2">
@@ -152,12 +174,10 @@ export function FilterLensHomeSection() {
               )}
             >
               <div className="relative aspect-[4/5] overflow-hidden bg-muted/40">
-                <img
-                  src={PREVIEW_BG[(i + 2) % PREVIEW_BG.length]}
-                  alt=""
-                  className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                  style={{ filter: previewCssForLens(l.specialty, i) }}
-                  loading="lazy"
+                <div
+                  className="h-full w-full transition duration-300 group-hover:scale-[1.03]"
+                  style={uniquePreviewStyle(`lens-${l.id}`, previewCssForLens(l.specialty, i))}
+                  aria-hidden
                 />
               </div>
               <div className="px-2.5 py-2">
