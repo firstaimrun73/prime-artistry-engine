@@ -1,7 +1,8 @@
 /**
  * VIDEO gallery — Motion2AI Creation.
- * Media-driven size (no forced wrapper letterbox). One sound toggle top-right.
- * Real title under card. Desktop max-w caps — more columns, not bigger cards.
+ * Native video size drives card height (no aspect-ratio wrapper, no object-cover letterbox).
+ * One glassy sound toggle top-right. Real title under card.
+ * Desktop max-w caps — more columns of same-sized cards, not bigger cards.
  */
 import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
@@ -29,13 +30,6 @@ function VideoCard({
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const catalogPortrait = isPortraitRatio(sample.aspectRatio);
-  const [ratio, setRatio] = useState<string | null>(() =>
-    sample.width && sample.height
-      ? `${sample.width} / ${sample.height}`
-      : sample.aspectRatio
-        ? sample.aspectRatio.replace(":", " / ")
-        : null,
-  );
   const [portrait, setPortrait] = useState(catalogPortrait);
   const [muted, setMuted] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -45,7 +39,6 @@ function VideoCard({
     if (!v) return;
     const onMeta = () => {
       if (v.videoWidth > 0 && v.videoHeight > 0) {
-        setRatio(`${v.videoWidth} / ${v.videoHeight}`);
         setPortrait(v.videoHeight > v.videoWidth);
       }
     };
@@ -74,19 +67,16 @@ function VideoCard({
     onDeactivate(v);
   }, [onDeactivate]);
 
-  const toggleMute = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const v = ref.current;
-      if (!v) return;
-      const next = !v.muted;
-      v.muted = next;
-      setMuted(next);
-      if (!next) void v.play().catch(() => {});
-    },
-    [],
-  );
+  const toggleMute = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const v = ref.current;
+    if (!v) return;
+    const next = !v.muted;
+    v.muted = next;
+    setMuted(next);
+    if (!next) void v.play().catch(() => {});
+  }, []);
 
   if (failed) return null;
 
@@ -96,14 +86,16 @@ function VideoCard({
         "group w-full overflow-hidden rounded-2xl border border-border/50 bg-transparent",
         "transition-[transform,opacity] duration-200 ease-out",
         "hover:scale-[1.01] active:scale-[0.98] active:opacity-90",
+        // A7: hard max-width — desktop adds columns, not larger cards
         portrait ? "max-w-[280px]" : "max-w-[400px]",
       )}
     >
-      <div className="relative w-full" style={ratio ? { aspectRatio: ratio } : undefined}>
+      {/* A1: no aspect-ratio wrapper — video intrinsic size drives height */}
+      <div className="relative w-full">
         <Link
           to="/sample/$id"
           params={{ id: sample.id }}
-          className="absolute inset-0 block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           aria-label={`Open ${sample.title}`}
           onMouseEnter={startPreview}
           onMouseLeave={stopPreview}
@@ -118,8 +110,8 @@ function VideoCard({
             playsInline
             loop
             preload="metadata"
-            // object-cover fills the ratio box from real metadata — no black bars
-            className="pointer-events-none h-full w-full object-cover"
+            // Native ratio only — no object-cover/contain, no forced box
+            className="pointer-events-none block h-auto w-full"
           />
         </Link>
         {/* B2: single glassy sound control top-right */}
