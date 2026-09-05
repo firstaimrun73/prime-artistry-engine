@@ -27,7 +27,7 @@ function ImageCard({ sample }: { sample: R2Sample }) {
   return (
     <article
       className={cn(
-        "group w-full overflow-hidden rounded-2xl border border-border/50 bg-transparent",
+        "group w-full self-start overflow-hidden rounded-2xl border border-border/50 bg-transparent",
         "transition-[transform,opacity] duration-200 ease-out",
         "hover:scale-[1.01] active:scale-[0.98] active:opacity-90",
         // A7: hard pixel-ish caps — desktop gets more columns, not bigger cards
@@ -69,8 +69,8 @@ export function ImagineGallery() {
   return (
     <section className="space-y-4" data-creation-section="image">
       <h3 className="text-[14px] font-bold tracking-tight">Image</h3>
-      {/* justify-items-center so max-w cards don't stretch to fill grid tracks */}
-      <div className="mx-auto grid max-w-[1200px] grid-cols-2 justify-items-center gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+      {/* items-start: prevent row stretch leaving white under shorter cards */}
+      <div className="mx-auto grid max-w-[1200px] grid-cols-2 items-start justify-items-center gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
         {samples.map((s) => (
           <ImageCard key={s.id} sample={s} />
         ))}
