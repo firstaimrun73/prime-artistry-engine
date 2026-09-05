@@ -15,11 +15,9 @@ import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
 import { TrustSection } from "@/components/home/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
-import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
-import { ImagineGallery } from "@/components/home/ImagineGallery";
-import { VideoStudioGallery } from "@/components/home/VideoStudioGallery";
-import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
+import { WatchDemoSection } from "@/components/home/WatchDemoSection";
+import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -57,7 +55,10 @@ function SignedInHome() {
 }
 
 /**
- * Signed-out homepage — single coherent premium flow.
+ * Signed-out homepage — PUBLIC MARKETING ONLY.
+ * Hard rule: do NOT render private creation/sample galleries here.
+ * No ImagineGallery, VideoStudioGallery, MusicStudioGallery, CircleSampleGallery,
+ * or Motion2AI Creation feed. Watch Demo is the only media exception.
  */
 function SignedOutHome() {
   return (
@@ -66,35 +67,13 @@ function SignedOutHome() {
       <HomeHero />
       <BeforeAfterShowcase />
 
+      <WatchDemoSection variant="prominent" />
+
       <div className="mx-auto w-full max-w-6xl px-4">
-        <CircleSampleGallery />
-        <section className="mt-10 space-y-6" data-motion2ai-creation>
-          <div className="space-y-1">
-            <h2 className="flex items-center gap-2 text-[20px] font-extrabold tracking-tight sm:text-[22px]">
-              <span>
-                Motion<span className="text-primary">2</span>AI Creation
-              </span>
-              <svg
-                aria-hidden
-                viewBox="0 0 24 24"
-                className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6"
-                fill="currentColor"
-              >
-                <path d="M12 2l1.2 6.3L19.5 9 13.2 10.7 12 17l-1.2-6.3L4.5 9l6.3-.7L12 2z" />
-                <path d="M18.5 14l.6 2.6 2.4.6-2.4.6-.6 2.6-.6-2.6-2.4-.6 2.4-.6.6-2.6z" opacity="0.85" />
-                <path d="M5.2 15.5l.45 1.9 1.8.45-1.8.45-.45 1.9-.45-1.9-1.8-.45 1.8-.45.45-1.9z" opacity="0.7" />
-              </svg>
-            </h2>
-            <p className="text-[13px] text-muted-foreground">
-              Image, video, and music samples from Motio2edit.
-            </p>
-          </div>
-          <ImagineGallery />
-          <VideoStudioGallery />
-          <MusicStudioGallery />
-        </section>
         <FilterLensHomeSection />
       </div>
+
+      <ArchitectureFlowSection />
 
       <StudioShowcase />
       <TrustSection />
