@@ -3,7 +3,7 @@
  * No generation prompts exposed in UI.
  */
 import {
-  getActiveR2ImageSamples,
+  getImagineOnlySamples,
   type R2Sample,
 } from "@/lib/r2-catalog";
 
@@ -20,6 +20,7 @@ export type ImagineSample = {
   width?: number;
   height?: number;
   format?: string;
+  fileSizeLabel?: string;
   studio?: string;
   feature?: string;
   sortOrder: number;
@@ -38,6 +39,7 @@ function fromR2(s: R2Sample): ImagineSample {
     width: s.width,
     height: s.height,
     format: s.format,
+    fileSizeLabel: s.fileSizeLabel,
     studio: s.studio,
     feature: s.feature,
     sortOrder: s.sortOrder,
@@ -46,10 +48,7 @@ function fromR2(s: R2Sample): ImagineSample {
 }
 
 export function getActiveImagineSamples(): ImagineSample[] {
-  return getActiveR2ImageSamples()
-    .filter((s) => s.studio === "image" || s.feature === "imagine" || s.feature === "image-generation" || s.feature === "portrait")
-    .map(fromR2)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  return getImagineOnlySamples().map(fromR2).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export function resolveImagineMediaUrl(sample: ImagineSample): string {
