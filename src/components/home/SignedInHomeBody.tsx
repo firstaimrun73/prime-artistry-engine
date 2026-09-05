@@ -23,6 +23,7 @@ import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
 import { ImagineGallery } from "@/components/home/ImagineGallery";
 import { VideoStudioGallery } from "@/components/home/VideoStudioGallery";
+import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 
 type RecentGen = {
   id: string;
@@ -140,6 +141,8 @@ export function SignedInHomeBody() {
       <ImagineGallery />
 
       <VideoStudioGallery />
+
+      <MusicStudioGallery />
 
       <Link
         to="/studio/image/auto-edit"
