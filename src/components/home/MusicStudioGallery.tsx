@@ -1,7 +1,6 @@
 /**
  * MUSIC gallery — Motion2AI Creation.
- * Large visual cover art only. No SAMPLE caption, no large metadata block,
- * no provider names. Click → /sample/$id.
+ * Cover art only. No SAMPLE caption. Premium tokens shared with image/video.
  */
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
@@ -9,6 +8,7 @@ import { Music } from "lucide-react";
 import track1 from "@/assets/samples/track-1.mp3.asset.json";
 import track2 from "@/assets/samples/track-2.mp3.asset.json";
 import track3 from "@/assets/samples/track-3.mp3.asset.json";
+import { cn } from "@/lib/utils";
 
 type TrackCard = {
   id: string;
@@ -54,9 +54,16 @@ export function MusicStudioGallery() {
         <Music className="h-4 w-4" />
         Music
       </h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+      <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {tracks.map((t) => (
-          <article key={t.id} className="group overflow-hidden rounded-3xl">
+          <article
+            key={t.id}
+            className={cn(
+              "group overflow-hidden rounded-2xl border border-border/60 bg-transparent shadow-sm",
+              "transition-[transform,box-shadow,opacity] duration-180 ease-out",
+              "hover:scale-[1.015] hover:shadow-md active:scale-[0.985] active:opacity-95",
+            )}
+          >
             <Link
               to="/sample/$id"
               params={{ id: t.id }}
@@ -66,7 +73,7 @@ export function MusicStudioGallery() {
               <img
                 src={t.cover}
                 alt={`${t.title} cover`}
-                className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                className="h-full w-full object-cover"
                 loading="lazy"
               />
             </Link>
