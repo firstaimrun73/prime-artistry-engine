@@ -2,6 +2,7 @@
  * IMAGE gallery — Motion2AI Creation.
  * Visual-only cards: media defines the card. No SAMPLE caption, no title block,
  * no Info/Download/Share on the card. Native aspect. Click → /sample/$id.
+ * Premium tokens: consistent radius, border, hover/active, grid gaps.
  */
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
@@ -34,9 +35,10 @@ function ImageCard({ sample }: { sample: R2Sample }) {
   return (
     <article
       className={cn(
-        "group overflow-hidden rounded-3xl",
-        // Grid-span rule (Section 5): landscape/ultrawide span wider; portrait/square stay narrow
-        landscape ? "col-span-2 sm:col-span-2 lg:col-span-2" : portrait ? "col-span-1" : "col-span-1",
+        "group overflow-hidden rounded-2xl border border-border/60 bg-transparent shadow-sm",
+        "transition-[transform,box-shadow,opacity] duration-180 ease-out",
+        "hover:scale-[1.015] hover:shadow-md active:scale-[0.985] active:opacity-95",
+        landscape ? "col-span-2 sm:col-span-2 lg:col-span-2" : "col-span-1",
       )}
     >
       <Link
@@ -47,8 +49,8 @@ function ImageCard({ sample }: { sample: R2Sample }) {
       >
         <img
           src={sample.url}
-          alt={sample.title}
-          className="block h-auto w-full object-contain transition duration-300 group-hover:scale-[1.015]"
+          alt={sample.title || "Image sample"}
+          className="block h-auto w-full object-contain"
           loading="lazy"
           style={
             sample.width && sample.height
@@ -78,7 +80,7 @@ export function ImagineGallery() {
   return (
     <section className="space-y-4" data-creation-section="image">
       <h3 className="text-[14px] font-bold tracking-tight">Image</h3>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 lg:gap-5">
+      <div className="mx-auto grid max-w-[1200px] grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
         {samples.map((s) => (
           <ImageCard key={s.id} sample={s} />
         ))}
