@@ -138,11 +138,20 @@ export function SignedInHomeBody() {
 
       <CircleSampleGallery />
 
-      <ImagineGallery />
-
-      <VideoStudioGallery />
-
-      <MusicStudioGallery />
+      <section className="mt-10 space-y-6" data-motion2ai-creation>
+        <div>
+          <h2 className="text-[17px] font-extrabold tracking-tight">
+            Motion<span className="text-primary">2</span>AI Creation{" "}
+            <span aria-hidden>💎</span>
+          </h2>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            Image, video, and music samples from Motio2edit.
+          </p>
+        </div>
+        <ImagineGallery />
+        <VideoStudioGallery />
+        <MusicStudioGallery />
+      </section>
 
       <Link
         to="/studio/image/auto-edit"
