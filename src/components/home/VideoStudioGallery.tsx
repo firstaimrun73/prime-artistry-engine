@@ -1,22 +1,29 @@
 /**
- * VIDEO STUDIO section — signed-in homepage.
- * Real R2 videos from central catalog. Deduped. Glass controls. Muted previews.
+ * VIDEO STUDIO — premium previews with native aspect ratios.
+ * Never force 16:9. No Audio metadata. Media opens detail.
  */
 import { useMemo, useState } from "react";
-import { Download, Share2, Info, X, Film, Play, Sparkles } from "lucide-react";
+import { Download, Share2, Info, X, Film } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { getActiveR2VideoSamples, HOMEPAGE_WATCH_DEMO, type R2Sample } from "@/lib/r2-catalog";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-function GlassIconBtn({
+function aspectClass(ar: string): string {
+  if (ar === "9:16") return "aspect-[9/16]";
+  if (ar === "1:1") return "aspect-square";
+  if (ar === "4:5") return "aspect-[4/5]";
+  return "aspect-video";
+}
+
+function CompactAction({
   onClick,
   label,
   children,
   isDark,
 }: {
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   label: string;
   children: React.ReactNode;
   isDark: boolean;
@@ -27,10 +34,10 @@ function GlassIconBtn({
       onClick={onClick}
       aria-label={label}
       className={cn(
-        "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md transition active:scale-95",
+        "grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
         isDark
-          ? "border-white/20 bg-black/35 text-white hover:bg-black/50"
-          : "border-white/40 bg-white/55 text-[#1A1C24] hover:bg-white/80 shadow-sm",
+          ? "border-white/15 bg-black/30 text-white/90 hover:bg-black/50"
+          : "border-white/50 bg-white/50 text-[#1A1C24] hover:bg-white/80",
       )}
     >
       {children}
@@ -52,7 +59,7 @@ function VideoDetailSheet({
       <button type="button" className="fixed inset-0 z-[80] bg-black/55" aria-label="Close" onClick={onClose} />
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-[90] max-h-[88vh] overflow-y-auto rounded-t-3xl border-t px-4 py-5 shadow-2xl",
+          "fixed inset-x-0 bottom-0 z-[90] max-h-[90vh] overflow-y-auto rounded-t-3xl border-t px-4 py-5 shadow-2xl",
           "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
           isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
         )}
@@ -76,7 +83,7 @@ function VideoDetailSheet({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="aspect-video overflow-hidden rounded-xl bg-black">
+        <div className={cn("mx-auto max-w-2xl overflow-hidden rounded-xl bg-black", aspectClass(sample.aspectRatio))}>
           <video src={sample.url} controls playsInline className="h-full w-full object-contain" />
         </div>
         <p className={cn("mt-3 text-[13px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
@@ -95,10 +102,6 @@ function VideoDetailSheet({
             <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Format</dt>
             <dd className="font-semibold">{sample.format}</dd>
           </div>
-          <div>
-            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Audio</dt>
-            <dd className="font-semibold">{sample.hasAudio ? "Present (AAC stereo)" : "Not verified"}</dd>
-          </div>
           {sample.durationLabel ? (
             <div>
               <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Duration</dt>
@@ -109,10 +112,9 @@ function VideoDetailSheet({
         <div className="mt-5">
           <Link
             to={"/studio/video" as "/studio/video"}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-red-600 px-4 py-3 text-[14px] font-semibold text-white shadow-sm"
+            className="inline-flex w-full items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-[14px] font-semibold text-white shadow-sm"
           >
-            <Sparkles className="h-4 w-4" />
-            Try Now
+            Open Video Studio
           </Link>
         </div>
       </div>
@@ -122,9 +124,11 @@ function VideoDetailSheet({
 
 function VideoCard({ sample, isDark }: { sample: R2Sample; isDark: boolean }) {
   const [detail, setDetail] = useState(false);
-  const arClass = sample.aspectRatio === "9:16" ? "aspect-[9/16]" : "aspect-video";
+  const ar = aspectClass(sample.aspectRatio);
+  const isPortrait = sample.aspectRatio === "9:16" || sample.aspectRatio === "4:5";
 
-  const onDownload = async () => {
+  const onDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const res = await fetch(sample.url);
       const blob = await res.blob();
@@ -140,7 +144,8 @@ function VideoCard({ sample, isDark }: { sample: R2Sample; isDark: boolean }) {
     }
   };
 
-  const onShare = async () => {
+  const onShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       if (navigator.share) {
         await navigator.share({ title: sample.title, text: sample.description, url: sample.url });
@@ -157,37 +162,51 @@ function VideoCard({ sample, isDark }: { sample: R2Sample; isDark: boolean }) {
     <>
       <article
         className={cn(
-          "flex w-[min(100%,320px)] shrink-0 flex-col overflow-hidden rounded-2xl border shadow-[0_8px_30px_rgba(0,0,0,0.06)]",
-          isDark ? "border-white/10 bg-white/[0.03]" : "border-black/5 bg-white/70 backdrop-blur-sm",
+          "flex shrink-0 flex-col overflow-hidden rounded-2xl border",
+          isDark ? "border-white/10 bg-white/[0.03]" : "border-black/5 bg-white/80",
+          isPortrait ? "w-[min(100%,200px)]" : "w-[min(100%,340px)]",
         )}
       >
-        <div className={cn("relative w-full overflow-hidden bg-black", arClass)}>
-          <video src={sample.url} muted playsInline preload="metadata" className="h-full w-full object-cover" />
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm">
-              <Play className="h-4 w-4 fill-current" />
-            </span>
-          </span>
+        <button
+          type="button"
+          onClick={() => setDetail(true)}
+          className={cn("relative w-full overflow-hidden bg-black text-left", ar)}
+          aria-label={`Open ${sample.title}`}
+        >
+          <video
+            src={sample.url}
+            muted
+            playsInline
+            preload="metadata"
+            className="pointer-events-none h-full w-full object-contain"
+          />
           <span
             className={cn(
-              "absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] backdrop-blur-md",
-              isDark ? "bg-black/45 text-white/90" : "bg-white/70 text-[#3A3E4C]",
+              "pointer-events-none absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] backdrop-blur-md",
+              isDark ? "bg-black/40 text-white/90" : "bg-white/70 text-[#3A3E4C]",
             )}
           >
             Video
           </span>
-          <div className="absolute right-2 top-2 z-10 flex flex-col gap-1.5">
-            <GlassIconBtn onClick={() => setDetail(true)} label={`About ${sample.title}`} isDark={isDark}>
-              <Info className="h-3.5 w-3.5" strokeWidth={2.25} />
-            </GlassIconBtn>
-            <GlassIconBtn onClick={() => void onDownload()} label="Download" isDark={isDark}>
-              <Download className="h-3.5 w-3.5" strokeWidth={2.25} />
-            </GlassIconBtn>
-            <GlassIconBtn onClick={() => void onShare()} label="Share" isDark={isDark}>
-              <Share2 className="h-3.5 w-3.5" strokeWidth={2.25} />
-            </GlassIconBtn>
+          <div className="absolute bottom-2 right-2 z-10 flex gap-1" onClick={(e) => e.stopPropagation()}>
+            <CompactAction
+              onClick={(e) => {
+                e.stopPropagation();
+                setDetail(true);
+              }}
+              label={`About ${sample.title}`}
+              isDark={isDark}
+            >
+              <Info className="h-3 w-3" strokeWidth={2.25} />
+            </CompactAction>
+            <CompactAction onClick={onDownload} label="Download" isDark={isDark}>
+              <Download className="h-3 w-3" strokeWidth={2.25} />
+            </CompactAction>
+            <CompactAction onClick={onShare} label="Share" isDark={isDark}>
+              <Share2 className="h-3 w-3" strokeWidth={2.25} />
+            </CompactAction>
           </div>
-        </div>
+        </button>
         <div className="px-2.5 py-2">
           <h3 className="text-[12px] font-semibold leading-tight line-clamp-1">{sample.title}</h3>
         </div>
@@ -221,7 +240,7 @@ export function VideoStudioGallery() {
 
   return (
     <section
-      className="mt-10 space-y-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      className="mt-10 space-y-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       data-video-studio-section="post-login"
     >
       <div>
@@ -230,7 +249,7 @@ export function VideoStudioGallery() {
           Video Studio
         </h2>
         <p className={cn("mt-0.5 text-[13px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-          Motion samples · muted preview · open for sound
+          Motion samples · native aspect · muted preview
         </p>
       </div>
       <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory">
