@@ -5,11 +5,15 @@
  */
 import { useRef, useCallback, useState, useEffect } from "react";
 import { Play } from "lucide-react";
-import { PUBLIC_WATCH_DEMO } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
 
+/** Approved public Watch Demo asset — exact R2 URL required. */
+const PUBLIC_WATCH_DEMO = {
+  url: "https://assets.motio2edit.com/samples/video/VID_20260831_011245.mp4",
+  title: "Watch Demo",
+} as const;
+
 type Props = {
-  /** prominent = marketing section; quiet = signed-in low priority */
   variant?: "prominent" | "quiet";
 };
 
