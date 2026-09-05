@@ -1,9 +1,7 @@
 /**
  * VIDEO gallery — Motion2AI Creation.
- * Each video owns its native-ratio card (16:9 wide, 9:16 portrait).
- * No black letterbox, no crop, no forced uniform height.
- * Muted one-at-a-time preview. Click → /sample/$id.
- * No SAMPLE caption — media is the card.
+ * Native-ratio cards. No SAMPLE caption. Muted one-at-a-time preview.
+ * Premium tokens shared with image/music galleries.
  */
 import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
@@ -68,8 +66,9 @@ function VideoCard({
   return (
     <article
       className={cn(
-        "group overflow-hidden rounded-3xl",
-        // Section 5 / 9: portrait half-width side-by-side; landscape full-row on sm+
+        "group overflow-hidden rounded-2xl border border-border/60 bg-transparent shadow-sm",
+        "transition-[transform,box-shadow,opacity] duration-180 ease-out",
+        "hover:scale-[1.015] hover:shadow-md active:scale-[0.985] active:opacity-95",
         portrait ? "col-span-1" : "col-span-1 sm:col-span-2",
       )}
     >
@@ -134,7 +133,7 @@ export function VideoStudioGallery() {
   return (
     <section className="space-y-4" data-creation-section="video">
       <h3 className="text-[14px] font-bold tracking-tight">Video</h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+      <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
         {samples.map((s) => (
           <VideoCard
             key={s.id}
