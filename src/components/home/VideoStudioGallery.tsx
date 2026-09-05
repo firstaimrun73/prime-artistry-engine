@@ -18,6 +18,7 @@ function aspectStyle(s: R2Sample): React.CSSProperties {
     "1:1": "1 / 1",
     "4:5": "4 / 5",
     "3:4": "3 / 4",
+    "21:9": "21 / 9",
   };
   return { aspectRatio: map[s.aspectRatio] ?? "16 / 9" };
 }
@@ -34,7 +35,7 @@ function VideoCard({
   onDeactivate: (el: HTMLVideoElement) => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const isPortrait = sample.aspectRatio === "9:16" || sample.aspectRatio === "4:5";
+  const isPortrait = sample.aspectRatio === "9:16" || sample.aspectRatio === "4:5" || sample.aspectRatio === "3:4";
 
   const startPreview = useCallback(() => {
     const v = ref.current;
@@ -54,8 +55,8 @@ function VideoCard({
   return (
     <article
       className={cn(
-        "group overflow-hidden rounded-2xl border",
-        isDark ? "border-white/10 bg-white/[0.02]" : "border-black/5 bg-white/80",
+        "group overflow-hidden rounded-2xl",
+        isDark ? "bg-white/[0.03]" : "bg-black/[0.03]",
         isPortrait ? "sm:col-span-1" : "sm:col-span-2",
       )}
     >
@@ -84,8 +85,8 @@ function VideoCard({
           className={cn(
             "pointer-events-none absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md",
             isDark
-              ? "border-white/15 bg-black/35 text-white/90"
-              : "border-white/50 bg-white/60 text-[#1A1C24]",
+              ? "border-white/15 bg-black/40 text-white/90"
+              : "border-white/60 bg-white/70 text-[#1A1C24]",
           )}
           aria-hidden
         >
@@ -93,7 +94,9 @@ function VideoCard({
         </span>
       </Link>
       <div className="px-2 py-1.5">
-        <h3 className="text-[11px] font-medium leading-tight line-clamp-1">{sample.title}</h3>
+        <h3 className="text-[11px] font-medium leading-tight tracking-tight line-clamp-1 text-foreground/90">
+          {sample.title}
+        </h3>
       </div>
     </article>
   );

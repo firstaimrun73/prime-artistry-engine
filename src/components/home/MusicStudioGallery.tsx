@@ -1,6 +1,7 @@
 /**
  * MUSIC gallery — Motion2AI Creation.
  * Larger editorial cards. Click → /sample/$id. No provider names.
+ * No Download/Share/Audio meta on homepage.
  */
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
@@ -11,7 +12,15 @@ import track3 from "@/assets/samples/track-3.mp3.asset.json";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-const TRACKS = [
+type TrackCard = {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  cover: string;
+};
+
+const TRACKS: TrackCard[] = [
   {
     id: "music-neon-skyline",
     title: "Neon Skyline",
@@ -54,28 +63,28 @@ export function MusicStudioGallery() {
           <article
             key={t.id}
             className={cn(
-              "overflow-hidden rounded-2xl border",
-              isDark ? "border-white/10 bg-white/[0.02]" : "border-black/5 bg-white/80",
+              "overflow-hidden rounded-2xl",
+              isDark ? "bg-white/[0.03]" : "bg-black/[0.03]",
             )}
           >
             <Link
               to="/sample/$id"
               params={{ id: t.id }}
-              className="relative block aspect-square overflow-hidden bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              className="relative block aspect-square overflow-hidden bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               aria-label={`Open ${t.title}`}
             >
               <img
                 src={t.cover}
                 alt={`${t.title} cover`}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover transition duration-300 hover:scale-[1.02]"
                 loading="lazy"
               />
               <span
                 className={cn(
                   "pointer-events-none absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md",
                   isDark
-                    ? "border-white/15 bg-black/35 text-white/90"
-                    : "border-white/50 bg-white/60 text-[#1A1C24]",
+                    ? "border-white/15 bg-black/40 text-white/90"
+                    : "border-white/60 bg-white/70 text-[#1A1C24]",
                 )}
                 aria-hidden
               >
