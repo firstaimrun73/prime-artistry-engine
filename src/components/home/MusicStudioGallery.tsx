@@ -1,7 +1,7 @@
 /**
  * MUSIC gallery — Motion2AI Creation.
- * Visual covers + tiny SAMPLE label. No caption, no Info, no provider names.
- * Click → /sample/$id.
+ * Large visual cover art only. No SAMPLE caption, no large metadata block,
+ * no provider names. Click → /sample/$id.
  */
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
@@ -9,8 +9,6 @@ import { Music } from "lucide-react";
 import track1 from "@/assets/samples/track-1.mp3.asset.json";
 import track2 from "@/assets/samples/track-2.mp3.asset.json";
 import track3 from "@/assets/samples/track-3.mp3.asset.json";
-import { useTheme } from "@/lib/theme";
-import { cn } from "@/lib/utils";
 
 type TrackCard = {
   id: string;
@@ -49,8 +47,6 @@ const TRACKS: TrackCard[] = [
 
 export function MusicStudioGallery() {
   const tracks = useMemo(() => TRACKS, []);
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
 
   return (
     <section className="space-y-4" data-creation-section="music">
@@ -74,14 +70,6 @@ export function MusicStudioGallery() {
                 loading="lazy"
               />
             </Link>
-            <p
-              className={cn(
-                "px-1.5 pt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em]",
-                isDark ? "text-white/45" : "text-black/40",
-              )}
-            >
-              Sample
-            </p>
           </article>
         ))}
       </div>
