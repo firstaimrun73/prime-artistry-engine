@@ -3,25 +3,22 @@ import { FooterAd } from "@/components/ads";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, Video, Music, Download, Zap, Wand2, Lock, ArrowRight, Check } from "lucide-react";
+import { Image as ImageIcon, Video, Music, Lock, ArrowRight, Check } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef, useState } from "react";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/routes/feedback";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
-import { SampleShowcase } from "@/components/SampleShowcase";
-import { SampleGallery } from "@/components/SampleGallery";
-import { MusicSamples } from "@/components/MusicSamples";
-import { VideoSamples } from "@/components/VideoSamples";
 import { HomeHero } from "@/components/home/HomeHero";
 import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
 import { TrustSection } from "@/components/home/TrustSection";
-import { WhyChoose } from "@/components/home/WhyChoose";
-import { TestimonialsCarousel } from "@/components/home/TestimonialsCarousel";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
+import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
+import { ImagineGallery } from "@/components/home/ImagineGallery";
+import { VideoStudioGallery } from "@/components/home/VideoStudioGallery";
+import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -58,22 +55,27 @@ function SignedInHome() {
   );
 }
 
+/**
+ * Signed-out homepage — single coherent premium flow.
+ * Removed stacked legacy SampleShowcase / SampleGallery / MusicSamples /
+ * VideoSamples / StudioLoopingShowcase / MusicHomeSection marketing blocks.
+ */
 function SignedOutHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <HomeHero />
       <BeforeAfterShowcase />
-      <SampleShowcase />
-      <SampleGallery />
-      <MusicSamples />
-      <VideoSamples />
-      <StudioLoopingShowcase />
+
+      <div className="mx-auto w-full max-w-6xl px-4">
+        <CircleSampleGallery />
+        <ImagineGallery />
+        <VideoStudioGallery />
+        <MusicStudioGallery />
+      </div>
+
       <StudioShowcase />
       <TrustSection />
-      <WhyChoose />
-      <MusicHomeSection />
-      <TestimonialsCarousel />
       <HomeTestimonials />
       <FinalCTA />
       <FooterAd placement="home" />
@@ -91,7 +93,7 @@ function HomeTestimonials() {
   if (!data || data.length === 0) return null;
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
-      <h2 className="text-center text-2xl font-bold sm:text-3xl">Loved by creators worldwide 🌍</h2>
+      <h2 className="text-center text-2xl font-bold sm:text-3xl">Loved by creators worldwide</h2>
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {data.slice(0, 6).map((f) => (
           <FeedbackCard key={f.id} f={f} />
@@ -100,41 +102,6 @@ function HomeTestimonials() {
       <div className="mt-8 text-center">
         <Button asChild variant="outline">
           <Link to="/feedback">See more feedback</Link>
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-function MusicHomeSection() {
-  const items = [
-    { icon: Music, title: "AI Music Generation", desc: "Create original tracks from text prompts" },
-    { icon: Video, title: "Cinematic Soundtracks", desc: "Epic music for videos and presentations" },
-    { icon: Zap, title: "Background Music", desc: "Perfect ambient music for any project" },
-    { icon: Wand2, title: "Any Genre & Mood", desc: "Hip-hop, classical, lo-fi, electronic and more" },
-    { icon: Download, title: "Instant Generation", desc: "Your custom track ready in under a minute" },
-  ];
-  return (
-    <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
-      <div className="mb-8 text-center">
-        <h2 className="text-2xl font-bold sm:text-3xl">AI Music Studio</h2>
-        <p className="mt-2 text-muted-foreground">Generate original music in seconds</p>
-      </div>
-      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-        {items.map((f) => {
-          const Icon = f.icon;
-          return (
-            <div key={f.title} className="rounded-xl border border-border bg-card p-6">
-              <Icon className="h-6 w-6 text-primary" />
-              <h3 className="mt-4 font-semibold">{f.title}</h3>
-              <p className="mt-1.5 text-sm text-muted-foreground">{f.desc}</p>
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-8 text-center">
-        <Button asChild size="lg">
-          <Link to="/studio/music">Open Music Studio</Link>
         </Button>
       </div>
     </section>
@@ -188,7 +155,7 @@ function StudioShowcase() {
     <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
       <div className="mb-8 text-center">
         <h2 className="text-2xl font-bold sm:text-3xl">Three studios, one workspace</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Pick a studio to jump straight into the right tools.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Jump straight into the right tools.</p>
       </div>
       <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {STUDIO_CARDS.map((c) => {
@@ -203,16 +170,20 @@ function StudioShowcase() {
               key={c.name}
               type="button"
               onClick={onClick}
-              className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-xl hover:border-primary/40"
+              className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:border-primary/40 hover:shadow-xl"
             >
-              <div className={`pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full ${c.accent} opacity-30 blur-3xl`} />
+              <div
+                className={`pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full ${c.accent} opacity-30 blur-3xl`}
+              />
               <div className="relative flex items-center gap-3">
                 <div className="rounded-xl border border-border bg-background/60 p-2.5">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
                 <h3 className="text-lg font-bold">{c.name}</h3>
                 {c.freeAllowed && (
-                  <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Free</span>
+                  <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    Free
+                  </span>
                 )}
               </div>
               <ul className="relative mt-4 space-y-2 text-sm text-muted-foreground">
@@ -234,134 +205,12 @@ function StudioShowcase() {
                   </div>
                   <div className="text-sm font-semibold">Locked on Free plan</div>
                   <div className="text-xs text-muted-foreground">Upgrade to unlock {c.name}</div>
-                  <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                    View plans <ArrowRight className="h-3 w-3" />
-                  </span>
                 </div>
               )}
             </button>
           );
         })}
       </div>
-    </section>
-  );
-}
-
-type LoopSlide = {
-  label: string;
-  tagline: string;
-  icon: typeof ImageIcon;
-  bg: string;
-};
-
-const LOOP_SLIDES: LoopSlide[] = [
-  {
-    label: "Image Studio",
-    tagline: "Remove, restore, restyle",
-    icon: ImageIcon,
-    bg: "linear-gradient(135deg,#fff7ed 0%,#fdba74 45%,#f97316 100%)",
-  },
-  {
-    label: "Video Studio",
-    tagline: "Cinematic motion, on demand",
-    icon: Video,
-    bg: "linear-gradient(135deg,#fee2e2 0%,#f87171 45%,#dc2626 100%)",
-  },
-  {
-    label: "Music Studio",
-    tagline: "Sunset aura soundtracks",
-    icon: Music,
-    bg: "linear-gradient(135deg,#4B0082 0%,#8B008B 50%,#FF69B4 100%)",
-  },
-];
-
-function StudioLoopingShowcase() {
-  const [idx, setIdx] = useState(0);
-  const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    if (paused) return;
-    const id = setInterval(() => setIdx((i) => (i + 1) % LOOP_SLIDES.length), 4000);
-    return () => clearInterval(id);
-  }, [paused]);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "ArrowRight") setIdx((i) => (i + 1) % LOOP_SLIDES.length);
-      if (e.key === "ArrowLeft") setIdx((i) => (i - 1 + LOOP_SLIDES.length) % LOOP_SLIDES.length);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const touchX = useRef<number | null>(null);
-  function onTouchStart(e: React.TouchEvent) {
-    touchX.current = e.touches[0]?.clientX ?? null;
-    setPaused(true);
-  }
-  function onTouchEnd(e: React.TouchEvent) {
-    const start = touchX.current;
-    const end = e.changedTouches[0]?.clientX ?? null;
-    if (start != null && end != null) {
-      const dx = end - start;
-      if (Math.abs(dx) > 40) {
-        setIdx((i) => (i + (dx < 0 ? 1 : -1) + LOOP_SLIDES.length) % LOOP_SLIDES.length);
-      }
-    }
-    touchX.current = null;
-    setTimeout(() => setPaused(false), 500);
-  }
-
-  return (
-    <section className="mx-auto w-full max-w-6xl px-4 pb-10 sm:pb-12">
-      <div
-        className="glass-panel relative mx-auto overflow-hidden rounded-3xl p-1"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        <div className="relative h-52 sm:h-72 lg:h-80">
-          {LOOP_SLIDES.map((s, i) => {
-            const Icon = s.icon;
-            const active = i === idx;
-            return (
-              <div
-                key={s.label}
-                aria-hidden={!active}
-                className="absolute inset-0 flex items-center justify-center rounded-3xl transition-opacity duration-700 ease-in-out"
-                style={{ background: s.bg, opacity: active ? 1 : 0 }}
-              >
-                <div className="flex flex-col items-center gap-3 text-center text-white drop-shadow-lg">
-                  <Icon className="h-14 w-14" strokeWidth={1.5} />
-                  <div className="text-2xl font-extrabold tracking-tight sm:text-4xl">{s.label}</div>
-                  <div className="text-sm opacity-90 sm:text-base">{s.tagline}</div>
-                  <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] opacity-80">
-                    Powered by Motion2AI
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
-          {LOOP_SLIDES.map((s, i) => (
-            <button
-              key={s.label}
-              type="button"
-              aria-label={`Show ${s.label}`}
-              onClick={() => setIdx(i)}
-              className={
-                "h-2 rounded-full transition-all " +
-                (i === idx ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/80")
-              }
-            />
-          ))}
-        </div>
-      </div>
-      <p className="mt-3 text-center text-xs text-muted-foreground">
-        A single hub for image, video, and music — powered by Motion2AI.
-      </p>
     </section>
   );
 }
