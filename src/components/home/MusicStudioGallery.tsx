@@ -92,7 +92,7 @@ export function MusicStudioGallery() {
               </span>
             </Link>
             <div className="px-2.5 py-2">
-              <h3 className="text-[12px] font-semibold leading-tight line-clamp-1">{t.title}</h3>
+              <h3 className={"text-[12px] font-semibold leading-tight line-clamp-1"}>{t.title}</h3>
             </div>
           </article>
         ))}
