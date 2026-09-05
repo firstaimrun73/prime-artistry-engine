@@ -49,11 +49,11 @@ function RemoveCard() {
   return (
     <article
       className={cn(
-        "group relative flex w-full max-w-[380px] flex-col overflow-hidden rounded-3xl border shadow-md",
+        "group relative isolate flex w-full max-w-[380px] flex-col overflow-hidden rounded-2xl border shadow-md",
         isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
       )}
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
+      <div className="relative z-0 aspect-[4/5] w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
         <DemoErrorBoundary>
           <CircleRemoveHeroDemo />
         </DemoErrorBoundary>
@@ -91,7 +91,7 @@ function RemoveCard() {
               isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
             )}
           >
-            Mark people and clutter — keep the landmark, open the frame.
+            Paint over people, objects, or clutter you want removed. Circle 2edit reconstructs the scene while preserving the surrounding image.
           </p>
         </div>
         <Link
@@ -115,11 +115,11 @@ function AddCard() {
   return (
     <article
       className={cn(
-        "group relative flex w-full max-w-[380px] flex-col overflow-hidden rounded-3xl border shadow-md",
+        "group relative isolate flex w-full max-w-[380px] flex-col overflow-hidden rounded-2xl border shadow-md",
         isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
       )}
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
+      <div className="relative z-0 aspect-[4/5] w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
         <DemoErrorBoundary>
           <CircleAddHeroDemo />
         </DemoErrorBoundary>
@@ -148,7 +148,7 @@ function AddCard() {
               isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
             )}
           >
-            Paint where to place an object — AI matches light and perspective.
+            Paint where the new object should sit. AI matches lighting, scale, perspective, and scene integration.
           </p>
         </div>
         <Link
@@ -164,18 +164,34 @@ function AddCard() {
 }
 
 export function CircleSampleGallery() {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-
   return (
-    <section className="mt-8 space-y-5" data-circle-samples="whats-new">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-[17px] font-extrabold tracking-tight">What's New</h2>
-          <p className={cn("mt-0.5 text-[13px] font-medium", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-            Circle 2edit — mark · remove · add
-          </p>
+    <section className="mt-8 space-y-0" data-circle-samples="whats-new">
+      <div className="overflow-hidden rounded-2xl bg-[#12141C] px-4 py-5 text-white sm:px-6 sm:py-6">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#A89BFF]">What's New</p>
+        <h2 className="mt-1.5 text-[18px] font-extrabold tracking-tight sm:text-[20px]">
+          Circle 2edit
+        </h2>
+        <p className="mt-1 max-w-xl text-[13px] leading-snug text-white/70">
+          New ways to remove and add objects — mark a region, generate, keep the rest of the frame.
+        </p>
+      </div>
+
+      <div
+        className={cn(
+          "mt-4 flex flex-col gap-4",
+          "sm:flex-row sm:gap-4 sm:overflow-x-auto sm:pb-2",
+          "sm:snap-x sm:snap-mandatory",
+        )}
+      >
+        <div className="sm:snap-start sm:w-[min(100%,340px)] sm:shrink-0">
+          <RemoveCard />
         </div>
+        <div className="sm:snap-start sm:w-[min(100%,340px)] sm:shrink-0">
+          <AddCard />
+        </div>
+      </div>
+
+      <div className="mt-3 flex justify-end">
         <Link
           to="/about"
           hash="circle-2edit"
@@ -183,11 +199,6 @@ export function CircleSampleGallery() {
         >
           How it works
         </Link>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 sm:justify-items-center">
-        <RemoveCard />
-        <AddCard />
       </div>
     </section>
   );
