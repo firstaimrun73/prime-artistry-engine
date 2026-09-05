@@ -240,15 +240,108 @@ function AboutProductPage() {
             One place to create, edit, and reimagine images, video, and music with AI.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-neutral-700 sm:text-lg">
-            This page documents how Motio2edit works today: Image Studio modes and tags, credits and quality,
-            Maluto AI, Circle 2edit, Filters, and Lenses. Video Studio and Music Studio headings are reserved
-            while those product specs are finalized.
+            This page documents how Motio2edit works today across Image Studio, Video Studio, Music Studio,
+            Maluto AI, Circle 2edit, Filters, and Lenses — modes, quality, credits, and practical workflows.
           </p>
         </section>
 
         <Divider />
 
-        {/* FULL PAGE RESTORED - content continues with all sections from 2cd6fe5 + credits fix */}
+        <section id="image-studio" aria-labelledby="image-h" className="scroll-mt-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: IMAGE_ACCENT }}>
+            Generate · edit · refine
+          </p>
+          <h2 id="image-h" className="mt-2 text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
+            Image Studio
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Image Studio covers text-to-image and image-to-image generation, plus focused edit tools.
+            Choose quality and aspect ratio, add semantic tags when helpful, and spend credits by path
+            (Standard, Premium, Ultra, Auto Edit).
+          </p>
+          <StepDiagram
+            accent={IMAGE_ACCENT}
+            steps={["Prompt or upload", "Quality & tags", "Generate", "Refine", "Download"]}
+          />
+          <Table
+            accent={IMAGE_ACCENT}
+            headers={["Path", "Typical credits"]}
+            rows={[
+              ["Standard", String(STANDARD_CREDITS)],
+              ["Premium", String(PREMIUM_T2I_CREDITS)],
+              ["Ultra", String(ULTRA_T2I_CREDITS)],
+              [AUTO_EDIT_PRODUCT_NAME, Object.values(AUTO_EDIT_CREDITS_BY_QUALITY).map(String).join(" / ")],
+            ]}
+          />
+          <h3 className="mt-10 text-base font-semibold text-neutral-900">Quality & dimensions</h3>
+          <Table headers={["Quality", "1:1 example", "16:9 example", "Best for"]} rows={qualityRows} />
+          <h3 className="mt-10 text-base font-semibold text-neutral-900">Aspect ratios</h3>
+          <Table headers={["Ratio", "Shape", "Use", "Notes"]} rows={aspectRows} />
+          <p className="mt-4 text-sm text-neutral-600">
+            Semantic tags: up to {MAX_SEMANTIC_TAGS} from a registry of {tagCount} tags across categories
+            ({Array.from(tagsByCategory.keys()).join(", ")}).
+          </p>
+        </section>
+
+        <Divider />
+
+        <section id="video-studio" aria-labelledby="video-h" className="scroll-mt-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: VIDEO_ACCENT }}>
+            Motion · scene · clip
+          </p>
+          <h2 id="video-h" className="mt-2 text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
+            Video Studio
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Video Studio turns text or still images into short cinematic clips. Describe the scene or upload a
+            reference, pick duration and aspect, then generate. Clips are suited to social and concept
+            previews; longer timelines and advanced audio tools continue to expand with the product.
+          </p>
+          <StepDiagram
+            accent={VIDEO_ACCENT}
+            steps={["Text or still", "Duration & aspect", "Generate", "Preview", "Download"]}
+          />
+        </section>
+
+        <Divider />
+
+        <section id="music-studio" aria-labelledby="music-h" className="scroll-mt-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: MUSIC_ACCENT }}>
+            Score · mood · track
+          </p>
+          <h2 id="music-h" className="mt-2 text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
+            Music Studio
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Music Studio generates original tracks from text prompts. Pick genre and mood chips, generate a
+            bed or full track, then download for use in video or standalone listening. Credit costs and
+            length options follow the active plan.
+          </p>
+          <StepDiagram
+            accent={MUSIC_ACCENT}
+            steps={["Prompt & mood", "Generate", "Listen", "Download"]}
+          />
+        </section>
+
+        <Divider />
+
+        <section id="maluto-ai" aria-labelledby="maluto-h" className="scroll-mt-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: MALUTO_ACCENT }}>
+            Guide · suggest · orient
+          </p>
+          <h2 id="maluto-h" className="mt-2 text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
+            Maluto AI
+          </h2>
+          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Maluto AI is Motio2edit's in-product assistant for creative guidance — helping refine ideas,
+            suggest edit directions, and orient you inside the studios. Generation credits for Image, Video,
+            and Music still apply when you run those tools; Maluto itself is guidance, not a separate
+            generation meter on this page.
+          </p>
+        </section>
+
+        <Divider />
+
         <section id="circle-2edit" aria-labelledby="circle-h" className="scroll-mt-24">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: CIRCLE }}>
             Mark · remove · add
