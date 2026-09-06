@@ -70,6 +70,11 @@ function nightLift(src: HTMLCanvasElement, strength = 0.75): HTMLCanvasElement {
   return put(out, img);
 }
 
+/** Strong night/face light boost for bulb mode. */
+export function nightBoostPreview(src: HTMLCanvasElement, strength = 0.85): HTMLCanvasElement {
+  return nightLift(src, strength);
+}
+
 function denoise(src: HTMLCanvasElement): HTMLCanvasElement {
   const w = src.width, h = src.height;
   const s = data(src).data;
@@ -353,9 +358,9 @@ export function applyLensOpticalEnhanced(
   let base = cropToAspect(source, aspectId);
   switch (lens.id) {
     case "lens_widevista":
-      return sharpen(radialMap(base, 0.45), 0.4);
+      return sharpen(radialMap(base, 0.55), 0.45);
     case "lens_ultrawide_horizon":
-      return grade(radialMap(base, 0.72), "contrast(1.08) saturate(1.1)");
+      return grade(radialMap(base, 0.95), "contrast(1.12) saturate(1.15)");
     case "lens_fisheye_orbit":
       return fisheyeMap(base);
     case "lens_natural_frame":
@@ -374,7 +379,7 @@ export function applyLensOpticalEnhanced(
     case "lens_architect_align":
       return sharpen(grade(radialMap(base, -0.22), "contrast(1.12) saturate(0.92)"), 0.4);
     case "lens_dreamsoft":
-      return softFocus(nightLift(denoise(base), 0.85), 3);
+      return softFocus(nightLift(denoise(base), 1.0), 2.5);
     case "lens_glowmist":
       return diffusionGlow(nightLift(base, 0.35));
     case "lens_starflare": {
@@ -396,9 +401,9 @@ export function applyLensOpticalEnhanced(
     case "lens_vintage_halation":
       return vintageHalation(base);
     case "lens_infraglow":
-      return infraredLook(base);
+      return infraredLook(nightLift(base, 0.5));
     case "lens_longglass_detail":
-      return grade(sharpen(denoise(teleCrop(base, 1.7)), 0.85), "contrast(1.12) saturate(1.08)");
+      return grade(sharpen(denoise(denoise(teleCrop(base, 1.35))), 1.0), "contrast(1.18) saturate(1.12) brightness(1.04)");
     case "lens_perspective_stretch":
       return grade(radialMap(base, 0.85), "contrast(1.1) saturate(1.08)");
     default:
