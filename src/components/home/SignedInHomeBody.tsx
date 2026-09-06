@@ -18,9 +18,8 @@ import { canAccessMusic, canAccessVideo } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
-import { ImagineGallery } from "@/components/home/ImagineGallery";
-import { VideoStudioGallery } from "@/components/home/VideoStudioGallery";
-import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
+import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery";
+import { ExtraaSection } from "@/components/home/ExtraaSection";
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 
 const QUICK_CREATE = [
@@ -30,16 +29,10 @@ const QUICK_CREATE = [
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
   { to: "/studio/image/auto-edit" as const, label: "Auto Edit", icon: Sparkles },
   { to: "/studio/image/filters" as const, label: "Filters", icon: Filter },
-  { to: "/studio/image/lenses" as const, label: "Lenses", icon: Aperture },
+  { to: "/studio/image/lens-editor" as const, label: "Lenses", icon: Aperture },
 ] as const;
 
-const AUTO_EDIT_FLOW = [
-  "Input",
-  "AI analysis",
-  "One click",
-  "Editing",
-  "Output",
-] as const;
+const AUTO_EDIT_FLOW = ["Input", "AI analysis", "One click", "Editing", "Output"] as const;
 
 export function SignedInHomeBody() {
   const { profile } = useAuth();
@@ -96,7 +89,7 @@ export function SignedInHomeBody() {
                     | "/studio/image/circle-remove"
                     | "/studio/image/auto-edit"
                     | "/studio/image/filters"
-                    | "/studio/image/lenses"
+                    | "/studio/image/lens-editor"
                 }
                 className="flex min-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
@@ -115,37 +108,10 @@ export function SignedInHomeBody() {
 
       <CircleSampleGallery />
 
-      <section className="mt-12 space-y-6" data-motion2ai-creation>
-        <div className="space-y-1">
-          <h2 className="flex items-center gap-2 text-[20px] font-extrabold tracking-tight sm:text-[22px]">
-            <span>
-              Motion<span className="text-primary">2</span>AI Creation
-            </span>
-            <svg
-              aria-hidden
-              viewBox="0 0 24 24"
-              className="h-5 w-5 shrink-0 text-primary sm:h-6 sm:w-6"
-              fill="currentColor"
-            >
-              <path d="M12 2l1.2 6.3L19.5 9 13.2 10.7 12 17l-1.2-6.3L4.5 9l6.3-.7L12 2z" />
-              <path
-                d="M18.5 14l.6 2.6 2.4.6-2.4.6-.6 2.6-.6-2.6-2.4-.6 2.4-.6.6-2.6z"
-                opacity="0.85"
-              />
-              <path
-                d="M5.2 15.5l.45 1.9 1.8.45-1.8.45-.45 1.9-.45-1.9-1.8-.45 1.8-.45.45-1.9z"
-                opacity="0.7"
-              />
-            </svg>
-          </h2>
-          <p className="text-[13px] text-muted-foreground">
-            Image, video, and music samples from Motio2edit.
-          </p>
-        </div>
-        <ImagineGallery />
-        <VideoStudioGallery />
-        <MusicStudioGallery />
-      </section>
+      <div className="mt-12 space-y-2">
+        <VisualDiscoveryGallery />
+        <ExtraaSection />
+      </div>
 
       <FilterLensHomeSection />
 
