@@ -1,6 +1,5 @@
 /**
- * Motio2edit Lens Editor — camera product roster.
- * All 20 lenses are full client-side camera software (free, no AI).
+ * Motio2edit original lens names — premium optical character, no brand trademarks.
  */
 
 export type LensOpticalConcept =
@@ -41,26 +40,26 @@ export const LENS_AI_MAX_CREDITS = 25 as const;
 export const LENS_GENERATION_CREDITS = 0 as const;
 
 export const CAMERA_LENS_ROSTER: CameraLensDef[] = [
-  { id: "lens_widevista", name: "Widevista", concept: "wide-angle", shortDescription: "Wider field of view", status: "full", creditCost: 0 },
-  { id: "lens_ultrawide_horizon", name: "Ultrawide Horizon", concept: "ultra-wide", shortDescription: "Extra-wide scene coverage", status: "full", creditCost: 0 },
-  { id: "lens_fisheye_orbit", name: "Fisheye Orbit", concept: "fisheye", shortDescription: "Circular fisheye look", status: "full", creditCost: 0 },
-  { id: "lens_natural_frame", name: "Natural Frame", concept: "standard", shortDescription: "Clean clarity + less grain", status: "full", creditCost: 0 },
-  { id: "lens_portrait_bloom", name: "Portrait Bloom", concept: "portrait-prime", shortDescription: "Soft background separation", status: "full", creditCost: 0 },
-  { id: "lens_cinematic_compress", name: "Cinematic Compress", concept: "telephoto", shortDescription: "Movie color + mild zoom", status: "full", creditCost: 0 },
-  { id: "lens_farreach", name: "FarReach", concept: "super-telephoto", shortDescription: "Strong zoom + detail", status: "full", creditCost: 0 },
-  { id: "lens_microreveal", name: "MicroReveal", concept: "macro", shortDescription: "Close-up detail boost", status: "full", creditCost: 0 },
-  { id: "lens_miniature_shift", name: "Miniature Shift", concept: "tilt-shift", shortDescription: "Tilt-shift miniature", status: "full", creditCost: 0 },
-  { id: "lens_architect_align", name: "Architect Align", concept: "perspective-correction", shortDescription: "Straighter lines + clarity", status: "full", creditCost: 0 },
-  { id: "lens_dreamsoft", name: "DreamSoft", concept: "soft-focus", shortDescription: "Soft glow + night lift", status: "full", creditCost: 0 },
-  { id: "lens_glowmist", name: "GlowMist", concept: "diffusion", shortDescription: "Diffusion glow", status: "full", creditCost: 0 },
-  { id: "lens_starflare", name: "Starflare", concept: "diffraction", shortDescription: "Highlight bloom", status: "full", creditCost: 0 },
-  { id: "lens_prism_echo", name: "Prism Echo", concept: "prism", shortDescription: "Edge prism shift", status: "full", creditCost: 0 },
-  { id: "lens_swirl_depth", name: "Swirl Depth", concept: "swirly-bokeh", shortDescription: "Swirly edge blur", status: "full", creditCost: 0 },
-  { id: "lens_vintage_halation", name: "Vintage Halation", concept: "vintage", shortDescription: "Warm vintage glow", status: "full", creditCost: 0 },
-  { id: "lens_infraglow", name: "InfraGlow", concept: "infrared", shortDescription: "Infrared-style tones", status: "full", creditCost: 0 },
-  { id: "lens_longglass_detail", name: "LongGlass Detail", concept: "long-glass", shortDescription: "HQ sharpen + clean", status: "full", creditCost: 0 },
-  { id: "lens_perspective_stretch", name: "Perspective Stretch", concept: "strong-wide-perspective", shortDescription: "Strong wide perspective", status: "full", creditCost: 0 },
-  { id: "lens_selective_focus", name: "Selective Focus", concept: "selective-focus", shortDescription: "Focus band blur", status: "full", creditCost: 0 },
+  { id: "lens_widevista", name: "VistaWide", concept: "wide-angle", shortDescription: "Open wide field", status: "full", creditCost: 0 },
+  { id: "lens_ultrawide_horizon", name: "HorizonX", concept: "ultra-wide", shortDescription: "Ultra-wide scene", status: "full", creditCost: 0 },
+  { id: "lens_fisheye_orbit", name: "OrbEye", concept: "fisheye", shortDescription: "Full circular eye", status: "full", creditCost: 0 },
+  { id: "lens_natural_frame", name: "TrueTone", concept: "standard", shortDescription: "Clean natural clarity", status: "full", creditCost: 0 },
+  { id: "lens_portrait_bloom", name: "SoftPrime", concept: "portrait-prime", shortDescription: "Portrait soft depth", status: "full", creditCost: 0 },
+  { id: "lens_cinematic_compress", name: "CineFrame", concept: "telephoto", shortDescription: "Cinematic grade", status: "full", creditCost: 0 },
+  { id: "lens_farreach", name: "FarGlass", concept: "super-telephoto", shortDescription: "Long reach zoom", status: "full", creditCost: 0 },
+  { id: "lens_microreveal", name: "MicroPeak", concept: "macro", shortDescription: "Macro detail peak", status: "full", creditCost: 0 },
+  { id: "lens_miniature_shift", name: "MiniWorld", concept: "tilt-shift", shortDescription: "Miniature world", status: "full", creditCost: 0 },
+  { id: "lens_architect_align", name: "LineTrue", concept: "perspective-correction", shortDescription: "Straight architecture", status: "full", creditCost: 0 },
+  { id: "lens_dreamsoft", name: "NightLift", concept: "soft-focus", shortDescription: "Brighten dark scenes", status: "full", creditCost: 0 },
+  { id: "lens_glowmist", name: "MistGlow", concept: "diffusion", shortDescription: "Soft diffusion light", status: "full", creditCost: 0 },
+  { id: "lens_starflare", name: "StarBloom", concept: "diffraction", shortDescription: "Highlight star bloom", status: "full", creditCost: 0 },
+  { id: "lens_prism_echo", name: "PrismEdge", concept: "prism", shortDescription: "Prism edge shift", status: "full", creditCost: 0 },
+  { id: "lens_swirl_depth", name: "SwirlBokeh", concept: "swirly-bokeh", shortDescription: "Swirling depth blur", status: "full", creditCost: 0 },
+  { id: "lens_vintage_halation", name: "RetroWarm", concept: "vintage", shortDescription: "Warm retro film", status: "full", creditCost: 0 },
+  { id: "lens_infraglow", name: "InfraTone", concept: "infrared", shortDescription: "Infrared color map", status: "full", creditCost: 0 },
+  { id: "lens_longglass_detail", name: "CrystalHQ", concept: "long-glass", shortDescription: "HQ sharp clean", status: "full", creditCost: 0 },
+  { id: "lens_perspective_stretch", name: "DeepWide", concept: "strong-wide-perspective", shortDescription: "Deep wide stretch", status: "full", creditCost: 0 },
+  { id: "lens_selective_focus", name: "FocusBand", concept: "selective-focus", shortDescription: "Selective focus band", status: "full", creditCost: 0 },
 ];
 
 export function getDefaultCameraLens(): CameraLensDef {
@@ -71,3 +70,15 @@ export function getCameraLensById(id: string | null | undefined): CameraLensDef 
   if (!id) return undefined;
   return CAMERA_LENS_ROSTER.find((l) => l.id === id);
 }
+
+export const LENS_ASPECT_PRESETS = [
+  { id: "native", label: "Native", ratio: 0 },
+  { id: "1:1", label: "1:1", ratio: 1 },
+  { id: "4:3", label: "4:3", ratio: 4 / 3 },
+  { id: "3:4", label: "3:4", ratio: 3 / 4 },
+  { id: "16:9", label: "16:9", ratio: 16 / 9 },
+  { id: "9:16", label: "9:16", ratio: 9 / 16 },
+  { id: "21:9", label: "21:9", ratio: 21 / 9 },
+] as const;
+
+export type LensAspectId = (typeof LENS_ASPECT_PRESETS)[number]["id"];
