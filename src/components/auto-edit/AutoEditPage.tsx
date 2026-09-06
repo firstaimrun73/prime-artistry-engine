@@ -2,14 +2,13 @@
  * Maluto AI — Auto Edit product page.
  * Glassy, minimal copy. Backend: runStandaloneAutoEdit (vision + FLUX Kontext).
  *
- * UI fixes (Sep 2026):
- * - No Motio2edit Header bar on this page
- * - Clean back + Maluto AI title only
- * - i-button floating credit cost (auto-hides)
- * - Full-width Enhance button
- * - Hide clear (X) after generation
- * - How Maluto AI Works visual flow
- * - FAQs section (no recent history)
+ * UI:
+ * - No global Header; back + Motio2edit + Maluto AI + live gem
+ * - i-button shows credit cost table (auto-hides)
+ * - Full-width Enhance; hide X after generation
+ * - Map-style How-it-works flow with gentle dotted connectors
+ * - FAQs (no recent history block)
+ * - History already persisted server-side (input + output + quality)
  */
 import { Link } from "@tanstack/react-router";
 import {
@@ -31,6 +30,7 @@ import {
   Download,
   Eye,
   FileStack,
+  Gem,
   ImageIcon,
   Info,
   Loader2,
@@ -46,6 +46,7 @@ import { useAuth } from "@/lib/auth";
 import { runStandaloneAutoEdit } from "@/lib/auto-edit/auto-edit.functions";
 import {
   AUTO_EDIT_PRODUCT_NAME,
+  AUTO_EDIT_CREDITS_BY_QUALITY,
   autoEditCreditCost,
   type AutoEditQuality,
 } from "@/lib/auto-edit/constants";
@@ -59,13 +60,16 @@ import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { uploadToStorage } from "@/lib/editor/editor.utils";
 import { cn } from "@/lib/utils";
 
-const PIPELINE = [
-  "Upload",
-  "Analyse",
-  "Plan",
-  "Generate",
-  "Finish",
-] as const;
+const PIPELINE = ["Upload", "Analyse", "Plan", "Generate", "Finish"] as const;
+
+const CREDIT_TABLE: { label: string; credits: number }[] = [
+  { label: "SD", credits: AUTO_EDIT_CREDITS_BY_QUALITY.sd },
+  { label: "HD", credits: AUTO_EDIT_CREDITS_BY_QUALITY.hd },
+  { label: "2K", credits: AUTO_EDIT_CREDITS_BY_QUALITY["2k"] },
+  { label: "4K", credits: AUTO_EDIT_CREDITS_BY_QUALITY["4k"] },
+  { label: "8K", credits: AUTO_EDIT_CREDITS_BY_QUALITY["8k"] },
+  { label: "8K Max", credits: AUTO_EDIT_CREDITS_BY_QUALITY["8k_max"] },
+];
 
 const FAQ_ITEMS = [
   {
@@ -94,6 +98,13 @@ const FAQ_ITEMS = [
   },
 ] as const;
 
+const FLOW_STEPS = [
+  { icon: Eye, title: "Analyse", desc: "Vision model studies the photo" },
+  { icon: FileStack, title: "Filing", desc: "Issues & edit plan are structured" },
+  { icon: Cloud, title: "Data server", desc: "Secure cloud GPU processes the edit" },
+  { icon: Sparkles, title: "Output", desc: "Polished image is returned" },
+] as const;
+
 function isAcceptableImageFile(file: File): boolean {
   return (
     file.type.startsWith("image/") ||
@@ -116,7 +127,7 @@ export function AutoEditPage() {
   const [dlBusy, setDlBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [showCost, setShowCost] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [openFaq, setOpenFaq] = useState<number | null>(1);
   const inputRef = useRef<HTMLInputElement>(null);
   const costTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -128,11 +139,10 @@ export function AutoEditPage() {
   const isAdmin = isAdminEmail(user?.email);
   const creditCost = autoEditCreditCost(quality);
 
-  // Floating cost: show briefly when quality changes or user taps i
   const revealCost = useCallback(() => {
     setShowCost(true);
     if (costTimer.current) clearTimeout(costTimer.current);
-    costTimer.current = setTimeout(() => setShowCost(false), 3500);
+    costTimer.current = setTimeout(() => setShowCost(false), 5000);
   }, []);
 
   useEffect(() => {
@@ -200,7 +210,6 @@ export function AutoEditPage() {
       const uploaded = await uploadToStorage(file, user.id);
       setStep(1);
       setProgress(35);
-      // Plan step is implicit in the server pipeline; surface it briefly
       setStep(2);
       setProgress(50);
       const result = await runEdit({
@@ -261,15 +270,16 @@ export function AutoEditPage() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-violet-50 via-background to-background dark:from-violet-950/40">
         <main className="mx-auto max-w-md px-4 py-16 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg backdrop-blur">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg">
             <Sparkles className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
+            Motio2edit
+          </p>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight">
             {AUTO_EDIT_PRODUCT_NAME}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to enhance one photo.
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">Sign in to enhance one photo.</p>
           <Link
             to="/auth"
             search={{ redirect: "/studio/image/auto-edit" }}
@@ -284,27 +294,40 @@ export function AutoEditPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-violet-50/90 via-background to-cyan-50/30 dark:from-violet-950/40 dark:via-background dark:to-background">
-      {/* No global Header on Maluto AI page */}
       <main className="mx-auto max-w-xl px-4 py-6 sm:py-10">
-        {/* Clean page header: back + title only */}
+        {/* Header: back · Motio2edit · Maluto AI + live gem */}
         <div className="mb-5 flex items-center gap-3">
           <Link
             to="/"
-            className="grid h-9 w-9 place-items-center rounded-full border border-white/40 bg-white/50 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/40 bg-white/50 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/5"
             aria-label="Home"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <h1 className="text-xl font-extrabold tracking-tight">
-            {AUTO_EDIT_PRODUCT_NAME}
-          </h1>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
+              Motio2edit
+            </p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-extrabold tracking-tight">{AUTO_EDIT_PRODUCT_NAME}</h1>
+              {/* Live gem — Gemini-style motion */}
+              <span
+                className="relative inline-flex h-6 w-6 items-center justify-center"
+                title="Maluto AI is live"
+                aria-label="Live"
+              >
+                <span className="absolute inset-0 animate-ping rounded-full bg-violet-400/40" />
+                <span className="absolute inset-0.5 animate-pulse rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-400 to-cyan-400 opacity-80" />
+                <Gem className="relative h-3.5 w-3.5 text-white drop-shadow" />
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Live pipeline strip */}
+        {/* Pipeline strip */}
         <div className="mb-5 flex items-center justify-between gap-1 rounded-2xl border border-white/50 bg-white/40 px-3 py-2.5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
           {PIPELINE.map((label, i) => {
-            const done =
-              step > i || (progress === 100 && i === PIPELINE.length - 1);
+            const done = step > i || (progress === 100 && i === PIPELINE.length - 1);
             const active = busy && step === i;
             return (
               <div key={label} className="flex flex-1 flex-col items-center gap-1">
@@ -318,14 +341,13 @@ export function AutoEditPage() {
                 >
                   {done ? <Check className="h-3 w-3" /> : i + 1}
                 </span>
-                <span className="text-[9px] font-medium text-muted-foreground">
-                  {label}
-                </span>
+                <span className="text-[9px] font-medium text-muted-foreground">{label}</span>
               </div>
             );
           })}
         </div>
 
+        {/* Upload / result card */}
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -362,7 +384,6 @@ export function AutoEditPage() {
                     className="mx-auto max-h-[400px] w-auto object-contain"
                   />
                 )}
-                {/* Hide clear (X) after generation — only show while no output */}
                 {!output && (
                   <button
                     type="button"
@@ -375,7 +396,7 @@ export function AutoEditPage() {
                 )}
               </div>
 
-              {/* Quality pills + i-button credit cost */}
+              {/* Quality + i credit table */}
               <div className="flex flex-wrap items-center gap-2">
                 {qualityOptions.map((opt) => (
                   <button
@@ -393,20 +414,40 @@ export function AutoEditPage() {
                   </button>
                 ))}
 
-                {/* i button — never shows total balance, only job cost */}
                 {!isAdmin && (
                   <div className="relative ml-auto">
                     <button
                       type="button"
                       onClick={revealCost}
                       className="grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-white/40 text-violet-600 backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-violet-300"
-                      aria-label="Show credit cost"
+                      aria-label="Show credit costs"
                     >
                       <Info className="h-4 w-4" />
                     </button>
                     {showCost && (
-                      <div className="absolute right-0 top-full z-20 mt-1.5 whitespace-nowrap rounded-full border border-violet-300/50 bg-violet-600 px-3 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in zoom-in-95 duration-200">
-                        {creditCost} credits
+                      <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-2xl border border-violet-300/40 bg-white/95 p-2 shadow-xl backdrop-blur-xl dark:border-violet-500/30 dark:bg-violet-950/95">
+                        <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+                          Credit costs
+                        </p>
+                        <div className="space-y-0.5">
+                          {CREDIT_TABLE.map((row) => (
+                            <div
+                              key={row.label}
+                              className={cn(
+                                "flex items-center justify-between rounded-lg px-2 py-1 text-[11px]",
+                                row.credits === creditCost
+                                  ? "bg-violet-500/15 font-semibold text-violet-700 dark:text-violet-200"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              <span>{row.label}</span>
+                              <span>{row.credits}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-1.5 border-t border-violet-200/50 px-1 pt-1.5 text-[10px] text-muted-foreground dark:border-violet-500/20">
+                          Selected: <strong>{creditCost} credits</strong>
+                        </p>
                       </div>
                     )}
                   </div>
@@ -422,7 +463,6 @@ export function AutoEditPage() {
                 </div>
               )}
 
-              {/* Full-width Enhance button */}
               <div className="space-y-2">
                 <Button
                   type="button"
@@ -481,83 +521,36 @@ export function AutoEditPage() {
 
         {output && (
           <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-            <Check className="h-3.5 w-3.5" /> Ready
+            <Check className="h-3.5 w-3.5" /> Ready · saved to History
           </p>
         )}
 
-        {/* ── How Maluto AI Works ── */}
+        {/* ── How Maluto AI Works — map-style flow ── */}
         <section className="mt-10">
-          <h2 className="text-center text-sm font-bold tracking-tight text-foreground">
-            How Maluto AI Works
-          </h2>
+          <h2 className="text-center text-sm font-bold tracking-tight">How Maluto AI Works</h2>
           <p className="mt-1 text-center text-[11px] text-muted-foreground">
             One photo in → intelligent analysis → polished result
           </p>
 
-          <div className="relative mt-6 flex flex-col items-stretch gap-0 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
-            {[
-              {
-                icon: Eye,
-                title: "Analyse",
-                desc: "Vision model studies the photo",
-              },
-              {
-                icon: FileStack,
-                title: "Filing",
-                desc: "Issues & edit plan are structured",
-              },
-              {
-                icon: Cloud,
-                title: "Data server",
-                desc: "Secure cloud GPU processes the edit",
-              },
-              {
-                icon: Sparkles,
-                title: "Output",
-                desc: "Polished image is returned",
-              },
-            ].map((s, idx) => (
-              <div
-                key={s.title}
-                className="relative flex flex-1 flex-col items-center"
-              >
-                {/* Curved dotted connector (desktop) */}
-                {idx < 3 && (
+          <div className="relative mx-auto mt-8 max-w-sm">
+            {FLOW_STEPS.map((s, idx) => (
+              <div key={s.title} className="relative flex gap-4 pb-8 last:pb-0">
+                {/* Vertical map line with gentle curve feel */}
+                {idx < FLOW_STEPS.length - 1 && (
                   <div
-                    className="pointer-events-none absolute left-[calc(50%+28px)] top-7 hidden h-0.5 w-[calc(100%-56px)] sm:block"
-                    aria-hidden
-                  >
-                    <svg
-                      className="h-3 w-full overflow-visible"
-                      viewBox="0 0 100 12"
-                      preserveAspectRatio="none"
-                    >
-                      <path
-                        d="M0 6 Q 50 -4 100 6"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeDasharray="4 4"
-                        className="text-violet-400/70 dark:text-violet-500/50"
-                      />
-                    </svg>
-                  </div>
-                )}
-                {/* Vertical dotted connector (mobile) */}
-                {idx < 3 && (
-                  <div
-                    className="absolute left-1/2 top-[56px] h-6 w-px -translate-x-1/2 border-l border-dashed border-violet-400/60 sm:hidden"
+                    className="absolute left-[27px] top-14 bottom-0 w-0 border-l-2 border-dashed border-violet-400/50 dark:border-violet-500/40"
                     aria-hidden
                   />
                 )}
 
-                <div className="z-10 grid h-14 w-14 place-items-center rounded-2xl border border-violet-300/40 bg-gradient-to-br from-violet-500/15 to-cyan-400/15 text-violet-600 shadow-sm backdrop-blur dark:border-violet-500/30 dark:text-violet-300">
+                <div className="relative z-10 grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-violet-300/50 bg-gradient-to-br from-violet-500/15 to-cyan-400/15 text-violet-600 shadow-sm dark:border-violet-500/30 dark:text-violet-300">
                   <s.icon className="h-6 w-6" />
                 </div>
-                <p className="mt-2 text-xs font-bold text-foreground">{s.title}</p>
-                <p className="mt-0.5 max-w-[110px] text-center text-[10px] leading-snug text-muted-foreground">
-                  {s.desc}
-                </p>
+
+                <div className="flex min-w-0 flex-1 flex-col justify-center pt-1">
+                  <p className="text-sm font-bold text-foreground">{s.title}</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{s.desc}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -565,9 +558,7 @@ export function AutoEditPage() {
 
         {/* ── FAQs ── */}
         <section className="mt-10 mb-8">
-          <h2 className="mb-3 text-center text-sm font-bold tracking-tight">
-            Maluto AI FAQs
-          </h2>
+          <h2 className="mb-3 text-center text-sm font-bold tracking-tight">Maluto AI FAQs</h2>
           <div className="space-y-2">
             {FAQ_ITEMS.map((item, i) => {
               const open = openFaq === i;
@@ -581,9 +572,7 @@ export function AutoEditPage() {
                     onClick={() => setOpenFaq(open ? null : i)}
                     className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                   >
-                    <span className="text-xs font-semibold text-foreground">
-                      {item.q}
-                    </span>
+                    <span className="text-xs font-semibold text-foreground">{item.q}</span>
                     <ChevronDown
                       className={cn(
                         "h-4 w-4 shrink-0 text-violet-500 transition-transform",
