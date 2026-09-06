@@ -3,13 +3,12 @@ import { FooterAd } from "@/components/ads";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, Video, Music, Lock, ArrowRight, Check } from "lucide-react";
+import { Image as ImageIcon, Video, Music, ArrowRight, Check } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/routes/feedback";
 import { useAuth } from "@/lib/auth";
-import { isAdminEmail } from "@/lib/admin-config";
 import { HomeHero } from "@/components/home/HomeHero";
 import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
 import { TrustSection } from "@/components/home/TrustSection";
@@ -17,6 +16,7 @@ import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
 import { WatchDemoSection } from "@/components/home/WatchDemoSection";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
+import { ConstructionNotice } from "@/components/home/ConstructionNotice";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { user, profile, loading } = useAuth();
+  const { user, loading } = useAuth();
   // Auth/profile race: never flash SignedOutHome for a signed-in user while loading.
   if (loading) {
     return (
@@ -57,6 +57,7 @@ function SignedInHome() {
     <div className="min-h-screen bg-background">
       <Header />
       <SignedInHomeBody />
+      <ConstructionNotice />
     </div>
   );
 }
@@ -85,6 +86,7 @@ function SignedOutHome() {
       <FinalCTA />
       <FooterAd placement="home" />
       <Footer />
+      <ConstructionNotice />
     </div>
   );
 }
