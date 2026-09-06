@@ -1,39 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ALL_LENSES, listLensSpecialties } from "@/lib/filter-lens/lenses/lens-registry";
-import { EffectStudioPage, lensToCatalogItem } from "@/components/filter-lens/EffectStudioPage";
+import { LensEditor } from "@/components/lens-camera/LensEditor";
 
-type Search = { effect?: string };
+type Search = { lens?: string; image?: string };
 
 export const Route = createFileRoute("/studio/image/lens-editor")({
   ssr: false,
   validateSearch: (search: Record<string, unknown>): Search => ({
-    effect: typeof search.effect === "string" ? search.effect : undefined,
+    lens: typeof search.lens === "string" ? search.lens : undefined,
+    image: typeof search.image === "string" ? search.image : undefined,
   }),
   head: () => ({
     meta: [
       { title: "Lens Editor — Motio2edit" },
       {
         name: "description",
-        content: "Apply Motio2edit AI Lenses to your photo. Upload or camera, intensity, undo/redo.",
+        content:
+          "Motio2edit Lens Editor — premium camera experience with optical lenses. Capture or choose a photo, pick a lens, apply.",
       },
     ],
   }),
-  component: LensEditorPage,
+  component: LensEditorRoute,
 });
 
-function LensEditorPage() {
-  const { effect } = Route.useSearch();
-  const items = ALL_LENSES.map(lensToCatalogItem);
-  const categories = listLensSpecialties();
-  return (
-    <EffectStudioPage
-      kind="lens"
-      pageMode="edit"
-      title="AI Lenses"
-      subtitle="Lens Editor"
-      items={items}
-      categories={categories}
-      initialSelectedId={effect ?? null}
-    />
-  );
+function LensEditorRoute() {
+  const { lens, image } = Route.useSearch();
+  return <LensEditor initialLensId={lens ?? null} initialImageUrl={image ?? null} />;
 }
