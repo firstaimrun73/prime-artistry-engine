@@ -2,7 +2,7 @@
  * Motio2edit Lens — camera software (20 fixed lenses).
  * Front camera default · free · on-device optics.
  * Back always returns to homepage.
- * Live aspect crop mask on preview; capture matches selected aspect.
+ * Snapchat-style aspect crop mask; FACE guide sits inside crop.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -70,9 +70,11 @@ function cropRect(
   let width: number;
   let height: number;
   if (containerR > targetRatio) {
+    // container is wider than target → letterbox left/right
     height = containerH;
     width = containerH * targetRatio;
   } else {
+    // container is taller → letterbox top/bottom
     width = containerW;
     height = containerW / targetRatio;
   }
@@ -93,7 +95,6 @@ export function LensEditor({ initialLensId }: Props) {
   const [lensId, setLensId] = useState(() => initialLensId || getDefaultCameraLens().id);
   const lens = useMemo(() => getCameraLensById(lensId) ?? getDefaultCameraLens(), [lensId]);
 
-  // Keep in sync when deep-link ?lens= changes
   useEffect(() => {
     if (initialLensId && getCameraLensById(initialLensId)) {
       setLensId(initialLensId);
@@ -106,7 +107,8 @@ export function LensEditor({ initialLensId }: Props) {
   const [aspectId, setAspectId] = useState<LensAspectId>("native");
   const [bulbOn, setBulbOn] = useState(false);
   const [faceBoxes, setFaceBoxes] = useState<FaceBox[]>([]);
-  const [faceTrack, setFaceTrack] = useState(true);
+  // Default OFF — aspect mask must be readable without orange FACE overlay
+  const [faceTrack, setFaceTrack] = useState(false);
   const [previewSize, setPreviewSize] = useState({ w: 0, h: 0 });
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -208,7 +210,6 @@ export function LensEditor({ initialLensId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, user]);
 
-  // Measure stage for aspect mask
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -228,9 +229,21 @@ export function LensEditor({ initialLensId }: Props) {
     }
     const w = previewSize.w || stageRef.current?.clientWidth || 1;
     const h = previewSize.h || stageRef.current?.clientHeight || 1;
-    // Static portrait guide when FACE is on (honest — not claimed tracking)
-    setFaceBoxes([{ x: w * 0.22, y: h * 0.18, w: w * 0.56, h: h * 0.52 }]);
-  }, [cameraReady, faceTrack, phase, previewSize.w, previewSize.h]);
+    const r =
+      aspectRatio > 0
+        ? cropRect(w, h, aspectRatio)
+        : { left: 0, top: 0, width: w, height: h };
+    const fw = r.width * 0.56;
+    const fh = Math.min(r.height * 0.62, fw * 1.35);
+    setFaceBoxes([
+      {
+        x: r.left + (r.width - fw) / 2,
+        y: r.top + (r.height - fh) / 2,
+        w: fw,
+        h: fh,
+      },
+    ]);
+  }, [cameraReady, faceTrack, phase, previewSize.w, previewSize.h, aspectRatio]);
 
   const flipCamera = () => {
     const next = facing === "environment" ? "user" : "environment";
@@ -394,25 +407,24 @@ export function LensEditor({ initialLensId }: Props) {
               )}
             />
 
-            {/* Live aspect crop mask */}
+            {/* Snapchat-style aspect crop: heavy letterbox + bright frame */}
             {showMask && (
               <div className="pointer-events-none absolute inset-0 z-10" aria-hidden>
-                {/* Dim outside crop */}
                 <div
-                  className="absolute bg-black/55"
+                  className="absolute bg-black/70"
                   style={{ left: 0, top: 0, right: 0, height: Math.max(0, mask.top) }}
                 />
                 <div
-                  className="absolute bg-black/55"
+                  className="absolute bg-black/70"
                   style={{
                     left: 0,
-                    bottom: 0,
+                    top: mask.top + mask.height,
                     right: 0,
                     height: Math.max(0, previewSize.h - mask.top - mask.height),
                   }}
                 />
                 <div
-                  className="absolute bg-black/55"
+                  className="absolute bg-black/70"
                   style={{
                     left: 0,
                     top: mask.top,
@@ -421,24 +433,31 @@ export function LensEditor({ initialLensId }: Props) {
                   }}
                 />
                 <div
-                  className="absolute bg-black/55"
+                  className="absolute bg-black/70"
                   style={{
-                    right: 0,
+                    left: mask.left + mask.width,
                     top: mask.top,
                     width: Math.max(0, previewSize.w - mask.left - mask.width),
                     height: mask.height,
                   }}
                 />
-                {/* Crop frame */}
                 <div
-                  className="absolute border border-white/70 shadow-[0_0_0_1px_rgba(0,0,0,0.3)]"
+                  className="absolute rounded-sm border-2 border-white/90"
                   style={{
                     left: mask.left,
                     top: mask.top,
                     width: mask.width,
                     height: mask.height,
+                    boxShadow:
+                      "0 0 0 1px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.15)",
                   }}
                 />
+                <span
+                  className="absolute left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/90 backdrop-blur-sm"
+                  style={{ top: Math.max(8, mask.top + 8) }}
+                >
+                  {aspectId}
+                </span>
               </div>
             )}
 
@@ -498,7 +517,8 @@ export function LensEditor({ initialLensId }: Props) {
                   aria-selected={active}
                   onClick={() => setLensId(l.id)}
                   className="flex w-[72px] shrink-0 flex-col items-center gap-1.5"
-                  style={{ scrollSnapAlign: "center" }}>
+                  style={{ scrollSnapAlign: "center" }}
+                >
                   <span
                     className={cn(
                       "grid h-14 w-14 place-items-center rounded-full border text-[10px] font-bold uppercase tracking-wide transition",
