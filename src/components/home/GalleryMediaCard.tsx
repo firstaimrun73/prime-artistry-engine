@@ -1,10 +1,10 @@
 /**
- * Shared homepage media card — media defines the card; no forced aspect wrappers.
- * Videos use the global home-video-controller mutex and tap-gated sound icon.
+ * Editorial discovery card — media-first, native ratio, independent actions:
+ * media → viewer | ♥ → favourite | ⓘ → /sample/$id
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Volume2, VolumeX } from "lucide-react";
+import { Heart, Info, Volume2, VolumeX } from "lucide-react";
 import type { R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
 import {
@@ -24,48 +24,52 @@ function parseRatio(ar: string): number {
   return w / h;
 }
 
-function maxWidthForRatio(ar: string, context: "feed" | "extraa"): string {
-  const r = parseRatio(ar);
-  if (context === "extraa") {
-    if (r >= 2.2) return "min(92vw, 720px)";
-    if (r >= 1.5) return "min(88vw, 640px)";
-    return "min(80vw, 480px)";
-  }
-  if (r < 0.75) return "min(100%, 240px)";
-  if (r < 1.05) return "min(100%, 280px)";
-  if (r < 1.5) return "min(100%, 340px)";
-  return "min(100%, 400px)";
+/** Editorial span hint for CSS grid placement (content-aware scale). */
+export function spanClassForSample(sample: R2Sample): string {
+  const r = parseRatio(sample.aspectRatio);
+  const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
+  if (r >= 2.2) return "col-span-2 md:col-span-3 lg:col-span-4";
+  if (isVideo && r >= 1.6) return "col-span-2 md:col-span-2 lg:col-span-2";
+  if (r >= 1.5 && r < 2.2) return "col-span-1 md:col-span-2 lg:col-span-2";
+  if (r < 0.85) return "col-span-1";
+  return "col-span-1";
 }
 
 function categoryBadge(sample: R2Sample): string | null {
   if (sample.homepageCategory === "try-now") return "TRY NOW";
   if (sample.homepageCategory === "trend") return "TREND";
-  if (sample.homepageCategory === "samples") return "SAMPLE";
   if (sample.studio === "circle") return "TRY NOW";
-  return "SAMPLE";
+  return null;
 }
 
 type Props = {
   sample: R2Sample;
-  context?: "feed" | "extraa";
+  liked?: boolean;
+  onToggleLike?: (sample: R2Sample) => void;
+  onOpenViewer?: (sample: R2Sample) => void;
   className?: string;
 };
 
-export function GalleryMediaCard({ sample, context = "feed", className }: Props) {
+export function GalleryMediaCard({
+  sample,
+  liked = false,
+  onToggleLike,
+  onOpenViewer,
+  className,
+}: Props) {
   const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
   const [failed, setFailed] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [activeId, setActiveId] = useState<string | null>(() => homeVideoGetActiveId());
+  const [, setActiveTick] = useState(0);
   const [showSound, setShowSound] = useState(false);
   const [unmuted, setUnmuted] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => homeVideoSubscribe(() => setActiveId(homeVideoGetActiveId())), []);
+  useEffect(() => homeVideoSubscribe(() => setActiveTick((n) => n + 1)), []);
 
   useEffect(() => {
     if (!isVideo) return;
-    const el = videoRef.current;
-    homeVideoRegister(sample.id, el);
+    homeVideoRegister(sample.id, videoRef.current);
     return () => homeVideoRegister(sample.id, null);
   }, [isVideo, sample.id]);
 
@@ -84,23 +88,23 @@ export function GalleryMediaCard({ sample, context = "feed", className }: Props)
     }
   }, [sample.id]);
 
-  const onDirectTap = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      if (!isVideo) return;
-      e.stopPropagation();
-      const el = videoRef.current;
-      if (!el) return;
-      setShowSound(true);
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-      hideTimer.current = setTimeout(() => setShowSound(false), 2800);
-
-      const currentlyActive = homeVideoGetActiveId() === sample.id;
-      if (!currentlyActive || el.paused) {
-        homeVideoRequestPlay(sample.id, el, { unmuted: false });
-        setUnmuted(false);
+  const openViewer = useCallback(
+    (e?: React.MouseEvent | React.TouchEvent) => {
+      e?.stopPropagation();
+      e?.preventDefault();
+      if (isVideo) {
+        const el = videoRef.current;
+        if (el) {
+          homeVideoRequestPlay(sample.id, el, { unmuted: false });
+          setUnmuted(false);
+          setShowSound(true);
+          if (hideTimer.current) clearTimeout(hideTimer.current);
+          hideTimer.current = setTimeout(() => setShowSound(false), 2800);
+        }
       }
+      onOpenViewer?.(sample);
     },
-    [isVideo, sample.id],
+    [isVideo, onOpenViewer, sample],
   );
 
   const toggleSound = useCallback(
@@ -112,7 +116,6 @@ export function GalleryMediaCard({ sample, context = "feed", className }: Props)
       setShowSound(true);
       if (hideTimer.current) clearTimeout(hideTimer.current);
       hideTimer.current = setTimeout(() => setShowSound(false), 2800);
-
       if (unmuted) {
         el.muted = true;
         setUnmuted(false);
@@ -124,38 +127,45 @@ export function GalleryMediaCard({ sample, context = "feed", className }: Props)
     [sample.id, unmuted],
   );
 
-  useEffect(() => {
-    return () => {
+  const onLike = useCallback(
+    (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleLike?.(sample);
+    },
+    [onToggleLike, sample],
+  );
+
+  useEffect(
+    () => () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
-    };
-  }, []);
+    },
+    [],
+  );
 
   if (failed) return null;
 
   const badge = categoryBadge(sample);
-  const maxW = maxWidthForRatio(sample.aspectRatio, context);
+  const span = spanClassForSample(sample);
 
   return (
     <article
       className={cn(
-        "group relative w-full self-start overflow-hidden rounded-2xl border border-border/40 bg-transparent",
-        "transition-[transform,opacity] duration-200 ease-out",
-        "hover:scale-[1.01] active:scale-[0.98] active:opacity-90",
+        "group relative w-full self-start overflow-hidden rounded-xl",
+        "bg-transparent",
+        span,
         className,
       )}
-      style={{ maxWidth: maxW }}
       data-sample-id={sample.id}
       data-aspect={sample.aspectRatio}
     >
-      <Link
-        to="/sample/$id"
-        params={{ id: sample.id }}
-        className="relative block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        aria-label={sample.title || "Open sample"}
+      <button
+        type="button"
+        className="relative block w-full overflow-hidden rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        onClick={openViewer}
         onMouseEnter={isVideo ? startMutedPreview : undefined}
         onMouseLeave={isVideo ? stopIfMuted : undefined}
-        onTouchStart={isVideo ? onDirectTap : undefined}
-        onClick={isVideo ? onDirectTap : undefined}
+        aria-label={`View ${sample.title || "media"}`}
       >
         {isVideo ? (
           <video
@@ -180,32 +190,66 @@ export function GalleryMediaCard({ sample, context = "feed", className }: Props)
         )}
 
         {badge ? (
-          <span className="pointer-events-none absolute left-2 top-2 rounded-full border border-white/20 bg-black/40 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/90 backdrop-blur-sm">
+          <span className="pointer-events-none absolute left-2 top-2 rounded-full border border-white/15 bg-black/35 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/90 backdrop-blur-sm">
             {badge}
           </span>
         ) : null}
-      </Link>
 
-      {isVideo && showSound ? (
-        <button
-          type="button"
-          onClick={toggleSound}
-          onTouchStart={(e) => e.stopPropagation()}
-          className={cn(
-            "absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full",
-            "border border-white/25 bg-black/50 text-white backdrop-blur-md",
-            "transition-opacity duration-150",
-          )}
-          aria-label={unmuted ? "Mute" : "Unmute"}
-        >
-          {unmuted ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-        </button>
-      ) : null}
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
+          {isVideo && showSound ? (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={toggleSound}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") toggleSound(e as unknown as React.MouseEvent);
+              }}
+              className="grid h-7 w-7 place-items-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur-md"
+              aria-label={unmuted ? "Mute" : "Unmute"}
+            >
+              {unmuted ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+            </span>
+          ) : null}
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={onLike}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") onLike(e as unknown as React.MouseEvent);
+            }}
+            className={cn(
+              "grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md transition",
+              liked
+                ? "border-primary/40 bg-primary/25 text-primary"
+                : "border-white/20 bg-black/35 text-white",
+            )}
+            aria-label={liked ? "Remove from favourites" : "Add to favourites"}
+          >
+            <Heart className={cn("h-3.5 w-3.5", liked && "fill-current")} />
+          </span>
+          <Link
+            to="/sample/$id"
+            params={{ id: sample.id }}
+            onClick={(e) => e.stopPropagation()}
+            className="grid h-7 w-7 place-items-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur-md"
+            aria-label="View details"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </button>
 
       {sample.title ? (
-        <p className="truncate px-1.5 pt-1 text-[11px] font-medium leading-tight text-foreground/75">
-          {sample.title}
-        </p>
+        <div className="px-0.5 pt-1.5">
+          <p className="truncate text-[12px] font-semibold leading-snug text-foreground/90">
+            {sample.title}
+          </p>
+          {sample.description && sample.description.length < 90 ? (
+            <p className="mt-0.5 line-clamp-1 text-[11px] leading-snug text-muted-foreground">
+              {sample.description}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </article>
   );
