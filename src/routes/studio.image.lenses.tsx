@@ -1,7 +1,5 @@
 /**
- * More Lenses — discovery/search for the camera Lens Editor.
- * Selecting a lens opens the canonical Lens Editor with that lens selected.
- * This is NOT the editor itself.
+ * More Lenses - discovery for the camera Lens Editor.
  */
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -87,8 +85,8 @@ function MoreLensesPage() {
                     .slice(0, 2)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{l.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{l.shortDescription}</p>
+                  <p className={"truncate text-sm font-semibold"}>{l.name}</p>
+                  <p className={"truncate text-xs text-muted-foreground"}>{l.shortDescription}</p>
                 </div>
                 {l.status === "full" ? (
                   <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
