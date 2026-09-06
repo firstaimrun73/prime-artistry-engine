@@ -42,10 +42,6 @@ const LENS_CSS: Record<string, string> = {
   night: "brightness(0.8) contrast(1.25) saturate(0.75)",
 };
 
-/**
- * Distinct preview backgrounds per entry — no shared image across two names.
- * CSS gradients so Filters and Lenses never duplicate thumbnails.
- */
 const PREVIEW_GRADIENTS = [
   "linear-gradient(135deg, #1e3a5f 0%, #0f766e 50%, #134e4a 100%)",
   "linear-gradient(160deg, #4c1d95 0%, #7c3aed 45%, #c4b5fd 100%)",
@@ -155,17 +151,17 @@ export function FilterLensHomeSection() {
             </p>
           </div>
           <Link
-            to="/studio/image/lenses"
+            to="/studio/image/lens-editor"
             className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary"
           >
-            Browse all <ArrowRight className="h-3.5 w-3.5" />
+            Open editor <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {featuredLenses.map((l, i) => (
             <Link
               key={l.id}
-              to="/studio/image/lenses"
+              to="/studio/image/lens-editor"
               className={cn(
                 "group overflow-hidden rounded-2xl border transition-colors",
                 isDark
