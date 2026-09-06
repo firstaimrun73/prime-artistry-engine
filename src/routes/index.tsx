@@ -15,7 +15,6 @@ import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
 import { TrustSection } from "@/components/home/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
-import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 import { WatchDemoSection } from "@/components/home/WatchDemoSection";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
 
@@ -40,8 +39,16 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { user, profile } = useAuth();
-  if (user && profile) return <SignedInHome />;
+  const { user, profile, loading } = useAuth();
+  // Auth/profile race: never flash SignedOutHome for a signed-in user while loading.
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-label="Loading" />
+      </div>
+    );
+  }
+  if (user) return <SignedInHome />;
   return <SignedOutHome />;
 }
 
@@ -57,8 +64,6 @@ function SignedInHome() {
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
  * Hard rule: do NOT render private creation/sample galleries here.
- * No ImagineGallery, VideoStudioGallery, MusicStudioGallery, CircleSampleGallery,
- * or Motion2AI Creation feed. Watch Demo is the only media exception.
  */
 function SignedOutHome() {
   return (
@@ -70,7 +75,6 @@ function SignedOutHome() {
       <WatchDemoSection variant="prominent" />
 
       <div className="mx-auto w-full max-w-6xl px-4">
-        <FilterLensHomeSection />
       </div>
 
       <ArchitectureFlowSection />
@@ -146,11 +150,8 @@ const STUDIO_CARDS: StudioCardSpec[] = [
 ];
 
 function StudioShowcase() {
-  const { user, profile } = useAuth();
+  /* Pre-login marketing only — no plan locks (visitor has no plan yet). */
   const navigate = useNavigate();
-  const isAdmin = isAdminEmail(profile?.email);
-  const plan = profile?.plan ?? "free";
-  const isPaid = isAdmin || (plan !== "free" && !!user);
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
@@ -160,11 +161,10 @@ function StudioShowcase() {
       </div>
       <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {STUDIO_CARDS.map((c) => {
-          const locked = !c.freeAllowed && !isPaid;
+          const locked = false;
           const Icon = c.icon;
           const onClick = () => {
-            if (locked) navigate({ to: "/pricing" });
-            else navigate({ to: c.href });
+            navigate({ to: "/auth", search: { redirect: c.href } });
           };
           return (
             <button
@@ -199,15 +199,6 @@ function StudioShowcase() {
                 {locked ? "Upgrade to unlock" : "Open studio"}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </div>
-              {locked && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-2xl bg-background/70 backdrop-blur-sm">
-                  <div className="rounded-full border border-border bg-card p-2.5">
-                    <Lock className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="text-sm font-semibold">Locked on Free plan</div>
-                  <div className="text-xs text-muted-foreground">Upgrade to unlock {c.name}</div>
-                </div>
-              )}
             </button>
           );
         })}
