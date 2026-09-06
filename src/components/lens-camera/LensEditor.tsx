@@ -1,6 +1,7 @@
 /**
  * Motio2edit Lens — camera software (20 fixed lenses).
  * Front camera default · free · on-device optics.
+ * Back always returns to homepage.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -76,6 +77,10 @@ export function LensEditor({ initialLensId }: Props) {
   const facingRef = useRef(facing);
   facingRef.current = facing;
 
+  const goHome = useCallback(() => {
+    void navigate({ to: "/" });
+  }, [navigate]);
+
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => { try { t.stop(); } catch { /* */ } });
     streamRef.current = null;
@@ -140,6 +145,7 @@ export function LensEditor({ initialLensId }: Props) {
     if (!v) return;
     const w = v.clientWidth || 1;
     const h = v.clientHeight || 1;
+    // Static portrait guide (real FaceDetector to be done by Claude backend pass)
     setFaceBoxes([{ x: w * 0.22, y: h * 0.18, w: w * 0.56, h: h * 0.52 }]);
   }, [cameraReady, faceTrack, phase]);
 
@@ -232,7 +238,7 @@ export function LensEditor({ initialLensId }: Props) {
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-black text-white">
       <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button type="button" onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) window.history.back(); else void navigate({ to: "/" }); }} className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md" aria-label="Back">
+        <button type="button" onClick={goHome} className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md" aria-label="Back to home">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex flex-col items-center">
@@ -279,7 +285,6 @@ export function LensEditor({ initialLensId }: Props) {
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/55 backdrop-blur-sm">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm font-medium">Applying {lens.name}…</p>
-            <p className="text-[11px] text-white/50">Motio2edit · free · on-device</p>
           </div>
         )}
       </div>
@@ -322,11 +327,6 @@ export function LensEditor({ initialLensId }: Props) {
               <span className="text-[9px] font-semibold text-white/50">{facing === "user" ? "Front" : "Rear"}</span>
             </div>
           </div>
-
-          <p className="text-center text-[10px] text-white/35">
-            Motio2edit · {lens.name} · {aspectId === "native" ? "Full frame" : aspectId}
-            {bulbOn ? " · Night light on" : ""}
-          </p>
         </div>
       )}
 
