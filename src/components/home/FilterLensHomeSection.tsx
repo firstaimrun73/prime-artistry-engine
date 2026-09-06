@@ -1,16 +1,15 @@
 /**
  * Homepage discovery for Filters + Lenses.
- * Links to real studio routes. Media-first, compact, no fake controls.
+ * Lens cards deep-link to /studio/image/lens-editor?lens=<id> with CAMERA_LENS_ROSTER names.
  */
 import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import { Aperture, Filter, ArrowRight } from "lucide-react";
 import { ALL_FILTERS } from "@/lib/filter-lens/filters/filter-registry";
-import { ALL_LENSES } from "@/lib/filter-lens/lenses/lens-registry";
+import { CAMERA_LENS_ROSTER } from "@/lib/lens-camera/roster";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-/** Category → CSS filter preview (approximate look, no binary assets required). */
 const FILTER_CSS: Record<string, string> = {
   Natural: "contrast(1.05) saturate(1.1)",
   Portrait: "contrast(1.08) brightness(1.05) saturate(0.95)",
@@ -35,11 +34,19 @@ const FILTER_CSS: Record<string, string> = {
 };
 
 const LENS_CSS: Record<string, string> = {
+  "wide-angle": "contrast(1.1) saturate(1.1)",
+  "ultra-wide": "contrast(1.12) saturate(1.15) brightness(1.02)",
+  fisheye: "contrast(1.2) saturate(1.05)",
+  standard: "contrast(1.08) saturate(1.05)",
+  "portrait-prime": "brightness(1.06) contrast(1.08) saturate(0.92)",
+  telephoto: "contrast(1.22) saturate(0.88) brightness(0.96)",
+  "super-telephoto": "contrast(1.15) saturate(1.05)",
+  macro: "contrast(1.2) saturate(1.15)",
+  "tilt-shift": "saturate(1.2) contrast(1.1)",
+  "soft-focus": "brightness(1.1) contrast(0.95)",
+  infrared: "hue-rotate(-20deg) saturate(1.3) contrast(1.15)",
+  vintage: "sepia(0.35) contrast(1.05)",
   default: "contrast(1.1) saturate(1.05)",
-  portrait: "brightness(1.06) contrast(1.08) saturate(0.92)",
-  cinematic: "contrast(1.22) saturate(0.88) brightness(0.96)",
-  landscape: "saturate(1.2) contrast(1.08)",
-  night: "brightness(0.8) contrast(1.25) saturate(0.75)",
 };
 
 const PREVIEW_GRADIENTS = [
@@ -65,18 +72,16 @@ function hashId(id: string): number {
 
 function uniquePreviewStyle(id: string, cssFilter: string): CSSProperties {
   const g = PREVIEW_GRADIENTS[hashId(id) % PREVIEW_GRADIENTS.length];
-  return {
-    backgroundImage: g,
-    filter: cssFilter,
-  };
+  return { backgroundImage: g, filter: cssFilter };
 }
 
 function previewCssForFilter(category: string): string {
   return FILTER_CSS[category] ?? "contrast(1.08) saturate(1.05)";
 }
 
-function previewCssForLens(specialty: string, index: number): string {
-  const key = specialty.toLowerCase();
+function previewCssForLens(concept: string, index: number): string {
+  const key = (concept || "").toLowerCase();
+  if (LENS_CSS[key]) return LENS_CSS[key];
   for (const k of Object.keys(LENS_CSS)) {
     if (key.includes(k)) return LENS_CSS[k];
   }
@@ -89,7 +94,7 @@ export function FilterLensHomeSection() {
   const isDark = theme === "dark";
 
   const featuredFilters = ALL_FILTERS.filter((f) => f.unlock.isFree).slice(0, 6);
-  const featuredLenses = ALL_LENSES.slice(0, 6);
+  const featuredLenses = CAMERA_LENS_ROSTER.slice(0, 6);
 
   return (
     <div className="mt-12 space-y-10">
@@ -100,14 +105,9 @@ export function FilterLensHomeSection() {
               <Filter className="h-4 w-4 text-primary" />
               Filters
             </h3>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">
-              Photographic looks · apply to your photo
-            </p>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">Photographic looks · apply to your photo</p>
           </div>
-          <Link
-            to="/studio/image/filters"
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary"
-          >
+          <Link to="/studio/image/filters" className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary">
             Browse all <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -118,17 +118,11 @@ export function FilterLensHomeSection() {
               to="/studio/image/filters"
               className={cn(
                 "group overflow-hidden rounded-2xl border transition-colors",
-                isDark
-                  ? "border-white/10 bg-white/[0.03] hover:border-primary/40"
-                  : "border-black/5 bg-black/[0.02] hover:border-primary/40",
+                isDark ? "border-white/10 bg-white/[0.03] hover:border-primary/40" : "border-black/5 bg-black/[0.02] hover:border-primary/40",
               )}
             >
               <div className="relative aspect-[4/5] overflow-hidden bg-muted/40">
-                <div
-                  className="h-full w-full transition duration-300 group-hover:scale-[1.03]"
-                  style={uniquePreviewStyle(f.id, previewCssForFilter(f.category))}
-                  aria-hidden
-                />
+                <div className="h-full w-full transition duration-300 group-hover:scale-[1.03]" style={uniquePreviewStyle(f.id, previewCssForFilter(f.category))} aria-hidden />
               </div>
               <div className="px-2.5 py-2">
                 <p className="truncate text-[12px] font-semibold leading-tight">{f.name}</p>
@@ -146,15 +140,14 @@ export function FilterLensHomeSection() {
               <Aperture className="h-4 w-4 text-primary" />
               Lenses
             </h3>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">
-              Computational looks · specialty processing
-            </p>
+            <p className="mt-0.5 text-[12px] text-muted-foreground">Same 20 Motio2edit lenses · open in Lens</p>
           </div>
           <Link
             to="/studio/image/lens-editor"
+            search={{ lens: CAMERA_LENS_ROSTER[0]?.id }}
             className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary"
           >
-            Open editor <ArrowRight className="h-3.5 w-3.5" />
+            Open Lens <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -162,23 +155,18 @@ export function FilterLensHomeSection() {
             <Link
               key={l.id}
               to="/studio/image/lens-editor"
+              search={{ lens: l.id }}
               className={cn(
                 "group overflow-hidden rounded-2xl border transition-colors",
-                isDark
-                  ? "border-white/10 bg-white/[0.03] hover:border-primary/40"
-                  : "border-black/5 bg-black/[0.02] hover:border-primary/40",
+                isDark ? "border-white/10 bg-white/[0.03] hover:border-primary/40" : "border-black/5 bg-black/[0.02] hover:border-primary/40",
               )}
             >
               <div className="relative aspect-[4/5] overflow-hidden bg-muted/40">
-                <div
-                  className="h-full w-full transition duration-300 group-hover:scale-[1.03]"
-                  style={uniquePreviewStyle(`lens-${l.id}`, previewCssForLens(l.specialty, i))}
-                  aria-hidden
-                />
+                <div className="h-full w-full transition duration-300 group-hover:scale-[1.03]" style={uniquePreviewStyle(`lens-${l.id}`, previewCssForLens(l.concept, i))} aria-hidden />
               </div>
               <div className="px-2.5 py-2">
                 <p className="truncate text-[12px] font-semibold leading-tight">{l.name}</p>
-                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{l.specialty}</p>
+                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{l.shortDescription}</p>
               </div>
             </Link>
           ))}
