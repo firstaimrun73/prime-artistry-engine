@@ -10,11 +10,11 @@ export const Route = createFileRoute("/studio/image/lens-editor")({
   }),
   head: () => ({
     meta: [
-      { title: "Lens Editor — Motio2edit" },
+      { title: "Lens — Motio2edit" },
       {
         name: "description",
         content:
-          "Motio2edit Lens Editor — premium camera lenses. Capture with optical treatments powered by Motion2AI camera software.",
+          "Motio2edit Lens — premium camera lenses. Capture with optical treatments powered by Motion2AI camera software.",
       },
     ],
   }),
