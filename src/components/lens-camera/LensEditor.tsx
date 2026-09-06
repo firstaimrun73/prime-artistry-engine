@@ -2,6 +2,7 @@
  * Motio2edit Lens — camera software (20 fixed lenses).
  * Front camera default · free · on-device optics.
  * Back always returns to homepage.
+ * Live aspect crop mask on preview; capture matches selected aspect.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -48,7 +49,39 @@ function friendlyError(err: unknown): string {
 }
 
 function lensInitials(name: string): string {
-  return name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+/** Compute crop rect inside a container for a target aspect ratio (0 = native/full). */
+function cropRect(
+  containerW: number,
+  containerH: number,
+  targetRatio: number,
+): { left: number; top: number; width: number; height: number } {
+  if (!targetRatio || containerW < 2 || containerH < 2) {
+    return { left: 0, top: 0, width: containerW, height: containerH };
+  }
+  const containerR = containerW / containerH;
+  let width: number;
+  let height: number;
+  if (containerR > targetRatio) {
+    height = containerH;
+    width = containerH * targetRatio;
+  } else {
+    width = containerW;
+    height = containerW / targetRatio;
+  }
+  return {
+    left: (containerW - width) / 2,
+    top: (containerH - height) / 2,
+    width,
+    height,
+  };
 }
 
 type Props = { initialLensId?: string | null };
@@ -60,6 +93,13 @@ export function LensEditor({ initialLensId }: Props) {
   const [lensId, setLensId] = useState(() => initialLensId || getDefaultCameraLens().id);
   const lens = useMemo(() => getCameraLensById(lensId) ?? getDefaultCameraLens(), [lensId]);
 
+  // Keep in sync when deep-link ?lens= changes
+  useEffect(() => {
+    if (initialLensId && getCameraLensById(initialLensId)) {
+      setLensId(initialLensId);
+    }
+  }, [initialLensId]);
+
   const [phase, setPhase] = useState<Phase>("ready");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -67,8 +107,10 @@ export function LensEditor({ initialLensId }: Props) {
   const [bulbOn, setBulbOn] = useState(false);
   const [faceBoxes, setFaceBoxes] = useState<FaceBox[]>([]);
   const [faceTrack, setFaceTrack] = useState(true);
+  const [previewSize, setPreviewSize] = useState({ w: 0, h: 0 });
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [facing, setFacing] = useState<"environment" | "user">("user");
   const [cameraReady, setCameraReady] = useState(false);
@@ -77,12 +119,21 @@ export function LensEditor({ initialLensId }: Props) {
   const facingRef = useRef(facing);
   facingRef.current = facing;
 
+  const aspectPreset = LENS_ASPECT_PRESETS.find((p) => p.id === aspectId);
+  const aspectRatio = aspectPreset?.ratio ?? 0;
+
   const goHome = useCallback(() => {
     void navigate({ to: "/" });
   }, [navigate]);
 
   const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => { try { t.stop(); } catch { /* */ } });
+    streamRef.current?.getTracks().forEach((t) => {
+      try {
+        t.stop();
+      } catch {
+        /* */
+      }
+    });
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraReady(false);
@@ -92,21 +143,36 @@ export function LensEditor({ initialLensId }: Props) {
     const face = mode ?? facingRef.current;
     setCameraError(null);
     setCameraReady(false);
-    streamRef.current?.getTracks().forEach((t) => { try { t.stop(); } catch { /* */ } });
+    streamRef.current?.getTracks().forEach((t) => {
+      try {
+        t.stop();
+      } catch {
+        /* */
+      }
+    });
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     try {
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Camera is not supported in this browser.");
+      if (!navigator.mediaDevices?.getUserMedia)
+        throw new Error("Camera is not supported in this browser.");
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { facingMode: { exact: face }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: {
+            facingMode: { exact: face },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         });
       } catch {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: { facingMode: { ideal: face }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: {
+            facingMode: { ideal: face },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         });
       }
       streamRef.current = stream;
@@ -117,8 +183,14 @@ export function LensEditor({ initialLensId }: Props) {
         v.muted = true;
         await v.play().catch(() => undefined);
         await new Promise<void>((resolve) => {
-          if (v.videoWidth > 0) { resolve(); return; }
-          const onMeta = () => { v.removeEventListener("loadedmetadata", onMeta); resolve(); };
+          if (v.videoWidth > 0) {
+            resolve();
+            return;
+          }
+          const onMeta = () => {
+            v.removeEventListener("loadedmetadata", onMeta);
+            resolve();
+          };
           v.addEventListener("loadedmetadata", onMeta);
           setTimeout(resolve, 1200);
         });
@@ -136,18 +208,29 @@ export function LensEditor({ initialLensId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, user]);
 
+  // Measure stage for aspect mask
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) setPreviewSize({ w: r.width, h: r.height });
+    });
+    ro.observe(el);
+    setPreviewSize({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, [phase, cameraReady]);
+
   useEffect(() => {
     if (!cameraReady || !faceTrack || phase !== "ready") {
       setFaceBoxes([]);
       return;
     }
-    const v = videoRef.current;
-    if (!v) return;
-    const w = v.clientWidth || 1;
-    const h = v.clientHeight || 1;
-    // Static portrait guide (real FaceDetector to be done by Claude backend pass)
+    const w = previewSize.w || stageRef.current?.clientWidth || 1;
+    const h = previewSize.h || stageRef.current?.clientHeight || 1;
+    // Static portrait guide when FACE is on (honest — not claimed tracking)
     setFaceBoxes([{ x: w * 0.22, y: h * 0.18, w: w * 0.56, h: h * 0.52 }]);
-  }, [cameraReady, faceTrack, phase]);
+  }, [cameraReady, faceTrack, phase, previewSize.w, previewSize.h]);
 
   const flipCamera = () => {
     const next = facing === "environment" ? "user" : "environment";
@@ -204,12 +287,18 @@ export function LensEditor({ initialLensId }: Props) {
   const download = async () => {
     if (!resultUrl) return;
     try {
-      await triggerBrowserDownload(resultUrl, `motio2edit-${lens.name.replace(/\s+/g, "-").toLowerCase()}.jpg`);
+      await triggerBrowserDownload(
+        resultUrl,
+        `motio2edit-${lens.name.replace(/\s+/g, "-").toLowerCase()}.jpg`,
+      );
       toast.success("Download started");
     } catch {
       toast.error("Download failed");
     }
   };
+
+  const mask = cropRect(previewSize.w, previewSize.h, aspectRatio);
+  const showMask = aspectId !== "native" && previewSize.w > 0 && phase === "ready";
 
   if (authLoading) {
     return (
@@ -227,7 +316,11 @@ export function LensEditor({ initialLensId }: Props) {
           <Camera className="mx-auto h-10 w-10 text-primary" />
           <h1 className="mt-4 text-xl font-bold">Lens</h1>
           <p className="mt-2 text-sm text-muted-foreground">Sign in to use Motio2edit lenses.</p>
-          <Link to="/auth" search={{ redirect: "/studio/image/lens-editor" }} className="mt-6 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
+          <Link
+            to="/auth"
+            search={{ redirect: "/studio/image/lens-editor" }}
+            className="mt-6 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+          >
             Sign in
           </Link>
         </main>
@@ -238,41 +331,139 @@ export function LensEditor({ initialLensId }: Props) {
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-black text-white">
       <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <button type="button" onClick={goHome} className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md" aria-label="Back to home">
+        <button
+          type="button"
+          onClick={goHome}
+          className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md"
+          aria-label="Back to home"
+        >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex flex-col items-center">
           <span className="text-[10px] font-medium tracking-[0.16em] text-white/40">MOTIO2EDIT</span>
           <span className="text-sm font-bold tracking-tight">Lens</span>
-          <span className="text-[10px] text-white/50">{lens.name} · {lens.shortDescription}</span>
+          <span className="text-[10px] text-white/50">
+            {lens.name} · {lens.shortDescription}
+          </span>
         </div>
-        <button type="button" onClick={() => setFaceTrack((v) => !v)} className={cn("grid h-10 w-10 place-items-center rounded-full border backdrop-blur-md text-[9px] font-bold", faceTrack ? "border-primary/50 bg-primary/20 text-primary" : "border-white/15 bg-black/40 text-white/70")} aria-label="Toggle face guide">
+        <button
+          type="button"
+          onClick={() => setFaceTrack((v) => !v)}
+          className={cn(
+            "grid h-10 w-10 place-items-center rounded-full border backdrop-blur-md text-[9px] font-bold",
+            faceTrack
+              ? "border-primary/50 bg-primary/20 text-primary"
+              : "border-white/15 bg-black/40 text-white/70",
+          )}
+          aria-label="Toggle face guide"
+        >
           FACE
         </button>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden">
+      <div ref={stageRef} className="relative flex flex-1 items-center justify-center overflow-hidden">
         {phase === "result" && resultUrl ? (
-          <img src={resultUrl} alt={`${lens.name} result`} className="max-h-[100dvh] max-w-full object-contain" />
+          <img
+            src={resultUrl}
+            alt={`${lens.name} result`}
+            className="max-h-[100dvh] max-w-full object-contain"
+          />
         ) : phase === "error" ? (
           <div className="px-6 text-center">
             <CameraOff className="mx-auto h-10 w-10 text-white/50" />
             <p className="mt-3 text-sm text-white/80">{errorMsg}</p>
-            <button type="button" onClick={retake} className="mt-4 rounded-full border border-white/20 px-4 py-2 text-sm">Try again</button>
+            <button
+              type="button"
+              onClick={retake}
+              className="mt-4 rounded-full border border-white/20 px-4 py-2 text-sm"
+            >
+              Try again
+            </button>
           </div>
         ) : (
           <>
-            <video ref={videoRef} playsInline muted autoPlay className={cn("h-full w-full object-cover", facing === "user" && "scale-x-[-1]", bulbOn && "brightness-125 contrast-110")} />
-            {faceTrack && faceBoxes.map((b, i) => (
-              <div key={i} className="pointer-events-none absolute rounded-xl border-2 border-primary/80 shadow-[0_0_12px_hsl(24_95%_53%/0.4)]" style={{ left: b.x, top: b.y, width: b.w, height: b.h }} />
-            ))}
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              className={cn(
+                "h-full w-full object-cover",
+                facing === "user" && "scale-x-[-1]",
+                bulbOn && "brightness-125 contrast-110",
+              )}
+            />
+
+            {/* Live aspect crop mask */}
+            {showMask && (
+              <div className="pointer-events-none absolute inset-0 z-10" aria-hidden>
+                {/* Dim outside crop */}
+                <div
+                  className="absolute bg-black/55"
+                  style={{ left: 0, top: 0, right: 0, height: Math.max(0, mask.top) }}
+                />
+                <div
+                  className="absolute bg-black/55"
+                  style={{
+                    left: 0,
+                    bottom: 0,
+                    right: 0,
+                    height: Math.max(0, previewSize.h - mask.top - mask.height),
+                  }}
+                />
+                <div
+                  className="absolute bg-black/55"
+                  style={{
+                    left: 0,
+                    top: mask.top,
+                    width: Math.max(0, mask.left),
+                    height: mask.height,
+                  }}
+                />
+                <div
+                  className="absolute bg-black/55"
+                  style={{
+                    right: 0,
+                    top: mask.top,
+                    width: Math.max(0, previewSize.w - mask.left - mask.width),
+                    height: mask.height,
+                  }}
+                />
+                {/* Crop frame */}
+                <div
+                  className="absolute border border-white/70 shadow-[0_0_0_1px_rgba(0,0,0,0.3)]"
+                  style={{
+                    left: mask.left,
+                    top: mask.top,
+                    width: mask.width,
+                    height: mask.height,
+                  }}
+                />
+              </div>
+            )}
+
+            {faceTrack &&
+              faceBoxes.map((b, i) => (
+                <div
+                  key={i}
+                  className="pointer-events-none absolute z-20 rounded-xl border-2 border-primary/80 shadow-[0_0_12px_hsl(24_95%_53%/0.4)]"
+                  style={{ left: b.x, top: b.y, width: b.w, height: b.h }}
+                />
+              ))}
+
             {!cameraReady && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 px-6 text-center">
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/80 px-6 text-center">
                 {cameraError ? (
                   <>
                     <CameraOff className="h-8 w-8 text-white/50" />
                     <p className="text-sm text-white/70">{cameraError}</p>
-                    <button type="button" onClick={() => void startCamera(facing)} className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold">Retry camera</button>
+                    <button
+                      type="button"
+                      onClick={() => void startCamera(facing)}
+                      className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold"
+                    >
+                      Retry camera
+                    </button>
                   </>
                 ) : (
                   <Loader2 className="h-6 w-6 animate-spin text-white/50" />
@@ -282,7 +473,7 @@ export function LensEditor({ initialLensId }: Props) {
           </>
         )}
         {phase === "processing" && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/55 backdrop-blur-sm">
+          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/55 backdrop-blur-sm">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm font-medium">Applying {lens.name}…</p>
           </div>
@@ -291,15 +482,41 @@ export function LensEditor({ initialLensId }: Props) {
 
       {phase !== "result" && phase !== "error" && (
         <div className="absolute inset-x-0 bottom-0 z-30 space-y-2 bg-gradient-to-t from-black via-black/85 to-transparent px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-12">
-          <div className="flex gap-3 overflow-x-auto overflow-y-visible px-1 pb-2 pt-3 scrollbar-none" style={{ scrollSnapType: "x mandatory" }} role="listbox" aria-label="Lenses">
+          <div
+            className="flex gap-3 overflow-x-auto overflow-y-visible px-1 pb-2 pt-3 scrollbar-none"
+            style={{ scrollSnapType: "x mandatory" }}
+            role="listbox"
+            aria-label="Lenses"
+          >
             {CAMERA_LENS_ROSTER.map((l) => {
               const active = l.id === lensId;
               return (
-                <button key={l.id} type="button" role="option" aria-selected={active} onClick={() => setLensId(l.id)} className="flex w-[72px] shrink-0 flex-col items-center gap-1.5" style={{ scrollSnapAlign: "center" }}>
-                  <span className={cn("grid h-14 w-14 place-items-center rounded-full border text-[10px] font-bold uppercase tracking-wide transition", active ? "scale-110 border-primary bg-primary/25 text-white shadow-[0_0_16px_hsl(24_95%_53%/0.35)]" : "border-white/20 bg-white/10 text-white/70")}>
+                <button
+                  key={l.id}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => setLensId(l.id)}
+                  className="flex w-[72px] shrink-0 flex-col items-center gap-1.5"
+                  style={{ scrollSnapAlign: "center" }}>
+                  <span
+                    className={cn(
+                      "grid h-14 w-14 place-items-center rounded-full border text-[10px] font-bold uppercase tracking-wide transition",
+                      active
+                        ? "scale-110 border-primary bg-primary/25 text-white shadow-[0_0_16px_hsl(24_95%_53%/0.35)]"
+                        : "border-white/20 bg-white/10 text-white/70",
+                    )}
+                  >
                     {lensInitials(l.name)}
                   </span>
-                  <span className={cn("max-w-[72px] truncate text-center text-[10px] font-medium", active ? "text-white" : "text-white/55")}>{l.name}</span>
+                  <span
+                    className={cn(
+                      "max-w-[72px] truncate text-center text-[10px] font-medium",
+                      active ? "text-white" : "text-white/55",
+                    )}
+                  >
+                    {l.name}
+                  </span>
                 </button>
               );
             })}
@@ -307,24 +524,57 @@ export function LensEditor({ initialLensId }: Props) {
 
           <div className="flex items-center justify-center gap-1.5 overflow-x-auto scrollbar-none">
             {LENS_ASPECT_PRESETS.map((p) => (
-              <button key={p.id} type="button" onClick={() => setAspectId(p.id)} className={cn("shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold", aspectId === p.id ? "border-primary bg-primary/25 text-primary" : "border-white/15 bg-black/40 text-white/70")}>
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setAspectId(p.id)}
+                className={cn(
+                  "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
+                  aspectId === p.id
+                    ? "border-primary bg-primary/25 text-primary"
+                    : "border-white/15 bg-black/40 text-white/70",
+                )}
+              >
                 {p.label}
               </button>
             ))}
           </div>
 
           <div className="flex items-center justify-center gap-5">
-            <button type="button" onClick={flipCamera} className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/40 backdrop-blur-md" aria-label="Flip camera">
+            <button
+              type="button"
+              onClick={flipCamera}
+              className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/40 backdrop-blur-md"
+              aria-label="Flip camera"
+            >
               <SwitchCamera className="h-5 w-5" />
             </button>
-            <button type="button" onClick={() => setBulbOn((b) => !b)} className={cn("grid h-11 w-11 place-items-center rounded-full border backdrop-blur-md", bulbOn ? "border-amber-400/60 bg-amber-400/25 text-amber-300" : "border-white/20 bg-black/40 text-white")} aria-label="Night light boost">
+            <button
+              type="button"
+              onClick={() => setBulbOn((b) => !b)}
+              className={cn(
+                "grid h-11 w-11 place-items-center rounded-full border backdrop-blur-md",
+                bulbOn
+                  ? "border-amber-400/60 bg-amber-400/25 text-amber-300"
+                  : "border-white/20 bg-black/40 text-white",
+              )}
+              aria-label="Night light boost"
+            >
               <Lightbulb className={cn("h-5 w-5", bulbOn && "fill-current")} />
             </button>
-            <button type="button" onClick={() => void captureAndApply()} disabled={phase === "processing" || !cameraReady} className="relative grid h-[68px] w-[68px] place-items-center rounded-full border-[3px] border-white/90 bg-white/15 shadow-[0_0_24px_rgba(255,255,255,0.15)] transition active:scale-90 disabled:opacity-40" aria-label="Capture">
+            <button
+              type="button"
+              onClick={() => void captureAndApply()}
+              disabled={phase === "processing" || !cameraReady}
+              className="relative grid h-[68px] w-[68px] place-items-center rounded-full border-[3px] border-white/90 bg-white/15 shadow-[0_0_24px_rgba(255,255,255,0.15)] transition active:scale-90 disabled:opacity-40"
+              aria-label="Capture"
+            >
               <span className="h-14 w-14 rounded-full bg-white" />
             </button>
             <div className="grid h-11 w-11 place-items-center">
-              <span className="text-[9px] font-semibold text-white/50">{facing === "user" ? "Front" : "Rear"}</span>
+              <span className="text-[9px] font-semibold text-white/50">
+                {facing === "user" ? "Front" : "Rear"}
+              </span>
             </div>
           </div>
         </div>
@@ -332,8 +582,18 @@ export function LensEditor({ initialLensId }: Props) {
 
       {phase === "result" && resultUrl && (
         <div className="absolute inset-x-0 bottom-0 z-30 flex items-center justify-center gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-12">
-          <button type="button" onClick={retake} className="rounded-full border border-white/25 bg-black/50 px-4 py-2.5 text-sm font-semibold backdrop-blur-md">Retake</button>
-          <button type="button" onClick={() => void download()} className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
+          <button
+            type="button"
+            onClick={retake}
+            className="rounded-full border border-white/25 bg-black/50 px-4 py-2.5 text-sm font-semibold backdrop-blur-md"
+          >
+            Retake
+          </button>
+          <button
+            type="button"
+            onClick={() => void download()}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+          >
             <Download className="h-4 w-4" /> Download
           </button>
         </div>
