@@ -1,13 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LensEditor } from "@/components/lens-camera/LensEditor";
 
-type Search = { lens?: string; image?: string };
+type Search = { lens?: string };
 
 export const Route = createFileRoute("/studio/image/lens-editor")({
   ssr: false,
   validateSearch: (search: Record<string, unknown>): Search => ({
     lens: typeof search.lens === "string" ? search.lens : undefined,
-    image: typeof search.image === "string" ? search.image : undefined,
   }),
   head: () => ({
     meta: [
@@ -15,7 +14,7 @@ export const Route = createFileRoute("/studio/image/lens-editor")({
       {
         name: "description",
         content:
-          "Motio2edit Lens Editor — premium camera experience with optical lenses. Capture or choose a photo, pick a lens, apply.",
+          "Motio2edit Lens Editor — premium camera lenses. Capture with optical treatments powered by Motion2AI camera software.",
       },
     ],
   }),
@@ -23,6 +22,6 @@ export const Route = createFileRoute("/studio/image/lens-editor")({
 });
 
 function LensEditorRoute() {
-  const { lens, image } = Route.useSearch();
-  return <LensEditor initialLensId={lens ?? null} initialImageUrl={image ?? null} />;
+  const { lens } = Route.useSearch();
+  return <LensEditor initialLensId={lens ?? null} />;
 }
