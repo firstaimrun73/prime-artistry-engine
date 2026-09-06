@@ -4,7 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Heart, Info, Volume2, VolumeX } from "lucide-react";
+import { Heart, Info, Play, Volume2, VolumeX } from "lucide-react";
 import type { R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
 import {
@@ -39,6 +39,14 @@ function categoryBadge(sample: R2Sample): string | null {
   if (sample.homepageCategory === "trend") return "TREND";
   if (sample.studio === "circle") return "TRY NOW";
   return null;
+}
+
+function shortDesc(desc: string | undefined): string | null {
+  if (!desc) return null;
+  const words = desc.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return null;
+  const take = words.slice(0, 4).join(" ");
+  return words.length > 4 ? `${take}…` : take;
 }
 
 type Props = {
@@ -146,15 +154,11 @@ export function GalleryMediaCard({
 
   const badge = categoryBadge(sample);
   const span = spanClassForSample(sample);
+  const desc = shortDesc(sample.description);
 
   return (
     <article
-      className={cn(
-        "group relative w-full self-start overflow-hidden rounded-xl",
-        "bg-transparent",
-        span,
-        className,
-      )}
+      className={cn("group relative w-full self-start overflow-hidden rounded-xl", "bg-transparent", span, className)}
       data-sample-id={sample.id}
       data-aspect={sample.aspectRatio}
     >
@@ -188,6 +192,12 @@ export function GalleryMediaCard({
           />
         )}
 
+        {isVideo ? (
+          <span className="pointer-events-none absolute bottom-2 left-2 grid h-7 w-7 place-items-center rounded-full border border-white/20 bg-black/45 text-white backdrop-blur-md">
+            <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
+          </span>
+        ) : null}
+
         {badge ? (
           <span className="pointer-events-none absolute left-2 top-2 rounded-full border border-white/15 bg-black/35 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/90 backdrop-blur-sm">
             {badge}
@@ -218,9 +228,7 @@ export function GalleryMediaCard({
             }}
             className={cn(
               "grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md transition",
-              liked
-                ? "border-primary/40 bg-primary/25 text-primary"
-                : "border-white/20 bg-black/35 text-white",
+              liked ? "border-primary/40 bg-primary/25 text-primary" : "border-white/20 bg-black/35 text-white",
             )}
             aria-label={liked ? "Remove from favourites" : "Add to favourites"}
           >
@@ -240,14 +248,8 @@ export function GalleryMediaCard({
 
       {sample.title ? (
         <div className="overflow-visible px-0.5 pt-1.5 pb-1">
-          <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-foreground/90">
-            {sample.title}
-          </p>
-          {sample.description ? (
-            <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-              {sample.description}
-            </p>
-          ) : null}
+          <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-foreground/90">{sample.title}</p>
+          {desc ? <p className="mt-0.5 line-clamp-1 text-[11px] leading-snug text-muted-foreground">{desc}</p> : null}
         </div>
       ) : null}
     </article>
