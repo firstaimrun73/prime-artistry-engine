@@ -11,7 +11,7 @@ type AutoEditProfileRow = {
 
 const inputSchema = z.object({
   imageUrl: z.string().url().max(15_000_000),
-  imageQuality: z.enum(["sd", "hd", "2k", "4k"]).optional(),
+  imageQuality: z.enum(["sd", "hd", "2k", "4k", "8k", "8k_max"]).optional(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
 });
