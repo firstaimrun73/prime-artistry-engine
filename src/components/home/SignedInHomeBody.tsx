@@ -20,6 +20,7 @@ import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
 import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery";
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
+import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 
 const QUICK_CREATE = [
   { to: "/studio/image" as const, label: "Image", icon: ImageIcon },
@@ -110,6 +111,8 @@ export function SignedInHomeBody() {
       <div className="mt-12">
         <VisualDiscoveryGallery />
       </div>
+
+      <MusicStudioGallery />
 
       <FilterLensHomeSection />
 

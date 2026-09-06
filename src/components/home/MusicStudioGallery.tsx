@@ -1,91 +1,145 @@
 /**
- * MUSIC gallery — Motion2AI Creation.
- * Cover + title only. Max-w cap. Hide on cover load failure.
+ * Music section — instrumental performance video samples from R2 catalog.
+ * Media-first cards; native aspect; inline play.
  */
-import { useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { Music } from "lucide-react";
-import track1 from "@/assets/samples/track-1.mp3.asset.json";
-import track2 from "@/assets/samples/track-2.mp3.asset.json";
-import track3 from "@/assets/samples/track-3.mp3.asset.json";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { Music, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { getMusicVideoSamples, type R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
+import {
+  homeVideoRegister,
+  homeVideoRequestPlay,
+  homeVideoPause,
+  homeVideoGetActiveId,
+  homeVideoSubscribe,
+} from "@/lib/home-video-controller";
 
-type TrackCard = {
-  id: string;
-  title: string;
-  description: string;
-  url: string;
-  cover: string;
-};
-
-const TRACKS: TrackCard[] = [
-  {
-    id: "music-neon-skyline",
-    title: "Neon Skyline",
-    description: "Cinematic electronic bed for motion and trailers.",
-    url: track1.url as string,
-    cover: "/demo/music/cover-vinyl.jpg",
-  },
-  {
-    id: "music-golden-hour",
-    title: "Golden Hour Drift",
-    description: "Lo-fi chill with soft pads for ambient and social cuts.",
-    url: track2.url as string,
-    cover: "/demo/music/cover-waveform.jpg",
-  },
-  {
-    id: "music-heritage",
-    title: "Heritage Strings",
-    description: "Orchestral strings-forward mood for narrative scenes.",
-    url: track3.url as string,
-    cover: "/demo/music/cover-studio.jpg",
-  },
-];
-
-function MusicCard({ t }: { t: TrackCard }) {
+function MusicVideoCard({ sample }: { sample: R2Sample }) {
   const [failed, setFailed] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [unmuted, setUnmuted] = useState(false);
+  const [, tick] = useState(0);
+
+  useEffect(() => homeVideoSubscribe(() => tick((n) => n + 1)), []);
+  useEffect(() => {
+    homeVideoRegister(sample.id, videoRef.current);
+    return () => homeVideoRegister(sample.id, null);
+  }, [sample.id]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    const active = homeVideoGetActiveId() === sample.id;
+    setPlaying(!!(active && el && !el.paused));
+    if (!active) setUnmuted(false);
+  });
+
+  const toggle = useCallback(
+    (e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      const el = videoRef.current;
+      if (!el) return;
+      if (homeVideoGetActiveId() === sample.id && !el.paused) {
+        homeVideoPause(sample.id);
+        setPlaying(false);
+        setUnmuted(false);
+        el.muted = true;
+      } else {
+        homeVideoRequestPlay(sample.id, el, { unmuted: false });
+        setPlaying(true);
+      }
+    },
+    [sample.id],
+  );
+
+  const toggleSound = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const el = videoRef.current;
+      if (!el) return;
+      if (!playing) {
+        homeVideoRequestPlay(sample.id, el, { unmuted: true });
+        setPlaying(true);
+        setUnmuted(true);
+        return;
+      }
+      if (unmuted) {
+        el.muted = true;
+        setUnmuted(false);
+      } else {
+        el.muted = false;
+        setUnmuted(true);
+        homeVideoRequestPlay(sample.id, el, { unmuted: true });
+      }
+    },
+    [sample.id, playing, unmuted],
+  );
+
   if (failed) return null;
+
   return (
-    <article
-      className={cn(
-        "group w-full max-w-[280px] self-start overflow-hidden rounded-2xl border border-border/50 bg-transparent",
-        "transition-[transform,opacity] duration-200 ease-out",
-        "hover:scale-[1.01] active:scale-[0.98] active:opacity-90",
-      )}
-    >
-      <Link
-        to="/sample/$id"
-        params={{ id: t.id }}
-        className="relative block aspect-square overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        aria-label={`Open ${t.title}`}
-      >
-        <img
-          src={t.cover}
-          alt={`${t.title} cover`}
-          className="h-full w-full object-cover"
-          loading="lazy"
+    <article className="group relative w-full self-start overflow-hidden rounded-2xl bg-muted/20 ring-1 ring-border/30">
+      <button type="button" onClick={toggle} className="relative block w-full text-left" aria-label={playing ? "Pause" : "Play"}>
+        <video
+          ref={videoRef}
+          src={sample.url}
+          muted
+          playsInline
+          loop
+          preload="metadata"
+          className="pointer-events-none block h-auto w-full"
           onError={() => setFailed(true)}
         />
-      </Link>
-      <p className="truncate px-1.5 pt-1.5 text-[11px] font-medium leading-tight text-foreground/80">
-        {t.title}
-      </p>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
+        <span
+          className={cn(
+            "absolute bottom-2 left-2 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur-md",
+            playing && "border-primary/50 bg-primary/85",
+          )}
+        >
+          {playing ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+        </span>
+        {playing && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={toggleSound}
+            className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-md"
+            aria-label={unmuted ? "Mute" : "Unmute"}
+          >
+            {unmuted ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+          </span>
+        )}
+        <div className={cn("absolute inset-x-0 bottom-0 px-2.5 pb-2.5", "pl-12")}>
+          <p className="line-clamp-1 text-[12px] font-semibold text-white drop-shadow-sm">{sample.title}</p>
+          {sample.durationLabel ? (
+            <p className="text-[10px] text-white/70">
+              {sample.durationLabel}
+              {sample.fileSizeLabel ? ` · ${sample.fileSizeLabel}` : ""}
+            </p>
+          ) : null}
+        </div>
+      </button>
     </article>
   );
 }
 
 export function MusicStudioGallery() {
-  const tracks = useMemo(() => TRACKS, []);
+  const samples = useMemo(() => getMusicVideoSamples(), []);
+  if (samples.length === 0) return null;
 
   return (
-    <section className="space-y-4" data-creation-section="music">
-      <h3 className="flex items-center gap-1.5 text-[14px] font-bold tracking-tight">
-        <Music className="h-4 w-4" />
-        Music
-      </h3>
-      <div className="mx-auto grid max-w-[1200px] grid-cols-2 items-start justify-items-center gap-3 sm:grid-cols-3 sm:gap-5">
-        {tracks.map((t) => (
-          <MusicCard key={t.id} t={t} />
+    <section className="mt-10 space-y-3" data-creation-section="music">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="flex items-center gap-1.5 text-[16px] font-extrabold tracking-tight sm:text-[18px]">
+          <Music className="h-4 w-4" />
+          Music
+        </h2>
+        <p className="text-[11px] text-muted-foreground">Instrumental samples</p>
+      </div>
+      <div className="mx-auto grid max-w-[1200px] grid-cols-2 items-start gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+        {samples.map((s) => (
+          <MusicVideoCard key={s.id} sample={s} />
         ))}
       </div>
     </section>
