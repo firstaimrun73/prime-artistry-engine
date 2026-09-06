@@ -24,7 +24,6 @@ function parseRatio(ar: string): number {
   return w / h;
 }
 
-/** Editorial span hint for CSS grid placement (content-aware scale). */
 export function spanClassForSample(sample: R2Sample): string {
   const r = parseRatio(sample.aspectRatio);
   const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
@@ -240,12 +239,12 @@ export function GalleryMediaCard({
       </button>
 
       {sample.title ? (
-        <div className="px-0.5 pt-1.5">
-          <p className="truncate text-[12px] font-semibold leading-snug text-foreground/90">
+        <div className="overflow-visible px-0.5 pt-1.5 pb-1">
+          <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-foreground/90">
             {sample.title}
           </p>
-          {sample.description && sample.description.length < 90 ? (
-            <p className="mt-0.5 line-clamp-1 text-[11px] leading-snug text-muted-foreground">
+          {sample.description ? (
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
               {sample.description}
             </p>
           ) : null}
