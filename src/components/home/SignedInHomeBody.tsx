@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
 import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery";
-import { ExtraaSection } from "@/components/home/ExtraaSection";
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 
 const QUICK_CREATE = [
@@ -108,9 +107,8 @@ export function SignedInHomeBody() {
 
       <CircleSampleGallery />
 
-      <div className="mt-12 space-y-2">
+      <div className="mt-12">
         <VisualDiscoveryGallery />
-        <ExtraaSection />
       </div>
 
       <FilterLensHomeSection />
