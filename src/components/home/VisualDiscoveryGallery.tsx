@@ -1,10 +1,12 @@
 /**
- * Unified editorial Discover feed — all ratios in one composition.
- * EXTRAA is retired as a separate section; 21:9 / 16:9 are first-class here.
+ * Unified editorial Discover feed — images + videos, native ratios.
+ * Whats New strip on top. Media-first cards (see GalleryMediaCard).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { Aperture, Circle, Sparkles } from "lucide-react";
 import {
   getImagineOnlySamples,
   getActiveR2VideoSamples,
@@ -50,6 +52,58 @@ export function getAllDiscoverySamples(): R2Sample[] {
     if (ri < rest.length) push(rest[ri++]);
   }
   return out;
+}
+
+const WHATS_NEW = [
+  {
+    to: "/studio/image/circle-remove" as const,
+    label: "Circle 2edit",
+    hint: "Remove objects",
+    icon: Circle,
+  },
+  {
+    to: "/studio/image/auto-edit" as const,
+    label: "Maluto AI",
+    hint: "One-click enhance",
+    icon: Sparkles,
+  },
+  {
+    to: "/studio/image/lens-editor" as const,
+    label: "Lens",
+    hint: "Camera software",
+    icon: Aperture,
+  },
+] as const;
+
+function WhatsNewStrip() {
+  return (
+    <section className="space-y-2.5" aria-label="What's new">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-[15px] font-extrabold tracking-tight sm:text-[16px]">What's new</h2>
+        <span className="text-[11px] text-muted-foreground">Try these next</span>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+        {WHATS_NEW.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.label}
+              to={item.to}
+              className="flex min-w-[140px] shrink-0 items-center gap-2.5 rounded-2xl border border-border/70 bg-card/80 px-3 py-2.5 transition hover:border-primary/40 hover:bg-muted/30"
+            >
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[12px] font-semibold leading-tight">{item.label}</span>
+                <span className="block truncate text-[10px] text-muted-foreground">{item.hint}</span>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 export function VisualDiscoveryGallery() {
@@ -119,40 +173,51 @@ export function VisualDiscoveryGallery() {
     [user, likedIds, toggleFn],
   );
 
-  if (samples.length === 0) return null;
+  if (samples.length === 0) {
+    return (
+      <div className="space-y-6">
+        <WhatsNewStrip />
+      </div>
+    );
+  }
 
   return (
-    <section className="space-y-4" data-discovery="unified-feed">
-      <div className="space-y-1">
-        <h2 className="text-[18px] font-extrabold tracking-tight sm:text-[20px]">Discover</h2>
-        <p className="text-[13px] text-muted-foreground">
-          Creative visuals from Motio2edit — browse, then open any card to explore.
-        </p>
-      </div>
+    <div className="space-y-7" data-discovery="unified-feed">
+      <WhatsNewStrip />
 
-      <div
-        className={cn(
-          "mx-auto grid max-w-[1200px] items-start gap-2.5 sm:gap-3",
-          "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-        )}
-      >
-        {samples.map((s) => (
-          <GalleryMediaCard
-            key={s.id}
-            sample={s}
-            liked={likedIds.has(s.id)}
-            onToggleLike={onToggleLike}
-            onOpenViewer={setViewer}
-          />
-        ))}
-      </div>
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-[18px] font-extrabold tracking-tight sm:text-[20px]">Discover</h2>
+          <p className="text-[11px] text-muted-foreground sm:text-[12px]">
+            Photos · videos · samples
+          </p>
+        </div>
+
+        <div
+          className={cn(
+            "mx-auto grid max-w-[1200px] items-start",
+            "gap-2 sm:gap-2.5 md:gap-3",
+            "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+          )}
+        >
+          {samples.map((s) => (
+            <GalleryMediaCard
+              key={s.id}
+              sample={s}
+              liked={likedIds.has(s.id)}
+              onToggleLike={onToggleLike}
+              onOpenViewer={setViewer}
+            />
+          ))}
+        </div>
+      </section>
 
       <DiscoveryMediaViewer
         sample={viewer}
         open={!!viewer}
         onClose={() => setViewer(null)}
       />
-    </section>
+    </div>
   );
 }
 
