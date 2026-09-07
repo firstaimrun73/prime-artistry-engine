@@ -2,6 +2,7 @@
  * Canonical media detail page — image / video / music.
  * Download & Share live here (not on homepage cards).
  * Exactly ONE Back control. No provider/model names. No original prompts.
+ * Pass 10: redundant Info toggle removed — description always visible.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -9,7 +10,6 @@ import {
   ArrowLeft,
   Download,
   Share2,
-  Info,
   Play,
   Pause,
   Volume2,
@@ -32,7 +32,6 @@ function categoryLabel(s: R2Sample | null, isMusic: boolean): string {
   return "Sample";
 }
 
-/** Section 8 — studio identity, never generic "Motio2edit" or model/provider IDs. */
 function editorLabel(s: R2Sample | null, kind: "image" | "video" | "music"): string {
   if (kind === "music") return "Music Studio";
   if (!s) return "Image Studio";
@@ -41,7 +40,6 @@ function editorLabel(s: R2Sample | null, kind: "image" | "video" | "music"): str
   }
   if (s.studio === "auto-edit" || s.feature === "auto-edit") return "Maluto AI";
   if (s.studio === "video" || kind === "video") return "Video Studio";
-  // Image tiers only if quality is known; otherwise plain Image Studio
   if (s.quality === "Ultra") return "Image Studio Ultra AI";
   if (s.quality === "Premium" || s.quality === "High") return "Image Studio Premium";
   return "Image Studio";
@@ -78,7 +76,6 @@ function SampleDetailPage() {
   const isDark = theme === "dark";
   const sample = getR2SampleById(id);
   const kind = mediaKind(sample, id);
-  const [showInfo, setShowInfo] = useState(true);
 
   const goBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -194,7 +191,6 @@ function SampleDetailPage() {
 
   return (
     <div className={cn("min-h-screen", isDark ? "bg-[#0F1117]" : "bg-background")}>
-      {/* Exactly ONE Back control — Audit D */}
       <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-border/50 bg-background/90 px-3 py-2.5 backdrop-blur-md">
         <button
           type="button"
@@ -252,92 +248,82 @@ function SampleDetailPage() {
           >
             <Share2 className="h-4 w-4" /> Share
           </button>
-          <button
-            type="button"
-            onClick={() => setShowInfo((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium"
-            aria-pressed={showInfo}
-          >
-            <Info className="h-4 w-4" /> Info
-          </button>
         </div>
 
-        {showInfo ? (
-          <div className="mt-8 space-y-4">
+        <div className="mt-8 space-y-4">
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {kind === "video" ? "Video" : kind === "music" ? "Music" : "Image"}
+            </p>
+          </div>
+          <dl className="grid gap-2 text-sm">
             <div>
-              <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
-              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {kind === "video" ? "Video" : kind === "music" ? "Music" : "Image"}
-              </p>
+              <dt className="text-muted-foreground">Editor</dt>
+              <dd className="font-semibold">{editorLabel(sample, kind)}</dd>
             </div>
-            <dl className="grid gap-2 text-sm">
-              <div>
-                <dt className="text-muted-foreground">Editor</dt>
-                <dd className="font-semibold">{editorLabel(sample, kind)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Category</dt>
-                <dd className="font-semibold">{categoryLabel(sample, kind === "music")}</dd>
-              </div>
-            </dl>
+            <div>
+              <dt className="text-muted-foreground">Category</dt>
+              <dd className="font-semibold">{categoryLabel(sample, kind === "music")}</dd>
+            </div>
+          </dl>
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Description
+            </h2>
+            <p
+              className={cn(
+                "mt-1 text-[14px] leading-relaxed",
+                isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]",
+              )}
+            >
+              {description}
+            </p>
+          </div>
+          {sample ? (
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Description
+                Details
               </h2>
-              <p
-                className={cn(
-                  "mt-1 text-[14px] leading-relaxed",
-                  isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]",
-                )}
-              >
-                {description}
-              </p>
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                {sample.quality ? (
+                  <div>
+                    <dt className="text-muted-foreground">Quality</dt>
+                    <dd className="font-semibold">{sample.quality}</dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt className="text-muted-foreground">Aspect</dt>
+                  <dd className="font-semibold">{sample.aspectRatio}</dd>
+                </div>
+                {sample.width && sample.height ? (
+                  <div>
+                    <dt className="text-muted-foreground">Dimensions</dt>
+                    <dd className="font-semibold">
+                      {sample.width}×{sample.height}
+                    </dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt className="text-muted-foreground">Format</dt>
+                  <dd className="font-semibold">{sample.format}</dd>
+                </div>
+                {sample.fileSizeLabel ? (
+                  <div>
+                    <dt className="text-muted-foreground">File size</dt>
+                    <dd className="font-semibold">{sample.fileSizeLabel}</dd>
+                  </div>
+                ) : null}
+                {sample.durationLabel ? (
+                  <div>
+                    <dt className="text-muted-foreground">Duration</dt>
+                    <dd className="font-semibold">{sample.durationLabel}</dd>
+                  </div>
+                ) : null}
+              </dl>
             </div>
-            {sample ? (
-              <div>
-                <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Details
-                </h2>
-                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
-                  {sample.quality ? (
-                    <div>
-                      <dt className="text-muted-foreground">Quality</dt>
-                      <dd className="font-semibold">{sample.quality}</dd>
-                    </div>
-                  ) : null}
-                  <div>
-                    <dt className="text-muted-foreground">Aspect</dt>
-                    <dd className="font-semibold">{sample.aspectRatio}</dd>
-                  </div>
-                  {sample.width && sample.height ? (
-                    <div>
-                      <dt className="text-muted-foreground">Dimensions</dt>
-                      <dd className="font-semibold">
-                        {sample.width}×{sample.height}
-                      </dd>
-                    </div>
-                  ) : null}
-                  <div>
-                    <dt className="text-muted-foreground">Format</dt>
-                    <dd className="font-semibold">{sample.format}</dd>
-                  </div>
-                  {sample.fileSizeLabel ? (
-                    <div>
-                      <dt className="text-muted-foreground">File size</dt>
-                      <dd className="font-semibold">{sample.fileSizeLabel}</dd>
-                    </div>
-                  ) : null}
-                  {sample.durationLabel ? (
-                    <div>
-                      <dt className="text-muted-foreground">Duration</dt>
-                      <dd className="font-semibold">{sample.durationLabel}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </main>
     </div>
   );
