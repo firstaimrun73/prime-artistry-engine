@@ -1,6 +1,6 @@
 /**
  * Motio2edit Lens roster — 20 on-device image lenses (upload only).
- * Free. Badge: code + color.
+ * Default selection = NONE (no auto-apply).
  */
 
 export type LensOpticalConcept =
@@ -19,11 +19,11 @@ export type LensOpticalConcept =
   | "vintage"
   | "infrared"
   | "sharpen"
+  | "enhance-4k"
   | "prism"
   | "soft-focus"
-  | "long-glass"
-  | "selective-focus"
-  | "perspective";
+  | "perspective"
+  | "selective-focus";
 
 export type LensImplementationStatus = "full" | "preview-only" | "coming-soon";
 
@@ -43,8 +43,7 @@ export const LENS_AI_MAX_CREDITS = 0 as const;
 export const LENS_GENERATION_CREDITS = 0 as const;
 
 /**
- * 20 lenses — ids stable for deep-links; optics rebuilt for clear visible effect.
- * 1 Deep Wide · 2 360 · 3 Ultrawide · 4 Portrait · 5 Sketch · 6 Cine Sharp · 7 Night Blue
+ * 20 lenses. Default UI state is NONE — no effect until user taps a lens.
  */
 export const CAMERA_LENS_ROSTER: CameraLensDef[] = [
   {
@@ -209,11 +208,11 @@ export const CAMERA_LENS_ROSTER: CameraLensDef[] = [
   },
   {
     id: "lens_swirl_depth",
-    name: "Soft Bloom",
-    code: "SB",
-    color: "#6A0572",
-    concept: "soft-focus",
-    shortDescription: "Dream soft focus",
+    name: "Enhance 4K",
+    code: "4K",
+    color: "#E8A317",
+    concept: "enhance-4k",
+    shortDescription: "Clarity · detail · upscale feel",
     status: "full",
     creditCost: 0,
   },
@@ -249,8 +248,9 @@ export const CAMERA_LENS_ROSTER: CameraLensDef[] = [
   },
 ];
 
-export function getDefaultCameraLens(): CameraLensDef {
-  return CAMERA_LENS_ROSTER[0];
+/** Default = no lens selected. Never auto-apply first item. */
+export function getDefaultCameraLens(): CameraLensDef | null {
+  return null;
 }
 
 export function getCameraLensById(id: string | null | undefined): CameraLensDef | undefined {
