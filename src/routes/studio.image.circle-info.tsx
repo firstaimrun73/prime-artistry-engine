@@ -1,8 +1,8 @@
 /**
  * Circle 2edit information + per-sample detail page.
  * Route: /studio/image/circle-info
- * Optional search: ?sampleId=rm-butterfly | add-dog | …
- * Generic product page when no sampleId; dedicated SAMPLE detail when sampleId is present.
+ * Back always → homepage (never Image Studio).
+ * Visual demo: Before + After only (1:1), no blank middle stages.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -10,10 +10,7 @@ import {
   ArrowRight,
   Sparkles,
   Circle,
-  Brush,
-  Eraser,
   Layers,
-  Info,
 } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
@@ -55,107 +52,90 @@ export const Route = createFileRoute("/studio/image/circle-info")({
   }),
 });
 
-const FAQ = [
-  {
-    q: "What is Circle 2edit?",
-    a: "A dedicated product for marking a region on a photo and either removing content or adding a curated object with lighting, perspective, and shadow match.",
-  },
-  {
-    q: "How is Remove different from Add?",
-    a: "Remove erases the marked region and fills it naturally. Add places a chosen object (animals, vehicles, objects, nature) into the painted placement area.",
-  },
-  {
-    q: "Do I need a paid plan?",
-    a: "Circle Remove is available on free with credits. Circle Add requires a paid plan. Credits are charged server-side per operation.",
-  },
-  {
-    q: "What marking tools are available?",
-    a: "Circle (A→B freehand lasso), Brush for precise paint, and Eraser to correct the mask — with undo/redo.",
-  },
-  {
-    q: "Is the watermark required?",
-    a: "Circle outputs use a Circle-specific Motio 2 Edit purple-ring mark. Free plans always include it; paid users can toggle it. Server export enforces the setting.",
-  },
-  {
-    q: "Where do samples live?",
-    a: "After sign-in, the homepage shows Circle feature cards. Try Now opens the editor with the same asset and mode preserved.",
-  },
-] as const;
-
-function StageFrame({
-  label,
-  caption,
-  src,
-  showMark,
+function BeforeAfterPair({
+  beforeSrc,
+  afterSrc,
+  objectLabel,
+  isRemove,
   isDark,
 }: {
-  label: string;
-  caption: string;
-  src: string;
-  showMark?: boolean;
+  beforeSrc: string;
+  afterSrc: string;
+  objectLabel: string;
+  isRemove: boolean;
   isDark: boolean;
 }) {
   return (
-    <div className="space-y-2">
-      <div className="overflow-hidden rounded-2xl border border-[#7B6FE0]/25">
-        <div className="relative aspect-[4/5] w-full max-h-[280px] bg-black/10">
-          <img src={src} alt={label} className="h-full w-full object-cover" />
-          {showMark ? (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div
-                className="relative h-[42%] w-[42%] rounded-full border-[3px] border-[#7B6FE0]"
-                style={{
-                  boxShadow:
-                    "0 0 0 9999px rgba(123,111,224,0.2), 0 0 22px rgba(123,111,224,0.4)",
-                  background: "rgba(123,111,224,0.16)",
-                }}
-              >
-                <span className="absolute inset-[16%] rounded-full border-2 border-dashed border-white/70" />
-              </div>
+    <section className="space-y-3">
+      <h2 className="text-[15px] font-bold tracking-tight">Before and After</h2>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <div className="overflow-hidden rounded-2xl border border-[#7B6FE0]/25 bg-black/5">
+            <div className="relative aspect-square w-full">
+              <img
+                src={beforeSrc}
+                alt={`Before — ${objectLabel}`}
+                className="h-full w-full object-cover"
+                loading="eager"
+              />
             </div>
-          ) : null}
+          </div>
+          <p className="text-[12px] font-bold text-[#7B6FE0]">Before</p>
+          <p className={cn("text-[11px] leading-snug", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+            {isRemove ? `Scene with ${objectLabel}` : "Scene without the object"}
+          </p>
+        </div>
+        <div className="space-y-1.5">
+          <div className="overflow-hidden rounded-2xl border border-[#7B6FE0]/25 bg-black/5">
+            <div className="relative aspect-square w-full">
+              <img
+                src={afterSrc}
+                alt={`After — ${objectLabel}`}
+                className="h-full w-full object-cover"
+                loading="eager"
+              />
+            </div>
+          </div>
+          <p className="text-[12px] font-bold text-[#7B6FE0]">After</p>
+          <p className={cn("text-[11px] leading-snug", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+            {isRemove ? `${objectLabel} removed cleanly` : `${objectLabel} added naturally`}
+          </p>
         </div>
       </div>
-      <div>
-        <p className="text-[12px] font-bold text-[#7B6FE0]">{label}</p>
-        <p className={cn("text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>{caption}</p>
-      </div>
-    </div>
+    </section>
   );
 }
 
-function RemoveBlockDiagram({ objectLabel, isDark }: { objectLabel: string; isDark: boolean }) {
-  const steps = [
-    { n: "1", title: "Upload Image", body: `Scene with ${objectLabel}` },
-    { n: "2", title: "Mark Object", body: "Purple circle + shaded selection" },
-    { n: "3", title: "AI Analyses", body: "Understands the selected region" },
-    { n: "4", title: "AI Removes", body: "Reconstructs the selected area" },
-    { n: "5", title: "Final Result", body: `${objectLabel} removed` },
-  ];
+function SimpleFlow({ isRemove, objectLabel, isDark }: { isRemove: boolean; objectLabel: string; isDark: boolean }) {
+  const steps = isRemove
+    ? [
+        { n: "1", title: "Upload", body: "Your photo" },
+        { n: "2", title: "Mark", body: `Circle the ${objectLabel.toLowerCase()}` },
+        { n: "3", title: "Remove", body: "AI fills the area" },
+      ]
+    : [
+        { n: "1", title: "Upload", body: "Your photo" },
+        { n: "2", title: "Place", body: `Paint where ${objectLabel.toLowerCase()} goes` },
+        { n: "3", title: "Add", body: "Lighting-matched result" },
+      ];
   return (
     <section className="space-y-3">
-      <h2 className="text-[15px] font-bold tracking-tight">How Circle 2edit Removes an Object</h2>
-      <div className="space-y-2">
-        {steps.map((s, i) => (
-          <div key={s.n}>
-            <div
-              className={cn(
-                "rounded-2xl border px-4 py-3",
-                isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/90",
-              )}
-            >
-              <p className="text-[12px] font-bold text-[#7B6FE0]">
-                {s.n}. {s.title}
-              </p>
-              <p className={cn("mt-0.5 text-[12px]", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
-                {s.body}
-              </p>
-            </div>
-            {i < steps.length - 1 ? (
-              <div className="flex justify-center py-1">
-                <span className="text-[#7B6FE0]">↓</span>
-              </div>
-            ) : null}
+      <h2 className="text-[15px] font-bold tracking-tight">How it works</h2>
+      <div className="grid grid-cols-3 gap-2">
+        {steps.map((s) => (
+          <div
+            key={s.n}
+            className={cn(
+              "rounded-2xl border p-3 text-center",
+              isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/90",
+            )}
+          >
+            <p className="text-[11px] font-bold text-[#7B6FE0]">
+              {s.n}. {s.title}
+            </p>
+            <p className={cn("mt-1 text-[11px] leading-snug", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
+              {s.body}
+            </p>
           </div>
         ))}
       </div>
@@ -175,14 +155,10 @@ function FeatureDetail({
   onStart: () => void;
 }) {
   const beforeSrc = useMemo(() => resolveCircleSampleMediaUrl(sample, { stage: "before" }), [sample]);
-  const markSrc = useMemo(() => resolveCircleSampleMediaUrl(sample, { stage: "mark" }), [sample]);
-  const outlineSrc = useMemo(() => resolveCircleSampleMediaUrl(sample, { stage: "outline" }), [sample]);
   const afterSrc = useMemo(() => resolveCircleSampleMediaUrl(sample, { stage: "after" }), [sample]);
   const asset = sample.assetId ? findAddAsset(sample.assetId) : null;
   const tryHref = circleSampleTryHref(sample, "sample");
   const isRemove = sample.mode === "remove";
-  const midSrc = isRemove ? markSrc : outlineSrc;
-  const hasDistinctAfter = !!(sample.afterUrl || sample.afterR2Key);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 px-4 py-8">
@@ -203,75 +179,24 @@ function FeatureDetail({
           >
             {isRemove ? "Remove" : "Add"}
           </span>
-          {sample.objectLabel ? (
-            <span className={cn("text-[11px] font-medium", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-              Object: {sample.objectLabel}
-            </span>
-          ) : null}
         </div>
         <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-          {isRemove ? `Remove ${sample.objectLabel} with Circle 2edit` : sample.title}
+          {isRemove ? `Remove ${sample.objectLabel}` : sample.title}
         </h1>
         <p className={cn("text-[14px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
           {sample.description}
         </p>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-[15px] font-bold tracking-tight">Visual demonstration</h2>
-        <StageFrame
-          label="1 · Before"
-          caption={isRemove ? "Original scene with the object present" : "Environment without the target object"}
-          src={beforeSrc}
-          isDark={isDark}
-        />
-        <div className="flex justify-center">
-          <span className="text-[#7B6FE0]">↓</span>
-        </div>
-        <StageFrame
-          label={isRemove ? "2 · Mark" : "2 · Outline"}
-          caption={
-            isRemove
-              ? "Same photo · purple circular selection · translucent shade"
-              : "Explanatory outline of the selected object"
-          }
-          src={midSrc}
-          showMark={isRemove && !sample.markUrl}
-          isDark={isDark}
-        />
-        {isRemove ? (
-          <div className="flex flex-col items-center gap-2 py-2">
-            <div className="flex items-center gap-6">
-              {["Analyse", "Removing", "Generating"].map((lab) => (
-                <div key={lab} className="flex flex-col items-center gap-1.5">
-                  <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-[#7B6FE0] bg-[rgba(123,111,224,0.15)]">
-                    <span className="h-2 w-2 rounded-full bg-[#7B6FE0]" />
-                  </span>
-                  <span className="text-[10px] font-semibold text-[#7B6FE0]">{lab}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <span className="text-[#7B6FE0]">↓</span>
-          </div>
-        )}
-        <StageFrame
-          label="3 · After"
-          caption={
-            isRemove
-              ? hasDistinctAfter
-                ? "Same composition · object completely removed"
-                : "Result stage — upload butterfly-after.jpg to R2 for verified media"
-              : "Same environment · selected object realistically added"
-          }
-          src={afterSrc}
-          isDark={isDark}
-        />
-      </section>
+      <BeforeAfterPair
+        beforeSrc={beforeSrc}
+        afterSrc={afterSrc}
+        objectLabel={sample.objectLabel}
+        isRemove={isRemove}
+        isDark={isDark}
+      />
 
-      {isRemove ? <RemoveBlockDiagram objectLabel={sample.objectLabel} isDark={isDark} /> : null}
+      <SimpleFlow isRemove={isRemove} objectLabel={sample.objectLabel} isDark={isDark} />
 
       <section
         className={cn(
@@ -279,7 +204,7 @@ function FeatureDetail({
           isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/90",
         )}
       >
-        <h2 className="mb-3 text-[14px] font-bold tracking-tight">Sample details</h2>
+        <h2 className="mb-3 text-[14px] font-bold tracking-tight">Details</h2>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
           <div>
             <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Object</dt>
@@ -290,26 +215,12 @@ function FeatureDetail({
             <dd className="font-semibold">{isRemove ? "Remove" : "Add"}</dd>
           </div>
           <div>
-            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Quality</dt>
-            <dd className="font-semibold">{sample.quality}</dd>
-          </div>
-          <div>
-            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Aspect ratio</dt>
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Aspect</dt>
             <dd className="font-semibold">{sample.aspectRatio}</dd>
           </div>
           <div>
-            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Generation mode</dt>
-            <dd className="font-semibold">{sample.generationMode}</dd>
-          </div>
-          <div>
-            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Build duration</dt>
-            <dd className="font-semibold">{sample.buildDuration}</dd>
-          </div>
-          <div className="col-span-2">
-            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>AI operation</dt>
-            <dd className="font-semibold">
-              {isRemove ? "Object removal / generative reconstruction" : "Object insertion / scene match"}
-            </dd>
+            <dt className={isDark ? "text-[#9AA0B0]" : "text-[#5C6170]"}>Quality</dt>
+            <dd className="font-semibold">{sample.quality}</dd>
           </div>
           {asset ? (
             <div className="col-span-2 flex items-center gap-2 pt-1">
@@ -320,26 +231,6 @@ function FeatureDetail({
             </div>
           ) : null}
         </dl>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-[15px] font-bold tracking-tight">How to use this feature</h2>
-        <ol className={cn("list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
-          {isRemove ? (
-            <>
-              <li>Upload a photo</li>
-              <li>Circle or paint the object to remove</li>
-              <li>Generate — AI fills the region naturally</li>
-            </>
-          ) : (
-            <>
-              <li>Upload a photo</li>
-              <li>Object is preselected from this sample</li>
-              <li>Paint the placement region</li>
-              <li>Confirm — AI integrates the object</li>
-            </>
-          )}
-        </ol>
       </section>
 
       <Link
@@ -403,16 +294,17 @@ function Circle2editInfoPage() {
           isDark ? "border-white/8 bg-[#181A22]/90" : "border-black/6 bg-white/85",
         )}
       >
-        <Link
-          to="/"
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/", replace: true })}
           className={cn(
             "grid h-9 w-9 place-items-center rounded-xl border",
             isDark ? "border-white/10" : "border-black/8",
           )}
-          aria-label="Back"
+          aria-label="Back to home"
         >
           <ArrowLeft className="h-4 w-4" />
-        </Link>
+        </button>
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-bold tracking-tight">
             Circle <span style={{ color: "#7B6FE0", fontStyle: "italic" }}>2</span>edit
@@ -428,16 +320,12 @@ function Circle2editInfoPage() {
       ) : (
         <div className="mx-auto max-w-2xl space-y-10 px-4 py-8">
           <section className="relative overflow-hidden rounded-3xl border border-[#7B6FE0]/35 bg-gradient-to-br from-[rgba(123,111,224,0.18)] via-transparent to-transparent p-6 sm:p-8">
-            <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full border-[6px] border-[#7B6FE0]/40" />
-            <div className="pointer-events-none absolute right-6 top-10 h-16 w-16 rounded-full border-[3px] border-[#7B6FE0]/55" />
-            <div className="pointer-events-none absolute right-10 top-14 h-4 w-4 rounded-full bg-[#7B6FE0]" />
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#7B6FE0]">Circle 2edit</p>
             <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
               Mark. Remove. Add.
             </h1>
             <p className={cn("mt-2 max-w-md text-[14px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
-              Draw a region, then let AI erase or insert objects that match lighting, perspective, and
-              shadows of your photo — not stickers.
+              Draw a region, then let AI erase or insert objects that match lighting and perspective of your photo.
             </p>
             <button
               type="button"
@@ -448,20 +336,15 @@ function Circle2editInfoPage() {
               {user ? "Try Now" : "Start Now"}
               <ArrowRight className="h-4 w-4" />
             </button>
-            {!user && (
-              <p className={cn("mt-2 text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-                Sign in required before the editor opens.
-              </p>
-            )}
           </section>
 
           <section className="space-y-3">
             <h2 className="text-[15px] font-bold tracking-tight">Workflow</h2>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { icon: Circle, label: "Mark", body: "A→B · Brush · Eraser" },
-                { icon: Layers, label: "Choose", body: "Remove or Add object" },
-                { icon: Sparkles, label: "Generate", body: "Lighting-matched result" },
+                { icon: Circle, label: "Mark", body: "Circle · Brush · Eraser" },
+                { icon: Layers, label: "Choose", body: "Remove or Add" },
+                { icon: Sparkles, label: "Generate", body: "Matched result" },
               ].map(({ icon: Icon, label, body }) => (
                 <div
                   key={label}
@@ -474,88 +357,41 @@ function Circle2editInfoPage() {
                     <Icon className="h-5 w-5" />
                   </span>
                   <p className="mt-2 text-[12px] font-bold">{label}</p>
-                  <p className={cn("mt-0.5 text-[10px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>{body}</p>
+                  <p className={cn("text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>{body}</p>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="space-y-2">
-            <h2 className="text-[15px] font-bold tracking-tight">Remove</h2>
-            <ol className={cn("list-decimal space-y-1 pl-5 text-[13px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
-              <li>Upload a photo</li>
-              <li>Circle or paint the unwanted object</li>
-              <li>Refine with Brush / Eraser</li>
-              <li>Tap Remove Object</li>
-              <li>Compare before / after</li>
-            </ol>
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="text-[15px] font-bold tracking-tight">Add</h2>
-            <ol className={cn("list-decimal space-y-1 pl-5 text-[13px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
-              <li>Select an object from the curated set</li>
-              <li>Choose factors (breed, color, pose…)</li>
-              <li>Paint the placement region</li>
-              <li>Confirm — AI integrates the object</li>
-            </ol>
-          </section>
-
-          <section className="space-y-2">
-            <h2 className="text-[15px] font-bold tracking-tight">Marking tools</h2>
-            <ul className="space-y-2 text-[13px]">
-              <li className="flex gap-2">
-                <Circle className="mt-0.5 h-4 w-4 shrink-0 text-[#7B6FE0]" />
-                <span>
-                  <strong>Circle (A→B)</strong> — freehand outline; snaps closed when endpoints meet.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <Brush className="mt-0.5 h-4 w-4 shrink-0 text-[#7B6FE0]" />
-                <span>
-                  <strong>Brush</strong> — paint precise mask regions.
-                </span>
-              </li>
-              <li className="flex gap-2">
-                <Eraser className="mt-0.5 h-4 w-4 shrink-0 text-[#7B6FE0]" />
-                <span>
-                  <strong>Eraser</strong> — correct the mask without restarting.
-                </span>
-              </li>
-            </ul>
-          </section>
-
           <section className="space-y-3">
-            <h2 className="text-[15px] font-bold tracking-tight">FAQ</h2>
-            <div className="space-y-2">
-              {FAQ.map((item) => (
-                <details
-                  key={item.q}
-                  className={cn(
-                    "group rounded-2xl border px-4 py-3",
-                    isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/90",
-                  )}
-                >
-                  <summary className="cursor-pointer list-none text-[13px] font-semibold marker:content-none">
-                    {item.q}
-                  </summary>
-                  <p className={cn("mt-2 text-[12px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
-                    {item.a}
-                  </p>
-                </details>
-              ))}
+            <h2 className="text-[15px] font-bold tracking-tight">Samples</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {getActiveCircleSamples().slice(0, 4).map((s) => {
+                const src = resolveCircleSampleMediaUrl(s, { stage: "before" });
+                return (
+                  <Link
+                    key={s.id}
+                    to="/studio/image/circle-info"
+                    search={{ sampleId: s.id }}
+                    className={cn(
+                      "flex gap-3 rounded-2xl border p-3 transition hover:border-[#7B6FE0]/40",
+                      isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white/90",
+                    )}
+                  >
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-black/5">
+                      <img src={src} alt="" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-semibold">{s.title}</p>
+                      <p className={cn("text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+                        {s.mode === "remove" ? "Remove" : "Add"} · {s.aspectRatio}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </section>
-
-          <button
-            type="button"
-            onClick={start}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#7B6FE0] px-5 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-[rgba(123,111,224,0.35)] transition active:scale-[0.98]"
-          >
-            <Sparkles className="h-4 w-4" />
-            {user ? "Try Now" : "Start Now"}
-            <ArrowRight className="h-4 w-4" />
-          </button>
         </div>
       )}
     </div>
