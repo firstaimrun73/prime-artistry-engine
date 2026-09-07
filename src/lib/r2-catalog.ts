@@ -1,6 +1,7 @@
 /**
  * Central R2 sample catalog — production public URLs only.
  * Domain: https://assets.motio2edit.com
+ * TRY NOW = actionable tools (Circle). TREND reserved — not on random generations.
  */
 
 export const R2_PUBLIC = "https://assets.motio2edit.com" as const;
@@ -23,7 +24,6 @@ export type HomepageCategory =
   | "video"
   | "music";
 
-/** Model tier shown on sample cards / detail. */
 export type SampleQualityTier = "Standard" | "Premium" | "Ultra AI";
 
 export type R2Sample = {
@@ -43,7 +43,6 @@ export type R2Sample = {
   aspectRatio: string;
   format: string;
   quality?: string;
-  /** Card badge: Standard | Premium | Ultra AI */
   qualityTier?: SampleQualityTier;
   assetId?: string | null;
   fileSizeLabel?: string;
@@ -87,7 +86,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     height: 1200,
     aspectRatio: "4:3",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     fileSizeLabel: "1.52 MB",
     label: "Image Studio",
@@ -100,13 +98,12 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Dramatic sunset over Rio — image generation.",
     studio: "image",
     feature: "image-generation",
-    homepageCategory: "trend",
+    homepageCategory: "samples",
     url: img("file_0000000000cc81fa86915dca20ae5d72.png"),
     width: 1499,
     height: 1049,
     aspectRatio: "3:2",
     format: "PNG",
-    quality: "High",
     qualityTier: "Premium",
     fileSizeLabel: "2.22 MB",
     label: "Generated",
@@ -125,7 +122,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     height: 1024,
     aspectRatio: "3:2",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     fileSizeLabel: "2.21 MB",
     label: "Image Studio",
@@ -138,14 +134,12 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Full-colour peacock on a wet city street at sunset.",
     studio: "image",
     feature: "image-generation",
-    homepageCategory: "try-now",
-    tryNowRoute: "/studio/image",
+    homepageCategory: "samples",
     url: img("file_00000000234c82088edca4a78fe13fe9.png"),
     width: 1254,
     height: 1254,
     aspectRatio: "1:1",
     format: "PNG",
-    quality: "High",
     qualityTier: "Ultra AI",
     fileSizeLabel: "3.41 MB",
     label: "Image Studio",
@@ -164,7 +158,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     height: 1024,
     aspectRatio: "3:2",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     fileSizeLabel: "3.08 MB",
     label: "Image Studio",
@@ -181,9 +174,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     url: img("BKM9xW1knxqG07FllyyPF.png"),
     width: 704,
     height: 944,
-    aspectRatio: "11:15",
+    aspectRatio: "3:4",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     fileSizeLabel: "1.1 MB",
     label: "Image Studio",
@@ -196,13 +188,12 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Tall fashion frame for stories and lookbooks.",
     studio: "image",
     feature: "image-generation",
-    homepageCategory: "trend",
+    homepageCategory: "samples",
     url: img("M4wsUG3TjuqM_K50IXT4S_8VLXCl8F.png"),
     width: 576,
     height: 1024,
     aspectRatio: "9:16",
     format: "PNG",
-    quality: "High",
     qualityTier: "Premium",
     fileSizeLabel: "966.8 kB",
     label: "Image Studio",
@@ -221,7 +212,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     height: 1254,
     aspectRatio: "1:1",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     fileSizeLabel: "3.41 MB",
     label: "Image Studio",
@@ -240,7 +230,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     height: 1024,
     aspectRatio: "3:2",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     fileSizeLabel: "2.65 MB",
     label: "Image Studio",
@@ -257,9 +246,8 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     url: img("file_00000000483c8206bf252418131277ae.png"),
     width: 1536,
     height: 1024,
-    aspectRatio: "3:2",
+    aspectRatio: "4:3",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     fileSizeLabel: "2.46 MB",
     label: "Image Studio",
@@ -272,14 +260,12 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     description: "Widescreen still for hero frames and thumbnails.",
     studio: "image",
     feature: "image-generation",
-    homepageCategory: "try-now",
-    tryNowRoute: "/studio/image",
+    homepageCategory: "samples",
     url: img("JNAxa2b4OCiSvBFg3sNO0_dAODEa8l.png"),
     width: 1024,
     height: 576,
     aspectRatio: "16:9",
     format: "PNG",
-    quality: "High",
     qualityTier: "Premium",
     fileSizeLabel: "1.03 MB",
     label: "Image Studio",
@@ -298,7 +284,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     height: 1024,
     aspectRatio: "9:16",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     fileSizeLabel: "966.8 kB",
     label: "Image Studio",
@@ -320,7 +305,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     height: 1168,
     aspectRatio: "2:3",
     format: "JPEG",
-    quality: "High",
     qualityTier: "Premium",
     assetId: "animal_deer",
     label: "Circle to Add",
@@ -341,7 +325,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     afterUrl: CIRCLE_REMOVE_GIZA.after,
     aspectRatio: "1:1",
     format: "PNG",
-    quality: "High",
     qualityTier: "Standard",
     label: "Circle to Remove",
     sortOrder: 101,
@@ -349,7 +332,6 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
   },
 ];
 
-/** Videos — All shows these; instrumental also listed under Music tab. */
 export const R2_VIDEO_SAMPLES: R2Sample[] = [
   {
     id: "vid-drums-gmmf",
@@ -567,7 +549,6 @@ export function getActiveR2VideoSamples(): R2Sample[] {
   return R2_VIDEO_SAMPLES.filter((s) => s.active).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-/** Discover “All” = images + videos only (no music-only audio assets). */
 export function getAllDiscoverSamples(): R2Sample[] {
   return [...getActiveR2ImageSamples(), ...getActiveR2VideoSamples()].sort(
     (a, b) => a.sortOrder - b.sortOrder,
@@ -580,7 +561,6 @@ export function getImagineOnlySamples(): R2Sample[] {
   );
 }
 
-/** Music tab — instrumental performance videos until pure audio samples exist. */
 export function getMusicVideoSamples(): R2Sample[] {
   return getActiveR2VideoSamples().filter((s) => s.homepageCategory === "music");
 }
