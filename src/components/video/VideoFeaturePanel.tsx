@@ -79,7 +79,7 @@ const ASPECT_LABELS: Partial<Record<VideoAspect, string>> = {
   "1:1": "1:1",
   "4:3": "4:3",
   "3:4": "3:4",
-  "21:9": "IMAX 21:9",
+  "21:9": "21:9",
 };
 
 export function VideoFeaturePanel({
@@ -155,7 +155,7 @@ export function VideoFeaturePanel({
           >
             <p className="text-sm font-bold">Standard</p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Fast · any aspect · SD/HD · from 125 credits
+              Fast clips · SD/HD · from 125 credits
             </p>
           </button>
           <button
@@ -173,13 +173,13 @@ export function VideoFeaturePanel({
             )}
           >
             <p className="text-sm font-bold">
-              Premium{premiumLocked ? " 🔒" : ""}
+              {premiumLocked ? "Premium 🔒" : "👑 Premium"}
               {!premiumLocked && (
                 <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
               )}
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Higher quality · IMAX · audio · from 200 credits
+              Higher quality · longer clips · from 200 credits
             </p>
           </button>
         </div>
@@ -221,7 +221,6 @@ export function VideoFeaturePanel({
         <div className="flex flex-wrap gap-2">
           {aspects.map((a) => {
             const active = safeAspect === a;
-            const isImax = a === "21:9";
             return (
               <button
                 key={a}
@@ -231,9 +230,7 @@ export function VideoFeaturePanel({
                 className={cn(
                   "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
                   active
-                    ? isImax
-                      ? "border-amber-500 bg-amber-500 text-white"
-                      : "border-red-500 bg-red-500 text-white"
+                    ? "border-red-500 bg-red-500 text-white"
                     : "border-border bg-background text-muted-foreground hover:border-red-400/50",
                   disabled && "opacity-40",
                 )}
