@@ -4,8 +4,6 @@ import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-
 import {
   VIDEO_STYLE_MODIFIERS,
   PRODUCT_VIDEO_DURATIONS,
-  is4kDurationLocked,
-  MAX_4K_DURATION_SEC,
   resolutionUiLabel,
 } from "@/lib/video-model-registry";
 
@@ -81,7 +79,7 @@ const ASPECT_LABELS: Partial<Record<VideoAspect, string>> = {
   "1:1": "1:1",
   "4:3": "4:3",
   "3:4": "3:4",
-  "21:9": "21:9",
+  "21:9": "IMAX 21:9",
 };
 
 export function VideoFeaturePanel({
@@ -123,15 +121,22 @@ export function VideoFeaturePanel({
 }) {
   const safeAspect = (aspects.includes(aspect) ? aspect : aspects[0] ?? "16:9") as VideoAspect;
   const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
+  const isPremium = tier === "premium";
 
   const durationOpts = PRODUCT_VIDEO_DURATIONS.map((d) => ({
     id: String(d) as `${number}`,
     label: `${d}s`,
-    locked: is4kDurationLocked(d, safeRes),
   }));
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
+    <div
+      className={cn(
+        "space-y-4 rounded-2xl border p-4 transition-all duration-300",
+        isPremium
+          ? "border-amber-500/30 bg-gradient-to-br from-card via-amber-500/5 to-violet-500/5 shadow-[0_0_40px_-12px_rgba(245,158,11,0.35)]"
+          : "border-border/70 bg-card/80",
+      )}
+    >
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Features</p>
 
       <div>
@@ -142,14 +147,16 @@ export function VideoFeaturePanel({
             disabled={disabled}
             onClick={() => setTier("standard")}
             className={cn(
-              "rounded-2xl border p-3 text-left transition-colors",
+              "rounded-2xl border p-3 text-left transition-all duration-200",
               tier === "standard"
                 ? "border-red-500 bg-red-500/10 ring-1 ring-red-500/30"
                 : "border-border/70 bg-background hover:border-red-400/40",
             )}
           >
             <p className="text-sm font-bold">Standard</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Fast generation for everyday videos.</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Fast · any aspect · SD/HD · from 125 credits
+            </p>
           </button>
           <button
             type="button"
@@ -159,15 +166,20 @@ export function VideoFeaturePanel({
               else setTier("premium");
             }}
             className={cn(
-              "rounded-2xl border p-3 text-left transition-colors",
+              "rounded-2xl border p-3 text-left transition-all duration-200",
               tier === "premium"
-                ? "border-red-500 bg-red-500/10 ring-1 ring-red-500/30"
-                : "border-border/70 bg-background hover:border-red-400/40",
+                ? "border-amber-500 bg-gradient-to-br from-amber-500/15 to-violet-500/10 ring-1 ring-amber-500/40 shadow-sm"
+                : "border-border/70 bg-background hover:border-amber-400/40",
             )}
           >
-            <p className="text-sm font-bold">Premium{premiumLocked ? " 🔒" : ""}</p>
+            <p className="text-sm font-bold">
+              Premium{premiumLocked ? " 🔒" : ""}
+              {!premiumLocked && (
+                <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+              )}
+            </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Higher quality, longer clips, audio, and advanced capabilities.
+              Higher quality · IMAX · audio · from 200 credits
             </p>
           </button>
         </div>
@@ -177,7 +189,9 @@ export function VideoFeaturePanel({
         <div>
           <p className="text-sm font-medium">Sound</p>
           <p className="text-[11px] text-muted-foreground">
-            {soundOn ? "Synchronized audio when supported" : "Silent video"}
+            {soundOn
+              ? "Synchronized audio when supported (+ credits)"
+              : "Silent · prompt sound words still request audio"}
           </p>
         </div>
         <button
@@ -207,6 +221,7 @@ export function VideoFeaturePanel({
         <div className="flex flex-wrap gap-2">
           {aspects.map((a) => {
             const active = safeAspect === a;
+            const isImax = a === "21:9";
             return (
               <button
                 key={a}
@@ -216,7 +231,9 @@ export function VideoFeaturePanel({
                 className={cn(
                   "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
                   active
-                    ? "border-red-500 bg-red-500 text-white"
+                    ? isImax
+                      ? "border-amber-500 bg-amber-500 text-white"
+                      : "border-red-500 bg-red-500 text-white"
                     : "border-border bg-background text-muted-foreground hover:border-red-400/50",
                   disabled && "opacity-40",
                 )}
@@ -234,14 +251,9 @@ export function VideoFeaturePanel({
         options={resolutions.map((r) => ({
           id: r,
           label: resolutionUiLabel(r),
-          locked: r === "4k" && tier !== "premium",
         }))}
         value={safeRes}
-        onChange={(v) => {
-          if (v === "4k" && tier !== "premium") return;
-          setResolution(v);
-          if (is4kDurationLocked(duration, v)) setDuration(MAX_4K_DURATION_SEC);
-        }}
+        onChange={(v) => setResolution(v)}
         disabled={disabled}
       />
 
@@ -249,19 +261,9 @@ export function VideoFeaturePanel({
         label="Duration"
         options={durationOpts}
         value={String(duration) as `${number}`}
-        onChange={(v) => {
-          const d = parseInt(v, 10);
-          if (is4kDurationLocked(d, safeRes)) return;
-          setDuration(d);
-        }}
+        onChange={(v) => setDuration(parseInt(v, 10))}
         disabled={disabled}
       />
-
-      {safeRes === "4k" && (
-        <p className="text-[11px] text-amber-600 dark:text-amber-400">
-          4K is limited to {MAX_4K_DURATION_SEC}s maximum (Premium).
-        </p>
-      )}
 
       <div>
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style</p>
