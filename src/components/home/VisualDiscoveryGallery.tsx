@@ -1,7 +1,6 @@
 /**
- * Motion2AI Creation — Discover
- * Tabs: All (img+video) · Img · Video · Music
- * Horizontal strips use larger aspect-aware card widths.
+ * Motion2AI Creation — Discover (post-login).
+ * Pass 10: ratio-consistent horizontal strips; video → lightbox.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -14,7 +13,10 @@ import {
   getVideoOnlySamples,
   type R2Sample,
 } from "@/lib/r2-catalog";
-import { GalleryMediaCard } from "@/components/home/GalleryMediaCard";
+import {
+  GalleryMediaCard,
+  stripWidthClassForSample,
+} from "@/components/home/GalleryMediaCard";
 import { DiscoveryMediaViewer } from "@/components/home/DiscoveryMediaViewer";
 import { useAuth } from "@/lib/auth";
 import {
@@ -31,30 +33,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "video", label: "Video" },
   { id: "music", label: "Music" },
 ];
-
-function parseRatio(ar: string): number {
-  const m = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(ar.trim());
-  if (!m) return 1;
-  const w = Number(m[1]);
-  const h = Number(m[2]);
-  if (!w || !h) return 1;
-  return w / h;
-}
-
-/** Larger, aspect-aware widths for horizontal strips (mobile-first). */
-function stripCardWidthClass(sample: R2Sample): string {
-  const r = parseRatio(sample.aspectRatio);
-  // Ultra-wide / 21:9-ish
-  if (r >= 2.0) return "w-[min(88vw,320px)] sm:w-[340px]";
-  // 16:9 landscape
-  if (r >= 1.45) return "w-[min(78vw,280px)] sm:w-[300px]";
-  // near square 1:1
-  if (r >= 0.9 && r < 1.45) return "w-[min(56vw,220px)] sm:w-[240px]";
-  // portrait 3:4 / 2:3
-  if (r >= 0.65) return "w-[min(48vw,200px)] sm:w-[210px]";
-  // tall 9:16
-  return "w-[min(44vw,180px)] sm:w-[190px]";
-}
 
 function HorizontalStrip({
   title,
@@ -75,9 +53,17 @@ function HorizontalStrip({
       <h3 className="px-0.5 text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
         {title}
       </h3>
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 scrollbar-none">
+      <div
+        className="gallery-row -mx-1 flex gap-2 overflow-x-auto px-1 pb-2 scrollbar-none"
+        style={{ scrollSnapType: "x mandatory" }}
+      >
         {samples.map((s) => (
-          <div key={s.id} className={cn("shrink-0", stripCardWidthClass(s))}>
+          <div
+            key={s.id}
+            className={cn("gallery-card shrink-0", stripWidthClassForSample(s))}
+            style={{ scrollSnapAlign: "start" }}
+            data-ratio={s.aspectRatio}
+          >
             <GalleryMediaCard
               sample={s}
               liked={likedIds.has(s.id)}

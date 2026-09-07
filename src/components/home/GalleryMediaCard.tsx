@@ -1,10 +1,11 @@
 /**
- * Media-first discovery card — native aspect, quality tier badge, larger sizes.
- * Premium shows crown; Ultra AI badge is animated.
+ * Media-first discovery card — Pass 10.
+ * 16:9/21:9 full width in strips; other ratios smaller, never cropped.
+ * Like/Info fixed top-right. Video tap opens lightbox (not only inline).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Crown, Heart, Info, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Crown, Heart, Info, Play, Volume2, VolumeX } from "lucide-react";
 import type { R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
 import {
@@ -32,6 +33,17 @@ export function spanClassForSample(sample: R2Sample): string {
   if (r >= 1.5 && r < 2.2) return "col-span-1 md:col-span-2 lg:col-span-2";
   if (r < 0.85) return "col-span-1";
   return "col-span-1";
+}
+
+/** Horizontal-strip width per Pass 10 — wide full, others smaller, never crop. */
+export function stripWidthClassForSample(sample: R2Sample): string {
+  const r = parseRatio(sample.aspectRatio);
+  if (r >= 2.0) return "w-[min(88vw,480px)]"; // 21:9-ish
+  if (r >= 1.5) return "w-[min(88vw,420px)]"; // 16:9
+  if (r >= 1.2) return "w-[220px]"; // 4:3
+  if (r >= 0.9) return "w-[220px]"; // 1:1
+  if (r >= 0.7) return "w-[190px]"; // 3:4
+  return "w-[190px]"; // 9:16
 }
 
 function categoryBadge(sample: R2Sample): string | null {
@@ -72,7 +84,6 @@ type Props = {
   onToggleLike?: (sample: R2Sample) => void;
   onOpenViewer?: (sample: R2Sample) => void;
   className?: string;
-  /** Larger type + controls for Discover strips */
   size?: "default" | "large";
 };
 
@@ -108,51 +119,20 @@ export function GalleryMediaCard({
     if (!active) setUnmuted(false);
   }, [activeTick, sample.id]);
 
-  const togglePlay = useCallback(
+  /** Primary media click: image → lightbox; video → lightbox (Pass 10). */
+  const openMedia = useCallback(
     (e?: React.MouseEvent | React.TouchEvent) => {
       e?.stopPropagation();
       e?.preventDefault();
-      if (!isVideo) {
-        onOpenViewer?.(sample);
-        return;
-      }
-      const el = videoRef.current;
-      if (!el) return;
-      if (homeVideoGetActiveId() === sample.id && !el.paused) {
+      onOpenViewer?.(sample);
+      // Pause any inline preview when opening lightbox
+      if (isVideo) {
         homeVideoPause(sample.id);
         setPlayingHere(false);
-        setUnmuted(false);
-        el.muted = true;
-      } else {
-        homeVideoRequestPlay(sample.id, el, { unmuted: false });
-        setPlayingHere(true);
         setUnmuted(false);
       }
     },
     [isVideo, onOpenViewer, sample],
-  );
-
-  const toggleSound = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const el = videoRef.current;
-      if (!el) return;
-      if (!playingHere) {
-        homeVideoRequestPlay(sample.id, el, { unmuted: true });
-        setPlayingHere(true);
-        setUnmuted(true);
-        return;
-      }
-      if (unmuted) {
-        el.muted = true;
-        setUnmuted(false);
-      } else {
-        homeVideoRequestPlay(sample.id, el, { unmuted: true });
-        setUnmuted(true);
-      }
-    },
-    [sample.id, unmuted, playingHere],
   );
 
   const onLike = useCallback(
@@ -174,7 +154,7 @@ export function GalleryMediaCard({
   return (
     <article
       className={cn(
-        "group relative w-full self-start overflow-hidden rounded-2xl",
+        "group relative w-full self-start overflow-hidden rounded-[14px]",
         "bg-muted/15 ring-1 ring-border/25 transition duration-300",
         "hover:ring-primary/30 hover:shadow-md",
         span,
@@ -182,18 +162,39 @@ export function GalleryMediaCard({
       )}
       data-sample-id={sample.id}
       data-aspect={sample.aspectRatio}
+      data-ratio={sample.aspectRatio}
     >
+      {/* Fixed controls — always top-right, same inset (Pass 10) */}
+      <div className="gallery-card__controls absolute right-2 top-2 z-20 flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onLike}
+          className={cn(
+            "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
+            liked
+              ? "border-primary/40 bg-primary/25 text-primary"
+              : "border-white/20 bg-black/40 text-white",
+          )}
+          aria-label={liked ? "Unlike" : "Like"}
+        >
+          <Heart className={cn("h-3.5 w-3.5", liked && "fill-current")} />
+        </button>
+        <Link
+          to="/sample/$id"
+          params={{ id: sample.id }}
+          onClick={(e) => e.stopPropagation()}
+          className="grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md"
+          aria-label="View details"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
       <button
         type="button"
-        className="relative block w-full overflow-hidden rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        onClick={togglePlay}
-        aria-label={
-          isVideo
-            ? playingHere
-              ? "Pause video"
-              : "Play video"
-            : `View ${title || "media"}`
-        }
+        className="relative block w-full overflow-hidden rounded-[14px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        onClick={openMedia}
+        aria-label={isVideo ? `Open video ${title || ""}` : `View ${title || "media"}`}
       >
         {isVideo ? (
           <video
@@ -205,10 +206,6 @@ export function GalleryMediaCard({
             preload="metadata"
             className="pointer-events-none block h-auto w-full"
             onError={() => setFailed(true)}
-            onPlay={() => setPlayingHere(true)}
-            onPause={() => {
-              if (homeVideoGetActiveId() !== sample.id) setPlayingHere(false);
-            }}
           />
         ) : (
           <img
@@ -237,78 +234,18 @@ export function GalleryMediaCard({
             className={cn(
               "absolute bottom-2.5 left-2.5 grid place-items-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur-md",
               large ? "h-9 w-9" : "h-8 w-8",
-              playingHere && "border-primary/50 bg-primary/85",
             )}
             aria-hidden
           >
-            {playingHere ? (
-              <Pause className={cn(large ? "h-4 w-4" : "h-3.5 w-3.5", "fill-current")} />
-            ) : (
-              <Play className={cn(large ? "h-4 w-4" : "h-3.5 w-3.5", "fill-current")} />
-            )}
+            <Play className={cn(large ? "h-4 w-4" : "h-3.5 w-3.5", "fill-current")} />
           </span>
         ) : null}
-
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
-          {isVideo && playingHere ? (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={toggleSound}
-              className={cn(
-                "grid place-items-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-md",
-                large ? "h-9 w-9" : "h-8 w-8",
-              )}
-              aria-label={unmuted ? "Mute" : "Unmute"}
-            >
-              {unmuted ? (
-                <Volume2 className={large ? "h-4 w-4" : "h-3.5 w-3.5"} />
-              ) : (
-                <VolumeX className={large ? "h-4 w-4" : "h-3.5 w-3.5"} />
-              )}
-            </span>
-          ) : null}
-
-          {!playingHere ? (
-            <>
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={onLike}
-                className={cn(
-                  "grid place-items-center rounded-full border backdrop-blur-md",
-                  large ? "h-9 w-9" : "h-8 w-8",
-                  liked
-                    ? "border-primary/40 bg-primary/25 text-primary"
-                    : "border-white/20 bg-black/40 text-white",
-                )}
-                aria-label={liked ? "Unlike" : "Like"}
-              >
-                <Heart
-                  className={cn(large ? "h-4 w-4" : "h-3.5 w-3.5", liked && "fill-current")}
-                />
-              </span>
-              <Link
-                to="/sample/$id"
-                params={{ id: sample.id }}
-                onClick={(e) => e.stopPropagation()}
-                className={cn(
-                  "grid place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md",
-                  large ? "h-9 w-9" : "h-8 w-8",
-                )}
-                aria-label="View details"
-              >
-                <Info className={large ? "h-4 w-4" : "h-3.5 w-3.5"} />
-              </Link>
-            </>
-          ) : null}
-        </div>
 
         {title ? (
           <div
             className={cn(
               "pointer-events-none absolute inset-x-0 bottom-0 px-2.5 pb-2.5",
-              isVideo && (large ? "pl-12" : "pl-11"),
+              isVideo && "pl-12",
             )}
           >
             <p
