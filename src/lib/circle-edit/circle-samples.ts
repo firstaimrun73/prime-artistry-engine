@@ -3,6 +3,13 @@
  * Media: prefer local GitHub assets (1:1) so info pages never show blank stages.
  */
 
+import sampleRemovalBefore from "@/assets/sample-removal-before.jpg";
+import sampleRemovalAfter from "@/assets/sample-removal-after.jpg";
+import sampleObjectBefore from "@/assets/sample-object-before.jpg";
+import sampleObjectAfter from "@/assets/sample-object-after.jpg";
+import sampleRestoreBefore from "@/assets/sample-restore-before.jpg";
+import sampleRestoreAfter from "@/assets/sample-restore-after.jpg";
+
 export type CircleSampleMode = "add" | "remove";
 
 export type CircleSample = {
@@ -35,20 +42,19 @@ const ADD = "circle/samples/add";
 const REMOVE = "circle/samples/remove";
 
 /** Local assets shipped in repo — reliable 1:1 product frames */
-const LOCAL_REMOVAL_BEFORE = "/src/assets/sample-removal-before.jpg";
-const LOCAL_REMOVAL_AFTER = "/src/assets/sample-removal-after.jpg";
-const LOCAL_OBJECT_BEFORE = "/src/assets/sample-object-before.jpg";
-const LOCAL_OBJECT_AFTER = "/src/assets/sample-object-after.jpg";
-
-const U = (id: string, w = 800) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=80&h=${w}`;
+const LOCAL_REMOVAL_BEFORE = sampleRemovalBefore;
+const LOCAL_REMOVAL_AFTER = sampleRemovalAfter;
+const LOCAL_OBJECT_BEFORE = sampleObjectBefore;
+const LOCAL_OBJECT_AFTER = sampleObjectAfter;
+const LOCAL_RESTORE_BEFORE = sampleRestoreBefore;
+const LOCAL_RESTORE_AFTER = sampleRestoreAfter;
 
 export const CIRCLE_SAMPLES: CircleSample[] = [
   {
     id: "rm-object",
     title: "Remove unwanted object",
     description:
-      "Before & After: mark any object and erase it cleanly. Local demo assets show a verified 1:1 product comparison — same framing, object gone.",
+      "Before and After: mark the object you do not want and erase it. Same framing, object gone — clean fill matched to the background.",
     mode: "remove",
     assetId: null,
     category: "remove",
@@ -69,7 +75,7 @@ export const CIRCLE_SAMPLES: CircleSample[] = [
     id: "rm-butterfly",
     title: "Remove butterfly",
     description:
-      "Before: butterfly on the bloom. After: flower restored. Best for small wildlife on natural backgrounds.",
+      "Before and After: small wildlife on a natural background. Circle the butterfly and restore the flower underneath.",
     mode: "remove",
     assetId: null,
     category: "remove",
@@ -89,13 +95,13 @@ export const CIRCLE_SAMPLES: CircleSample[] = [
     id: "add-deer",
     title: "Add a deer",
     description:
-      "Before: open forest path. After: a deer matched to scale and light. Animal placement with natural proportions — 1:1 square frames.",
+      "Before and After: open scene becomes a placed deer matched to scale and light. Animal placement with natural proportions — 1:1 frames.",
     mode: "add",
     assetId: "animal_deer",
     category: "animals",
     objectLabel: "Deer",
-    beforeUrl: U("photo-1441974231531-c6227db76b6e", 900),
-    afterUrl: U("photo-1484406566174-9da000fda645", 900),
+    beforeUrl: LOCAL_RESTORE_BEFORE,
+    afterUrl: LOCAL_RESTORE_AFTER,
     beforeR2Key: `${ADD}/deer-before.jpg`,
     afterR2Key: `${ADD}/deer-after.jpg`,
     aspectRatio: "1:1",
@@ -108,13 +114,14 @@ export const CIRCLE_SAMPLES: CircleSample[] = [
   {
     id: "add-cat",
     title: "Add a cat",
-    description: "Place a photoreal cat that matches scene lighting and scale.",
+    description:
+      "Before and After: place a photoreal cat that matches scene lighting and scale.",
     mode: "add",
     assetId: "animal_cat",
     category: "animals",
     objectLabel: "Cat",
-    beforeUrl: U("photo-1441974231531-c6227db76b6e", 900),
-    afterUrl: U("photo-1514888286974-6c03e2ca1dba", 900),
+    beforeUrl: LOCAL_OBJECT_BEFORE,
+    afterUrl: LOCAL_OBJECT_AFTER,
     beforeR2Key: `${ADD}/cat-before.jpg`,
     afterR2Key: `${ADD}/cat-after.jpg`,
     aspectRatio: "1:1",
@@ -127,13 +134,14 @@ export const CIRCLE_SAMPLES: CircleSample[] = [
   {
     id: "add-dog",
     title: "Add a dog",
-    description: "Natural breed, pose, and lighting match for outdoor scenes.",
+    description:
+      "Before and After: natural breed, pose, and lighting match for outdoor scenes.",
     mode: "add",
     assetId: "animal_dog",
     category: "animals",
     objectLabel: "Dog",
-    beforeUrl: U("photo-1441974231531-c6227db76b6e", 900),
-    afterUrl: U("photo-1552053831-71594a27632d", 900),
+    beforeUrl: LOCAL_REMOVAL_BEFORE,
+    afterUrl: LOCAL_REMOVAL_AFTER,
     beforeR2Key: `${ADD}/dog-before.jpg`,
     afterR2Key: `${ADD}/dog-after.jpg`,
     aspectRatio: "1:1",
@@ -227,13 +235,27 @@ export function circleInfoHref(sampleId?: string | null): string {
   return "/studio/image/circle-info";
 }
 
-/** Back NEVER goes to Image Studio (/studio/image → /editor). Missing from → homepage. */
+/**
+ * Back NEVER goes to Image Studio (/studio/image → redirects to /editor).
+ * Missing/unknown from → homepage `/`.
+ */
 export function resolveCircleBackTarget(from?: string | null, sampleId?: string | null): string {
   if (from === "home") return "/";
   if (from === "studio") return "/studio";
   if (from === "sample" && sampleId) {
     return `/studio/image/circle-info?sampleId=${encodeURIComponent(sampleId)}`;
   }
-  if (from === "info") return "/studio/image/circle-info";
+  if (from === "info") {
+    if (sampleId) return `/studio/image/circle-info?sampleId=${encodeURIComponent(sampleId)}`;
+    return "/studio/image/circle-info";
+  }
   return "/";
+}
+
+/** Safe browser navigation that never lands on Image Studio redirect. */
+export function navigateCircleBack(from?: string | null, sampleId?: string | null): void {
+  const target = resolveCircleBackTarget(from, sampleId);
+  if (typeof window !== "undefined") {
+    window.location.assign(target);
+  }
 }
