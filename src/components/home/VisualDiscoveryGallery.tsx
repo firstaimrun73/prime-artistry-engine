@@ -1,13 +1,17 @@
 /**
- * Unified editorial Discover feed — images + videos, native ratios.
- * Media-first cards only (no Whats New promo strip).
+ * Motion2AI Creation — Discover
+ * Tabs: All (img+video) · Img · Video · Music
+ * Subsection strips: horizontal scroll. Tighter spacing.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
+  getAllDiscoverSamples,
   getImagineOnlySamples,
   getActiveR2VideoSamples,
+  getMusicVideoSamples,
+  getVideoOnlySamples,
   type R2Sample,
 } from "@/lib/r2-catalog";
 import { GalleryMediaCard } from "@/components/home/GalleryMediaCard";
@@ -19,46 +23,64 @@ import {
 } from "@/lib/sample-favourites.functions";
 import { cn } from "@/lib/utils";
 
-function ratioValue(ar: string): number {
-  const m = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(ar.trim());
-  if (!m) return 1;
-  return Number(m[1]) / Number(m[2]);
-}
+type TabId = "all" | "img" | "video" | "music";
 
-/** Single mixed feed: images + videos, all ratios. Content-aware interleave. */
-export function getAllDiscoverySamples(): R2Sample[] {
-  const images = getImagineOnlySamples();
-  const videos = getActiveR2VideoSamples();
-  const seen = new Set<string>();
-  const out: R2Sample[] = [];
+const TABS: { id: TabId; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "img", label: "Img" },
+  { id: "video", label: "Video" },
+  { id: "music", label: "Music" },
+];
 
-  const wide = [...videos, ...images].filter((s) => ratioValue(s.aspectRatio) >= 1.5);
-  const rest = [...images, ...videos].filter((s) => ratioValue(s.aspectRatio) < 1.5);
-
-  const push = (s: R2Sample) => {
-    if (seen.has(s.url) || seen.has(s.id)) return;
-    seen.add(s.url);
-    seen.add(s.id);
-    out.push(s);
-  };
-
-  let wi = 0;
-  let ri = 0;
-  while (ri < rest.length || wi < wide.length) {
-    for (let k = 0; k < 2 && ri < rest.length; k++) push(rest[ri++]);
-    if (wi < wide.length) push(wide[wi++]);
-    if (ri < rest.length) push(rest[ri++]);
-  }
-  return out;
+function HorizontalStrip({
+  title,
+  samples,
+  likedIds,
+  onToggleLike,
+  onOpenViewer,
+}: {
+  title: string;
+  samples: R2Sample[];
+  likedIds: Set<string>;
+  onToggleLike: (s: R2Sample) => void;
+  onOpenViewer: (s: R2Sample) => void;
+}) {
+  if (samples.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <h3 className="px-0.5 text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h3>
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
+        {samples.map((s) => (
+          <div key={s.id} className="w-[148px] shrink-0 sm:w-[168px]">
+            <GalleryMediaCard
+              sample={s}
+              liked={likedIds.has(s.id)}
+              onToggleLike={onToggleLike}
+              onOpenViewer={onOpenViewer}
+              className="!col-span-1"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function VisualDiscoveryGallery() {
   const { user } = useAuth();
-  const samples = useMemo(() => getAllDiscoverySamples(), []);
+  const [tab, setTab] = useState<TabId>("all");
   const [viewer, setViewer] = useState<R2Sample | null>(null);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const toggleFn = useServerFn(toggleSampleFavourite);
   const listIdsFn = useServerFn(getMyFavouriteIds);
+
+  const all = useMemo(() => getAllDiscoverSamples(), []);
+  const images = useMemo(() => getImagineOnlySamples(), []);
+  const videosOnly = useMemo(() => getVideoOnlySamples(), []);
+  const music = useMemo(() => getMusicVideoSamples(), []);
+  const allVideos = useMemo(() => getActiveR2VideoSamples(), []);
 
   useEffect(() => {
     if (!user) {
@@ -119,43 +141,115 @@ export function VisualDiscoveryGallery() {
     [user, likedIds, toggleFn],
   );
 
-  if (samples.length === 0) return null;
+  const gridSamples =
+    tab === "all"
+      ? all
+      : tab === "img"
+        ? images
+        : tab === "video"
+          ? allVideos
+          : music;
 
   return (
-    <section className="space-y-3" data-discovery="unified-feed">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-[18px] font-extrabold tracking-tight sm:text-[20px]">Discover</h2>
-        <p className="text-[11px] text-muted-foreground sm:text-[12px]">Photos · videos · samples</p>
+    <section className="space-y-4" data-discovery="motion2ai-creation">
+      {/* Dark Motion2AI header */}
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-zinc-950 text-white shadow-sm dark:border-white/10">
+        <div className="px-4 py-3.5 sm:px-5 sm:py-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
+            Motion2AI creation
+          </p>
+          <h2 className="mt-0.5 text-[18px] font-extrabold tracking-tight sm:text-[20px]">
+            Discover
+          </h2>
+          <p className="mt-1 text-[12px] text-white/60">Images · videos · samples</p>
+        </div>
+        <div className="flex gap-1 overflow-x-auto border-t border-white/10 px-2 py-2 scrollbar-none">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "shrink-0 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition",
+                tab === t.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-white/10 text-white/70 hover:bg-white/15",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div
-        className={cn(
-          "mx-auto grid max-w-[1200px] items-start",
-          "gap-2 sm:gap-2.5 md:gap-3",
-          "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-        )}
-      >
-        {samples.map((s) => (
-          <GalleryMediaCard
-            key={s.id}
-            sample={s}
-            liked={likedIds.has(s.id)}
+      {/* Horizontal category strips when on All */}
+      {tab === "all" && (
+        <div className="space-y-5">
+          <HorizontalStrip
+            title="Images"
+            samples={images}
+            likedIds={likedIds}
             onToggleLike={onToggleLike}
             onOpenViewer={setViewer}
           />
-        ))}
-      </div>
+          <HorizontalStrip
+            title="Video"
+            samples={videosOnly.length ? videosOnly : allVideos}
+            likedIds={likedIds}
+            onToggleLike={onToggleLike}
+            onOpenViewer={setViewer}
+          />
+          {music.length > 0 && (
+            <HorizontalStrip
+              title="Music"
+              samples={music}
+              likedIds={likedIds}
+              onToggleLike={onToggleLike}
+              onOpenViewer={setViewer}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Focused tab: denser grid, less whitespace */}
+      {tab !== "all" && (
+        <div
+          className={cn(
+            "grid items-start gap-2",
+            "grid-cols-2 sm:grid-cols-3 md:grid-cols-4",
+          )}
+        >
+          {gridSamples.map((s) => (
+            <GalleryMediaCard
+              key={s.id}
+              sample={s}
+              liked={likedIds.has(s.id)}
+              onToggleLike={onToggleLike}
+              onOpenViewer={setViewer}
+            />
+          ))}
+          {gridSamples.length === 0 && (
+            <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
+              {tab === "music"
+                ? "Music samples coming soon. Instrumental clips are under Video for now."
+                : "No samples in this section yet."}
+            </p>
+          )}
+        </div>
+      )}
 
       <DiscoveryMediaViewer sample={viewer} open={!!viewer} onClose={() => setViewer(null)} />
     </section>
   );
 }
 
-/** @deprecated EXTRAA retired — all ratios live in the unified feed. */
+/** @deprecated */
 export function getExtraaSamples(): R2Sample[] {
   return [];
 }
-
 export function isExtraaCandidate(_s: R2Sample): boolean {
   return false;
+}
+export function getAllDiscoverySamples(): R2Sample[] {
+  return getAllDiscoverSamples();
 }

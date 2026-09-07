@@ -1,7 +1,5 @@
 /**
- * Premium media-first discovery card.
- * Native aspect · minimal text (overlay only) · inline video play.
- * Does not change global colors / header / nav.
+ * Media-first discovery card — native aspect, quality tier badge, minimal text.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -25,7 +23,6 @@ function parseRatio(ar: string): number {
   return w / h;
 }
 
-/** Editorial span by native aspect — media drives the grid. */
 export function spanClassForSample(sample: R2Sample): string {
   const r = parseRatio(sample.aspectRatio);
   const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
@@ -41,6 +38,10 @@ function categoryBadge(sample: R2Sample): string | null {
   if (sample.homepageCategory === "trend") return "TREND";
   if (sample.studio === "circle") return "TRY NOW";
   return null;
+}
+
+function tierBadge(sample: R2Sample): string | null {
+  return sample.qualityTier ?? null;
 }
 
 type Props = {
@@ -140,6 +141,7 @@ export function GalleryMediaCard({
   if (failed) return null;
 
   const badge = categoryBadge(sample);
+  const tier = tierBadge(sample);
   const span = spanClassForSample(sample);
   const title = sample.title?.trim() || null;
 
@@ -147,8 +149,8 @@ export function GalleryMediaCard({
     <article
       className={cn(
         "group relative w-full self-start overflow-hidden rounded-2xl",
-        "bg-muted/20 ring-1 ring-border/30 transition duration-300",
-        "hover:ring-primary/35 hover:shadow-[0_8px_28px_rgba(0,0,0,0.12)]",
+        "bg-muted/15 ring-1 ring-border/25 transition duration-300",
+        "hover:ring-primary/30 hover:shadow-md",
         span,
         className,
       )}
@@ -167,7 +169,6 @@ export function GalleryMediaCard({
             : `View ${title || "media"}`
         }
       >
-        {/* Media fills native aspect — no forced crop */}
         {isVideo ? (
           <video
             ref={videoRef}
@@ -194,20 +195,32 @@ export function GalleryMediaCard({
           />
         )}
 
-        {/* Soft bottom gradient for title readability only */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/65 via-black/25 to-transparent opacity-90 transition group-hover:opacity-100" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
 
-        {badge ? (
-          <span className="pointer-events-none absolute left-2 top-2 rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/95 backdrop-blur-sm">
-            {badge}
-          </span>
-        ) : null}
+        <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
+          {badge ? (
+            <span className="rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/95 backdrop-blur-sm">
+              {badge}
+            </span>
+          ) : null}
+          {tier ? (
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[9px] font-semibold backdrop-blur-sm",
+                tier === "Ultra AI" && "bg-violet-600/90 text-white",
+                tier === "Premium" && "bg-amber-500/90 text-black",
+                tier === "Standard" && "bg-white/85 text-zinc-800",
+              )}
+            >
+              {tier}
+            </span>
+          ) : null}
+        </div>
 
-        {/* Video play — corner only */}
         {isVideo ? (
           <span
             className={cn(
-              "absolute bottom-2.5 left-2.5 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur-md transition",
+              "absolute bottom-2.5 left-2.5 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur-md",
               playingHere && "border-primary/50 bg-primary/85",
             )}
             aria-hidden
@@ -220,17 +233,12 @@ export function GalleryMediaCard({
           </span>
         ) : null}
 
-        {/* Actions */}
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
           {isVideo && playingHere ? (
             <span
               role="button"
               tabIndex={0}
               onClick={toggleSound}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ")
-                  toggleSound(e as unknown as React.MouseEvent);
-              }}
               className="grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-md"
               aria-label={unmuted ? "Mute" : "Unmute"}
             >
@@ -244,17 +252,13 @@ export function GalleryMediaCard({
                 role="button"
                 tabIndex={0}
                 onClick={onLike}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ")
-                    onLike(e as unknown as React.MouseEvent);
-                }}
                 className={cn(
-                  "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md transition",
+                  "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
                   liked
                     ? "border-primary/40 bg-primary/25 text-primary"
                     : "border-white/20 bg-black/40 text-white",
                 )}
-                aria-label={liked ? "Remove from favourites" : "Add to favourites"}
+                aria-label={liked ? "Unlike" : "Like"}
               >
                 <Heart className={cn("h-3.5 w-3.5", liked && "fill-current")} />
               </span>
@@ -271,15 +275,9 @@ export function GalleryMediaCard({
           ) : null}
         </div>
 
-        {/* Title overlay only — no description block under the card */}
         {title ? (
-          <div
-            className={cn(
-              "pointer-events-none absolute inset-x-0 bottom-0 px-2.5 pb-2.5 pt-6",
-              isVideo && "pl-12",
-            )}
-          >
-            <p className="line-clamp-1 text-[12px] font-semibold leading-tight tracking-tight text-white drop-shadow-sm sm:text-[13px]">
+          <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 px-2.5 pb-2.5", isVideo && "pl-12")}>
+            <p className="line-clamp-1 text-[12px] font-semibold leading-tight text-white drop-shadow-sm">
               {title}
             </p>
           </div>
