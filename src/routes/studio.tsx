@@ -49,7 +49,7 @@ function StudioHub() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
           <Link
-            to="/studio/image"
+            to="/editor"
             className="group relative flex min-h-[200px] flex-col justify-end overflow-hidden rounded-3xl border border-border bg-card p-6 transition-transform hover:scale-[1.01] sm:min-h-[240px]"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/30 via-primary/5 to-transparent" />
@@ -69,7 +69,7 @@ function StudioHub() {
 
           <Link
             to="/studio/image/circle-remove"
-            search={{ from: "studio" as const }}
+            search={{ mode: "remove" as const, from: "studio" as const }}
             className="group relative flex min-h-[200px] flex-col justify-end overflow-hidden rounded-3xl border border-[#7B6FE0]/35 bg-card p-6 transition-transform hover:scale-[1.01] dark:border-[#7B6FE0]/40 dark:bg-[#181A22] sm:min-h-[240px]"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#7B6FE0]/20 via-transparent to-transparent" />
