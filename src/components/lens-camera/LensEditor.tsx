@@ -1,89 +1,72 @@
 /**
- * Motio2edit Lens — camera software (20 fixed lenses).
- * Front camera default · free · on-device optics.
- * Back always returns to homepage.
- * Snapchat-style aspect crop mask; FACE guide sits inside crop.
+ * Motio2edit Lens — software optical enhancement (image upload).
+ * Snapchat-style lens carousel + shutter apply.
+ * Glassy UI · gold accent · light & dark mode.
+ * Free · on-device canvas processing (no live-camera dependency).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   ArrowLeft,
-  Camera,
-  CameraOff,
   Download,
+  ImagePlus,
   Loader2,
-  SwitchCamera,
-  Lightbulb,
+  X,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import {
   CAMERA_LENS_ROSTER,
-  LENS_ASPECT_PRESETS,
   getCameraLensById,
   getDefaultCameraLens,
-  type LensAspectId,
+  type CameraLensDef,
 } from "@/lib/lens-camera/roster";
 import {
   applyLensOpticalEnhanced,
-  captureVideoFrame,
   canvasToBlob,
-  nightBoostPreview,
 } from "@/lib/lens-camera/optical-engine";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
-type Phase = "ready" | "processing" | "result" | "error";
-type FaceBox = { x: number; y: number; w: number; h: number };
+type Phase = "idle" | "ready" | "processing" | "result";
 
-function friendlyError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err ?? "");
-  if (/permission|NotAllowed|NotFound|DevicesNotFound/i.test(raw)) {
-    return "Camera access is blocked. Check browser permissions and try again.";
-  }
-  if (/not ready|frame is not ready/i.test(raw)) {
-    return "Camera is still starting. Wait a second and try again.";
-  }
-  return raw || "Something went wrong. Please try again.";
+/** Circle chip colors per lens (name + bg + text) — Motio2edit originals. */
+const LENS_CHIP: Record<string, { bg: string; text: string }> = {
+  lens_widevista: { bg: "#1e3a5f", text: "#e8f1ff" },
+  lens_ultrawide_horizon: { bg: "#0f4c5c", text: "#d8f3f0" },
+  lens_fisheye_orbit: { bg: "#3b1f6e", text: "#f0e7ff" },
+  lens_natural_frame: { bg: "#2d3436", text: "#f5f6fa" },
+  lens_portrait_bloom: { bg: "#6d214f", text: "#ffe8f3" },
+  lens_cinematic_compress: { bg: "#1b1464", text: "#e8e6ff" },
+  lens_farreach: { bg: "#0c2461", text: "#dfe6ff" },
+  lens_microreveal: { bg: "#006266", text: "#e0fffc" },
+  lens_miniature_shift: { bg: "#b71540", text: "#ffe8ee" },
+  lens_architect_align: { bg: "#1e272e", text: "#ecf0f1" },
+  lens_dreamsoft: { bg: "#4a69bd", text: "#eef3ff" },
+  lens_glowmist: { bg: "#574b90", text: "#f3efff" },
+  lens_starflare: { bg: "#c44569", text: "#fff0f5" },
+  lens_prism_echo: { bg: "#574b90", text: "#f5f0ff" },
+  lens_swirl_depth: { bg: "#303952", text: "#eef0f8" },
+  lens_vintage_halation: { bg: "#84817a", text: "#faf8f2" },
+  lens_infraglow: { bg: "#2c2c54", text: "#f0eef8" },
+  lens_longglass_detail: { bg: "#b33939", text: "#fff0f0" },
+  lens_perspective_stretch: { bg: "#218c74", text: "#e8fff8" },
+  lens_selective_focus: { bg: "#cd6133", text: "#fff5ee" },
+};
+
+function chipStyle(id: string) {
+  return LENS_CHIP[id] ?? { bg: "#b8860b", text: "#fff8e7" };
 }
 
-function lensInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-/** Compute crop rect inside a container for a target aspect ratio (0 = native/full). */
-function cropRect(
-  containerW: number,
-  containerH: number,
-  targetRatio: number,
-): { left: number; top: number; width: number; height: number } {
-  if (!targetRatio || containerW < 2 || containerH < 2) {
-    return { left: 0, top: 0, width: containerW, height: containerH };
-  }
-  const containerR = containerW / containerH;
-  let width: number;
-  let height: number;
-  if (containerR > targetRatio) {
-    // container is wider than target → letterbox left/right
-    height = containerH;
-    width = containerH * targetRatio;
-  } else {
-    // container is taller → letterbox top/bottom
-    width = containerW;
-    height = containerW / targetRatio;
-  }
-  return {
-    left: (containerW - width) / 2,
-    top: (containerH - height) / 2,
-    width,
-    height,
-  };
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not load image"));
+    img.src = src;
+  });
 }
 
 type Props = { initialLensId?: string | null };
@@ -96,205 +79,79 @@ export function LensEditor({ initialLensId }: Props) {
   const lens = useMemo(() => getCameraLensById(lensId) ?? getDefaultCameraLens(), [lensId]);
 
   useEffect(() => {
-    if (initialLensId && getCameraLensById(initialLensId)) {
-      setLensId(initialLensId);
-    }
+    if (initialLensId && getCameraLensById(initialLensId)) setLensId(initialLensId);
   }, [initialLensId]);
 
-  const [phase, setPhase] = useState<Phase>("ready");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [aspectId, setAspectId] = useState<LensAspectId>("native");
-  const [bulbOn, setBulbOn] = useState(false);
-  const [faceBoxes, setFaceBoxes] = useState<FaceBox[]>([]);
-  // Default OFF — aspect mask must be readable without orange FACE overlay
-  const [faceTrack, setFaceTrack] = useState(false);
-  const [previewSize, setPreviewSize] = useState({ w: 0, h: 0 });
-
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [facing, setFacing] = useState<"environment" | "user">("user");
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const processingRef = useRef(false);
-  const facingRef = useRef(facing);
-  facingRef.current = facing;
-
-  const aspectPreset = LENS_ASPECT_PRESETS.find((p) => p.id === aspectId);
-  const aspectRatio = aspectPreset?.ratio ?? 0;
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   const goHome = useCallback(() => {
-    void navigate({ to: "/" });
+    void navigate({ to: "/", replace: true });
   }, [navigate]);
 
-  const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => {
-      try {
-        t.stop();
-      } catch {
-        /* */
-      }
-    });
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setCameraReady(false);
-  }, []);
-
-  const startCamera = useCallback(async (mode?: "environment" | "user") => {
-    const face = mode ?? facingRef.current;
-    setCameraError(null);
-    setCameraReady(false);
-    streamRef.current?.getTracks().forEach((t) => {
-      try {
-        t.stop();
-      } catch {
-        /* */
-      }
-    });
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-    try {
-      if (!navigator.mediaDevices?.getUserMedia)
-        throw new Error("Camera is not supported in this browser.");
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { exact: face },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-        });
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: face },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-        });
-      }
-      streamRef.current = stream;
-      const v = videoRef.current;
-      if (v) {
-        v.srcObject = stream;
-        v.setAttribute("playsinline", "true");
-        v.muted = true;
-        await v.play().catch(() => undefined);
-        await new Promise<void>((resolve) => {
-          if (v.videoWidth > 0) {
-            resolve();
-            return;
-          }
-          const onMeta = () => {
-            v.removeEventListener("loadedmetadata", onMeta);
-            resolve();
-          };
-          v.addEventListener("loadedmetadata", onMeta);
-          setTimeout(resolve, 1200);
-        });
-      }
-      setCameraReady(true);
-    } catch (err) {
-      setCameraError(friendlyError(err));
-      setCameraReady(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (phase === "ready" && user) void startCamera(facing);
-    return () => stopCamera();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, user]);
-
-  useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const r = entries[0]?.contentRect;
-      if (r) setPreviewSize({ w: r.width, h: r.height });
-    });
-    ro.observe(el);
-    setPreviewSize({ w: el.clientWidth, h: el.clientHeight });
-    return () => ro.disconnect();
-  }, [phase, cameraReady]);
-
-  useEffect(() => {
-    if (!cameraReady || !faceTrack || phase !== "ready") {
-      setFaceBoxes([]);
+  const onPick = (file: File | null) => {
+    if (!file || !file.type.startsWith("image/")) {
+      toast.error("Please choose an image");
       return;
     }
-    const w = previewSize.w || stageRef.current?.clientWidth || 1;
-    const h = previewSize.h || stageRef.current?.clientHeight || 1;
-    const r =
-      aspectRatio > 0
-        ? cropRect(w, h, aspectRatio)
-        : { left: 0, top: 0, width: w, height: h };
-    const fw = r.width * 0.56;
-    const fh = Math.min(r.height * 0.62, fw * 1.35);
-    setFaceBoxes([
-      {
-        x: r.left + (r.width - fw) / 2,
-        y: r.top + (r.height - fh) / 2,
-        w: fw,
-        h: fh,
-      },
-    ]);
-  }, [cameraReady, faceTrack, phase, previewSize.w, previewSize.h, aspectRatio]);
-
-  const flipCamera = () => {
-    const next = facing === "environment" ? "user" : "environment";
-    setFacing(next);
-    facingRef.current = next;
-    void startCamera(next);
+    if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
+    if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
+    setResultUrl(null);
+    setSourceUrl(URL.createObjectURL(file));
+    setPhase("ready");
   };
 
-  const captureAndApply = async () => {
+  const clear = () => {
+    if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
+    if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
+    setSourceUrl(null);
+    setResultUrl(null);
+    setPhase("idle");
+  };
+
+  const applyLens = async (target?: CameraLensDef) => {
     if (!user) {
       navigate({ to: "/auth", search: { redirect: "/studio/image/lens-editor" } });
       return;
     }
-    if (processingRef.current) return;
-    const v = videoRef.current;
-    if (!v || !cameraReady || !v.videoWidth) {
-      toast.error("Camera is not ready yet.");
-      return;
-    }
+    if (!sourceUrl || processingRef.current) return;
+    const active = target ?? lens;
     processingRef.current = true;
     setPhase("processing");
-    setErrorMsg(null);
     try {
-      const mirror = facing === "user";
-      let frame = captureVideoFrame(v, mirror);
-      if (bulbOn) frame = nightBoostPreview(frame, 0.9);
-      stopCamera();
-      await new Promise((r) => setTimeout(r, 16));
-      const canvas = applyLensOpticalEnhanced(frame, lens, aspectId);
-      const blob = await canvasToBlob(canvas, "image/jpeg", 0.95);
+      const img = await loadImage(sourceUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas unavailable");
+      ctx.drawImage(img, 0, 0);
+      const out = applyLensOpticalEnhanced(canvas, active, "native");
+      const blob = await canvasToBlob(out, "image/jpeg", 0.94);
       const url = URL.createObjectURL(blob);
       setResultUrl((prev) => {
         if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
         return url;
       });
       setPhase("result");
-      toast.success(`${lens.name} · free`);
+      toast.success(`${active.name} applied · free`);
     } catch (err) {
-      setErrorMsg(friendlyError(err));
-      setPhase("error");
-      toast.error(friendlyError(err));
+      toast.error(err instanceof Error ? err.message : "Lens failed");
+      setPhase("ready");
     } finally {
       processingRef.current = false;
     }
   };
 
-  const retake = () => {
-    if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
-    setResultUrl(null);
-    setErrorMsg(null);
-    setPhase("ready");
+  const selectLens = (id: string) => {
+    setLensId(id);
+    // Snap to center in carousel
+    const el = carouselRef.current?.querySelector(`[data-lens-id="${id}"]`);
+    el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   };
 
   const download = async () => {
@@ -310,13 +167,10 @@ export function LensEditor({ initialLensId }: Props) {
     }
   };
 
-  const mask = cropRect(previewSize.w, previewSize.h, aspectRatio);
-  const showMask = aspectId !== "native" && previewSize.w > 0 && phase === "ready";
-
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
-        <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
       </div>
     );
   }
@@ -326,13 +180,12 @@ export function LensEditor({ initialLensId }: Props) {
       <div className="min-h-screen bg-background">
         <Header />
         <main className="mx-auto max-w-md px-4 py-16 text-center">
-          <Camera className="mx-auto h-10 w-10 text-primary" />
-          <h1 className="mt-4 text-xl font-bold">Lens</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Sign in to use Motio2edit lenses.</p>
+          <h1 className="text-xl font-bold">Lens</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Sign in to enhance photos with Motio2edit lenses.</p>
           <Link
             to="/auth"
             search={{ redirect: "/studio/image/lens-editor" }}
-            className="mt-6 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+            className="mt-6 inline-flex rounded-full bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white"
           >
             Sign in
           </Link>
@@ -342,282 +195,168 @@ export function LensEditor({ initialLensId }: Props) {
   }
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col bg-black text-white">
+    <div className="relative flex min-h-[100dvh] flex-col bg-zinc-100 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+      {/* Top bar — glassy */}
       <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 px-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={goHome}
-          className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md"
+          className="grid h-10 w-10 place-items-center rounded-full border border-black/10 bg-white/70 shadow-sm backdrop-blur-md dark:border-white/15 dark:bg-black/40"
           aria-label="Back to home"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex flex-col items-center">
-          <span className="text-[10px] font-medium tracking-[0.16em] text-white/40">MOTIO2EDIT</span>
+          <span className="text-[10px] font-medium tracking-[0.16em] text-amber-700/80 dark:text-amber-400/70">
+            MOTIO2EDIT
+          </span>
           <span className="text-sm font-bold tracking-tight">Lens</span>
-          <span className="text-[10px] text-white/50">
-            {lens.name} · {lens.shortDescription}
+          <span className="text-[10px] text-muted-foreground">
+            {lens.name} · enhance · free
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setFaceTrack((v) => !v)}
-          className={cn(
-            "grid h-10 w-10 place-items-center rounded-full border backdrop-blur-md text-[9px] font-bold",
-            faceTrack
-              ? "border-primary/50 bg-primary/20 text-primary"
-              : "border-white/15 bg-black/40 text-white/70",
-          )}
-          aria-label="Toggle face guide"
-        >
-          FACE
-        </button>
+        <div className="w-10" />
       </div>
 
-      <div ref={stageRef} className="relative flex flex-1 items-center justify-center overflow-hidden">
-        {phase === "result" && resultUrl ? (
-          <img
-            src={resultUrl}
-            alt={`${lens.name} result`}
-            className="max-h-[100dvh] max-w-full object-contain"
-          />
-        ) : phase === "error" ? (
-          <div className="px-6 text-center">
-            <CameraOff className="mx-auto h-10 w-10 text-white/50" />
-            <p className="mt-3 text-sm text-white/80">{errorMsg}</p>
-            <button
-              type="button"
-              onClick={retake}
-              className="mt-4 rounded-full border border-white/20 px-4 py-2 text-sm"
-            >
-              Try again
-            </button>
-          </div>
-        ) : (
-          <>
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              autoPlay
-              className={cn(
-                "h-full w-full object-cover",
-                facing === "user" && "scale-x-[-1]",
-                bulbOn && "brightness-125 contrast-110",
-              )}
+      {/* Stage */}
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3 pb-44 pt-16">
+        {phase === "idle" && (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="flex w-full max-w-sm flex-col items-center gap-3 rounded-3xl border border-dashed border-amber-600/40 bg-white/60 px-6 py-16 text-center shadow-sm backdrop-blur-xl dark:border-amber-400/30 dark:bg-white/5"
+          >
+            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-amber-500/15 text-amber-700 dark:text-amber-300">
+              <ImagePlus className="h-7 w-7" />
+            </span>
+            <p className="text-sm font-semibold">Upload a photo</p>
+            <p className="text-xs text-muted-foreground">Apply a Motio2edit lens · on-device · free</p>
+          </button>
+        )}
+
+        {(phase === "ready" || phase === "processing" || phase === "result") && sourceUrl && (
+          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-black/5 bg-black/5 shadow-lg dark:border-white/10">
+            <img
+              src={phase === "result" && resultUrl ? resultUrl : sourceUrl}
+              alt={lens.name}
+              className="mx-auto max-h-[min(62dvh,640px)] w-auto object-contain"
             />
-
-            {/* Snapchat-style aspect crop: heavy letterbox + bright frame */}
-            {showMask && (
-              <div className="pointer-events-none absolute inset-0 z-10" aria-hidden>
-                <div
-                  className="absolute bg-black/70"
-                  style={{ left: 0, top: 0, right: 0, height: Math.max(0, mask.top) }}
-                />
-                <div
-                  className="absolute bg-black/70"
-                  style={{
-                    left: 0,
-                    top: mask.top + mask.height,
-                    right: 0,
-                    height: Math.max(0, previewSize.h - mask.top - mask.height),
-                  }}
-                />
-                <div
-                  className="absolute bg-black/70"
-                  style={{
-                    left: 0,
-                    top: mask.top,
-                    width: Math.max(0, mask.left),
-                    height: mask.height,
-                  }}
-                />
-                <div
-                  className="absolute bg-black/70"
-                  style={{
-                    left: mask.left + mask.width,
-                    top: mask.top,
-                    width: Math.max(0, previewSize.w - mask.left - mask.width),
-                    height: mask.height,
-                  }}
-                />
-                <div
-                  className="absolute rounded-sm border-2 border-white/90"
-                  style={{
-                    left: mask.left,
-                    top: mask.top,
-                    width: mask.width,
-                    height: mask.height,
-                    boxShadow:
-                      "0 0 0 1px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.15)",
-                  }}
-                />
-                <span
-                  className="absolute left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/90 backdrop-blur-sm"
-                  style={{ top: Math.max(8, mask.top + 8) }}
-                >
-                  {aspectId}
-                </span>
+            {phase !== "result" && (
+              <button
+                type="button"
+                onClick={clear}
+                className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/45 text-white backdrop-blur"
+                aria-label="Clear"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {phase === "processing" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 backdrop-blur-sm">
+                <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                <p className="text-sm font-medium text-white">Applying {lens.name}…</p>
               </div>
             )}
-
-            {faceTrack &&
-              faceBoxes.map((b, i) => (
-                <div
-                  key={i}
-                  className="pointer-events-none absolute z-20 rounded-xl border-2 border-primary/80 shadow-[0_0_12px_hsl(24_95%_53%/0.4)]"
-                  style={{ left: b.x, top: b.y, width: b.w, height: b.h }}
-                />
-              ))}
-
-            {!cameraReady && (
-              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/80 px-6 text-center">
-                {cameraError ? (
-                  <>
-                    <CameraOff className="h-8 w-8 text-white/50" />
-                    <p className="text-sm text-white/70">{cameraError}</p>
-                    <button
-                      type="button"
-                      onClick={() => void startCamera(facing)}
-                      className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold"
-                    >
-                      Retry camera
-                    </button>
-                  </>
-                ) : (
-                  <Loader2 className="h-6 w-6 animate-spin text-white/50" />
-                )}
-              </div>
-            )}
-          </>
-        )}
-        {phase === "processing" && (
-          <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/55 backdrop-blur-sm">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm font-medium">Applying {lens.name}…</p>
           </div>
         )}
       </div>
 
-      {phase !== "result" && phase !== "error" && (
-        <div className="absolute inset-x-0 bottom-0 z-30 space-y-2 bg-gradient-to-t from-black via-black/85 to-transparent px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-12">
-          <div
-            className="flex gap-3 overflow-x-auto overflow-y-visible px-1 pb-2 pt-3 scrollbar-none"
-            style={{ scrollSnapType: "x mandatory" }}
-            role="listbox"
-            aria-label="Lenses"
-          >
-            {CAMERA_LENS_ROSTER.map((l) => {
-              const active = l.id === lensId;
-              return (
-                <button
-                  key={l.id}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  onClick={() => setLensId(l.id)}
-                  className="flex w-[72px] shrink-0 flex-col items-center gap-1.5"
-                  style={{ scrollSnapAlign: "center" }}
-                >
-                  <span
-                    className={cn(
-                      "grid h-14 w-14 place-items-center rounded-full border text-[10px] font-bold uppercase tracking-wide transition",
-                      active
-                        ? "scale-110 border-primary bg-primary/25 text-white shadow-[0_0_16px_hsl(24_95%_53%/0.35)]"
-                        : "border-white/20 bg-white/10 text-white/70",
-                    )}
-                  >
-                    {lensInitials(l.name)}
-                  </span>
-                  <span
-                    className={cn(
-                      "max-w-[72px] truncate text-center text-[10px] font-medium",
-                      active ? "text-white" : "text-white/55",
-                    )}
-                  >
-                    {l.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-center gap-1.5 overflow-x-auto scrollbar-none">
-            {LENS_ASPECT_PRESETS.map((p) => (
+      {/* Bottom: Snapchat-style lens carousel + shutter */}
+      <div className="absolute inset-x-0 bottom-0 z-30 space-y-3 bg-gradient-to-t from-zinc-100 via-zinc-100/95 to-transparent px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 dark:from-zinc-950 dark:via-zinc-950/95">
+        <div
+          ref={carouselRef}
+          className="flex gap-3 overflow-x-auto px-1 pb-1 pt-2 scrollbar-none"
+          style={{ scrollSnapType: "x mandatory" }}
+          role="listbox"
+          aria-label="Lenses"
+        >
+          {CAMERA_LENS_ROSTER.map((l) => {
+            const active = l.id === lensId;
+            const colors = chipStyle(l.id);
+            return (
               <button
-                key={p.id}
+                key={l.id}
                 type="button"
-                onClick={() => setAspectId(p.id)}
-                className={cn(
-                  "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
-                  aspectId === p.id
-                    ? "border-primary bg-primary/25 text-primary"
-                    : "border-white/15 bg-black/40 text-white/70",
-                )}
+                data-lens-id={l.id}
+                role="option"
+                aria-selected={active}
+                onClick={() => selectLens(l.id)}
+                className="flex w-[72px] shrink-0 flex-col items-center gap-1.5"
+                style={{ scrollSnapAlign: "center" }}
               >
-                {p.label}
+                <span
+                  className={cn(
+                    "grid h-14 w-14 place-items-center rounded-full border-2 text-[10px] font-bold uppercase tracking-wide transition",
+                    active
+                      ? "scale-110 border-amber-500 shadow-[0_0_16px_rgba(217,119,6,0.45)]"
+                      : "border-transparent opacity-80",
+                  )}
+                  style={{ backgroundColor: colors.bg, color: colors.text }}
+                >
+                  {l.name.slice(0, 2).toUpperCase()}
+                </span>
+                <span
+                  className={cn(
+                    "max-w-[72px] truncate text-center text-[10px] font-medium",
+                    active ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground",
+                  )}
+                >
+                  {l.name}
+                </span>
               </button>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-center gap-5">
-            <button
-              type="button"
-              onClick={flipCamera}
-              className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/40 backdrop-blur-md"
-              aria-label="Flip camera"
-            >
-              <SwitchCamera className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulbOn((b) => !b)}
-              className={cn(
-                "grid h-11 w-11 place-items-center rounded-full border backdrop-blur-md",
-                bulbOn
-                  ? "border-amber-400/60 bg-amber-400/25 text-amber-300"
-                  : "border-white/20 bg-black/40 text-white",
-              )}
-              aria-label="Night light boost"
-            >
-              <Lightbulb className={cn("h-5 w-5", bulbOn && "fill-current")} />
-            </button>
-            <button
-              type="button"
-              onClick={() => void captureAndApply()}
-              disabled={phase === "processing" || !cameraReady}
-              className="relative grid h-[68px] w-[68px] place-items-center rounded-full border-[3px] border-white/90 bg-white/15 shadow-[0_0_24px_rgba(255,255,255,0.15)] transition active:scale-90 disabled:opacity-40"
-              aria-label="Capture"
-            >
-              <span className="h-14 w-14 rounded-full bg-white" />
-            </button>
-            <div className="grid h-11 w-11 place-items-center">
-              <span className="text-[9px] font-semibold text-white/50">
-                {facing === "user" ? "Front" : "Rear"}
-              </span>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      )}
 
-      {phase === "result" && resultUrl && (
-        <div className="absolute inset-x-0 bottom-0 z-30 flex items-center justify-center gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-12">
+        <div className="flex items-center justify-center gap-6">
           <button
             type="button"
-            onClick={retake}
-            className="rounded-full border border-white/25 bg-black/50 px-4 py-2.5 text-sm font-semibold backdrop-blur-md"
+            onClick={() => inputRef.current?.click()}
+            className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white/80 text-zinc-700 backdrop-blur dark:border-white/15 dark:bg-white/10 dark:text-white"
+            aria-label="Choose photo"
           >
-            Retake
+            <ImagePlus className="h-5 w-5" />
           </button>
+
           <button
             type="button"
-            onClick={() => void download()}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+            onClick={() => void applyLens()}
+            disabled={phase === "processing" || !sourceUrl}
+            className="relative grid h-[72px] w-[72px] place-items-center rounded-full border-[3px] border-amber-500 bg-amber-500/20 shadow-[0_0_24px_rgba(217,119,6,0.25)] transition active:scale-90 disabled:opacity-40"
+            aria-label="Apply lens"
           >
-            <Download className="h-4 w-4" /> Download
+            <span className="h-[58px] w-[58px] rounded-full bg-gradient-to-br from-amber-400 to-amber-700" />
           </button>
+
+          {phase === "result" && resultUrl ? (
+            <button
+              type="button"
+              onClick={() => void download()}
+              className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white/80 text-zinc-700 backdrop-blur dark:border-white/15 dark:bg-white/10 dark:text-white"
+              aria-label="Download"
+            >
+              <Download className="h-5 w-5" />
+            </button>
+          ) : (
+            <div className="h-11 w-11" />
+          )}
         </div>
-      )}
+
+        <p className="text-center text-[10px] text-muted-foreground">
+          Swipe lenses · tap gold shutter to apply · free on-device
+        </p>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          onPick(e.target.files?.[0] ?? null);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }
