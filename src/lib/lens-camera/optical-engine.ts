@@ -240,8 +240,8 @@ function sketchOutline(src: HTMLCanvasElement): HTMLCanvasElement {
         2 * d[i - 4 + w * 4] +
         -d[i + 4 - w * 4] +
         d[i + 4 + w * 4];
-      const mag = Math.min(255, Math.sqrt(gx * gx + gy * gy) * 0.35);
-      const edge = mag > 28 ? Math.min(255, mag * 1.8) : 0;
+      const mag = Math.min(255, Math.sqrt(gx * gx + gy * gy) * 0.55);
+      const edge = mag > 18 ? Math.min(255, mag * 2.2) : 0;
       const v = 255 - edge;
       o[i] = o[i + 1] = o[i + 2] = v;
       o[i + 3] = 255;
@@ -257,7 +257,7 @@ function nightBlueVision(src: HTMLCanvasElement): HTMLCanvasElement {
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
     const y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    const lift = Math.pow(1 - y / 255, 1.2) * 90;
+    const lift = Math.pow(1 - y / 255, 1.15) * 120;
     let r = d[i] + lift * 0.25;
     let g = d[i + 1] + lift * 0.55;
     let b = d[i + 2] + lift * 1.35 + 25;
@@ -281,8 +281,8 @@ function nightBlueVision(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 function portraitClose(src: HTMLCanvasElement): HTMLCanvasElement {
-  let c = teleCrop(src, 1.65);
-  c = grade(c, "brightness(1.08) contrast(1.08) saturate(1.15)");
+  let c = teleCrop(src, 1.9);
+  c = grade(c, "brightness(1.1) contrast(1.12) saturate(1.22)");
   const ctx = c.getContext("2d")!;
   ctx.globalCompositeOperation = "screen";
   ctx.globalAlpha = 0.3;
@@ -307,8 +307,8 @@ function portraitClose(src: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 function cineSharp(src: HTMLCanvasElement): HTMLCanvasElement {
-  let c = sharpen(src, 1.35);
-  c = grade(c, "contrast(1.22) saturate(1.28) brightness(1.06)");
+  let c = sharpen(src, 1.6);
+  c = grade(c, "contrast(1.28) saturate(1.35) brightness(1.08)");
   const img = data(c);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
@@ -406,11 +406,11 @@ export function applyLensOpticalEnhanced(
   const base = cropToAspect(source, aspectId);
   switch (lens.id) {
     case "lens_perspective_stretch":
-      return grade(radialMap(base, 1.25), "contrast(1.16) saturate(1.12)");
+      return grade(radialMap(base, 1.55), "contrast(1.22) saturate(1.18) brightness(1.04)");
     case "lens_fisheye_orbit":
-      return grade(fisheye360(base), "contrast(1.12) saturate(1.1)");
+      return grade(fisheye360(base), "contrast(1.2) saturate(1.15) brightness(1.02)");
     case "lens_ultrawide_horizon":
-      return grade(radialMap(base, 1.05), "contrast(1.14) saturate(1.18) brightness(1.03)");
+      return grade(radialMap(base, 1.35), "contrast(1.18) saturate(1.25) brightness(1.05)");
     case "lens_portrait_bloom":
       return portraitClose(base);
     case "lens_natural_frame":
@@ -420,11 +420,11 @@ export function applyLensOpticalEnhanced(
     case "lens_dreamsoft":
       return nightBlueVision(base);
     case "lens_widevista":
-      return grade(radialMap(base, 0.7), "contrast(1.1) saturate(1.08)");
+      return grade(radialMap(base, 0.95), "contrast(1.16) saturate(1.14) brightness(1.03)");
     case "lens_farreach":
-      return grade(sharpen(teleCrop(base, 2.4), 0.9), "contrast(1.15)");
+      return grade(sharpen(teleCrop(base, 2.8), 1.15), "contrast(1.22) saturate(1.05)");
     case "lens_microreveal":
-      return grade(sharpen(teleCrop(base, 3.0), 1.3), "contrast(1.25) saturate(1.2)");
+      return grade(sharpen(teleCrop(base, 3.4), 1.55), "contrast(1.32) saturate(1.28)");
     case "lens_miniature_shift":
       return tiltShift(base);
     case "lens_glowmist":
@@ -434,7 +434,7 @@ export function applyLensOpticalEnhanced(
     case "lens_infraglow":
       return infrared(base);
     case "lens_longglass_detail":
-      return grade(sharpen(base, 1.5), "contrast(1.2) saturate(1.1)");
+      return grade(sharpen(base, 1.85), "contrast(1.28) saturate(1.15) brightness(1.02)");
     case "lens_prism_echo":
       return prismEcho(base);
     case "lens_swirl_depth":
