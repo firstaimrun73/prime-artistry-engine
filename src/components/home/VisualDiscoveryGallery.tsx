@@ -1,6 +1,6 @@
 /**
  * Motion2AI Creation — Discover (post-login).
- * Pass 10: ratio-consistent horizontal strips; video → lightbox.
+ * Horizontal strips: fixed height, width follows aspect ratio (bottoms align).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,10 +13,7 @@ import {
   getVideoOnlySamples,
   type R2Sample,
 } from "@/lib/r2-catalog";
-import {
-  GalleryMediaCard,
-  stripWidthClassForSample,
-} from "@/components/home/GalleryMediaCard";
+import { GalleryMediaCard } from "@/components/home/GalleryMediaCard";
 import { DiscoveryMediaViewer } from "@/components/home/DiscoveryMediaViewer";
 import { useAuth } from "@/lib/auth";
 import {
@@ -53,14 +50,20 @@ function HorizontalStrip({
       <h3 className="px-0.5 text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
         {title}
       </h3>
+      {/* Fixed row height — each card width = height × its ratio */}
       <div
-        className="gallery-row -mx-1 flex gap-2 overflow-x-auto px-1 pb-2 scrollbar-none"
-        style={{ scrollSnapType: "x mandatory" }}
+        className="gallery-row -mx-1 flex items-end gap-2 overflow-x-auto px-1 pb-2 scrollbar-none"
+        style={
+          {
+            scrollSnapType: "x mandatory",
+            ["--strip-h" as string]: "200px",
+          } as React.CSSProperties
+        }
       >
         {samples.map((s) => (
           <div
             key={s.id}
-            className={cn("gallery-card shrink-0", stripWidthClassForSample(s))}
+            className="shrink-0"
             style={{ scrollSnapAlign: "start" }}
             data-ratio={s.aspectRatio}
           >
@@ -69,7 +72,7 @@ function HorizontalStrip({
               liked={likedIds.has(s.id)}
               onToggleLike={onToggleLike}
               onOpenViewer={onOpenViewer}
-              className="!col-span-1"
+              stripMode
               size="large"
             />
           </div>
@@ -220,20 +223,18 @@ export function VisualDiscoveryGallery() {
         </div>
       )}
 
+      {/* Separate Img / Video / Music tabs also use fixed-height horizontal strips */}
       {tab !== "all" && (
-        <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 sm:gap-3 md:grid-cols-4">
-          {gridSamples.map((s) => (
-            <GalleryMediaCard
-              key={s.id}
-              sample={s}
-              liked={likedIds.has(s.id)}
-              onToggleLike={onToggleLike}
-              onOpenViewer={setViewer}
-              size="large"
-            />
-          ))}
+        <div className="space-y-4">
+          <HorizontalStrip
+            title={tab === "img" ? "Images" : tab === "video" ? "Video" : "Music"}
+            samples={gridSamples}
+            likedIds={likedIds}
+            onToggleLike={onToggleLike}
+            onOpenViewer={setViewer}
+          />
           {gridSamples.length === 0 && (
-            <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               {tab === "music"
                 ? "Music samples coming soon. Instrumental clips are under Video for now."
                 : "No samples in this section yet."}
