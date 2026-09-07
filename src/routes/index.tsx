@@ -1,22 +1,23 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { FooterAd } from "@/components/ads";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Button } from "@/components/ui/button";
 import { Image as ImageIcon, Video, Music, ArrowRight, Check } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { listPublicFeedback } from "@/lib/feedback.functions";
-import { FeedbackCard } from "@/routes/feedback";
-import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
 import { HomeHero } from "@/components/home/HomeHero";
 import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
-import { TrustSection } from "@/components/home/TrustSection";
-import { FinalCTA } from "@/components/home/FinalCTA";
-import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
 import { WatchDemoSection } from "@/components/home/WatchDemoSection";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
+import { useAuth } from "@/lib/auth";
+import { listPublicFeedback } from "@/lib/feedback.functions";
+import { FeedbackCard } from "@/components/FeedbackCard";
+import { TrustSection } from "@/components/TrustSection";
+import { FinalCTA } from "@/components/home/FinalCTA";
+import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
+import { FooterAd } from "@/components/ads";
 import { ConstructionNotice } from "@/components/home/ConstructionNotice";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Motio2edit: AI image and video editing in one workspace. Remove objects, enhance portraits, change outfits, generate video. Upload, describe, generate.",
+          "Edit images and videos with AI. Circle to Remove, background replace, portrait enhance, and more — powered by Motion2AI.",
       },
       { property: "og:title", content: "Motio2edit — AI Image & Video Editing, Made Simple" },
       {
@@ -35,19 +36,21 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  component: Index,
+  component: HomePage,
 });
 
-function Index() {
+function HomePage() {
   const { user, loading } = useAuth();
+
   // Auth/profile race: never flash SignedOutHome for a signed-in user while loading.
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-label="Loading" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
+
   if (user) return <SignedInHome />;
   return <SignedOutHome />;
 }
@@ -57,6 +60,7 @@ function SignedInHome() {
     <div className="min-h-screen bg-background">
       <Header />
       <SignedInHomeBody />
+      <Footer />
       <ConstructionNotice />
     </div>
   );
@@ -65,6 +69,7 @@ function SignedInHome() {
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
  * Hard rule: do NOT render private creation/sample galleries here.
+ * Editor buttons are display-only CTAs → always /auth (never open an editor logged-out).
  */
 function SignedOutHome() {
   return (
@@ -152,20 +157,20 @@ const STUDIO_CARDS: StudioCardSpec[] = [
 ];
 
 function StudioShowcase() {
-  /* Pre-login marketing only — no plan locks (visitor has no plan yet). */
+  /* Pre-login marketing only — cards are showcases; click → login only. */
   const navigate = useNavigate();
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
       <div className="mb-8 text-center">
         <h2 className="text-2xl font-bold sm:text-3xl">Three studios, one workspace</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Jump straight into the right tools.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Sign in to open any studio.</p>
       </div>
       <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {STUDIO_CARDS.map((c) => {
-          const locked = false;
           const Icon = c.icon;
           const onClick = () => {
+            // Never open editors pre-login — always auth.
             navigate({ to: "/auth", search: { redirect: c.href } });
           };
           return (
@@ -198,7 +203,7 @@ function StudioShowcase() {
                 ))}
               </ul>
               <div className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-                {locked ? "Upgrade to unlock" : "Open studio"}
+                Sign in to open
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </div>
             </button>

@@ -2,6 +2,10 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 
+/**
+ * Pre-login final CTA — marketing only.
+ * Try Now must go to /auth (never open an editor while logged out).
+ */
 export function FinalCTA() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-16 sm:pb-24">
@@ -18,7 +22,7 @@ export function FinalCTA() {
         </p>
         <div className="relative mt-7 flex flex-col items-stretch justify-center gap-3 sm:flex-row">
           <Button asChild size="lg" className="btn-animate">
-            <Link to="/studio/image/circle-info">
+            <Link to="/auth" search={{ redirect: "/" }}>
               Try Now <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>
           </Button>
