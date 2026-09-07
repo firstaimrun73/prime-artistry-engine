@@ -1,7 +1,7 @@
 /**
- * Motio2edit Lens — image upload only (no live camera).
- * Live preview on swipe · full apply on shutter · free.
- * Back always → homepage `/`.
+ * Motio2edit Lens — image upload only.
+ * Default selected effect = NONE (original stays unchanged until user picks a lens).
+ * Preview on select · full apply on shutter · back → homepage.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 import {
   CAMERA_LENS_ROSTER,
   getCameraLensById,
-  getDefaultCameraLens,
   type CameraLensDef,
 } from "@/lib/lens-camera/roster";
 import {
@@ -40,8 +39,14 @@ export function LensEditor({ initialLensId }: Props) {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  const [lensId, setLensId] = useState(() => initialLensId || getDefaultCameraLens().id);
-  const lens = useMemo(() => getCameraLensById(lensId) ?? getDefaultCameraLens(), [lensId]);
+  // Default = NONE. Only set if deep-link provides a valid lens id.
+  const [lensId, setLensId] = useState<string | null>(() =>
+    initialLensId && getCameraLensById(initialLensId) ? initialLensId : null,
+  );
+  const lens: CameraLensDef | null = useMemo(
+    () => (lensId ? getCameraLensById(lensId) ?? null : null),
+    [lensId],
+  );
 
   useEffect(() => {
     if (initialLensId && getCameraLensById(initialLensId)) setLensId(initialLensId);
@@ -58,13 +63,19 @@ export function LensEditor({ initialLensId }: Props) {
   const previewBusy = useRef(false);
   const carouselRef = useRef<HTMLDivElement>(null);
 
-  /** Always homepage — never Image Studio. */
   const goHome = useCallback(() => {
     void navigate({ to: "/", replace: true });
   }, [navigate]);
 
+  // Preview only when a lens is explicitly selected.
   useEffect(() => {
-    if (!sourceUrl || phase === "processing" || phase === "idle") return;
+    if (!sourceUrl || !lens || phase === "processing" || phase === "idle") {
+      if (!lens && previewUrl) {
+        if (previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      return;
+    }
     let cancelled = false;
     const run = async () => {
       if (previewBusy.current) return;
@@ -94,6 +105,7 @@ export function LensEditor({ initialLensId }: Props) {
       cancelled = true;
       window.clearTimeout(t);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lens, sourceUrl, phase]);
 
   const onPick = (file: File | null) => {
@@ -106,6 +118,7 @@ export function LensEditor({ initialLensId }: Props) {
     if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
     setResultUrl(null);
     setPreviewUrl(null);
+    // Keep original unchanged — do not auto-select a lens.
     setSourceUrl(URL.createObjectURL(file));
     setPhase("ready");
   };
@@ -117,6 +130,7 @@ export function LensEditor({ initialLensId }: Props) {
     setSourceUrl(null);
     setResultUrl(null);
     setPreviewUrl(null);
+    setLensId(null);
     setPhase("idle");
   };
 
@@ -157,6 +171,10 @@ export function LensEditor({ initialLensId }: Props) {
       inputRef.current?.click();
       return;
     }
+    if (!lens) {
+      toast.message("Select a lens first");
+      return;
+    }
     try {
       const img = await loadImage(sourceUrl);
       const canvas = document.createElement("canvas");
@@ -170,7 +188,7 @@ export function LensEditor({ initialLensId }: Props) {
   };
 
   const selectLens = (id: string) => {
-    setLensId(id);
+    setLensId((prev) => (prev === id ? null : id));
     const el = carouselRef.current?.querySelector(`[data-lens-id="${id}"]`);
     el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   };
@@ -178,10 +196,8 @@ export function LensEditor({ initialLensId }: Props) {
   const download = async () => {
     if (!resultUrl) return;
     try {
-      await triggerBrowserDownload(
-        resultUrl,
-        `motio2edit-${lens.name.replace(/\s+/g, "-").toLowerCase()}.jpg`,
-      );
+      const name = (lens?.name ?? "lens").replace(/\s+/g, "-").toLowerCase();
+      await triggerBrowserDownload(resultUrl, `motio2edit-${name}.jpg`);
       toast.success("Download started");
     } catch {
       toast.error("Download failed");
@@ -219,7 +235,7 @@ export function LensEditor({ initialLensId }: Props) {
   const stillSrc =
     showResult && !holdingOriginal
       ? resultUrl!
-      : previewUrl && phase === "ready"
+      : previewUrl && phase === "ready" && lens
         ? previewUrl
         : sourceUrl;
 
@@ -238,9 +254,11 @@ export function LensEditor({ initialLensId }: Props) {
           <span className="rounded-full border border-white/30 bg-white/40 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.16em] text-amber-800/90 backdrop-blur-md dark:border-white/10 dark:bg-white/10 dark:text-amber-300/90">
             MOTIO2EDIT
           </span>
-          <span className="mt-1 text-sm font-bold tracking-tight drop-shadow-sm">{lens.name}</span>
+          <span className="mt-1 text-sm font-bold tracking-tight drop-shadow-sm">
+            {lens?.name ?? "Lens"}
+          </span>
           <span className="max-w-[220px] truncate text-center text-[11px] text-zinc-600/90 dark:text-zinc-300/80">
-            {lens.shortDescription}
+            {lens?.shortDescription ?? "Select a lens · original stays clean"}
           </span>
         </div>
         <div className="w-10" aria-hidden />
@@ -257,7 +275,7 @@ export function LensEditor({ initialLensId }: Props) {
               <ImagePlus className="h-7 w-7" />
             </span>
             <p className="text-sm font-semibold">Upload a photo</p>
-            <p className="text-xs text-muted-foreground">Apply a Motio2edit lens · free · on-device</p>
+            <p className="text-xs text-muted-foreground">Original stays unchanged until you pick a lens</p>
           </button>
         )}
 
@@ -271,7 +289,7 @@ export function LensEditor({ initialLensId }: Props) {
           >
             <img
               src={stillSrc}
-              alt={holdingOriginal ? "Original" : lens.name}
+              alt={holdingOriginal ? "Original" : lens?.name ?? "Photo"}
               className="mx-auto max-h-[min(62dvh,640px)] w-auto object-contain"
             />
             {phase === "result" && (
@@ -279,9 +297,14 @@ export function LensEditor({ initialLensId }: Props) {
                 {holdingOriginal ? "Original" : "Hold to see original"}
               </p>
             )}
-            {phase === "ready" && previewUrl && (
+            {phase === "ready" && !lens && (
               <p className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[10px] text-white/90 backdrop-blur-md">
-                Live preview · shutter for full
+                Original · tap a lens to preview
+              </p>
+            )}
+            {phase === "ready" && lens && previewUrl && (
+              <p className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-3 py-1 text-[10px] text-white/90 backdrop-blur-md">
+                Preview · shutter to commit
               </p>
             )}
             {phase !== "result" && (
@@ -297,7 +320,7 @@ export function LensEditor({ initialLensId }: Props) {
             {phase === "processing" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 backdrop-blur-sm">
                 <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
-                <p className="text-sm font-medium text-white">{lens.name}</p>
+                <p className="text-sm font-medium text-white">{lens?.name ?? "Processing"}</p>
               </div>
             )}
           </div>
@@ -369,7 +392,7 @@ export function LensEditor({ initialLensId }: Props) {
           <button
             type="button"
             onClick={() => void applyLens()}
-            disabled={phase === "processing"}
+            disabled={phase === "processing" || !lens}
             className="relative grid h-[76px] w-[76px] place-items-center rounded-full transition active:scale-90 disabled:opacity-40"
             aria-label="Apply lens"
             style={{
@@ -406,7 +429,7 @@ export function LensEditor({ initialLensId }: Props) {
         </div>
 
         <p className="text-center text-[10px] text-muted-foreground">
-          Upload · swipe lens · shutter · free
+          Upload · pick lens · shutter · free · back = home
         </p>
       </div>
 
