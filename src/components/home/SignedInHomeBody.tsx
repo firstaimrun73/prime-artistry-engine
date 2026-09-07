@@ -23,7 +23,8 @@ import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 
 const QUICK_CREATE = [
-  { to: "/studio/image" as const, label: "Image", icon: ImageIcon },
+  // Image opens the real editor directly (not /studio/image which only redirects).
+  { to: "/editor" as const, label: "Image", icon: ImageIcon },
   { to: "/studio/video" as const, label: "Video", icon: Video },
   { to: "/studio/music" as const, label: "Music", icon: Music },
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
@@ -83,7 +84,7 @@ export function SignedInHomeBody() {
                 to={
                   (locked ? "/pricing" : q.to) as
                     | "/pricing"
-                    | "/studio/image"
+                    | "/editor"
                     | "/studio/video"
                     | "/studio/music"
                     | "/studio/image/circle-remove"
