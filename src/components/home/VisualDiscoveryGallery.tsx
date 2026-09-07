@@ -1,10 +1,10 @@
 /**
  * Motion2AI Creation — Discover (post-login).
- * Horizontal strips: fixed height, width follows aspect ratio (bottoms align).
+ * Horizontal strips: fixed height, width follows aspect ratio.
+ * Likes: silent toggle (no success toast).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
 import {
   getAllDiscoverSamples,
   getImagineOnlySamples,
@@ -50,7 +50,6 @@ function HorizontalStrip({
       <h3 className="px-0.5 text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
         {title}
       </h3>
-      {/* Fixed row height — each card width = height × its ratio */}
       <div
         className="gallery-row -mx-1 flex items-end gap-2 overflow-x-auto px-1 pb-2 scrollbar-none"
         style={
@@ -114,10 +113,7 @@ export function VisualDiscoveryGallery() {
 
   const onToggleLike = useCallback(
     async (sample: R2Sample) => {
-      if (!user) {
-        toast.message("Sign in to save favourites");
-        return;
-      }
+      if (!user) return;
       const wasLiked = likedIds.has(sample.id);
       setLikedIds((prev) => {
         const next = new Set(prev);
@@ -142,14 +138,13 @@ export function VisualDiscoveryGallery() {
           else next.delete(sample.id);
           return next;
         });
-      } catch (err) {
+      } catch {
         setLikedIds((prev) => {
           const next = new Set(prev);
           if (wasLiked) next.add(sample.id);
           else next.delete(sample.id);
           return next;
         });
-        toast.error(err instanceof Error ? err.message : "Could not update favourite");
       }
     },
     [user, likedIds, toggleFn],
@@ -223,7 +218,6 @@ export function VisualDiscoveryGallery() {
         </div>
       )}
 
-      {/* Separate Img / Video / Music tabs also use fixed-height horizontal strips */}
       {tab !== "all" && (
         <div className="space-y-4">
           <HorizontalStrip

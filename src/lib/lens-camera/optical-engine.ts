@@ -179,7 +179,52 @@ function sharpen(src: HTMLCanvasElement, amount = 1.2): HTMLCanvasElement {
   return put(c, img);
 }
 
-/** Sketch: white field + dark outlines only. */
+/** Light denoise via neighbor average blend on low-detail noise. */
+function lightDenoise(src: HTMLCanvasElement, strength = 0.35): HTMLCanvasElement {
+  const c = clone(src);
+  const w = c.width;
+  const h = c.height;
+  const srcD = data(src).data;
+  const img = data(c);
+  const d = img.data;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = (y * w + x) * 4;
+      for (let ch = 0; ch < 3; ch++) {
+        const avg =
+          (srcD[i + ch] +
+            srcD[i - 4 + ch] +
+            srcD[i + 4 + ch] +
+            srcD[i - w * 4 + ch] +
+            srcD[i + w * 4 + ch]) /
+          5;
+        d[i + ch] = Math.round(srcD[i + ch] * (1 - strength) + avg * strength);
+      }
+    }
+  }
+  return put(c, img);
+}
+
+/** Enhance 4K — clarity stack for soft / compressed / low-detail photos. */
+function enhance4k(src: HTMLCanvasElement): HTMLCanvasElement {
+  let c = lightDenoise(src, 0.28);
+  c = grade(c, "contrast(1.18) saturate(1.12) brightness(1.04)");
+  c = sharpen(c, 1.55);
+  c = sharpen(c, 0.85);
+  const img = data(c);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    // mild local contrast lift in midtones
+    for (let ch = 0; ch < 3; ch++) {
+      const v = d[i + ch];
+      if (v > 40 && v < 220) {
+        d[i + ch] = Math.max(0, Math.min(255, v + (v - 128) * 0.08));
+      }
+    }
+  }
+  return put(c, img);
+}
+
 function sketchOutline(src: HTMLCanvasElement): HTMLCanvasElement {
   const w = src.width;
   const h = src.height;
@@ -219,7 +264,6 @@ function sketchOutline(src: HTMLCanvasElement): HTMLCanvasElement {
   return out;
 }
 
-/** Night vision: lift shadows + deep blue thermal feel. */
 function nightBlueVision(src: HTMLCanvasElement): HTMLCanvasElement {
   const c = clone(src);
   const img = data(c);
@@ -230,7 +274,6 @@ function nightBlueVision(src: HTMLCanvasElement): HTMLCanvasElement {
     let r = d[i] + lift * 0.25;
     let g = d[i + 1] + lift * 0.55;
     let b = d[i + 2] + lift * 1.35 + 25;
-    // push midtones into cold blue
     r = r * 0.45;
     g = g * 0.75 + 15;
     b = Math.min(255, b * 1.15 + 40);
@@ -239,7 +282,6 @@ function nightBlueVision(src: HTMLCanvasElement): HTMLCanvasElement {
     d[i + 2] = Math.min(255, b);
   }
   put(c, img);
-  // soft bloom on bright edges
   const ctx = c.getContext("2d")!;
   ctx.globalCompositeOperation = "screen";
   ctx.globalAlpha = 0.22;
@@ -262,7 +304,6 @@ function portraitClose(src: HTMLCanvasElement): HTMLCanvasElement {
   ctx.filter = "none";
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
-  // soft vignette keeps subject center
   const g = ctx.createRadialGradient(
     c.width / 2,
     c.height / 2,
@@ -378,7 +419,6 @@ export function applyLensOpticalEnhanced(
   const base = cropToAspect(source, aspectId);
   switch (lens.id) {
     case "lens_perspective_stretch":
-      // Deep Wide — strong FOV so you feel inside the frame
       return grade(radialMap(base, 1.25), "contrast(1.16) saturate(1.12)");
     case "lens_fisheye_orbit":
       return grade(fisheye360(base), "contrast(1.12) saturate(1.1)");
@@ -411,7 +451,8 @@ export function applyLensOpticalEnhanced(
     case "lens_prism_echo":
       return prismEcho(base);
     case "lens_swirl_depth":
-      return grade(diffusion(teleCrop(base, 1.2)), "brightness(1.05)");
+      // Enhance 4K — real clarity stack, not a rename of soft bloom
+      return enhance4k(base);
     case "lens_architect_align":
       return sharpen(grade(radialMap(base, -0.32), "contrast(1.15) saturate(0.9)"), 0.7);
     case "lens_starflare":
