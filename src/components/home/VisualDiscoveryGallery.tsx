@@ -1,7 +1,7 @@
 /**
  * Motion2AI Creation — Discover
  * Tabs: All (img+video) · Img · Video · Music
- * Subsection strips: horizontal scroll. Tighter spacing.
+ * Horizontal strips use larger aspect-aware card widths.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -32,6 +32,30 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "music", label: "Music" },
 ];
 
+function parseRatio(ar: string): number {
+  const m = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(ar.trim());
+  if (!m) return 1;
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  if (!w || !h) return 1;
+  return w / h;
+}
+
+/** Larger, aspect-aware widths for horizontal strips (mobile-first). */
+function stripCardWidthClass(sample: R2Sample): string {
+  const r = parseRatio(sample.aspectRatio);
+  // Ultra-wide / 21:9-ish
+  if (r >= 2.0) return "w-[min(88vw,320px)] sm:w-[340px]";
+  // 16:9 landscape
+  if (r >= 1.45) return "w-[min(78vw,280px)] sm:w-[300px]";
+  // near square 1:1
+  if (r >= 0.9 && r < 1.45) return "w-[min(56vw,220px)] sm:w-[240px]";
+  // portrait 3:4 / 2:3
+  if (r >= 0.65) return "w-[min(48vw,200px)] sm:w-[210px]";
+  // tall 9:16
+  return "w-[min(44vw,180px)] sm:w-[190px]";
+}
+
 function HorizontalStrip({
   title,
   samples,
@@ -47,19 +71,20 @@ function HorizontalStrip({
 }) {
   if (samples.length === 0) return null;
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <h3 className="px-0.5 text-[12px] font-bold uppercase tracking-wide text-muted-foreground">
         {title}
       </h3>
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-none">
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 scrollbar-none">
         {samples.map((s) => (
-          <div key={s.id} className="w-[148px] shrink-0 sm:w-[168px]">
+          <div key={s.id} className={cn("shrink-0", stripCardWidthClass(s))}>
             <GalleryMediaCard
               sample={s}
               liked={likedIds.has(s.id)}
               onToggleLike={onToggleLike}
               onOpenViewer={onOpenViewer}
               className="!col-span-1"
+              size="large"
             />
           </div>
         ))}
@@ -151,8 +176,7 @@ export function VisualDiscoveryGallery() {
           : music;
 
   return (
-    <section className="space-y-4" data-discovery="motion2ai-creation">
-      {/* Dark Motion2AI header */}
+    <section className="space-y-5" data-discovery="motion2ai-creation">
       <div className="overflow-hidden rounded-2xl border border-border/60 bg-zinc-950 text-white shadow-sm dark:border-white/10">
         <div className="px-4 py-3.5 sm:px-5 sm:py-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
@@ -182,9 +206,8 @@ export function VisualDiscoveryGallery() {
         </div>
       </div>
 
-      {/* Horizontal category strips when on All */}
       {tab === "all" && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <HorizontalStrip
             title="Images"
             samples={images}
@@ -211,14 +234,8 @@ export function VisualDiscoveryGallery() {
         </div>
       )}
 
-      {/* Focused tab: denser grid, less whitespace */}
       {tab !== "all" && (
-        <div
-          className={cn(
-            "grid items-start gap-2",
-            "grid-cols-2 sm:grid-cols-3 md:grid-cols-4",
-          )}
-        >
+        <div className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 sm:gap-3 md:grid-cols-4">
           {gridSamples.map((s) => (
             <GalleryMediaCard
               key={s.id}
@@ -226,6 +243,7 @@ export function VisualDiscoveryGallery() {
               liked={likedIds.has(s.id)}
               onToggleLike={onToggleLike}
               onOpenViewer={setViewer}
+              size="large"
             />
           ))}
           {gridSamples.length === 0 && (
@@ -243,7 +261,6 @@ export function VisualDiscoveryGallery() {
   );
 }
 
-/** @deprecated */
 export function getExtraaSamples(): R2Sample[] {
   return [];
 }
