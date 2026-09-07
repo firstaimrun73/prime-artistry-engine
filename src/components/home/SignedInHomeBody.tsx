@@ -91,6 +91,9 @@ export function SignedInHomeBody() {
                     | "/studio/image/filters"
                     | "/studio/image/lens-editor"
                 }
+                {...(!locked && q.label === "Circle"
+                  ? { search: { mode: "remove" as const, from: "home" as const } }
+                  : {})}
                 className="flex min-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
                 <span className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
