@@ -14,7 +14,7 @@ export const Route = createFileRoute("/studio/image/lens-editor")({
       {
         name: "description",
         content:
-          "Motio2edit Lens — premium camera lenses. Capture with optical treatments powered by Motion2AI camera software.",
+          "Motio2edit Lens — apply optical treatments to your photos. Free on-device lenses.",
       },
     ],
   }),
