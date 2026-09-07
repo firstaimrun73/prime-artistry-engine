@@ -1,13 +1,9 @@
 /**
  * Video Studio model registry — verified fal.ai endpoint IDs only.
- * Do not invent endpoints. Unavailable models stay marked unavailable.
- *
- * Users never see fal model names in the UI.
- * Backend picks a model via selectVideoModel({ mode, tier, duration, resolution, aspect, soundOn }).
- *
- * Credit retail: $0.0145 / credit (covers fal cost).
- * Product floors: Standard 125 silent / 150 sound; Premium 200 / 250; V2V higher.
- * 4K removed from product surface.
+ * Credit retail: $0.0145 / credit.
+ * Floors: Standard 125 silent / 150 sound; Premium 200 / 250; V2V higher.
+ * Credits always rounded to nearest 25 for clean UI.
+ * Product durations: 5 / 10 / 15s.
  */
 
 export type VideoGenMode = "text" | "image" | "video";
@@ -17,26 +13,14 @@ export type VideoResolution = "480p" | "720p" | "1080p" | "2k";
 export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 
 export const USER_MAX_DURATION_SEC = 60;
-
-/** Credit retail USD. */
 export const CREDIT_RETAIL_USD = 0.0145;
-
-/** Standard floor — silent 5s any aspect SD/HD. */
 export const MIN_VIDEO_CREDITS = 125;
-/** Standard with synchronized sound. */
 export const MIN_VIDEO_CREDITS_SOUND = 150;
-/** Premium floor — silent. */
 export const MIN_PREMIUM_VIDEO_CREDITS = 200;
-/** Premium with sound. */
 export const MIN_PREMIUM_VIDEO_CREDITS_SOUND = 250;
-/** Video→Video floor. */
 export const MIN_VIDEO_TO_VIDEO_CREDITS = 180;
 export const MIN_VIDEO_TO_VIDEO_CREDITS_SOUND = 220;
-
-/** Product-facing duration chips (UI). Model maxDuration still gates selection. */
-export const PRODUCT_VIDEO_DURATIONS = [5, 10] as const;
-
-/** 4K removed from product. */
+export const PRODUCT_VIDEO_DURATIONS = [5, 10, 15] as const;
 export const MAX_4K_DURATION_SEC = 0;
 
 export function is4kDurationLocked(_durationSec: number, _resolution: VideoResolution): boolean {
@@ -74,6 +58,11 @@ export type VideoModelDef = {
   supportsMotionStrength?: boolean;
 };
 
+export function roundVideoCredits(n: number, step = 25): number {
+  if (!Number.isFinite(n) || n <= 0) return step;
+  return Math.max(step, Math.ceil(n / step) * step);
+}
+
 export function estimateModelCredits(opts: {
   model: VideoModelDef;
   durationSec: number;
@@ -95,12 +84,11 @@ export function estimateModelCredits(opts: {
   } else {
     base = soundOn && model.nativeAudio ? MIN_VIDEO_CREDITS_SOUND : MIN_VIDEO_CREDITS;
   }
-  const durMult = d <= 5 ? 1 : 1 + (d - 5) * 0.12;
+  const durMult = d <= 5 ? 1 : d <= 10 ? 1.6 : 2.2;
   let resMult = 1;
-  if (opts.resolution === "1080p") resMult = 1.05;
-  else if (opts.resolution === "2k") resMult = 1.15;
-  else if (opts.resolution === "480p") resMult = 0.95;
-  return Math.max(base, Math.round(base * durMult * resMult));
+  if (opts.resolution === "1080p") resMult = 1.1;
+  else if (opts.resolution === "2k") resMult = 1.2;
+  return roundVideoCredits(base * durMult * resMult, 25);
 }
 
 export const VIDEO_MODELS: VideoModelDef[] = [
@@ -117,8 +105,8 @@ export const VIDEO_MODELS: VideoModelDef[] = [
     audioParam: "generate_audio",
     resolutions: ["720p", "1080p"],
     aspects: ["16:9", "9:16", "1:1"],
-    durations: [5, 10],
-    maxDuration: 10,
+    durations: [5, 10, 15],
+    maxDuration: 15,
     usdPerSec: 0.084,
     audioUsdMult: 1.5,
     available: true,
@@ -137,8 +125,8 @@ export const VIDEO_MODELS: VideoModelDef[] = [
     audioParam: "generate_audio",
     resolutions: ["720p", "1080p"],
     aspects: ["16:9", "9:16", "1:1"],
-    durations: [5, 10],
-    maxDuration: 10,
+    durations: [5, 10, 15],
+    maxDuration: 15,
     usdPerSec: 0.126,
     audioUsdMult: 1,
     available: true,
@@ -214,8 +202,8 @@ export const VIDEO_MODELS: VideoModelDef[] = [
     audioParam: "generate_audio",
     resolutions: ["720p", "1080p"],
     aspects: ["16:9", "9:16", "1:1"],
-    durations: [5, 10],
-    maxDuration: 10,
+    durations: [5, 10, 15],
+    maxDuration: 15,
     usdPerSec: 0.112,
     audioUsdMult: 1.5,
     available: true,
@@ -234,7 +222,7 @@ export const VIDEO_MODELS: VideoModelDef[] = [
     audioParam: "generate_audio",
     resolutions: ["720p", "1080p"],
     aspects: ["16:9", "9:16", "1:1"],
-    durations: [5, 10],
+    durations: [5, 10, 15],
     maxDuration: 15,
     usdPerSec: 0.168,
     audioUsdMult: 1,
@@ -457,7 +445,6 @@ export function selectVideoModel(opts: {
     candidates = modelsInTier("standard", mode);
   }
   if (candidates.length === 0) return null;
-
   candidates = candidates.filter((m) => {
     if (durationSec > m.maxDuration) return false;
     if (!m.resolutions.includes(resolution)) return false;
@@ -468,9 +455,7 @@ export function selectVideoModel(opts: {
     if (soundOn && !m.nativeAudio) return false;
     return true;
   });
-
   if (candidates.length === 0) return null;
-
   candidates.sort((a, b) => {
     const aDur = a.durations.includes(durationSec) ? 0 : 1;
     const bDur = b.durations.includes(durationSec) ? 0 : 1;
@@ -480,7 +465,6 @@ export function selectVideoModel(opts: {
     if (tier === "premium" && mode === "video") return bCost - aCost;
     return aCost - bCost;
   });
-
   return candidates[0] ?? null;
 }
 
@@ -495,20 +479,18 @@ export function videoSelectionUnavailableMessage(opts: {
   if (opts.soundOn) {
     const withoutSound = selectVideoModel({ ...opts, soundOn: false });
     if (withoutSound) {
-      return "Synchronized sound is not available for this combination of mode, duration, resolution, and aspect ratio. Turn sound off or change settings.";
+      return "Synchronized sound is not available for this combination. Turn sound off or change settings.";
     }
   }
   if (opts.mode === "video") {
-    return "Video → Video isn't available for these settings. Try a shorter duration, 720p/1080p, or 16:9 / 9:16 / 1:1.";
+    return "Video → Video isn't available for these settings. Try a shorter duration or 16:9 / 9:16 / 1:1.";
   }
-  return "This combination isn't available yet. Try a shorter duration, different resolution, or another aspect ratio.";
+  return "This combination isn't available yet. Try a shorter duration or different quality.";
 }
 
 export function availableMaxDurationFor(tier: VideoTier, mode: VideoGenMode): number {
   const list = modelsInTier(tier, mode);
-  if (list.length === 0 && tier === "premium") {
-    return availableMaxDurationFor("standard", mode);
-  }
+  if (list.length === 0 && tier === "premium") return availableMaxDurationFor("standard", mode);
   if (list.length === 0) return 0;
   return Math.min(USER_MAX_DURATION_SEC, Math.max(...list.map((m) => m.maxDuration)));
 }
@@ -559,7 +541,6 @@ export function applyVideoStyle(prompt: string, styleId: string | null | undefin
   return `${p}. ${mod}.`;
 }
 
-/** Detect audio-related intent in the user prompt (for sound routing). */
 export function promptMentionsSound(prompt: string): boolean {
   const p = (prompt || "").toLowerCase();
   return /\b(sound|audio|music|dialogue|dialog|voice|speech|talking|speak|sfx|soundtrack|ambient|noise|whisper|sing|song|lyrics)\b/.test(
