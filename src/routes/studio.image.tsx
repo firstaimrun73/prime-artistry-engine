@@ -42,9 +42,15 @@ const CHILD_PRODUCT_PREFIXES = [
 ] as const;
 
 function isChildProductRoute(pathname: string): boolean {
-  return CHILD_PRODUCT_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+  if (CHILD_PRODUCT_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return true;
+  }
+  // Any deeper product under /studio/image/* (except exact /studio/image) is a child.
+  // Prevents accidental redirect to /editor when a new child route is added.
+  if (pathname.startsWith("/studio/image/") && pathname !== "/studio/image") {
+    return true;
+  }
+  return false;
 }
 
 function ImageStudio() {
@@ -70,6 +76,11 @@ function ImageStudio() {
   // Never redirect child product routes (Circle, Lens, Filter, Auto Edit, …).
   useEffect(() => {
     if (isChild) return;
+    // Extra guard: never redirect away from a product URL during hydration.
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname;
+      if (p.startsWith("/studio/image/") && p !== "/studio/image") return;
+    }
     if (!user) return;
     try {
       sessionStorage.setItem("motio2edit-mode", "image");
