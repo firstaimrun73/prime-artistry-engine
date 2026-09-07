@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Search } from "lucide-react";
 import { Header } from "@/components/Header";
-import { CAMERA_LENS_ROSTER, LENS_GENERATION_CREDITS } from "@/lib/lens-camera/roster";
+import { CAMERA_LENS_ROSTER } from "@/lib/lens-camera/roster";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/studio/image/lenses")({
@@ -41,16 +41,16 @@ function MoreLensesPage() {
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-4">
         <div className="mb-4 flex items-center gap-3">
           <Link
-            to="/studio/image/lens-editor"
+            to="/"
             className="grid h-9 w-9 place-items-center rounded-full border border-border"
-            aria-label="Back to Lens Editor"
+            aria-label="Back to home"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
             <h1 className="text-lg font-extrabold tracking-tight">More Lenses</h1>
             <p className="text-xs text-muted-foreground">
-              {CAMERA_LENS_ROSTER.length} lenses · {LENS_GENERATION_CREDITS} credits each
+              {CAMERA_LENS_ROSTER.length} optical lenses · free on-device
             </p>
           </div>
         </div>

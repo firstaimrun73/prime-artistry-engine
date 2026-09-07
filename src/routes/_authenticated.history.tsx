@@ -43,12 +43,25 @@ type Generation = {
   metadata?: GenerationMeta | null;
 };
 
+/** Never render [object Object] from prompt/metadata. */
+function safeText(value: unknown, fallback = ""): string {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    const s = JSON.stringify(value);
+    return s && s !== "{}" ? s : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Detect Auto Edit without changing other experience identities. */
 function isAutoEditGeneration(g: Generation): boolean {
   const m = g.metadata;
   if (m?.experience === "auto-edit") return true;
   if (m?.source === "standalone_auto") return true;
-  const p = (g.prompt ?? "").toLowerCase();
+  const p = safeText(g.prompt).toLowerCase();
   return p.includes("maluto ai") || p.includes("motio2edit-auto");
 }
 
@@ -73,8 +86,6 @@ function HistoryPage() {
     }
     setLoading(true);
     setLoadError(null);
-    // RLS scopes rows to auth.uid(); explicit user_id keeps the filter clear.
-    // If metadata is missing on older DBs, fall back without it.
     supabase
       .from("generations")
       .select("id, type, prompt, output_url, status, created_at, metadata")
@@ -100,7 +111,6 @@ function HistoryPage() {
             setLoadError(null);
           }
         } else {
-          // Successful query: data may be [] — empty history is NOT an error.
           setGens((data as Generation[]) ?? []);
           setLoadError(null);
         }
@@ -272,7 +282,7 @@ function HistoryPage() {
                     ) : (
                       <img
                         src={g.output_url}
-                        alt={g.prompt ?? "Generated"}
+                        alt={safeText(g.prompt, "Generated")}
                         loading="lazy"
                         className="h-full w-full object-cover"
                         onError={(e) => {
@@ -318,7 +328,7 @@ function HistoryPage() {
                   )}
                 >
                   <p className="truncate text-xs font-medium">
-                    {auto ? "Maluto AI Auto Edit" : g.prompt ?? t("history.untitled")}
+                    {auto ? "Maluto AI Auto Edit" : safeText(g.prompt, t("history.untitled"))}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     {new Date(g.created_at).toLocaleDateString()}
@@ -340,7 +350,7 @@ function HistoryPage() {
               <DialogDescription className="line-clamp-2">
                 {isAutoEditGeneration(active)
                   ? "Maluto AI Auto Edit"
-                  : active.prompt ?? "No prompt"}
+                  : safeText(active.prompt, "No prompt")}
               </DialogDescription>
               <div className="mt-2 flex max-h-[70vh] items-center justify-center overflow-auto rounded-lg border border-border bg-secondary/40 p-2">
                 {active.output_url ? (
@@ -356,7 +366,7 @@ function HistoryPage() {
                   ) : (
                     <img
                       src={active.output_url}
-                      alt={active.prompt ?? "Generated"}
+                      alt={safeText(active.prompt, "Generated")}
                       onClick={() => setZoomed((z) => !z)}
                       className={cn(
                         "cursor-zoom-in object-contain transition-transform duration-200",
