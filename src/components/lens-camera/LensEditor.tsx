@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowLeft, Download, ImagePlus, Loader2, X } from "lucide-react";
+import { ArrowLeft, Download, ImagePlus, Loader2, RotateCcw, X } from "lucide-react";
 import { Header } from "@/components/Header";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,30 @@ import {
   canvasToBlob,
 } from "@/lib/lens-camera/optical-engine";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
+
+/** Short mechanical shutter click — no external asset. */
+function playShutterClick() {
+  try {
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AC();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(220, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.06);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.09);
+    window.setTimeout(() => void ctx.close(), 200);
+  } catch {
+    /* ignore */
+  }
+}
 
 type Phase = "idle" | "ready" | "processing" | "result";
 
@@ -136,6 +160,7 @@ export function LensEditor({ initialLensId }: Props) {
 
   const applyFromCanvas = async (canvas: HTMLCanvasElement, active: CameraLensDef) => {
     processingRef.current = true;
+    playShutterClick();
     setPhase("processing");
     try {
       const out = applyLensOpticalEnhanced(canvas, active, "native");
@@ -189,6 +214,14 @@ export function LensEditor({ initialLensId }: Props) {
 
   const selectLens = (id: string) => {
     setLensId((prev) => (prev === id ? null : id));
+    // Leave committed result so the new lens can live-preview + apply.
+    setResultUrl((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setPhase((p) => (p === "result" || p === "processing" ? "ready" : p));
+    setHoldingOriginal(false);
+    previewBusy.current = false;
     const el = carouselRef.current?.querySelector(`[data-lens-id="${id}"]`);
     el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   };
@@ -415,14 +448,39 @@ export function LensEditor({ initialLensId }: Props) {
           </button>
 
           {phase === "result" && resultUrl ? (
-            <button
-              type="button"
-              onClick={() => void download()}
-              className="grid h-11 w-11 place-items-center rounded-full border border-white/50 bg-white/60 text-zinc-700 shadow-sm backdrop-blur-xl dark:border-white/15 dark:bg-white/10 dark:text-white"
-              aria-label="Download"
-            >
-              <Download className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Restart: keep source image, clear result, pick another lens
+                  setResultUrl((prev) => {
+                    if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+                    return null;
+                  });
+                  setPreviewUrl((prev) => {
+                    if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+                    return null;
+                  });
+                  setLensId(null);
+                  setPhase("ready");
+                  setHoldingOriginal(false);
+                  toast.message("Choose another lens");
+                }}
+                className="grid h-11 w-11 place-items-center rounded-full border border-white/50 bg-white/60 text-zinc-700 shadow-sm backdrop-blur-xl dark:border-white/15 dark:bg-white/10 dark:text-white"
+                aria-label="Restart lenses"
+                title="Choose another lens"
+              >
+                <RotateCcw className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void download()}
+                className="grid h-11 w-11 place-items-center rounded-full border border-white/50 bg-white/60 text-zinc-700 shadow-sm backdrop-blur-xl dark:border-white/15 dark:bg-white/10 dark:text-white"
+                aria-label="Download"
+              >
+                <Download className="h-5 w-5" />
+              </button>
+            </div>
           ) : (
             <div className="h-11 w-11" aria-hidden />
           )}
