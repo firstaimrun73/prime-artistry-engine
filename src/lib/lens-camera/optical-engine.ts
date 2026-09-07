@@ -179,7 +179,6 @@ function sharpen(src: HTMLCanvasElement, amount = 1.2): HTMLCanvasElement {
   return put(c, img);
 }
 
-/** Light denoise via neighbor average blend on low-detail noise. */
 function lightDenoise(src: HTMLCanvasElement, strength = 0.35): HTMLCanvasElement {
   const c = clone(src);
   const w = c.width;
@@ -205,20 +204,18 @@ function lightDenoise(src: HTMLCanvasElement, strength = 0.35): HTMLCanvasElemen
   return put(c, img);
 }
 
-/** Enhance 4K — clarity stack for soft / compressed / low-detail photos. */
+/** Enhance 4K — clean clarity (avoid grain / oversharpen). */
 function enhance4k(src: HTMLCanvasElement): HTMLCanvasElement {
-  let c = lightDenoise(src, 0.28);
-  c = grade(c, "contrast(1.18) saturate(1.12) brightness(1.04)");
-  c = sharpen(c, 1.55);
-  c = sharpen(c, 0.85);
+  let c = lightDenoise(src, 0.42);
+  c = grade(c, "contrast(1.12) saturate(1.08) brightness(1.03)");
+  c = sharpen(c, 0.95);
   const img = data(c);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
-    // mild local contrast lift in midtones
     for (let ch = 0; ch < 3; ch++) {
       const v = d[i + ch];
-      if (v > 40 && v < 220) {
-        d[i + ch] = Math.max(0, Math.min(255, v + (v - 128) * 0.08));
+      if (v > 45 && v < 210) {
+        d[i + ch] = Math.max(0, Math.min(255, v + (v - 128) * 0.05));
       }
     }
   }
@@ -451,7 +448,6 @@ export function applyLensOpticalEnhanced(
     case "lens_prism_echo":
       return prismEcho(base);
     case "lens_swirl_depth":
-      // Enhance 4K — real clarity stack, not a rename of soft bloom
       return enhance4k(base);
     case "lens_architect_align":
       return sharpen(grade(radialMap(base, -0.32), "contrast(1.15) saturate(0.9)"), 0.7);
