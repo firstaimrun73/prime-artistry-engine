@@ -1,6 +1,7 @@
 /**
- * Motio2edit Lens — live camera OR upload · Snapchat carousel · hold-to-compare.
- * Strong on-device optics · glassy · gold · light/dark · free.
+ * Motio2edit Lens — Pass 10
+ * Live camera · live preview on swipe (cheap client optics) · full apply on shutter
+ * Badge carousel (code+color) · free · no apply toast · no duplicate upload by shutter
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -9,7 +10,6 @@ import {
   ArrowLeft,
   Camera,
   Download,
-  ImagePlus,
   Loader2,
   SwitchCamera,
   X,
@@ -32,33 +32,6 @@ import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
 type Phase = "live" | "ready" | "processing" | "result";
 
-const LENS_CHIP: Record<string, { bg: string; text: string }> = {
-  lens_widevista: { bg: "#1e3a5f", text: "#e8f1ff" },
-  lens_ultrawide_horizon: { bg: "#0f4c5c", text: "#d8f3f0" },
-  lens_fisheye_orbit: { bg: "#3b1f6e", text: "#f0e7ff" },
-  lens_natural_frame: { bg: "#2d3436", text: "#f5f6fa" },
-  lens_portrait_bloom: { bg: "#6d214f", text: "#ffe8f3" },
-  lens_cinematic_compress: { bg: "#1b1464", text: "#e8e6ff" },
-  lens_farreach: { bg: "#0c2461", text: "#dfe6ff" },
-  lens_microreveal: { bg: "#006266", text: "#e0fffc" },
-  lens_miniature_shift: { bg: "#b71540", text: "#ffe8ee" },
-  lens_architect_align: { bg: "#1e272e", text: "#ecf0f1" },
-  lens_dreamsoft: { bg: "#4a69bd", text: "#eef3ff" },
-  lens_glowmist: { bg: "#574b90", text: "#f3efff" },
-  lens_starflare: { bg: "#c44569", text: "#fff0f5" },
-  lens_prism_echo: { bg: "#574b90", text: "#f5f0ff" },
-  lens_swirl_depth: { bg: "#303952", text: "#eef0f8" },
-  lens_vintage_halation: { bg: "#84817a", text: "#faf8f2" },
-  lens_infraglow: { bg: "#2c2c54", text: "#f0eef8" },
-  lens_longglass_detail: { bg: "#b33939", text: "#fff0f0" },
-  lens_perspective_stretch: { bg: "#218c74", text: "#e8fff8" },
-  lens_selective_focus: { bg: "#cd6133", text: "#fff5ee" },
-};
-
-function chipStyle(id: string) {
-  return LENS_CHIP[id] ?? { bg: "#b8860b", text: "#fff8e7" };
-}
-
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -67,6 +40,38 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error("Could not load image"));
     img.src = src;
   });
+}
+
+/** Cheap CSS approx for live-camera preview while swiping (not full apply). */
+function liveCssForLens(id: string): string {
+  switch (id) {
+    case "lens_widevista":
+    case "lens_perspective_stretch":
+      return "contrast(1.08) saturate(1.1)";
+    case "lens_ultrawide_horizon":
+      return "contrast(1.12) saturate(1.15) brightness(1.03)";
+    case "lens_fisheye_orbit":
+      return "contrast(1.1) saturate(1.2)";
+    case "lens_portrait_bloom":
+      return "brightness(1.06) contrast(1.05) saturate(1.1) blur(0.3px)";
+    case "lens_cinematic_compress":
+      return "contrast(1.2) saturate(0.88) brightness(0.95)";
+    case "lens_vintage_halation":
+      return "sepia(0.35) contrast(1.08) brightness(1.04)";
+    case "lens_infraglow":
+      return "hue-rotate(90deg) saturate(1.3)";
+    case "lens_dreamsoft":
+      return "brightness(1.12) blur(0.6px)";
+    case "lens_glowmist":
+      return "brightness(1.1) contrast(0.95) saturate(1.05)";
+    case "lens_starflare":
+      return "brightness(1.15) contrast(1.1)";
+    case "lens_natural_frame":
+    case "lens_longglass_detail":
+      return "contrast(1.12) saturate(1.05)";
+    default:
+      return "contrast(1.06) saturate(1.04)";
+  }
 }
 
 type Props = { initialLensId?: string | null };
@@ -85,6 +90,7 @@ export function LensEditor({ initialLensId }: Props) {
   const [phase, setPhase] = useState<Phase>("live");
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [holdingOriginal, setHoldingOriginal] = useState(false);
   const [facing, setFacing] = useState<"user" | "environment">("user");
   const [camError, setCamError] = useState<string | null>(null);
@@ -93,6 +99,7 @@ export function LensEditor({ initialLensId }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const processingRef = useRef(false);
+  const previewBusy = useRef(false);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const stopCamera = useCallback(() => {
@@ -120,7 +127,7 @@ export function LensEditor({ initialLensId }: Props) {
       }
       setPhase("live");
     } catch {
-      setCamError("Camera unavailable — upload a photo instead");
+      setCamError("Camera unavailable — use gallery from the camera icon when needed");
       setPhase("live");
     }
   }, [facing, stopCamera]);
@@ -137,6 +144,42 @@ export function LensEditor({ initialLensId }: Props) {
     void navigate({ to: "/", replace: true });
   }, [navigate, stopCamera]);
 
+  /** Live optical preview when a still source is available and lens changes. */
+  useEffect(() => {
+    if (!sourceUrl || phase === "processing" || phase === "live") return;
+    let cancelled = false;
+    const run = async () => {
+      if (previewBusy.current) return;
+      previewBusy.current = true;
+      try {
+        const img = await loadImage(sourceUrl);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.min(img.naturalWidth, 960);
+        canvas.height = Math.round(
+          (canvas.width / img.naturalWidth) * img.naturalHeight,
+        );
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const out = applyLensOpticalEnhanced(canvas, lens, "native");
+        const blob = await canvasToBlob(out, "image/jpeg", 0.82);
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        setPreviewUrl((prev) => {
+          if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+          return url;
+        });
+      } catch {
+        /* ignore preview errors */
+      } finally {
+        previewBusy.current = false;
+      }
+    };
+    const t = window.setTimeout(() => void run(), 80);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [lens, sourceUrl, phase]);
+
   const onPick = (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) {
       toast.error("Please choose an image");
@@ -145,7 +188,9 @@ export function LensEditor({ initialLensId }: Props) {
     stopCamera();
     if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
     if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
+    if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
     setResultUrl(null);
+    setPreviewUrl(null);
     setSourceUrl(URL.createObjectURL(file));
     setPhase("ready");
   };
@@ -153,8 +198,10 @@ export function LensEditor({ initialLensId }: Props) {
   const clearToLive = () => {
     if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
     if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
+    if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
     setSourceUrl(null);
     setResultUrl(null);
+    setPreviewUrl(null);
     setPhase("live");
     void startCamera();
   };
@@ -165,7 +212,6 @@ export function LensEditor({ initialLensId }: Props) {
     try {
       const out = applyLensOpticalEnhanced(canvas, active, "native");
       const blob = await canvasToBlob(out, "image/jpeg", 0.94);
-      // keep source as the pre-apply frame for hold-compare
       const srcBlob = await canvasToBlob(canvas, "image/jpeg", 0.92);
       const srcUrl = URL.createObjectURL(srcBlob);
       const url = URL.createObjectURL(blob);
@@ -177,8 +223,9 @@ export function LensEditor({ initialLensId }: Props) {
         if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
         return url;
       });
+      setPreviewUrl(null);
       setPhase("result");
-      toast.success(`${active.name} applied · free · hold image to see original`);
+      // No toast — Pass 10
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lens failed");
       setPhase(sourceUrl ? "ready" : "live");
@@ -195,7 +242,6 @@ export function LensEditor({ initialLensId }: Props) {
     if (processingRef.current) return;
     const active = lens;
 
-    // Capture from live camera first
     if (phase === "live" && videoRef.current && streamRef.current) {
       const v = videoRef.current;
       if (!v.videoWidth) {
@@ -209,7 +255,7 @@ export function LensEditor({ initialLensId }: Props) {
     }
 
     if (!sourceUrl) {
-      toast.error("Open camera or upload a photo first");
+      toast.error("Open camera first");
       return;
     }
     try {
@@ -271,8 +317,12 @@ export function LensEditor({ initialLensId }: Props) {
   }
 
   const showResult = phase === "result" && resultUrl;
-  const displaySrc =
-    showResult && !holdingOriginal ? resultUrl! : sourceUrl || resultUrl;
+  const stillSrc =
+    showResult && !holdingOriginal
+      ? resultUrl!
+      : previewUrl && phase === "ready"
+        ? previewUrl
+        : sourceUrl;
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-zinc-100 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
@@ -290,8 +340,8 @@ export function LensEditor({ initialLensId }: Props) {
             MOTIO2EDIT
           </span>
           <span className="text-sm font-bold tracking-tight">Lens</span>
-          <span className="text-[10px] text-muted-foreground">
-            {lens.name} · free
+          <span className="max-w-[200px] truncate text-center text-[10px] text-muted-foreground">
+            {lens.shortDescription}
           </span>
         </div>
         <button
@@ -305,7 +355,6 @@ export function LensEditor({ initialLensId }: Props) {
       </div>
 
       <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3 pb-48 pt-16">
-        {/* Live camera */}
         {phase === "live" && (
           <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-black shadow-lg">
             <video
@@ -317,6 +366,7 @@ export function LensEditor({ initialLensId }: Props) {
                 "mx-auto max-h-[min(62dvh,640px)] w-full object-cover",
                 facing === "user" && "scale-x-[-1]",
               )}
+              style={{ filter: liveCssForLens(lensId) }}
             />
             {camError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-900/90 p-6 text-center">
@@ -327,14 +377,14 @@ export function LensEditor({ initialLensId }: Props) {
                   onClick={() => inputRef.current?.click()}
                   className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-black"
                 >
-                  Upload photo
+                  Choose photo
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {(phase === "ready" || phase === "processing" || phase === "result") && displaySrc && (
+        {(phase === "ready" || phase === "processing" || phase === "result") && stillSrc && (
           <div
             className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-black/5 bg-black/5 shadow-lg dark:border-white/10"
             onPointerDown={() => phase === "result" && setHoldingOriginal(true)}
@@ -343,13 +393,18 @@ export function LensEditor({ initialLensId }: Props) {
             onPointerCancel={() => setHoldingOriginal(false)}
           >
             <img
-              src={displaySrc}
+              src={stillSrc}
               alt={holdingOriginal ? "Original" : lens.name}
               className="mx-auto max-h-[min(62dvh,640px)] w-auto object-contain"
             />
             {phase === "result" && (
               <p className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[10px] text-white backdrop-blur">
                 {holdingOriginal ? "Original" : "Hold to see original"}
+              </p>
+            )}
+            {phase === "ready" && previewUrl && (
+              <p className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1 text-[10px] text-white/90 backdrop-blur">
+                Live preview · shutter for full
               </p>
             )}
             {phase !== "result" && (
@@ -365,7 +420,7 @@ export function LensEditor({ initialLensId }: Props) {
             {phase === "processing" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 backdrop-blur-sm">
                 <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
-                <p className="text-sm font-medium text-white">Applying {lens.name}…</p>
+                <p className="text-sm font-medium text-white">{lens.name}</p>
               </div>
             )}
           </div>
@@ -382,7 +437,6 @@ export function LensEditor({ initialLensId }: Props) {
         >
           {CAMERA_LENS_ROSTER.map((l) => {
             const active = l.id === lensId;
-            const colors = chipStyle(l.id);
             return (
               <button
                 key={l.id}
@@ -396,14 +450,14 @@ export function LensEditor({ initialLensId }: Props) {
               >
                 <span
                   className={cn(
-                    "grid h-14 w-14 place-items-center rounded-full border-2 text-[10px] font-bold uppercase tracking-wide transition",
+                    "lens-badge grid h-[52px] w-[52px] place-items-center rounded-full text-[13px] font-semibold text-white transition",
                     active
-                      ? "scale-110 border-amber-500 shadow-[0_0_16px_rgba(217,119,6,0.45)]"
-                      : "border-transparent opacity-80",
+                      ? "scale-110 ring-2 ring-amber-500 ring-offset-2 ring-offset-zinc-100 dark:ring-offset-zinc-950"
+                      : "opacity-85",
                   )}
-                  style={{ backgroundColor: colors.bg, color: colors.text }}
+                  style={{ background: l.color }}
                 >
-                  {l.name.slice(0, 2).toUpperCase()}
+                  {l.code}
                 </span>
                 <span
                   className={cn(
@@ -418,14 +472,15 @@ export function LensEditor({ initialLensId }: Props) {
           })}
         </div>
 
-        <div className="flex items-center justify-center gap-5">
+        {/* Shutter only — no duplicate upload icon (Pass 10 §6.1) */}
+        <div className="flex items-center justify-center gap-8">
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
+            onClick={clearToLive}
             className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white/80 text-zinc-700 backdrop-blur dark:border-white/15 dark:bg-white/10 dark:text-white"
-            aria-label="Upload photo"
+            aria-label="Live camera"
           >
-            <ImagePlus className="h-5 w-5" />
+            <Camera className="h-5 w-5" />
           </button>
 
           <button
@@ -433,7 +488,7 @@ export function LensEditor({ initialLensId }: Props) {
             onClick={() => void applyLens()}
             disabled={phase === "processing"}
             className="relative grid h-[72px] w-[72px] place-items-center rounded-full border-[3px] border-amber-500 bg-amber-500/20 shadow-[0_0_24px_rgba(217,119,6,0.25)] transition active:scale-90 disabled:opacity-40"
-            aria-label="Capture and apply lens"
+            aria-label="Apply lens"
           >
             <span className="h-[58px] w-[58px] rounded-full bg-gradient-to-br from-amber-400 to-amber-700" />
           </button>
@@ -448,22 +503,16 @@ export function LensEditor({ initialLensId }: Props) {
               <Download className="h-5 w-5" />
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={clearToLive}
-              className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white/80 text-zinc-700 backdrop-blur dark:border-white/15 dark:bg-white/10 dark:text-white"
-              aria-label="Live camera"
-            >
-              <Camera className="h-5 w-5" />
-            </button>
+            <div className="h-11 w-11" aria-hidden />
           )}
         </div>
 
         <p className="text-center text-[10px] text-muted-foreground">
-          Live view · swipe lens · gold shutter · hold result for original
+          Swipe for live preview · shutter for full · free
         </p>
       </div>
 
+      {/* Hidden file input only for camera-denied fallback */}
       <input
         ref={inputRef}
         type="file"
