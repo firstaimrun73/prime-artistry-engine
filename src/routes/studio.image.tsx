@@ -23,17 +23,22 @@ export const Route = createFileRoute("/studio/image")({
   component: ImageStudio,
 });
 
-/** Child product routes under /studio/image/* — must render via Outlet, never redirect to /editor. */
+/**
+ * Child product routes under /studio/image/* — must render via Outlet.
+ * NEVER redirect these to /editor (Image Studio).
+ * circle-info was missing → (i) buttons opened Image Editor. Fixed.
+ */
 const CHILD_PRODUCT_PREFIXES = [
   "/studio/image/auto-edit",
   "/studio/image/circle-remove",
+  "/studio/image/circle-info",
+  "/studio/image/circle-add-discover",
   "/studio/image/multi",
   "/studio/image/filters",
   "/studio/image/lenses",
   "/studio/image/filter-editor",
   "/studio/image/lens-editor",
   "/studio/image/age",
-  "/studio/image/circle-add-discover",
 ] as const;
 
 function isChildProductRoute(pathname: string): boolean {
@@ -42,10 +47,6 @@ function isChildProductRoute(pathname: string): boolean {
   );
 }
 
-/**
- * Image Studio landing for exact /studio/image.
- * Child routes (Auto Edit, Circle 2edit, Multi, Filters, Lenses, Age) render via Outlet.
- */
 function ImageStudio() {
   const { user, profile } = useAuth();
   const { t } = useI18n();
@@ -66,7 +67,7 @@ function ImageStudio() {
   };
 
   // Exact /studio/image only: signed-in users go into the Image Editor.
-  // Never redirect child product routes.
+  // Never redirect child product routes (Circle, Lens, Filter, Auto Edit, …).
   useEffect(() => {
     if (isChild) return;
     if (!user) return;

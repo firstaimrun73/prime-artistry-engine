@@ -1,10 +1,7 @@
 /**
- * WHAT'S NEW — Circle 2edit feature presentation (post-login homepage).
- * Circle to Remove: frozen Giza animation (CircleRemoveHeroDemo — DO NOT modify).
- * Circle to Add: CircleAddHeroDemo (deer sequence).
- * Try Now deep-links: mode=remove|add & from=home.
- * Info (i) goes to detail page, not slider.
- * Visual-first: short captions, tiny CIRCLE 2EDIT label, no large badges.
+ * WHAT'S NEW — Circle 2edit (post-login homepage).
+ * Info (i) → /studio/image/circle-info?sampleId=… (must be a real CIRCLE_SAMPLES id).
+ * Try Now → circle-remove with from=home so back returns home.
  */
 import { Link } from "@tanstack/react-router";
 import { Info, Sparkles } from "lucide-react";
@@ -14,7 +11,6 @@ import { CircleAddHeroDemo } from "@/components/circle-edit/CircleAddHeroDemo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-/** Isolates demo render failures so the rest of the signed-in homepage stays up. */
 class DemoErrorBoundary extends Component<
   { children: ReactNode; fallback?: ReactNode },
   { failed: boolean }
@@ -44,8 +40,9 @@ class DemoErrorBoundary extends Component<
 function RemoveCard() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  // Real sample ids from circle-samples.ts — not r2-catalog ids
   const tryHref = "/studio/image/circle-remove?mode=remove&from=home";
-  const infoHref = "/studio/image/circle-info?sampleId=img-giza-remove";
+  const infoHref = "/studio/image/circle-info?sampleId=rm-object";
 
   return (
     <article
@@ -54,7 +51,7 @@ function RemoveCard() {
         isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
       )}
     >
-      <div className="relative z-0 aspect-[4/5] w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
+      <div className="relative z-0 aspect-square w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
         <DemoErrorBoundary>
           <CircleRemoveHeroDemo />
         </DemoErrorBoundary>
@@ -76,7 +73,7 @@ function RemoveCard() {
               ? "border-white/15 bg-black/40 text-white hover:bg-black/55"
               : "border-black/10 bg-white/80 text-[#1A1C24] hover:bg-white",
           )}
-          aria-label="About Circle to Remove sample"
+          aria-label="About Circle to Remove"
           onClick={(e) => e.stopPropagation()}
         >
           <Info className="h-4 w-4" strokeWidth={2.25} />
@@ -110,8 +107,8 @@ function RemoveCard() {
 function AddCard() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const tryHref = "/studio/image/circle-remove?mode=add&from=home";
-  const infoHref = "/studio/image/circle-info?sampleId=img-deer-add";
+  const tryHref = "/studio/image/circle-remove?mode=add&from=home&assetId=animal_deer";
+  const infoHref = "/studio/image/circle-info?sampleId=add-deer";
 
   return (
     <article
@@ -120,7 +117,7 @@ function AddCard() {
         isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
       )}
     >
-      <div className="relative z-0 aspect-[4/5] w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
+      <div className="relative z-0 aspect-square w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
         <DemoErrorBoundary>
           <CircleAddHeroDemo />
         </DemoErrorBoundary>
@@ -142,7 +139,7 @@ function AddCard() {
               ? "border-white/15 bg-black/40 text-white hover:bg-black/55"
               : "border-black/10 bg-white/80 text-[#1A1C24] hover:bg-white",
           )}
-          aria-label="About Circle to Add sample"
+          aria-label="About Circle to Add"
           onClick={(e) => e.stopPropagation()}
         >
           <Info className="h-4 w-4" strokeWidth={2.25} />
