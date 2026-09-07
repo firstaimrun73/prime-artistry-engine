@@ -3,6 +3,7 @@
  * Remove: circleInstant true
  * Add: circleInstant false → flux-pro fill; asset rail + factors + confirm
  * Exit/Back respects from=home|info|sample so Homepage → Editor → Exit returns Homepage.
+ * Auth: logged-out users are redirected to /auth (editor is post-login only).
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -110,7 +111,7 @@ async function waitForImageLoadable(url: string): Promise<void> {
 function Circle2editPage() {
   const navigate = Route.useNavigate();
   const search = Route.useSearch();
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, loading: authLoading } = useAuth();
   const isAdmin = isAdminEmail(profile?.email);
   const addLocked = !isAdmin && isFreePlan(profile?.plan);
   const watermarkLocked = !isAdmin && isFreePlan(profile?.plan);
@@ -150,6 +151,20 @@ function Circle2editPage() {
   const goBack = useCallback(() => {
     navigateCircleBack(search.from ?? "home", search.sampleId);
   }, [search.from, search.sampleId]);
+
+  // Pre-login: never show Circle editor — send visitor to sign-in first
+  useEffect(() => {
+    if (authLoading) return;
+    if (user) return;
+    const q = new URLSearchParams();
+    if (search.mode) q.set("mode", search.mode);
+    if (search.assetId) q.set("assetId", search.assetId);
+    if (search.sampleId) q.set("sampleId", search.sampleId);
+    if (search.from) q.set("from", search.from);
+    const qs = q.toString();
+    const dest = `/studio/image/circle-remove${qs ? `?${qs}` : ""}`;
+    void navigate({ to: "/auth", search: { redirect: dest } });
+  }, [authLoading, user, navigate, search.mode, search.assetId, search.sampleId, search.from]);
 
   const clearProgressTimers = useCallback(() => {
     progressTimers.current.forEach((id) => window.clearTimeout(id));
@@ -474,6 +489,17 @@ function Circle2editPage() {
 
   const selectedAsset = findAddAsset(addObjectId);
   const paintLocked = phase === "generating" || (mode === "add" && !addConfirmed);
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
+          aria-label="Loading"
+        />
+      </div>
+    );
+  }
 
   const watermarkToggle = (
     <div
