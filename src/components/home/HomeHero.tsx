@@ -19,6 +19,10 @@ const STEPS = [
   { icon: Download, label: "Generate" },
 ];
 
+/** Pre-login hero — never deep-link into product editors (Circle, Lens, etc.). */
+const AUTH_THEN_CIRCLE =
+  "/studio/image/circle-remove?mode=remove&from=home";
+
 export function HomeHero() {
   const [demoOpen, setDemoOpen] = useState(false);
 
@@ -27,11 +31,14 @@ export function HomeHero() {
       <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
         <div className="reveal-up min-w-0 text-center lg:text-left">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
-            <Zap className="h-3.5 w-3.5 text-primary" /> <span className="notranslate" translate="no">Motio2edit</span> · Credit-based AI studio
+            <Zap className="h-3.5 w-3.5 text-primary" />{" "}
+            <span className="notranslate" translate="no">
+              Motio2edit
+            </span>{" "}
+            · Credit-based AI studio
           </span>
           <h1 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-            AI Image & Video Editing,{" "}
-            <span className="text-primary">Made Simple</span>
+            AI Image & Video Editing, <span className="text-primary">Made Simple</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground sm:text-lg lg:mx-0">
             Edit images and videos with AI in one workspace. Remove objects, enhance portraits,
@@ -40,7 +47,7 @@ export function HomeHero() {
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
             <Button asChild size="lg" className="gap-2">
-              <Link to="/studio/image/circle-info">
+              <Link to="/auth" search={{ redirect: AUTH_THEN_CIRCLE }}>
                 Try Now <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
@@ -58,16 +65,19 @@ export function HomeHero() {
             </Button>
           </div>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground lg:justify-start">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4 lg:justify-start">
             {VALUE_PROPS.map(({ icon: Icon, label }) => (
-              <span key={label} className="inline-flex items-center gap-1.5">
-                <Icon className="h-4 w-4 text-primary" />
+              <div
+                key={label}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground"
+              >
+                <Icon className="h-3.5 w-3.5 text-primary" />
                 {label}
-              </span>
+              </div>
             ))}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs font-medium text-muted-foreground lg:justify-start">
+          <div className="mt-6 flex items-center justify-center gap-3 text-xs text-muted-foreground lg:justify-start">
             {STEPS.map(({ icon: Icon, label }, i) => (
               <span key={label} className="inline-flex items-center gap-1.5">
                 {i > 0 && <span className="mx-1 text-border">→</span>}
@@ -78,21 +88,21 @@ export function HomeHero() {
           </div>
         </div>
 
-        <div className="reveal-up relative min-w-0">
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
+        <div className="reveal-up relative mx-auto w-full max-w-md lg:max-w-none">
+          <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
             <button
               type="button"
               className="group relative block w-full"
               onClick={() => setDemoOpen(true)}
-              aria-label="Motio2edit product demo"
+              aria-label="Play demo video"
             >
               <img
                 src={DEMO_POSTER}
-                alt=""
+                alt="Motio2edit demo"
                 className="aspect-video w-full object-cover"
               />
-              <span className="absolute inset-0 flex items-center justify-center bg-black/30 transition group-hover:bg-black/40">
-                <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
+              <span className="absolute inset-0 flex items-center justify-center bg-black/25 transition group-hover:bg-black/35">
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg">
                   <Play className="h-6 w-6 fill-current" />
                 </span>
               </span>
@@ -103,11 +113,12 @@ export function HomeHero() {
 
       {demoOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
+          aria-label="Demo video"
         >
-          <div className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-black shadow-2xl">
+          <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-black shadow-2xl">
             <button
               type="button"
               className="absolute right-3 top-3 z-10 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"
