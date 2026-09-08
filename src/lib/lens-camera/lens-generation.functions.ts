@@ -1,13 +1,13 @@
 /**
- * Lens generation billing — 15 credits per successful apply.
+ * Lens generation billing — AI tier = 20 credits per successful apply.
+ * Normal (on-device) tier = 0 credits, never charged.
  * Single server deduction via existing deduct_credits RPC.
- * Client must pass a stable generationId and only call once after success.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isAdminClaims } from "@/lib/admin-guard.server";
-import { LENS_GENERATION_CREDITS, getCameraLensById } from "@/lib/lens-camera/roster";
+import { getCameraLensById, isAiLens } from "@/lib/lens-camera/roster";
 
 const chargeSchema = z.object({
   lensId: z.string().min(1).max(64),
@@ -25,7 +25,19 @@ export const chargeLensGeneration = createServerFn({ method: "POST" })
     if (!lens) throw new Error("Unknown lens.");
     if (lens.status === "coming-soon") throw new Error("This lens is not available yet.");
 
-    const cost = LENS_GENERATION_CREDITS;
+    // Normal tier is free — no charge path.
+    if (!isAiLens(lens) || lens.creditCost <= 0) {
+      return {
+        ok: true as const,
+        credits: 0,
+        charged: 0,
+        generationId: data.generationId,
+        lensName: lens.name,
+        cost: 0,
+      };
+    }
+
+    const cost = lens.creditCost;
 
     const { data: profile, error: pErr } = await supabase
       .from("profiles")
@@ -37,7 +49,7 @@ export const chargeLensGeneration = createServerFn({ method: "POST" })
     const isAdmin = isAdminClaims({ email: profile.email ?? undefined });
 
     if (!isAdmin && (profile.credits as number) < cost) {
-      throw new Error(`Not enough credits. Lens generation costs ${cost} credits.`);
+      throw new Error(`Not enough credits. ${lens.name} costs ${cost} credits.`);
     }
 
     let newCredits = profile.credits as number;
@@ -51,7 +63,7 @@ export const chargeLensGeneration = createServerFn({ method: "POST" })
       });
       if (dErr || !deduction) {
         if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
-          throw new Error(`Not enough credits. Lens generation costs ${cost} credits.`);
+          throw new Error(`Not enough credits. ${lens.name} costs ${cost} credits.`);
         }
         throw new Error("Could not charge credits. Please try again.");
       }
