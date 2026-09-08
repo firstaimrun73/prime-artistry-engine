@@ -1,23 +1,44 @@
 import { useState } from "react";
 import { Info, X } from "lucide-react";
+import { CREDIT_RETAIL_USD } from "@/lib/motio-video-credits";
 
 type Breakdown = {
   tier?: string;
   mode?: string;
   durationSec?: number;
+  quality?: string;
   resolution?: string;
   soundOn?: boolean;
 };
 
-/** Credit details — never shows backend model names or USD. */
+function modeLabel(mode?: string) {
+  if (mode === "video") return "Video → Video";
+  if (mode === "image") return "Image → Video";
+  if (mode === "audio") return "Audio → Video";
+  return "Text → Video";
+}
+
+function qualityLabel(b?: Breakdown) {
+  if (b?.quality) return b.quality;
+  if (b?.resolution === "1080p" || b?.resolution === "2k") return "HD";
+  if (b?.resolution === "720p" || b?.resolution === "480p") return "SD";
+  return b?.resolution ?? "—";
+}
+
+/** Credit details — never shows backend model names. */
 export function VideoCreditsInfo({
   credits,
   breakdown,
+  usd,
 }: {
   credits: number;
   breakdown?: Breakdown;
+  usd?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const displayUsd =
+    usd != null ? usd : +(credits * CREDIT_RETAIL_USD).toFixed(2);
+
   return (
     <>
       <button
@@ -47,40 +68,42 @@ export function VideoCreditsInfo({
               <li>
                 · Tier:{" "}
                 <span className="font-medium text-foreground">
-                  {breakdown?.tier === "premium" ? "Premium (from 200)" : "Standard (from 125)"}
+                  {breakdown?.tier === "premium"
+                    ? "Premium"
+                    : breakdown?.tier === "standard"
+                      ? "Standard"
+                      : "—"}
                 </span>
               </li>
               <li>
                 · Mode:{" "}
-                <span className="font-medium text-foreground">
-                  {breakdown?.mode === "video"
-                    ? "Video → Video"
-                    : breakdown?.mode === "image"
-                      ? "Image → Video"
-                      : "Text → Video"}
-                </span>
+                <span className="font-medium text-foreground">{modeLabel(breakdown?.mode)}</span>
               </li>
               <li>
                 · Duration:{" "}
-                <span className="font-medium text-foreground">{breakdown?.durationSec ?? "—"}s</span>
+                <span className="font-medium text-foreground">
+                  {breakdown?.durationSec != null ? `${breakdown.durationSec}s` : "—"}
+                </span>
               </li>
               <li>
                 · Quality:{" "}
-                <span className="font-medium text-foreground">{breakdown?.resolution ?? "—"}</span>
+                <span className="font-medium text-foreground">{qualityLabel(breakdown)}</span>
               </li>
               <li>
                 · Sound:{" "}
                 <span className="font-medium text-foreground">
-                  {breakdown?.soundOn ? "On (+ credits)" : "Silent"}
+                  {breakdown?.soundOn == null ? "—" : breakdown.soundOn ? "Enabled" : "Silent"}
                 </span>
               </li>
             </ul>
             <p className="mt-4 text-sm">
               Estimated charge:{" "}
-              <span className="font-bold tabular-nums text-red-600">{credits} credits</span>
+              <span className="font-bold tabular-nums text-red-600">
+                {credits} credits (${displayUsd.toFixed(2)})
+              </span>
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Amounts are rounded to clean steps (25). Charged only after a successful generation.
+              1 credit = $0.01. Prices rounded to clean 25-credit steps. Charged only after a successful generation.
             </p>
             <button
               type="button"
