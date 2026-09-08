@@ -23,6 +23,7 @@ import { renderLensPreview, renderLensFullResolution } from "@/lib/filter-lens/l
 import type { ProcessingProfile } from "@/lib/filter-lens/shared/processing-types";
 import { unlockFilterOrLens } from "@/lib/filter-lens/unlock.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
+import type { FilterDefinition } from "@/lib/filter-lens/filters/filter-types";
 
 export type EffectKind = "filter" | "lens";
 
@@ -40,6 +41,23 @@ export type CatalogItem = {
   intensityMax: number;
   bestFor?: string;
 };
+
+/** Map registry FilterDefinition → EffectStudio CatalogItem. */
+export function filterToCatalogItem(f: FilterDefinition): CatalogItem {
+  return {
+    id: f.id,
+    name: f.name,
+    category: f.category,
+    description: f.description,
+    visualDescription: f.visualDescription,
+    isFree: f.unlock.isFree,
+    unlockCost: f.unlock.unlockCost,
+    profile: f.processingProfile,
+    intensityDefault: f.intensityRange.default,
+    intensityMin: f.intensityRange.min,
+    intensityMax: f.intensityRange.max,
+  };
+}
 
 type Props = {
   kind: EffectKind;
