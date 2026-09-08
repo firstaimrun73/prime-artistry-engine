@@ -2,6 +2,7 @@
  * Video Studio — thin orchestrator.
  * User picks Standard/Premium + creative requirements.
  * Backend selectVideoModel() chooses the engine. No model names in UI.
+ * Retail credits: single source of truth = computeMotioVideoCredits().
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -28,15 +29,18 @@ import {
   selectVideoModel,
   videoSelectionUnavailableMessage,
   capabilitiesForTier,
-  estimateRequestCredits,
   availableMaxDurationFor,
-  MIN_VIDEO_CREDITS,
   promptMentionsSound,
   type VideoGenMode,
   type VideoAspect,
   type VideoResolution,
   type VideoTier,
 } from "@/lib/video-model-registry";
+import {
+  computeMotioVideoCredits,
+  qualityFromResolution,
+  allowedDurationsForTier,
+} from "@/lib/motio-video-credits";
 import type { VideoStudioResult } from "@/components/video/video-studio-types";
 
 export const Route = createFileRoute("/studio/video")({
@@ -89,14 +93,20 @@ function VideoStudioPage() {
   const caps = useMemo(() => capabilitiesForTier(tier, mode), [tier, mode]);
   const availableMax = useMemo(() => availableMaxDurationFor(tier, mode), [tier, mode]);
   const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
+  const tierDurations = useMemo(() => allowedDurationsForTier(tier), [tier]);
 
   useEffect(() => {
     if (!caps.aspects.includes(aspect)) setAspect(caps.aspects[0] ?? "16:9");
     if (!caps.resolutions.includes(resolution)) {
       setResolution(caps.resolutions.includes("1080p") ? "1080p" : (caps.resolutions[0] ?? "720p"));
     }
-    if (duration > availableMax && availableMax > 0) setDuration(Math.min(duration, availableMax));
-  }, [caps, aspect, resolution, duration, availableMax]);
+    // Clamp duration to tier-allowed set (Standard never keeps 15s)
+    if (!tierDurations.includes(duration)) {
+      setDuration(tierDurations.includes(5) ? 5 : (tierDurations[0] ?? 5));
+    } else if (duration > availableMax && availableMax > 0) {
+      setDuration(Math.min(duration, availableMax));
+    }
+  }, [caps, aspect, resolution, duration, availableMax, tierDurations]);
 
   const effectiveSound = useMemo(() => {
     if (soundOn) return true;
@@ -104,19 +114,21 @@ function VideoStudioPage() {
     return false;
   }, [soundOn, prompt]);
 
-  const cost = useMemo(() => {
-    return Math.max(
-      MIN_VIDEO_CREDITS,
-      estimateRequestCredits({
-        mode,
+  // SINGLE SOURCE OF TRUTH for retail credits
+  const price = useMemo(
+    () =>
+      computeMotioVideoCredits({
         tier,
         durationSec: duration,
-        resolution,
-        aspect,
+        quality: qualityFromResolution(resolution),
         soundOn: effectiveSound,
+        mode,
       }),
-    );
-  }, [mode, tier, duration, resolution, aspect, effectiveSound]);
+    [mode, tier, duration, resolution, effectiveSound],
+  );
+
+  const cost = price.credits;
+  const costSupported = price.supported;
 
   const selected = useMemo(
     () =>
@@ -148,13 +160,14 @@ function VideoStudioPage() {
   }, [busy]);
 
   const canGenerate = useMemo(() => {
+    if (!costSupported) return false;
     if (duration < 1 || duration > availableMax) return false;
     if (mode === "video") return !!mediaFile;
     if (!prompt.trim()) return false;
     if (mode === "image" && !mediaFile) return false;
     if (!selected) return false;
     return true;
-  }, [prompt, mode, mediaFile, duration, availableMax, selected]);
+  }, [prompt, mode, mediaFile, duration, availableMax, selected, costSupported]);
 
   if (user && profile && !allowed) {
     return (
@@ -209,6 +222,10 @@ function VideoStudioPage() {
 
   const onGenerate = async () => {
     if (!canGenerate || busy) return;
+    if (!costSupported) {
+      toast.error(price.reason ?? "This combination isn't available.");
+      return;
+    }
     if (duration > availableMax) {
       toast.error(`Maximum available for these settings is ${availableMax}s.`);
       return;
@@ -451,7 +468,12 @@ function VideoStudioPage() {
 
       {!busy && (
         <div className="space-y-2">
-          {!selected && (
+          {!costSupported && (
+            <p className="text-center text-xs text-amber-600 dark:text-amber-400">
+              {price.reason ?? "This combination isn't available yet."}
+            </p>
+          )}
+          {costSupported && !selected && (
             <p className="text-center text-xs text-amber-600 dark:text-amber-400">
               {videoSelectionUnavailableMessage({
                 mode,
@@ -465,10 +487,25 @@ function VideoStudioPage() {
           )}
           <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
             <span>
-              Estimated <span className="font-bold tabular-nums text-foreground">{cost}</span> credits
-              {effectiveSound ? " · with sound" : " · silent"}
+              Estimated{" "}
+              <span className="font-bold tabular-nums text-foreground">
+                {costSupported ? cost : "—"}
+              </span>{" "}
+              credits
+              {costSupported ? (effectiveSound ? " · with sound" : " · silent") : ""}
+              {costSupported ? ` · $${price.usd.toFixed(2)}` : ""}
             </span>
-            <VideoCreditsInfo credits={cost} />
+            <VideoCreditsInfo
+              credits={cost}
+              usd={price.usd}
+              breakdown={{
+                tier: price.breakdown.tier,
+                mode,
+                durationSec: duration,
+                quality: price.breakdown.quality,
+                soundOn: effectiveSound,
+              }}
+            />
           </div>
           <button
             type="button"
