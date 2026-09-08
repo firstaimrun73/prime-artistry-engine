@@ -1,11 +1,8 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-registry";
-import {
-  VIDEO_STYLE_MODIFIERS,
-  PRODUCT_VIDEO_DURATIONS,
-  resolutionUiLabel,
-} from "@/lib/video-model-registry";
+import { VIDEO_STYLE_MODIFIERS, resolutionUiLabel } from "@/lib/video-model-registry";
+import { allowedDurationsForTier, TIER_COPY } from "@/lib/motio-video-credits";
 
 function ChipGroup<T extends string>({
   label,
@@ -123,7 +120,7 @@ export function VideoFeaturePanel({
   const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
   const isPremium = tier === "premium";
 
-  const durationOpts = PRODUCT_VIDEO_DURATIONS.map((d) => ({
+  const durationOpts = allowedDurationsForTier(tier).map((d) => ({
     id: String(d) as `${number}`,
     label: `${d}s`,
   }));
@@ -153,10 +150,8 @@ export function VideoFeaturePanel({
                 : "border-border/70 bg-background hover:border-red-400/40",
             )}
           >
-            <p className="text-sm font-bold">Standard</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Fast clips · SD/HD · from 125 credits
-            </p>
+            <p className="text-sm font-bold">{TIER_COPY.standard.title}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{TIER_COPY.standard.supporting}</p>
           </button>
           <button
             type="button"
@@ -173,14 +168,12 @@ export function VideoFeaturePanel({
             )}
           >
             <p className="text-sm font-bold">
-              {premiumLocked ? "Premium 🔒" : "👑 Premium"}
+              {premiumLocked ? "Premium 🔒" : `👑 ${TIER_COPY.premium.title}`}
               {!premiumLocked && (
                 <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
               )}
             </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Higher quality · longer clips · from 200 credits
-            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{TIER_COPY.premium.supporting}</p>
           </button>
         </div>
       </div>
