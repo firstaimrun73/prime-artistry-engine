@@ -1,11 +1,16 @@
 /**
- * More Lenses - discovery for the camera Lens Editor.
+ * More Lenses — circular R2 samples, deep-link to Lens Editor (upload required there).
+ * Back always → homepage (never Image Studio).
  */
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, Lock } from "lucide-react";
 import { Header } from "@/components/Header";
-import { CAMERA_LENS_ROSTER } from "@/lib/lens-camera/roster";
+import { LENS_GENERATION_CREDITS } from "@/lib/lens-camera/roster";
+import { getLensSampleCards } from "@/lib/lens-camera/lens-samples";
+import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/studio/image/lenses")({
@@ -23,17 +28,21 @@ export const Route = createFileRoute("/studio/image/lenses")({
 });
 
 function MoreLensesPage() {
+  const { profile } = useAuth();
+  const admin = isAdminEmail(profile?.email);
+  const paid = admin || isPaidPlan(profile?.plan);
   const [q, setQ] = useState("");
+  const all = useMemo(() => getLensSampleCards(), []);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return CAMERA_LENS_ROSTER;
-    return CAMERA_LENS_ROSTER.filter(
+    if (!needle) return all;
+    return all.filter(
       (l) =>
         l.name.toLowerCase().includes(needle) ||
-        l.shortDescription.toLowerCase().includes(needle) ||
-        l.concept.includes(needle),
+        l.about.toLowerCase().includes(needle) ||
+        l.lensId.includes(needle),
     );
-  }, [q]);
+  }, [q, all]);
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -50,10 +59,21 @@ function MoreLensesPage() {
           <div>
             <h1 className="text-lg font-extrabold tracking-tight">More Lenses</h1>
             <p className="text-xs text-muted-foreground">
-              {CAMERA_LENS_ROSTER.length} optical lenses · free on-device
+              {all.length} lenses · AI {LENS_GENERATION_CREDITS} cr · free optical 0 cr
             </p>
           </div>
         </div>
+
+        {!paid && (
+          <div className="mb-4 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 text-xs text-muted-foreground">
+            <Lock className="mr-1 inline h-3.5 w-3.5 text-primary" />
+            Lenses are on upgraded plans. Preview below, then{" "}
+            <Link to="/pricing" className="font-semibold text-primary underline">
+              upgrade
+            </Link>{" "}
+            to apply on your photos.
+          </div>
+        )}
 
         <div className="relative mb-5">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -66,41 +86,62 @@ function MoreLensesPage() {
           />
         </div>
 
-        <ul className="space-y-2">
-          {list.map((l) => (
-            <li key={l.id}>
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+          {list.map((l) => {
+            const body = (
+              <>
+                <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-full border border-border bg-muted shadow-sm">
+                  <img
+                    src={l.imageUrl}
+                    alt={`${l.name} — ${l.about}`}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      console.warn("[more-lenses] failed", l.imageUrl);
+                      (e.currentTarget as HTMLImageElement).style.opacity = "0.25";
+                    }}
+                  />
+                  {!paid && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <Lock className="h-4 w-4 text-white" />
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 truncate text-center text-[11px] font-semibold">{l.name}</p>
+                <p className="truncate text-center text-[10px] text-muted-foreground">{l.about}</p>
+              </>
+            );
+
+            if (!paid) {
+              return (
+                <Link
+                  key={l.id}
+                  to="/pricing"
+                  className="rounded-2xl border border-border bg-card p-2.5 text-center"
+                >
+                  {body}
+                </Link>
+              );
+            }
+
+            return (
               <Link
+                key={l.id}
                 to="/studio/image/lens-editor"
-                search={{ lens: l.id }}
+                search={{ lens: l.lensId }}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition hover:border-primary/40",
-                  l.status !== "full" && "opacity-80",
+                  "rounded-2xl border border-border bg-card p-2.5 text-center transition hover:border-primary/40",
                 )}
               >
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                  {l.name
-                    .split(" ")
-                    .map((w) => w[0])
-                    .join("")
-                    .slice(0, 2)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className={"truncate text-sm font-semibold"}>{l.name}</p>
-                  <p className={"truncate text-xs text-muted-foreground"}>{l.shortDescription}</p>
-                </div>
-                {l.status === "full" ? (
-                  <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                    Open
-                  </span>
-                ) : (
-                  <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                    Soon
-                  </span>
-                )}
+                {body}
               </Link>
-            </li>
-          ))}
-        </ul>
+            );
+          })}
+        </div>
+
+        <p className="mt-6 text-center text-[11px] text-muted-foreground">
+          Selecting a lens opens the camera editor. Upload or capture your own photo before generating.
+        </p>
       </main>
     </div>
   );

@@ -15,7 +15,8 @@ const TITLES: Record<StudioEditorKind, string> = {
 };
 
 /**
- * Editor content shell only — does not replace global Header/nav (Phase 1 §2).
+ * Editor content shell only — does not replace global Header/nav.
+ * Back always → homepage (never Image Studio hub).
  */
 export function StudioShell({
   kind,
@@ -44,26 +45,24 @@ export function StudioShell({
         <div className="mb-6 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <Link
-              to="/studio"
+              to="/"
               className="text-xs font-medium text-muted-foreground hover:text-foreground"
             >
-              ← All studios
+              ← Home
             </Link>
-            <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
-              {TITLES[kind]}{" "}
-              <span className="text-orange-500">Studio</span>
+            <h1 className={cn("mt-1 text-2xl font-extrabold tracking-tight", studioAccentClass(tier))}>
+              {TITLES[kind]} Studio
             </h1>
-            {subtitle && (
-              <p className="mt-1 max-w-md text-sm text-muted-foreground">{subtitle}</p>
-            )}
+            {subtitle ? (
+              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+            ) : null}
           </div>
-          <div className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border/70 bg-card/80 px-3 py-1.5 text-sm shadow-sm backdrop-blur">
-            <Coins className={cn("h-4 w-4", studioAccentClass(tier))} />
-            <span className="tabular-nums font-semibold">
-              {credits != null ? credits.toLocaleString() : "—"}
-            </span>
-            <span className="text-muted-foreground">credits</span>
-          </div>
+          {typeof credits === "number" ? (
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold tabular-nums">
+              <Coins className="h-3.5 w-3.5 text-primary" />
+              {credits.toLocaleString()} credits
+            </div>
+          ) : null}
         </div>
         {children}
       </div>
