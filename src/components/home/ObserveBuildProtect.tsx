@@ -1,6 +1,5 @@
 /**
  * Homepage workflow diagram — Observe · Build · Protect & connect
- * Dark technical layout, dashed connectors, center orange action (distinct icons).
  */
 import { Eye, Sparkles, ShieldCheck, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,40 +65,12 @@ export function ObserveBuildProtect({ className }: { className?: string }) {
               </div>
               {i < STAGES.length - 1 && (
                 <>
-                  <svg
-                    className="my-1 h-8 w-6 text-orange-500/50 sm:hidden"
-                    viewBox="0 0 24 32"
-                    fill="none"
-                    aria-hidden
-                  >
-                    <path
-                      d="M12 2 C4 10, 20 22, 12 30"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeDasharray="3 4"
-                      strokeLinecap="round"
-                    />
+                  <svg className="my-1 h-8 w-6 text-orange-500/50 sm:hidden" viewBox="0 0 24 32" fill="none" aria-hidden>
+                    <path d="M12 2 C4 10, 20 22, 12 30" stroke="currentColor" strokeWidth="1.6" strokeDasharray="3 4" strokeLinecap="round" />
                   </svg>
-                  <svg
-                    className="mx-1 hidden h-8 w-12 shrink-0 text-orange-500/55 sm:block"
-                    viewBox="0 0 48 32"
-                    fill="none"
-                    aria-hidden
-                  >
-                    <path
-                      d="M2 16 C16 6, 32 26, 46 16"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeDasharray="3 4"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M40 11 L46 16 L40 21"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+                  <svg className="mx-1 hidden h-8 w-12 shrink-0 text-orange-500/55 sm:block" viewBox="0 0 48 32" fill="none" aria-hidden>
+                    <path d="M2 16 C16 6, 32 26, 46 16" stroke="currentColor" strokeWidth="1.6" strokeDasharray="3 4" strokeLinecap="round" />
+                    <path d="M40 11 L46 16 L40 21" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </>
               )}
@@ -108,13 +79,15 @@ export function ObserveBuildProtect({ className }: { className?: string }) {
         })}
       </div>
 
-      <div className="mx-auto mt-8 flex max-w-sm flex-col items-center rounded-2xl border border-orange-500/40 bg-gradient-to-br from-orange-500/25 via-orange-600/15 to-transparent px-5 py-4 text-center shadow-[0_0_40px_rgba(249,115,22,0.2)]">
+      <div className="mx-auto mt-8 flex max-w-md flex-col items-center rounded-2xl border border-orange-500/40 bg-gradient-to-br from-orange-500/25 via-orange-600/15 to-transparent px-5 py-5 text-center shadow-[0_0_40px_rgba(249,115,22,0.2)]">
         <span className="grid h-12 w-12 place-items-center rounded-full bg-orange-500 text-white shadow-lg">
           <Sparkles className="h-6 w-6" />
         </span>
-        <p className="mt-2 text-sm font-bold">Generate with Motion2AI</p>
-        <p className="mt-1 text-[11px] text-white/60">
-          One primary reference keeps motion accurate. Extra refs are optional guidance only.
+        <p className="mt-2 text-sm font-bold tracking-tight">Generate with Motion2AI Engine</p>
+        <p className="mt-2 text-[11px] leading-relaxed text-white/70">
+          Motion2AI is a single motion engine: one technical prompt can bind several reference
+          photos into one coherent result. Stacking separate AI models often breaks identity and
+          gait — Motion2AI keeps pose, clothing, and scene locked under one control path.
         </p>
       </div>
     </section>
