@@ -20,10 +20,12 @@ import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
 import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery";
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
+import { ExploreLensesSection } from "@/components/home/ExploreLensesSection";
+import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
+import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 
 const QUICK_CREATE = [
-  // Image opens the real editor directly (not /studio/image which only redirects).
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
   { to: "/studio/video" as const, label: "Video", icon: Video },
   { to: "/studio/music" as const, label: "Music", icon: Music },
@@ -42,7 +44,7 @@ export function SignedInHomeBody() {
 
   const planId = (profile?.plan ?? "free") as PlanId;
   const firstName = profile?.display_name ? profile.display_name.split(" ")[0] : "";
-  const credits = isAdmin ? "∞" : (profile?.credits ?? 0).toLocaleString();
+  const credits = isAdmin ? "\u221e" : (profile?.credits ?? 0).toLocaleString();
   const videoOk = canAccessVideo({ plan: planId, email: profile?.email, isAdmin });
   const musicOk = canAccessMusic({ plan: planId, email: profile?.email, isAdmin });
 
@@ -120,18 +122,24 @@ export function SignedInHomeBody() {
 
       <FilterLensHomeSection />
 
+      <ExploreLensesSection />
+
+      <ObserveBuildProtect />
+
+      <HomePromptBar />
+
       <Link
         to="/studio/image/auto-edit"
         className="group relative mt-8 block overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-4 shadow-md transition-all duration-300 hover:scale-[1.01] hover:border-primary/70 hover:shadow-[0_8px_32px_hsl(24_95%_53%/0.22)] active:scale-[0.99] sm:p-5"
       >
         <div className="flex items-center gap-4">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-base font-black text-primary-foreground shadow-[0_0_20px_hsl(24_95%_53%/0.4)] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-[-3deg] sm:h-14 sm:w-14 sm:text-lg">
-            A✦
+            A\u2726
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-base font-bold sm:text-lg">Auto Edit</p>
             <p className="text-xs text-muted-foreground sm:text-sm">
-              One photo · no prompt · Motio2AI decides
+              One photo \u00b7 no prompt \u00b7 Motio2AI decides
             </p>
           </div>
           <ArrowRight className="h-5 w-5 shrink-0 text-primary transition-transform duration-300 group-hover:translate-x-1" />
@@ -151,7 +159,7 @@ export function SignedInHomeBody() {
               )}
               {i < AUTO_EDIT_FLOW.length - 1 && (
                 <span className="text-[10px] text-primary/50 sm:hidden" aria-hidden>
-                  →
+                  \u2192
                 </span>
               )}
             </div>
