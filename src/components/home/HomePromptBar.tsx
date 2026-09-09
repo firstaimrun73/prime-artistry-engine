@@ -1,83 +1,65 @@
 /**
- * Homepage prompt bar — text + walking-man reference chips.
- * Multi-select refs with accuracy warning. Does not replace the full editor.
+ * Homepage example — Motion2AI multi-reference demo (not a fillable form).
+ * One technical prompt + five walking-man refs show how Motion2AI binds multiple images.
  */
-import { useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { ImagePlus, Sparkles, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
 import {
   WALKING_MAN_SAMPLES,
-  REFERENCE_ACCURACY_NOTE,
 } from "@/lib/samples/walking-man";
 import { cn } from "@/lib/utils";
 
+/** Technical prompt derived from: walking man on a road, alone surroundings */
+export const MOTION2AI_EXAMPLE_PROMPT =
+  "Subject: solitary walking man on an empty rural road. Preserve identity, gait, and clothing across all reference frames. Environment: alone surroundings — open path, muted sky, distant hills, no crowd. Camera: natural lens, eye-level tracking, mild motion blur on limbs, locked horizon. Motion2AI: fuse multiple reference images into one coherent motion sequence; primary ref drives pose continuity, secondary refs guide style and wardrobe only.";
+
+const SCROLL_HIDE =
+  "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden";
+
 export function HomePromptBar() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [prompt, setPrompt] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
-
-  const toggle = (id: string) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  };
-
-  const go = () => {
-    try {
-      if (prompt.trim()) sessionStorage.setItem("motio2edit-home-prompt", prompt.trim());
-      if (selected.length) sessionStorage.setItem("motio2edit-home-refs", JSON.stringify(selected));
-      sessionStorage.setItem("motio2edit-mode", "image");
-    } catch {
-      /* ignore */
-    }
-    if (!user) {
-      void navigate({ to: "/auth", search: { redirect: "/editor" } });
-      return;
-    }
-    void navigate({ to: "/editor" });
-  };
-
   return (
     <section
-      className="mt-12 rounded-3xl border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur-sm sm:p-6"
+      className="mt-12 rounded-3xl border border-border/80 bg-card/90 p-4 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-card/70 sm:p-6"
       data-home-section="prompt-bar"
     >
       <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary" />
-        <h2 className="text-sm font-extrabold tracking-tight">Describe & reference</h2>
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-primary">
+          <span className="text-sm font-black">✦</span>
+        </span>
+        <h2 className="text-base font-extrabold tracking-tight text-foreground sm:text-lg">
+          Motion2AI · multi-reference example
+        </h2>
       </div>
-      <p className="mt-1 text-[11px] text-muted-foreground">
-        One primary reference is best for accuracy. Motion2AI can use extra refs for style — too many
-        lowers consistency.
+
+      <p className="mt-2 text-[12px] font-semibold leading-relaxed text-foreground/90 dark:text-white/85 sm:text-[13px]">
+        One prompt can attach several photos. Ordinary multi-model stacks often fight each other —
+        Motion2AI binds them as a single motion engine so identity, gait, and scene stay consistent.
       </p>
 
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        rows={3}
-        placeholder="Describe motion, pose, clothing, camera angle, background, and style…"
-        className="mt-3 w-full resize-none rounded-2xl border border-border bg-background/80 px-3 py-2.5 text-sm outline-none focus:border-primary/50"
-      />
+      <div
+        className={cn(
+          "mt-4 rounded-2xl border border-primary/25 bg-primary/5 px-3.5 py-3",
+          "dark:border-orange-500/30 dark:bg-orange-500/10",
+        )}
+        role="note"
+        aria-label="Example technical prompt"
+      >
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary dark:text-orange-300">
+          Example prompt (read-only)
+        </p>
+        <p className="mt-2 text-[13px] font-bold leading-snug text-foreground dark:text-white sm:text-sm">
+          {MOTION2AI_EXAMPLE_PROMPT}
+        </p>
+      </div>
 
-      <p className="mt-3 text-[11px] font-semibold text-muted-foreground">Walking references</p>
-      <div className="mt-2 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {WALKING_MAN_SAMPLES.map((s) => {
-          const on = selected.includes(s.id);
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => toggle(s.id)}
-              className={cn(
-                "relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border transition",
-                on ? "border-primary ring-2 ring-primary/40" : "border-border opacity-90 hover:opacity-100",
-              )}
-              aria-pressed={on}
-              aria-label={s.alt}
-            >
+      <p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        Walking references · 5 frames · one engine
+      </p>
+      <div className={cn("mt-2 flex gap-3 overflow-x-auto pb-1", SCROLL_HIDE)}>
+        {WALKING_MAN_SAMPLES.map((s, i) => (
+          <figure
+            key={s.id}
+            className="w-[42%] max-w-[160px] shrink-0 sm:w-[28%] sm:max-w-[180px]"
+          >
+            <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border/80 bg-muted shadow-md dark:border-white/10">
               <img
                 src={s.url}
                 alt={s.alt}
@@ -88,52 +70,21 @@ export function HomePromptBar() {
                   (e.currentTarget as HTMLImageElement).style.opacity = "0.3";
                 }}
               />
-              {on && (
-                <span className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full bg-primary text-[9px] text-primary-foreground">
-                  ✓
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {selected.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {selected.map((id) => {
-            const s = WALKING_MAN_SAMPLES.find((x) => x.id === id);
-            if (!s) return null;
-            return (
-              <span
-                key={id}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px]"
-              >
-                {s.label}
-                <button type="button" onClick={() => toggle(id)} aria-label={`Remove ${s.label}`}>
-                  <X className="h-3 w-3" />
-                </button>
+              <span className="absolute left-1.5 top-1.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+                Ref {i + 1}
               </span>
-            );
-          })}
-        </div>
-      )}
-
-      {selected.length >= 3 && (
-        <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-400">{REFERENCE_ACCURACY_NOTE}</p>
-      )}
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button type="button" className="rounded-full" onClick={go}>
-          <Sparkles className="mr-1.5 h-4 w-4" />
-          Open Image Studio
-        </Button>
-        <Button type="button" variant="outline" className="rounded-full" asChild>
-          <Link to={user ? "/studio/image/lens-editor" : "/auth"} search={user ? undefined : { redirect: "/studio/image/lens-editor" }}>
-            <ImagePlus className="mr-1.5 h-4 w-4" />
-            Lens camera
-          </Link>
-        </Button>
+            </div>
+            <figcaption className="mt-1.5 truncate text-center text-[11px] font-semibold text-foreground/80">
+              {s.label}
+            </figcaption>
+          </figure>
+        ))}
       </div>
+
+      <p className="mt-3 text-[11px] font-medium leading-relaxed text-muted-foreground dark:text-white/50">
+        Demo only — shows how Motion2AI can run one technical prompt across multiple stills.
+        Open Image Studio or Lens from Quick create when you want to generate on your own photos.
+      </p>
     </section>
   );
 }
