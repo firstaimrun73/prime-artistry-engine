@@ -24,6 +24,7 @@ import { ExploreLensesSection } from "@/components/home/ExploreLensesSection";
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
+import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
 const QUICK_CREATE = [
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
@@ -35,8 +36,6 @@ const QUICK_CREATE = [
   { to: "/studio/image/lens-editor" as const, label: "Lenses", icon: Aperture },
 ] as const;
 
-const AUTO_EDIT_FLOW = ["Input", "AI analysis", "One click", "Editing", "Output"] as const;
-
 export function SignedInHomeBody() {
   const { profile } = useAuth();
   const { t } = useI18n();
@@ -44,7 +43,7 @@ export function SignedInHomeBody() {
 
   const planId = (profile?.plan ?? "free") as PlanId;
   const firstName = profile?.display_name ? profile.display_name.split(" ")[0] : "";
-  const credits = isAdmin ? "\u221e" : (profile?.credits ?? 0).toLocaleString();
+  const credits = isAdmin ? "∞" : (profile?.credits ?? 0).toLocaleString();
   const videoOk = canAccessVideo({ plan: planId, email: profile?.email, isAdmin });
   const musicOk = canAccessMusic({ plan: planId, email: profile?.email, isAdmin });
 
@@ -75,7 +74,7 @@ export function SignedInHomeBody() {
         <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
           Quick create
         </h2>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {QUICK_CREATE.map((q) => {
             const Icon = q.icon;
             const locked =
@@ -128,44 +127,7 @@ export function SignedInHomeBody() {
 
       <HomePromptBar />
 
-      <Link
-        to="/studio/image/auto-edit"
-        className="group relative mt-8 block overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-4 shadow-md transition-all duration-300 hover:scale-[1.01] hover:border-primary/70 hover:shadow-[0_8px_32px_hsl(24_95%_53%/0.22)] active:scale-[0.99] sm:p-5"
-      >
-        <div className="flex items-center gap-4">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-base font-black text-primary-foreground shadow-[0_0_20px_hsl(24_95%_53%/0.4)] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-[-3deg] sm:h-14 sm:w-14 sm:text-lg">
-            A\u2726
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-bold sm:text-lg">Auto Edit</p>
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              One photo \u00b7 no prompt \u00b7 Motio2AI decides
-            </p>
-          </div>
-          <ArrowRight className="h-5 w-5 shrink-0 text-primary transition-transform duration-300 group-hover:translate-x-1" />
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
-          {AUTO_EDIT_FLOW.map((step, i) => (
-            <div key={step} className="flex items-center gap-1.5 sm:gap-2">
-              <span className="rounded-full border border-primary/30 bg-background/70 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-foreground/90 shadow-sm backdrop-blur-sm sm:text-[11px]">
-                {step}
-              </span>
-              {i < AUTO_EDIT_FLOW.length - 1 && (
-                <span
-                  className="hidden h-px w-3 border-t border-dashed border-primary/40 sm:block sm:w-4"
-                  aria-hidden
-                />
-              )}
-              {i < AUTO_EDIT_FLOW.length - 1 && (
-                <span className="text-[10px] text-primary/50 sm:hidden" aria-hidden>
-                  \u2192
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </Link>
+      <AutoEditHomeCard />
     </main>
   );
 }
