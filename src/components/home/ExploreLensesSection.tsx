@@ -1,7 +1,5 @@
 /**
- * Homepage — Explore AI Lenses
- * Circular 1:1 R2 samples → deep-link to Lens Editor (user uploads own image).
- * Free users: locked previews + upgrade CTA.
+ * Homepage — Explore AI Lenses (max 7 on home + more CTA).
  */
 import { Link } from "@tanstack/react-router";
 import { Aperture, ArrowRight, Lock } from "lucide-react";
@@ -15,7 +13,9 @@ export function ExploreLensesSection() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
-  const cards = getLensSampleCards();
+  const allCards = getLensSampleCards();
+  const cards = allCards.slice(0, 7);
+  const moreCount = Math.max(0, allCards.length - cards.length);
 
   return (
     <section className="mt-12 space-y-4" data-home-section="explore-lenses">
@@ -30,17 +30,11 @@ export function ExploreLensesSection() {
           </p>
         </div>
         {paid ? (
-          <Link
-            to="/studio/image/lens-editor"
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary"
-          >
+          <Link to="/studio/image/lens-editor" className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary">
             Open Lens <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         ) : (
-          <Link
-            to="/pricing"
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary"
-          >
+          <Link to="/pricing" className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary">
             Unlock <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         )}
@@ -53,7 +47,7 @@ export function ExploreLensesSection() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7">
         {cards.map((c) => {
           const inner = (
             <>
@@ -80,22 +74,14 @@ export function ExploreLensesSection() {
                   </span>
                 )}
               </div>
-              <p className="mt-2 truncate text-center text-[11px] font-semibold leading-tight">
-                {c.name}
-              </p>
+              <p className="mt-2 truncate text-center text-[11px] font-semibold leading-tight">{c.name}</p>
               <p className="truncate text-center text-[10px] text-muted-foreground">{c.about}</p>
             </>
           );
 
           if (!paid) {
             return (
-              <Link
-                key={c.id}
-                to="/pricing"
-                className={cn(
-                  "rounded-2xl border border-border/70 bg-card/60 p-2.5 text-center transition hover:border-primary/35",
-                )}
-              >
+              <Link key={c.id} to="/pricing" className={cn("rounded-2xl border border-border/70 bg-card/60 p-2.5 text-center transition hover:border-primary/35")}>
                 {inner}
               </Link>
             );
@@ -117,6 +103,16 @@ export function ExploreLensesSection() {
           );
         })}
       </div>
+
+      {moreCount > 0 && (
+        <Link
+          to={paid ? "/studio/image/lenses" : "/pricing"}
+          className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-primary/35 bg-primary/5 px-4 py-3 text-center text-[12px] font-semibold text-primary transition hover:border-primary/55 hover:bg-primary/10"
+        >
+          +{moreCount} more lenses made by Motion2AI
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      )}
 
       <p className="text-center text-[10px] text-muted-foreground">
         Selecting a lens opens the camera editor. You always upload or capture your own photo.
