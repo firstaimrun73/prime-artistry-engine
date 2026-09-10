@@ -2,6 +2,7 @@
  * Motio2edit Lens — Snapchat-style camera.
  * - Idle: only floating glass upload label over dark canvas (no carousel, no badges).
  * - Image loaded: shutter IS the lens selector (indicator on shutter, swipe near it cycles).
+ * - Floating lens circles (R2 visuals, no names) beside/above shutter.
  * - Shutter tap commits → dedicated result screen with CompareSlider, Download, Share.
  * - Native aspect always preserved. No generic toasts; glass labels only.
  * - Shutter shows R2 circular sample for current lens. Watermark toggle on result. Free users gated.
@@ -193,7 +194,7 @@ export function LensEditor({ initialLensId }: Props) {
         swipeIndex.current = CAMERA_LENS_ROSTER.findIndex((l) => l.id === firstFree.id);
       }
     }
-    setGlassMsg("Image ready · swipe shutter to change lens");
+    setGlassMsg("Image ready · swipe or tap a lens");
   };
 
   const clear = () => {
@@ -274,7 +275,7 @@ export function LensEditor({ initialLensId }: Props) {
       return;
     }
     if (!lens) {
-      setGlassMsg("Swipe to select a lens first");
+      setGlassMsg("Pick a lens first");
       return;
     }
     try {
@@ -407,19 +408,19 @@ export function LensEditor({ initialLensId }: Props) {
           <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.16em] text-amber-300/90 backdrop-blur-md">
             MOTIO2EDIT
           </span>
-          {phase !== "idle" && (
-            <>
-              <span className="mt-1 text-sm font-bold tracking-tight">{lens?.name ?? "Lens"}</span>
-              <span className="max-w-[220px] truncate text-center text-[11px] text-zinc-400">
-                {lens?.shortDescription ?? "Swipe shutter to change lens"}
-              </span>
-            </>
+          {phase !== "idle" && phase !== "result" && (
+            <span className="mt-1 text-[10px] font-medium tracking-wide text-zinc-500">
+              Lenses
+            </span>
+          )}
+          {phase === "result" && (
+            <span className="mt-1 text-sm font-bold tracking-tight">{lens?.name ?? "Lens"}</span>
           )}
         </div>
         <div className="w-10" aria-hidden />
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3 pb-44 pt-16">
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3 pb-52 pt-16">
         {phase === "idle" && (
           <button
             type="button"
@@ -435,11 +436,11 @@ export function LensEditor({ initialLensId }: Props) {
             <img
               src={stillSrc}
               alt={lens?.name ?? "Photo"}
-              className="mx-auto max-h-[min(58dvh,600px)] w-auto object-contain"
+              className="mx-auto max-h-[min(52dvh,560px)] w-auto object-contain"
             />
             {phase === "ready" && lens && (
               <p className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/50 px-3 py-1 text-[10px] text-white/90 backdrop-blur-md">
-                Preview · tap shutter to commit
+                Preview · tap shutter
                 {isAiLens(lens) ? ` · ${lens.creditCost} cr` : " · free"}
               </p>
             )}
@@ -475,7 +476,7 @@ export function LensEditor({ initialLensId }: Props) {
                   });
                   setPreviewUrl(null);
                   setPhase("ready");
-                  setGlassMsg("Swipe shutter for another lens");
+                  setGlassMsg("Swipe or tap a lens");
                 }}
                 className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/50 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-xl"
               >
@@ -520,10 +521,64 @@ export function LensEditor({ initialLensId }: Props) {
       </div>
 
       {phase !== "idle" && phase !== "result" && (
-        <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-3 bg-gradient-to-t from-zinc-950 via-zinc-950/95 to-transparent px-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-12">
-          <p className="text-[10px] text-zinc-500">Swipe left / right on shutter to change lens</p>
+        <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-2 bg-gradient-to-t from-zinc-950 via-zinc-950/95 to-transparent px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
+          {/* Snapchat-style floating lens circles — visuals only, no names */}
+          <div className="w-full overflow-x-auto overflow-y-visible px-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mx-auto flex w-max items-center gap-3 py-1">
+              {CAMERA_LENS_ROSTER.map((l) => {
+                const active = lens?.id === l.id;
+                const img = sampleByLensId.get(l.id);
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => {
+                      setLensId(l.id);
+                      const idx = CAMERA_LENS_ROSTER.findIndex((x) => x.id === l.id);
+                      if (idx >= 0) swipeIndex.current = idx;
+                      setResultUrl((prev) => {
+                        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+                        return null;
+                      });
+                      setPreviewUrl(null);
+                      setPhase((p) => (p === "result" || p === "processing" ? "ready" : p));
+                      previewBusy.current = false;
+                    }}
+                    className={cn(
+                      "relative shrink-0 overflow-hidden rounded-full border-2 transition-all duration-200 active:scale-90",
+                      active
+                        ? "h-14 w-14 border-white shadow-[0_0_16px_rgba(255,255,255,0.35)]"
+                        : "h-11 w-11 border-white/25 opacity-80",
+                    )}
+                    style={
+                      active
+                        ? { boxShadow: `0 0 0 2px ${l.color}, 0 0 18px ${l.color}99` }
+                        : undefined
+                    }
+                    aria-label={l.name}
+                    aria-pressed={active}
+                  >
+                    {img ? (
+                      <img src={img} alt="" className="h-full w-full object-cover" draggable={false} />
+                    ) : (
+                      <span
+                        className="grid h-full w-full place-items-center text-[10px] font-bold text-white"
+                        style={{ background: l.color }}
+                      >
+                        {l.code}
+                      </span>
+                    )}
+                    {l.tier === "ai" && (
+                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-zinc-950 bg-amber-400" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-          <div className="flex items-center justify-center gap-10">
+          {/* Shutter row */}
+          <div className="flex w-full items-center justify-center gap-10 px-3">
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
@@ -578,9 +633,6 @@ export function LensEditor({ initialLensId }: Props) {
                   </span>
                 )}
               </button>
-              <p className="mt-2 max-w-[120px] truncate text-center text-[11px] font-semibold text-zinc-300">
-                {lens?.name ?? "—"}
-              </p>
             </div>
 
             <div className="w-11" aria-hidden />
@@ -590,7 +642,7 @@ export function LensEditor({ initialLensId }: Props) {
 
       {glassMsg && (
         <GlassLabel
-          className="bottom-[max(7.5rem,env(safe-area-inset-bottom)+6rem)]"
+          className="bottom-[max(9rem,env(safe-area-inset-bottom)+7.5rem)]"
           onDismiss={() => setGlassMsg(null)}
         >
           {glassMsg}
