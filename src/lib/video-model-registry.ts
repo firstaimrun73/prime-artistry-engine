@@ -87,3 +87,30 @@ export function estimateModelCredits(_opts: {
 }): number {
   return MIN_VIDEO_CREDITS;
 }
+
+/** @deprecated Legacy style modifiers — keep for prompt enrichment only */
+export const VIDEO_STYLE_MODIFIERS: Record<string, string> = {
+  classic: "classic film look, natural color grading",
+  retro: "retro 1980s aesthetic, soft grain, warm tones",
+  vintage: "vintage film stock, faded colors, subtle scratches",
+  cinematic: "cinematic lighting, anamorphic lens, shallow depth of field",
+  documentary: "documentary style, handheld feel, natural light",
+  anime: "anime style, clean lines, vibrant colors",
+  film: "35mm film photography look, rich contrast",
+  product: "product commercial, clean studio lighting, sharp detail",
+  social: "vertical social media style, bold colors, energetic",
+};
+
+export function applyVideoStyle(prompt: string, styleId: string | null | undefined): string {
+  if (!styleId || !VIDEO_STYLE_MODIFIERS[styleId]) return prompt;
+  const mod = VIDEO_STYLE_MODIFIERS[styleId];
+  const p = prompt.trim();
+  if (!p) return mod;
+  if (p.toLowerCase().includes(mod.split(",")[0].toLowerCase())) return p;
+  return `${p}. ${mod}.`;
+}
+
+/** @deprecated Use getApprovedModel */
+export function getVideoModel(id: string) {
+  return getApprovedModel(id);
+}
