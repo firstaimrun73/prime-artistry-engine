@@ -9,6 +9,7 @@
  * No schema migration required for Phase C scaffold.
  *
  * Idempotency: same idempotencyKey returns the same in-flight quote.
+ * Atomic concurrency: deduct_credits updates only when credits >= amount.
  */
 
 import { randomUUID } from "node:crypto";
@@ -153,6 +154,7 @@ export async function reserveCreditsForQuote(
     return quote;
   }
 
+  // Atomic: only succeeds when profiles.credits >= amount (no negative balance).
   const { data, error } = await admin.rpc("deduct_credits", {
     _amount: quote.customerCredits,
     _gen_type: `${quote.product}_reservation`,
@@ -187,6 +189,7 @@ export async function releaseReservation(
   admin: SupabaseAdmin,
   quote: GenerationQuote,
 ): Promise<GenerationQuote> {
+  // Idempotent: already terminal → no second refund.
   if (quote.status === "released" || quote.status === "finalized") {
     return quote;
   }
@@ -205,6 +208,9 @@ export async function releaseReservation(
 }
 
 export function markGenerating(quote: GenerationQuote): GenerationQuote {
+  if (quote.status === "generating") {
+    return quote;
+  }
   if (quote.status !== "reserved") {
     throw new Error(`QUOTE_INVALID_STATUS:${quote.status}`);
   }
@@ -217,7 +223,11 @@ export function finalizeQuote(
   quote: GenerationQuote,
   opts?: { finalProviderCogsUsd?: number; finalCredits?: number },
 ): GenerationQuote {
-  if (quote.status !== "generating" && quote.status !== "reserved") {
+  // Idempotent: already finalized → return as-is (no second charge).
+  if (quote.status === "finalized") {
+    return quote;
+  }
+  if (quote.status !== "generating" && quote.status !== "reserved" && quote.status !== "succeeded") {
     throw new Error(`QUOTE_INVALID_STATUS:${quote.status}`);
   }
   quote.status = "finalized";
@@ -251,4 +261,22 @@ export function setQuoteStatus(quoteId: string, status: QuoteStatus): void {
 export function _clearQuoteStoreForTests(): void {
   quoteStore.clear();
   idempotencyIndex.clear();
+}
+
+/**
+ * Mark expired quoted/reserved quotes. Does not auto-refund without admin —
+ * caller must releaseReservation when a reservationTxId is present.
+ */
+export function expireStaleQuotes(nowMs: number = Date.now()): GenerationQuote[] {
+  const expired: GenerationQuote[] = [];
+  for (const q of quoteStore.values()) {
+    if (q.status === "quoted" || q.status === "reserved") {
+      if (new Date(q.expiresAt).getTime() < nowMs) {
+        q.status = "expired";
+        quoteStore.set(q.quoteId, q);
+        expired.push(q);
+      }
+    }
+  }
+  return expired;
 }
