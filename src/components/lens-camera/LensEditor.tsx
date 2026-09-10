@@ -1,15 +1,11 @@
 /**
  * Motio2edit Lens — Snapchat-style camera.
- * - Idle: only floating glass upload label over dark canvas (no carousel, no badges).
- * - Image loaded: shutter IS the lens selector (indicator on shutter, swipe near it cycles).
- * - Floating lens circles (R2 visuals, no names) beside/above shutter.
- * - Shutter tap commits → dedicated result screen with CompareSlider, Download, Share.
- * - Native aspect always preserved. No generic toasts; glass labels only.
- * - Shutter shows R2 circular sample for current lens. Watermark toggle on result. Free users gated.
+ * Clean surface: MOTIO2EDIT + floating lens circles only.
+ * Info (i) for name/credits. Camera + gallery. Watermark final-only.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Download, ImagePlus, Loader2, RotateCcw, Share2, X } from "lucide-react";
+import { ArrowLeft, Camera, Download, ImagePlus, Info, Loader2, RotateCcw, Share2, X } from "lucide-react";
 import { Header } from "@/components/Header";
 import { CompareSlider } from "@/components/CompareSlider";
 import { useAuth } from "@/lib/auth";
@@ -66,33 +62,6 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function GlassLabel({
-  children,
-  className,
-  onDismiss,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  onDismiss?: () => void;
-}) {
-  useEffect(() => {
-    if (!onDismiss) return;
-    const t = window.setTimeout(onDismiss, 2200);
-    return () => window.clearTimeout(t);
-  }, [onDismiss]);
-  return (
-    <div
-      className={cn(
-        "pointer-events-none absolute left-1/2 z-40 -translate-x-1/2 rounded-full border border-white/20 bg-black/55 px-3.5 py-1.5 text-[11px] font-medium text-white/95 shadow-lg backdrop-blur-xl",
-        className,
-      )}
-      role="status"
-    >
-      {children}
-    </div>
-  );
-}
-
 type Props = { initialLensId?: string | null };
 
 export function LensEditor({ initialLensId }: Props) {
@@ -105,6 +74,8 @@ export function LensEditor({ initialLensId }: Props) {
     return m;
   }, []);
   const [watermarkOn, setWatermarkOn] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
+  const [nameChip, setNameChip] = useState<string | null>(null);
 
   const [lensId, setLensId] = useState<string | null>(() =>
     initialLensId && getCameraLensById(initialLensId) ? initialLensId : null,
@@ -122,7 +93,6 @@ export function LensEditor({ initialLensId }: Props) {
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [glassMsg, setGlassMsg] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const processingRef = useRef(false);
@@ -130,17 +100,49 @@ export function LensEditor({ initialLensId }: Props) {
   const shutterAreaRef = useRef<HTMLDivElement>(null);
   const swipeStartX = useRef<number | null>(null);
   const swipeIndex = useRef(0);
+  const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const chipTimer = useRef<number | null>(null);
 
   const goHome = useCallback(() => {
     void navigate({ to: "/", replace: true });
   }, [navigate]);
 
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
+
+  const flashName = useCallback((name: string) => {
+    setNameChip(name);
+    if (chipTimer.current) window.clearTimeout(chipTimer.current);
+    chipTimer.current = window.setTimeout(() => setNameChip(null), 1400);
+  }, []);
+
+  const selectLens = useCallback(
+    (id: string) => {
+      setLensId(id);
+      const idx = CAMERA_LENS_ROSTER.findIndex((x) => x.id === id);
+      if (idx >= 0) swipeIndex.current = idx;
+      const def = getCameraLensById(id);
+      if (def) flashName(def.name);
+      setResultUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setPreviewUrl(null);
+      setPhase((p) => (p === "result" || p === "processing" ? "ready" : p));
+      previewBusy.current = false;
+      setShowInfo(false);
+    },
+    [flashName],
+  );
+
   useEffect(() => {
     if (!sourceUrl || !lens || phase === "processing" || phase === "idle" || phase === "result") {
-      if (!lens && previewUrl) {
-        if (previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(null);
-      }
       return;
     }
     let cancelled = false;
@@ -175,11 +177,49 @@ export function LensEditor({ initialLensId }: Props) {
     };
   }, [lens, sourceUrl, phase]);
 
-  const onPick = (file: File | null) => {
-    if (!file || !file.type.startsWith("image/")) {
-      setGlassMsg("Please choose an image");
-      return;
+  const startCamera = async () => {
+    try {
+      stopCamera();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
+      setSourceUrl(null);
+      setResultUrl(null);
+      setPreviewUrl(null);
+      setPhase("ready");
+      if (!lensId) {
+        const first = CAMERA_LENS_ROSTER.find((l) => l.tier === "normal") ?? CAMERA_LENS_ROSTER[0];
+        if (first) selectLens(first.id);
+      }
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.playsInline = true;
+      video.muted = true;
+      await video.play();
+      await new Promise((r) => setTimeout(r, 450));
+      if (video.videoWidth < 2) {
+        stopCamera();
+        inputRef.current?.click();
+        return;
+      }
+      const c = document.createElement("canvas");
+      c.width = video.videoWidth;
+      c.height = video.videoHeight;
+      c.getContext("2d")!.drawImage(video, 0, 0);
+      const blob = await canvasToBlob(c, "image/jpeg", 0.92);
+      stopCamera();
+      setSourceUrl(URL.createObjectURL(blob));
+    } catch {
+      inputRef.current?.click();
     }
+  };
+
+  const onPick = (file: File | null) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    stopCamera();
     if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
     if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
     if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
@@ -188,16 +228,13 @@ export function LensEditor({ initialLensId }: Props) {
     setSourceUrl(URL.createObjectURL(file));
     setPhase("ready");
     if (!lensId) {
-      const firstFree = CAMERA_LENS_ROSTER.find((l) => l.tier === "normal") ?? CAMERA_LENS_ROSTER[0];
-      if (firstFree) {
-        setLensId(firstFree.id);
-        swipeIndex.current = CAMERA_LENS_ROSTER.findIndex((l) => l.id === firstFree.id);
-      }
+      const first = CAMERA_LENS_ROSTER.find((l) => l.tier === "normal") ?? CAMERA_LENS_ROSTER[0];
+      if (first) selectLens(first.id);
     }
-    setGlassMsg("Image ready · swipe or tap a lens");
   };
 
   const clear = () => {
+    stopCamera();
     if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
     if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
     if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
@@ -206,7 +243,8 @@ export function LensEditor({ initialLensId }: Props) {
     setPreviewUrl(null);
     setLensId(null);
     setPhase("idle");
-    setGlassMsg(null);
+    setNameChip(null);
+    setShowInfo(false);
   };
 
   const applyFromCanvas = async (canvas: HTMLCanvasElement, active: CameraLensDef) => {
@@ -214,10 +252,9 @@ export function LensEditor({ initialLensId }: Props) {
     playShutterClick();
     setPhase("processing");
     try {
-      let out = applyLensOpticalEnhanced(canvas, active, "native", {
-        watermark: watermarkOn && active.tier === "normal" && active.creditCost === 0,
-      });
-      if (watermarkOn && !(active.tier === "normal" && active.creditCost === 0)) {
+      let out = applyLensOpticalEnhanced(canvas, active, "native", { watermark: false });
+      const wantWm = !isPaid || watermarkOn;
+      if (wantWm) {
         out = applyFreeLensWatermark(out);
       }
       const blob = await canvasToBlob(out, "image/jpeg", 0.94);
@@ -228,12 +265,7 @@ export function LensEditor({ initialLensId }: Props) {
       if (isAiLens(active) && active.creditCost > 0) {
         const generationId = `lens_${active.id}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
         try {
-          const charged = await chargeLensGeneration({
-            data: { lensId: active.id, generationId },
-          });
-          if (charged?.charged) {
-            setGlassMsg(`${active.name} · ${charged.charged} credits`);
-          }
+          await chargeLensGeneration({ data: { lensId: active.id, generationId } });
         } catch (chargeErr) {
           URL.revokeObjectURL(url);
           URL.revokeObjectURL(srcUrl);
@@ -250,9 +282,9 @@ export function LensEditor({ initialLensId }: Props) {
         return url;
       });
       setPreviewUrl(null);
+      setNameChip(null);
       setPhase("result");
-    } catch (err) {
-      setGlassMsg(err instanceof Error ? err.message : "Lens failed");
+    } catch {
       setPhase(sourceUrl ? "ready" : "idle");
     } finally {
       processingRef.current = false;
@@ -265,7 +297,6 @@ export function LensEditor({ initialLensId }: Props) {
       return;
     }
     if (!isPaid) {
-      setGlassMsg("Lenses require an upgraded plan");
       navigate({ to: "/pricing" });
       return;
     }
@@ -274,10 +305,7 @@ export function LensEditor({ initialLensId }: Props) {
       inputRef.current?.click();
       return;
     }
-    if (!lens) {
-      setGlassMsg("Pick a lens first");
-      return;
-    }
+    if (!lens) return;
     try {
       const img = await loadImage(sourceUrl);
       const canvas = document.createElement("canvas");
@@ -285,8 +313,8 @@ export function LensEditor({ initialLensId }: Props) {
       canvas.height = img.naturalHeight;
       canvas.getContext("2d")!.drawImage(img, 0, 0);
       await applyFromCanvas(canvas, lens);
-    } catch (err) {
-      setGlassMsg(err instanceof Error ? err.message : "Lens failed");
+    } catch {
+      /* ignore */
     }
   };
 
@@ -300,17 +328,9 @@ export function LensEditor({ initialLensId }: Props) {
         if (found >= 0) idx = found;
       }
       idx = (idx + dir + list.length) % list.length;
-      swipeIndex.current = idx;
-      const next = list[idx];
-      setLensId(next.id);
-      setResultUrl((prev) => {
-        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-        return null;
-      });
-      setPhase((p) => (p === "result" || p === "processing" ? "ready" : p));
-      previewBusy.current = false;
+      selectLens(list[idx].id);
     },
-    [lensId],
+    [lensId, selectLens],
   );
 
   const onShutterPointerDown = (e: React.PointerEvent) => {
@@ -337,9 +357,8 @@ export function LensEditor({ initialLensId }: Props) {
     try {
       const name = (lens?.name ?? "lens").replace(/\s+/g, "-").toLowerCase();
       await triggerBrowserDownload(resultUrl, `motio2edit-${name}.jpg`);
-      setGlassMsg("Download started");
     } catch {
-      setGlassMsg("Download failed");
+      /* ignore */
     }
   };
 
@@ -350,10 +369,7 @@ export function LensEditor({ initialLensId }: Props) {
         const res = await fetch(resultUrl);
         const blob = await res.blob();
         const file = new File([blob], "motio2edit-lens.jpg", { type: "image/jpeg" });
-        await navigator.share({
-          files: [file],
-          title: lens?.name ?? "Motio2edit Lens",
-        });
+        await navigator.share({ files: [file], title: lens?.name ?? "Motio2edit Lens" });
       } else {
         await download();
       }
@@ -404,46 +420,57 @@ export function LensEditor({ initialLensId }: Props) {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div className="flex flex-col items-center">
-          <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.16em] text-amber-300/90 backdrop-blur-md">
-            MOTIO2EDIT
-          </span>
-          {phase !== "idle" && phase !== "result" && (
-            <span className="mt-1 text-[10px] font-medium tracking-wide text-zinc-500">
-              Lenses
-            </span>
-          )}
-          {phase === "result" && (
-            <span className="mt-1 text-sm font-bold tracking-tight">{lens?.name ?? "Lens"}</span>
-          )}
-        </div>
-        <div className="w-10" aria-hidden />
+        <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.16em] text-amber-300/90 backdrop-blur-md">
+          MOTIO2EDIT
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowInfo((v) => !v)}
+          className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-black/40 text-zinc-300 backdrop-blur-xl"
+          aria-label="Lens info"
+        >
+          <Info className="h-4 w-4" />
+        </button>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3 pb-52 pt-16">
+      {showInfo && lens && phase !== "idle" && (
+        <div className="absolute right-3 top-[max(3.5rem,env(safe-area-inset-top)+2.75rem)] z-40 max-w-[200px] rounded-2xl border border-white/15 bg-black/75 px-3 py-2 text-left shadow-xl backdrop-blur-xl">
+          <p className="text-[12px] font-semibold text-white">{lens.name}</p>
+          <p className="mt-0.5 text-[10px] text-zinc-400">{lens.shortDescription}</p>
+          <p className="mt-1 text-[10px] font-medium text-amber-300/90">
+            {isAiLens(lens) ? `${lens.creditCost} credits` : "Free"}
+          </p>
+        </div>
+      )}
+
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3 pb-56 pt-14">
         {phase === "idle" && (
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/20 bg-black/55 px-5 py-2.5 text-sm font-medium text-white/95 shadow-xl backdrop-blur-xl transition active:scale-95"
-          >
-            Upload your image here
-          </button>
+          <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="rounded-full border border-white/20 bg-black/55 px-5 py-2.5 text-sm font-medium text-white/95 shadow-xl backdrop-blur-xl transition active:scale-95"
+            >
+              Upload your image here
+            </button>
+            <button
+              type="button"
+              onClick={() => void startCamera()}
+              className="flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-4 py-2 text-xs font-medium text-zinc-200 backdrop-blur-xl"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              Open camera
+            </button>
+          </div>
         )}
 
         {(phase === "ready" || phase === "processing") && stillSrc && (
           <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-black/30 shadow-2xl">
             <img
               src={stillSrc}
-              alt={lens?.name ?? "Photo"}
+              alt=""
               className="mx-auto max-h-[min(52dvh,560px)] w-auto object-contain"
             />
-            {phase === "ready" && lens && (
-              <p className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/50 px-3 py-1 text-[10px] text-white/90 backdrop-blur-md">
-                Preview · tap shutter
-                {isAiLens(lens) ? ` · ${lens.creditCost} cr` : " · free"}
-              </p>
-            )}
             <button
               type="button"
               onClick={clear}
@@ -453,11 +480,16 @@ export function LensEditor({ initialLensId }: Props) {
               <X className="h-4 w-4" />
             </button>
             {phase === "processing" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50 backdrop-blur-sm">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                 <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
-                <p className="text-sm font-medium text-white">{lens?.name ?? "Processing"}</p>
               </div>
             )}
+          </div>
+        )}
+
+        {nameChip && phase === "ready" && (
+          <div className="pointer-events-none absolute left-1/2 top-[max(4.5rem,env(safe-area-inset-top)+3.5rem)] z-40 -translate-x-1/2 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[11px] font-medium text-white/95 shadow-lg backdrop-blur-xl">
+            {nameChip}
           </div>
         )}
 
@@ -476,7 +508,6 @@ export function LensEditor({ initialLensId }: Props) {
                   });
                   setPreviewUrl(null);
                   setPhase("ready");
-                  setGlassMsg("Swipe or tap a lens");
                 }}
                 className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/50 px-4 py-2.5 text-xs font-semibold text-white backdrop-blur-xl"
               >
@@ -502,12 +533,21 @@ export function LensEditor({ initialLensId }: Props) {
             </div>
             <button
               type="button"
-              onClick={() => setWatermarkOn((v) => !v)}
-              className={`mx-auto rounded-full border px-3 py-1.5 text-[10px] font-semibold ${
-                watermarkOn ? "border-white/30 bg-white/15 text-white" : "border-white/10 text-zinc-400"
-              }`}
+              disabled={!isPaid}
+              onClick={() => {
+                if (!isPaid) return;
+                setWatermarkOn((v) => !v);
+              }}
+              className={cn(
+                "mx-auto flex min-w-[140px] items-center justify-center gap-2 rounded-full border px-4 py-2 text-[11px] font-semibold",
+                !isPaid
+                  ? "cursor-not-allowed border-white/10 bg-black/40 text-zinc-500"
+                  : watermarkOn
+                    ? "border-white/30 bg-white/15 text-white"
+                    : "border-white/10 text-zinc-400",
+              )}
             >
-              Watermark {watermarkOn ? "On" : "Off"}
+              {!isPaid ? "Locked · " : ""}Watermark {watermarkOn ? "On" : "Off"}
             </button>
             <button
               type="button"
@@ -521,10 +561,9 @@ export function LensEditor({ initialLensId }: Props) {
       </div>
 
       {phase !== "idle" && phase !== "result" && (
-        <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-2 bg-gradient-to-t from-zinc-950 via-zinc-950/95 to-transparent px-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
-          {/* Snapchat-style floating lens circles — visuals only, no names */}
-          <div className="w-full overflow-x-auto overflow-y-visible px-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="mx-auto flex w-max items-center gap-3 py-1">
+        <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col items-center gap-2 bg-gradient-to-t from-zinc-950 via-zinc-950/95 to-transparent pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8">
+          <div className="w-full overflow-x-auto px-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mx-auto flex w-max items-center gap-2.5 py-1">
               {CAMERA_LENS_ROSTER.map((l) => {
                 const active = lens?.id === l.id;
                 const img = sampleByLensId.get(l.id);
@@ -532,28 +571,13 @@ export function LensEditor({ initialLensId }: Props) {
                   <button
                     key={l.id}
                     type="button"
-                    onClick={() => {
-                      setLensId(l.id);
-                      const idx = CAMERA_LENS_ROSTER.findIndex((x) => x.id === l.id);
-                      if (idx >= 0) swipeIndex.current = idx;
-                      setResultUrl((prev) => {
-                        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-                        return null;
-                      });
-                      setPreviewUrl(null);
-                      setPhase((p) => (p === "result" || p === "processing" ? "ready" : p));
-                      previewBusy.current = false;
-                    }}
+                    onClick={() => selectLens(l.id)}
                     className={cn(
-                      "relative shrink-0 overflow-hidden rounded-full border-2 transition-all duration-200 active:scale-90",
-                      active
-                        ? "h-14 w-14 border-white shadow-[0_0_16px_rgba(255,255,255,0.35)]"
-                        : "h-11 w-11 border-white/25 opacity-80",
+                      "relative shrink-0 overflow-hidden rounded-full border-2 transition-transform duration-200 active:scale-90",
+                      active ? "h-[52px] w-[52px] border-white" : "h-10 w-10 border-white/25 opacity-75",
                     )}
                     style={
-                      active
-                        ? { boxShadow: `0 0 0 2px ${l.color}, 0 0 18px ${l.color}99` }
-                        : undefined
+                      active ? { boxShadow: `0 0 0 2px ${l.color}, 0 0 14px ${l.color}88` } : undefined
                     }
                     aria-label={l.name}
                     aria-pressed={active}
@@ -562,14 +586,14 @@ export function LensEditor({ initialLensId }: Props) {
                       <img src={img} alt="" className="h-full w-full object-cover" draggable={false} />
                     ) : (
                       <span
-                        className="grid h-full w-full place-items-center text-[10px] font-bold text-white"
+                        className="grid h-full w-full place-items-center text-[9px] font-bold text-white"
                         style={{ background: l.color }}
                       >
                         {l.code}
                       </span>
                     )}
                     {l.tier === "ai" && (
-                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-zinc-950 bg-amber-400" />
+                      <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border border-zinc-950 bg-amber-400" />
                     )}
                   </button>
                 );
@@ -577,20 +601,19 @@ export function LensEditor({ initialLensId }: Props) {
             </div>
           </div>
 
-          {/* Shutter row */}
-          <div className="flex w-full items-center justify-center gap-10 px-3">
+          <div className="flex h-[96px] w-full items-center justify-center gap-10 px-3">
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="grid h-11 w-11 place-items-center rounded-full border border-white/15 bg-black/40 text-zinc-300 backdrop-blur-xl"
-              aria-label="Upload photo"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/15 bg-black/40 text-zinc-300 backdrop-blur-xl"
+              aria-label="Gallery"
             >
               <ImagePlus className="h-5 w-5" />
             </button>
 
             <div
               ref={shutterAreaRef}
-              className="relative touch-none select-none"
+              className="relative shrink-0 touch-none select-none"
               onPointerDown={onShutterPointerDown}
               onPointerMove={onShutterPointerMove}
               onPointerUp={onShutterPointerUp}
@@ -600,20 +623,17 @@ export function LensEditor({ initialLensId }: Props) {
                 type="button"
                 onClick={() => void applyLens()}
                 disabled={phase === "processing" || !lens}
-                className="relative grid h-[84px] w-[84px] place-items-center rounded-full transition active:scale-90 disabled:opacity-40"
-                aria-label={lens ? `Apply ${lens.name}` : "Select lens"}
+                className="relative grid h-[84px] w-[84px] place-items-center rounded-full transition-transform active:scale-90 disabled:opacity-40"
+                aria-label="Shutter"
                 style={{
-                  boxShadow: `0 0 0 3px ${ringColor}, 0 0 28px ${ringColor}88, inset 0 1px 0 rgba(255,255,255,0.4)`,
+                  boxShadow: `0 0 0 3px ${ringColor}, 0 0 24px ${ringColor}77`,
                   background: `linear-gradient(145deg, ${ringColor}55, ${ringColor}22)`,
-                  backdropFilter: "blur(12px)",
                 }}
               >
                 <span
-                  className="relative grid h-[64px] w-[64px] place-items-center overflow-hidden rounded-full text-[13px] font-bold text-white"
+                  className="grid h-[64px] w-[64px] place-items-center overflow-hidden rounded-full"
                   style={{
-                    background: `linear-gradient(160deg, ${ringColor}ee 0%, ${ringColor} 55%, ${ringColor}aa 100%)`,
-                    boxShadow:
-                      "inset 0 2px 4px rgba(255,255,255,0.45), inset 0 -2px 6px rgba(0,0,0,0.25)",
+                    background: `linear-gradient(160deg, ${ringColor}ee, ${ringColor})`,
                   }}
                 >
                   {lens && sampleByLensId.get(lens.id) ? (
@@ -623,30 +643,21 @@ export function LensEditor({ initialLensId }: Props) {
                       className="h-full w-full object-cover"
                       draggable={false}
                     />
-                  ) : (
-                    lens?.code ?? "·"
-                  )}
+                  ) : null}
                 </span>
-                {lens && isAiLens(lens) && (
-                  <span className="absolute -bottom-1 left-1/2 z-[1] -translate-x-1/2 rounded-full bg-amber-500 px-1.5 text-[8px] font-bold leading-3 text-white shadow">
-                    AI
-                  </span>
-                )}
               </button>
             </div>
 
-            <div className="w-11" aria-hidden />
+            <button
+              type="button"
+              onClick={() => void startCamera()}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/15 bg-black/40 text-zinc-300 backdrop-blur-xl"
+              aria-label="Camera"
+            >
+              <Camera className="h-5 w-5" />
+            </button>
           </div>
         </div>
-      )}
-
-      {glassMsg && (
-        <GlassLabel
-          className="bottom-[max(9rem,env(safe-area-inset-bottom)+7.5rem)]"
-          onDismiss={() => setGlassMsg(null)}
-        >
-          {glassMsg}
-        </GlassLabel>
       )}
 
       <input
