@@ -1,12 +1,12 @@
 /**
  * Central lens sample catalog — Cloudflare R2 public assets.
- * Homepage + Lenses page share this list (circular 1:1 previews).
+ * One unique sample image per roster lens (no shared thumbnails).
  */
 import { CAMERA_LENS_ROSTER, type CameraLensDef } from "@/lib/lens-camera/roster";
 
 const R2_BASE = "https://assets.motio2edit.com/samples/lenses";
 
-/** All objects under samples/lenses/ (public R2). */
+/** Ordered R2 files — assigned 1:1 to roster index. */
 export const LENS_SAMPLE_FILES = [
   "2Ti7KYKk9HVPvHs5e3i6r_N6dU1tWa.png",
   "6Ki-lTcNz87zct8UjBSh0_3Ut20WQ2.png",
@@ -34,7 +34,6 @@ export type LensSampleCard = {
   name: string;
   about: string;
   imageUrl: string;
-  /** Roster lens id for deep-link */
   lensId: string;
   tier: "ai" | "normal";
   creditCost: number;
@@ -47,13 +46,15 @@ function sampleUrl(file: string): string {
 }
 
 /**
- * Pair each roster lens with an R2 sample (cycle files if fewer images than lenses).
+ * Pair each roster lens with a unique R2 sample (index-aligned).
+ * Extra lenses beyond file count get a deterministic fallback from the list end.
  */
 export function getLensSampleCards(
   roster: CameraLensDef[] = CAMERA_LENS_ROSTER,
 ): LensSampleCard[] {
+  const n = LENS_SAMPLE_FILES.length;
   return roster.map((lens, i) => {
-    const file = LENS_SAMPLE_FILES[i % LENS_SAMPLE_FILES.length];
+    const file = LENS_SAMPLE_FILES[Math.min(i, n - 1)];
     return {
       id: `sample-${lens.id}`,
       name: lens.name,
@@ -68,7 +69,6 @@ export function getLensSampleCards(
   });
 }
 
-/** Deep-link to Lens Editor with lens preselected — user still uploads their photo. */
 export function lensEditorHref(lensId: string): string {
   return `/studio/image/lens-editor?lens=${encodeURIComponent(lensId)}`;
 }
