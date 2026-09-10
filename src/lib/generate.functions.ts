@@ -12,7 +12,15 @@ import {
   promptMentionsAudio,
 } from "@/lib/video-model-registry";
 import type { VideoGenMode, VideoProductMode, VideoResolution, VideoAspect } from "@/lib/video/video-capability-registry";
-import { quoteVideoGeneration } from "@/lib/billing";
+import {
+  quoteVideoGeneration,
+  reserveCreditsForQuote,
+  releaseReservation,
+  markGenerating,
+  finalizeQuote,
+  markFailed,
+  type GenerationQuote,
+} from "@/lib/billing";
 import { buildVideoFromRegistry } from "@/lib/video-fal-step";
 import { imageUpscaleFactor, videoResolutionMultiplier, videoResolutionUpscales } from "@/lib/quality-options";
 import { computeImageExperienceCredits } from "@/lib/studio/image/image-experience-credits";
@@ -274,6 +282,15 @@ export const generateMedia = createServerFn({ method: "POST" })
     if (!falKey) throw new Error("AI service unavailable.");
     let outputUrl: string | null = null;
     let standardCharge: number | null = null;
+    /** Video only: reserved quote (deducted up-front; released on failure). */
+    let reservedVideoQuote: GenerationQuote | null = null;
+
+    // Video: reserve credits BEFORE provider call (no blind post-charge).
+    if (data.type === "video" && !isAdmin && videoQuote?.ok && !isVideoEnhance) {
+      const reserved = await reserveCreditsForQuote(supabaseAdmin, videoQuote.quote, profile.credits);
+      reservedVideoQuote = reserved;
+      markGenerating(reserved);
+    }
 
     try {
       if (data.type === "image" && useStandardImagePath(data.studioTier)) {
@@ -354,6 +371,14 @@ export const generateMedia = createServerFn({ method: "POST" })
         outputUrl = await runFalStepResilient(step, falKey);
       }
     } catch (err) {
+      if (reservedVideoQuote) {
+        try {
+          markFailed(reservedVideoQuote);
+          await releaseReservation(supabaseAdmin, reservedVideoQuote);
+        } catch (relErr) {
+          console.error("[generate] video reservation release failed:", relErr);
+        }
+      }
       const raw = err instanceof Error ? err.message : "Generation failed.";
       throw new Error(`${raw} — Generation failed. Credits not charged.`);
     }
@@ -393,12 +418,22 @@ export const generateMedia = createServerFn({ method: "POST" })
       });
       if (circleFinal != null) chargeAmount = circleFinal;
     }
-    if (!isAdmin && chargeAmount > profile.credits) {
-      throw new Error(`Not enough credits. Image generation costs ${chargeAmount} credits.`);
-    }
 
     let newCredits = profile.credits;
-    if (!isAdmin) {
+    if (reservedVideoQuote) {
+      // Already reserved/deducted before provider call — finalize only.
+      finalizeQuote(reservedVideoQuote, {
+        finalProviderCogsUsd: reservedVideoQuote.providerCogsUsd,
+        finalCredits: reservedVideoQuote.customerCredits,
+      });
+      chargeAmount = reservedVideoQuote.customerCredits;
+      // Refresh balance after reservation debit
+      const { data: bal } = await supabase.from("profiles").select("credits").eq("id", userId).single();
+      newCredits = bal?.credits ?? Math.max(0, profile.credits - chargeAmount);
+    } else if (!isAdmin) {
+      if (chargeAmount > profile.credits) {
+        throw new Error(`Not enough credits. Image generation costs ${chargeAmount} credits.`);
+      }
       const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", { _amount: chargeAmount, _gen_type: data.type, _user_id: userId });
       if (dErr || !deduction) {
         if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
