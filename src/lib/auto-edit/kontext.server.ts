@@ -4,6 +4,9 @@
  * Model: fal-ai/flux-kontext-lora
  * Auth: FAL_API_KEY only.
  * ONE image_url + Gemini final_edit_prompt.
+ *
+ * Billing: shared @/lib/billing lifecycle (quote → reserve → generate → finalize/release).
+ * Legacy credit amounts used as bridge until final economics review.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,6 +19,7 @@ import {
   autoEditTargetMegapixels,
   type AutoEditQuality,
 } from "./constants";
+import { quoteForProduct, runWithBillingLifecycle } from "@/lib/billing";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -69,7 +73,7 @@ function qualityParams(quality: AutoEditQuality): {
   }
 }
 
-export type KontextEditResult = {
+type KontextEditResult = {
   outputUrl: string;
   width?: number;
   height?: number;
@@ -84,68 +88,44 @@ async function runKontextQueue(
     Authorization: `Key ${falKey}`,
     "Content-Type": "application/json",
   };
-  const label = "FLUX Kontext LoRA";
-
-  console.log("[auto-edit/kontext] ▶", AUTO_EDIT_FAL_MODEL, "|", {
-    steps: body.num_inference_steps,
-    guidance: body.guidance_scale,
-    resolution_mode: body.resolution_mode,
-    promptChars: typeof body.prompt === "string" ? (body.prompt as string).length : 0,
-  });
-
   const submit = await fetch(`${FAL_QUEUE}${AUTO_EDIT_FAL_MODEL}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   });
   if (!submit.ok) {
-    const txt = await submit.text();
-    throw new Error(falErrorMessage(label, submit.status, txt));
+    throw new Error(falErrorMessage("Auto Edit", submit.status, await submit.text()));
   }
-
   const { status_url, response_url } = (await submit.json()) as {
-    request_id: string;
     status_url: string;
     response_url: string;
   };
-
-  const deadline = Date.now() + 290_000;
-  let delay = 1500;
+  const deadline = Date.now() + 170_000;
+  let delay = 1200;
   let lastStatus = "";
   while (Date.now() < deadline) {
     await sleep(delay);
     const st = await fetch(status_url, { headers });
-    if (!st.ok) {
-      delay = Math.min(delay * 1.3, 5000);
-      continue;
+    if (!st.ok) throw new Error(falErrorMessage("Auto Edit", st.status, await st.text()));
+    const bodySt = (await st.json()) as { status?: string };
+    lastStatus = bodySt.status ?? "";
+    if (lastStatus === "COMPLETED") break;
+    if (lastStatus === "FAILED" || lastStatus === "ERROR") {
+      const bodyTxt = await fetch(response_url, { headers }).then((r) => r.text()).catch(() => "");
+      throw new Error(falErrorMessage("Auto Edit", 500, bodyTxt || lastStatus));
     }
-    const sj = (await st.json()) as { status?: string };
-    if (sj.status) lastStatus = sj.status;
-    if (sj.status === "COMPLETED") break;
-    if (sj.status === "FAILED" || sj.status === "ERROR") {
-      const bodyTxt = await fetch(response_url, { headers })
-        .then((r) => r.text())
-        .catch(() => "");
-      throw new Error(falErrorMessage(label, 500, bodyTxt));
-    }
-    delay = Math.min(delay * 1.3, 5000);
+    delay = Math.min(delay + 400, 4000);
   }
-  if (lastStatus !== "COMPLETED") {
-    throw new Error(`${label} took too long and timed out. Please try again.`);
-  }
-
+  if (lastStatus !== "COMPLETED") throw new Error("Auto Edit timed out. Please retry.");
   const res = await fetch(response_url, { headers });
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(falErrorMessage(label, res.status, txt));
-  }
-  const json = (await res.json()) as {
+  if (!res.ok) throw new Error(falErrorMessage("Auto Edit", res.status, await res.text()));
+  const result = (await res.json()) as {
     images?: { url?: string; width?: number; height?: number }[];
     image?: { url?: string; width?: number; height?: number };
   };
-  const img = json.images?.[0] ?? json.image;
-  const url = img?.url ?? null;
-  if (!url) throw new Error(`${label} returned no output. Please try again.`);
+  const img = result.images?.[0] ?? result.image;
+  const url = img?.url;
+  if (!url || typeof url !== "string") throw new Error("Auto Edit returned no image URL.");
   const width = img?.width;
   const height = img?.height;
   const actualMegapixels =
@@ -192,9 +172,22 @@ export async function runAutoKontextEdit(
   const quality = args.quality;
   const cost = autoEditCreditCost(quality);
   const targetMp = autoEditTargetMegapixels(quality);
-  if (!args.isAdmin && args.profile.credits < cost) {
-    throw new Error(`Not enough credits. Auto Edit costs ${cost} credits.`);
-  }
+
+  // Server quote via shared lifecycle. Legacy customer credits bridge until final economics.
+  // providerCogsUsd: 0 until Auto Edit has a dedicated provider-cost estimator (internal only).
+  const quote = quoteForProduct({
+    userId: args.userId,
+    product: "auto_edit",
+    operation: "kontext_edit",
+    provider: "fal",
+    modelId: AUTO_EDIT_FAL_MODEL,
+    endpoint: AUTO_EDIT_FAL_MODEL,
+    providerCogsUsd: 0,
+    legacyCustomerCredits: cost,
+    idempotencyKey: `auto_edit:${args.userId}:${quality}:${args.imageUrl.slice(-48)}:${args.editPrompt.slice(0, 64)}`,
+    resolution: quality,
+    metadata: { quality, targetMegapixels: targetMp },
+  });
 
   const qp = qualityParams(quality);
   const body: Record<string, unknown> = {
@@ -210,15 +203,34 @@ export async function runAutoKontextEdit(
   };
 
   let kontext: KontextEditResult;
+  let creditsChargedFromLifecycle = 0;
   try {
-    kontext = await Promise.race([
-      runKontextQueue(body, falKey),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Generation timed out. Please retry.")), 180_000),
-      ),
-    ]);
+    const billed = await runWithBillingLifecycle({
+      admin: args.supabaseAdmin,
+      quote,
+      availableCredits: args.profile.credits,
+      isAdmin: args.isAdmin,
+      execute: async () => {
+        return Promise.race([
+          runKontextQueue(body, falKey),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Generation timed out. Please retry.")), 180_000),
+          ),
+        ]);
+      },
+    });
+    kontext = billed.result;
+    creditsChargedFromLifecycle = billed.creditsCharged;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("INSUFFICIENT_CREDITS") ||
+      (err as { details?: { code?: string } })?.details?.code === "INSUFFICIENT_CREDITS"
+    ) {
+      throw new Error(
+        `INSUFFICIENT_CREDITS: need ${cost} Motio2edit credits (you have ${args.profile.credits}). Generation not started.`,
+      );
+    }
     throw new Error(`${msg} — Generation failed. Credits not charged.`);
   }
 
@@ -230,21 +242,15 @@ export async function runAutoKontextEdit(
     isAdmin: args.isAdmin,
     keepWatermark: args.keepWatermark === true,
   });
+
   if (wmMode !== "none") {
     try {
-      const { applyServerWatermark, fetchImageBuffer } = await import("@/lib/watermark.server");
-      const raw = await fetchImageBuffer(outputUrl);
-      const stamped = await applyServerWatermark(raw, wmMode);
-      const path = `${args.userId}/out-wm-auto-${Date.now()}.jpg`;
-      const { error: upErr } = await args.supabaseAdmin.storage
-        .from("uploads")
-        .upload(path, stamped, { contentType: "image/jpeg", upsert: true });
-      if (upErr) throw new Error(PREPARE_FAILED);
-      const { data: signed } = await args.supabaseAdmin.storage
-        .from("uploads")
-        .createSignedUrl(path, 60 * 60 * 24 * 7);
-      if (!signed?.signedUrl) throw new Error(PREPARE_FAILED);
-      outputUrl = signed.signedUrl;
+      const { stampImageWatermark } = await import("@/lib/watermark/image");
+      outputUrl = await stampImageWatermark({
+        sourceUrl: outputUrl,
+        mode: wmMode,
+        position: AUTO_EDIT_WATERMARK_POSITION,
+      });
     } catch (e) {
       console.error("[auto-edit/kontext] stamp failed (no credits charged):", e);
       if (e instanceof Error && e.message === PREPARE_FAILED) throw e;
@@ -252,39 +258,15 @@ export async function runAutoKontextEdit(
     }
   }
 
+  // Credits already reserved+finalized by runWithBillingLifecycle (or 0 for admin).
+  let creditsCharged = creditsChargedFromLifecycle;
   let newCredits = args.profile.credits;
-  let creditsCharged = 0;
-  if (!args.isAdmin) {
-    const { data: deduction, error: dErr } = await args.supabaseAdmin.rpc("deduct_credits", {
-      _amount: cost,
-      _gen_type: "image",
-      _user_id: args.userId,
-    });
-    if (dErr || !deduction) {
-      if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
-        throw new Error(`Not enough credits. Auto Edit costs ${cost} credits.`);
-      }
-      throw new Error(`Could not charge credits: ${dErr?.message || "unknown error"}`);
-    }
-    newCredits = (deduction as { credits: number }).credits;
-    creditsCharged = cost;
-    console.log("[auto-edit/kontext] charged", cost, "credits → remaining", newCredits);
-
-    // Free-plan one-time counter
-    if (args.profile.plan === "free") {
-      await args.supabaseAdmin
-        .from("profiles")
-        .update({
-          auto_edit_used_count: 1,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", args.userId)
-        .eq("plan", "free");
-    }
+  if (!args.isAdmin && creditsCharged > 0) {
+    const { data: bal } = await args.supabase.from("profiles").select("credits").eq("id", args.userId).single();
+    newCredits = bal?.credits ?? Math.max(0, args.profile.credits - creditsCharged);
+    console.log("[auto-edit/kontext] lifecycle charged", creditsCharged, "credits → remaining", newCredits);
   }
 
-  // Persist History with service-role client.
-  // metadata column may be missing on older DBs — fall back without it.
   const historyBase = {
     user_id: args.userId,
     type: "image" as const,
