@@ -180,18 +180,18 @@ export function VideoFeaturePanel({
 
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">Sound</p>
+          <p className="text-sm font-medium">Audio</p>
           <p className="text-[11px] text-muted-foreground">
             {soundOn
-              ? "Synchronized audio when supported (+ credits)"
-              : "Silent · prompt sound words still request audio"}
+              ? "Native audio when the model supports it (+ credits)"
+              : "Silent · audio words in the prompt can still enable audio"}
           </p>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={soundOn}
-          aria-label={soundOn ? "Sound on" : "Sound off"}
+          aria-label={soundOn ? "Audio on" : "Audio off"}
           disabled={disabled}
           onClick={() => setSoundOn(!soundOn)}
           className={cn(
