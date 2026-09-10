@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
-import { Image as ImageIcon, Video, Music, Lock } from "lucide-react";
+import { Image as ImageIcon, Video, Music, Lock, Frame } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
@@ -11,7 +11,10 @@ export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
       { title: "Studio — Motio2edit by Motion2AI" },
-      { name: "description", content: "Image, Video, Music, and Circle 2edit studios in one hub." },
+      {
+        name: "description",
+        content: "Image, Circle 2edit, Frames, Video, and Music studios in one hub.",
+      },
       { property: "og:title", content: "Studio — Motio2edit by Motion2AI" },
     ],
   }),
@@ -24,7 +27,7 @@ function StudioLayout() {
   return <StudioHub />;
 }
 
-/** Windows-style fixed studio picker — no page scroll, glass tiles. */
+/** Fixed viewport studio picker — no page scroll. */
 function StudioHub() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
@@ -36,22 +39,23 @@ function StudioHub() {
     <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background">
       <Header />
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6">
-        <div className="mb-3 shrink-0 text-center sm:mb-4">
+        <div className="mb-2 shrink-0 text-center sm:mb-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Studio
           </p>
-          <h1 className="mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a studio</h1>
+          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a studio</h1>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-2 sm:gap-3">
+        {/* 3 rows: Image|Circle, Frames full-width, Video|Music — fits without scroll */}
+        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[1fr_0.72fr_1fr] gap-2 sm:gap-3">
           <StudioTile
             to="/editor"
             title="Image"
             subtitle="Generate · enhance"
             gradient="from-primary/35 via-primary/10 to-transparent"
             icon={
-              <span className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg">
-                <ImageIcon className="h-6 w-6 sm:h-7 sm:w-7" />
+              <span className="inline-flex rounded-2xl bg-primary p-2.5 text-primary-foreground shadow-lg sm:p-3">
+                <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6" />
               </span>
             }
           />
@@ -72,14 +76,27 @@ function StudioHub() {
           />
 
           <StudioTile
+            to="/studio/frames"
+            title="Frames"
+            subtitle="Frame · Glass"
+            gradient="from-slate-400/30 via-zinc-200/10 to-transparent"
+            className="col-span-2"
+            icon={
+              <span className="inline-flex rounded-2xl border border-slate-400/40 bg-background/80 p-2.5 sm:p-3">
+                <Frame className="h-5 w-5 text-slate-600 dark:text-slate-300 sm:h-6 sm:w-6" />
+              </span>
+            }
+          />
+
+          <StudioTile
             to={videoOk ? "/studio/video" : "/pricing"}
             title="Video"
             subtitle={videoOk ? "Cinematic motion" : "Upgrade to unlock"}
             gradient="from-rose-500/30 via-transparent to-transparent"
             locked={!videoOk}
             icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3">
-                <Video className="h-6 w-6 text-primary sm:h-7 sm:w-7" />
+              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-2.5 sm:p-3">
+                <Video className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
               </span>
             }
           />
@@ -91,8 +108,8 @@ function StudioHub() {
             gradient="from-fuchsia-500/30 via-transparent to-transparent"
             locked={!musicOk}
             icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3">
-                <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7" />
+              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-2.5 sm:p-3">
+                <Music className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
               </span>
             }
           />
@@ -111,6 +128,7 @@ function StudioTile({
   gradient,
   borderClass,
   locked,
+  className,
 }: {
   to: string;
   search?: Record<string, string>;
@@ -120,22 +138,24 @@ function StudioTile({
   gradient: string;
   borderClass?: string;
   locked?: boolean;
+  className?: string;
 }) {
   return (
     <Link
       to={to}
       search={search as never}
       className={cn(
-        "group relative flex min-h-0 flex-col justify-between overflow-hidden rounded-2xl border bg-card/80 p-4 shadow-sm backdrop-blur-md transition-transform active:scale-[0.98] sm:rounded-3xl sm:p-5",
+        "group relative flex min-h-0 flex-col justify-between overflow-hidden rounded-2xl border bg-card/80 p-3 shadow-sm backdrop-blur-md transition-transform active:scale-[0.98] sm:rounded-3xl sm:p-4",
         "border-border/80",
         borderClass,
+        className,
       )}
     >
       <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br", gradient)} />
       <div className="relative">{icon}</div>
       <div className="relative mt-auto">
-        <h2 className="text-lg font-extrabold tracking-tight sm:text-xl">{title}</h2>
-        <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">{subtitle}</p>
+        <h2 className="text-base font-extrabold tracking-tight sm:text-lg">{title}</h2>
+        <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{subtitle}</p>
       </div>
       {locked ? (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-2xl bg-background/55 backdrop-blur-[2px] sm:rounded-3xl">
@@ -151,10 +171,10 @@ function StudioTile({
 function CircleMetaRing() {
   return (
     <span
-      className="relative grid h-12 w-12 place-items-center rounded-2xl border border-[#7B6FE0]/45 bg-white/80 shadow-lg dark:bg-[#22252F] sm:h-14 sm:w-14"
+      className="relative grid h-11 w-11 place-items-center rounded-2xl border border-[#7B6FE0]/45 bg-white/80 shadow-lg dark:bg-[#22252F] sm:h-12 sm:w-12"
       aria-hidden
     >
-      <svg viewBox="0 0 40 40" className="h-9 w-9 overflow-visible sm:h-10 sm:w-10">
+      <svg viewBox="0 0 40 40" className="h-8 w-8 overflow-visible sm:h-9 sm:w-9">
         <defs>
           <linearGradient id="studioMetaRing" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#A8A0F0" />
