@@ -2,6 +2,7 @@
  * Motio2edit Lens — on-device image processing.
  * Each lens produces a clearly distinguishable result.
  * Native aspect is preserved when aspectId === "native".
+ * Watermark is NEVER applied unless opts.watermark === true (final output only).
  */
 import type { CameraLensDef, LensAspectId } from "./roster";
 import { LENS_ASPECTS } from "./roster";
@@ -105,8 +106,8 @@ function radialMap(src: HTMLCanvasElement, strength: number): HTMLCanvasElement 
       const dy = (y - cy) / maxR;
       const r = Math.sqrt(dx * dx + dy * dy);
       const f = 1 + strength * r * r;
-      const sx = Math.round(cx + dx * maxR / f);
-      const sy = Math.round(cy + dy * maxR / f);
+      const sx = Math.round(cx + (dx * maxR) / f);
+      const sy = Math.round(cy + (dy * maxR) / f);
       const si = (Math.min(w - 1, Math.max(0, sx)) + Math.min(h - 1, Math.max(0, sy)) * w) * 4;
       const di = (x + y * w) * 4;
       out.data[di] = img.data[si];
@@ -206,7 +207,7 @@ function architectAlign(src: HTMLCanvasElement): HTMLCanvasElement {
   return sharpen(grade(radialMap(src, -0.38), "contrast(1.18) saturate(0.92)"), 0.75);
 }
 
-/** Dense white corner watermark — LENSES / motio2edit */
+/** Dense white corner watermark — L E N S E S / M O T I O 2 E D I T */
 export function applyFreeLensWatermark(src: HTMLCanvasElement): HTMLCanvasElement {
   const c = clone(src);
   const ctx = c.getContext("2d")!;
@@ -216,9 +217,9 @@ export function applyFreeLensWatermark(src: HTMLCanvasElement): HTMLCanvasElemen
   ctx.save();
   ctx.textAlign = "right";
   ctx.textBaseline = "bottom";
-  const labelW = Math.round(fontSize * 7.2);
+  const labelW = Math.round(fontSize * 8.5);
   const labelH = Math.round(fontSize * 2.6);
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
   const rx = c.width - pad - labelW - 6;
   const ry = c.height - pad - labelH - 4;
   const r = Math.max(6, Math.round(fontSize * 0.35));
@@ -231,13 +232,13 @@ export function applyFreeLensWatermark(src: HTMLCanvasElement): HTMLCanvasElemen
   ctx.closePath();
   ctx.fill();
   ctx.font = `700 ${fontSize}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
   ctx.shadowColor = "rgba(0,0,0,0.55)";
   ctx.shadowBlur = 6;
-  ctx.fillText("LENSES", c.width - pad, c.height - pad - fontSize * 1.15);
-  ctx.font = `600 ${Math.round(fontSize * 0.78)}px system-ui, -apple-system, sans-serif`;
-  ctx.fillStyle = "rgba(255,255,255,0.82)";
-  ctx.fillText("motio2edit", c.width - pad, c.height - pad);
+  ctx.fillText("L E N S E S", c.width - pad, c.height - pad - fontSize * 1.2);
+  ctx.font = `600 ${Math.round(fontSize * 0.72)}px system-ui, -apple-system, sans-serif`;
+  ctx.fillStyle = "rgba(255,255,255,0.86)";
+  ctx.fillText("M O T I O 2 E D I T", c.width - pad, c.height - pad);
   ctx.restore();
   return c;
 }
@@ -314,8 +315,8 @@ export function applyLensOpticalEnhanced(
     default:
       result = grade(sharpen(base, 0.9), "contrast(1.1)");
   }
-  const wantWm = opts?.watermark !== false && lens.tier === "normal" && lens.creditCost === 0;
-  if (wantWm) {
+  // Watermark ONLY when explicitly requested (final commit), never on live preview
+  if (opts?.watermark === true) {
     result = applyFreeLensWatermark(result);
   }
   return result;
@@ -329,7 +330,7 @@ export function applyLensOptical(
 ): HTMLCanvasElement {
   const frame =
     source instanceof HTMLVideoElement ? captureVideoFrame(source, mirror) : source;
-  return applyLensOpticalEnhanced(frame, lens, aspectId);
+  return applyLensOpticalEnhanced(frame, lens, aspectId, { watermark: false });
 }
 
 export function canvasToBlob(
