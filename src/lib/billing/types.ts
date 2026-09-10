@@ -115,7 +115,13 @@ export type BillingConfig = {
 
 /**
  * FINAL ECONOMICS TO BE DESIGNED AFTER CROSS-REVIEW BY CHATGPT + GROK + CLAUDE.
- * These defaults are scaffolding only — change via config, not scattered code.
+ *
+ * These defaults are SCAFFOLDING ONLY.
+ * Do NOT treat them as approved Motio2edit plan prices.
+ * Do NOT hardcode "5s = N credits" or fixed video floors in product code.
+ * productMinimumCredits.video is intentionally 0 until economics are approved.
+ * The MotioCreditPricingEngine remains the single conversion point:
+ *   provider COGS → (configurable formula) → customer Motio2edit credits.
  */
 export const DEFAULT_BILLING_CONFIG: BillingConfig = {
   creditFaceUsd: 0.011,
@@ -123,8 +129,9 @@ export const DEFAULT_BILLING_CONFIG: BillingConfig = {
   targetGrossMargin: 0.45,
   operatingReserveUsd: 0.05,
   roundingStep: 10,
+  // No permanent product floors until final economics review.
   productMinimumCredits: {
-    video: 75,
+    video: 0,
   },
   quoteTtlSeconds: 300,
   pricingVersion: "2026-09-scaffold-v1",
