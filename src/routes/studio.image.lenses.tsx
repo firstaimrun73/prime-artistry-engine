@@ -1,6 +1,7 @@
 /**
  * More Lenses — circular R2 samples, deep-link to Lens Editor (upload required there).
- * Back always → homepage (never Image Studio).
+ * Free optical (tier=normal, 0 cr) open for everyone.
+ * AI lenses (20 cr) require upgraded plan (or admin).
  */
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -44,6 +45,9 @@ function MoreLensesPage() {
     );
   }, [q, all]);
 
+  const freeCount = all.filter((l) => l.tier === "normal").length;
+  const aiCount = all.filter((l) => l.tier === "ai").length;
+
   return (
     <div className="min-h-[100dvh] bg-background">
       <Header />
@@ -59,7 +63,7 @@ function MoreLensesPage() {
           <div>
             <h1 className="text-lg font-extrabold tracking-tight">More Lenses</h1>
             <p className="text-xs text-muted-foreground">
-              {all.length} lenses · AI {LENS_GENERATION_CREDITS} cr · free optical 0 cr
+              {freeCount} free optical · {aiCount} AI ({LENS_GENERATION_CREDITS} cr)
             </p>
           </div>
         </div>
@@ -67,11 +71,11 @@ function MoreLensesPage() {
         {!paid && (
           <div className="mb-4 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 text-xs text-muted-foreground">
             <Lock className="mr-1 inline h-3.5 w-3.5 text-primary" />
-            Lenses are on upgraded plans. Preview below, then{" "}
+            Free optical lenses are open. AI lenses need an{" "}
             <Link to="/pricing" className="font-semibold text-primary underline">
-              upgrade
-            </Link>{" "}
-            to apply on your photos.
+              upgraded plan
+            </Link>
+            .
           </div>
         )}
 
@@ -88,6 +92,8 @@ function MoreLensesPage() {
 
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
           {list.map((l) => {
+            const isAi = l.tier === "ai";
+            const locked = isAi && !paid;
             const body = (
               <>
                 <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-full border border-border bg-muted shadow-sm">
@@ -101,9 +107,19 @@ function MoreLensesPage() {
                       (e.currentTarget as HTMLImageElement).style.opacity = "0.25";
                     }}
                   />
-                  {!paid && (
+                  {locked && (
                     <span className="absolute inset-0 flex items-center justify-center bg-black/40">
                       <Lock className="h-4 w-4 text-white" />
+                    </span>
+                  )}
+                  {!isAi && (
+                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
+                      Free
+                    </span>
+                  )}
+                  {isAi && !locked && (
+                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-orange-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
+                      AI {l.creditCost}
                     </span>
                   )}
                 </div>
@@ -112,7 +128,7 @@ function MoreLensesPage() {
               </>
             );
 
-            if (!paid) {
+            if (locked) {
               return (
                 <Link
                   key={l.id}
@@ -140,7 +156,7 @@ function MoreLensesPage() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-muted-foreground">
-          Selecting a lens opens the camera editor. Upload or capture your own photo before generating.
+          Tap a lens to open the camera editor. Upload your own photo before generating.
         </p>
       </main>
     </div>
