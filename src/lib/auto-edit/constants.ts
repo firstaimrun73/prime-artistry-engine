@@ -20,7 +20,11 @@ export const AUTO_EDIT_TARGET_MP: Record<AutoEditQuality, number> = {
   "8k_max": 6,
 };
 
-/** Total Auto Edit credits by quality (analysis + edit bundled; no second charge). */
+/**
+ * Total Auto Edit credits by quality (legacy product table / bridge).
+ * Debit flows through @/lib/billing lifecycle; amounts remain until final economics review.
+ * FINAL ECONOMICS TO BE DESIGNED AFTER CROSS-REVIEW BY CHATGPT + GROK + CLAUDE.
+ */
 export const AUTO_EDIT_CREDITS_BY_QUALITY: Record<AutoEditQuality, number> = {
   sd: 45,
   hd: 45,
@@ -58,66 +62,10 @@ export const AUTO_EDIT_PRODUCT_NAME = "Maluto AI" as const;
 export const AUTO_EDIT_PIPELINE_STATES = [
   "QUEUED",
   "ANALYSING",
-  "BUILDING_EDIT_PLAN",
-  "GENERATING",
-  "VALIDATING",
-  "WATERMARKING",
+  "EDITING",
   "FINALISING",
-  "COMPLETE",
-  "NO_CHANGE",
-  "ERROR",
+  "DONE",
+  "FAILED",
 ] as const;
 
 export type AutoEditPipelineState = (typeof AUTO_EDIT_PIPELINE_STATES)[number];
-
-/** Human-readable labels for detected quality issues (client-safe). */
-export const ISSUE_LABELS: Record<string, string> = {
-  blur: "Soft focus / blur",
-  motion_blur: "Motion blur",
-  defocus: "Out of focus",
-  noise: "Image noise",
-  compression_artifacts: "Compression artifacts",
-  pixelation: "Pixelation",
-  overexposed: "Overexposure",
-  underexposed: "Underexposure",
-  low_contrast: "Low contrast",
-  color_cast: "Color cast",
-  oversharpened: "Over-sharpening",
-  low_resolution: "Low resolution",
-  missing_detail: "Missing fine detail",
-  fading: "Fading",
-  scratches: "Scratches",
-  cracks: "Cracks",
-  dust: "Dust",
-  stains: "Stains",
-  tears: "Tears",
-  damaged_regions: "Damaged regions",
-  monochrome_aged: "Aged monochrome",
-  color_loss: "Color loss",
-  photobomber: "Photobomber / distraction",
-  bad_crop: "Poor crop / framing",
-  screenshot_border: "Screenshot UI / borders",
-};
-
-/** Human-readable labels for recommended actions (client-safe). */
-export const IMPROVEMENT_LABELS: Record<string, string> = {
-  restore: "Photo restoration",
-  colorize: "Color restoration",
-  deblur: "Deblur / focus recovery",
-  denoise: "Noise reduction",
-  exposure: "Exposure correction",
-  color_balance: "Color / white balance",
-  face_detail: "Face detail recovery",
-  background_cleanup: "Background cleanup",
-  remove_distraction: "Remove distraction",
-  crop: "Crop / reframing",
-  polish: "Natural polish",
-};
-
-export function labelIssue(id: string): string {
-  return ISSUE_LABELS[id] ?? id.replace(/_/g, " ");
-}
-
-export function labelImprovement(id: string): string {
-  return IMPROVEMENT_LABELS[id] ?? id.replace(/_/g, " ");
-}
