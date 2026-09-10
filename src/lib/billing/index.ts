@@ -12,4 +12,6 @@ export * from "./types";
 export * from "./provider-cost";
 export * from "./customer-pricing";
 export * from "./quote-service";
+export * from "./lifecycle";
+export * from "./product-quote";
 export { quoteVideoGeneration } from "./video-quote";
