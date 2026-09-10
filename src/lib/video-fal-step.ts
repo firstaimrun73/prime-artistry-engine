@@ -52,8 +52,9 @@ export function buildVideoFromRegistry({
   if (resolution) {
     const r = resolution.toLowerCase();
     if (r === "4k" || r === "2160p") body.resolution = "4k";
-    else if (r === "1080p" || r === "hd") body.resolution = "1080p";
-    else if (r === "720p" || r === "sd") body.resolution = "720p";
+    else if (r === "1080p" || r === "fhd") body.resolution = "1080p";
+    else if (r === "720p" || r === "hd") body.resolution = "720p";
+    else if (r === "480p" || r === "sd") body.resolution = "480p";
     else body.resolution = resolution;
   }
   if (generateAudio != null) {
