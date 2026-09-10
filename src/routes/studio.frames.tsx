@@ -1,11 +1,10 @@
 /**
- * Frames Studio — media-first, ratio-matched, distinct designs.
- * - Frame set filtered to source image's native ratio (no forced crop).
- * - Genuinely distinct aesthetic designs (not color swatches).
- * - No top nav bar; full-bleed dark presentation.
- * - Glass labels instead of generic toasts.
+ * Frames Studio — ratio-matched designs only, no aspect UI, no top nav bar.
+ * Source 16:9 → only landscape/16:9-capable frames in the bar.
+ * No ratio chips, no "Source 16:9" labels in the asset bar.
+ * Full-bleed: no header / nav bar.
  */
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,22 +14,28 @@ export const Route = createFileRoute("/studio/frames")({
   head: () => ({
     meta: [
       { title: "Frames — Motio2edit" },
-      {
-        name: "description",
-        content: "Frame your photo with ratio-matched designs.",
-      },
+      { name: "description", content: "Frame your photo with ratio-matched designs." },
     ],
   }),
   component: FramesPage,
 });
 
+/** Coarse family used only for filtering — never shown in the UI */
 type RatioFamily = "square" | "portrait" | "landscape" | "ultrawide";
 
 type FrameDesign = {
   id: string;
   name: string;
   families: RatioFamily[];
-  style: "minimal-line" | "polaroid" | "film-strip" | "ornate" | "matte-deep" | "gallery" | "rounded-soft" | "editorial";
+  style:
+    | "minimal-line"
+    | "polaroid"
+    | "film-strip"
+    | "ornate"
+    | "matte-deep"
+    | "gallery"
+    | "rounded-soft"
+    | "editorial";
   borderColor: string;
   matColor: string;
   accentColor?: string;
@@ -121,6 +126,26 @@ const FRAME_DESIGNS: FrameDesign[] = [
     borderW: 0.018,
     matW: 0.035,
   },
+  {
+    id: "cinema-black",
+    name: "Cinema",
+    families: ["landscape", "ultrawide"],
+    style: "matte-deep",
+    borderColor: "#0a0a0a",
+    matColor: "#111",
+    borderW: 0.05,
+    matW: 0.03,
+  },
+  {
+    id: "wide-gallery",
+    name: "Wide Gallery",
+    families: ["landscape", "ultrawide"],
+    style: "gallery",
+    borderColor: "#f5f5f5",
+    matColor: "#fff",
+    borderW: 0.035,
+    matW: 0.05,
+  },
 ];
 
 function ratioFamily(w: number, h: number): RatioFamily {
@@ -129,31 +154,6 @@ function ratioFamily(w: number, h: number): RatioFamily {
   if (r >= 2.0) return "ultrawide";
   if (r > 1.05) return "landscape";
   return "portrait";
-}
-
-function nearestAspectLabel(w: number, h: number): string {
-  const r = w / h;
-  const presets: [string, number][] = [
-    ["1:1", 1],
-    ["4:5", 4 / 5],
-    ["3:4", 3 / 4],
-    ["2:3", 2 / 3],
-    ["9:16", 9 / 16],
-    ["4:3", 4 / 3],
-    ["3:2", 3 / 2],
-    ["16:9", 16 / 9],
-    ["21:9", 21 / 9],
-  ];
-  let best = presets[0];
-  let bestDiff = Infinity;
-  for (const p of presets) {
-    const d = Math.abs(Math.log(r / p[1]));
-    if (d < bestDiff) {
-      bestDiff = d;
-      best = p;
-    }
-  }
-  return best[0];
 }
 
 function compose(
@@ -293,17 +293,17 @@ function GlassLabel({
 }
 
 function FramesPage() {
+  const navigate = useNavigate();
   const [designId, setDesignId] = useState(FRAME_DESIGNS[0].id);
   const [source, setSource] = useState<HTMLImageElement | null>(null);
   const [family, setFamily] = useState<RatioFamily | null>(null);
-  const [aspectLabel, setAspectLabel] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [glassMsg, setGlassMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const available = useMemo(() => {
-    if (!family) return FRAME_DESIGNS;
+    if (!family) return [];
     return FRAME_DESIGNS.filter((d) => d.families.includes(family));
   }, [family]);
 
@@ -311,13 +311,13 @@ function FramesPage() {
     available.find((d) => d.id === designId) ?? available[0] ?? FRAME_DESIGNS[0];
 
   useEffect(() => {
-    if (!available.some((d) => d.id === designId) && available[0]) {
+    if (available.length && !available.some((d) => d.id === designId)) {
       setDesignId(available[0].id);
     }
   }, [available, designId]);
 
   useEffect(() => {
-    if (!source) {
+    if (!source || !available.length) {
       setPreviewUrl(null);
       return;
     }
@@ -330,7 +330,7 @@ function FramesPage() {
       }
     }, 40);
     return () => clearTimeout(t);
-  }, [source, design]);
+  }, [source, design, available.length]);
 
   const onPick = useCallback((file?: File) => {
     if (!file) return;
@@ -348,9 +348,8 @@ function FramesPage() {
       }
       const fam = ratioFamily(img.naturalWidth, img.naturalHeight);
       setFamily(fam);
-      setAspectLabel(nearestAspectLabel(img.naturalWidth, img.naturalHeight));
       setSource(img);
-      setGlassMsg(`Loaded · ${nearestAspectLabel(img.naturalWidth, img.naturalHeight)} frames`);
+      setGlassMsg("Photo loaded");
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -388,26 +387,21 @@ function FramesPage() {
   const clear = () => {
     setSource(null);
     setFamily(null);
-    setAspectLabel(null);
     setPreviewUrl(null);
     setGlassMsg(null);
   };
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col bg-zinc-950 text-zinc-50">
-      <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <Link
-          to="/studio"
-          className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-black/40 backdrop-blur-xl"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <span className="rounded-full border border-white/10 bg-black/40 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.16em] text-amber-300/90 backdrop-blur-md">
-          FRAMES
-        </span>
-        <div className="w-10" />
-      </div>
+      {/* NO nav bar / header. Only a floating back control when needed. */}
+      <button
+        type="button"
+        onClick={() => void navigate({ to: "/studio" })}
+        className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-30 grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-black/50 backdrop-blur-xl"
+        aria-label="Back"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </button>
 
       <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3 pb-52 pt-14">
         {!source ? (
@@ -435,11 +429,6 @@ function FramesPage() {
             >
               <X className="h-4 w-4" />
             </button>
-            {aspectLabel && (
-              <p className="mt-2 text-center text-[10px] text-zinc-500">
-                Source {aspectLabel} · matching frames only
-              </p>
-            )}
           </div>
         )}
       </div>
@@ -452,12 +441,9 @@ function FramesPage() {
         onChange={(e) => onPick(e.target.files?.[0])}
       />
 
-      {source && (
+      {source && available.length > 0 && (
         <div className="absolute inset-x-0 bottom-0 z-30 space-y-3 bg-gradient-to-t from-zinc-950 via-zinc-950/95 to-transparent px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
           <div className="mx-auto max-w-lg">
-            <p className="mb-1.5 text-center text-[10px] text-zinc-500">
-              Distinct designs for {aspectLabel ?? "this ratio"}
-            </p>
             <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none]">
               {available.map((d) => {
                 const active = d.id === design.id;
