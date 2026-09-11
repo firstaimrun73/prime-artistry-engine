@@ -1,6 +1,6 @@
 /**
- * Circle 2edit mask stage — build restore.
- * Full freehand/brush/eraser implementation restored for compile + runtime API.
+ * Circle 2edit mask stage — exports required by circle-remove route.
+ * Uses authoritative maskCanvas helpers (WorkingMask.canvas-based).
  */
 import {
   useCallback,
@@ -10,7 +10,7 @@ import {
   useImperativeHandle,
   forwardRef,
 } from "react";
-import type { MaskTool, Point } from "@/components/circle-edit/mask/types";
+import type { MaskTool, Point, BrushSettings, Size } from "@/components/circle-edit/mask/types";
 import {
   createWorkingMask,
   stampBrush,
@@ -56,11 +56,16 @@ const INK_RGB: Record<InkColor, string> = {
   black: "26, 28, 36",
 };
 
+function toolKind(tool: MaskTool): "brush" | "erase" | "path" {
+  if (tool === "eraser" || tool === "erase") return "erase";
+  if (tool === "brush") return "brush";
+  return "path";
+}
+
 export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function CircleMaskStage(
   { imageUrl, tool, brushSize, disabled, onMaskChange, inkColor = "purple", onHistoryChange },
   ref,
 ) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const maskRef = useRef<WorkingMask | null>(null);
@@ -68,61 +73,21 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const drawingRef = useRef(false);
   const lastPtRef = useRef<Point | null>(null);
   const pathRef = useRef<Point[]>([]);
+  const dispScaleRef = useRef(1);
   const [ready, setReady] = useState(false);
 
+  const settings = (): BrushSettings => ({
+    sizePx: brushSize,
+    opacity: 100,
+    hardness: 80,
+    featherPx: 2,
+  });
+
   const notify = useCallback(() => {
-    const has = maskHasPaint(maskRef.current);
+    const has = !!maskRef.current && maskHasPaint(maskRef.current);
     onMaskChange?.(has);
     onHistoryChange?.(historyRef.current.past.length > 0, historyRef.current.future.length > 0);
   }, [onMaskChange, onHistoryChange]);
-
-  const pushHistory = useCallback(() => {
-    const snap = snapshotMask(maskRef.current);
-    if (!snap) return;
-    historyRef.current.past.push(snap);
-    if (historyRef.current.past.length > 40) historyRef.current.past.shift();
-    historyRef.current.future = [];
-    notify();
-  }, [notify]);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      exportMask: () => exportMaskNatural(maskRef.current),
-      exportMaskStats: () => computeMaskStats(maskRef.current),
-      clear: () => {
-        clearWorkingMask(maskRef.current);
-        historyRef.current = { past: [], future: [] };
-        notify();
-        redraw();
-      },
-      hasMask: () => maskHasPaint(maskRef.current),
-      undo: () => {
-        const { past, future } = historyRef.current;
-        if (!past.length) return;
-        const cur = snapshotMask(maskRef.current);
-        if (cur) future.push(cur);
-        const prev = past.pop()!;
-        restoreSnapshot(maskRef.current, prev);
-        notify();
-        redraw();
-      },
-      redo: () => {
-        const { past, future } = historyRef.current;
-        if (!future.length) return;
-        const cur = snapshotMask(maskRef.current);
-        if (cur) past.push(cur);
-        const next = future.pop()!;
-        restoreSnapshot(maskRef.current, next);
-        notify();
-        redraw();
-      },
-      canUndo: () => historyRef.current.past.length > 0,
-      canRedo: () => historyRef.current.future.length > 0,
-      fit: () => redraw(),
-    }),
-    [notify],
-  );
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -135,20 +100,70 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.globalAlpha = 0.45;
-    ctx.fillStyle = `rgba(${INK_RGB[inkColor]}, 0.55)`;
-    // Overlay painted mask region
+    ctx.globalCompositeOperation = "source-over";
+    // Tint mask: draw mask canvas with color via multiply-like pass
     const tmp = document.createElement("canvas");
     tmp.width = mask.width;
     tmp.height = mask.height;
     const tctx = tmp.getContext("2d");
     if (tctx) {
-      const id = tctx.createImageData(mask.width, mask.height);
-      id.data.set(mask.data);
-      tctx.putImageData(id, 0, 0);
+      tctx.drawImage(mask.canvas, 0, 0);
+      tctx.globalCompositeOperation = "source-in";
+      tctx.fillStyle = `rgba(${INK_RGB[inkColor]}, 0.7)`;
+      tctx.fillRect(0, 0, tmp.width, tmp.height);
       ctx.drawImage(tmp, 0, 0, canvas.width, canvas.height);
     }
     ctx.restore();
   }, [inkColor]);
+
+  const pushHistory = useCallback(() => {
+    const snap = snapshotMask(maskRef.current!);
+    if (!snap) return;
+    historyRef.current.past.push(snap);
+    if (historyRef.current.past.length > 40) historyRef.current.past.shift();
+    historyRef.current.future = [];
+    notify();
+  }, [notify]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      exportMask: () => (maskRef.current ? exportMaskNatural(maskRef.current) : null),
+      exportMaskStats: () => (maskRef.current ? computeMaskStats(maskRef.current) : null),
+      clear: () => {
+        if (!maskRef.current) return;
+        clearWorkingMask(maskRef.current);
+        historyRef.current = { past: [], future: [] };
+        notify();
+        redraw();
+      },
+      hasMask: () => !!maskRef.current && maskHasPaint(maskRef.current),
+      undo: () => {
+        if (!maskRef.current) return;
+        const { past, future } = historyRef.current;
+        if (!past.length) return;
+        const cur = snapshotMask(maskRef.current);
+        if (cur) future.push(cur);
+        restoreSnapshot(maskRef.current, past.pop()!);
+        notify();
+        redraw();
+      },
+      redo: () => {
+        if (!maskRef.current) return;
+        const { past, future } = historyRef.current;
+        if (!future.length) return;
+        const cur = snapshotMask(maskRef.current);
+        if (cur) past.push(cur);
+        restoreSnapshot(maskRef.current, future.pop()!);
+        notify();
+        redraw();
+      },
+      canUndo: () => historyRef.current.past.length > 0,
+      canRedo: () => historyRef.current.future.length > 0,
+      fit: () => redraw(),
+    }),
+    [notify, redraw],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -157,15 +172,17 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     img.onload = () => {
       if (cancelled) return;
       imgRef.current = img;
+      const natural: Size = { width: img.naturalWidth, height: img.naturalHeight };
       const maxEdge = 1280;
-      const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.max(1, Math.round(img.naturalWidth * scale));
-      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const scale = Math.min(1, maxEdge / Math.max(natural.width, natural.height));
+      const w = Math.max(1, Math.round(natural.width * scale));
+      const h = Math.max(1, Math.round(natural.height * scale));
       const canvas = canvasRef.current;
       if (!canvas) return;
       canvas.width = w;
       canvas.height = h;
-      maskRef.current = createWorkingMask(w, h, img.naturalWidth, img.naturalHeight);
+      dispScaleRef.current = w / natural.width;
+      maskRef.current = createWorkingMask(natural);
       historyRef.current = { past: [], future: [] };
       setReady(true);
       notify();
@@ -182,37 +199,41 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     redraw();
   }, [inkColor, redraw]);
 
-  const toLocal = (e: React.PointerEvent): Point | null => {
+  const toNatural = (e: React.PointerEvent): Point | null => {
     const canvas = canvasRef.current;
-    if (!canvas) return null;
+    const mask = maskRef.current;
+    if (!canvas || !mask) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
-    return { x, y };
+    const sx = ((e.clientX - rect.left) / rect.width) * canvas.width;
+    const sy = ((e.clientY - rect.top) / rect.height) * canvas.height;
+    // display → natural
+    return { x: sx / Math.max(dispScaleRef.current, 0.0001), y: sy / Math.max(dispScaleRef.current, 0.0001) };
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (disabled || !ready) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    if (disabled || !ready || !maskRef.current) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     drawingRef.current = true;
     pushHistory();
-    const pt = toLocal(e);
-    if (!pt || !maskRef.current) return;
+    const pt = toNatural(e);
+    if (!pt) return;
     lastPtRef.current = pt;
     pathRef.current = [pt];
-    if (tool === "brush" || tool === "eraser") {
-      stampBrush(maskRef.current, pt.x, pt.y, brushSize, tool === "eraser");
+    const kind = toolKind(tool);
+    if (kind === "brush" || kind === "erase") {
+      stampBrush(maskRef.current, pt, kind, settings(), dispScaleRef.current);
     }
     redraw();
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!drawingRef.current || disabled) return;
-    const pt = toLocal(e);
-    if (!pt || !maskRef.current) return;
+    if (!drawingRef.current || disabled || !maskRef.current) return;
+    const pt = toNatural(e);
+    if (!pt) return;
     const last = lastPtRef.current;
-    if (last && (tool === "brush" || tool === "eraser")) {
-      strokeBetween(maskRef.current, last.x, last.y, pt.x, pt.y, brushSize, tool === "eraser");
+    const kind = toolKind(tool);
+    if (last && (kind === "brush" || kind === "erase")) {
+      strokeBetween(maskRef.current, last, pt, kind, settings(), dispScaleRef.current);
     }
     pathRef.current.push(pt);
     lastPtRef.current = pt;
@@ -222,7 +243,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const onPointerUp = () => {
     if (!drawingRef.current) return;
     drawingRef.current = false;
-    if ((tool === "circle" || tool === "lasso" || tool === "freehand") && pathRef.current.length > 3 && maskRef.current) {
+    const kind = toolKind(tool);
+    if (kind === "path" && pathRef.current.length > 3 && maskRef.current) {
       fillClosedPath(maskRef.current, pathRef.current);
     }
     pathRef.current = [];
@@ -232,7 +254,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   };
 
   return (
-    <div ref={containerRef} className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black/40">
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black/40">
       <canvas
         ref={canvasRef}
         className="max-h-full max-w-full touch-none"
