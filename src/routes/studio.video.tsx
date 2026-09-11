@@ -63,145 +63,222 @@ export const Route = createFileRoute("/studio/video")({
 function VideoStudioPage() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = isAdminEmail(user?.email);
-  const canVideo = isAdmin || canAccessVideo(profile?.plan);
+  const admin = isAdminEmail(profile?.email ?? user?.email);
+  const allowed = canAccessVideo({ plan: profile?.plan, email: profile?.email, isAdmin: admin });
 
   const [mode, setMode] = useState<VideoGenMode>("text");
   const [prompt, setPrompt] = useState("");
   const [tier, setTier] = useState<VideoTier>("standard");
+  const [duration, setDuration] = useState<5 | 10 | 15>(5);
   const [aspect, setAspect] = useState<VideoAspect>("16:9");
   const [resolution, setResolution] = useState<VideoResolution>("720p");
-  const [duration, setDuration] = useState(5);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [stageIdx, setStageIdx] = useState(0);
-  const [eta, setEta] = useState(60);
+  const [eta, setEta] = useState(45);
   const [result, setResult] = useState<VideoStudioResult | null>(null);
   const [welcomeFree, setWelcomeFree] = useState(false);
 
-  const genFn = useServerFn(generateMedia);
-  const welcomeFn = useServerFn(getWelcomeFreeVideoStatus);
+  const generate = useServerFn(generateMedia);
+  const welcomeStatus = useServerFn(getWelcomeFreeVideoStatus);
 
   useEffect(() => {
-    void welcomeFn({ data: {} }).then((s) => setWelcomeFree(!!s?.eligible)).catch(() => {});
-  }, [welcomeFn]);
+    if (!user) return;
+    void welcomeStatus({}).then((s) => {
+      if (s?.eligible) setWelcomeFree(true);
+    }).catch(() => {});
+  }, [user, welcomeStatus]);
 
-  const maxPrompt = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
-  const credits = useMemo(
-    () => computeMotioVideoCredits({ tier, durationSec: duration, quality: qualityFromResolution(resolution) }),
-    [tier, duration, resolution],
-  );
+  const caps = useMemo(() => capabilitiesForMode(mode, tier), [mode, tier]);
+  const maxDur = useMemo(() => availableMaxDurationFor(mode, tier), [mode, tier]);
+  const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
+
+  useEffect(() => {
+    if (duration > maxDur) setDuration(maxDur as 5 | 10 | 15);
+  }, [maxDur, duration]);
+
+  const creditsEstimate = useMemo(() => {
+    return computeMotioVideoCredits({
+      durationSec: duration,
+      quality: qualityFromResolution(resolution),
+      sound: promptMentionsAudio(prompt),
+      tier,
+    });
+  }, [duration, resolution, prompt, tier]);
 
   const onGenerate = useCallback(async () => {
-    if (!canVideo && !welcomeFree) {
-      toast.error("Video requires a paid plan");
+    if (!allowed && !welcomeFree) {
+      toast.error("Upgrade to unlock Video Studio");
+      navigate({ to: "/pricing" });
       return;
     }
     const p = prompt.trim();
     if (!p) {
-      toast.error("Enter a prompt");
+      toast.error("Add a prompt");
       return;
     }
-    if (p.length > maxPrompt) {
-      toast.error(`Prompt max ${maxPrompt} characters`);
+    if ((mode === "image" || mode === "video") && !sourceUrl) {
+      toast.error("Upload a source first");
       return;
     }
-    const selection = selectVideoModel({ mode, tier, aspect, resolution, durationSec: duration });
+    const timing = parsePromptTiming(p);
+    const timingErr = validateTimingAgainstDuration(timing, duration);
+    if (timingErr) {
+      toast.error(timingErr);
+      return;
+    }
+    const selection = selectVideoModel({ mode, tier, duration, resolution, aspect });
     if (!selection.ok) {
       toast.error(videoSelectionUnavailableMessage(selection));
       return;
     }
+
     setBusy(true);
     setStageIdx(0);
-    setEta(90);
+    setEta(duration <= 5 ? 40 : duration <= 10 ? 70 : 100);
     startGeneration("video");
+    const stageTimer = window.setInterval(() => {
+      setStageIdx((i) => Math.min(i + 1, 3));
+    }, 8000);
+
     try {
-      const out = await genFn({
+      const res = await generate({
         data: {
           kind: "video",
           prompt: p,
           mode,
-          tier,
+          duration,
           aspect,
           resolution,
-          durationSec: duration,
+          tier,
           sourceUrl: sourceUrl ?? undefined,
-          modelId: selection.modelId,
         },
       });
-      if (out?.url) {
-        setResult({ url: out.url, prompt: p, modelId: selection.modelId, durationSec: duration });
-        toast.success("Video ready");
-      } else {
-        toast.error(out?.error ?? "Generation failed");
-      }
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Generation failed");
+      if (!res?.outputUrl) throw new Error(res?.error || "Generation failed");
+      setResult({
+        outputUrl: res.outputUrl,
+        mode,
+        prompt: p,
+        duration,
+        aspect,
+        quality: resolution,
+        size: resolution === "1080p" ? "large" : resolution === "720p" ? "medium" : "small",
+        soundRequested: promptMentionsAudio(p),
+        creditsUsed: res.creditsCharged ?? creditsEstimate,
+        sourcePreview: sourceUrl,
+      });
+      toast.success("Video ready");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate video");
     } finally {
+      window.clearInterval(stageTimer);
       setBusy(false);
       endGeneration();
     }
-  }, [canVideo, welcomeFree, prompt, maxPrompt, mode, tier, aspect, resolution, duration, sourceUrl, genFn]);
+  }, [
+    allowed, welcomeFree, prompt, mode, sourceUrl, duration, aspect, resolution, tier,
+    generate, navigate, creditsEstimate,
+  ]);
 
   const onDownload = useCallback(async () => {
-    if (!result?.url) return;
-    await triggerBrowserDownload(result.url, `motio-video-${Date.now()}.mp4`);
+    if (!result?.outputUrl) return;
+    try {
+      await triggerBrowserDownload(result.outputUrl, `motio2edit-video-${Date.now()}.mp4`);
+    } catch {
+      toast.error("Download failed");
+    }
   }, [result]);
 
   if (!user) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
-        <Video className="h-10 w-10 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">Sign in to use Video Studio</p>
+      <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 p-6">
+        <Video className="h-10 w-10 text-primary" />
+        <p className="text-center text-muted-foreground">Sign in to open Video Studio</p>
         <Button asChild><Link to="/auth">Sign in</Link></Button>
       </div>
     );
   }
 
+  if (!allowed && !welcomeFree) {
+    return (
+      <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 p-6">
+        <Lock className="h-10 w-10 text-amber-400" />
+        <p className="text-center text-lg font-semibold">Video Studio is on paid plans</p>
+        <p className="max-w-sm text-center text-sm text-muted-foreground">
+          Unlock cinematic text-to-video, image-to-video, and video-to-video.
+        </p>
+        <Button asChild><Link to="/pricing">View plans</Link></Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col bg-background">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-2">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/studio"><ArrowLeft className="h-4 w-4" /></Link>
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
+      <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b px-3">
+        <Button variant="ghost" size="icon" className="h-9 w-9" asChild>
+          <Link to="/studio" aria-label="Back to Studio">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
         </Button>
-        <div className="flex-1 text-sm font-semibold">Video Studio</div>
-        {!canVideo && !welcomeFree && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground"><Lock className="h-3 w-3" /> Pro</span>
-        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold tracking-wide">Video Studio</p>
+          <p className="truncate text-[11px] text-muted-foreground">Motio2edit · cinematic motion</p>
+        </div>
       </header>
 
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 pb-28">
+        <VideoModeSelector mode={mode} onChange={setMode} disabled={busy} />
+        {(mode === "image" || mode === "video") && (
+          <VideoSourceUpload
+            mode={mode}
+            sourceUrl={sourceUrl}
+            onFile={(f, url) => {
+              setSourceFile(f);
+              setSourceUrl(url);
+            }}
+            onClear={() => {
+              setSourceFile(null);
+              setSourceUrl(null);
+            }}
+            disabled={busy}
+          />
+        )}
+        <VideoPromptBar
+          value={prompt}
+          onChange={setPrompt}
+          maxLength={promptMax}
+          suggestions={[...VIDEO_PROMPT_SUGGESTIONS]}
+          disabled={busy}
+        />
+        <VideoStudioControls
+          tier={tier}
+          onTier={setTier}
+          duration={duration}
+          onDuration={setDuration}
+          aspect={aspect}
+          onAspect={setAspect}
+          resolution={resolution}
+          onResolution={setResolution}
+          maxDuration={maxDur}
+          caps={caps}
+          creditsEstimate={creditsEstimate}
+          disabled={busy}
+        />
+      </div>
+
       {!result && (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-          <VideoModeSelector mode={mode} onChange={setMode} />
-          {(mode === "image" || mode === "video") && (
-            <VideoSourceUpload mode={mode} url={sourceUrl} onUrl={setSourceUrl} />
-          )}
-          <VideoPromptBar
-            value={prompt}
-            onChange={setPrompt}
-            maxLength={maxPrompt}
-            suggestions={VIDEO_PROMPT_SUGGESTIONS}
-          />
-          <VideoStudioControls
-            tier={tier}
-            onTier={setTier}
-            aspect={aspect}
-            onAspect={setAspect}
-            resolution={resolution}
-            onResolution={setResolution}
-            duration={duration}
-            onDuration={setDuration}
-            maxDuration={availableMaxDurationFor(mode, tier)}
-            credits={credits}
-          />
-          <div className="mt-auto pt-2">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 p-3 backdrop-blur-md">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || !prompt.trim()}
               onClick={() => void onGenerate()}
               className={cn(
-                "flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground",
-                busy && "opacity-60",
+                "flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition",
+                busy || !prompt.trim()
+                  ? "cursor-not-allowed bg-muted text-muted-foreground"
+                  : "bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-[0.98]",
               )}
             >
               <Sparkles className="h-4 w-4" aria-hidden />
@@ -211,7 +288,9 @@ function VideoStudioPage() {
         </div>
       )}
 
-      {busy && <VideoGeneratingOverlay stageIndex={stageIdx} etaSeconds={eta} prompt={prompt.trim()} />}
+      {busy && (
+        <VideoGeneratingOverlay stageIndex={stageIdx} etaSeconds={eta} prompt={prompt.trim()} />
+      )}
       {result && !busy && (
         <VideoOutputView
           result={result}
