@@ -69,3 +69,28 @@ export const AUTO_EDIT_PIPELINE_STATES = [
 ] as const;
 
 export type AutoEditPipelineState = (typeof AUTO_EDIT_PIPELINE_STATES)[number];
+
+/** Human-readable label for a detected issue key or free-text issue. */
+export function labelIssue(issue: string): string {
+  const key = (issue || "").trim();
+  if (!key) return "Issue";
+  // Title-case snake/kebab keys; leave natural sentences as-is
+  if (/^[a-z0-9_\-]+$/i.test(key) && /[_\-]/.test(key)) {
+    return key
+      .replace(/[_\-]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/** Human-readable label for a recommended improvement action. */
+export function labelImprovement(action: string): string {
+  const key = (action || "").trim();
+  if (!key) return "Improvement";
+  if (/^[a-z0-9_\-]+$/i.test(key) && /[_\-]/.test(key)) {
+    return key
+      .replace(/[_\-]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
