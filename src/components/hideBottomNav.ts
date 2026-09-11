@@ -2,6 +2,7 @@
 export function hideBottomNav(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
   if (pathname.startsWith("/studio/video")) return true;
+  if (pathname.startsWith("/studio/frames")) return true;
   if (pathname === "/music" || pathname.startsWith("/music/")) return true;
   if (pathname.startsWith("/studio/music")) return true;
   if (pathname.startsWith("/studio/image/circle-remove")) return true;
