@@ -1,8 +1,15 @@
-import { useRef, useState } from "react";
-import { Download, RefreshCw, X, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+/**
+ * Full-viewport result experience for Video Studio.
+ */
+import { Download, Share2, RotateCcw, X, Maximize2 } from "lucide-react";
 import type { VideoStudioResult } from "./video-studio-types";
+
+function qualityLabel(q: string): string {
+  if (q === "480p" || q === "sd") return "SD · 480p";
+  if (q === "720p" || q === "hd") return "HD · 720p";
+  if (q === "1080p" || q === "fhd") return "FHD · 1080p";
+  return q;
+}
 
 export function VideoOutputView({
   result,
@@ -15,104 +22,95 @@ export function VideoOutputView({
   onRegenerate: () => void;
   onDownload: () => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [tab, setTab] = useState<"description" | "input">("description");
-
   const modeLabel =
-    result.mode === "text"
-      ? "Text → Video"
-      : result.mode === "image"
-        ? "Image → Video"
-        : "Video → Video";
+    result.mode === "text" ? "Text → Video" : result.mode === "image" ? "Image → Video" : "Video → Video";
+
+  const share = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Motio2edit Video", url: result.outputUrl });
+      } else {
+        await navigator.clipboard.writeText(result.outputUrl);
+      }
+    } catch {
+      /* cancelled */
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-background">
-      <header className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="text-base font-bold">Output</h2>
-        <button type="button" onClick={onClose} className="rounded-full p-2 hover:bg-muted" aria-label="Close">
-          <X className="h-5 w-5" />
+    <div className="absolute inset-0 z-50 flex flex-col bg-zinc-950">
+      <div className="flex items-center justify-between px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="grid h-9 w-9 place-items-center rounded-full border border-white/15 bg-white/5 text-white"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
         </button>
-      </header>
+        <p className="text-xs font-bold tracking-[0.18em] text-zinc-300">RESULT</p>
+        <span className="w-9" />
+      </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
-          <div className="overflow-hidden rounded-2xl bg-black">
-            <video
-              ref={videoRef}
-              src={result.outputUrl}
-              controls
-              playsInline
-              className="mx-auto max-h-[50vh] w-full"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={onRegenerate}>
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Regenerate
-            </Button>
-            <Button size="sm" variant="secondary" onClick={onDownload}>
-              <Download className="mr-1.5 h-3.5 w-3.5" /> Download
-            </Button>
-            <Button size="sm" variant="outline" onClick={onClose}>
-              <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit again
-            </Button>
-          </div>
-
-          <div className="flex gap-2 border-b border-border">
-            {(["description", "input"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={cn(
-                  "px-3 py-2 text-sm font-semibold capitalize",
-                  tab === t ? "border-b-2 border-red-500 text-red-600" : "text-muted-foreground",
-                )}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          {tab === "description" ? (
-            <div className="space-y-2 rounded-2xl border border-border p-4 text-sm">
-              <p className="font-semibold">About this video</p>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-muted-foreground">
-                <dt>Mode</dt>
-                <dd className="text-foreground">{modeLabel}</dd>
-                <dt>Quality</dt>
-                <dd className="text-foreground">{result.quality}</dd>
-                <dt>Aspect ratio</dt>
-                <dd className="text-foreground">{result.aspect}</dd>
-                <dt>Duration</dt>
-                <dd className="text-foreground">{result.duration}s</dd>
-                <dt>Audio</dt>
-                <dd className="text-foreground">{result.soundRequested ? "Requested" : "No"}</dd>
-                <dt>Credits used</dt>
-                <dd className="text-foreground">{result.creditsUsed}</dd>
-              </dl>
-              <p className="pt-2 text-xs text-muted-foreground">Prompt applied by Motio2AI</p>
-            </div>
-          ) : (
-            <div className="space-y-3 rounded-2xl border border-border p-4 text-sm">
-              <p className="font-semibold">Input</p>
-              <p className="text-muted-foreground">
-                Type: <span className="text-foreground">{modeLabel}</span>
-              </p>
-              {result.sourcePreview && (
-                <div className="overflow-hidden rounded-xl border bg-black/5">
-                  {result.mode === "video" ? (
-                    <video src={result.sourcePreview} className="mx-auto max-h-32 object-contain" />
-                  ) : result.mode === "image" ? (
-                    <img src={result.sourcePreview} alt="" className="mx-auto max-h-32 object-contain" />
-                  ) : null}
-                </div>
-              )}
-              <p className="text-muted-foreground">Prompt</p>
-              <p className="whitespace-pre-wrap text-foreground">{result.prompt || "—"}</p>
-            </div>
-          )}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-3">
+        <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl">
+          <video
+            src={result.outputUrl}
+            controls
+            playsInline
+            className="mx-auto max-h-[min(48dvh,420px)] w-full object-contain"
+          />
         </div>
+
+        <dl className="mt-3 grid w-full max-w-lg grid-cols-3 gap-2 text-center text-[10px] text-zinc-400">
+          <div className="rounded-lg border border-white/8 bg-white/5 px-1 py-1.5">
+            <dt className="text-zinc-500">Mode</dt>
+            <dd className="font-semibold text-zinc-200">{modeLabel}</dd>
+          </div>
+          <div className="rounded-lg border border-white/8 bg-white/5 px-1 py-1.5">
+            <dt className="text-zinc-500">Quality</dt>
+            <dd className="font-semibold text-zinc-200">{qualityLabel(result.quality)}</dd>
+          </div>
+          <div className="rounded-lg border border-white/8 bg-white/5 px-1 py-1.5">
+            <dt className="text-zinc-500">Duration</dt>
+            <dd className="font-semibold text-zinc-200">{result.duration}s · {result.aspect}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div
+        className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 px-3 pt-3"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        <button
+          type="button"
+          onClick={onDownload}
+          className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500 px-4 py-2.5 text-xs font-bold text-white"
+        >
+          <Download className="h-3.5 w-3.5" /> Download
+        </button>
+        <button
+          type="button"
+          onClick={() => void share()}
+          className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white"
+        >
+          <Share2 className="h-3.5 w-3.5" /> Share
+        </button>
+        <button
+          type="button"
+          onClick={onRegenerate}
+          className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white"
+        >
+          <RotateCcw className="h-3.5 w-3.5" /> Another
+        </button>
+        <a
+          href={result.outputUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-2.5 text-xs font-semibold text-white"
+        >
+          <Maximize2 className="h-3.5 w-3.5" /> Full
+        </a>
       </div>
     </div>
   );
