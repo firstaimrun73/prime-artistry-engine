@@ -15,3 +15,4 @@ export * from "./quote-service";
 export * from "./lifecycle";
 export * from "./product-quote";
 export { quoteVideoGeneration } from "./video-quote";
+export * from "./free-generation-entitlement";
