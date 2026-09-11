@@ -1,47 +1,52 @@
+/**
+ * Product-level generation stages — not provider internals.
+ */
 import { cn } from "@/lib/utils";
-import { VIDEO_GEN_STAGES } from "./video-studio-types";
+import { Video } from "lucide-react";
+
+const STAGES = ["Preparing scene", "Building motion", "Rendering video", "Finishing"] as const;
 
 export function VideoGeneratingOverlay({
   stageIndex,
   etaSeconds,
+  prompt,
 }: {
   stageIndex: number;
-  etaSeconds: number;
+  etaSeconds?: number;
+  prompt?: string;
 }) {
+  const idx = Math.min(Math.max(0, stageIndex), STAGES.length - 1);
   return (
-    <div className="rounded-2xl border border-red-500/20 bg-gradient-to-br from-red-500/5 to-orange-500/5 p-5">
-      <p className="mb-4 text-sm font-semibold">Generating video…</p>
-      <ol className="space-y-3">
-        {VIDEO_GEN_STAGES.map((s, i) => {
-          const done = i < stageIndex;
-          const active = i === stageIndex;
-          return (
-            <li
-              key={s.id}
+    <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-5 bg-zinc-950/90 px-6 backdrop-blur-md">
+      <div
+        className={cn(
+          "relative grid h-16 w-16 place-items-center rounded-2xl border border-red-500/40 bg-red-500/10",
+          "motion-safe:animate-pulse",
+        )}
+      >
+        <Video className="h-7 w-7 text-red-400" />
+        <span className="pointer-events-none absolute inset-0 rounded-2xl shadow-[0_0_28px_rgba(239,68,68,0.35)] motion-safe:animate-pulse" />
+      </div>
+      <div className="w-full max-w-xs space-y-2 text-center">
+        <p className="text-sm font-semibold text-white">{STAGES[idx]}</p>
+        {etaSeconds != null && etaSeconds > 0 && (
+          <p className="text-[11px] text-zinc-400">About {etaSeconds}s · keep this tab open</p>
+        )}
+        {prompt && (
+          <p className="line-clamp-2 text-[11px] text-zinc-500">“{prompt}”</p>
+        )}
+        <div className="mt-3 flex justify-center gap-1.5">
+          {STAGES.map((_, i) => (
+            <span
+              key={i}
               className={cn(
-                "flex items-center gap-3 text-sm",
-                done && "text-red-600",
-                active && "font-semibold text-foreground",
-                !done && !active && "text-muted-foreground",
+                "h-1 w-6 rounded-full transition-colors",
+                i <= idx ? "bg-red-500" : "bg-white/15",
               )}
-            >
-              <span
-                className={cn(
-                  "flex h-7 w-7 items-center justify-center rounded-full border text-[10px]",
-                  done && "border-red-500 bg-red-500/15",
-                  active && "border-red-500 bg-red-500/10 animate-pulse",
-                )}
-              >
-                {done ? "✓" : i + 1}
-              </span>
-              {s.label}
-            </li>
-          );
-        })}
-      </ol>
-      <p className="mt-4 text-center text-xs text-muted-foreground">
-        Expected ~{etaSeconds}s — keep this tab open
-      </p>
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
