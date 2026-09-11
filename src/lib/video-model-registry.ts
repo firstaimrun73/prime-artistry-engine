@@ -114,3 +114,52 @@ export function applyVideoStyle(prompt: string, styleId: string | null | undefin
 export function getVideoModel(id: string) {
   return getApprovedModel(id);
 }
+
+/** Compatibility: UI capability snapshot by product tier (mode-agnostic durations). */
+export function capabilitiesForTier(productMode: VideoProductMode | VideoTier, _mode?: VideoGenMode) {
+  return capabilitiesForMode(productMode as VideoProductMode);
+}
+
+/**
+ * Compatibility wrapper used by Video Studio UI.
+ * Prefer selectApprovedVideoRoute for new code.
+ */
+export function selectVideoModel(opts: {
+  mode: VideoGenMode;
+  tier: VideoProductMode | VideoTier;
+  durationSec: number;
+  resolution: VideoResolution;
+  aspect: VideoAspect;
+  soundOn: boolean;
+}): { id: string; nativeAudio: boolean; endpoint: string } | null {
+  const route = selectApprovedVideoRoute({
+    mode: opts.mode,
+    productMode: opts.tier as VideoProductMode,
+    durationSec: opts.durationSec,
+    resolution: opts.resolution,
+    aspect: opts.aspect,
+    audio: opts.soundOn,
+  });
+  if (!route) return null;
+  return {
+    id: route.model.id,
+    nativeAudio: !!route.model.nativeAudio,
+    endpoint: route.endpoint,
+  };
+}
+
+/** Message when no approved route matches current UI settings. */
+export function videoSelectionUnavailableMessage(_opts?: unknown): string {
+  return "This combination isn't available right now. Try a shorter duration or lower quality.";
+}
+
+export function availableMaxDurationForTierMode(
+  productMode: VideoProductMode | VideoTier,
+  mode: VideoGenMode,
+): number {
+  try {
+    return availableMaxDurationFor(productMode as VideoProductMode, "720p", false);
+  } catch {
+    return productMode === "premium" ? 15 : 10;
+  }
+}
