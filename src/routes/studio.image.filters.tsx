@@ -10,7 +10,7 @@ export const Route = createFileRoute("/studio/image/filters")({
       {
         name: "description",
         content:
-          "Browse 100 original Motio2edit photographic filters — search, categories, and free/premium catalog.",
+          "Motio2edit photographic filters — Natural, Portrait, Cinematic, Film and more. Live preview on your photo.",
       },
     ],
   }),
@@ -25,7 +25,7 @@ function FiltersDiscoveryPage() {
       kind="filter"
       pageMode="discover"
       title="Filters"
-      subtitle={`${ALL_FILTERS.length} original Motio2edit filters · first 10 free`}
+      subtitle={`${ALL_FILTERS.length} Motio2edit filters · live preview on your photo`}
       items={items}
       categories={categories}
     />
