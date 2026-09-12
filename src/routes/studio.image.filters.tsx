@@ -25,7 +25,7 @@ function FiltersDiscoveryPage() {
       kind="filter"
       pageMode="discover"
       title="Filters"
-      subtitle={`${ALL_FILTERS.length} Motio2edit filters · live preview on your photo`}
+      subtitle="100+ AI Filters · Live preview on your photo"
       items={items}
       categories={categories}
     />
