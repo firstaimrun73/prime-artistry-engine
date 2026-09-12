@@ -5,7 +5,6 @@ import { cloneImage } from "@/lib/filter-lens/filters/filter-engine";
 import type { LucideIcon } from "lucide-react";
 import { SunMedium, Contrast, Palette, Aperture, CircleDot, Focus } from "lucide-react";
 import { createElement, type SVGProps } from "react";
-import { FILTERS_WM_DATA_URL } from "./filters-wm-asset";
 
 /** Film-grain / stipple icon — texture, not AI sparkle. (no JSX — this is a .ts file) */
 export function GrainIcon(props: SVGProps<SVGSVGElement>) {
@@ -86,13 +85,7 @@ export const COLOR_SWATCHES = [
   { id: "purple", label: "Purple", rgb: [140, 70, 200] as const },
 ];
 
-export const ADJUST_META: {
-  key: AdjustKey;
-  label: string;
-  icon: LucideIcon | typeof GrainIcon;
-  min: number;
-  max: number;
-}[] = [
+export const ADJUST_META: { key: AdjustKey; label: string; icon: LucideIcon | typeof GrainIcon; min: number; max: number }[] = [
   { key: "light", label: "Light", icon: SunMedium, min: -50, max: 50 },
   { key: "shadow", label: "Shadow", icon: Contrast, min: -50, max: 50 },
   { key: "color", label: "Color", icon: Palette, min: -50, max: 50 },
@@ -216,41 +209,18 @@ export function hasAdj(adj: AdjustValues, colorId: string): boolean {
 }
 
 /**
- * Exact Motio2edit Filters watermark asset (supplied PNG — glossy wordmark + orange 2 + sparkle).
- * Exact supplied PNG pixels via filters-wm-asset; never CSS/text redraw.
- * Applied on OUTPUT / download only — never on editor preview.
- */
-let _wmImg: HTMLImageElement | null = null;
-function loadFiltersWm(): Promise<HTMLImageElement> {
-  if (_wmImg && _wmImg.complete && _wmImg.naturalWidth > 0) {
-    return Promise.resolve(_wmImg);
-  }
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      _wmImg = img;
-      resolve(img);
-    };
-    img.onerror = () => reject(new Error("filters wm load"));
-    img.src = FILTERS_WM_DATA_URL;
-  });
-}
-
-/**
- * Bake the exact Motio2edit Filters watermark onto the final bitmap (output only).
- * Larger mark, bottom-right, preserves aspect of the supplied asset.
+ * Original Motio2edit watermark: geometric camera mark + MOTIO2EDIT wordmark.
+ * Baked into the final bitmap for free users (output / download only).
+ * Never drawn on editor preview or thumbnails.
  */
 export async function applyOutputWatermark(srcUrl: string): Promise<string> {
-  const [img, wm] = await Promise.all([
-    new Promise<HTMLImageElement>((res, rej) => {
-      const i = new Image();
-      i.crossOrigin = "anonymous";
-      i.onload = () => res(i);
-      i.onerror = () => rej(new Error("wm src load"));
-      i.src = srcUrl;
-    }),
-    loadFiltersWm(),
-  ]);
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.crossOrigin = "anonymous";
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error("wm src load"));
+    i.src = srcUrl;
+  });
 
   const c = document.createElement("canvas");
   c.width = img.naturalWidth;
@@ -259,23 +229,62 @@ export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   ctx.drawImage(img, 0, 0);
 
   const minDim = Math.min(c.width, c.height);
-  // Larger watermark: ~42–52% of min dimension width
-  const targetW = Math.max(
-    160,
-    Math.round(Math.min(c.width * 0.46, minDim * 0.52)),
-  );
-  const aspect = wm.naturalWidth / Math.max(1, wm.naturalHeight);
-  const targetH = Math.round(targetW / aspect);
-  const pad = Math.max(14, Math.round(minDim * 0.028));
-  const x = c.width - pad - targetW;
-  const y = c.height - pad - targetH;
+  const pad = Math.max(14, Math.round(minDim * 0.022));
+  const fs = Math.max(13, Math.round(minDim * 0.03));
+  const iconSize = Math.max(16, Math.round(fs * 1.25));
+  const gap = Math.max(5, Math.round(fs * 0.32));
+
+  ctx.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
+  const text = "MOTIO2EDIT";
+  const tw = ctx.measureText(text).width;
+  const totalW = iconSize + gap + tw;
+  const xRight = c.width - pad;
+  const yBase = c.height - pad;
+  const iconX = xRight - totalW;
+  const iconY = yBase - iconSize + 1;
 
   ctx.save();
-  ctx.globalAlpha = 0.94;
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = Math.max(4, Math.round(minDim * 0.008));
+  ctx.globalAlpha = 0.88;
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 6;
   ctx.shadowOffsetY = 1;
-  ctx.drawImage(wm, x, y, targetW, targetH);
+
+  const ox = iconX;
+  const oy = iconY;
+  const s = iconSize;
+  const r = s * 0.16;
+  ctx.fillStyle = "#FF5A1F";
+  ctx.beginPath();
+  ctx.moveTo(ox + r, oy + s * 0.22);
+  ctx.lineTo(ox + s * 0.28, oy + s * 0.22);
+  ctx.lineTo(ox + s * 0.34, oy + s * 0.08);
+  ctx.lineTo(ox + s * 0.66, oy + s * 0.08);
+  ctx.lineTo(ox + s * 0.72, oy + s * 0.22);
+  ctx.lineTo(ox + s - r, oy + s * 0.22);
+  ctx.quadraticCurveTo(ox + s, oy + s * 0.22, ox + s, oy + s * 0.22 + r);
+  ctx.lineTo(ox + s, oy + s - r);
+  ctx.quadraticCurveTo(ox + s, oy + s, ox + s - r, oy + s);
+  ctx.lineTo(ox + r, oy + s);
+  ctx.quadraticCurveTo(ox, oy + s, ox, oy + s - r);
+  ctx.lineTo(ox, oy + s * 0.22 + r);
+  ctx.quadraticCurveTo(ox, oy + s * 0.22, ox + r, oy + s * 0.22);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.beginPath();
+  ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FF5A1F";
+  ctx.beginPath();
+  ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(text, iconX + iconSize + gap, yBase - 1);
+
   ctx.restore();
 
   return new Promise((resolve, reject) => {
