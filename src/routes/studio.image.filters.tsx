@@ -10,7 +10,7 @@ export const Route = createFileRoute("/studio/image/filters")({
       {
         name: "description",
         content:
-          "Motio2edit Filters — 100+ looks with live preview. Natural, Portrait, Cinematic, Film and more.",
+          "Motio2edit Filters — AI-powered looks with live preview. Natural, Portrait, Cinematic, Comic, Sketch and more.",
       },
     ],
   }),
@@ -25,7 +25,7 @@ function FiltersDiscoveryPage() {
       kind="filter"
       pageMode="discover"
       title="Filters"
-      subtitle="100+ AI Filters"
+      subtitle="AI Filters"
       items={items}
       categories={categories}
     />
