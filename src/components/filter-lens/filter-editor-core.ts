@@ -1,9 +1,30 @@
-/** Shared Filters editor helpers — adjust pipeline + watermark (output only). */
+/** Shared Filters editor helpers — adjust pipeline + output-only watermark. */
 import type { FilterDefinition } from "@/lib/filter-lens/filters/filter-types";
 import type { RGBAImage } from "@/lib/filter-lens/shared/processing-types";
 import { cloneImage } from "@/lib/filter-lens/filters/filter-engine";
 import type { LucideIcon } from "lucide-react";
-import { SunMedium, Contrast, Palette, Aperture, CircleDot, Focus, Sparkles } from "lucide-react";
+import { SunMedium, Contrast, Palette, Aperture, CircleDot, Focus } from "lucide-react";
+import type { SVGProps } from "react";
+
+/** Film-grain / stipple icon — texture, not AI sparkle. */
+export function GrainIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" {...props}>
+      <circle cx="6" cy="7" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="11" cy="5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="7" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="13" cy="11" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="12" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="17" r="1" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="18" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="16" r="0.95" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="18" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export type CatalogBadge = "ai+" | "pro" | "premium" | null;
 
 export type CatalogItem = {
   id: string;
@@ -13,21 +34,29 @@ export type CatalogItem = {
   intensityDefault: number;
   isFree: boolean;
   kind: "filter" | "lens";
-  badge?: "premium" | "ai+" | null;
+  badge: CatalogBadge;
+  animatedThumb?: boolean;
 };
 
+/** Explicit FilterDefinition.tier is the only source of badge truth. */
 export function filterToCatalogItem(f: FilterDefinition, index = 0): CatalogItem {
-  let badge: "premium" | "ai+" | null = null;
-  if (index >= 10) badge = index % 7 === 0 ? "ai+" : "premium";
+  const isFree = index < 10 || !!f.unlock?.isFree;
+  let badge: CatalogBadge = null;
+  if (!isFree && f.tier) {
+    if (f.tier === "ai+" || f.tier === "pro" || f.tier === "premium") {
+      badge = f.tier;
+    }
+  }
   return {
     id: f.id,
     name: f.name,
     category: f.category,
     description: f.description,
     intensityDefault: f.intensityRange?.default ?? 85,
-    isFree: index < 10 || !!f.unlock?.isFree,
+    isFree,
     kind: "filter",
     badge,
+    animatedThumb: !!f.animatedThumb,
   };
 }
 
@@ -52,14 +81,20 @@ export const COLOR_SWATCHES = [
   { id: "purple", label: "Purple", rgb: [140, 70, 200] as const },
 ];
 
-export const ADJUST_META: { key: AdjustKey; label: string; icon: LucideIcon; min: number; max: number }[] = [
+export const ADJUST_META: {
+  key: AdjustKey;
+  label: string;
+  icon: LucideIcon | typeof GrainIcon;
+  min: number;
+  max: number;
+}[] = [
   { key: "light", label: "Light", icon: SunMedium, min: -50, max: 50 },
   { key: "shadow", label: "Shadow", icon: Contrast, min: -50, max: 50 },
   { key: "color", label: "Color", icon: Palette, min: -50, max: 50 },
   { key: "hue", label: "Hue", icon: Aperture, min: -180, max: 180 },
   { key: "vignette", label: "Vignette", icon: CircleDot, min: 0, max: 100 },
   { key: "sharpness", label: "Sharpness", icon: Focus, min: 0, max: 100 },
-  { key: "grain", label: "Grain", icon: Sparkles, min: 0, max: 100 },
+  { key: "grain", label: "Grain", icon: GrainIcon, min: 0, max: 100 },
 ];
 
 function clamp8(v: number): number {
@@ -175,6 +210,10 @@ export function hasAdj(adj: AdjustValues, colorId: string): boolean {
   );
 }
 
+/**
+ * Original Motio2edit watermark: geometric camera mark + MOTIO2EDIT wordmark.
+ * Baked into the final bitmap for free users only (output / download).
+ */
 export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   const img = new Image();
   img.crossOrigin = "anonymous";
@@ -188,18 +227,74 @@ export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   c.height = img.naturalHeight;
   const ctx = c.getContext("2d")!;
   ctx.drawImage(img, 0, 0);
-  const pad = Math.max(12, Math.round(Math.min(c.width, c.height) * 0.02));
-  const fs = Math.max(11, Math.round(Math.min(c.width, c.height) * 0.028));
+
+  const minDim = Math.min(c.width, c.height);
+  const pad = Math.max(14, Math.round(minDim * 0.022));
+  const fs = Math.max(12, Math.round(minDim * 0.028));
+  const iconSize = Math.max(15, Math.round(fs * 1.2));
+  const gap = Math.max(5, Math.round(fs * 0.3));
+
+  ctx.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
+  const text = "MOTIO2EDIT";
+  const tw = ctx.measureText(text).width;
+  const totalW = iconSize + gap + tw;
+  const xRight = c.width - pad;
+  const yBase = c.height - pad;
+  const iconX = xRight - totalW;
+  const iconY = yBase - iconSize + 1;
+
   ctx.save();
-  ctx.font = `600 ${fs}px system-ui, sans-serif`;
-  ctx.textAlign = "right";
-  ctx.textBaseline = "bottom";
-  ctx.fillStyle = "rgba(255,255,255,0.72)";
-  ctx.shadowColor = "rgba(0,0,0,0.45)";
-  ctx.shadowBlur = 4;
-  ctx.fillText("MOTIO2EDIT", c.width - pad, c.height - pad);
+  ctx.globalAlpha = 0.82;
+  ctx.shadowColor = "rgba(0,0,0,0.55)";
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 1;
+
+  // Original Motio2edit geometric camera / frame mark
+  const ox = iconX;
+  const oy = iconY;
+  const s = iconSize;
+  const r = s * 0.16;
+  ctx.fillStyle = "#FF5A1F";
+  ctx.beginPath();
+  ctx.moveTo(ox + r, oy + s * 0.22);
+  ctx.lineTo(ox + s * 0.28, oy + s * 0.22);
+  ctx.lineTo(ox + s * 0.34, oy + s * 0.08);
+  ctx.lineTo(ox + s * 0.66, oy + s * 0.08);
+  ctx.lineTo(ox + s * 0.72, oy + s * 0.22);
+  ctx.lineTo(ox + s - r, oy + s * 0.22);
+  ctx.quadraticCurveTo(ox + s, oy + s * 0.22, ox + s, oy + s * 0.22 + r);
+  ctx.lineTo(ox + s, oy + s - r);
+  ctx.quadraticCurveTo(ox + s, oy + s, ox + s - r, oy + s);
+  ctx.lineTo(ox + r, oy + s);
+  ctx.quadraticCurveTo(ox, oy + s, ox, oy + s - r);
+  ctx.lineTo(ox, oy + s * 0.22 + r);
+  ctx.quadraticCurveTo(ox, oy + s * 0.22, ox + r, oy + s * 0.22);
+  ctx.closePath();
+  ctx.fill();
+
+  // Lens
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.beginPath();
+  ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#FF5A1F";
+  ctx.beginPath();
+  ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wordmark
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(text, iconX + iconSize + gap, yBase - 1);
+
   ctx.restore();
+
   return new Promise((resolve, reject) => {
-    c.toBlob((b) => (b ? resolve(URL.createObjectURL(b)) : reject(new Error("wm blob"))), "image/jpeg", 0.94);
+    c.toBlob(
+      (b) => (b ? resolve(URL.createObjectURL(b)) : reject(new Error("wm blob"))),
+      "image/jpeg",
+      0.94,
+    );
   });
 }
