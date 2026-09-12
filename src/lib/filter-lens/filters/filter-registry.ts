@@ -1,23 +1,11 @@
 /**
  * filters/filter-registry.ts
- * Merges all filter definition files into a single registry.
+ * Curated Motio2edit AI Filters registry (~36 unique looks).
  */
 import { FilterDefinition, FilterCategory, FILTER_CATEGORIES } from './filter-types';
-import { FILTERS_001_025 } from './filters-001-025';
-import { FILTERS_026_050 } from './filters-026-050';
-import { FILTERS_051_075 } from './filters-051-075';
-import { FILTERS_076_100 } from './filters-076-100';
-import { FILTERS_101_130 } from './filters-101-130';
-import { FILTERS_131_145 } from './filters-131-145';
+import { FILTERS_CURATED } from './filters-curated';
 
-export const ALL_FILTERS: FilterDefinition[] = [
-  ...FILTERS_001_025,
-  ...FILTERS_026_050,
-  ...FILTERS_051_075,
-  ...FILTERS_076_100,
-  ...FILTERS_101_130,
-  ...FILTERS_131_145,
-];
+export const ALL_FILTERS: FilterDefinition[] = [...FILTERS_CURATED];
 
 export function getFilterById(id: string): FilterDefinition | undefined {
   return ALL_FILTERS.find((f) => f.id === id);
@@ -28,7 +16,8 @@ export function getFiltersByCategory(category: FilterCategory): FilterDefinition
 }
 
 export function listFilterCategories(): FilterCategory[] {
-  return FILTER_CATEGORIES;
+  const present = new Set(ALL_FILTERS.map((f) => f.category));
+  return FILTER_CATEGORIES.filter((c) => present.has(c));
 }
 
 export function getFreeFilters(): FilterDefinition[] {
@@ -46,8 +35,8 @@ export interface RegistryValidationResult {
 
 export function validateFilterRegistry(): RegistryValidationResult {
   const errors: string[] = [];
-  if (ALL_FILTERS.length < 120) {
-    errors.push(`Expected at least 120 filters, found ${ALL_FILTERS.length}`);
+  if (ALL_FILTERS.length < 20) {
+    errors.push(`Expected at least 20 curated filters, found ${ALL_FILTERS.length}`);
   }
   const ids = new Set<string>();
   const names = new Set<string>();
@@ -70,8 +59,8 @@ export function validateFilterRegistry(): RegistryValidationResult {
     }
   }
   const freeCount = getFreeFilters().length;
-  if (freeCount !== 10) {
-    errors.push(`Expected exactly 10 free filters, found ${freeCount}`);
+  if (freeCount !== 5) {
+    errors.push(`Expected exactly 5 free filters, found ${freeCount}`);
   }
   return { valid: errors.length === 0, errors };
 }
