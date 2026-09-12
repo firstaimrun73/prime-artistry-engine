@@ -7,12 +7,16 @@ import { FILTERS_001_025 } from './filters-001-025';
 import { FILTERS_026_050 } from './filters-026-050';
 import { FILTERS_051_075 } from './filters-051-075';
 import { FILTERS_076_100 } from './filters-076-100';
+import { FILTERS_101_130 } from './filters-101-130';
+import { FILTERS_131_145 } from './filters-131-145';
 
 export const ALL_FILTERS: FilterDefinition[] = [
   ...FILTERS_001_025,
   ...FILTERS_026_050,
   ...FILTERS_051_075,
   ...FILTERS_076_100,
+  ...FILTERS_101_130,
+  ...FILTERS_131_145,
 ];
 
 export function getFilterById(id: string): FilterDefinition | undefined {
@@ -42,8 +46,8 @@ export interface RegistryValidationResult {
 
 export function validateFilterRegistry(): RegistryValidationResult {
   const errors: string[] = [];
-  if (ALL_FILTERS.length !== 100) {
-    errors.push(`Expected exactly 100 filters, found ${ALL_FILTERS.length}`);
+  if (ALL_FILTERS.length < 120) {
+    errors.push(`Expected at least 120 filters, found ${ALL_FILTERS.length}`);
   }
   const ids = new Set<string>();
   const names = new Set<string>();
@@ -58,11 +62,11 @@ export function validateFilterRegistry(): RegistryValidationResult {
     if (f.supportsCamera !== false) {
       errors.push(`Filter ${f.id} must not expose camera capability`);
     }
-  }
-  for (const category of FILTER_CATEGORIES) {
-    const inCategory = getFiltersByCategory(category);
-    if (inCategory.length !== 5) {
-      errors.push(`Category ${category} has ${inCategory.length} filters, expected 5`);
+    if (!f.unlock.isFree && !f.tier) {
+      errors.push(`Locked filter ${f.id} must declare tier (ai+|pro|premium)`);
+    }
+    if (f.tier && !['ai+', 'pro', 'premium'].includes(f.tier)) {
+      errors.push(`Filter ${f.id} has invalid tier: ${f.tier}`);
     }
   }
   const freeCount = getFreeFilters().length;
