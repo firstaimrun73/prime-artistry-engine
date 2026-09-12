@@ -17,6 +17,7 @@ import {
   Share2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
 import { cn } from "@/lib/utils";
 import {
   fileToRGBAImage,
@@ -92,8 +93,10 @@ function OrangeSlider({
 export function EffectStudioPage({
   kind, pageMode: _pageMode, title, subtitle: _subtitle, items, categories, initialSelectedId = null,
 }: Props) {
-  const { profile } = useAuth();
-  const freeUser = !profile || profile.plan === "free" || !profile.plan;
+  const { profile, user } = useAuth();
+  const isAdmin = isAdminEmail(user?.email ?? profile?.email);
+  // Free = no paid plan and not admin. Admin treated as fully unlocked for testing.
+  const freeUser = !isAdmin && (!profile || profile.plan === "free" || !profile.plan);
   const [category, setCategory] = useState<string | "all">("all");
   const [editorTab, setEditorTab] = useState<"filter" | "adjust">("filter");
   const [adj, setAdj] = useState<AdjustValues>({ ...DEFAULT_ADJ });
@@ -125,7 +128,7 @@ export function EffectStudioPage({
   const thumbRgba = useRef<RGBAImage | null>(null);
   const selectLock = useRef(false);
   const selected = useMemo(() => items.find((i) => i.id === selectedId) ?? null, [items, selectedId]);
-  const isUnlocked = useCallback((item: CatalogItem) => item.isFree === true, []);
+  const isUnlocked = useCallback((item: CatalogItem) => isAdmin || item.isFree === true, [isAdmin]);
   const filtered = useMemo(() => (category === "all" ? items : items.filter((i) => i.category === category)), [items, category]);
   const colorTint = useMemo(() => {
     const sw = COLOR_SWATCHES.find((s) => s.id === colorId);
@@ -276,7 +279,7 @@ export function EffectStudioPage({
             <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
           </div>
         </header>
-        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10">
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 min-h-0">
           <p className="mb-5 max-w-sm text-center text-sm text-[#6F6862]">AI-powered filters · live preview on your photo</p>
           <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
             className="flex w-full flex-col items-center gap-4 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/45 bg-[#FFF1E6] px-6 py-16 transition hover:border-[#FF5A1F] hover:bg-[#FFE6DA]">
@@ -329,16 +332,50 @@ export function EffectStudioPage({
             <button type="button" onClick={onRestart} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Restart"><RotateCcw className="h-5 w-5" /></button>
             <button type="button" onClick={() => setComparing((v) => !v)} className={cn("grid h-11 w-11 place-items-center rounded-xl", comparing && "bg-[#FFE6DA] text-[#FF5A1F]")} aria-label="Compare"><Columns2 className="h-5 w-5" /></button>
             <button type="button" onClick={onDownload} className="grid h-11 w-11 place-items-center rounded-xl bg-[#FFE8DA]" aria-label="Download"><Download className="h-5 w-5" /></button>
-            <button type="button" onClick={() => void onShare()} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Share"><Share2 className="h-5 w-5" /></button>
           </div>
-          {freeUser ? (
-            <p className="mb-2 text-center text-[11px] text-[#6F6862]">Free plan includes Motio2edit watermark</p>
-          ) : (
-            <label className="mb-2 flex items-center justify-center gap-2 text-xs text-[#6F6862]">
-              <input type="checkbox" checked={wmEnabled} onChange={(e) => setWmEnabled(e.target.checked)} />
+          <div className="mb-3 flex flex-col items-center gap-1">
+            <button
+              type="button"
+              disabled={freeUser}
+              onClick={() => {
+                if (freeUser) {
+                  toast.message("Free plan watermark cannot be removed");
+                  return;
+                }
+                setWmEnabled((v) => !v);
+              }}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold",
+                freeUser
+                  ? "cursor-not-allowed border-[#E8E0D8] bg-[#F5F0EB] text-[#6F6862] opacity-90"
+                  : showWm
+                    ? "border-[#FF5A1F]/40 bg-[#FFE8DA] text-[#FF5A1F]"
+                    : "border-[#E8E0D8] bg-white text-[#161412]",
+              )}
+              aria-pressed={showWm}
+              aria-label={freeUser ? "Watermark locked on free plan" : "Toggle watermark"}
+            >
+              <span
+                className={cn(
+                  "relative inline-flex h-4 w-7 items-center rounded-full transition",
+                  showWm ? "bg-[#FF5A1F]" : "bg-[#D4CDC4]",
+                )}
+                aria-hidden
+              >
+                <span
+                  className={cn(
+                    "absolute h-3 w-3 rounded-full bg-white shadow transition",
+                    showWm ? "right-0.5" : "left-0.5",
+                  )}
+                />
+              </span>
               Watermark
-            </label>
-          )}
+              {freeUser ? <span className="text-[10px] font-medium opacity-80">Locked</span> : null}
+            </button>
+            {freeUser ? (
+              <p className="text-center text-[10px] text-[#6F6862]">Free plan includes Motio2edit watermark</p>
+            ) : null}
+          </div>
           <div className="flex gap-2">
             <button type="button" onClick={onDownload} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white"><Download className="h-4 w-4" /> Download</button>
             <button type="button" onClick={() => void onShare()} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[#E8E0D8] bg-white py-3 text-sm font-bold text-[#161412]"><Share2 className="h-4 w-4" /> Share</button>
@@ -380,7 +417,16 @@ export function EffectStudioPage({
                           {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-[#E8E0D8]" />}
                           {isSel && <span className="absolute right-1 top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#FF5A1F] text-[11px] font-bold text-white">✓</span>}
                           {!item.isFree && item.badge && (
-                            <span className="absolute left-1 top-1 rounded bg-black/70 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white">{item.badge === "ai+" ? "AI+" : "Premium"}</span>
+                            item.badge === "ai+" ? (
+                              <span className="absolute left-1 top-1 inline-flex items-center rounded bg-[#1B3A6B]/90 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#7EC8FF] ring-1 ring-[#7EC8FF]/40">AI+</span>
+                            ) : (
+                              <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-gradient-to-r from-[#8B6914] to-[#C9A227] px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#FFF8E7] shadow-sm">
+                                <svg className="h-2.5 w-2.5 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                                  <path d="M8 1.5l1.6 3.6 3.9.3-3 2.7.9 3.8L8 9.8l-3.4 2.1.9-3.8-3-2.7 3.9-.3L8 1.5z" />
+                                </svg>
+                                Premium
+                              </span>
+                            )
                           )}
                           <span className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center text-[9px] font-semibold uppercase tracking-wide text-white truncate">{item.name}</span>
                         </div>
@@ -404,8 +450,9 @@ export function EffectStudioPage({
                 </div>
                 <div className="flex gap-1 overflow-x-auto px-1 scrollbar-none">
                   {ADJUST_META.map((m) => (
-                    <button key={m.key} type="button" onClick={() => setAdjKey(m.key)} className={cn("flex min-w-[60px] flex-col items-center gap-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide", adjKey === m.key ? "text-[#FF5A1F]" : "text-[#6F6862]")}>
-                      <span className="text-xl">{typeof m.icon === "function" ? null : null}{m.label}</span>
+                    <button key={m.key} type="button" onClick={() => setAdjKey(m.key)} className={cn("flex min-w-[64px] shrink-0 flex-col items-center gap-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide", adjKey === m.key ? "text-[#FF5A1F]" : "text-[#6F6862]")}>
+                      <m.icon className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
+                      <span className="leading-tight">{m.label}</span>
                       <span className={cn("h-1 w-1 rounded-full", adjKey === m.key || adj[m.key] !== 0 ? "bg-[#FF5A1F]" : "bg-transparent")} />
                     </button>
                   ))}
