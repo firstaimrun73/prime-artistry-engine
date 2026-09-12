@@ -5,6 +5,7 @@ import { cloneImage } from "@/lib/filter-lens/filters/filter-engine";
 import type { LucideIcon } from "lucide-react";
 import { SunMedium, Contrast, Palette, Aperture, CircleDot, Focus } from "lucide-react";
 import { createElement, type SVGProps } from "react";
+import { FILTERS_WM_DATA_URL } from "./filters-wm-asset";
 
 /** Film-grain / stipple icon — texture, not AI sparkle. (no JSX — this is a .ts file) */
 export function GrainIcon(props: SVGProps<SVGSVGElement>) {
@@ -209,9 +210,8 @@ export function hasAdj(adj: AdjustValues, colorId: string): boolean {
 }
 
 /**
- * Original Motio2edit watermark: geometric camera mark + MOTIO2EDIT wordmark.
- * Baked into the final bitmap for free users (output / download only).
- * Never drawn on editor preview or thumbnails.
+ * Exact supplied Motio2edit Filters watermark PNG on output only.
+ * Falls back to camera + MOTIO2EDIT if asset fails to load.
  */
 export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   const img = await new Promise<HTMLImageElement>((res, rej) => {
@@ -230,62 +230,74 @@ export async function applyOutputWatermark(srcUrl: string): Promise<string> {
 
   const minDim = Math.min(c.width, c.height);
   const pad = Math.max(14, Math.round(minDim * 0.022));
-  const fs = Math.max(13, Math.round(minDim * 0.03));
-  const iconSize = Math.max(16, Math.round(fs * 1.25));
-  const gap = Math.max(5, Math.round(fs * 0.32));
 
-  ctx.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
-  const text = "MOTIO2EDIT";
-  const tw = ctx.measureText(text).width;
-  const totalW = iconSize + gap + tw;
-  const xRight = c.width - pad;
-  const yBase = c.height - pad;
-  const iconX = xRight - totalW;
-  const iconY = yBase - iconSize + 1;
-
-  ctx.save();
-  ctx.globalAlpha = 0.88;
-  ctx.shadowColor = "rgba(0,0,0,0.55)";
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 1;
-
-  const ox = iconX;
-  const oy = iconY;
-  const s = iconSize;
-  const r = s * 0.16;
-  ctx.fillStyle = "#FF5A1F";
-  ctx.beginPath();
-  ctx.moveTo(ox + r, oy + s * 0.22);
-  ctx.lineTo(ox + s * 0.28, oy + s * 0.22);
-  ctx.lineTo(ox + s * 0.34, oy + s * 0.08);
-  ctx.lineTo(ox + s * 0.66, oy + s * 0.08);
-  ctx.lineTo(ox + s * 0.72, oy + s * 0.22);
-  ctx.lineTo(ox + s - r, oy + s * 0.22);
-  ctx.quadraticCurveTo(ox + s, oy + s * 0.22, ox + s, oy + s * 0.22 + r);
-  ctx.lineTo(ox + s, oy + s - r);
-  ctx.quadraticCurveTo(ox + s, oy + s, ox + s - r, oy + s);
-  ctx.lineTo(ox + r, oy + s);
-  ctx.quadraticCurveTo(ox, oy + s, ox, oy + s - r);
-  ctx.lineTo(ox, oy + s * 0.22 + r);
-  ctx.quadraticCurveTo(ox, oy + s * 0.22, ox + r, oy + s * 0.22);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.beginPath();
-  ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#FF5A1F";
-  ctx.beginPath();
-  ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.12, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(255,255,255,0.94)";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText(text, iconX + iconSize + gap, yBase - 1);
-
-  ctx.restore();
+  try {
+    const wm = await new Promise<HTMLImageElement>((res, rej) => {
+      const w = new Image();
+      w.onload = () => res(w);
+      w.onerror = () => rej(new Error("wm asset"));
+      w.src = FILTERS_WM_DATA_URL;
+    });
+    const targetW = Math.max(140, Math.round(Math.min(c.width * 0.42, minDim * 0.48)));
+    const aspect = wm.naturalWidth / Math.max(1, wm.naturalHeight);
+    const targetH = Math.round(targetW / aspect);
+    const x = c.width - pad - targetW;
+    const y = c.height - pad - targetH;
+    ctx.save();
+    ctx.globalAlpha = 0.94;
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = Math.max(4, Math.round(minDim * 0.008));
+    ctx.shadowOffsetY = 1;
+    ctx.drawImage(wm, x, y, targetW, targetH);
+    ctx.restore();
+  } catch {
+    const fs = Math.max(13, Math.round(minDim * 0.03));
+    const iconSize = Math.max(16, Math.round(fs * 1.25));
+    const gap = Math.max(5, Math.round(fs * 0.32));
+    ctx.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
+    const text = "MOTIO2EDIT";
+    const tw = ctx.measureText(text).width;
+    const totalW = iconSize + gap + tw;
+    const iconX = c.width - pad - totalW;
+    const yBase = c.height - pad;
+    const iconY = yBase - iconSize + 1;
+    ctx.save();
+    ctx.globalAlpha = 0.88;
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 1;
+    const ox = iconX, oy = iconY, s = iconSize, r = s * 0.16;
+    ctx.fillStyle = "#FF5A1F";
+    ctx.beginPath();
+    ctx.moveTo(ox + r, oy + s * 0.22);
+    ctx.lineTo(ox + s * 0.28, oy + s * 0.22);
+    ctx.lineTo(ox + s * 0.34, oy + s * 0.08);
+    ctx.lineTo(ox + s * 0.66, oy + s * 0.08);
+    ctx.lineTo(ox + s * 0.72, oy + s * 0.22);
+    ctx.lineTo(ox + s - r, oy + s * 0.22);
+    ctx.quadraticCurveTo(ox + s, oy + s * 0.22, ox + s, oy + s * 0.22 + r);
+    ctx.lineTo(ox + s, oy + s - r);
+    ctx.quadraticCurveTo(ox + s, oy + s, ox + s - r, oy + s);
+    ctx.lineTo(ox + r, oy + s);
+    ctx.quadraticCurveTo(ox, oy + s, ox, oy + s - r);
+    ctx.lineTo(ox, oy + s * 0.22 + r);
+    ctx.quadraticCurveTo(ox, oy + s * 0.22, ox + r, oy + s * 0.22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.beginPath();
+    ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#FF5A1F";
+    ctx.beginPath();
+    ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.94)";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(text, iconX + iconSize + gap, yBase - 1);
+    ctx.restore();
+  }
 
   return new Promise((resolve, reject) => {
     c.toBlob(
