@@ -4,23 +4,27 @@ import type { RGBAImage } from "@/lib/filter-lens/shared/processing-types";
 import { cloneImage } from "@/lib/filter-lens/filters/filter-engine";
 import type { LucideIcon } from "lucide-react";
 import { SunMedium, Contrast, Palette, Aperture, CircleDot, Focus } from "lucide-react";
-import type { SVGProps } from "react";
+import { createElement, type SVGProps } from "react";
 
-/** Film-grain / stipple icon — texture, not AI sparkle. */
+/** Film-grain / stipple icon — texture, not AI sparkle. (no JSX — this is a .ts file) */
 export function GrainIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" {...props}>
-      <circle cx="6" cy="7" r="1.1" fill="currentColor" stroke="none" />
-      <circle cx="11" cy="5" r="0.9" fill="currentColor" stroke="none" />
-      <circle cx="16" cy="7" r="1.1" fill="currentColor" stroke="none" />
-      <circle cx="8" cy="12" r="1" fill="currentColor" stroke="none" />
-      <circle cx="13" cy="11" r="1.15" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="12" r="0.9" fill="currentColor" stroke="none" />
-      <circle cx="5" cy="17" r="1" fill="currentColor" stroke="none" />
-      <circle cx="10" cy="18" r="1.1" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="16" r="0.95" fill="currentColor" stroke="none" />
-      <circle cx="19" cy="18" r="1" fill="currentColor" stroke="none" />
-    </svg>
+  const dots: [number, number, number][] = [
+    [6, 7, 1.1], [11, 5, 0.9], [16, 7, 1.1], [8, 12, 1], [13, 11, 1.15],
+    [18, 12, 0.9], [5, 17, 1], [10, 18, 1.1], [15, 16, 0.95], [19, 18, 1],
+  ];
+  return createElement(
+    "svg",
+    {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.75,
+      strokeLinecap: "round",
+      ...props,
+    },
+    ...dots.map(([cx, cy, r]) =>
+      createElement("circle", { key: `${cx}-${cy}`, cx, cy, r, fill: "currentColor", stroke: "none" }),
+    ),
   );
 }
 
@@ -249,7 +253,6 @@ export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   ctx.shadowBlur = 6;
   ctx.shadowOffsetY = 1;
 
-  // Original Motio2edit geometric camera / frame mark
   const ox = iconX;
   const oy = iconY;
   const s = iconSize;
@@ -272,7 +275,6 @@ export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   ctx.closePath();
   ctx.fill();
 
-  // Lens
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.beginPath();
   ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.22, 0, Math.PI * 2);
@@ -282,7 +284,6 @@ export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   ctx.arc(ox + s * 0.5, oy + s * 0.58, s * 0.12, 0, Math.PI * 2);
   ctx.fill();
 
-  // Wordmark
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
