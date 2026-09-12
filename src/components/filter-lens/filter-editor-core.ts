@@ -201,8 +201,10 @@ export function hasAdj(adj: AdjustValues, colorId: string): boolean {
 }
 
 /**
- * Motio2edit watermark on OUTPUT only — large brand mark (Motio2edit Filters).
- * Free users always get this; paid can toggle off.
+ * Motio2edit watermark on OUTPUT only — balanced two-line lockup:
+ * Motio[2]edit
+ * Filters (sparkle on i)
+ * Both lines share the same visual center axis.
  */
 export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   const img = await new Promise<HTMLImageElement>((res, rej) => {
@@ -220,49 +222,65 @@ export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   ctx.drawImage(img, 0, 0);
 
   const minDim = Math.min(c.width, c.height);
-  const fsMain = Math.max(22, Math.round(minDim * 0.055));
-  const fsSub = Math.max(16, Math.round(minDim * 0.042));
-  const pad = Math.max(16, Math.round(minDim * 0.035));
+  const fsMain = Math.max(20, Math.round(minDim * 0.048));
+  const fsSub = Math.max(15, Math.round(fsMain * 0.78));
+  const pad = Math.max(14, Math.round(minDim * 0.03));
+  const lineGap = Math.round(fsMain * 0.22);
 
   ctx.save();
-  ctx.globalAlpha = 0.94;
-  ctx.shadowColor = "rgba(0,0,0,0.55)";
-  ctx.shadowBlur = Math.max(6, Math.round(minDim * 0.01));
-  ctx.shadowOffsetY = 2;
-  ctx.textAlign = "right";
+  ctx.globalAlpha = 0.93;
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = Math.max(5, Math.round(minDim * 0.008));
+  ctx.shadowOffsetY = 1;
   ctx.textBaseline = "alphabetic";
 
-  const y1 = c.height - pad - fsSub - Math.round(fsMain * 0.35);
-  const y2 = c.height - pad;
-
   ctx.font = `700 ${fsMain}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-  const editW = ctx.measureText("edit").width;
-  ctx.fillStyle = "rgba(255,255,255,0.96)";
-  ctx.fillText("edit", c.width - pad, y1);
-  const twoW = ctx.measureText("2").width;
-  ctx.fillStyle = "#FF5A1F";
-  ctx.fillText("2", c.width - pad - editW, y1);
-  ctx.fillStyle = "rgba(255,255,255,0.96)";
-  ctx.fillText("Motio", c.width - pad - editW - twoW, y1);
+  const wMotio = ctx.measureText("Motio").width;
+  const w2 = ctx.measureText("2").width;
+  const wEdit = ctx.measureText("edit").width;
+  const wLine1 = wMotio + w2 + wEdit;
 
   ctx.font = `700 ${fsSub}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-  ctx.fillStyle = "rgba(255,255,255,0.96)";
-  ctx.fillText("Filters", c.width - pad, y2);
+  const wLine2 = ctx.measureText("Filters").width;
 
-  const filtersW = ctx.measureText("Filters").width;
-  const sparkX = c.width - pad - filtersW + fsSub * 0.22;
-  const sparkY = y2 - fsSub * 0.85;
-  const sp = Math.max(3, Math.round(fsSub * 0.18));
+  const blockW = Math.max(wLine1, wLine2);
+  const blockRight = c.width - pad;
+  const blockCenterX = blockRight - blockW / 2;
+
+  const y2 = c.height - pad;
+  const y1 = y2 - fsSub - lineGap;
+
+  ctx.font = `700 ${fsMain}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  let x = blockCenterX - wLine1 / 2;
+  ctx.fillStyle = "rgba(255,255,255,0.96)";
+  ctx.fillText("Motio", x, y1);
+  x += wMotio;
+  ctx.fillStyle = "#FF5A1F";
+  ctx.fillText("2", x, y1);
+  x += w2;
+  ctx.fillStyle = "rgba(255,255,255,0.96)";
+  ctx.fillText("edit", x, y1);
+
+  ctx.font = `700 ${fsSub}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  const filtersX = blockCenterX - wLine2 / 2;
+  ctx.fillStyle = "rgba(255,255,255,0.96)";
+  ctx.fillText("Filters", filtersX, y2);
+
+  const wF = ctx.measureText("F").width;
+  const wI = ctx.measureText("i").width;
+  const sparkX = filtersX + wF + wI * 0.5;
+  const sparkY = y2 - fsSub * 0.92;
+  const sp = Math.max(2.5, Math.round(fsSub * 0.16));
   ctx.fillStyle = "#FF5A1F";
   ctx.beginPath();
   ctx.moveTo(sparkX, sparkY - sp);
-  ctx.lineTo(sparkX + sp * 0.35, sparkY - sp * 0.35);
+  ctx.lineTo(sparkX + sp * 0.32, sparkY - sp * 0.32);
   ctx.lineTo(sparkX + sp, sparkY);
-  ctx.lineTo(sparkX + sp * 0.35, sparkY + sp * 0.35);
+  ctx.lineTo(sparkX + sp * 0.32, sparkY + sp * 0.32);
   ctx.lineTo(sparkX, sparkY + sp);
-  ctx.lineTo(sparkX - sp * 0.35, sparkY + sp * 0.35);
+  ctx.lineTo(sparkX - sp * 0.32, sparkY + sp * 0.32);
   ctx.lineTo(sparkX - sp, sparkY);
-  ctx.lineTo(sparkX - sp * 0.35, sparkY - sp * 0.35);
+  ctx.lineTo(sparkX - sp * 0.32, sparkY - sp * 0.32);
   ctx.closePath();
   ctx.fill();
 
