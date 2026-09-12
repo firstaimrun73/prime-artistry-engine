@@ -14,7 +14,7 @@ export const Route = createFileRoute("/studio/image/filter-editor")({
       { title: "Filter Editor — Motio2edit" },
       {
         name: "description",
-        content: "Apply Motio2edit photographic filters to your photo. Upload or camera, intensity, undo/redo.",
+        content: "Apply Motio2edit Filters to your photo with live preview and adjustments.",
       },
     ],
   }),
@@ -23,14 +23,14 @@ export const Route = createFileRoute("/studio/image/filter-editor")({
 
 function FilterEditorPage() {
   const { effect } = Route.useSearch();
-  const items = ALL_FILTERS.map(filterToCatalogItem);
+  const items = ALL_FILTERS.map((f, i) => filterToCatalogItem(f, i));
   const categories = listFilterCategories();
   return (
     <EffectStudioPage
       kind="filter"
       pageMode="edit"
       title="Filters"
-      subtitle="Filter Editor"
+      subtitle="100+ AI Filters"
       items={items}
       categories={categories}
       initialSelectedId={effect ?? null}

@@ -10,7 +10,7 @@ export const Route = createFileRoute("/studio/image/filters")({
       {
         name: "description",
         content:
-          "Motio2edit photographic filters — Natural, Portrait, Cinematic, Film and more. Live preview on your photo.",
+          "Motio2edit Filters — 100+ looks with live preview. Natural, Portrait, Cinematic, Film and more.",
       },
     ],
   }),
@@ -18,14 +18,14 @@ export const Route = createFileRoute("/studio/image/filters")({
 });
 
 function FiltersDiscoveryPage() {
-  const items = ALL_FILTERS.map(filterToCatalogItem);
+  const items = ALL_FILTERS.map((f, i) => filterToCatalogItem(f, i));
   const categories = listFilterCategories();
   return (
     <EffectStudioPage
       kind="filter"
       pageMode="discover"
       title="Filters"
-      subtitle="100+ AI Filters · Live preview on your photo"
+      subtitle="100+ AI Filters"
       items={items}
       categories={categories}
     />
