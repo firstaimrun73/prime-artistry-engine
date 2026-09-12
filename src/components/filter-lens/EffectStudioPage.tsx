@@ -55,6 +55,27 @@ type Props = {
   initialSelectedId?: string | null;
 };
 
+/** Title with subtle sparkle near the i-dot of "Filters". */
+function FiltersTitle({ className }: { className?: string }) {
+  return (
+    <h1 className={className}>
+      F
+      <span className="relative inline-block">
+        i
+        <svg
+          className="pointer-events-none absolute -right-1.5 -top-1 h-2.5 w-2.5 text-[#FF5A1F]"
+          viewBox="0 0 12 12"
+          fill="currentColor"
+          aria-hidden
+        >
+          <path d="M6 0.5l0.7 3.2 3.3.2-2.5 2.2.8 3.2L6 7.5 3.7 9.3l.8-3.2L2 3.9l3.3-.2L6 0.5z" opacity="0.9" />
+        </svg>
+      </span>
+      lters
+    </h1>
+  );
+}
+
 function OrangeSlider({
   value,
   min,
@@ -118,7 +139,7 @@ export function EffectStudioPage({
   const [colorId, setColorId] = useState("neutral");
 
   const sortedCategories = useMemo(() => {
-    const preferred = ["Natural", "Portrait", "Cinematic", "Film", "Vintage", "Moody"];
+    const preferred = ["Natural", "Portrait", "Cinematic", "Film", "Vintage", "Moody", "Comic", "Sketch", "Retro", "Art", "Neon"];
     const head = preferred.filter((c) => categories.includes(c));
     const rest = categories.filter((c) => !preferred.includes(c));
     return [...head, ...rest];
@@ -429,14 +450,10 @@ export function EffectStudioPage({
             <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">
               Motio2edit
             </p>
-            <h1 className="truncate text-lg font-bold tracking-tight">{title}</h1>
+            <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
           </div>
         </header>
         <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-4 py-10">
-          <div className="mb-6 text-center">
-            <p className="text-2xl font-bold tracking-tight text-[#161412]">100+ AI Filters</p>
-            <p className="mt-1 text-sm text-[#6F6862]">Live preview on your photo</p>
-          </div>
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -481,7 +498,7 @@ export function EffectStudioPage({
           <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">
             Motio2edit
           </p>
-          <h1 className="truncate text-base font-bold">{title}</h1>
+          <FiltersTitle className="truncate text-base font-bold" />
         </div>
         {phase !== "result" ? (
           <button
@@ -588,6 +605,9 @@ export function EffectStudioPage({
           <div className="shrink-0 border-t border-[#E8E0D8]/60 bg-white/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md">
             {editorTab === "filter" ? (
               <div className="mx-auto max-w-lg space-y-3 px-3">
+                <p className="text-center text-[11px] font-semibold tracking-wide text-[#6F6862]">
+                  <span className="font-bold text-[#161412]">100+</span> AI Filters
+                </p>
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                   <button
                     type="button"
@@ -622,27 +642,20 @@ export function EffectStudioPage({
                   {filtered.map((item) => {
                     const active = selectedId === item.id;
                     const unlocked = isUnlocked(item);
-                    const thumb = thumbMap[item.id];
                     return (
                       <button
                         key={item.id}
                         type="button"
-                        onPointerUp={(e) => {
-                          e.preventDefault();
-                          selectFilter(item);
-                        }}
+                        onClick={() => selectFilter(item)}
                         className={cn(
-                          "relative shrink-0 overflow-hidden rounded-xl border-2 transition",
-                          active
-                            ? "border-[#FF5A1F] shadow-md shadow-[#FF5A1F]/25"
-                            : "border-transparent",
+                          "relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl border-2 transition",
+                          active ? "border-[#FF5A1F]" : "border-transparent",
                         )}
-                        style={{ width: 72, height: 88 }}
                       >
-                        {thumb ? (
+                        {thumbMap[item.id] ? (
                           <img
-                            src={thumb}
-                            alt={item.name}
+                            src={thumbMap[item.id]}
+                            alt=""
                             className="h-full w-full object-cover"
                             draggable={false}
                           />
@@ -660,15 +673,26 @@ export function EffectStudioPage({
                             <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
                           </span>
                         )}
-                        {item.badge === "premium" && (
-                          <span className="absolute left-1 top-1 rounded bg-black/55 px-1 py-0.5 text-[8px] font-bold text-amber-300">
-                            PREMIUM
-                          </span>
-                        )}
                         {item.badge === "ai+" && (
-                          <span className="absolute left-1 top-1 rounded bg-black/55 px-1 py-0.5 text-[8px] font-bold text-[#FF5A1F]">
+                          <span className="absolute left-1 top-1 rounded-md bg-black/60 px-1 py-0.5 text-[8px] font-bold tracking-wide text-[#FF8A4C] shadow-sm">
                             AI+
                           </span>
+                        )}
+                        {item.badge === "pro" && (
+                          <span className="absolute left-1 top-1 rounded-md bg-black/60 px-1 py-0.5 text-[8px] font-bold tracking-wide text-[#7DD3FC] shadow-sm">
+                            PRO
+                          </span>
+                        )}
+                        {item.badge === "premium" && (
+                          <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-md bg-black/65 px-1 py-0.5 text-[8px] font-bold tracking-wide text-amber-300 shadow-sm">
+                            PREMIUM
+                            <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="currentColor" aria-hidden>
+                              <path d="M6 1.2l1.4 2.6 2.9.5-2 2.1.4 2.9L6 8.1 3.3 9.3l.4-2.9-2-2.1 2.9-.5L6 1.2z" />
+                            </svg>
+                          </span>
+                        )}
+                        {item.animatedThumb && item.badge === "ai+" && (
+                          <span className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-[#FF5A1F]/35 animate-pulse" />
                         )}
                         {!unlocked && (
                           <span className="absolute inset-0 bg-black/20" />
@@ -767,39 +791,31 @@ export function EffectStudioPage({
                     }}
                     ariaLabel={adjMeta.label}
                   />
-                  <span className="w-10 shrink-0 text-right text-xs font-bold tabular-nums text-[#161412]">
+                  <span className="w-8 shrink-0 text-right text-xs font-bold tabular-nums text-[#161412]">
                     {adj[adjKey]}
                   </span>
                 </div>
 
                 {adjKey === "color" && (
-                  <div className="flex flex-wrap justify-center gap-2.5 px-2 pt-1">
-                    {COLOR_SWATCHES.map((sw) => {
-                      const active = colorId === sw.id;
-                      return (
-                        <button
-                          key={sw.id}
-                          type="button"
-                          onClick={() => {
-                            bumpToEdit();
-                            setColorId(sw.id);
-                          }}
-                          className={cn(
-                            "h-8 w-8 rounded-full border-2 transition",
-                            active
-                              ? "border-[#FF5A1F] ring-2 ring-[#FF5A1F]/30"
-                              : "border-white shadow-sm",
-                          )}
-                          style={{
-                            background:
-                              sw.id === "neutral"
-                                ? "linear-gradient(135deg,#ccc,#888)"
-                                : `rgb(${sw.rgb.join(",")})`,
-                          }}
-                          aria-label={sw.label}
-                        />
-                      );
-                    })}
+                  <div className="flex flex-wrap gap-2 px-1">
+                    {COLOR_SWATCHES.map((sw) => (
+                      <button
+                        key={sw.id}
+                        type="button"
+                        onClick={() => {
+                          bumpToEdit();
+                          setColorId(sw.id);
+                        }}
+                        className={cn(
+                          "h-7 w-7 rounded-full border-2",
+                          colorId === sw.id ? "border-[#FF5A1F]" : "border-transparent",
+                        )}
+                        style={{
+                          backgroundColor: `rgb(${sw.rgb[0]},${sw.rgb[1]},${sw.rgb[2]})`,
+                        }}
+                        aria-label={sw.label}
+                      />
+                    ))}
                   </div>
                 )}
 
