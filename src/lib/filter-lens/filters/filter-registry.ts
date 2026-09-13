@@ -1,6 +1,7 @@
 /**
  * filters/filter-registry.ts
- * Curated Motio2edit AI Filters registry (~36 unique looks).
+ * Motio2edit AI Filters registry — 100 unique original looks.
+ * Common 40 (free) · AI+ 35 · Premium 25
  */
 import { FilterDefinition, FilterCategory, FILTER_CATEGORIES } from './filter-types';
 import { FILTERS_CURATED } from './filters-curated';
@@ -35,11 +36,12 @@ export interface RegistryValidationResult {
 
 export function validateFilterRegistry(): RegistryValidationResult {
   const errors: string[] = [];
-  if (ALL_FILTERS.length < 20) {
-    errors.push(`Expected at least 20 curated filters, found ${ALL_FILTERS.length}`);
+  if (ALL_FILTERS.length !== 100) {
+    errors.push(`Expected exactly 100 filters, found ${ALL_FILTERS.length}`);
   }
   const ids = new Set<string>();
   const names = new Set<string>();
+  let common = 0, aiPlus = 0, premium = 0;
   for (const f of ALL_FILTERS) {
     if (ids.has(f.id)) errors.push(`Duplicate filter id: ${f.id}`);
     ids.add(f.id);
@@ -57,10 +59,16 @@ export function validateFilterRegistry(): RegistryValidationResult {
     if (f.tier && !['ai+', 'pro', 'premium'].includes(f.tier)) {
       errors.push(`Filter ${f.id} has invalid tier: ${f.tier}`);
     }
+    if (f.unlock.isFree || !f.tier) common++;
+    else if (f.tier === 'ai+') aiPlus++;
+    else if (f.tier === 'premium' || f.tier === 'pro') premium++;
   }
   const freeCount = getFreeFilters().length;
-  if (freeCount !== 5) {
-    errors.push(`Expected exactly 5 free filters, found ${freeCount}`);
+  if (freeCount !== 40) {
+    errors.push(`Expected exactly 40 free (Common) filters, found ${freeCount}`);
   }
+  if (aiPlus !== 35) errors.push(`Expected 35 AI+ filters, found ${aiPlus}`);
+  if (premium !== 25) errors.push(`Expected 25 Premium filters, found ${premium}`);
+  if (common !== 40) errors.push(`Expected 40 Common (free/no-tier) filters, found ${common}`);
   return { valid: errors.length === 0, errors };
 }
