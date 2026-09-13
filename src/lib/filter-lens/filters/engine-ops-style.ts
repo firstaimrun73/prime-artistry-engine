@@ -1,5 +1,6 @@
 /**
  * engine-ops-style.ts — comic/sketch/neon/style ops
+ * Anime-style Comic (cel shading + ink lines), pure pencil Sketch (no warm cast).
  */
 import type { RGBAImage, ProcessingProfile } from '../shared/processing-types';
 import { clamp8, applySaturationVibrance } from './engine-ops-basic';
@@ -9,11 +10,11 @@ import { applySoftBlur, applyContrastish, applyNeonStyle } from './engine-ops-ex
 export function applyComicStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height;
   const data = image.data;
-  const t = Math.max(0.45, Math.min(1, intensity / 100));
+  const t = Math.max(0.55, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
 
-  // Cel-shade flat colors (anime): quantize to fewer levels + punchy sat
-  const levels = 5;
+  // Anime cel-shade: fewer flat color levels + strong saturation
+  const levels = 4;
   const step = 255 / (levels - 1);
   for (let i = 0; i < data.length; i += 4) {
     for (let c = 0; c < 3; c++) {
@@ -21,15 +22,15 @@ export function applyComicStyle(image: RGBAImage, intensity: number) {
       data[i + c] = clamp8(q);
     }
   }
-  applySaturationVibrance(data, 22 + t * 28, 14 + t * 16);
-  applyContrastish(data, 14 + t * 16);
+  applySaturationVibrance(data, 35 + t * 40, 22 + t * 24);
+  applyContrastish(data, 20 + t * 22);
 
-  // Clean thick anime outlines from original luminance
+  // Thick clean anime ink outlines from original luminance (Sobel)
   const gray = new Float32Array(w * h);
   for (let i = 0, p = 0; i < src.length; i += 4, p++) {
     gray[p] = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
   }
-  const edgeThresh = 36 - t * 12;
+  const edgeThresh = 28 - t * 10;
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const p = y * w + x;
@@ -42,8 +43,8 @@ export function applyComicStyle(image: RGBAImage, intensity: number) {
       const mag = Math.sqrt(gx * gx + gy * gy);
       if (mag > edgeThresh) {
         const i = p * 4;
-        const ink = Math.max(0, 18 - (mag - edgeThresh) * 0.08);
-        const k = Math.min(1, (mag - edgeThresh) / 80) * (0.75 + t * 0.25);
+        const ink = Math.max(0, 8 - (mag - edgeThresh) * 0.05);
+        const k = Math.min(1, (mag - edgeThresh) / 55) * (0.85 + t * 0.15);
         data[i] = clamp8(data[i] * (1 - k) + ink * k);
         data[i + 1] = clamp8(data[i + 1] * (1 - k) + ink * k);
         data[i + 2] = clamp8(data[i + 2] * (1 - k) + ink * k);
@@ -52,11 +53,11 @@ export function applyComicStyle(image: RGBAImage, intensity: number) {
   }
 }
 
-/** Pencil-sketch via classic grayscale + inverted-blur color-dodge. */
+/** Pure pencil-sketch: grayscale + inverted-blur color-dodge. No brown/warm cast. */
 export function applySketchStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height;
   const data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
+  const t = Math.max(0.5, Math.min(1, intensity / 100));
   const gray = new Float32Array(w * h);
   for (let i = 0, p = 0; i < data.length; i += 4, p++) {
     gray[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
@@ -64,7 +65,7 @@ export function applySketchStyle(image: RGBAImage, intensity: number) {
   const inv = new Float32Array(w * h);
   for (let p = 0; p < gray.length; p++) inv[p] = 255 - gray[p];
   let cur = inv;
-  const passes = 3 + Math.round(t * 2);
+  const passes = 4 + Math.round(t * 2);
   for (let pass = 0; pass < passes; pass++) {
     const next = new Float32Array(w * h);
     for (let y = 1; y < h - 1; y++) {
@@ -86,16 +87,17 @@ export function applySketchStyle(image: RGBAImage, intensity: number) {
     }
     cur = next;
   }
-  const paper = 245;
+  // Pure neutral gray output — no R/B bias, no paper tint
   for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
     const denom = 255 - cur[p] + 1e-3;
     let v = (gray[p] * 255) / denom;
     if (v > 255) v = 255;
-    const line = Math.min(255, v);
-    const g = line * (0.92 + 0.08 * (1 - t)) + paper * 0.04 * (1 - t);
-    data[i] = clamp8(g * 1.02);
-    data[i + 1] = clamp8(g * 1.0);
-    data[i + 2] = clamp8(g * 0.96);
+    // Darker lines at higher intensity, keep pure B/W
+    const g = Math.min(255, v * (0.88 + 0.12 * (1 - t)));
+    const out = clamp8(g);
+    data[i] = out;
+    data[i + 1] = out;
+    data[i + 2] = out;
   }
 }
 
