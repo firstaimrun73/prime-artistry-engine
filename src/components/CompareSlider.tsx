@@ -3,19 +3,63 @@ import { useRef, useState, useCallback, useEffect } from "react";
 type Props = {
   before: string;
   after: string;
-  /** Optional className on the outer frame */
   className?: string;
 };
 
 /**
- * BEFORE ← slider → AFTER only.
- * Natural aspect ratio, object-fit contain, shared geometry.
- * Touch + mouse friendly vertical divider.
+ * BEFORE ← slider → AFTER.
+ * Shared aspect-ratio frame constrained by available width AND height.
+ * Divider + handle use Filters brand orange #FF5A1F.
+ * Before and After share identical geometry for every aspect ratio.
  */
 export function CompareSlider({ before, after, className }: Props) {
   const [pos, setPos] = useState(50);
+  const [ratio, setRatio] = useState<number | null>(null);
+  const [frameW, setFrameW] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      const w = img.naturalWidth || 1;
+      const h = img.naturalHeight || 1;
+      setRatio(w / h);
+    };
+    img.onerror = () => {
+      if (!cancelled) setRatio(1);
+    };
+    img.src = after;
+    return () => {
+      cancelled = true;
+    };
+  }, [after]);
+
+  useEffect(() => {
+    const outer = outerRef.current;
+    if (!outer || ratio == null) return;
+
+    const measure = () => {
+      const ow = outer.clientWidth;
+      const oh = outer.clientHeight;
+      if (ow <= 0 || oh <= 0) return;
+      let w = ow;
+      let h = w / ratio;
+      if (h > oh) {
+        h = oh;
+        w = h * ratio;
+      }
+      setFrameW(Math.round(w));
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(outer);
+    return () => ro.disconnect();
+  }, [ratio]);
 
   const update = useCallback((clientX: number) => {
     const el = ref.current;
@@ -54,69 +98,71 @@ export function CompareSlider({ before, after, className }: Props) {
     };
   }, [update, endDrag]);
 
+  const frameH = ratio && frameW > 0 ? Math.round(frameW / ratio) : undefined;
+
   return (
     <div
-      ref={ref}
-      className={`relative w-full select-none overflow-hidden rounded-xl bg-black/5 ${className ?? ""}`}
-      style={{ touchAction: "none" }}
-      onMouseDown={(e) => {
-        dragging.current = true;
-        update(e.clientX);
-      }}
-      onTouchStart={(e) => {
-        if (!e.touches[0]) return;
-        dragging.current = true;
-        update(e.touches[0].clientX);
-      }}
+      ref={outerRef}
+      className={`flex h-full max-h-full w-full max-w-full items-center justify-center ${className ?? ""}`}
     >
-      {/* Shared aspect box: after sets natural ratio via img layout */}
-      <div className="relative w-full">
+      <div
+        ref={ref}
+        className="relative select-none overflow-hidden rounded-xl bg-black/5"
+        style={{
+          touchAction: "none",
+          width: frameW > 0 ? frameW : "100%",
+          height: frameH ?? "auto",
+          maxWidth: "100%",
+          maxHeight: "100%",
+          aspectRatio: ratio ? String(ratio) : undefined,
+        }}
+        onMouseDown={(e) => {
+          dragging.current = true;
+          update(e.clientX);
+        }}
+        onTouchStart={(e) => {
+          if (!e.touches[0]) return;
+          dragging.current = true;
+          update(e.touches[0].clientX);
+        }}
+      >
         <img
           src={after}
           alt="After"
           draggable={false}
-          className="block h-auto w-full object-contain"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ objectFit: "fill" }}
         />
-        {/* Before clipped on top — same box, same contain fit */}
         <div
-          className="absolute inset-0 overflow-hidden"
-          style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          style={{ width: `${pos}%` }}
         >
           <img
             src={before}
             alt="Before"
             draggable={false}
-            className="absolute inset-0 h-full w-full object-contain object-center"
+            className="absolute left-0 top-0 h-full max-w-none"
+            style={{
+              width: frameW > 0 ? frameW : "100%",
+              height: "100%",
+              objectFit: "fill",
+            }}
           />
         </div>
-
-        <span className="pointer-events-none absolute left-2 top-2 z-20 rounded bg-black/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-          Before
-        </span>
-        <span className="pointer-events-none absolute right-2 top-2 z-20 rounded bg-black/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-          After
-        </span>
-
-        {/* Divider */}
         <div
-          className="absolute inset-y-0 z-30 w-0.5 -translate-x-1/2 cursor-ew-resize bg-[#7B6FE0]"
+          className="pointer-events-none absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-[#FF5A1F]"
           style={{ left: `${pos}%` }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            dragging.current = true;
-            update(e.clientX);
-          }}
-          onTouchStart={(e) => {
-            e.stopPropagation();
-            if (!e.touches[0]) return;
-            dragging.current = true;
-            update(e.touches[0].clientX);
-          }}
         >
-          <span className="absolute top-1/2 left-1/2 grid h-10 w-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-[#7B6FE0] text-sm font-semibold text-white shadow-lg">
-            ⇆
-          </span>
+          <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-[#FF5A1F] shadow-md">
+            <span className="text-[10px] font-bold text-white">‖</span>
+          </div>
         </div>
+        <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          BEFORE
+        </span>
+        <span className="pointer-events-none absolute right-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          AFTER
+        </span>
       </div>
     </div>
   );
