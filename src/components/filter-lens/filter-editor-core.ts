@@ -104,17 +104,19 @@ export function applyUserAdjustments(
   image: RGBAImage,
   adj: AdjustValues,
   colorTint: readonly [number, number, number] | null,
+  shadowTint: readonly [number, number, number] | null = null,
 ): RGBAImage {
   const working = cloneImage(image);
   const data = working.data;
   const { light, shadow, color, hue, vignette, sharpness, grain } = adj;
 
-  if (light !== 0 || shadow !== 0 || color !== 0 || hue !== 0 || colorTint) {
+  if (light !== 0 || shadow !== 0 || color !== 0 || hue !== 0 || colorTint || shadowTint) {
     const hueRad = (hue * Math.PI) / 180;
     const cosH = Math.cos(hueRad);
     const sinH = Math.sin(hueRad);
     const satMul = 1 + color / 50;
-    const tintAmt = colorTint ? 0.12 + Math.abs(color) / 200 : 0;
+    const tintAmt = colorTint ? 0.14 + Math.abs(color) / 200 : 0;
+    const shadowTintAmt = shadowTint ? 0.16 + Math.abs(color) / 200 : 0;
     for (let i = 0; i < data.length; i += 4) {
       let r = data[i], g = data[i + 1], b = data[i + 2];
       if (light !== 0) {
@@ -140,10 +142,23 @@ export function applyUserAdjustments(
         g = l + (g - l) * satMul;
         b = l + (b - l) * satMul;
       }
+      // Highlight tint: stronger on brighter regions
       if (colorTint && tintAmt > 0) {
-        r = r * (1 - tintAmt) + colorTint[0] * tintAmt;
-        g = g * (1 - tintAmt) + colorTint[1] * tintAmt;
-        b = b * (1 - tintAmt) + colorTint[2] * tintAmt;
+        const l = 0.299 * r + 0.587 * g + 0.114 * b;
+        const hw = Math.min(1, Math.max(0, (l - 70) / 130));
+        const ha = tintAmt * (0.35 + 0.65 * hw);
+        r = r * (1 - ha) + colorTint[0] * ha;
+        g = g * (1 - ha) + colorTint[1] * ha;
+        b = b * (1 - ha) + colorTint[2] * ha;
+      }
+      // Shadow tint: stronger on darker regions
+      if (shadowTint && shadowTintAmt > 0) {
+        const l = 0.299 * r + 0.587 * g + 0.114 * b;
+        const sw = Math.min(1, Math.max(0, (150 - l) / 130));
+        const sa = shadowTintAmt * (0.35 + 0.65 * sw);
+        r = r * (1 - sa) + shadowTint[0] * sa;
+        g = g * (1 - sa) + shadowTint[1] * sa;
+        b = b * (1 - sa) + shadowTint[2] * sa;
       }
       data[i] = clamp8(r); data[i + 1] = clamp8(g); data[i + 2] = clamp8(b);
     }
@@ -193,10 +208,15 @@ export function applyUserAdjustments(
   return working;
 }
 
-export function hasAdj(adj: AdjustValues, colorId: string): boolean {
+export function hasAdj(
+  adj: AdjustValues,
+  highlightColorId: string,
+  shadowColorId: string = "neutral",
+): boolean {
   return (
     adj.light !== 0 || adj.shadow !== 0 || adj.color !== 0 || adj.hue !== 0 ||
-    adj.vignette !== 0 || adj.sharpness !== 0 || adj.grain !== 0 || colorId !== "neutral"
+    adj.vignette !== 0 || adj.sharpness !== 0 || adj.grain !== 0 ||
+    highlightColorId !== "neutral" || shadowColorId !== "neutral"
   );
 }
 
