@@ -1,2 +1,6 @@
-/** Motio2edit Filters — full editor implementation restored from 5323bc98 */
-export { EffectStudioPage } from './EffectStudioPage.full';
+/** PLACEHOLDER - see next commit for full body */
+export function EffectStudioPage() {
+  return null;
+}
+export type CatalogItem = any;
+export function filterToCatalogItem(f: any): any { return f; }
