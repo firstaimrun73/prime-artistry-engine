@@ -105,7 +105,7 @@ export async function rgbaImageToObjectUrl(image: RGBAImage): Promise<string> {
   return URL.createObjectURL(blob);
 }
 
-/** Nearest-neighbor downscale for preview pipelines (shared with filter-engine). */
+/** Bilinear downscale for preview pipelines (source remains full-res for Apply/Download). */
 export function downscale(image: RGBAImage, maxDimension: number): RGBAImage {
   const long = Math.max(image.width, image.height);
   if (long <= maxDimension) {
@@ -115,16 +115,28 @@ export function downscale(image: RGBAImage, maxDimension: number): RGBAImage {
   const w = Math.max(1, Math.round(image.width * scale));
   const h = Math.max(1, Math.round(image.height * scale));
   const out = new Uint8ClampedArray(w * h * 4);
+  const xRatio = (image.width - 1) / Math.max(1, w - 1);
+  const yRatio = (image.height - 1) / Math.max(1, h - 1);
   for (let y = 0; y < h; y++) {
+    const sy = y * yRatio;
+    const y0 = Math.floor(sy);
+    const y1 = Math.min(image.height - 1, y0 + 1);
+    const fy = sy - y0;
     for (let x = 0; x < w; x++) {
-      const sx = Math.min(image.width - 1, Math.floor(x / scale));
-      const sy = Math.min(image.height - 1, Math.floor(y / scale));
-      const si = (sy * image.width + sx) * 4;
+      const sx = x * xRatio;
+      const x0 = Math.floor(sx);
+      const x1 = Math.min(image.width - 1, x0 + 1);
+      const fx = sx - x0;
+      const i00 = (y0 * image.width + x0) * 4;
+      const i10 = (y0 * image.width + x1) * 4;
+      const i01 = (y1 * image.width + x0) * 4;
+      const i11 = (y1 * image.width + x1) * 4;
       const di = (y * w + x) * 4;
-      out[di] = image.data[si];
-      out[di + 1] = image.data[si + 1];
-      out[di + 2] = image.data[si + 2];
-      out[di + 3] = image.data[si + 3];
+      for (let c = 0; c < 4; c++) {
+        const v0 = image.data[i00 + c] * (1 - fx) + image.data[i10 + c] * fx;
+        const v1 = image.data[i01 + c] * (1 - fx) + image.data[i11 + c] * fx;
+        out[di + c] = (v0 * (1 - fy) + v1 * fy + 0.5) | 0;
+      }
     }
   }
   return { width: w, height: h, data: out };
