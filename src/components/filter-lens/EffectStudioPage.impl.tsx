@@ -1,6 +1,5 @@
 /**
- * Motio2edit Filters editor — RESTORED. Applies Comic, Sketch, Peacock, pure B/W, tints.
- * Re-export path kept for EffectStudioPage.tsx.
+ * Motio2edit Filters editor — re-export to live implementation.
  */
-export { EffectStudioPage, filterToCatalogItem } from './EffectStudioPage.live';
-export type { CatalogItem } from './EffectStudioPage.live';
+export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.live";
+export type { CatalogItem } from "./EffectStudioPage.live";
