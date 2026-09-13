@@ -5,8 +5,18 @@
  */
 import { FilterDefinition, FilterCategory, FILTER_CATEGORIES } from './filter-types';
 import { FILTERS_CURATED } from './filters-curated';
+import { FILTER_PROFILE_OVERRIDES, FILTER_NAME_OVERRIDES } from './filter-overrides';
 
-export const ALL_FILTERS: FilterDefinition[] = [...FILTERS_CURATED];
+export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
+  const profile = FILTER_PROFILE_OVERRIDES[f.id];
+  const name = FILTER_NAME_OVERRIDES[f.id];
+  if (!profile && !name) return f;
+  return {
+    ...f,
+    ...(name ? { name } : {}),
+    ...(profile ? { processingProfile: { ...f.processingProfile, ...profile } } : {}),
+  };
+});
 
 export function getFilterById(id: string): FilterDefinition | undefined {
   return ALL_FILTERS.find((f) => f.id === id);
