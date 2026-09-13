@@ -2,7 +2,8 @@
  * engine-ops-style.ts — comic/sketch/neon/style ops
  */
 import type { RGBAImage, ProcessingProfile } from '../shared/processing-types';
-import { clamp8, applySaturationVibrance, applyPosterize, applyFade } from './engine-ops-basic';
+import { clamp8, applySaturationVibrance } from './engine-ops-basic';
+import { applyPosterize, applyFade } from './engine-ops-basic-b';
 import { applySoftBlur, applyContrastish, applyNeonStyle } from './engine-ops-extra';
 
 export function applyComicStyle(image: RGBAImage, intensity: number) {
