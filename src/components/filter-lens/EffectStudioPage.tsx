@@ -1,7 +1,6 @@
 /**
- * Motio2edit Filters editor — production UI (restored).
- * Backend: anime Comic, strong Peacock/Rangoli/tints via filter-engine modules.
+ * Motio2edit Filters editor — production UI.
+ * Comic, Sketch, Peacock, pure B/W, tinted colors via filter engine.
  */
-export { EffectStudioPage } from "./EffectStudioPage.impl";
-export type { CatalogItem } from "./EffectStudioPage.impl";
-export { filterToCatalogItem } from "./EffectStudioPage.impl";
+export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.live";
+export type { CatalogItem } from "./EffectStudioPage.live";
