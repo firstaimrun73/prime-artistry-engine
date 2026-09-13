@@ -34,9 +34,9 @@ export type CatalogItem = {
   animatedThumb?: boolean;
 };
 
-/** First 5 free AI filters; rest Premium / AI+. */
+/** Free status comes only from catalog unlock metadata (40 Common free). */
 export function filterToCatalogItem(f: FilterDefinition, index = 0): CatalogItem {
-  const isFree = index < 5 || !!f.unlock?.isFree;
+  const isFree = !!f.unlock?.isFree;
   let badge: CatalogBadge = null;
   if (!isFree && f.tier) {
     if (f.tier === "ai+" || f.tier === "pro" || f.tier === "premium") {
@@ -142,7 +142,6 @@ export function applyUserAdjustments(
         g = l + (g - l) * satMul;
         b = l + (b - l) * satMul;
       }
-      // Highlight tint: stronger on brighter regions
       if (colorTint && tintAmt > 0) {
         const l = 0.299 * r + 0.587 * g + 0.114 * b;
         const hw = Math.min(1, Math.max(0, (l - 70) / 130));
@@ -151,7 +150,6 @@ export function applyUserAdjustments(
         g = g * (1 - ha) + colorTint[1] * ha;
         b = b * (1 - ha) + colorTint[2] * ha;
       }
-      // Shadow tint: stronger on darker regions
       if (shadowTint && shadowTintAmt > 0) {
         const l = 0.299 * r + 0.587 * g + 0.114 * b;
         const sw = Math.min(1, Math.max(0, (150 - l) / 130));
@@ -224,7 +222,6 @@ export function hasAdj(
  * Motio2edit watermark on OUTPUT only — balanced two-line lockup:
  * Motio[2]edit
  * Filters (sparkle on i)
- * Both lines share the same visual center axis.
  */
 export async function applyOutputWatermark(srcUrl: string): Promise<string> {
   const img = await new Promise<HTMLImageElement>((res, rej) => {
