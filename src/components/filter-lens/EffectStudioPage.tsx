@@ -1,5 +1,1 @@
-/**
- * Motio2edit Filters editor — production UI.
- * RECOVERY PLACEHOLDER - will be replaced
- */
-export function EffectStudioPage() { return null; }
+LOADING_FROM_FILE_33684_CHARS
