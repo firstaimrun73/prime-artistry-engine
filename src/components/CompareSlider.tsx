@@ -99,6 +99,9 @@ export function CompareSlider({ before, after, className }: Props) {
   }, [update, endDrag]);
 
   const frameH = ratio && frameW > 0 ? Math.round(frameW / ratio) : undefined;
+  // Keep labels clear of the handle at extremes (0% / 100%)
+  const showBefore = pos > 14;
+  const showAfter = pos < 86;
 
   return (
     <div
@@ -154,15 +157,23 @@ export function CompareSlider({ before, after, className }: Props) {
           style={{ left: `${pos}%` }}
         >
           <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-[#FF5A1F] shadow-md">
-            <span className="text-[10px] font-bold text-white">‖</span>
+            {/* BEFORE ↔ AFTER compare arrows */}
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden className="text-white">
+              <path d="M6 1L1 6l5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M10 1l5 5-5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
         </div>
-        <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-          BEFORE
-        </span>
-        <span className="pointer-events-none absolute right-2 top-2 rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-          AFTER
-        </span>
+        {showBefore ? (
+          <span className="pointer-events-none absolute left-2 top-2 z-[5] rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            BEFORE
+          </span>
+        ) : null}
+        {showAfter ? (
+          <span className="pointer-events-none absolute right-2 top-2 z-[5] rounded bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            AFTER
+          </span>
+        ) : null}
       </div>
     </div>
   );
