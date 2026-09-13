@@ -1,6 +1,7 @@
 /**
- * Motio2edit Filters editor — production UI.
- * Uses filter-editor-core for Adjust pipeline + output-only watermark.
- * RESTORED full implementation.
+ * Motio2edit Filters editor — production UI (restored).
+ * Backend: anime Comic, strong Peacock/Rangoli/tints via filter-engine modules.
  */
-export { EffectStudioPage } from './EffectStudioPage.impl';
+export { EffectStudioPage } from "./EffectStudioPage.impl";
+export type { CatalogItem } from "./EffectStudioPage.impl";
+export { filterToCatalogItem } from "./EffectStudioPage.impl";
