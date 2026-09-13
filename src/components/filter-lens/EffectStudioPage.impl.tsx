@@ -1,6 +1,6 @@
-/** PLACEHOLDER - see next commit for full body */
-export function EffectStudioPage() {
-  return null;
-}
-export type CatalogItem = any;
-export function filterToCatalogItem(f: any): any { return f; }
+/**
+ * Motio2edit Filters editor — RESTORED. Applies Comic, Sketch, Peacock, pure B/W, tints.
+ * Re-export path kept for EffectStudioPage.tsx.
+ */
+export { EffectStudioPage, filterToCatalogItem } from './EffectStudioPage.live';
+export type { CatalogItem } from './EffectStudioPage.live';
