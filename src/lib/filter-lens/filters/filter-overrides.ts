@@ -1,11 +1,13 @@
 /**
- * filter-overrides.ts — recipes merged on top of curated catalog (no UI change).
- * Anime = soft cel + clean ink (style:anime). Comic = bold ink + halftone (style:comic).
+ * filter-overrides.ts — recipes only (UI locked).
+ * 80s: magenta/cyan split, grain, neon contrast.
+ * Rangoli: high-sat multi-hue rainbow blushes.
+ * Anime/Comic/Sketch: face-preserving style ops.
  */
 import type { ProcessingProfile } from '../shared/processing-types';
 
 export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
-  // ——— Pure neutral grayscale (Common) ———
+  // ——— Pure neutral grayscale ———
   'filter-010': {
     monochrome: true,
     contrast: 24,
@@ -42,7 +44,30 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     clarity: 14,
   },
 
-  // ——— Photographic color tints ———
+  // ——— 80s retro (synth / neon era grade — no IP names) ———
+  'filter-015': {
+    temperature: -6,
+    tint: 18,
+    contrast: 28,
+    saturation: 22,
+    vibrance: 18,
+    fade: 12,
+    grain: 18,
+    vignette: 22,
+    bloom: 14,
+    highlights: -8,
+    shadows: -6,
+    softBlur: 4,
+    splitToning: {
+      shadowsHue: 300,
+      shadowsSaturation: 48,
+      highlightsHue: 185,
+      highlightsSaturation: 42,
+      balance: -4,
+    },
+  },
+
+  // ——— Photographic tints ———
   'filter-024': {
     temperature: -34,
     tint: -12,
@@ -137,7 +162,7 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     },
   },
 
-  // ——— Creative looks ———
+  // ——— Creative ———
   'filter-073': {
     saturation: 52,
     vibrance: 55,
@@ -155,21 +180,28 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     shadows: 8,
     bloom: 12,
   },
+  // Rangoli — rainbow color blushes (magenta / cyan / gold)
   'filter-075': {
-    saturation: 50,
-    vibrance: 46,
-    contrast: 26,
-    temperature: 8,
-    tint: 14,
+    saturation: 62,
+    vibrance: 58,
+    contrast: 22,
+    temperature: 4,
+    tint: 10,
+    bloom: 18,
+    clarity: 8,
+    softBlur: 3,
     splitToning: {
-      shadowsHue: 310,
-      shadowsSaturation: 58,
+      shadowsHue: 285,
+      shadowsSaturation: 72,
       highlightsHue: 48,
-      highlightsSaturation: 52,
-      balance: -10,
+      highlightsSaturation: 68,
+      balance: -12,
     },
-    clarity: 12,
-    bloom: 10,
+    channelAdjustments: {
+      red: { gain: 1.08 },
+      green: { gain: 1.04 },
+      blue: { gain: 1.12 },
+    },
   },
   'filter-064': {
     temperature: -18,
@@ -211,28 +243,29 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     temperature: 4,
   },
 
-  // Anime — soft cel + clean ink (distinct from Comic)
+  // Anime — soft cel, luminous skin
   'filter-095': {
     style: 'anime',
-    contrast: 16,
-    saturation: 26,
-    vibrance: 20,
-    temperature: 6,
-    softBlur: 2,
+    contrast: 12,
+    saturation: 22,
+    vibrance: 18,
+    temperature: 8,
+    softBlur: 3,
+    bloom: 8,
   },
-  // Comic — bold ink + halftone graphic
+  // Comic — graphic ink, readable faces
   'filter-099': {
     style: 'comic',
-    contrast: 30,
-    saturation: 32,
-    vibrance: 20,
-    clarity: 8,
+    contrast: 22,
+    saturation: 24,
+    vibrance: 14,
+    clarity: 6,
   },
-  // Sketch — pure pencil
+  // Sketch — stronger black line weight
   'filter-100': {
     style: 'sketch',
-    contrast: 14,
-    grain: 6,
+    contrast: 18,
+    grain: 4,
   },
 
   // Premium non-mono
