@@ -13,7 +13,6 @@ import {
   ImagePlus,
   Loader2,
   Redo2,
-  RotateCcw,
   Share2,
   Undo2,
 } from "lucide-react";
@@ -395,13 +394,17 @@ export function EffectStudioPage({
           <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
           <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
         </div>
-        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#E8E0D8] bg-white px-3 text-xs font-semibold">
-          <ImagePlus className="h-3.5 w-3.5" /> Change
-        </button>
+        {phase !== "result" ? (
+          <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#E8E0D8] bg-white px-3 text-xs font-semibold">
+            <ImagePlus className="h-3.5 w-3.5" /> Change
+          </button>
+        ) : (
+          <span className="h-9 w-9" aria-hidden />
+        )}
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
       </header>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-[#141210] px-2 py-2">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-white px-2 py-2">
         {phase === "result" && sourceUrl && displayResultUrl ? (
           comparing ? (
             <CompareSlider before={sourceUrl} after={displayResultUrl} className="h-full max-h-full w-full max-w-full" />
@@ -421,7 +424,7 @@ export function EffectStudioPage({
       {phase === "result" ? (
         <div className="shrink-0 border-t border-[#E8E0D8] bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md">
           <div className="mb-3 flex items-center justify-center gap-3">
-            <button type="button" onClick={onRestart} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Restart"><RotateCcw className="h-5 w-5" /></button>
+            <button type="button" onClick={() => inputRef.current?.click()} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Change photo"><ImagePlus className="h-5 w-5" /></button>
             <button type="button" onClick={() => setComparing((v) => !v)} className={cn("grid h-11 w-11 place-items-center rounded-xl", comparing && "bg-[#FFE6DA] text-[#FF5A1F]")} aria-label="Compare"><Columns2 className="h-5 w-5" /></button>
             <button type="button" onClick={onDownload} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Download"><Download className="h-5 w-5" /></button>
             <button type="button" onClick={() => void onShare()} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Share"><Share2 className="h-5 w-5" /></button>
