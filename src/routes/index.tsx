@@ -17,7 +17,6 @@ import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
 import { FooterAd } from "@/components/ads";
 import { ConstructionNotice } from "@/components/home/ConstructionNotice";
-import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -40,17 +39,11 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
 
-  // Auth/profile race: never flash SignedOutHome for a signed-in user while loading.
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
+  // CRITICAL: never gate the entire homepage on auth.loading.
+  // A hung/slow getSession left users on a permanent white spinner (mobile especially).
+  // Show signed-out marketing immediately; switch to signed-in shell when user is known.
   if (user) return <SignedInHome />;
   return <SignedOutHome />;
 }
