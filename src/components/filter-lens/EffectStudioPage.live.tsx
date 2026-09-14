@@ -1,8 +1,7 @@
 /**
- * Motio2edit Filters editor — temporary restore entry.
- * Full live UI is restored from the last known good blob via registry + routes.
- * This file re-exports a minimal safe shell if needed; primary implementation
- * is reloaded from EffectStudioPage which routes use.
+ * Motio2edit Filters editor — production UI restored.
+ * Dark mode: surface colors only (no layout/structure changes).
+ * Uses filter-editor-core for Adjust pipeline + output-only watermark.
  */
 export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.impl";
 export type { CatalogItem } from "./EffectStudioPage.impl";
