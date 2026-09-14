@@ -81,6 +81,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+/** Minimal critical CSS so the shell is never fully unstyled if the main bundle is delayed/blocked on mobile. */
+const CRITICAL_CSS = `
+html,body{margin:0;padding:0;background:#fafafa;color:#1a1a1a;font-family:Inter,system-ui,sans-serif;-webkit-text-size-adjust:100%}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;height:auto;display:block}
+button{font:inherit}
+`;
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -123,6 +131,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      // Preload main CSS first so mobile LTE is less likely to paint unstyled HTML
+      { rel: "preload", href: appCss, as: "style" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
@@ -152,6 +162,8 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        {/* Critical inline CSS: never leave the page fully unstyled if the main CSS bundle is delayed or blocked. */}
+        <style dangerouslySetInnerHTML={{ __html: CRITICAL_CSS }} />
       </head>
       <body>
         {children}
