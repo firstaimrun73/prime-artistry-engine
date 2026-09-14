@@ -32,6 +32,9 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/** Max time homepage / app may sit on the auth spinner before showing UI. */
+const AUTH_LOADING_TIMEOUT_MS = 3000;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -39,22 +42,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadProfile = async (uid: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, email, display_name, plan, credits, currency, avatar_url")
-      .eq("id", uid)
-      .maybeSingle();
-    if (data) {
-      const p = data as Profile;
-      if (p.avatar_url) {
-        const { data: signed } = await supabase.storage
-          .from("avatars")
-          .createSignedUrl(p.avatar_url, 60 * 60);
-        p.avatar_signed_url = signed?.signedUrl ?? null;
-      } else {
-        p.avatar_signed_url = null;
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, email, display_name, plan, credits, currency, avatar_url")
+        .eq("id", uid)
+        .maybeSingle();
+      if (data) {
+        const p = data as Profile;
+        if (p.avatar_url) {
+          const { data: signed } = await supabase.storage
+            .from("avatars")
+            .createSignedUrl(p.avatar_url, 60 * 60);
+          p.avatar_signed_url = signed?.signedUrl ?? null;
+        } else {
+          p.avatar_signed_url = null;
+        }
+        setProfile(p);
       }
-      setProfile(p);
+    } catch {
+      // Profile load must never block the app shell.
     }
   };
 
@@ -63,6 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const clearLoading = () => {
+      if (!cancelled) setLoading(false);
+    };
+
+    // Safety: never leave the whole app on a white spinner if auth hangs (mobile networks, blocked storage, etc.).
+    const timeoutId = window.setTimeout(clearLoading, AUTH_LOADING_TIMEOUT_MS);
+
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
@@ -71,16 +86,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfile(null);
       }
+      // Auth state known — drop spinner even if getSession is slow.
+      clearLoading();
     });
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      if (data.session?.user) loadProfile(data.session.user.id);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+        if (data.session?.user) loadProfile(data.session.user.id);
+      })
+      .catch((err) => {
+        console.warn("[auth] getSession failed", err);
+      })
+      .finally(() => {
+        clearLoading();
+        window.clearTimeout(timeoutId);
+      });
 
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
