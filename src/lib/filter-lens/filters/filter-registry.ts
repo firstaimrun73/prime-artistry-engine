@@ -2,10 +2,13 @@
  * filters/filter-registry.ts
  * Motio2edit AI Filters registry — 100 unique original looks.
  * Common 40 (free) · AI+ 35 · Premium 25
+ *
+ * Plus: Rangoli (rangoli_01) — premium generative img2img filter (separate pipeline).
  */
 import { FilterDefinition, FilterCategory, FILTER_CATEGORIES } from './filter-types';
 import { FILTERS_CURATED } from './filters-curated';
 import { FILTER_PROFILE_OVERRIDES, FILTER_NAME_OVERRIDES } from './filter-overrides';
+import { RANGOLI_FILTER } from './rangoli-filter';
 
 export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
   const profile = FILTER_PROFILE_OVERRIDES[f.id];
@@ -18,8 +21,16 @@ export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
   };
 });
 
+/** Premium generative filter (Flux img2img + ControlNet). Not part of the 100 CSS/programmatic set. */
+export { RANGOLI_FILTER };
+export const GENERATIVE_FILTERS = [RANGOLI_FILTER] as const;
+
 export function getFilterById(id: string): FilterDefinition | undefined {
   return ALL_FILTERS.find((f) => f.id === id);
+}
+
+export function getGenerativeFilterById(id: string) {
+  return GENERATIVE_FILTERS.find((f) => f.filter_id === id);
 }
 
 export function getFiltersByCategory(category: FilterCategory): FilterDefinition[] {
