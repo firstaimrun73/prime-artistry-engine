@@ -1,7 +1,7 @@
 /**
  * engine-ops-style.ts — anime / comic / sketch / neon style ops
- * Anime: soft cel-shade, clean thin-thick outlines, warm vibrant flats (no IP refs).
- * Comic: bold ink contours, flat graphic color, halftone shadow texture (no IP refs).
+ * Anime: soft cel + clean ink, preserves face/clothing midtones.
+ * Comic: bold ink + light halftone, less posterize so skin/shirts stay readable.
  * Sketch: pure neutral pencil (no brown cast).
  */
 import type { RGBAImage, ProcessingProfile } from '../shared/processing-types';
@@ -39,7 +39,7 @@ function inkOutlines(
       if (mag > edgeThresh) {
         const i = p * 4;
         const ink = Math.max(0, inkFloor - (mag - edgeThresh) * 0.04);
-        const k = Math.min(1, (mag - edgeThresh) / 50) * strength;
+        const k = Math.min(1, (mag - edgeThresh) / 55) * strength;
         data[i] = clamp8(data[i] * (1 - k) + ink * k);
         data[i + 1] = clamp8(data[i + 1] * (1 - k) + ink * k);
         data[i + 2] = clamp8(data[i + 2] * (1 - k) + ink * k);
@@ -48,71 +48,69 @@ function inkOutlines(
   }
 }
 
+/** Soft quantize: more levels + blend with original so faces/shirts stay readable. */
+function softCelQuantize(data: Uint8ClampedArray, levels: number, blend: number) {
+  const step = 255 / (levels - 1);
+  const keep = 1 - blend;
+  for (let i = 0; i < data.length; i += 4) {
+    for (let c = 0; c < 3; c++) {
+      const orig = data[i + c];
+      const q = Math.round(orig / step) * step;
+      data[i + c] = clamp8(orig * keep + q * blend);
+    }
+  }
+}
+
 /**
- * Anime: soft cel shading (2–3 flat tones), clean contour lines, warm saturated flats.
- * Descriptive technique only — no studio/artist/IP language.
+ * Anime: soft cel shading, clean contours, warm sat — keeps facial structure.
  */
 export function applyAnimeStyle(image: RGBAImage, intensity: number) {
+  const w = image.width, h = image.height;
+  const data = image.data;
+  const t = Math.max(0.45, Math.min(1, intensity / 100));
+  const src = new Uint8ClampedArray(data);
+
+  // 6–8 levels blended ~55% so skin/fabric retain shape
+  const levels = 6 + (t > 0.7 ? 0 : 1);
+  softCelQuantize(data, levels, 0.5 + t * 0.12);
+  applySaturationVibrance(data, 18 + t * 22, 14 + t * 14);
+  applyContrastish(data, 8 + t * 10);
+
+  const gray = luminanceGray(src, w, h);
+  // Soft clean ink — higher threshold so face details aren't crushed
+  inkOutlines(data, gray, w, h, 38 - t * 6, 28, 0.55 + t * 0.2);
+}
+
+/**
+ * Comic: bold ink + light shadow halftone; moderate quantize for readable faces/shirts.
+ */
+export function applyComicStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height;
   const data = image.data;
   const t = Math.max(0.5, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
 
-  // Soft cel: 3–4 levels, slight lift on midtones for smooth skin fields
-  const levels = 3 + (t > 0.75 ? 0 : 1);
-  const step = 255 / (levels - 1);
-  for (let i = 0; i < data.length; i += 4) {
-    for (let c = 0; c < 3; c++) {
-      const q = Math.round(data[i + c] / step) * step;
-      // Bias toward slightly brighter cel midtones
-      data[i + c] = clamp8(q * 0.92 + 18 * t);
-    }
-  }
-  applySaturationVibrance(data, 28 + t * 32, 18 + t * 20);
-  applyContrastish(data, 12 + t * 14);
-
-  const gray = luminanceGray(src, w, h);
-  // Clean anime contours — medium threshold, soft ink (not pure black)
-  inkOutlines(data, gray, w, h, 32 - t * 8, 22, 0.72 + t * 0.2);
-}
-
-/**
- * Comic: bold ink outlines, flat graphic color blocks, classic halftone in shadows.
- * Descriptive technique only — no franchise/IP language.
- */
-export function applyComicStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height;
-  const data = image.data;
-  const t = Math.max(0.55, Math.min(1, intensity / 100));
-  const src = new Uint8ClampedArray(data);
-
-  // Strong posterize for graphic color blocking
-  const levels = 4;
-  const step = 255 / (levels - 1);
-  for (let i = 0; i < data.length; i += 4) {
-    for (let c = 0; c < 3; c++) {
-      data[i + c] = clamp8(Math.round(data[i + c] / step) * step);
-    }
-  }
-  applySaturationVibrance(data, 30 + t * 28, 16 + t * 18);
-  applyContrastish(data, 26 + t * 24);
+  // 5–6 levels, ~60% blend — graphic but not muddy red/green blocks on skin
+  softCelQuantize(data, 5 + (t > 0.75 ? 0 : 1), 0.55 + t * 0.1);
+  applySaturationVibrance(data, 16 + t * 18, 12 + t * 12);
+  applyContrastish(data, 14 + t * 14);
 
   const gray = luminanceGray(src, w, h);
 
-  // Halftone dot pattern in shadow regions (print-comic texture)
-  const dotPeriod = Math.max(3, Math.round(5 - t * 1.5));
+  // Light halftone only in deeper shadows (g < 100), smaller dots
+  const dotPeriod = Math.max(4, Math.round(6 - t));
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const p = y * w + x;
       const g = gray[p];
-      if (g < 140) {
+      if (g < 100) {
         const cx = x % dotPeriod;
         const cy = y % dotPeriod;
         const dist = Math.sqrt((cx - dotPeriod / 2) ** 2 + (cy - dotPeriod / 2) ** 2);
-        const radius = ((140 - g) / 140) * (dotPeriod * 0.45) * (0.6 + t * 0.4);
+        const radius = ((100 - g) / 100) * (dotPeriod * 0.35) * (0.5 + t * 0.35);
         if (dist < radius) {
           const i = p * 4;
-          const darken = 0.55 + t * 0.25;
+          const darken = 0.7 + t * 0.15;
           data[i] = clamp8(data[i] * darken);
           data[i + 1] = clamp8(data[i + 1] * darken);
           data[i + 2] = clamp8(data[i + 2] * darken);
@@ -121,8 +119,8 @@ export function applyComicStyle(image: RGBAImage, intensity: number) {
     }
   }
 
-  // Bold black ink contours
-  inkOutlines(data, gray, w, h, 24 - t * 8, 4, 0.9 + t * 0.1);
+  // Bold ink on strong edges only
+  inkOutlines(data, gray, w, h, 30 - t * 6, 8, 0.75 + t * 0.15);
 }
 
 /** Pure pencil-sketch: grayscale + inverted-blur color-dodge. No brown/warm cast. */
