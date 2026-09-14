@@ -225,9 +225,8 @@ export function EffectStudioPage({
       setHighlightColorId("neutral"); setShadowColorId("neutral"); setColorTarget("highlight");
       setComparing(false);
       const initId = selectedId || items[0]?.id || null;
-      const initIntensity = (items.find((i) => i.id === initId) as { intensityDefault?: number } | undefined)?.intensityDefault ?? 85;
       if (!selectedId && items[0]) { setSelectedId(items[0].id); setIntensity(85); }
-      historyRef.current = [{ selectedId: initId, intensity: initIntensity, adj: { ...DEFAULT_ADJ }, highlightColorId: "neutral", shadowColorId: "neutral" }];
+      historyRef.current = [{ selectedId: initId, intensity: 85, adj: { ...DEFAULT_ADJ }, highlightColorId: "neutral", shadowColorId: "neutral" }];
       historyIdxRef.current = 0;
       setHistoryTick((t) => t + 1);
       toast.success("Photo ready — pick a look");
@@ -393,6 +392,7 @@ export function EffectStudioPage({
       <header className="flex shrink-0 items-center gap-3 border-b border-[#E8E0D8] bg-white px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] bg-white" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
         <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
           <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
         </div>
         <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#E8E0D8] bg-white px-3 text-xs font-semibold">
