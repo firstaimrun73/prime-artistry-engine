@@ -3,12 +3,18 @@
  * Motio2edit AI Filters registry — 100 unique original looks.
  * Common 40 (free) · AI+ 35 · Premium 25
  *
- * Plus: Rangoli (rangoli_01) — premium generative img2img filter (separate pipeline).
+ * Plus generative Premium filters (separate Flux img2img pipeline):
+ *   Rangoli + Wildfire, Glacier, Neon Pulse, Gold Dust,
+ *   Storm Break, Bloom, Molten, Chrome Future
  */
 import { FilterDefinition, FilterCategory, FILTER_CATEGORIES } from './filter-types';
 import { FILTERS_CURATED } from './filters-curated';
 import { FILTER_PROFILE_OVERRIDES, FILTER_NAME_OVERRIDES } from './filter-overrides';
 import { RANGOLI_FILTER } from './rangoli-filter';
+import {
+  HIGH_IMPACT_GENERATIVE_FILTERS,
+  type GenerativeFilterConfig,
+} from './high-impact-generative-filters';
 
 export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
   const profile = FILTER_PROFILE_OVERRIDES[f.id];
@@ -21,16 +27,36 @@ export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
   };
 });
 
-/** Premium generative filter (Flux img2img + ControlNet). Not part of the 100 CSS/programmatic set. */
+/** Premium generative filters (Flux img2img + ControlNet). Not part of the 100 CSS/programmatic set. */
 export { RANGOLI_FILTER };
-export const GENERATIVE_FILTERS = [RANGOLI_FILTER] as const;
+export {
+  HIGH_IMPACT_GENERATIVE_FILTERS,
+  WILDFIRE_FILTER,
+  GLACIER_FILTER,
+  NEON_PULSE_FILTER,
+  GOLD_DUST_FILTER,
+  STORM_BREAK_FILTER,
+  BLOOM_FILTER,
+  MOLTEN_FILTER,
+  CHROME_FUTURE_FILTER,
+} from './high-impact-generative-filters';
+export type { GenerativeFilterConfig };
+
+export const GENERATIVE_FILTERS: readonly GenerativeFilterConfig[] = [
+  RANGOLI_FILTER as GenerativeFilterConfig,
+  ...HIGH_IMPACT_GENERATIVE_FILTERS,
+] as const;
 
 export function getFilterById(id: string): FilterDefinition | undefined {
   return ALL_FILTERS.find((f) => f.id === id);
 }
 
-export function getGenerativeFilterById(id: string) {
+export function getGenerativeFilterById(id: string): GenerativeFilterConfig | undefined {
   return GENERATIVE_FILTERS.find((f) => f.filter_id === id);
+}
+
+export function listGenerativeFilters(): readonly GenerativeFilterConfig[] {
+  return GENERATIVE_FILTERS;
 }
 
 export function getFiltersByCategory(category: FilterCategory): FilterDefinition[] {
