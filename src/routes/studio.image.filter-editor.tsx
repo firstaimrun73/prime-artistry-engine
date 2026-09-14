@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CATALOG_FILTERS, listFilterCategories } from "@/lib/filter-lens/filters/filter-registry";
+import { ALL_FILTERS, listFilterCategories } from "@/lib/filter-lens/filters/filter-registry";
 import { EffectStudioPage, filterToCatalogItem } from "@/components/filter-lens/EffectStudioPage";
 
 type Search = { effect?: string };
@@ -23,8 +23,7 @@ export const Route = createFileRoute("/studio/image/filter-editor")({
 
 function FilterEditorPage() {
   const { effect } = Route.useSearch();
-  // CATALOG_FILTERS = original 100 + 25 Premium (same UI components, premium badge)
-  const items = CATALOG_FILTERS.map((f, i) => filterToCatalogItem(f, i));
+  const items = ALL_FILTERS.map((f, i) => filterToCatalogItem(f, i));
   const categories = listFilterCategories();
   return (
     <EffectStudioPage
