@@ -1,23 +1,14 @@
 /**
  * filters/filter-registry.ts
- * Motio2edit AI Filters registry — 100 unique original looks.
- * Common 40 (free) · AI+ 35 · Premium 25
- *
- * Note: The experimental 25 Premium recipe set (premium_01…premium_25) was
- * rejected and is NOT exposed in the Filters UI catalog.
+ * Motio2edit AI Filters registry — 100 unique looks.
+ * Common 40 (free) · AI+ 35 · Premium 25 (product reference set)
  */
 import { FilterDefinition, FilterCategory, FILTER_CATEGORIES } from './filter-types';
 import { FILTERS_CURATED } from './filters-curated';
 import { FILTER_PROFILE_OVERRIDES, FILTER_NAME_OVERRIDES } from './filter-overrides';
-import { RANGOLI_FILTER } from './rangoli-filter';
-import {
-  HIGH_IMPACT_GENERATIVE_FILTERS,
-  type GenerativeFilterConfig,
-} from './high-impact-generative-filters';
+import { FILTERS_PREMIUM_25 } from './filters-premium-25';
 
-export type { GenerativeFilterConfig };
-
-export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
+const curated = FILTERS_CURATED.map((f) => {
   const profile = FILTER_PROFILE_OVERRIDES[f.id];
   const name = FILTER_NAME_OVERRIDES[f.id];
   if (!profile && !name) return f;
@@ -28,35 +19,13 @@ export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
   };
 });
 
-/** Legacy generative configs (prompt-based) — kept for optional future pipeline use only */
-export { RANGOLI_FILTER };
-export {
-  HIGH_IMPACT_GENERATIVE_FILTERS,
-  WILDFIRE_FILTER,
-  GLACIER_FILTER,
-  NEON_PULSE_FILTER,
-  GOLD_DUST_FILTER,
-  STORM_BREAK_FILTER,
-  BLOOM_FILTER,
-  MOLTEN_FILTER,
-  CHROME_FUTURE_FILTER,
-} from './high-impact-generative-filters';
+/** Replace slots filter-076…filter-100 with the exact 25 Premium product filters */
+const premiumById = new Map(FILTERS_PREMIUM_25.map((f) => [f.id, f]));
 
-export const GENERATIVE_FILTERS: readonly GenerativeFilterConfig[] = [
-  RANGOLI_FILTER as GenerativeFilterConfig,
-  ...HIGH_IMPACT_GENERATIVE_FILTERS,
-] as const;
+export const ALL_FILTERS: FilterDefinition[] = curated.map((f) => premiumById.get(f.id) ?? f);
 
 export function getFilterById(id: string): FilterDefinition | undefined {
   return ALL_FILTERS.find((f) => f.id === id);
-}
-
-export function getGenerativeFilterById(id: string): GenerativeFilterConfig | undefined {
-  return GENERATIVE_FILTERS.find((f) => f.filter_id === id);
-}
-
-export function listGenerativeFilters(): readonly GenerativeFilterConfig[] {
-  return GENERATIVE_FILTERS;
 }
 
 export function getFiltersByCategory(category: FilterCategory): FilterDefinition[] {
