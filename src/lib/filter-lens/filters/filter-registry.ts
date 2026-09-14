@@ -5,9 +5,8 @@
  *
  * Plus:
  * - Generative Premium set (Rangoli + high-impact flux configs)
- * - Full 25 Premium multi-stage recipe registry (this file exports both)
- *
- * Backend only — no UI changes.
+ * - Full 25 Premium multi-stage recipe registry
+ * - PREMIUM_AS_FILTERS bridge so the existing Filters UI can display them
  */
 import { FilterDefinition, FilterCategory, FILTER_CATEGORIES } from './filter-types';
 import { FILTERS_CURATED } from './filters-curated';
@@ -25,6 +24,7 @@ import {
   getPremiumAdjustments,
   type PremiumFilterDefinition,
 } from './premium-filters-registry';
+import { PREMIUM_AS_FILTERS, getCatalogWithPremium } from './premium-to-catalog';
 
 export type { PremiumFilterDefinition, GenerativeFilterConfig };
 
@@ -38,6 +38,9 @@ export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
     ...(profile ? { processingProfile: { ...f.processingProfile, ...profile } } : {}),
   };
 });
+
+/** 100 base + 25 Premium (for UI catalog). Does not change validation of the locked 100. */
+export const CATALOG_FILTERS: FilterDefinition[] = getCatalogWithPremium(ALL_FILTERS);
 
 /** Legacy generative configs (prompt-based) */
 export { RANGOLI_FILTER };
@@ -58,17 +61,22 @@ export const GENERATIVE_FILTERS: readonly GenerativeFilterConfig[] = [
   ...HIGH_IMPACT_GENERATIVE_FILTERS,
 ] as const;
 
-/** Full 25 Premium recipe registry */
+/** Full 25 Premium recipe registry + catalog bridge */
 export {
   ALL_PREMIUM_FILTERS,
   getPremiumFilterById,
   listPremiumFiltersByPriority,
   listPremiumFiltersByCategory,
   getPremiumAdjustments,
+  PREMIUM_AS_FILTERS,
+  getCatalogWithPremium,
 };
 
 export function getFilterById(id: string): FilterDefinition | undefined {
-  return ALL_FILTERS.find((f) => f.id === id);
+  return (
+    ALL_FILTERS.find((f) => f.id === id) ??
+    PREMIUM_AS_FILTERS.find((f) => f.id === id)
+  );
 }
 
 export function getGenerativeFilterById(id: string): GenerativeFilterConfig | undefined {
@@ -80,11 +88,11 @@ export function listGenerativeFilters(): readonly GenerativeFilterConfig[] {
 }
 
 export function getFiltersByCategory(category: FilterCategory): FilterDefinition[] {
-  return ALL_FILTERS.filter((f) => f.category === category);
+  return CATALOG_FILTERS.filter((f) => f.category === category);
 }
 
 export function listFilterCategories(): FilterCategory[] {
-  const present = new Set(ALL_FILTERS.map((f) => f.category));
+  const present = new Set(CATALOG_FILTERS.map((f) => f.category));
   return FILTER_CATEGORIES.filter((c) => present.has(c));
 }
 
@@ -138,9 +146,11 @@ export function validateFilterRegistry(): RegistryValidationResult {
   if (premium !== 25) errors.push(`Expected 25 Premium filters, found ${premium}`);
   if (common !== 40) errors.push(`Expected 40 Common (free/no-tier) filters, found ${common}`);
 
-  // Premium recipe registry integrity
   if (ALL_PREMIUM_FILTERS.length !== 25) {
     errors.push(`Expected exactly 25 Premium recipe filters, found ${ALL_PREMIUM_FILTERS.length}`);
+  }
+  if (PREMIUM_AS_FILTERS.length !== 25) {
+    errors.push(`Expected 25 PREMIUM_AS_FILTERS catalog entries, found ${PREMIUM_AS_FILTERS.length}`);
   }
   const premiumIds = new Set<string>();
   for (const p of ALL_PREMIUM_FILTERS) {
