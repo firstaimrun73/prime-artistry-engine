@@ -1,8 +1,8 @@
 /**
- * engine-ops-style.ts — anime / comic / sketch / neon style ops
- * Anime: soft cel + clean ink, preserves face/clothing midtones.
- * Comic: bold ink + light halftone, less posterize so skin/shirts stay readable.
- * Sketch: pure neutral pencil (no brown cast).
+ * engine-ops-style.ts — anime / comic / sketch / neon style ops (backend only)
+ * Sketch: pure B/W with stronger black line weight.
+ * Anime: soft multi-tone cel, thin clean ink, luminous skin bias (technique-only).
+ * Comic: moderate quantize + bold ink + light shadow dots; preserves face structure.
  */
 import type { RGBAImage, ProcessingProfile } from '../shared/processing-types';
 import { clamp8, applySaturationVibrance } from './engine-ops-basic';
@@ -38,8 +38,8 @@ function inkOutlines(
       const mag = Math.sqrt(gx * gx + gy * gy);
       if (mag > edgeThresh) {
         const i = p * 4;
-        const ink = Math.max(0, inkFloor - (mag - edgeThresh) * 0.04);
-        const k = Math.min(1, (mag - edgeThresh) / 55) * strength;
+        const ink = Math.max(0, inkFloor - (mag - edgeThresh) * 0.03);
+        const k = Math.min(1, (mag - edgeThresh) / 48) * strength;
         data[i] = clamp8(data[i] * (1 - k) + ink * k);
         data[i + 1] = clamp8(data[i + 1] * (1 - k) + ink * k);
         data[i + 2] = clamp8(data[i + 2] * (1 - k) + ink * k);
@@ -48,7 +48,7 @@ function inkOutlines(
   }
 }
 
-/** Soft quantize: more levels + blend with original so faces/shirts stay readable. */
+/** Quantize blended with original — keeps face/fabric readable. */
 function softCelQuantize(data: Uint8ClampedArray, levels: number, blend: number) {
   const step = 255 / (levels - 1);
   const keep = 1 - blend;
@@ -62,68 +62,83 @@ function softCelQuantize(data: Uint8ClampedArray, levels: number, blend: number)
 }
 
 /**
- * Anime: soft cel shading, clean contours, warm sat — keeps facial structure.
+ * Anime (technique-only): soft cel fields, thin clean contours, slight skin lift.
+ * Inspired by classic cel-animation shading structure — not any named IP.
  */
 export function applyAnimeStyle(image: RGBAImage, intensity: number) {
+  const w = image.width, h = image.height;
+  const data = image.data;
+  const t = Math.max(0.4, Math.min(1, intensity / 100));
+  const src = new Uint8ClampedArray(data);
+
+  // Mild smooth base so skin reads as flat cel fields
+  applySoftBlur(image, 6 + t * 8);
+
+  // 7–8 soft levels, light blend — face structure stays
+  softCelQuantize(data, 7, 0.38 + t * 0.12);
+
+  // Luminous midtones (skin bias): lift mids slightly, keep highlights
+  for (let i = 0; i < data.length; i += 4) {
+    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    if (y > 40 && y < 210) {
+      const lift = (1 - Math.abs(y - 140) / 140) * (8 + t * 10);
+      data[i] = clamp8(data[i] + lift * 1.05);
+      data[i + 1] = clamp8(data[i + 1] + lift);
+      data[i + 2] = clamp8(data[i + 2] + lift * 0.92);
+    }
+  }
+
+  applySaturationVibrance(data, 14 + t * 16, 12 + t * 12);
+  applyContrastish(data, 6 + t * 8);
+
+  const gray = luminanceGray(src, w, h);
+  // Thin clean linework (not heavy comic black)
+  inkOutlines(data, gray, w, h, 42 - t * 5, 36, 0.42 + t * 0.18);
+}
+
+/**
+ * Comic: graphic but face-preserving — moderate quantize, bold ink, light shadow dots.
+ */
+export function applyComicStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height;
   const data = image.data;
   const t = Math.max(0.45, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
 
-  // 6–8 levels blended ~55% so skin/fabric retain shape
-  const levels = 6 + (t > 0.7 ? 0 : 1);
-  softCelQuantize(data, levels, 0.5 + t * 0.12);
-  applySaturationVibrance(data, 18 + t * 22, 14 + t * 14);
-  applyContrastish(data, 8 + t * 10);
-
-  const gray = luminanceGray(src, w, h);
-  // Soft clean ink — higher threshold so face details aren't crushed
-  inkOutlines(data, gray, w, h, 38 - t * 6, 28, 0.55 + t * 0.2);
-}
-
-/**
- * Comic: bold ink + light shadow halftone; moderate quantize for readable faces/shirts.
- */
-export function applyComicStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height;
-  const data = image.data;
-  const t = Math.max(0.5, Math.min(1, intensity / 100));
-  const src = new Uint8ClampedArray(data);
-
-  // 5–6 levels, ~60% blend — graphic but not muddy red/green blocks on skin
-  softCelQuantize(data, 5 + (t > 0.75 ? 0 : 1), 0.55 + t * 0.1);
-  applySaturationVibrance(data, 16 + t * 18, 12 + t * 12);
-  applyContrastish(data, 14 + t * 14);
+  // 6 levels, ~45% blend — graphic without muddy red/green face blocks
+  softCelQuantize(data, 6, 0.42 + t * 0.1);
+  applySaturationVibrance(data, 12 + t * 14, 10 + t * 10);
+  applyContrastish(data, 12 + t * 12);
 
   const gray = luminanceGray(src, w, h);
 
-  // Light halftone only in deeper shadows (g < 100), smaller dots
-  const dotPeriod = Math.max(4, Math.round(6 - t));
+  // Halftone only in deep shadows
+  const dotPeriod = 5;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const p = y * w + x;
       const g = gray[p];
-      if (g < 100) {
+      if (g < 90) {
         const cx = x % dotPeriod;
         const cy = y % dotPeriod;
-        const dist = Math.sqrt((cx - dotPeriod / 2) ** 2 + (cy - dotPeriod / 2) ** 2);
-        const radius = ((100 - g) / 100) * (dotPeriod * 0.35) * (0.5 + t * 0.35);
-        if (dist < radius) {
+        const dist = Math.sqrt((cx - 2.5) ** 2 + (cy - 2.5) ** 2);
+        if (dist < ((90 - g) / 90) * 1.8 * (0.5 + t * 0.4)) {
           const i = p * 4;
-          const darken = 0.7 + t * 0.15;
-          data[i] = clamp8(data[i] * darken);
-          data[i + 1] = clamp8(data[i + 1] * darken);
-          data[i + 2] = clamp8(data[i + 2] * darken);
+          data[i] = clamp8(data[i] * 0.72);
+          data[i + 1] = clamp8(data[i + 1] * 0.72);
+          data[i + 2] = clamp8(data[i + 2] * 0.72);
         }
       }
     }
   }
 
-  // Bold ink on strong edges only
-  inkOutlines(data, gray, w, h, 30 - t * 6, 8, 0.75 + t * 0.15);
+  // Strong black ink on clear edges only
+  inkOutlines(data, gray, w, h, 28 - t * 5, 6, 0.82 + t * 0.12);
 }
 
-/** Pure pencil-sketch: grayscale + inverted-blur color-dodge. No brown/warm cast. */
+/**
+ * Sketch: pure neutral pencil + stronger black outlines (user request).
+ */
 export function applySketchStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height;
   const data = image.data;
@@ -135,7 +150,7 @@ export function applySketchStyle(image: RGBAImage, intensity: number) {
   const inv = new Float32Array(w * h);
   for (let p = 0; p < gray.length; p++) inv[p] = 255 - gray[p];
   let cur = inv;
-  const passes = 4 + Math.round(t * 2);
+  const passes = 3 + Math.round(t * 2);
   for (let pass = 0; pass < passes; pass++) {
     const next = new Float32Array(w * h);
     for (let y = 1; y < h - 1; y++) {
@@ -157,15 +172,42 @@ export function applySketchStyle(image: RGBAImage, intensity: number) {
     }
     cur = next;
   }
+
+  // Base pencil dodge
   for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
     const denom = 255 - cur[p] + 1e-3;
     let v = (gray[p] * 255) / denom;
     if (v > 255) v = 255;
-    const g = Math.min(255, v * (0.88 + 0.12 * (1 - t)));
+    // Darker overall line weight
+    const g = Math.min(255, v * (0.78 + 0.14 * (1 - t)));
     const out = clamp8(g);
     data[i] = out;
     data[i + 1] = out;
     data[i + 2] = out;
+  }
+
+  // Extra pure-black edge pass on strong contours
+  const edgeThresh = 22 - t * 6;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      const gx =
+        -gray[p - w - 1] - 2 * gray[p - 1] - gray[p + w - 1] +
+         gray[p - w + 1] + 2 * gray[p + 1] + gray[p + w + 1];
+      const gy =
+        -gray[p - w - 1] - 2 * gray[p - w] - gray[p - w + 1] +
+         gray[p + w - 1] + 2 * gray[p + w] + gray[p + w + 1];
+      const mag = Math.sqrt(gx * gx + gy * gy);
+      if (mag > edgeThresh) {
+        const i = p * 4;
+        const k = Math.min(1, (mag - edgeThresh) / 40) * (0.7 + t * 0.3);
+        // Push toward pure black outlines
+        const ink = 0;
+        data[i] = clamp8(data[i] * (1 - k) + ink * k);
+        data[i + 1] = clamp8(data[i + 1] * (1 - k) + ink * k);
+        data[i + 2] = clamp8(data[i + 2] * (1 - k) + ink * k);
+      }
+    }
   }
 }
 
