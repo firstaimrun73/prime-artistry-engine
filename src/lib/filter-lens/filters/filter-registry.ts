@@ -3,9 +3,11 @@
  * Motio2edit AI Filters registry — 100 unique original looks.
  * Common 40 (free) · AI+ 35 · Premium 25
  *
- * Plus generative Premium filters (separate Flux img2img pipeline):
- *   Rangoli + Wildfire, Glacier, Neon Pulse, Gold Dust,
- *   Storm Break, Bloom, Molten, Chrome Future
+ * Plus:
+ * - Generative Premium set (Rangoli + high-impact flux configs)
+ * - Full 25 Premium multi-stage recipe registry (this file exports both)
+ *
+ * Backend only — no UI changes.
  */
 import { FilterDefinition, FilterCategory, FILTER_CATEGORIES } from './filter-types';
 import { FILTERS_CURATED } from './filters-curated';
@@ -15,6 +17,16 @@ import {
   HIGH_IMPACT_GENERATIVE_FILTERS,
   type GenerativeFilterConfig,
 } from './high-impact-generative-filters';
+import {
+  ALL_PREMIUM_FILTERS,
+  getPremiumFilterById,
+  listPremiumFiltersByPriority,
+  listPremiumFiltersByCategory,
+  getPremiumAdjustments,
+  type PremiumFilterDefinition,
+} from './premium-filters-registry';
+
+export type { PremiumFilterDefinition, GenerativeFilterConfig };
 
 export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
   const profile = FILTER_PROFILE_OVERRIDES[f.id];
@@ -27,7 +39,7 @@ export const ALL_FILTERS: FilterDefinition[] = FILTERS_CURATED.map((f) => {
   };
 });
 
-/** Premium generative filters (Flux img2img + ControlNet). Not part of the 100 CSS/programmatic set. */
+/** Legacy generative configs (prompt-based) */
 export { RANGOLI_FILTER };
 export {
   HIGH_IMPACT_GENERATIVE_FILTERS,
@@ -40,12 +52,20 @@ export {
   MOLTEN_FILTER,
   CHROME_FUTURE_FILTER,
 } from './high-impact-generative-filters';
-export type { GenerativeFilterConfig };
 
 export const GENERATIVE_FILTERS: readonly GenerativeFilterConfig[] = [
   RANGOLI_FILTER as GenerativeFilterConfig,
   ...HIGH_IMPACT_GENERATIVE_FILTERS,
 ] as const;
+
+/** Full 25 Premium recipe registry */
+export {
+  ALL_PREMIUM_FILTERS,
+  getPremiumFilterById,
+  listPremiumFiltersByPriority,
+  listPremiumFiltersByCategory,
+  getPremiumAdjustments,
+};
 
 export function getFilterById(id: string): FilterDefinition | undefined {
   return ALL_FILTERS.find((f) => f.id === id);
@@ -117,5 +137,19 @@ export function validateFilterRegistry(): RegistryValidationResult {
   if (aiPlus !== 35) errors.push(`Expected 35 AI+ filters, found ${aiPlus}`);
   if (premium !== 25) errors.push(`Expected 25 Premium filters, found ${premium}`);
   if (common !== 40) errors.push(`Expected 40 Common (free/no-tier) filters, found ${common}`);
+
+  // Premium recipe registry integrity
+  if (ALL_PREMIUM_FILTERS.length !== 25) {
+    errors.push(`Expected exactly 25 Premium recipe filters, found ${ALL_PREMIUM_FILTERS.length}`);
+  }
+  const premiumIds = new Set<string>();
+  for (const p of ALL_PREMIUM_FILTERS) {
+    if (premiumIds.has(p.filter_id)) errors.push(`Duplicate premium filter_id: ${p.filter_id}`);
+    premiumIds.add(p.filter_id);
+    if (!p.adjustments || p.adjustments.length === 0) {
+      errors.push(`Premium filter ${p.filter_id} has no adjustments`);
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
