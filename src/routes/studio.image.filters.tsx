@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ALL_FILTERS, listFilterCategories } from "@/lib/filter-lens/filters/filter-registry";
+import { CATALOG_FILTERS, listFilterCategories } from "@/lib/filter-lens/filters/filter-registry";
 import { EffectStudioPage, filterToCatalogItem } from "@/components/filter-lens/EffectStudioPage";
 
 export const Route = createFileRoute("/studio/image/filters")({
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/studio/image/filters")({
       {
         name: "description",
         content:
-          "Motio2edit Filters — AI-powered looks with live preview. Natural, Portrait, Cinematic, Comic, Sketch and more.",
+          "Motio2edit Filters — AI-powered looks with live preview. Natural, Portrait, Cinematic, Comic, Sketch, Anime, Rangoli and more.",
       },
     ],
   }),
@@ -18,7 +18,8 @@ export const Route = createFileRoute("/studio/image/filters")({
 });
 
 function FiltersDiscoveryPage() {
-  const items = ALL_FILTERS.map((f, i) => filterToCatalogItem(f, i));
+  // CATALOG_FILTERS = original 100 + 25 Premium (same UI components, premium badge)
+  const items = CATALOG_FILTERS.map((f, i) => filterToCatalogItem(f, i));
   const categories = listFilterCategories();
   return (
     <EffectStudioPage
