@@ -81,12 +81,71 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-/** Minimal critical CSS so the shell is never fully unstyled if the main bundle is delayed/blocked on mobile. */
+/**
+ * Emergency critical CSS — enough of the glass Motio2edit shell so the page
+ * never looks like raw unstyled HTML if the main Tailwind bundle is delayed,
+ * blocked, or fails on mobile networks.
+ */
 const CRITICAL_CSS = `
-html,body{margin:0;padding:0;background:#fafafa;color:#1a1a1a;font-family:Inter,system-ui,sans-serif;-webkit-text-size-adjust:100%}
+html,body{margin:0;padding:0;background:#fafafa;color:#1a1a1a;font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%;line-height:1.5}
+*,*::before,*::after{box-sizing:border-box}
 a{color:inherit;text-decoration:none}
-img{max-width:100%;height:auto;display:block}
-button{font:inherit}
+img,video{max-width:100%;height:auto;display:block}
+button{font:inherit;cursor:pointer;border:none;background:none}
+header{position:sticky;top:0;z-index:40;border-bottom:1px solid rgba(0,0,0,.08);background:rgba(250,250,250,.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+header>div{display:flex;align-items:center;justify-content:space-between;gap:.75rem;height:4rem;max-width:72rem;margin:0 auto;padding:0 .75rem}
+nav{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap}
+nav a{padding:.5rem .75rem;border-radius:.5rem;font-size:.875rem;font-weight:500;color:#666}
+main{max-width:72rem;margin:0 auto;padding:1.25rem 1rem 6rem}
+h1{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;margin:.25rem 0 0}
+h2{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#737373;margin:0 0 .75rem}
+section{margin-top:1.5rem}
+/* Quick-create row */
+.flex{display:flex}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-2{gap:.5rem}.gap-3{gap:.75rem}
+.overflow-x-auto{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.rounded-2xl{border-radius:1rem}.rounded-xl{border-radius:.75rem}.rounded-full{border-radius:9999px}
+.border{border:1px solid rgba(0,0,0,.1)}
+.bg-card,.bg-background{background:#fff}
+.p-4{padding:1rem}.px-4{padding-left:1rem;padding-right:1rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}
+.text-sm{font-size:.875rem}.text-xs{font-size:.75rem}.font-semibold{font-weight:600}.font-bold{font-weight:700}
+.text-muted-foreground{color:#737373}
+.min-h-screen{min-height:100vh}
+/* Gallery cards */
+article{position:relative;overflow:hidden;border-radius:14px;background:rgba(0,0,0,.04)}
+article img,article video{width:100%;display:block}
+`;
+
+/** If main Tailwind CSS never applies, force-reinsert the stylesheet once. */
+const CSS_GUARD_SCRIPT = `
+(function(){
+  try {
+    var href = ${JSON.stringify(appCss)};
+    function applied(){
+      var h = document.querySelector('header');
+      if (!h) return true;
+      var d = window.getComputedStyle(h).display;
+      var pos = window.getComputedStyle(h).position;
+      return pos === 'sticky' || pos === 'fixed' || (d === 'flex');
+    }
+    function inject(){
+      if (document.querySelector('link[data-motio-css-guard]')) return;
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href + (href.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now();
+      l.setAttribute('data-motio-css-guard','1');
+      document.head.appendChild(l);
+    }
+    function check(){
+      if (!applied()) inject();
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function(){ setTimeout(check, 400); setTimeout(check, 1500); });
+    } else {
+      setTimeout(check, 400);
+      setTimeout(check, 1500);
+    }
+  } catch (e) {}
+})();
 `;
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -131,7 +190,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      // Preload main CSS first so mobile LTE is less likely to paint unstyled HTML
       { rel: "preload", href: appCss, as: "style" },
       {
         rel: "stylesheet",
@@ -149,6 +207,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         children:
           "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3NCVLG63JR');",
       },
+      // Emergency: if main CSS never applies, force-reload it
+      { children: CSS_GUARD_SCRIPT },
     ],
   }),
   shellComponent: RootShell,
@@ -162,7 +222,6 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
-        {/* Critical inline CSS: never leave the page fully unstyled if the main CSS bundle is delayed or blocked. */}
         <style dangerouslySetInnerHTML={{ __html: CRITICAL_CSS }} />
       </head>
       <body>
@@ -178,7 +237,6 @@ function PageViewTracker() {
   useEffect(() => {
     const send = (path: string) => {
       trackPageView(path);
-      // First-party traffic (admin dashboard). Fire-and-forget.
       void import("@/lib/traffic-client").then((m) => m.reportPageView(path));
     };
     send(router.state.location.pathname);
@@ -201,7 +259,6 @@ function RootComponent() {
         <AuthProvider>
           <PageViewTracker />
           <AdPolicyGate />
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />
