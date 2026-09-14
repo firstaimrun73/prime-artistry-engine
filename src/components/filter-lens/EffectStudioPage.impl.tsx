@@ -1,7 +1,8 @@
 /**
- * Motio2edit Filters editor — production UI.
- * Dark mode via useTheme + Tailwind dark: classes (html.dark).
- * Layout: existing Motio2edit Filters interaction model.
+ * Motio2edit Filters editor — production UI (ORIGINAL Pass-2).
+ * Dark mode: surface color pairs only (html.dark). Layout/UX unchanged.
+ * Uses filter-editor-core for Adjust pipeline + output-only watermark.
+ * Header locked. No implementation disclosure. No filter credits.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -13,13 +14,13 @@ import {
   ImagePlus,
   Loader2,
   Redo2,
+  RotateCcw,
   Share2,
   Undo2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/lib/theme";
 import {
   fileToRGBAImage,
   rgbaImageToObjectUrl,
@@ -94,8 +95,6 @@ function OrangeSlider({
 export function EffectStudioPage({
   kind, pageMode: _pageMode, title, subtitle: _subtitle, items, categories, initialSelectedId = null,
 }: Props) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
   const { profile, user } = useAuth();
   const isAdmin = isAdminEmail(user?.email ?? profile?.email);
   const freeUser = !isAdmin && (!profile || profile.plan === "free" || !profile.plan);
@@ -121,7 +120,7 @@ export function EffectStudioPage({
   const [historyTick, setHistoryTick] = useState(0);
   const histDebounceRef = useRef<number | null>(null);
   const sortedCategories = useMemo(() => {
-    const preferred = ["Natural", "Portrait", "Cinematic", "Film", "Vintage", "Moody", "Comic", "Sketch", "Retro", "Art", "Neon", "Black & White", "Soft", "Dramatic", "Professional", "Landscape", "Sunset", "Cool"];
+    const preferred = ["Natural", "Portrait", "Cinematic", "Film", "Vintage", "Moody", "Comic", "Sketch", "Retro", "Art", "Neon", "Black & White"];
     const head = preferred.filter((c) => categories.includes(c));
     const rest = categories.filter((c) => !preferred.includes(c));
     return [...head, ...rest];
@@ -227,8 +226,9 @@ export function EffectStudioPage({
       setHighlightColorId("neutral"); setShadowColorId("neutral"); setColorTarget("highlight");
       setComparing(false);
       const initId = selectedId || items[0]?.id || null;
+      const initIntensity = (items.find((i) => i.id === initId) as { intensityDefault?: number } | undefined)?.intensityDefault ?? 85;
       if (!selectedId && items[0]) { setSelectedId(items[0].id); setIntensity(85); }
-      historyRef.current = [{ selectedId: initId, intensity: 85, adj: { ...DEFAULT_ADJ }, highlightColorId: "neutral", shadowColorId: "neutral" }];
+      historyRef.current = [{ selectedId: initId, intensity: initIntensity, adj: { ...DEFAULT_ADJ }, highlightColorId: "neutral", shadowColorId: "neutral" }];
       historyIdxRef.current = 0;
       setHistoryTick((t) => t + 1);
       toast.success("Photo ready — pick a look");
@@ -356,40 +356,32 @@ export function EffectStudioPage({
   const hasPhoto = !!sourceUrl;
   const adjMeta = ADJUST_META.find((m) => m.key === adjKey)!;
 
-  const shell = cn(
-    "flex min-h-[100dvh] flex-col",
-    isDark ? "bg-[#0F0E0D] text-[#F5F0EA]" : "bg-[#FFFBF7] text-[#161412]",
-  );
-  const border = isDark ? "border-[#2A2826]" : "border-[#E8E0D8]";
-  const muted = isDark ? "text-[#A39E97]" : "text-[#6F6862]";
-  const card = isDark ? "bg-[#1A1918]" : "bg-white";
-
   if (!items || items.length === 0) {
     return (
-      <div className={cn("flex min-h-[60vh] flex-col items-center justify-center gap-3", shell)}>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-[#FFFBF7] dark:bg-[#0F0E0D]">
         <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
-        <p className={cn("text-sm", muted)}>Loading filters…</p>
+        <p className="text-sm text-[#6F6862] dark:text-[#A39E97]">Loading filters…</p>
       </div>
     );
   }
 
   if (!hasPhoto) {
     return (
-      <div className={shell}>
-        <header className={cn("flex items-center gap-3 border-b px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]", border)}>
-          <Link to="/" className={cn("grid h-9 w-9 place-items-center rounded-full border", border, card)} aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
+      <div className="flex min-h-[100dvh] flex-col bg-[#FFFBF7] dark:bg-[#0F0E0D] text-[#161412] dark:text-[#F5F0EA]">
+        <header className="flex items-center gap-3 border-b border-[#E8E0D8] dark:border-[#2A2826] px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918]" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
             <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
           </div>
         </header>
         <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 min-h-0">
-          <p className={cn("mb-5 max-w-sm text-center text-sm", muted)}>AI-powered filters · live preview on your photo</p>
+          <p className="mb-5 max-w-sm text-center text-sm text-[#6F6862] dark:text-[#A39E97]">AI-powered filters · live preview on your photo</p>
           <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
-            className={cn("flex w-full flex-col items-center gap-4 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/45 px-6 py-16 transition", isDark ? "bg-[#1A1510]" : "bg-[#FFF1E6]")}>
+            className="flex w-full flex-col items-center gap-4 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/45 bg-[#FFF1E6] dark:bg-[#1A1510] px-6 py-16 transition">
             {busy ? <Loader2 className="h-10 w-10 animate-spin text-[#FF5A1F]" /> : <ImagePlus className="h-10 w-10 text-[#FF5A1F]" />}
             <span className="text-base font-semibold">Upload a photo</span>
-            <span className={cn("text-xs", muted)}>JPG, PNG, or WebP</span>
+            <span className="text-xs text-[#6F6862] dark:text-[#A39E97]">JPG, PNG, or WebP</span>
           </button>
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
         </main>
@@ -398,18 +390,18 @@ export function EffectStudioPage({
   }
 
   return (
-    <div className={shell}>
-      <header className={cn("flex items-center gap-2 border-b px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]", border)}>
-        <Link to="/" className={cn("grid h-9 w-9 place-items-center rounded-full border", border, card)} aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
+    <div className="flex min-h-[100dvh] flex-col bg-[#FFFBF7] dark:bg-[#0F0E0D] text-[#161412] dark:text-[#F5F0EA]">
+      <header className="flex items-center gap-2 border-b border-[#E8E0D8] dark:border-[#2A2826] px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918]" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
           <FiltersTitle className="truncate text-base font-bold tracking-tight" />
         </div>
-        <button type="button" onClick={onUndo} disabled={!canUndo} className={cn("grid h-9 w-9 place-items-center rounded-full border disabled:opacity-40", border, card)} aria-label="Undo"><Undo2 className="h-4 w-4" /></button>
-        <button type="button" onClick={onRedo} disabled={!canRedo} className={cn("grid h-9 w-9 place-items-center rounded-full border disabled:opacity-40", border, card)} aria-label="Redo"><Redo2 className="h-4 w-4" /></button>
+        <button type="button" onClick={onUndo} disabled={!canUndo} className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] disabled:opacity-40" aria-label="Undo"><Undo2 className="h-4 w-4" /></button>
+        <button type="button" onClick={onRedo} disabled={!canRedo} className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] disabled:opacity-40" aria-label="Redo"><Redo2 className="h-4 w-4" /></button>
       </header>
 
-      <div className={cn("relative flex-1 min-h-0 bg-black/5 dark:bg-black/40")}>
+      <div className="relative flex-1 min-h-0 bg-black/5 dark:bg-black/40">
         {comparing && sourceUrl && processedUrl ? (
           <CompareSlider before={sourceUrl} after={processedUrl} className="h-full max-h-[52vh] w-full" />
         ) : (
@@ -427,33 +419,43 @@ export function EffectStudioPage({
       </div>
 
       {phase === "result" ? (
-        <div className={cn("border-t px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]", border)}>
-          <div className="mx-auto flex max-w-md flex-wrap items-center justify-center gap-2">
-            <button type="button" onClick={() => setComparing((c) => !c)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-medium", border, card)}>
-              <Columns2 className="h-4 w-4" /> Compare
-            </button>
-            <button type="button" onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 py-2 text-sm font-semibold text-white">
-              <Download className="h-4 w-4" /> Download
-            </button>
-            <button type="button" onClick={() => void onShare()} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-medium", border, card)}>
-              <Share2 className="h-4 w-4" /> Share
-            </button>
-            <button type="button" onClick={onRestart} className={cn("text-sm font-medium", muted)}>Edit again</button>
+        <div className="border-t border-[#E8E0D8] dark:border-[#2A2826] px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto flex max-w-md flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button type="button" onClick={() => setComparing((c) => !c)} className="inline-flex items-center gap-1.5 rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] px-3 py-2 text-sm font-medium">
+                <Columns2 className="h-4 w-4" /> Compare
+              </button>
+              <button type="button" onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 py-2 text-sm font-semibold text-white">
+                <Download className="h-4 w-4" /> Download
+              </button>
+              <button type="button" onClick={() => void onShare()} className="inline-flex items-center gap-1.5 rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] px-3 py-2 text-sm font-medium">
+                <Share2 className="h-4 w-4" /> Share
+              </button>
+              <button type="button" onClick={onRestart} className="text-sm font-medium text-[#6F6862] dark:text-[#A39E97]">Edit again</button>
+            </div>
+            <label className="flex items-center justify-center gap-2 text-xs text-[#6F6862] dark:text-[#A39E97]">
+              <input type="checkbox" checked={showWm} disabled={freeUser} onChange={(e) => {
+                if (freeUser) { toast.message("Free plan watermark cannot be removed"); return; }
+                setWmEnabled(e.target.checked);
+              }} />
+              Watermark
+            </label>
+            {freeUser ? <p className="text-center text-[10px] text-[#6F6862] dark:text-[#A39E97]">Free plan includes Motio2edit watermark</p> : null}
           </div>
         </div>
       ) : (
         <>
-          <div className={cn("flex gap-2 border-t px-3 py-2", border)}>
-            <button type="button" onClick={() => setEditorTab("filter")} className={cn("rounded-full px-3 py-1.5 text-sm font-semibold", editorTab === "filter" ? "bg-[#FF5A1F] text-white" : muted)}>Filters</button>
-            <button type="button" onClick={() => setEditorTab("adjust")} className={cn("rounded-full px-3 py-1.5 text-sm font-semibold", editorTab === "adjust" ? "bg-[#FF5A1F] text-white" : muted)}>Adjust</button>
+          <div className="flex gap-2 border-t border-[#E8E0D8] dark:border-[#2A2826] px-3 py-2">
+            <button type="button" onClick={() => setEditorTab("filter")} className={cn("rounded-full px-3 py-1.5 text-sm font-semibold", editorTab === "filter" ? "bg-[#FF5A1F] text-white" : "text-[#6F6862] dark:text-[#A39E97]")}>Filters</button>
+            <button type="button" onClick={() => setEditorTab("adjust")} className={cn("rounded-full px-3 py-1.5 text-sm font-semibold", editorTab === "adjust" ? "bg-[#FF5A1F] text-white" : "text-[#6F6862] dark:text-[#A39E97]")}>Adjust</button>
           </div>
 
           {editorTab === "filter" && (
             <div className="px-3 pb-2">
               <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
-                <button type="button" onClick={() => setCategory("all")} className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold", category === "all" ? "bg-[#FF5A1F] text-white" : cn("border", border, muted))}>All</button>
+                <button type="button" onClick={() => setCategory("all")} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === "all" ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918]")}>All</button>
                 {sortedCategories.map((c) => (
-                  <button key={c} type="button" onClick={() => setCategory(c)} className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold", category === c ? "bg-[#FF5A1F] text-white" : cn("border", border, muted))}>{c}</button>
+                  <button key={c} type="button" onClick={() => setCategory(c)} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === c ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918]")}>{c}</button>
                 ))}
               </div>
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -467,15 +469,15 @@ export function EffectStudioPage({
                       onClick={() => selectFilter(item)}
                       className={cn(
                         "relative shrink-0 w-[72px] overflow-hidden rounded-xl border-2 transition",
-                        active ? "border-[#FF5A1F]" : border,
+                        active ? "border-[#FF5A1F]" : "border-[#E8E0D8] dark:border-[#2A2826]",
                         locked && "opacity-70",
                       )}
                     >
-                      <div className={cn("aspect-square w-full", card)}>
+                      <div className="aspect-square w-full bg-white dark:bg-[#1A1918]">
                         {thumbMap[item.id] ? (
                           <img src={thumbMap[item.id]} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <div className={cn("grid h-full place-items-center text-[10px]", muted)}>{thumbsBusy ? "…" : item.name.slice(0, 3)}</div>
+                          <div className="grid h-full place-items-center text-[10px] text-[#6F6862] dark:text-[#A39E97]">{thumbsBusy ? "…" : item.name.slice(0, 3)}</div>
                         )}
                       </div>
                       <p className="truncate px-1 py-0.5 text-center text-[10px] font-medium">{item.name}</p>
@@ -487,13 +489,12 @@ export function EffectStudioPage({
                 })}
               </div>
               <div className="flex items-center gap-2 py-1">
-                <span className={cn("text-xs font-medium", muted)}>Intensity</span>
-                <OrangeSlider value={intensity} min={0} max={100} onChange={(v) => { setIntensity(v); pushHistoryDebounced({ selectedId, intensity: v, adj, highlightColorId, shadowColorId }); }} ariaLabel="Intensity" />
+                <span className="w-16 shrink-0 text-[11px] font-semibold text-[#6F6862] dark:text-[#A39E97]">Intensity</span>
+                <OrangeSlider value={intensity} min={0} max={100} onChange={(v) => { bumpToEdit(); setIntensity(v); pushHistoryDebounced({ selectedId, intensity: v, adj: { ...adj }, highlightColorId, shadowColorId }); }} ariaLabel="Intensity" />
                 <span className="w-8 text-right text-xs font-semibold">{intensity}</span>
               </div>
-              <button type="button" onClick={() => void onApply()} disabled={busy || !selected}
-                className="mt-1 w-full rounded-full bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-50">
-                {busy ? "Working…" : "Apply filter"}
+              <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white shadow-md shadow-[#FF5A1F]/20 disabled:opacity-40">
+                {busy ? (<><Loader2 className="h-4 w-4 animate-spin" /> Applying…</>) : ("Apply filter")}
               </button>
             </div>
           )}
@@ -503,13 +504,13 @@ export function EffectStudioPage({
               <div className="flex gap-1.5 overflow-x-auto pb-2">
                 {ADJUST_META.map((m) => (
                   <button key={m.key} type="button" onClick={() => setAdjKey(m.key)}
-                    className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold", adjKey === m.key ? "bg-[#FF5A1F] text-white" : cn("border", border, muted))}>
+                    className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold", adjKey === m.key ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] dark:border-[#2A2826] text-[#6F6862] dark:text-[#A39E97]")}>
                     {m.label}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-2 py-1">
-                <span className={cn("text-xs font-medium", muted)}>{adjMeta.label}</span>
+                <span className="w-16 shrink-0 text-[11px] font-semibold text-[#6F6862] dark:text-[#A39E97]">{adjMeta.label}</span>
                 <OrangeSlider
                   value={adj[adjKey]}
                   min={adjMeta.min}
@@ -523,10 +524,11 @@ export function EffectStudioPage({
                 />
                 <span className="w-8 text-right text-xs font-semibold">{adj[adjKey]}</span>
               </div>
-              <button type="button" onClick={resetAdjust} className={cn("mt-1 text-xs font-medium", muted)}>Reset adjustments</button>
-              <button type="button" onClick={() => void onApply()} disabled={busy || !selected}
-                className="mt-2 w-full rounded-full bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-50">
-                {busy ? "Working…" : "Apply filter"}
+              <button type="button" onClick={resetAdjust} className="mt-1 text-xs font-medium text-[#6F6862] dark:text-[#A39E97]">
+                <RotateCcw className="mr-1 inline h-3 w-3" /> Reset adjustments
+              </button>
+              <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-40">
+                {busy ? "Applying…" : "Apply filter"}
               </button>
             </div>
           )}
