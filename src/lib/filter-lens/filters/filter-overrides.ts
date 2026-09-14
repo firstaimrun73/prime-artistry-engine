@@ -1,10 +1,6 @@
 /**
  * filter-overrides.ts — recipes merged on top of curated catalog (no UI change).
- * Rules enforced here:
- * - Pure neutral B/W / Deep B/W / Noir (monochrome last, no brown/sepia)
- * - Premium must NOT be monochrome (Black Glass / Platinum replaced)
- * - Visible Red / Green / Blue / Brown photographic tints
- * - Comic / Sketch / Peacock / Rangoli / Cyberpunk City / Night Flare / Light Clean
+ * Anime = soft cel + clean ink (style:anime). Comic = bold ink + halftone (style:comic).
  */
 import type { ProcessingProfile } from '../shared/processing-types';
 
@@ -18,7 +14,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     highlights: -6,
     grain: 2,
     vignette: 4,
-    // no temperature/tint/sepia/splitToning
   },
   'filter-011': {
     monochrome: true,
@@ -37,7 +32,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     vignette: 12,
     clarity: 6,
   },
-  // Noir — AI+ dramatic mono (still pure grayscale, not Premium)
   'filter-046': {
     monochrome: true,
     contrast: 54,
@@ -49,7 +43,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
   },
 
   // ——— Photographic color tints ———
-  // Blue Tint (was Blue)
   'filter-024': {
     temperature: -34,
     tint: -12,
@@ -65,7 +58,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
       balance: -8,
     },
   },
-  // Green Tint (was Arctic)
   'filter-037': {
     temperature: -8,
     tint: 22,
@@ -81,7 +73,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
       balance: -6,
     },
   },
-  // Brown Tint (was Café) — intentional warm brown, NOT B/W
   'filter-025': {
     temperature: 22,
     tint: 12,
@@ -98,7 +89,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
       balance: 4,
     },
   },
-  // Red Tint / Red Heat (was Crimson)
   'filter-055': {
     temperature: 36,
     tint: 18,
@@ -115,7 +105,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
       balance: 4,
     },
   },
-  // Orange film
   'filter-038': {
     temperature: 40,
     tint: 14,
@@ -132,7 +121,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
       balance: 6,
     },
   },
-  // Yellow (was Cyan)
   'filter-039': {
     temperature: 26,
     tint: -16,
@@ -149,8 +137,7 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     },
   },
 
-  // ——— AI+ creative looks ———
-  // Peacock
+  // ——— Creative looks ———
   'filter-073': {
     saturation: 52,
     vibrance: 55,
@@ -168,7 +155,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     shadows: 8,
     bloom: 12,
   },
-  // Colourful Rangoli (was Prism)
   'filter-075': {
     saturation: 50,
     vibrance: 46,
@@ -185,7 +171,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     clarity: 12,
     bloom: 10,
   },
-  // Cyberpunk City (was City Reflect)
   'filter-064': {
     temperature: -18,
     tint: 18,
@@ -204,7 +189,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
       balance: -4,
     },
   },
-  // Dark Night Light With Flares (was Midnight)
   'filter-043': {
     exposure: -8,
     contrast: 28,
@@ -216,7 +200,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     grain: 8,
     saturation: 8,
   },
-  // Light Without Flare (was Soft Light)
   'filter-029': {
     exposure: 10,
     contrast: 12,
@@ -226,35 +209,33 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     clarity: -4,
     saturation: 4,
     temperature: 4,
-    // no bloom on purpose
   },
-  // Comic — anime cel
+
+  // Anime — soft cel + clean ink (distinct from Comic)
+  'filter-095': {
+    style: 'anime',
+    contrast: 16,
+    saturation: 26,
+    vibrance: 20,
+    temperature: 6,
+    softBlur: 2,
+  },
+  // Comic — bold ink + halftone graphic
   'filter-099': {
     style: 'comic',
-    contrast: 28,
-    saturation: 36,
-    vibrance: 24,
-    clarity: 10,
+    contrast: 30,
+    saturation: 32,
+    vibrance: 20,
+    clarity: 8,
   },
-  // Sketch — pure pencil (no brown paper)
+  // Sketch — pure pencil
   'filter-100': {
     style: 'sketch',
     contrast: 14,
     grain: 6,
   },
-  // Anime (was Anime Soft)
-  'filter-095': {
-    style: 'comic',
-    softBlur: 4,
-    bloom: 10,
-    saturation: 28,
-    vibrance: 18,
-    contrast: 18,
-    temperature: 4,
-  },
 
-  // ——— Premium: replace former B/W slots with luxury color looks ———
-  // was Black Glass (mono) → Sapphire
+  // Premium non-mono
   'filter-091': {
     monochrome: false,
     temperature: -16,
@@ -273,7 +254,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
       balance: -6,
     },
   },
-  // was Platinum (mono) → Champagne
   'filter-092': {
     monochrome: false,
     temperature: 14,
