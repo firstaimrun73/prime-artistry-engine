@@ -103,11 +103,11 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
 
   p('filter-091', 'Oil Painting', 'Art',
     'Painterly brush texture and rich oil-paint color while keeping the subject clear.',
-    { style: 'oil', saturation: 14, contrast: 10, softBlur: 16 }),
+    { style: 'oil', saturation: 10, contrast: 8 }),
 
   p('filter-092', 'Cartoon', 'Comic',
-    'Clean illustrated cartoon shapes with tasteful color — identity preserved.',
-    { style: 'comic', saturation: 16, contrast: 14, vibrance: 12 }),
+    'Clean illustrated cartoon shapes with structure-aware color regions — identity preserved.',
+    { style: 'cartoon', saturation: 12, contrast: 10, vibrance: 10 }),
 
   p('filter-093', 'Watercolor', 'Art',
     'Soft watercolor washes and fluid color transitions with paper-like character.',
