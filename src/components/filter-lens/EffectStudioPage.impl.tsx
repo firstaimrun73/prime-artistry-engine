@@ -1,6 +1,6 @@
 /**
  * Motio2edit Filters editor — production UI.
- * Uses filter-editor-core for Adjust pipeline + output watermark.
+ * Uses filter-editor-core for Adjust pipeline + output-only watermark.
  * Header locked. No implementation disclosure. No filter credits.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +31,7 @@ import {
 import { getFilterById } from "@/lib/filter-lens/filters/filter-registry";
 import type { RGBAImage } from "@/lib/filter-lens/shared/processing-types";
 import { CompareSlider } from "@/components/CompareSlider";
+import { Header } from "@/components/Header";
 import {
   type CatalogItem,
   filterToCatalogItem,
@@ -69,27 +70,6 @@ function FiltersTitle({ className }: { className?: string }) {
       </span>
       lters
     </h1>
-  );
-}
-
-/** In-image Motio2edit / Filters lockup — matches output watermark treatment. */
-function PreviewWatermark() {
-  return (
-    <div className="pointer-events-none absolute bottom-3 right-3 z-[6] text-right drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)]">
-      <p className="text-[13px] font-bold leading-tight tracking-tight text-white sm:text-[15px]">
-        Motio<span className="text-[#FF5A1F]">2</span>edit
-      </p>
-      <p className="relative text-[11px] font-bold leading-tight text-white sm:text-[12px]">
-        F
-        <span className="relative inline-block">
-          i
-          <svg className="pointer-events-none absolute -right-1 -top-0.5 h-2 w-2 text-[#FF5A1F]" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-            <path d="M6 0.5l0.7 3.2 3.3.2-2.5 2.2.8 3.2L6 7.5 3.7 9.3l.8-3.2L2 3.9l3.3-.2L6 0.5z" opacity="0.9" />
-          </svg>
-        </span>
-        lters
-      </p>
-    </div>
   );
 }
 
@@ -375,13 +355,15 @@ export function EffectStudioPage({
   const displayResultUrl = showWm ? (resultWmUrl || resultUrl) : (resultUrl || resultWmUrl);
   const hasPhoto = !!sourceUrl;
   const adjMeta = ADJUST_META.find((m) => m.key === adjKey)!;
-  const showPreviewWm = showWm && phase !== "result" && !!processedUrl;
 
   if (!items || items.length === 0) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-background text-foreground">
-        <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
-        <p className="text-sm text-muted-foreground">Loading filters…</p>
+      <div className="flex min-h-[60vh] flex-col bg-background text-foreground">
+        <Header />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
+          <p className="text-sm text-muted-foreground">Loading filters…</p>
+        </div>
       </div>
     );
   }
@@ -389,7 +371,8 @@ export function EffectStudioPage({
   if (!hasPhoto) {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
-        <header className="flex items-center gap-3 border-b border-border px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <Header />
+        <header className="flex items-center gap-3 border-b border-border px-3 py-3">
           <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
@@ -412,32 +395,31 @@ export function EffectStudioPage({
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
+      <Header />
+      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-3 py-2.5">
         <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
         <div className="min-w-0 flex-1">
           <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
         </div>
-        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-semibold">
-          <ImagePlus className="h-3.5 w-3.5" /> Change
-        </button>
+        {/* Change only in editor — not on output screen (bottom action has Change there) */}
+        {phase !== "result" ? (
+          <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-semibold">
+            <ImagePlus className="h-3.5 w-3.5" /> Change
+          </button>
+        ) : null}
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
       </header>
 
-      {/* White workspace in light mode; theme surface in dark */}
-      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-white px-2 py-2 dark:bg-zinc-950">
+      {/* Visual workspace behind the image: always white (not dark-mode canvas) */}
+      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-white px-2 py-2">
         {phase === "result" && sourceUrl && displayResultUrl ? (
           comparing ? (
             <CompareSlider before={sourceUrl} after={displayResultUrl} className="h-full max-h-full w-full max-w-full" />
           ) : (
-            <div className="relative inline-flex max-h-full max-w-full">
-              <img src={displayResultUrl} alt="Result" className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain" draggable={false} />
-            </div>
+            <img src={displayResultUrl} alt="Result" className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain" draggable={false} />
           )
         ) : (
-          <div className="relative inline-flex max-h-full max-w-full">
-            <img src={processedUrl || sourceUrl!} alt="Preview" className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain" draggable={false} />
-            {showPreviewWm ? <PreviewWatermark /> : null}
-          </div>
+          <img src={processedUrl || sourceUrl!} alt="Preview" className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain" draggable={false} />
         )}
         {busy && (
           <div className="absolute inset-0 grid place-items-center bg-black/35">
