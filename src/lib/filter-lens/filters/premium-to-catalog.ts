@@ -11,7 +11,9 @@ import { ALL_PREMIUM_FILTERS, type PremiumFilterDefinition } from './premium-fil
 /** Map Premium category → existing UI category buckets */
 function mapCategory(p: PremiumFilterDefinition): FilterCategory {
   switch (p.filter_id) {
+    case 'premium_01_ghibli_art':
     case 'premium_01_anime':
+      return 'Art';
     case 'premium_02_comic':
       return 'Comic';
     case 'premium_03_sketch':
@@ -55,80 +57,91 @@ function mapCategory(p: PremiumFilterDefinition): FilterCategory {
 function profileFromPremium(p: PremiumFilterDefinition): ProcessingProfile {
   const style = p.styleKey && p.styleKey !== 'none' ? p.styleKey : undefined;
 
-  // Base atmospheric / color grades for hybrid & non-style filters
   const bases: Record<string, ProcessingProfile> = {
-    premium_04_rangoli: {
-      saturation: 35, vibrance: 28, contrast: 12, bloom: 18, temperature: 8,
-      atmosphere: 12, style: undefined,
-    },
-    premium_05_wildfire: {
-      temperature: 32, saturation: 18, contrast: 16, bloom: 22, shadows: -8,
-      atmosphere: 10,
-    },
-    premium_06_glacier: {
-      temperature: -28, tint: -8, saturation: -6, contrast: 14, bloom: 12,
+    premium_01_ghibli_art: {
+      style: 'oil',
+      temperature: 22,
+      saturation: 14,
+      vibrance: 16,
+      bloom: 20,
+      softBlur: 16,
       atmosphere: 14,
-    },
-    premium_07_neonpulse: {
-      style: 'neon', contrast: 22, saturation: 20, bloom: 20, temperature: -10,
-    },
-    premium_08_golddust: {
-      temperature: 28, saturation: 14, bloom: 24, contrast: 10, fade: 6,
-    },
-    premium_09_stormbreak: {
-      contrast: 28, shadows: -14, temperature: -12, atmosphere: 16, vignette: 22,
-    },
-    premium_10_bloom: {
-      bloom: 36, softBlur: 12, saturation: 10, fade: 10, contrast: -6,
-    },
-    premium_11_molten: {
-      temperature: 36, contrast: 18, shadows: -10, bloom: 16, saturation: 12,
-    },
-    premium_12_chromefuture: {
-      saturation: -25, contrast: 20, clarity: 18, temperature: -8, bloom: 8,
-    },
-    premium_13_velvetnoir: {
-      monochrome: true, contrast: 32, vignette: 28, grain: 16, shadows: -12,
-    },
-    premium_14_oilcanvas: { style: 'oil', saturation: 12, softBlur: 22 },
-    premium_15_watercolorbloom: { style: 'watercolor', saturation: 16, softBlur: 28, fade: 12 },
-    premium_16_duotonepulse: {
-      contrast: 18, posterizeLevels: 6, saturation: 8,
-      duotone: { shadow: [30, 20, 60], highlight: [255, 200, 120] },
-    },
-    premium_17_infrareddream: {
-      temperature: -15, saturation: 22, tint: 12, bloom: 14, contrast: 10,
-    },
-    premium_18_mirage: {
-      temperature: 22, softBlur: 8, atmosphere: 18, saturation: 8, fade: 6,
-    },
-    premium_19_auroraveil: {
-      saturation: 18, vibrance: 16, bloom: 20, temperature: -6, atmosphere: 14,
-    },
-    premium_20_copperpatina: {
-      temperature: 18, tint: 10, saturation: -8, contrast: 12, grain: 10,
-    },
-    premium_21_galaxydrift: {
-      saturation: 20, bloom: 22, temperature: -12, atmosphere: 16, contrast: 8,
-    },
-    premium_22_vintage8mm: {
-      sepia: 18, grain: 28, fade: 14, vignette: 24, contrast: 10, temperature: 12,
-    },
-    premium_23_porcelainart: {
-      softBlur: 14, contrast: -4, saturation: 6, bloom: 10, fade: 6,
-    },
-    premium_24_origamifold: {
-      posterizeLevels: 5, contrast: 16, edgeAmount: 18, saturation: -10,
-    },
-    premium_25_bioluminescence: {
-      contrast: 14, bloom: 28, temperature: -18, saturation: 12, shadows: 10,
+      contrast: 8,
+      shadows: 6,
+      fade: 4,
     },
     premium_01_anime: { style: 'anime', saturation: 16, contrast: 8 },
     premium_02_comic: { style: 'comic', saturation: 14, contrast: 14 },
     premium_03_sketch: { style: 'sketch' },
+    premium_04_rangoli: {
+      saturation: 38, vibrance: 32, contrast: 14, bloom: 20, temperature: 10,
+      atmosphere: 14, style: undefined,
+    },
+    premium_05_wildfire: {
+      temperature: 36, saturation: 22, contrast: 20, bloom: 26, shadows: -12,
+      atmosphere: 14,
+    },
+    premium_06_glacier: {
+      temperature: -32, tint: -10, saturation: -4, contrast: 18, bloom: 16,
+      atmosphere: 18,
+    },
+    premium_07_neonpulse: {
+      style: 'neon', contrast: 26, saturation: 24, bloom: 24, temperature: -12,
+    },
+    premium_08_golddust: {
+      temperature: 32, saturation: 16, bloom: 28, contrast: 14, fade: 8,
+    },
+    premium_09_stormbreak: {
+      contrast: 32, shadows: -18, temperature: -14, atmosphere: 20, vignette: 26,
+    },
+    premium_10_bloom: {
+      bloom: 42, softBlur: 16, saturation: 12, fade: 12, contrast: -8,
+    },
+    premium_11_molten: {
+      temperature: 40, contrast: 22, shadows: -14, bloom: 20, saturation: 16,
+    },
+    premium_12_chromefuture: {
+      saturation: -28, contrast: 24, clarity: 22, temperature: -10, bloom: 10,
+    },
+    premium_13_velvetnoir: {
+      monochrome: true, contrast: 36, vignette: 32, grain: 18, shadows: -16,
+    },
+    premium_14_oilcanvas: { style: 'oil', saturation: 16, softBlur: 26, contrast: 10 },
+    premium_15_watercolorbloom: { style: 'watercolor', saturation: 20, softBlur: 32, fade: 14 },
+    premium_16_duotonepulse: {
+      contrast: 22, posterizeLevels: 5, saturation: 10,
+      duotone: { shadow: [30, 20, 60], highlight: [255, 200, 120] },
+    },
+    premium_17_infrareddream: {
+      temperature: -18, saturation: 26, tint: 14, bloom: 18, contrast: 12,
+    },
+    premium_18_mirage: {
+      temperature: 26, softBlur: 12, atmosphere: 22, saturation: 12, fade: 8,
+    },
+    premium_19_auroraveil: {
+      saturation: 22, vibrance: 20, bloom: 26, temperature: -8, atmosphere: 18,
+    },
+    premium_20_copperpatina: {
+      temperature: 22, tint: 12, saturation: -6, contrast: 16, grain: 12,
+    },
+    premium_21_galaxydrift: {
+      saturation: 24, bloom: 28, temperature: -14, atmosphere: 20, contrast: 12,
+    },
+    premium_22_vintage8mm: {
+      sepia: 22, grain: 32, fade: 16, vignette: 28, contrast: 12, temperature: 14,
+    },
+    premium_23_porcelainart: {
+      softBlur: 18, contrast: -6, saturation: 8, bloom: 14, fade: 8,
+    },
+    premium_24_origamifold: {
+      posterizeLevels: 5, contrast: 20, edgeAmount: 22, saturation: -12,
+    },
+    premium_25_bioluminescence: {
+      contrast: 18, bloom: 34, temperature: -22, saturation: 16, shadows: 12,
+    },
   };
 
-  const base = bases[p.filter_id] ?? { contrast: 10, saturation: 8 };
+  const base = bases[p.filter_id] ?? { contrast: 12, saturation: 10 };
   if (style) base.style = style;
   return base;
 }
@@ -149,16 +162,16 @@ export function premiumToFilterDefinition(p: PremiumFilterDefinition): FilterDef
     supportsCamera: false,
     developerNotes: p.recipeNotes ?? '',
     attribution: createAttribution(),
-    unlock: createUnlockMetadata(p.credit_cost, false), // locked, premium
+    unlock: createUnlockMetadata(p.credit_cost, false),
     tier: 'premium',
     animatedThumb: p.priority === 'P0',
   };
 }
 
-/** All 25 Premium filters as catalog-ready FilterDefinitions */
+/** Premium filters as catalog-ready FilterDefinitions */
 export const PREMIUM_AS_FILTERS: FilterDefinition[] = ALL_PREMIUM_FILTERS.map(premiumToFilterDefinition);
 
-/** Combined catalog: original 100 + 25 Premium (UI still uses same components) */
+/** Combined catalog: original base + Premium (UI still uses same components) */
 export function getCatalogWithPremium(base: FilterDefinition[]): FilterDefinition[] {
   const existingIds = new Set(base.map((f) => f.id));
   const extra = PREMIUM_AS_FILTERS.filter((f) => !existingIds.has(f.id));
