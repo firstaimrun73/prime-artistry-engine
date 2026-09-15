@@ -1,312 +1,236 @@
 /**
- * engine-ops-style.ts — graphic style recipes only (UI locked).
- * Sketch outline strength scales with intensity.
- * Oil/watercolor avoid face-destroying step artifacts.
- * Neon is structure rim light, not a faint tint.
+ * engine-ops-style.ts
+ * Style recipes from Claude NPR engine. Intensity scales GRAPHIC stages.
+ * Public applyStyle keeps RGBAImage in-place API for filter-engine.ts.
  */
 import type { RGBAImage, ProcessingProfile } from '../shared/processing-types';
-import { clamp8, applySaturationVibrance } from './engine-ops-basic';
-import { applyFade } from './engine-ops-basic-b';
-import { applyContrastish, applyNeonStyle } from './engine-ops-extra';
 import {
-  grayLuma,
-  extractEdges,
-  applyInkContours,
-  applyCelBands,
-  applyHalftone,
-  applyCrossHatch,
-  applyNeonRim,
-  applyLumaPalette,
-} from './engine-graphic-primitives';
-import {
-  oilPaintFilter,
+  ImgBuf,
+  computeImageStats,
   bilateralApprox,
-  adaptiveEdgeMask,
-  applyEdgeMaskInk,
-  watercolorEdgeDarken,
+  oilPaint,
   softQuantize,
-  grayFromImage,
-  boxBlur,
-  analyzeImageStats,
+  blend,
 } from './engine-npr-core';
+import {
+  sobelInkMask,
+  adaptiveEdgeMask,
+  compositeInk,
+  crossHatch,
+  colorCells,
+  halftoneShadows,
+  neonRim,
+  midtoneDarken,
+  cyberpunkPaletteBlend,
+  warmGreenLift,
+} from './engine-graphic-primitives';
 
-/** Sketch — intensity controls outline darkness + hatch (not locked black). */
-export function applySketchStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height, data = image.data;
-  // Allow light sketches at low intensity
-  const t = Math.max(0.15, Math.min(1, intensity / 100));
-  const gray = grayLuma(data, w, h);
-  const edges = extractEdges(gray, w, h);
+export type StyleKey =
+  | 'sketch'
+  | 'oil'
+  | 'watercolor'
+  | 'cartoon'
+  | 'comic'
+  | 'anime'
+  | 'cyberpunk'
+  | 'neon'
+  | 'ghibli'
+  | 'retro3d'
+  | 'flatvector'
+  | 'painting'
+  | 'none';
 
-  const inv = new Float32Array(w * h);
-  for (let p = 0; p < gray.length; p++) inv[p] = 255 - gray[p];
-  let cur = inv;
-  const passes = 3 + Math.round(t * 3);
-  for (let pass = 0; pass < passes; pass++) {
-    const next = new Float32Array(w * h);
-    for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
-        let s = 0;
-        for (let dy = -1; dy <= 1; dy++)
-          for (let dx = -1; dx <= 1; dx++) s += cur[(y + dy) * w + (x + dx)];
-        next[y * w + x] = s / 9;
-      }
-    }
-    for (let x = 0; x < w; x++) {
-      next[x] = cur[x];
-      next[(h - 1) * w + x] = cur[(h - 1) * w + x];
-    }
-    for (let y = 0; y < h; y++) {
-      next[y * w] = cur[y * w];
-      next[y * w + w - 1] = cur[y * w + w - 1];
-    }
-    cur = next;
-  }
-
-  // Lighter paper + softer graphite at low intensity
-  const paperBase = 242 - t * 12;
-  const toneScale = 0.55 + t * 0.35;
-  for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
-    const denom = 255 - cur[p] + 1e-3;
-    let v = (gray[p] * 255) / denom;
-    if (v > 255) v = 255;
-    const g = Math.min(paperBase, v * toneScale + (1 - t) * 40);
-    const out = clamp8(g);
-    data[i] = out;
-    data[i + 1] = out;
-    data[i + 2] = out;
-  }
-
-  // Outline strength scales with intensity (user request)
-  const inkStrength = 0.25 + t * 0.55;
-  const inkThreshold = 55 - t * 18;
-  applyInkContours(data, edges, w, h, {
-    threshold: inkThreshold,
-    strength: inkStrength,
-    ink: 18 + (1 - t) * 40,
-    secondary: 28 + (1 - t) * 30,
-  });
-  if (t > 0.35) {
-    applyCrossHatch(data, gray, w, h, {
-      maxLum: 110,
-      density: 0.25 + t * 0.4,
-      strength: 0.12 + t * 0.22,
-    });
-  }
+function norm(intensity: number): number {
+  return Math.max(0, Math.min(100, intensity)) / 100;
 }
 
-export function applyCartoonStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-  const stats = analyzeImageStats(data, w, h);
-  const edgeBoost = stats.isLowContrast ? 1.15 : 1;
-
-  bilateralApprox(image, 2 + Math.round(t * 1.5), 30 + t * 25, 2);
-  softQuantize(data, 6 + Math.round(t), 0.65 + t * 0.2);
-  applyCelBands(data, 4, 0.4 + t * 0.2);
-  applySaturationVibrance(data, 10 + t * 14, 8 + t * 12);
-
-  const gray = grayFromImage(data, w, h);
-  const mask = adaptiveEdgeMask(gray, w, h, 9, (5 + t * 4) * edgeBoost);
-  applyEdgeMaskInk(data, mask, 0.55 + t * 0.3);
+function scaleMask(mask: Float32Array, factor: number): Float32Array {
+  const out = new Float32Array(mask.length);
+  for (let i = 0; i < mask.length; i++) out[i] = Math.min(1, mask[i] * factor);
+  return out;
 }
 
-export function applyAnimeStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-  bilateralApprox(image, 2 + Math.round(t), 38 + t * 22, 2);
-  softQuantize(data, 8, 0.5 + t * 0.2);
+function toBuf(image: RGBAImage): ImgBuf {
+  return { data: image.data, width: image.width, height: image.height };
+}
+
+function writeBack(image: RGBAImage, buf: ImgBuf): void {
+  if (image.data === buf.data) return;
+  image.data.set(buf.data);
+}
+
+// ── SKETCH ──────────────────────────────────────────────────────────────────
+function applySketch(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  const stats = computeImageStats(img);
+  const base = bilateralApprox(img, 2, 30);
+  const { width, height, data } = base;
+  const paper = new Uint8ClampedArray(data.length);
   for (let i = 0; i < data.length; i += 4) {
-    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    if (y > 40 && y < 210) {
-      const lift = (1 - Math.abs(y - 140) / 140) * (6 + t * 10);
-      data[i] = clamp8(data[i] + lift * 1.05);
-      data[i + 1] = clamp8(data[i + 1] + lift);
-      data[i + 2] = clamp8(data[i + 2] + lift * 0.9);
-    }
+    const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    const g = 235 - (235 - l) * 0.9;
+    paper[i] = paper[i + 1] = paper[i + 2] = g;
+    paper[i + 3] = data[i + 3];
   }
-  applySaturationVibrance(data, 12 + t * 14, 10 + t * 12);
-  const gray = grayFromImage(data, w, h);
-  const mask = adaptiveEdgeMask(gray, w, h, 11, 8 + t * 3);
-  applyEdgeMaskInk(data, mask, 0.35 + t * 0.25);
+  let out: ImgBuf = { data: paper, width, height };
+  const inkStrength = 0.3 + t * 1.1;
+  const threshold = 25 + stats.edgeDensity * 40;
+  const inkMask = sobelInkMask(img, inkStrength, threshold);
+  out = compositeInk(out, inkMask, [40, 38, 45]);
+  if (t > 0.4) {
+    out = crossHatch(out, (t - 0.4) / 0.6);
+  }
+  return out;
 }
 
-export function applyComicStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-  const srcGray = grayLuma(new Uint8ClampedArray(data), w, h);
-  bilateralApprox(image, 2 + Math.round(t), 28 + t * 18, 2);
-  softQuantize(data, 5, 0.65 + t * 0.18);
-  applyCelBands(data, 4, 0.45 + t * 0.2);
-  applySaturationVibrance(data, 12 + t * 14, 8 + t * 12);
-  applyContrastish(data, 10 + t * 12);
-  const edges = extractEdges(srcGray, w, h);
-  applyHalftone(data, srcGray, edges, w, h, {
-    period: 5,
-    maxLum: 95,
-    density: 0.45 + t * 0.35,
-    inkBoost: 0.65,
-  });
-  const gray = grayFromImage(data, w, h);
-  const mask = adaptiveEdgeMask(gray, w, h, 9, 5 + t * 3);
-  applyEdgeMaskInk(data, mask, 0.7 + t * 0.2);
+// ── OIL ─────────────────────────────────────────────────────────────────────
+function applyOil(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  const stats = computeImageStats(img);
+  const edgeAdj = stats.edgeDensity > 0.12 ? -1 : 0;
+  const radius = Math.max(2, Math.min(4, Math.round(2 + t * 2 + edgeAdj)));
+  const levels = stats.lowContrast ? 10 : 8;
+  let out = oilPaint(img, radius, levels);
+  if (t > 0.7) {
+    const second = oilPaint(out, radius + 1, levels);
+    out = blend(out, second, ((t - 0.7) / 0.3) * 0.5);
+  }
+  return out;
 }
 
-/** Oil — single moderate pass, every pixel, no double-destroy. */
-function applyOilPaintingStyle(image: RGBAImage, intensity: number) {
-  const t = Math.max(0.35, Math.min(1, intensity / 100));
-  const stats = analyzeImageStats(image.data, image.width, image.height);
-  // Smaller radius on busy/high-edge images to keep faces readable
-  const radius = stats.edgeDensity > 35 ? 2 + Math.round(t) : 3 + Math.round(t * 1.5);
-  const levels = 14 + Math.round(t * 8);
-  oilPaintFilter(image, radius, levels);
-  applySaturationVibrance(image.data, 4 + t * 8, 4 + t * 6);
-  applyContrastish(image.data, 3 + t * 5);
+// ── WATERCOLOR ──────────────────────────────────────────────────────────────
+function applyWatercolor(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  const stats = computeImageStats(img);
+  const radius = 3 + Math.round(t * 3);
+  const sigmaColor = 25 + t * 25;
+  let out = bilateralApprox(img, radius, sigmaColor);
+  const levels = stats.lowContrast ? 10 : 8;
+  out = softQuantize(out, levels, 0.6);
+  const edgeMask = adaptiveEdgeMask(img, 3, 6);
+  out = compositeInk(out, scaleMask(edgeMask, 0.25 + t * 0.35), [30, 20, 25]);
+  return out;
 }
 
-/** Ghibli Art — soft painterly + warm green storybook (original, not IP copy). */
-function applyGhibliStyle(image: RGBAImage, intensity: number) {
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-  oilPaintFilter(image, 2 + Math.round(t * 1.5), 16 + Math.round(t * 6));
-  bilateralApprox(image, 2, 42, 1);
-  const data = image.data;
+// ── CARTOON / COMIC ─────────────────────────────────────────────────────────
+function applyCartoon(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  const stats = computeImageStats(img);
+  const smoothed = bilateralApprox(img, 3, 45);
+  const levels = stats.lowContrast ? 9 : 7;
+  let out = softQuantize(smoothed, levels, 0.35);
+  const inkStrength = 0.5 + t * 1.0;
+  const threshold = 20 + stats.edgeDensity * 30;
+  const inkMask = sobelInkMask(img, inkStrength, threshold);
+  out = compositeInk(out, inkMask, [10, 10, 15]);
+  return out;
+}
+
+// ── CYBERPUNK ───────────────────────────────────────────────────────────────
+function applyCyberpunk(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  const stats = computeImageStats(img);
+  const cellSize = stats.edgeDensity > 0.12 ? 3 : 5;
+  let out = colorCells(img, cellSize, 0.5 + t * 0.2);
+  out = cyberpunkPaletteBlend(out, 0.35 + t * 0.35);
+  out = halftoneShadows(out, 4, 90, 0.3 + t * 0.3);
+  const inkMask = sobelInkMask(img, 0.6 + t * 0.8, 24);
+  out = compositeInk(out, inkMask, [5, 0, 15]);
+  out = neonRim(out, 0.4 + t * 0.5);
+  return out;
+}
+
+// ── NEON ────────────────────────────────────────────────────────────────────
+function applyNeon(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  let out = midtoneDarken(img, 0.25 + t * 0.35);
+  out = neonRim(out, 0.5 + t * 0.9);
+  return out;
+}
+
+// ── GHIBLI ART ──────────────────────────────────────────────────────────────
+function applyGhibli(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  const stats = computeImageStats(img);
+  const radius = stats.edgeDensity > 0.12 ? 1 : 2;
+  const painterly = oilPaint(img, radius, 10);
+  let out = blend(img, painterly, 0.4 + t * 0.3);
+  out = bilateralApprox(out, 2, 20);
+  out = warmGreenLift(out, 0.3 + t * 0.4);
+  const { width, height, data } = out;
+  const faded = new Uint8ClampedArray(data.length);
+  const fadeAmt = 0.08 + t * 0.08;
   for (let i = 0; i < data.length; i += 4) {
-    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    if (y > 45 && y < 220) {
-      data[i] = clamp8(data[i] + (4 + t * 6));
-      data[i + 1] = clamp8(data[i + 1] + (7 + t * 8));
-      data[i + 2] = clamp8(data[i + 2] - (2 + t * 2));
-    }
+    faded[i] = data[i] + (245 - data[i]) * fadeAmt * 0.3 + 10 * fadeAmt;
+    faded[i + 1] = data[i + 1] + (245 - data[i + 1]) * fadeAmt * 0.3 + 8 * fadeAmt;
+    faded[i + 2] = data[i + 2] + (245 - data[i + 2]) * fadeAmt * 0.3;
+    faded[i + 3] = data[i + 3];
   }
-  applySaturationVibrance(data, 5 + t * 8, 8 + t * 10);
-  applyFade(data, 4 + t * 6);
+  return { data: faded, width, height };
 }
 
-export function applyRetro3dStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-  bilateralApprox(image, 2 + Math.round(t), 26 + t * 18, 2);
-  softQuantize(data, 6, 0.6 + t * 0.18);
-  applyCelBands(data, 4, 0.4 + t * 0.2);
-  applyContrastish(data, 10 + t * 10);
-  const gray = grayFromImage(data, w, h);
-  const mask = adaptiveEdgeMask(gray, w, h, 9, 7 + t * 3);
-  applyEdgeMaskInk(data, mask, 0.3 + t * 0.25);
+// ── RETRO 3D / ANIME (lightweight) ──────────────────────────────────────────
+function applyRetro3d(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  const stats = computeImageStats(img);
+  let out = bilateralApprox(img, 2, 35);
+  out = softQuantize(out, stats.lowContrast ? 8 : 6, 0.4);
+  out = colorCells(out, 3, 0.35 + t * 0.25);
+  const inkMask = sobelInkMask(img, 0.35 + t * 0.4, 28);
+  out = compositeInk(out, inkMask, [20, 20, 25]);
+  return out;
 }
 
-export function applyCyberpunkStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.45, Math.min(1, intensity / 100));
-  bilateralApprox(image, 2 + Math.round(t), 26 + t * 20, 2);
-  softQuantize(data, 5, 0.65 + t * 0.18);
-  applyCelBands(data, 4, 0.5 + t * 0.2);
-  applyLumaPalette(data, [
-    { at: 0, rgb: [12, 6, 32] },
-    { at: 0.3, rgb: [30, 20, 100] },
-    { at: 0.5, rgb: [20, 130, 170] },
-    { at: 0.72, rgb: [150, 60, 190] },
-    { at: 1, rgb: [220, 190, 255] },
-  ], 0.5 + t * 0.25);
-  const gray0 = grayLuma(new Uint8ClampedArray(data), w, h);
-  const edges = extractEdges(gray0, w, h);
-  applyHalftone(data, gray0, edges, w, h, {
-    period: 4,
-    maxLum: 150,
-    density: 0.4 + t * 0.4,
-    inkBoost: 0.5,
-  });
-  applyContrastish(data, 12 + t * 12);
-  const gray = grayFromImage(data, w, h);
-  const mask = adaptiveEdgeMask(gray, w, h, 9, 5 + t * 3);
-  applyEdgeMaskInk(data, mask, 0.55 + t * 0.25);
-  applyNeonRim(data, edges, w, h, {
-    threshold: 40,
-    strength: 0.25 + t * 0.25,
-    rgb: [100, 40, 240],
-  });
+function applyAnime(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  let out = bilateralApprox(img, 2, 40);
+  out = softQuantize(out, 8, 0.3);
+  const inkMask = sobelInkMask(img, 0.3 + t * 0.35, 30);
+  out = compositeInk(out, inkMask, [15, 12, 18]);
+  return out;
 }
 
-function applyFlatVectorStyle(image: RGBAImage, intensity: number) {
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-  bilateralApprox(image, 2, 28, 2);
-  softQuantize(image.data, 4 + Math.round(t), 0.85);
-  applyCelBands(image.data, 3, 0.75);
-  const gray = grayFromImage(image.data, image.width, image.height);
-  const mask = adaptiveEdgeMask(gray, image.width, image.height, 9, 5);
-  applyEdgeMaskInk(image.data, mask, 0.7 + t * 0.2);
-}
-
-/** Watercolor — soft wash + edge darken; light quantize only (no ring banding). */
-function applyWatercolorStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-
-  bilateralApprox(image, 3 + Math.round(t), 48 + t * 25, 2);
-  const blurred = boxBlur(data, w, h, 2 + Math.round(t * 1.5));
-  const k = 0.3 + t * 0.25;
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = clamp8(data[i] * (1 - k) + blurred[i] * k);
-    data[i + 1] = clamp8(data[i + 1] * (1 - k) + blurred[i + 1] * k);
-    data[i + 2] = clamp8(data[i + 2] * (1 - k) + blurred[i + 2] * k);
+function applyStyleBuf(img: ImgBuf, style: string, intensity: number): ImgBuf {
+  switch (style) {
+    case 'sketch':
+      return applySketch(img, intensity);
+    case 'oil':
+    case 'painting':
+      return applyOil(img, intensity);
+    case 'watercolor':
+      return applyWatercolor(img, intensity);
+    case 'cartoon':
+    case 'comic':
+      return applyCartoon(img, intensity);
+    case 'cyberpunk':
+      return applyCyberpunk(img, intensity);
+    case 'neon':
+      return applyNeon(img, intensity);
+    case 'ghibli':
+      return applyGhibli(img, intensity);
+    case 'retro3d':
+      return applyRetro3d(img, intensity);
+    case 'anime':
+      return applyAnime(img, intensity);
+    case 'flatvector':
+      return applyCartoon(img, intensity);
+    default:
+      return img;
   }
-  // Mild quantize only — dithered to avoid concentric rings on smooth backgrounds
-  softQuantize(data, 10, 0.25 + t * 0.2);
-
-  const gray = grayFromImage(data, w, h);
-  const edges = extractEdges(gray, w, h);
-  watercolorEdgeDarken(data, edges, 0.45 + t * 0.35);
-  applySaturationVibrance(data, 6 + t * 10, 6 + t * 8);
-  applyFade(data, 8 + t * 10);
 }
 
-/** Neon — strong localized rim + cool/magenta night contrast (not a faint pink edge). */
-function applyNeonGraphicStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-  const gray = grayLuma(new Uint8ClampedArray(data), w, h);
-  const edges = extractEdges(gray, w, h);
-
-  // Darken midtones slightly for night club feel
-  for (let i = 0; i < data.length; i += 4) {
-    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    if (y < 180) {
-      const d = (1 - y / 180) * (12 + t * 18);
-      data[i] = clamp8(data[i] - d * 0.7);
-      data[i + 1] = clamp8(data[i + 1] - d * 0.85);
-      data[i + 2] = clamp8(data[i + 2] - d * 0.5);
-    }
-  }
-  applyNeonStyle(data, 70 + t * 25);
-  applyContrastish(data, 14 + t * 14);
-  applySaturationVibrance(data, 8 + t * 12, 6 + t * 10);
-  // Dual rim: magenta + cyan
-  applyNeonRim(data, edges, w, h, {
-    threshold: 28,
-    strength: 0.45 + t * 0.4,
-    rgb: [255, 30, 160],
-  });
-  applyNeonRim(data, edges, w, h, {
-    threshold: 50,
-    strength: 0.25 + t * 0.25,
-    rgb: [40, 220, 255],
-  });
-}
-
-export function applyStyle(image: RGBAImage, style: string | undefined, intensity: number) {
+/**
+ * Public API used by filter-engine.ts — mutates RGBAImage in place.
+ */
+export function applyStyle(
+  image: RGBAImage,
+  style: string | undefined,
+  intensity: number,
+): void {
   if (!style || style === 'none') return;
-  const t = Math.max(0, Math.min(100, intensity));
-  if (style === 'sketch') applySketchStyle(image, t);
-  else if (style === 'anime') applyAnimeStyle(image, t);
-  else if (style === 'comic') applyComicStyle(image, t);
-  else if (style === 'cartoon') applyCartoonStyle(image, t);
-  else if (style === 'oil') applyOilPaintingStyle(image, t);
-  else if (style === 'ghibli') applyGhibliStyle(image, t);
-  else if (style === 'retro3d') applyRetro3dStyle(image, t);
-  else if (style === 'cyberpunk') applyCyberpunkStyle(image, t);
-  else if (style === 'flatvector') applyFlatVectorStyle(image, t);
-  else if (style === 'watercolor') applyWatercolorStyle(image, t);
-  else if (style === 'neon') applyNeonGraphicStyle(image, t);
-  else if (style === 'painting') applyOilPaintingStyle(image, Math.min(100, 55 + t * 0.4));
+  const buf = toBuf(image);
+  const result = applyStyleBuf(buf, style, intensity);
+  writeBack(image, result);
 }
 
 export function scaleProfile(profile: ProcessingProfile, intensity: number): ProcessingProfile {
