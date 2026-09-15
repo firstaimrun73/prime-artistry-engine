@@ -1,12 +1,18 @@
 /**
- * Motio2edit Lenses — camera + upload optical lens product.
- * Live optical preview on camera (rAF, 480px cap). Watermark only on final output.
+ * Motio2edit Lenses — Snapchat-style full-screen camera UI.
+ * Live optical preview. Watermark only on final free-tier output.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Camera, Download, ImagePlus, Loader2, SwitchCamera,
+  ArrowLeft,
+  Download,
+  ImagePlus,
+  Loader2,
+  RotateCcw,
+  SwitchCamera,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -26,15 +32,21 @@ import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
 function playShutterClick() {
   try {
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new AC();
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.frequency.value = 880;
     g.gain.value = 0.04;
-    osc.connect(g); g.connect(ctx.destination);
-    osc.start(); osc.stop(ctx.currentTime + 0.06);
-  } catch { /* ignore */ }
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.06);
+  } catch {
+    /* ignore */
+  }
 }
 
 async function loadImage(url: string): Promise<HTMLImageElement> {
@@ -55,11 +67,12 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const liveRafRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
   const previewBusy = useRef(false);
 
   const [phase, setPhase] = useState<"idle" | "ready" | "processing" | "result">("idle");
   const [cameraOn, setCameraOn] = useState(false);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [lensId, setLensId] = useState<string | null>(
     initialLensId && getCameraLensById(initialLensId) ? initialLensId : null,
   );
@@ -83,6 +96,12 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     if (!plan || plan === "free") setWantWm(true);
   }, [user]);
 
+  // Auto-start front camera like Snapchat
+  useEffect(() => {
+    void startCamera("user");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stopCamera = useCallback(() => {
     if (liveRafRef.current != null) {
       cancelAnimationFrame(liveRafRef.current);
@@ -97,41 +116,62 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const startCamera = useCallback(async (face: "user" | "environment" = facingMode) => {
-    stopCamera();
-    try {
-      let stream: MediaStream;
+  const startCamera = useCallback(
+    async (face: "user" | "environment" = facingMode) => {
+      stopCamera();
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: face }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-      } catch {
+        let stream: MediaStream;
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: face }, audio: false });
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: face },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
         } catch {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: face },
+              audio: false,
+            });
+          } catch {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false,
+            });
+          }
         }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.style.transform = face === "user" ? "scaleX(-1)" : "none";
+          await videoRef.current.play();
+        }
+        setFacingMode(face);
+        setCameraOn(true);
+        setPhase("ready");
+        setResultUrl(null);
+      } catch (e) {
+        toast.error("Camera unavailable — try Upload");
+        console.error(e);
+        setPhase("idle");
       }
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.style.transform = face === "user" ? "scaleX(-1)" : "none";
-        await videoRef.current.play();
-      }
-      setFacingMode(face);
-      setCameraOn(true);
-      setPhase("ready");
-      setResultUrl(null);
-    } catch (e) {
-      toast.error("Camera unavailable");
-      console.error(e);
-    }
-  }, [facingMode, stopCamera]);
+    },
+    [facingMode, stopCamera],
+  );
 
   // Upload still preview
   useEffect(() => {
-    if (cameraOn || !sourceUrl || !lens || phase === "processing" || phase === "idle" || phase === "result") {
+    if (
+      cameraOn ||
+      !sourceUrl ||
+      !lens ||
+      phase === "processing" ||
+      phase === "idle" ||
+      phase === "result"
+    ) {
       return;
     }
     let cancelled = false;
@@ -152,11 +192,17 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
           return url;
         });
-      } catch { /* ignore */ }
-      finally { previewBusy.current = false; }
+      } catch {
+        /* ignore */
+      } finally {
+        previewBusy.current = false;
+      }
     };
     const t = window.setTimeout(() => void run(), 60);
-    return () => { cancelled = true; window.clearTimeout(t); };
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, [lens, sourceUrl, phase, cameraOn]);
 
   // Live optical preview on camera
@@ -200,7 +246,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(out, 0, 0);
         canvas.style.display = "block";
-      } catch { /* keep last */ }
+      } catch {
+        /* keep last */
+      }
       liveRafRef.current = requestAnimationFrame(tick);
     };
     liveRafRef.current = requestAnimationFrame(tick);
@@ -216,8 +264,16 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const flashNameChip = useCallback((name: string) => {
     if (nameChipTimer.current) window.clearTimeout(nameChipTimer.current);
     setNameChip(name);
-    nameChipTimer.current = window.setTimeout(() => setNameChip(null), 1400);
+    nameChipTimer.current = window.setTimeout(() => setNameChip(null), 1600);
   }, []);
+
+  const selectLens = useCallback(
+    (id: string, name: string) => {
+      setLensId(id);
+      flashNameChip(name);
+    },
+    [flashNameChip],
+  );
 
   const onPick = (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -245,7 +301,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       if (isAiLens(active) && active.creditCost > 0) {
         const generationId = `lens_${active.id}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
         try {
-          const charged = await chargeLensGeneration({ data: { lensId: active.id, generationId } });
+          const charged = await chargeLensGeneration({
+            data: { lensId: active.id, generationId },
+          });
           if (charged?.charged) toast.success(`${active.name} · ${charged.charged} credits`);
         } catch (chargeErr) {
           URL.revokeObjectURL(url);
@@ -269,7 +327,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
 
   const onShutter = async () => {
     if (!lens) {
-      toast.error("Pick a lens first");
+      toast.error("Swipe and pick a lens first");
       return;
     }
     if (cameraOn && videoRef.current && videoRef.current.videoWidth > 0) {
@@ -287,122 +345,283 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     }
   };
 
+  const onRetake = () => {
+    if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
+    setResultUrl(null);
+    setPhase("ready");
+    void startCamera(facingMode);
+  };
+
   const stillSrc = resultUrl || previewUrl || sourceUrl;
+  const showCamera = cameraOn && phase !== "result";
+  const showStill = !showCamera && stillSrc && phase !== "idle";
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
-      <header className="z-20 flex h-12 shrink-0 items-center gap-2 border-b px-3">
-        <Link to="/studio/image/lenses" className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted" aria-label="Back">
-          <ArrowLeft className="h-4 w-4" />
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
+      {/* ── Top bar (minimal, Snapchat-like) ── */}
+      <header className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
+        <Link
+          to="/studio/image/lenses"
+          className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
         </Link>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold tracking-wide">Motio2edit · LENSES</p>
+        <div className="rounded-full bg-black/40 px-3 py-1.5 backdrop-blur-md">
+          <p className="text-[11px] font-semibold tracking-[0.14em] text-white/90">
+            MOTIO2EDIT · LENSES
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
+          aria-label="Upload photo"
+        >
+          <ImagePlus className="h-5 w-5" />
+        </button>
       </header>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-3">
-        {phase === "idle" && !cameraOn && (
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-center text-sm text-muted-foreground">Camera or upload, then pick a lens</p>
+      {/* ── Full-bleed stage ── */}
+      <div className="relative min-h-0 flex-1">
+        {/* Live camera */}
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover",
+            !showCamera && "invisible",
+          )}
+        />
+        <canvas
+          ref={liveCanvasRef}
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          style={{ display: "none" }}
+        />
+
+        {/* Still / result */}
+        {showStill && (
+          <img
+            src={stillSrc!}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
+
+        {/* Idle fallback when no camera */}
+        {phase === "idle" && !cameraOn && !stillSrc && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-zinc-950 px-6">
+            <p className="text-center text-sm text-white/60">
+              Allow camera or upload a photo
+            </p>
             <div className="flex gap-3">
-              <button type="button" onClick={() => void startCamera()} className="flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground">
-                <Camera className="h-4 w-4" /> Camera
+              <button
+                type="button"
+                onClick={() => void startCamera("user")}
+                className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-black"
+              >
+                Open Camera
               </button>
-              <button type="button" onClick={() => inputRef.current?.click()} className="flex items-center gap-2 rounded-2xl border px-5 py-3 text-sm font-semibold">
-                <ImagePlus className="h-4 w-4" /> Upload
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="rounded-full border border-white/30 px-6 py-3 text-sm font-semibold"
+              >
+                Upload
               </button>
             </div>
           </div>
         )}
 
-        {cameraOn && (
-          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-black">
-            <video ref={videoRef} playsInline muted autoPlay className="mx-auto max-h-[min(58dvh,600px)] w-full object-cover" />
-            <canvas ref={liveCanvasRef} className="pointer-events-none absolute inset-0 mx-auto h-full max-h-[min(58dvh,600px)] w-full object-cover" style={{ display: "none" }} />
-            <button type="button" onClick={() => void startCamera(facingMode === "user" ? "environment" : "user")} className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-white/25 bg-black/55 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-md" aria-label="Switch camera">
-              <SwitchCamera className="h-3.5 w-3.5" />
-              {facingMode === "user" ? "Rear" : "Front"}
-            </button>
+        {/* Processing overlay */}
+        {phase === "processing" && (
+          <div className="absolute inset-0 z-20 grid place-items-center bg-black/50 backdrop-blur-sm">
+            <Loader2 className="h-10 w-10 animate-spin text-white" />
           </div>
         )}
 
-        {!cameraOn && (phase === "ready" || phase === "processing" || phase === "result") && stillSrc && (
-          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-black/40">
-            <img src={stillSrc} alt="" className="mx-auto max-h-[min(58dvh,600px)] w-full object-contain" />
-            {phase === "processing" && (
-              <div className="absolute inset-0 grid place-items-center bg-black/50 backdrop-blur-sm">
-                <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
-              </div>
-            )}
+        {/* Lens name chip */}
+        {nameChip && phase !== "result" && (
+          <div className="pointer-events-none absolute left-1/2 top-[22%] z-20 -translate-x-1/2">
+            <span className="rounded-full bg-black/55 px-4 py-1.5 text-sm font-semibold tracking-wide text-white backdrop-blur-xl">
+              {nameChip}
+            </span>
           </div>
         )}
 
-        {nameChip && (
-          <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2">
-            <span className="rounded-full border border-white/20 bg-black/55 px-3.5 py-1.5 text-[12px] font-semibold text-white backdrop-blur-xl">{nameChip}</span>
-          </div>
+        {/* Flip camera — Snapchat style right side */}
+        {showCamera && (
+          <button
+            type="button"
+            onClick={() =>
+              void startCamera(facingMode === "user" ? "environment" : "user")
+            }
+            className="absolute right-4 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] z-20 grid h-11 w-11 place-items-center rounded-full bg-black/45 backdrop-blur-md"
+            aria-label="Flip camera"
+          >
+            <SwitchCamera className="h-5 w-5" />
+          </button>
         )}
       </div>
 
-      {(cameraOn || phase === "ready" || phase === "processing") && (
-        <div className="shrink-0 border-t bg-background/95 p-2 backdrop-blur-md">
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {CAMERA_LENS_ROSTER.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                onClick={() => { setLensId(l.id); flashNameChip(l.name); }}
-                className={cn(
-                  "flex w-[4.5rem] shrink-0 flex-col items-center gap-1 rounded-xl p-1.5 text-[10px]",
-                  lensId === l.id ? "bg-primary/15 ring-1 ring-primary" : "opacity-80",
-                )}
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-xs font-bold">{l.name.slice(0, 2)}</div>
-                <span className="line-clamp-2 text-center leading-tight">{l.name}</span>
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            disabled={phase === "processing" || !lens}
-            onClick={() => void onShutter()}
-            className={cn(
-              "flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-semibold",
-              phase === "processing" || !lens ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground",
-            )}
+      {/* ── Bottom controls ── */}
+      {phase !== "result" && (
+        <div className="absolute bottom-0 left-0 right-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {/* Lens carousel */}
+          <div
+            ref={carouselRef}
+            className="mb-3 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            <Camera className="h-4 w-4" />
-            {phase === "processing" ? "Applying…" : "Capture"}
-          </button>
+            {CAMERA_LENS_ROSTER.map((l) => {
+              const selected = lensId === l.id;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => selectLens(l.id, l.name)}
+                  className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5"
+                >
+                  <div
+                    className={cn(
+                      "relative grid h-[3.35rem] w-[3.35rem] place-items-center rounded-full",
+                      selected ? "p-[3px]" : "p-0",
+                    )}
+                    style={
+                      selected
+                        ? {
+                            background: `linear-gradient(135deg, ${l.color}, #fff6)`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <div
+                      className={cn(
+                        "grid h-full w-full place-items-center rounded-full text-[11px] font-bold tracking-wide",
+                        selected ? "bg-zinc-900" : "bg-zinc-800/90 ring-1 ring-white/15",
+                      )}
+                      style={{ color: l.color }}
+                    >
+                      {l.code}
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      "line-clamp-1 max-w-full text-center text-[10px] font-medium",
+                      selected ? "text-white" : "text-white/55",
+                    )}
+                  >
+                    {l.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Shutter row */}
+          <div className="flex items-center justify-center gap-10 px-6">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="grid h-12 w-12 place-items-center rounded-full bg-white/10"
+              aria-label="Gallery"
+            >
+              <ImagePlus className="h-5 w-5 text-white/90" />
+            </button>
+
+            {/* Big Snapchat-style shutter */}
+            <button
+              type="button"
+              disabled={phase === "processing" || !lens}
+              onClick={() => void onShutter()}
+              className={cn(
+                "relative grid h-[4.5rem] w-[4.5rem] place-items-center rounded-full",
+                phase === "processing" || !lens
+                  ? "opacity-40"
+                  : "active:scale-95",
+              )}
+              aria-label="Capture"
+            >
+              <span className="absolute inset-0 rounded-full border-[3px] border-white" />
+              <span
+                className={cn(
+                  "h-[3.55rem] w-[3.55rem] rounded-full bg-white",
+                  phase === "processing" && "opacity-60",
+                )}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void startCamera(facingMode === "user" ? "environment" : "user")
+              }
+              className="grid h-12 w-12 place-items-center rounded-full bg-white/10"
+              aria-label="Flip"
+            >
+              <SwitchCamera className="h-5 w-5 text-white/90" />
+            </button>
+          </div>
+
+          {!lens && (
+            <p className="mt-2 text-center text-[11px] text-white/45">
+              Pick a lens above, then tap the shutter
+            </p>
+          )}
         </div>
       )}
 
+      {/* ── Result screen ── */}
       {phase === "result" && resultUrl && (
-        <div className="flex shrink-0 gap-2 border-t p-3">
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col gap-3 bg-gradient-to-t from-black via-black/90 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-16">
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black"
+              onClick={() =>
+                void triggerBrowserDownload(
+                  resultUrl,
+                  `motio-lens-${lensId ?? "shot"}.jpg`,
+                )
+              }
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </button>
+            <button
+              type="button"
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-white/15 text-sm font-semibold text-white"
+              onClick={onRetake}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Retake
+            </button>
+          </div>
           <button
             type="button"
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground"
-            onClick={() => void triggerBrowserDownload(resultUrl, `motio-lens-${lensId ?? "shot"}.jpg`)}
-          >
-            <Download className="h-4 w-4" /> Download
-          </button>
-          <button
-            type="button"
-            className="h-11 rounded-2xl border px-4 text-sm font-semibold"
+            className="h-11 text-sm font-medium text-white/60"
             onClick={() => {
               setPhase("idle");
               setResultUrl(null);
               setSourceUrl(null);
               setPreviewUrl(null);
               setLensId(null);
+              void startCamera("user");
             }}
           >
-            New
+            New shot
           </button>
         </div>
       )}
 
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+      />
     </div>
   );
 }
