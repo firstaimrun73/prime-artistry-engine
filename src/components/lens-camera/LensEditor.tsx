@@ -10,6 +10,7 @@ import {
   ImagePlus,
   Loader2,
   RotateCcw,
+  Share2,
   SwitchCamera,
   X,
 } from "lucide-react";
@@ -28,6 +29,8 @@ import {
 } from "@/lib/lens-camera/optical-engine";
 import { chargeLensGeneration } from "@/lib/lens-camera/lens-generation.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
+
+const DEFAULT_FREE_LENS = "lens_natural_frame";
 
 function playShutterClick() {
   try {
@@ -59,6 +62,12 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
   return img;
 }
 
+/** Free lenses first, then AI — easier discovery */
+const ORDERED_ROSTER = [
+  ...CAMERA_LENS_ROSTER.filter((l) => l.tier === "normal"),
+  ...CAMERA_LENS_ROSTER.filter((l) => l.tier === "ai"),
+];
+
 export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -70,12 +79,13 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const previewBusy = useRef(false);
   const didAutoStart = useRef(false);
 
+  const resolvedInitial =
+    initialLensId && getCameraLensById(initialLensId) ? initialLensId : DEFAULT_FREE_LENS;
+
   const [phase, setPhase] = useState<"idle" | "ready" | "processing" | "result">("idle");
   const [cameraOn, setCameraOn] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const [lensId, setLensId] = useState<string | null>(
-    initialLensId && getCameraLensById(initialLensId) ? initialLensId : null,
-  );
+  const [lensId, setLensId] = useState<string | null>(resolvedInitial);
   const lens = useMemo(
     () => (lensId ? getCameraLensById(lensId) ?? null : null),
     [lensId],
@@ -156,7 +166,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     [facingMode, stopCamera],
   );
 
-  // Auto-start front camera once (Snapchat-style)
   useEffect(() => {
     if (didAutoStart.current) return;
     didAutoStart.current = true;
@@ -206,7 +215,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     };
   }, [lens, sourceUrl, phase, cameraOn]);
 
-  // Live optical preview on camera
+  // Live optical preview
   useEffect(() => {
     if (!cameraOn || !lens || phase === "processing" || phase === "result") {
       if (liveRafRef.current != null) {
@@ -272,6 +281,13 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     (id: string, name: string) => {
       setLensId(id);
       flashNameChip(name);
+      // Scroll chip into view
+      requestAnimationFrame(() => {
+        const root = carouselRef.current;
+        if (!root) return;
+        const btn = root.querySelector(`[data-lens-id="${id}"]`) as HTMLElement | null;
+        btn?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      });
     },
     [flashNameChip],
   );
@@ -328,7 +344,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
 
   const onShutter = async () => {
     if (!lens) {
-      toast.error("Swipe and pick a lens first");
+      toast.error("Pick a lens first");
       return;
     }
     if (cameraOn && videoRef.current && videoRef.current.videoWidth > 0) {
@@ -353,13 +369,36 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     void startCamera(facingMode);
   };
 
+  const onShare = async () => {
+    if (!resultUrl) return;
+    try {
+      const blob = await fetch(resultUrl).then((r) => r.blob());
+      const file = new File([blob], `motio-lens-${lensId ?? "shot"}.jpg`, {
+        type: "image/jpeg",
+      });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: lens?.name ?? "Motio2edit Lens",
+          text: `Shot with Motio2edit Lenses${lens ? ` · ${lens.name}` : ""}`,
+        });
+        return;
+      }
+      toast.message("Share not supported — use Download");
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
+      toast.message("Share cancelled or unavailable");
+    }
+  };
+
   const stillSrc = resultUrl || previewUrl || sourceUrl;
   const showCamera = cameraOn && phase !== "result";
   const showStill = !showCamera && stillSrc && phase !== "idle";
+  const canShare =
+    typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   return (
     <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
-      {/* Top bar — minimal */}
       <header className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
         <Link
           to="/studio/image/lenses"
@@ -383,7 +422,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         </button>
       </header>
 
-      {/* Full-bleed stage */}
       <div className="relative min-h-0 flex-1">
         <video
           ref={videoRef}
@@ -461,19 +499,20 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         )}
       </div>
 
-      {/* Bottom controls */}
       {phase !== "result" && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black via-black/85 to-transparent pt-16 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div
             ref={carouselRef}
             className="mb-3 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {CAMERA_LENS_ROSTER.map((l) => {
+            {ORDERED_ROSTER.map((l) => {
               const selected = lensId === l.id;
+              const isAi = l.tier === "ai";
               return (
                 <button
                   key={l.id}
                   type="button"
+                  data-lens-id={l.id}
                   onClick={() => selectLens(l.id, l.name)}
                   className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5"
                 >
@@ -497,6 +536,11 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
                     >
                       {l.code}
                     </div>
+                    {isAi && (
+                      <span className="absolute -right-0.5 -top-0.5 rounded-full bg-orange-500 px-1 text-[8px] font-bold leading-3 text-white">
+                        AI
+                      </span>
+                    )}
                   </div>
                   <span
                     className={cn(
@@ -551,18 +595,17 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
               <SwitchCamera className="h-5 w-5 text-white/90" />
             </button>
           </div>
-
-          {!lens && (
-            <p className="mt-2 text-center text-[11px] text-white/45">
-              Pick a lens above, then tap the shutter
-            </p>
-          )}
         </div>
       )}
 
-      {/* Result screen */}
       {phase === "result" && resultUrl && (
         <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col gap-3 bg-gradient-to-t from-black via-black/90 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-16">
+          {lens && (
+            <p className="text-center text-xs font-medium text-white/70">
+              {lens.name}
+              {lens.tier === "ai" ? " · AI" : " · Free"}
+            </p>
+          )}
           <div className="flex gap-3">
             <button
               type="button"
@@ -577,6 +620,16 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
               <Download className="h-4 w-4" />
               Download
             </button>
+            {canShare && (
+              <button
+                type="button"
+                className="flex h-12 items-center justify-center gap-2 rounded-full bg-white/15 px-5 text-sm font-semibold text-white"
+                onClick={() => void onShare()}
+              >
+                <Share2 className="h-4 w-4" />
+                Share
+              </button>
+            )}
             <button
               type="button"
               className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-white/15 text-sm font-semibold text-white"
@@ -594,7 +647,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
               setResultUrl(null);
               setSourceUrl(null);
               setPreviewUrl(null);
-              setLensId(null);
+              setLensId(DEFAULT_FREE_LENS);
               void startCamera("user");
             }}
           >
