@@ -1,7 +1,6 @@
 /**
- * engine-ops-style.ts — structure-aware artistic styles (backend only).
- * Cartoon / Comic / Anime / Sketch / Oil use edge hierarchy, luminance masks,
- * and adaptive region simplification — not global color-only grades.
+ * engine-ops-style.ts — full-frame structure-aware artistic styles.
+ * Entire image participates; not photo+edges or global color-only grades.
  */
 import type { RGBAImage, ProcessingProfile } from '../shared/processing-types';
 import { clamp8, applySaturationVibrance } from './engine-ops-basic';
@@ -16,7 +15,6 @@ function luminanceGray(src: Uint8ClampedArray, w: number, h: number): Float32Arr
   return gray;
 }
 
-/** Sobel magnitude map (structure / object boundaries). */
 function edgeMagnitude(gray: Float32Array, w: number, h: number): Float32Array {
   const mag = new Float32Array(w * h);
   for (let y = 1; y < h - 1; y++) {
@@ -59,23 +57,6 @@ function inkOutlines(
   }
 }
 
-/** Quantize blended with original — keeps face/fabric readable. */
-function softCelQuantize(data: Uint8ClampedArray, levels: number, blend: number) {
-  const step = 255 / Math.max(2, levels - 1);
-  const keep = 1 - blend;
-  for (let i = 0; i < data.length; i += 4) {
-    for (let c = 0; c < 3; c++) {
-      const orig = data[i + c];
-      const q = Math.round(orig / step) * step;
-      data[i + c] = clamp8(orig * keep + q * blend);
-    }
-  }
-}
-
-/**
- * Adaptive posterization: stronger flattening on low-edge (smooth) regions,
- * lighter on strong structure so faces/buildings keep form.
- */
 function adaptiveRegionQuantize(
   data: Uint8ClampedArray,
   edgeMag: Float32Array,
@@ -86,7 +67,6 @@ function adaptiveRegionQuantize(
   const step = 255 / Math.max(2, levels - 1);
   for (let p = 0, i = 0; p < edgeMag.length; p++, i += 4) {
     const e = edgeMag[p];
-    // Low edge → more cartoon flatten; high edge → preserve structure
     const t = Math.min(1, e / 90);
     const blend = blendSmooth * (1 - t) + blendEdge * t;
     const keep = 1 - blend;
@@ -98,157 +78,56 @@ function adaptiveRegionQuantize(
   }
 }
 
-/** Mild bilateral-ish smooth: blur more where edges are weak. */
-function structurePreserveSmooth(
-  image: RGBAImage,
-  edgeMag: Float32Array,
-  baseBlur: number,
-) {
-  // Approximate: soft blur then restore high-edge pixels from a snapshot
-  const w = image.width;
-  const h = image.height;
+function structurePreserveSmooth(image: RGBAImage, edgeMag: Float32Array, baseBlur: number) {
   const data = image.data;
   const snap = new Uint8ClampedArray(data);
   applySoftBlur(image, baseBlur);
   for (let p = 0, i = 0; p < edgeMag.length; p++, i += 4) {
     const e = edgeMag[p];
-    if (e > 35) {
-      const k = Math.min(1, (e - 35) / 70); // restore structure on strong edges
+    if (e > 32) {
+      const k = Math.min(1, (e - 32) / 65);
       data[i] = clamp8(data[i] * (1 - k) + snap[i] * k);
       data[i + 1] = clamp8(data[i + 1] * (1 - k) + snap[i + 1] * k);
       data[i + 2] = clamp8(data[i + 2] * (1 - k) + snap[i + 2] * k);
     }
   }
-  void w;
-  void h;
 }
 
-/**
- * Cartoon: structured illustration — adaptive color regions + strong object contours.
- * Not global saturation. Faces/buildings keep geometry.
- */
-export function applyCartoonStyle(image: RGBAImage, intensity: number) {
-  const w = image.width;
-  const h = image.height;
-  const data = image.data;
-  const t = Math.max(0.45, Math.min(1, intensity / 100));
-  const src = new Uint8ClampedArray(data);
-  const gray = luminanceGray(src, w, h);
-  const edges = edgeMagnitude(gray, w, h);
-
-  structurePreserveSmooth(image, edges, 10 + t * 14);
-  adaptiveRegionQuantize(data, edges, 5 + Math.round(t), 0.62 + t * 0.12, 0.22 + t * 0.08);
-  applySaturationVibrance(data, 16 + t * 14, 14 + t * 12);
-  applyContrastish(data, 10 + t * 10);
-
-  // Clean object contours — stronger on primary structure
-  inkOutlines(data, edges, w, h, 36 - t * 6, 28, 0.55 + t * 0.2);
-}
-
-/**
- * Anime (technique-only): soft cel fields, thin clean contours, slight skin lift.
- * Structure-aware smoothing + adaptive cel quantize. Not IP-specific.
- */
-export function applyAnimeStyle(image: RGBAImage, intensity: number) {
-  const w = image.width;
-  const h = image.height;
-  const data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
-  const src = new Uint8ClampedArray(data);
-  const gray = luminanceGray(src, w, h);
-  const edges = edgeMagnitude(gray, w, h);
-
-  structurePreserveSmooth(image, edges, 8 + t * 12);
-  adaptiveRegionQuantize(data, edges, 7, 0.48 + t * 0.12, 0.18 + t * 0.08);
-
-  // Luminous midtones (skin-friendly lift) without inventing facial features
+/** Paper grain — subtle, full-frame. */
+function paperGrain(data: Uint8ClampedArray, amount: number, seed: number) {
+  let s = (seed * 1103515245 + 12345) >>> 0;
+  const a = amount * 0.01;
   for (let i = 0; i < data.length; i += 4) {
-    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    if (y > 45 && y < 205) {
-      const lift = (1 - Math.abs(y - 140) / 140) * (8 + t * 10);
-      data[i] = clamp8(data[i] + lift * 1.05);
-      data[i + 1] = clamp8(data[i + 1] + lift);
-      data[i + 2] = clamp8(data[i + 2] + lift * 0.92);
-    }
+    s = (s * 1664525 + 1013904223) >>> 0;
+    const n = ((s >>> 16) % 1000) / 1000 - 0.5;
+    const g = n * a * 40;
+    data[i] = clamp8(data[i] + g);
+    data[i + 1] = clamp8(data[i + 1] + g);
+    data[i + 2] = clamp8(data[i + 2] + g);
   }
-
-  applySaturationVibrance(data, 14 + t * 16, 12 + t * 12);
-  applyContrastish(data, 6 + t * 8);
-  // Thin clean linework on primary contours only
-  inkOutlines(data, edges, w, h, 44 - t * 5, 40, 0.38 + t * 0.16);
 }
 
-/**
- * Comic: primary/secondary contour hierarchy + selective shadow halftone.
- * Face-preserving graphic color cells.
- */
-export function applyComicStyle(image: RGBAImage, intensity: number) {
-  const w = image.width;
-  const h = image.height;
-  const data = image.data;
-  const t = Math.max(0.45, Math.min(1, intensity / 100));
-  const src = new Uint8ClampedArray(data);
-  const gray = luminanceGray(src, w, h);
-  const edges = edgeMagnitude(gray, w, h);
-
-  structurePreserveSmooth(image, edges, 5 + t * 6);
-  adaptiveRegionQuantize(data, edges, 6, 0.5 + t * 0.1, 0.2 + t * 0.08);
-  applySaturationVibrance(data, 14 + t * 14, 10 + t * 10);
-  applyContrastish(data, 14 + t * 12);
-
-  // Selective halftone only in deep shadows (not uniform dots)
-  const dotPeriod = 5;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const p = y * w + x;
-      const g = gray[p];
-      if (g < 85 && edges[p] < 55) {
-        const cx = x % dotPeriod;
-        const cy = y % dotPeriod;
-        const dist = Math.sqrt((cx - 2.5) ** 2 + (cy - 2.5) ** 2);
-        if (dist < ((85 - g) / 85) * 1.7 * (0.5 + t * 0.4)) {
-          const i = p * 4;
-          data[i] = clamp8(data[i] * 0.7);
-          data[i + 1] = clamp8(data[i + 1] * 0.7);
-          data[i + 2] = clamp8(data[i + 2] * 0.7);
-        }
-      }
-    }
-  }
-
-  // Primary contours (strong) + lighter secondary ink
-  inkOutlines(data, edges, w, h, 26 - t * 4, 4, 0.78 + t * 0.14);
-  inkOutlines(data, edges, w, h, 48 - t * 4, 50, 0.28 + t * 0.1);
-}
-
-/**
- * Sketch: graphite tonal base + edge hierarchy (primary strong, micro weak).
- * Intentionally drawn look — not uniform Sobel edges.
- */
+/** Full-frame coherent pencil sketch — entire photo becomes drawn. */
 export function applySketchStyle(image: RGBAImage, intensity: number) {
   const w = image.width;
   const h = image.height;
   const data = image.data;
-  const t = Math.max(0.5, Math.min(1, intensity / 100));
-  const gray = new Float32Array(w * h);
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    gray[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-  }
+  const t = Math.max(0.55, Math.min(1, intensity / 100));
+  const gray = luminanceGray(data, w, h);
   const edges = edgeMagnitude(gray, w, h);
 
-  // Color-dodge pencil base
+  // Multi-pass inverted blur for graphite tonal field (covers whole image)
   const inv = new Float32Array(w * h);
   for (let p = 0; p < gray.length; p++) inv[p] = 255 - gray[p];
   let cur = inv;
-  const passes = 3 + Math.round(t * 2);
+  const passes = 4 + Math.round(t * 3);
   for (let pass = 0; pass < passes; pass++) {
     const next = new Float32Array(w * h);
     for (let y = 1; y < h - 1; y++) {
       for (let x = 1; x < w - 1; x++) {
         let s = 0;
         for (let dy = -1; dy <= 1; dy++)
-          for (let dx = -1; dx <= 1; dx++)
-            s += cur[(y + dy) * w + (x + dx)];
+          for (let dx = -1; dx <= 1; dx++) s += cur[(y + dy) * w + (x + dx)];
         next[y * w + x] = s / 9;
       }
     }
@@ -263,52 +142,51 @@ export function applySketchStyle(image: RGBAImage, intensity: number) {
     cur = next;
   }
 
-  // Graphite paper base from dodge
+  // Full-frame graphite base (no photographic color remains)
   for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
     const denom = 255 - cur[p] + 1e-3;
     let v = (gray[p] * 255) / denom;
     if (v > 255) v = 255;
-    // Soften micro-noise in sky/flat areas (low edge)
+    // Lift flat regions slightly so sky/bg still look drawn, not blank photo
     const e = edges[p];
-    const soften = e < 18 ? 0.12 * t : 0;
-    const g = Math.min(255, v * (0.82 + 0.12 * (1 - t)) + soften * 40);
+    const paper = 235 + (e < 12 ? 12 : 0);
+    const g = Math.min(paper, v * (0.72 + 0.1 * (1 - t)) + (e < 15 ? 18 : 0));
     const out = clamp8(g);
     data[i] = out;
     data[i + 1] = out;
     data[i + 2] = out;
   }
 
-  // Edge hierarchy: primary ink strong, secondary medium, micro suppressed
+  // Stroke hierarchy over entire frame
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const p = y * w + x;
       const mag = edges[p];
       const i = p * 4;
-      if (mag > 55) {
-        // Primary structure
-        const k = Math.min(1, (mag - 55) / 40) * (0.75 + t * 0.25);
+      if (mag > 48) {
+        const k = Math.min(1, (mag - 48) / 38) * (0.82 + t * 0.18);
         data[i] = clamp8(data[i] * (1 - k));
         data[i + 1] = clamp8(data[i + 1] * (1 - k));
         data[i + 2] = clamp8(data[i + 2] * (1 - k));
-      } else if (mag > 28) {
-        // Secondary
-        const k = Math.min(1, (mag - 28) / 40) * (0.35 + t * 0.15);
-        data[i] = clamp8(data[i] * (1 - k) + 40 * k);
-        data[i + 1] = clamp8(data[i + 1] * (1 - k) + 40 * k);
-        data[i + 2] = clamp8(data[i + 2] * (1 - k) + 40 * k);
+      } else if (mag > 22) {
+        const k = Math.min(1, (mag - 22) / 40) * (0.4 + t * 0.15);
+        data[i] = clamp8(data[i] * (1 - k) + 35 * k);
+        data[i + 1] = clamp8(data[i + 1] * (1 - k) + 35 * k);
+        data[i + 2] = clamp8(data[i + 2] * (1 - k) + 35 * k);
       }
-      // micro < 28: leave graphite base (no equal edge weight)
     }
   }
 
-  // Light cross-hatch bias in deep shadows only
+  // Cross-hatch in shadows (full frame coverage in dark tones)
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const p = y * w + x;
-      if (gray[p] < 70 && edges[p] < 40) {
-        if (((x + y) % 4) === 0 || ((x - y + 1024) % 5) === 0) {
+      if (gray[p] < 95) {
+        const dens = (95 - gray[p]) / 95;
+        const step = dens > 0.55 ? 3 : 4;
+        if ((x + y) % step === 0 || (x - y + 2048) % (step + 1) === 0) {
           const i = p * 4;
-          const k = 0.12 + t * 0.1;
+          const k = (0.1 + dens * 0.22) * t;
           data[i] = clamp8(data[i] * (1 - k));
           data[i + 1] = clamp8(data[i + 1] * (1 - k));
           data[i + 2] = clamp8(data[i + 2] * (1 - k));
@@ -316,53 +194,211 @@ export function applySketchStyle(image: RGBAImage, intensity: number) {
       }
     }
   }
+
+  paperGrain(data, 8 + t * 10, 42);
 }
 
-/**
- * Oil / painterly (Ghibli-direction safe): soft fields, warm atmosphere,
- * structure-preserving edges — composition and identity retained.
- */
-function applyOilPaintingStyle(image: RGBAImage, intensity: number) {
+/** Full-frame cartoon render. */
+export function applyCartoonStyle(image: RGBAImage, intensity: number) {
   const w = image.width;
   const h = image.height;
   const data = image.data;
-  const t = Math.max(0.4, Math.min(1, intensity / 100));
+  const t = Math.max(0.5, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
   const gray = luminanceGray(src, w, h);
   const edges = edgeMagnitude(gray, w, h);
 
-  structurePreserveSmooth(image, edges, 22 + t * 28);
-  adaptiveRegionQuantize(data, edges, 8, 0.4 + t * 0.12, 0.12 + t * 0.06);
+  structurePreserveSmooth(image, edges, 14 + t * 18);
+  adaptiveRegionQuantize(data, edges, 4 + Math.round(t), 0.72 + t * 0.12, 0.28 + t * 0.1);
+  applySaturationVibrance(data, 18 + t * 16, 16 + t * 14);
+  applyContrastish(data, 12 + t * 12);
+  inkOutlines(data, edges, w, h, 32 - t * 6, 22, 0.62 + t * 0.22);
+}
 
-  // Warm sunlight bias + gentle green lift in midtones (environmental, not full recolor)
+/** Full-frame anime-inspired cel illustration (no fabricated anatomy). */
+export function applyAnimeStyle(image: RGBAImage, intensity: number) {
+  const w = image.width;
+  const h = image.height;
+  const data = image.data;
+  const t = Math.max(0.45, Math.min(1, intensity / 100));
+  const src = new Uint8ClampedArray(data);
+  const gray = luminanceGray(src, w, h);
+  const edges = edgeMagnitude(gray, w, h);
+
+  structurePreserveSmooth(image, edges, 12 + t * 16);
+  adaptiveRegionQuantize(data, edges, 6, 0.58 + t * 0.14, 0.2 + t * 0.1);
+
   for (let i = 0; i < data.length; i += 4) {
     const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    if (y > 50 && y < 210) {
-      data[i] = clamp8(data[i] + (6 + t * 8));
-      data[i + 1] = clamp8(data[i + 1] + (4 + t * 5));
-      data[i + 2] = clamp8(data[i + 2] - (2 + t * 2));
+    if (y > 40 && y < 210) {
+      const lift = (1 - Math.abs(y - 140) / 140) * (10 + t * 12);
+      data[i] = clamp8(data[i] + lift * 1.06);
+      data[i + 1] = clamp8(data[i + 1] + lift);
+      data[i + 2] = clamp8(data[i + 2] + lift * 0.9);
     }
   }
-  applySaturationVibrance(data, 10 + t * 10, 10 + t * 8);
-  applyContrastish(data, 6 + t * 6);
-  // Very soft contour — illustrated silhouette, not heavy ink
-  inkOutlines(data, edges, w, h, 50 - t * 4, 60, 0.18 + t * 0.1);
+  applySaturationVibrance(data, 16 + t * 18, 14 + t * 14);
+  applyContrastish(data, 8 + t * 10);
+  inkOutlines(data, edges, w, h, 40 - t * 5, 36, 0.42 + t * 0.18);
+}
+
+/** Full-frame comic illustration. */
+export function applyComicStyle(image: RGBAImage, intensity: number) {
+  const w = image.width;
+  const h = image.height;
+  const data = image.data;
+  const t = Math.max(0.5, Math.min(1, intensity / 100));
+  const src = new Uint8ClampedArray(data);
+  const gray = luminanceGray(src, w, h);
+  const edges = edgeMagnitude(gray, w, h);
+
+  structurePreserveSmooth(image, edges, 7 + t * 8);
+  adaptiveRegionQuantize(data, edges, 5, 0.58 + t * 0.12, 0.24 + t * 0.1);
+  applySaturationVibrance(data, 16 + t * 16, 12 + t * 12);
+  applyContrastish(data, 16 + t * 14);
+
+  const dotPeriod = 5;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const p = y * w + x;
+      const g = gray[p];
+      if (g < 90 && edges[p] < 50) {
+        const cx = x % dotPeriod;
+        const cy = y % dotPeriod;
+        const dist = Math.sqrt((cx - 2.5) ** 2 + (cy - 2.5) ** 2);
+        if (dist < ((90 - g) / 90) * 1.8 * (0.55 + t * 0.4)) {
+          const i = p * 4;
+          data[i] = clamp8(data[i] * 0.68);
+          data[i + 1] = clamp8(data[i + 1] * 0.68);
+          data[i + 2] = clamp8(data[i + 2] * 0.68);
+        }
+      }
+    }
+  }
+  inkOutlines(data, edges, w, h, 24 - t * 4, 2, 0.85 + t * 0.12);
+  inkOutlines(data, edges, w, h, 46 - t * 4, 48, 0.32 + t * 0.12);
+}
+
+/** Full-frame oil / painterly (Ghibli-direction safe, original look). */
+function applyOilPaintingStyle(image: RGBAImage, intensity: number) {
+  const w = image.width;
+  const h = image.height;
+  const data = image.data;
+  const t = Math.max(0.5, Math.min(1, intensity / 100));
+  const src = new Uint8ClampedArray(data);
+  const gray = luminanceGray(src, w, h);
+  const edges = edgeMagnitude(gray, w, h);
+
+  // Stronger full-frame painterly fields
+  structurePreserveSmooth(image, edges, 28 + t * 36);
+  adaptiveRegionQuantize(data, edges, 7, 0.52 + t * 0.14, 0.16 + t * 0.08);
+
+  // Directional brush-like smear along luminance gradient (light)
+  const snap = new Uint8ClampedArray(data);
+  for (let y = 2; y < h - 2; y++) {
+    for (let x = 2; x < w - 2; x++) {
+      const p = y * w + x;
+      if (edges[p] < 40) {
+        const i = p * 4;
+        const j = ((y - 1) * w + (x + 1)) * 4;
+        const k = 0.18 + t * 0.12;
+        data[i] = clamp8(snap[i] * (1 - k) + snap[j] * k);
+        data[i + 1] = clamp8(snap[i + 1] * (1 - k) + snap[j + 1] * k);
+        data[i + 2] = clamp8(snap[i + 2] * (1 - k) + snap[j + 2] * k);
+      }
+    }
+  }
+
+  for (let i = 0; i < data.length; i += 4) {
+    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    if (y > 45 && y < 220) {
+      data[i] = clamp8(data[i] + (8 + t * 10));
+      data[i + 1] = clamp8(data[i + 1] + (5 + t * 6));
+      data[i + 2] = clamp8(data[i + 2] - (1 + t * 2));
+    }
+  }
+  applySaturationVibrance(data, 12 + t * 12, 12 + t * 10);
+  applyContrastish(data, 8 + t * 8);
+  inkOutlines(data, edges, w, h, 48 - t * 4, 55, 0.22 + t * 0.12);
+}
+
+/**
+ * Original retro early-3D open-world game-art look.
+ * Not a copy of any game assets, characters, or logos.
+ */
+export function applyRetro3dStyle(image: RGBAImage, intensity: number) {
+  const w = image.width;
+  const h = image.height;
+  const data = image.data;
+  const t = Math.max(0.5, Math.min(1, intensity / 100));
+  const src = new Uint8ClampedArray(data);
+  const gray = luminanceGray(src, w, h);
+  const edges = edgeMagnitude(gray, w, h);
+
+  // Texture compression / simplified materials
+  structurePreserveSmooth(image, edges, 8 + t * 10);
+  adaptiveRegionQuantize(data, edges, 5, 0.55 + t * 0.12, 0.22 + t * 0.1);
+
+  // Early-console color: slightly crushed blacks, warm-cool split
+  for (let i = 0; i < data.length; i += 4) {
+    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    // Crush deep shadows
+    if (y < 45) {
+      data[i] = clamp8(data[i] * 0.75);
+      data[i + 1] = clamp8(data[i + 1] * 0.78);
+      data[i + 2] = clamp8(data[i + 2] * 0.85);
+    }
+    // Baked-light mid push
+    if (y > 50 && y < 190) {
+      data[i] = clamp8(data[i] + (4 + t * 6));
+      data[i + 1] = clamp8(data[i + 1] + (3 + t * 4));
+      data[i + 2] = clamp8(data[i + 2] + (2 + t * 3));
+    }
+  }
+  applyContrastish(data, 14 + t * 12);
+  applySaturationVibrance(data, 10 + t * 12, 8 + t * 10);
+
+  // Soft silhouette definition
+  inkOutlines(data, edges, w, h, 38 - t * 4, 30, 0.35 + t * 0.15);
+
+  // Mild pixel-block texture (controlled, not heavy pixel art)
+  const block = 2;
+  if (t > 0.4) {
+    for (let y = 0; y < h; y += block) {
+      for (let x = 0; x < w; x += block) {
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let dy = 0; dy < block && y + dy < h; dy++) {
+          for (let dx = 0; dx < block && x + dx < w; dx++) {
+            const i = ((y + dy) * w + (x + dx)) * 4;
+            r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+          }
+        }
+        if (!n) continue;
+        r = (r / n) | 0; g = (g / n) | 0; b = (b / n) | 0;
+        for (let dy = 0; dy < block && y + dy < h; dy++) {
+          for (let dx = 0; dx < block && x + dx < w; dx++) {
+            const i = ((y + dy) * w + (x + dx)) * 4;
+            const k = 0.35 + t * 0.2;
+            data[i] = clamp8(data[i] * (1 - k) + r * k);
+            data[i + 1] = clamp8(data[i + 1] * (1 - k) + g * k);
+            data[i + 2] = clamp8(data[i + 2] * (1 - k) + b * k);
+          }
+        }
+      }
+    }
+  }
 }
 
 export function applyStyle(image: RGBAImage, style: string | undefined, intensity: number) {
   if (!style || style === 'none') return;
   const t = Math.max(0, Math.min(100, intensity));
-  if (style === 'sketch') {
-    applySketchStyle(image, t);
-  } else if (style === 'anime') {
-    applyAnimeStyle(image, t);
-  } else if (style === 'comic') {
-    applyComicStyle(image, t);
-  } else if (style === 'cartoon') {
-    applyCartoonStyle(image, t);
-  } else if (style === 'oil') {
-    applyOilPaintingStyle(image, t);
-  } else if (style === 'watercolor') {
+  if (style === 'sketch') applySketchStyle(image, t);
+  else if (style === 'anime') applyAnimeStyle(image, t);
+  else if (style === 'comic') applyComicStyle(image, t);
+  else if (style === 'cartoon') applyCartoonStyle(image, t);
+  else if (style === 'oil') applyOilPaintingStyle(image, t);
+  else if (style === 'retro3d') applyRetro3dStyle(image, t);
+  else if (style === 'watercolor') {
     applySoftBlur(image, 50 + t * 0.2);
     applySaturationVibrance(image.data, 20, 15);
     applyFade(image.data, 15);
@@ -370,7 +406,7 @@ export function applyStyle(image: RGBAImage, style: string | undefined, intensit
     applyNeonStyle(image.data, 60 + t * 0.3);
     applyContrastish(image.data, 20);
   } else if (style === 'painting') {
-    applyOilPaintingStyle(image, Math.min(100, 55 + t * 0.35));
+    applyOilPaintingStyle(image, Math.min(100, 60 + t * 0.35));
   }
 }
 
