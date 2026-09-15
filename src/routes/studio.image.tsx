@@ -45,8 +45,6 @@ function isChildProductRoute(pathname: string): boolean {
   if (CHILD_PRODUCT_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return true;
   }
-  // Any deeper product under /studio/image/* (except exact /studio/image) is a child.
-  // Prevents accidental redirect to /editor when a new child route is added.
   if (pathname.startsWith("/studio/image/") && pathname !== "/studio/image") {
     return true;
   }
@@ -62,6 +60,10 @@ function ImageStudio() {
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
 
+  // Still under /studio/image tree (exact hub or child product)
+  const underImageStudio =
+    pathname === "/studio/image" || pathname.startsWith("/studio/image/");
+
   const openEditor = () => {
     try {
       sessionStorage.setItem("motio2edit-mode", "image");
@@ -74,12 +76,14 @@ function ImageStudio() {
 
   // Exact /studio/image only: signed-in users go into the Image Editor.
   // Never redirect child product routes (Circle, Lens, Filter, Auto Edit, …).
+  // Never run this redirect while leaving the image tree (e.g. Filters → homepage).
   useEffect(() => {
     if (isChild) return;
-    // Extra guard: never redirect away from a product URL during hydration.
+    if (!underImageStudio) return;
     if (typeof window !== "undefined") {
       const p = window.location.pathname;
       if (p.startsWith("/studio/image/") && p !== "/studio/image") return;
+      if (p !== "/studio/image") return;
     }
     if (!user) return;
     try {
@@ -89,10 +93,15 @@ function ImageStudio() {
       /* ignore */
     }
     void navigate({ to: "/editor" });
-  }, [user, navigate, isChild]);
+  }, [user, navigate, isChild, underImageStudio]);
 
   if (isChild) {
     return <Outlet />;
+  }
+
+  // Leaving Filters/etc. toward homepage: do not flash "Opening Image Studio"
+  if (!underImageStudio) {
+    return null;
   }
 
   if (user) {
