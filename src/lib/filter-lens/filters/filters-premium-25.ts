@@ -68,9 +68,8 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
     { style: 'neon', saturation: 28, contrast: 24, bloom: 20, temperature: -6, vignette: 14, vibrance: 16 }, true),
 
   p('filter-083', 'Cyberpunk', 'Neon',
-    'Futuristic cyan/magenta grading, high contrast, dark cinematic shadows.',
-    { style: 'neon', temperature: -12, contrast: 30, saturation: 22, bloom: 16, vignette: 22, shadows: -6,
-      splitToning: { shadowsHue: 280, shadowsSaturation: 35, highlightsHue: 180, highlightsSaturation: 28, balance: -10 } }, true),
+    'Full-frame illustrated cyberpunk — comic color cells, cyan/magenta neon, pop-art halftone, bold contours.',
+    { style: 'cyberpunk' }, true),
 
   p('filter-084', 'Aqua', 'Cool',
     'Cool teal and blue-green atmosphere with natural-looking skin.',
