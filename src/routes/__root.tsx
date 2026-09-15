@@ -83,39 +83,27 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-/** Glass shell critical CSS — usable even if the main bundle is late. */
+/**
+ * SAFE critical CSS only — must NOT override Tailwind responsive utilities
+ * (e.g. never force nav{display:flex} which breaks hidden lg:flex on mobile).
+ */
 const CRITICAL_CSS = `
-html,body{margin:0;padding:0;background:#fafafa;color:#1a1a1a;font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;-webkit-text-size-adjust:100%;line-height:1.5}
+html,body{margin:0;padding:0;-webkit-text-size-adjust:100%}
 *,*::before,*::after{box-sizing:border-box}
-a{color:inherit;text-decoration:none}
-img,video{max-width:100%;height:auto;display:block}
-button{font:inherit;cursor:pointer}
-header{position:sticky;top:0;z-index:40;border-bottom:1px solid rgba(0,0,0,.08);background:rgba(250,250,250,.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
-header>div{display:flex;align-items:center;justify-content:space-between;gap:.75rem;height:4rem;max-width:72rem;margin:0 auto;padding:0 .75rem}
-nav{display:flex;align-items:center;gap:.25rem;flex-wrap:wrap}
-nav a{padding:.5rem .75rem;border-radius:.5rem;font-size:.875rem;font-weight:500;color:#666}
-main{max-width:72rem;margin:0 auto;padding:1.25rem 1rem 6rem}
-h1{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;margin:.25rem 0 0}
-.flex{display:flex}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-2{gap:.5rem}.gap-3{gap:.75rem}
-.overflow-x-auto{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.rounded-2xl{border-radius:1rem}.rounded-xl{border-radius:.75rem}.rounded-full{border-radius:9999px}
-.border{border:1px solid rgba(0,0,0,.1)}.bg-card,.bg-background{background:#fff}
-.min-h-screen{min-height:100vh}
-article{position:relative;overflow:hidden;border-radius:14px;background:rgba(0,0,0,.04)}
-/* Prevent Google Translate from shoving body down / breaking sticky header */
-body{top:0!important;position:static!important}
+img,video{max-width:100%;height:auto}
+/* Google Translate: do not shove layout */
+body{top:0!important}
 .goog-te-banner-frame,.goog-te-balloon-frame,#goog-gt-tt{display:none!important;height:0!important;visibility:hidden!important}
 `;
 
 /**
  * Boot guard:
- * 1) Clear broken googtrans cookies that rewrite the entire DOM and destroy layout
- * 2) If header is still unstyled after load, force-reinsert the main CSS link
+ * 1) Clear googtrans cookies that rewrite the DOM
+ * 2) If main CSS clearly failed, re-inject stylesheet once
  */
 const BOOT_GUARD_SCRIPT = `
 (function(){
   try {
-    // Neutralize Google Translate auto-rewrite that can strip flex/glass layout
     var host = location.hostname;
     var domains = ['', host];
     var parts = host.split('.');
@@ -127,11 +115,18 @@ const BOOT_GUARD_SCRIPT = `
     try { localStorage.removeItem('motio2edit-gt-lang'); } catch(e) {}
 
     var href = ${JSON.stringify(appCss)};
-    function headerStyled(){
-      var h = document.querySelector('header');
-      if (!h) return true;
-      var cs = window.getComputedStyle(h);
-      return cs.position === 'sticky' || cs.position === 'fixed' || cs.display === 'flex';
+    function cssLoaded(){
+      // Detect Tailwind token presence without forcing layout rules
+      try {
+        var probe = document.createElement('div');
+        probe.className = 'bg-background';
+        probe.style.cssText = 'position:absolute;left:-9999px;top:0';
+        document.body.appendChild(probe);
+        var bg = window.getComputedStyle(probe).backgroundColor;
+        document.body.removeChild(probe);
+        // Unstyled default is typically transparent/rgba(0,0,0,0)
+        return bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+      } catch (e) { return true; }
     }
     function injectCss(){
       if (document.querySelector('link[data-motio-css-guard]')) return;
@@ -141,15 +136,15 @@ const BOOT_GUARD_SCRIPT = `
       l.setAttribute('data-motio-css-guard','1');
       document.head.appendChild(l);
     }
-    function check(){ if (!headerStyled()) injectCss(); }
+    function check(){ if (!cssLoaded()) injectCss(); }
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', function(){
-        setTimeout(check, 300);
-        setTimeout(check, 1200);
+        setTimeout(check, 400);
+        setTimeout(check, 1500);
       });
     } else {
-      setTimeout(check, 300);
-      setTimeout(check, 1200);
+      setTimeout(check, 400);
+      setTimeout(check, 1500);
     }
   } catch (e) {}
 })();
@@ -225,7 +220,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" translate="no">
+    <html lang="en">
       <head>
         <HeadContent />
         <style dangerouslySetInnerHTML={{ __html: CRITICAL_CSS }} />
