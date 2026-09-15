@@ -205,11 +205,14 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       try {
         const img = await loadImage(sourceUrl);
         const canvas = document.createElement("canvas");
-        canvas.width = Math.min(img.naturalWidth, 1280);
+        canvas.width = Math.min(img.naturalWidth, 2048);
         canvas.height = Math.round((canvas.width / img.naturalWidth) * img.naturalHeight);
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const ictx = canvas.getContext("2d")!;
+        ictx.imageSmoothingEnabled = true;
+        ictx.imageSmoothingQuality = "high";
+        ictx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const out = applyLensOpticalEnhanced(canvas, lens, "native", { watermark: false });
-        const blob = await canvasToBlob(out, "image/jpeg", 0.88);
+        const blob = await canvasToBlob(out, "image/jpeg", 0.92);
         if (cancelled) return;
         const url = URL.createObjectURL(blob);
         setPreviewUrl((prev) => {
@@ -229,7 +232,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     };
   }, [lens, sourceUrl, phase, cameraOn]);
 
-  // Live optical preview — higher quality, still safe on heavy warps
+  // Live optical preview — high quality
   useEffect(() => {
     if (!cameraOn || !lens || phase === "processing" || phase === "result") {
       if (liveRafRef.current != null) {
@@ -244,8 +247,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     if (!video || !canvas) return;
 
     const heavy = HEAVY_LENS_IDS.has(lens.id);
-    // Higher preview quality (was 280/400 — too soft)
-    const LIVE_MAX_W = heavy ? 480 : 720;
+    const LIVE_MAX_W = heavy ? 560 : 960;
     let frame = 0;
     const tmp = document.createElement("canvas");
 
@@ -255,7 +257,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         return;
       }
       frame++;
-      // Heavy warps only: skip every 3rd frame
       if (heavy && frame % 3 === 0) {
         liveRafRef.current = requestAnimationFrame(tick);
         return;
@@ -272,6 +273,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         tmp.height = h;
       }
       const tctx = tmp.getContext("2d")!;
+      tctx.imageSmoothingEnabled = true;
+      tctx.imageSmoothingQuality = "high";
       tctx.setTransform(1, 0, 0, 1, 0, 0);
       tctx.clearRect(0, 0, w, h);
       if (facingMode === "user") {
@@ -280,8 +283,13 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       }
       tctx.drawImage(video, 0, 0, w, h);
       try {
-        const out = applyLensOpticalEnhanced(tmp, lens, "native", { watermark: false });
+        const out = applyLensOpticalEnhanced(tmp, lens, "native", {
+          watermark: false,
+          maxEdge: LIVE_MAX_W,
+        });
         const ctx = canvas.getContext("2d")!;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(out, 0, 0);
         canvas.style.display = "block";
@@ -337,9 +345,12 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     setPhase("processing");
     try {
       const shouldWm = wantWm && (!isPaid || active.tier === "normal");
-      const out = applyLensOpticalEnhanced(canvas, active, "native", { watermark: shouldWm });
-      const blob = await canvasToBlob(out, "image/jpeg", 0.94);
-      const srcBlob = await canvasToBlob(canvas, "image/jpeg", 0.92);
+      const out = applyLensOpticalEnhanced(canvas, active, "native", {
+        watermark: shouldWm,
+        maxEdge: 2560,
+      });
+      const blob = await canvasToBlob(out, "image/jpeg", 0.96);
+      const srcBlob = await canvasToBlob(canvas, "image/jpeg", 0.95);
       const srcUrl = URL.createObjectURL(srcBlob);
       const url = URL.createObjectURL(blob);
 
@@ -385,7 +396,10 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       const c = document.createElement("canvas");
       c.width = img.naturalWidth;
       c.height = img.naturalHeight;
-      c.getContext("2d")!.drawImage(img, 0, 0);
+      const ctx = c.getContext("2d")!;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0);
       await applyFromCanvas(c, lens);
     }
   };
@@ -450,7 +464,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         </button>
       </header>
 
-      {/* Camera stage — stops above bottom controls */}
       <div className="relative min-h-0 flex-1 pb-[11.5rem]">
         <video
           ref={videoRef}
@@ -528,10 +541,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         )}
       </div>
 
-      {/* Bottom chrome — carousel swipe isolated from shutter */}
       {phase !== "result" && (
         <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col pb-[max(0.6rem,env(safe-area-inset-bottom))]">
-          {/* Swipe only lives in this strip */}
           <div className="pointer-events-none bg-gradient-to-t from-black via-black/80 to-transparent pt-10">
             <div
               ref={carouselRef}
@@ -594,7 +605,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
             </div>
           </div>
 
-          {/* Shutter row — no horizontal scroll, separate touch target */}
           <div className="pointer-events-auto flex items-center justify-center gap-10 bg-black/90 px-6 pt-1">
             <button
               type="button"
