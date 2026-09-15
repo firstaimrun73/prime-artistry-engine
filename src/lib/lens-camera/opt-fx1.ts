@@ -27,12 +27,14 @@ export function portraitBloom(src: HTMLCanvasElement): HTMLCanvasElement {
   ctx.drawImage(src, 0, 0);
   ctx.restore();
 
-  // Soft edge blend ring
-  const ring = ctx.createRadialGradient(cx, cy, rx * 0.75, cx, cy, rx * 1.15);
-  ring.addColorStop(0, "rgba(0,0,0,0)");
-  ring.addColorStop(1, "rgba(0,0,0,0)");
-  // vignette
-  const vig = ctx.createRadialGradient(cx, cy, Math.min(c.width, c.height) * 0.25, cx, cy, Math.min(c.width, c.height) * 0.75);
+  const vig = ctx.createRadialGradient(
+    cx,
+    cy,
+    Math.min(c.width, c.height) * 0.25,
+    cx,
+    cy,
+    Math.min(c.width, c.height) * 0.75,
+  );
   vig.addColorStop(0, "rgba(0,0,0,0)");
   vig.addColorStop(1, "rgba(0,0,0,0.35)");
   ctx.fillStyle = vig;
@@ -49,7 +51,6 @@ export function dreamSoft(src: HTMLCanvasElement): HTMLCanvasElement {
   ctx.drawImage(src, 0, 0);
   ctx.globalAlpha = 1;
   ctx.filter = "none";
-  // soft glow overlay
   ctx.filter = "blur(6px) brightness(1.15)";
   ctx.globalAlpha = 0.28;
   ctx.globalCompositeOperation = "screen";
@@ -76,10 +77,16 @@ export function glowMist(src: HTMLCanvasElement): HTMLCanvasElement {
 export function vintage(src: HTMLCanvasElement): HTMLCanvasElement {
   const c = grade(src, "sepia(0.45) contrast(1.18) brightness(1.06) saturate(0.85)");
   const ctx = c.getContext("2d")!;
-  // warm center + edge falloff
   const cx = c.width / 2;
   const cy = c.height / 2;
-  const vig = ctx.createRadialGradient(cx, cy, Math.min(c.width, c.height) * 0.2, cx, cy, Math.min(c.width, c.height) * 0.72);
+  const vig = ctx.createRadialGradient(
+    cx,
+    cy,
+    Math.min(c.width, c.height) * 0.2,
+    cx,
+    cy,
+    Math.min(c.width, c.height) * 0.72,
+  );
   vig.addColorStop(0, "rgba(255,200,120,0.08)");
   vig.addColorStop(0.55, "rgba(0,0,0,0)");
   vig.addColorStop(1, "rgba(40,20,10,0.4)");
@@ -88,6 +95,7 @@ export function vintage(src: HTMLCanvasElement): HTMLCanvasElement {
   return c;
 }
 
+/** Strong false-color infrared — pink/white vegetation, dark cool sky */
 export function infrared(src: HTMLCanvasElement): HTMLCanvasElement {
   const c = clone(src);
   const ctx = c.getContext("2d")!;
@@ -97,13 +105,34 @@ export function infrared(src: HTMLCanvasElement): HTMLCanvasElement {
     const r = d[i];
     const g = d[i + 1];
     const b = d[i + 2];
-    // classic false-color IR: foliage bright pink/white, sky dark
-    d[i] = Math.min(255, g * 1.25 + 30);
-    d[i + 1] = Math.min(255, r * 0.55 + b * 0.35 + 10);
-    d[i + 2] = Math.min(255, b * 0.4 + 15);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    // greens / bright foliage → hot pink-white
+    // blues / sky → deep indigo
+    // skin / midtones → magenta-rose
+    const greenness = Math.max(0, g - Math.max(r, b));
+    const blueness = Math.max(0, b - Math.max(r, g) * 0.85);
+    let nr = r;
+    let ng = g;
+    let nb = b;
+    if (greenness > 12 || (g > r + 8 && g > b + 8)) {
+      nr = Math.min(255, luma * 1.35 + 70);
+      ng = Math.min(255, luma * 0.55 + 20);
+      nb = Math.min(255, luma * 0.75 + 40);
+    } else if (blueness > 15 || b > r + 20) {
+      nr = Math.min(255, luma * 0.25);
+      ng = Math.min(255, luma * 0.35 + 10);
+      nb = Math.min(255, luma * 0.55 + 25);
+    } else {
+      nr = Math.min(255, g * 1.15 + r * 0.35 + 25);
+      ng = Math.min(255, r * 0.45 + b * 0.35 + 8);
+      nb = Math.min(255, b * 0.55 + 20);
+    }
+    d[i] = nr;
+    d[i + 1] = ng;
+    d[i + 2] = nb;
   }
   ctx.putImageData(img, 0, 0);
-  return grade(c, "contrast(1.35) saturate(1.45) brightness(1.05)");
+  return grade(c, "contrast(1.45) saturate(1.65) brightness(1.06)");
 }
 
 export function microReveal(src: HTMLCanvasElement): HTMLCanvasElement {
