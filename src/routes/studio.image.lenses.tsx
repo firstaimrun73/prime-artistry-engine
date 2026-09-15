@@ -1,5 +1,5 @@
 /**
- * More Lenses — circular R2 samples, deep-link to Lens Editor (upload required there).
+ * More Lenses — circular R2 samples, deep-link to Lens Editor.
  * Free optical (tier=normal, 0 cr) open for everyone.
  * AI lenses (20 cr) require upgraded plan (or admin).
  */
@@ -156,7 +156,7 @@ function MoreLensesPage() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-muted-foreground">
-          Tap a lens to open the camera editor. Upload your own photo before generating.
+          Tap a lens → camera opens. Capture or upload a photo, then shoot.
         </p>
       </main>
     </div>
