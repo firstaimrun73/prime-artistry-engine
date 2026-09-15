@@ -1,12 +1,19 @@
-/** Lens core helpers */
+/** Lens core helpers — high-quality canvas sampling */
 import type { LensAspectId } from "./roster";
 import { LENS_ASPECTS } from "./roster";
 
+function hqCtx(c: HTMLCanvasElement): CanvasRenderingContext2D {
+  const ctx = c.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  return ctx;
+}
+
 export function captureVideoFrame(video: HTMLVideoElement, mirror = false): HTMLCanvasElement {
   const c = document.createElement("canvas");
-  c.width = video.videoWidth || 1280;
-  c.height = video.videoHeight || 720;
-  const ctx = c.getContext("2d")!;
+  c.width = video.videoWidth || 1920;
+  c.height = video.videoHeight || 1080;
+  const ctx = hqCtx(c);
   if (mirror) {
     ctx.translate(c.width, 0);
     ctx.scale(-1, 1);
@@ -19,7 +26,7 @@ export function clone(src: HTMLCanvasElement): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = src.width;
   c.height = src.height;
-  c.getContext("2d")!.drawImage(src, 0, 0);
+  hqCtx(c).drawImage(src, 0, 0);
   return c;
 }
 
@@ -39,7 +46,7 @@ export function cropToAspect(src: HTMLCanvasElement, aspectId: LensAspectId): HT
   const out = document.createElement("canvas");
   out.width = cw;
   out.height = ch;
-  out.getContext("2d")!.drawImage(src, sx, sy, cw, ch, 0, 0, cw, ch);
+  hqCtx(out).drawImage(src, sx, sy, cw, ch, 0, 0, cw, ch);
   return out;
 }
 
@@ -47,7 +54,7 @@ export function grade(src: HTMLCanvasElement, filter: string): HTMLCanvasElement
   const c = document.createElement("canvas");
   c.width = src.width;
   c.height = src.height;
-  const ctx = c.getContext("2d")!;
+  const ctx = hqCtx(c);
   ctx.filter = filter;
   ctx.drawImage(src, 0, 0);
   ctx.filter = "none";
@@ -63,11 +70,27 @@ export function teleCrop(src: HTMLCanvasElement, factor: number): HTMLCanvasElem
   const out = document.createElement("canvas");
   out.width = src.width;
   out.height = src.height;
-  out.getContext("2d")!.drawImage(src, sx, sy, cw, ch, 0, 0, out.width, out.height);
+  hqCtx(out).drawImage(src, sx, sy, cw, ch, 0, 0, out.width, out.height);
   return out;
 }
 
-export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/jpeg", quality = 0.92): Promise<Blob> {
+/** Cap ultra-large frames so mobile GPUs stay stable (keeps up to 2560 long edge). */
+export function normalizeCaptureSize(src: HTMLCanvasElement, maxEdge = 2560): HTMLCanvasElement {
+  const edge = Math.max(src.width, src.height);
+  if (edge <= maxEdge) return src;
+  const scale = maxEdge / edge;
+  const out = document.createElement("canvas");
+  out.width = Math.round(src.width * scale);
+  out.height = Math.round(src.height * scale);
+  hqCtx(out).drawImage(src, 0, 0, out.width, out.height);
+  return out;
+}
+
+export function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type = "image/jpeg",
+  quality = 0.95,
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), type, quality);
   });
