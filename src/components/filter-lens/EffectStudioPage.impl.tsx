@@ -375,7 +375,7 @@ export function EffectStudioPage({
         <header className="flex items-center gap-3 border-b border-border px-3 py-3">
           <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
+            <p className="text-[10px] font-semibold tracking-[0.16em] text-foreground uppercase">Motio<span className="text-[#FF5A1F]">2</span>edit</p>
             <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
           </div>
         </header>
@@ -399,6 +399,7 @@ export function EffectStudioPage({
       <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-3 py-2.5">
         <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
         <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio<span className="text-[#FF5A1F]">2</span>edit</p>
           <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
         </div>
         {/* Change only in editor — not on output screen (bottom action has Change there) */}
@@ -489,7 +490,7 @@ export function EffectStudioPage({
                     return (
                       <button key={item.id} type="button" onClick={() => selectFilter(item)} className="w-[78px] shrink-0 text-left">
                         <div className={cn("relative aspect-[1/1.05] overflow-hidden rounded-lg bg-muted", isSel && "outline outline-2 outline-offset-1 outline-[#FF5A1F]")}>
-                          {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-muted" />}
+                          {thumb ? <img src={thumb} alt="" className="h-full w-full object-contain" /> : <div className="h-full w-full bg-muted" />}
                           {isSel && <span className="absolute right-1 top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#FF5A1F] text-[11px] font-bold text-white">✓</span>}
                           {!item.isFree && item.badge && (
                             item.badge === "ai+" ? (
