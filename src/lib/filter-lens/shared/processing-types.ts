@@ -72,7 +72,7 @@ export interface ProcessingParameters {
   /** Duotone: map luminance to two RGB colors. */
   duotone?: { shadow: [number, number, number]; highlight: [number, number, number] };
   /** Stylization preset applied after grading. */
-  style?: 'none' | 'sketch' | 'comic' | 'anime' | 'oil' | 'watercolor' | 'neon' | 'painting';
+  style?: 'none' | 'sketch' | 'comic' | 'anime' | 'cartoon' | 'oil' | 'watercolor' | 'neon' | 'painting';
 }
 
 export type ProcessingProfile = ProcessingParameters;
