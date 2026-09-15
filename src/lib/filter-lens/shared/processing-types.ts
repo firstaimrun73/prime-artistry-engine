@@ -61,17 +61,11 @@ export interface ProcessingParameters {
   dynamicRange?: number;
   starSeparation?: number;
   atmosphere?: number;
-  /** Posterize to N levels per channel (2–16). Strong graphic look. */
   posterizeLevels?: number;
-  /** Edge/sketch mix 0–100. */
   edgeAmount?: number;
-  /** Pixel block size in px (2–24). */
   pixelSize?: number;
-  /** Soft blur for dreamy/oil base 0–100. */
   softBlur?: number;
-  /** Duotone: map luminance to two RGB colors. */
   duotone?: { shadow: [number, number, number]; highlight: [number, number, number] };
-  /** Stylization preset applied after grading. */
   style?:
     | 'none'
     | 'sketch'
@@ -82,7 +76,8 @@ export interface ProcessingParameters {
     | 'watercolor'
     | 'neon'
     | 'painting'
-    | 'retro3d';
+    | 'retro3d'
+    | 'cyberpunk';
 }
 
 export type ProcessingProfile = ProcessingParameters;
