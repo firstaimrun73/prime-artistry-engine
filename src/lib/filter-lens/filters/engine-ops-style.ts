@@ -1,8 +1,7 @@
 /**
- * engine-ops-style.ts — anime / comic / sketch / neon style ops (backend only)
- * Sketch: pure B/W with stronger black line weight.
- * Anime: soft multi-tone cel, thin clean ink, luminous skin bias (technique-only).
- * Comic: moderate quantize + bold ink + light shadow dots; preserves face structure.
+ * engine-ops-style.ts — structure-aware artistic styles (backend only).
+ * Cartoon / Comic / Anime / Sketch / Oil use edge hierarchy, luminance masks,
+ * and adaptive region simplification — not global color-only grades.
  */
 import type { RGBAImage, ProcessingProfile } from '../shared/processing-types';
 import { clamp8, applySaturationVibrance } from './engine-ops-basic';
@@ -17,15 +16,9 @@ function luminanceGray(src: Uint8ClampedArray, w: number, h: number): Float32Arr
   return gray;
 }
 
-function inkOutlines(
-  data: Uint8ClampedArray,
-  gray: Float32Array,
-  w: number,
-  h: number,
-  edgeThresh: number,
-  inkFloor: number,
-  strength: number,
-) {
+/** Sobel magnitude map (structure / object boundaries). */
+function edgeMagnitude(gray: Float32Array, w: number, h: number): Float32Array {
+  const mag = new Float32Array(w * h);
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const p = y * w + x;
@@ -35,7 +28,25 @@ function inkOutlines(
       const gy =
         -gray[p - w - 1] - 2 * gray[p - w] - gray[p - w + 1] +
          gray[p + w - 1] + 2 * gray[p + w] + gray[p + w + 1];
-      const mag = Math.sqrt(gx * gx + gy * gy);
+      mag[p] = Math.sqrt(gx * gx + gy * gy);
+    }
+  }
+  return mag;
+}
+
+function inkOutlines(
+  data: Uint8ClampedArray,
+  edgeMag: Float32Array,
+  w: number,
+  h: number,
+  edgeThresh: number,
+  inkFloor: number,
+  strength: number,
+) {
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      const mag = edgeMag[p];
       if (mag > edgeThresh) {
         const i = p * 4;
         const ink = Math.max(0, inkFloor - (mag - edgeThresh) * 0.03);
@@ -50,7 +61,7 @@ function inkOutlines(
 
 /** Quantize blended with original — keeps face/fabric readable. */
 function softCelQuantize(data: Uint8ClampedArray, levels: number, blend: number) {
-  const step = 255 / (levels - 1);
+  const step = 255 / Math.max(2, levels - 1);
   const keep = 1 - blend;
   for (let i = 0; i < data.length; i += 4) {
     for (let c = 0; c < 3; c++) {
@@ -62,25 +73,98 @@ function softCelQuantize(data: Uint8ClampedArray, levels: number, blend: number)
 }
 
 /**
+ * Adaptive posterization: stronger flattening on low-edge (smooth) regions,
+ * lighter on strong structure so faces/buildings keep form.
+ */
+function adaptiveRegionQuantize(
+  data: Uint8ClampedArray,
+  edgeMag: Float32Array,
+  levels: number,
+  blendSmooth: number,
+  blendEdge: number,
+) {
+  const step = 255 / Math.max(2, levels - 1);
+  for (let p = 0, i = 0; p < edgeMag.length; p++, i += 4) {
+    const e = edgeMag[p];
+    // Low edge → more cartoon flatten; high edge → preserve structure
+    const t = Math.min(1, e / 90);
+    const blend = blendSmooth * (1 - t) + blendEdge * t;
+    const keep = 1 - blend;
+    for (let c = 0; c < 3; c++) {
+      const orig = data[i + c];
+      const q = Math.round(orig / step) * step;
+      data[i + c] = clamp8(orig * keep + q * blend);
+    }
+  }
+}
+
+/** Mild bilateral-ish smooth: blur more where edges are weak. */
+function structurePreserveSmooth(
+  image: RGBAImage,
+  edgeMag: Float32Array,
+  baseBlur: number,
+) {
+  // Approximate: soft blur then restore high-edge pixels from a snapshot
+  const w = image.width;
+  const h = image.height;
+  const data = image.data;
+  const snap = new Uint8ClampedArray(data);
+  applySoftBlur(image, baseBlur);
+  for (let p = 0, i = 0; p < edgeMag.length; p++, i += 4) {
+    const e = edgeMag[p];
+    if (e > 35) {
+      const k = Math.min(1, (e - 35) / 70); // restore structure on strong edges
+      data[i] = clamp8(data[i] * (1 - k) + snap[i] * k);
+      data[i + 1] = clamp8(data[i + 1] * (1 - k) + snap[i + 1] * k);
+      data[i + 2] = clamp8(data[i + 2] * (1 - k) + snap[i + 2] * k);
+    }
+  }
+  void w;
+  void h;
+}
+
+/**
+ * Cartoon: structured illustration — adaptive color regions + strong object contours.
+ * Not global saturation. Faces/buildings keep geometry.
+ */
+export function applyCartoonStyle(image: RGBAImage, intensity: number) {
+  const w = image.width;
+  const h = image.height;
+  const data = image.data;
+  const t = Math.max(0.45, Math.min(1, intensity / 100));
+  const src = new Uint8ClampedArray(data);
+  const gray = luminanceGray(src, w, h);
+  const edges = edgeMagnitude(gray, w, h);
+
+  structurePreserveSmooth(image, edges, 10 + t * 14);
+  adaptiveRegionQuantize(data, edges, 5 + Math.round(t), 0.62 + t * 0.12, 0.22 + t * 0.08);
+  applySaturationVibrance(data, 16 + t * 14, 14 + t * 12);
+  applyContrastish(data, 10 + t * 10);
+
+  // Clean object contours — stronger on primary structure
+  inkOutlines(data, edges, w, h, 36 - t * 6, 28, 0.55 + t * 0.2);
+}
+
+/**
  * Anime (technique-only): soft cel fields, thin clean contours, slight skin lift.
- * Inspired by classic cel-animation shading structure — not any named IP.
+ * Structure-aware smoothing + adaptive cel quantize. Not IP-specific.
  */
 export function applyAnimeStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height;
+  const w = image.width;
+  const h = image.height;
   const data = image.data;
   const t = Math.max(0.4, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
+  const gray = luminanceGray(src, w, h);
+  const edges = edgeMagnitude(gray, w, h);
 
-  // Mild smooth base so skin reads as flat cel fields
-  applySoftBlur(image, 6 + t * 8);
+  structurePreserveSmooth(image, edges, 8 + t * 12);
+  adaptiveRegionQuantize(data, edges, 7, 0.48 + t * 0.12, 0.18 + t * 0.08);
 
-  // 7–8 soft levels, light blend — face structure stays
-  softCelQuantize(data, 7, 0.38 + t * 0.12);
-
-  // Luminous midtones (skin bias): lift mids slightly, keep highlights
+  // Luminous midtones (skin-friendly lift) without inventing facial features
   for (let i = 0; i < data.length; i += 4) {
     const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    if (y > 40 && y < 210) {
+    if (y > 45 && y < 205) {
       const lift = (1 - Math.abs(y - 140) / 140) * (8 + t * 10);
       data[i] = clamp8(data[i] + lift * 1.05);
       data[i + 1] = clamp8(data[i + 1] + lift);
@@ -90,63 +174,69 @@ export function applyAnimeStyle(image: RGBAImage, intensity: number) {
 
   applySaturationVibrance(data, 14 + t * 16, 12 + t * 12);
   applyContrastish(data, 6 + t * 8);
-
-  const gray = luminanceGray(src, w, h);
-  // Thin clean linework (not heavy comic black)
-  inkOutlines(data, gray, w, h, 42 - t * 5, 36, 0.42 + t * 0.18);
+  // Thin clean linework on primary contours only
+  inkOutlines(data, edges, w, h, 44 - t * 5, 40, 0.38 + t * 0.16);
 }
 
 /**
- * Comic: graphic but face-preserving — moderate quantize, bold ink, light shadow dots.
+ * Comic: primary/secondary contour hierarchy + selective shadow halftone.
+ * Face-preserving graphic color cells.
  */
 export function applyComicStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height;
+  const w = image.width;
+  const h = image.height;
   const data = image.data;
   const t = Math.max(0.45, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
-
-  // 6 levels, ~45% blend — graphic without muddy red/green face blocks
-  softCelQuantize(data, 6, 0.42 + t * 0.1);
-  applySaturationVibrance(data, 12 + t * 14, 10 + t * 10);
-  applyContrastish(data, 12 + t * 12);
-
   const gray = luminanceGray(src, w, h);
+  const edges = edgeMagnitude(gray, w, h);
 
-  // Halftone only in deep shadows
+  structurePreserveSmooth(image, edges, 5 + t * 6);
+  adaptiveRegionQuantize(data, edges, 6, 0.5 + t * 0.1, 0.2 + t * 0.08);
+  applySaturationVibrance(data, 14 + t * 14, 10 + t * 10);
+  applyContrastish(data, 14 + t * 12);
+
+  // Selective halftone only in deep shadows (not uniform dots)
   const dotPeriod = 5;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const p = y * w + x;
       const g = gray[p];
-      if (g < 90) {
+      if (g < 85 && edges[p] < 55) {
         const cx = x % dotPeriod;
         const cy = y % dotPeriod;
         const dist = Math.sqrt((cx - 2.5) ** 2 + (cy - 2.5) ** 2);
-        if (dist < ((90 - g) / 90) * 1.8 * (0.5 + t * 0.4)) {
+        if (dist < ((85 - g) / 85) * 1.7 * (0.5 + t * 0.4)) {
           const i = p * 4;
-          data[i] = clamp8(data[i] * 0.72);
-          data[i + 1] = clamp8(data[i + 1] * 0.72);
-          data[i + 2] = clamp8(data[i + 2] * 0.72);
+          data[i] = clamp8(data[i] * 0.7);
+          data[i + 1] = clamp8(data[i + 1] * 0.7);
+          data[i + 2] = clamp8(data[i + 2] * 0.7);
         }
       }
     }
   }
 
-  // Strong black ink on clear edges only
-  inkOutlines(data, gray, w, h, 28 - t * 5, 6, 0.82 + t * 0.12);
+  // Primary contours (strong) + lighter secondary ink
+  inkOutlines(data, edges, w, h, 26 - t * 4, 4, 0.78 + t * 0.14);
+  inkOutlines(data, edges, w, h, 48 - t * 4, 50, 0.28 + t * 0.1);
 }
 
 /**
- * Sketch: pure neutral pencil + stronger black outlines (user request).
+ * Sketch: graphite tonal base + edge hierarchy (primary strong, micro weak).
+ * Intentionally drawn look — not uniform Sobel edges.
  */
 export function applySketchStyle(image: RGBAImage, intensity: number) {
-  const w = image.width, h = image.height;
+  const w = image.width;
+  const h = image.height;
   const data = image.data;
   const t = Math.max(0.5, Math.min(1, intensity / 100));
   const gray = new Float32Array(w * h);
   for (let i = 0, p = 0; i < data.length; i += 4, p++) {
     gray[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
   }
+  const edges = edgeMagnitude(gray, w, h);
+
+  // Color-dodge pencil base
   const inv = new Float32Array(w * h);
   for (let p = 0; p < gray.length; p++) inv[p] = 255 - gray[p];
   let cur = inv;
@@ -173,42 +263,90 @@ export function applySketchStyle(image: RGBAImage, intensity: number) {
     cur = next;
   }
 
-  // Base pencil dodge
+  // Graphite paper base from dodge
   for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
     const denom = 255 - cur[p] + 1e-3;
     let v = (gray[p] * 255) / denom;
     if (v > 255) v = 255;
-    // Darker overall line weight
-    const g = Math.min(255, v * (0.78 + 0.14 * (1 - t)));
+    // Soften micro-noise in sky/flat areas (low edge)
+    const e = edges[p];
+    const soften = e < 18 ? 0.12 * t : 0;
+    const g = Math.min(255, v * (0.82 + 0.12 * (1 - t)) + soften * 40);
     const out = clamp8(g);
     data[i] = out;
     data[i + 1] = out;
     data[i + 2] = out;
   }
 
-  // Extra pure-black edge pass on strong contours
-  const edgeThresh = 22 - t * 6;
+  // Edge hierarchy: primary ink strong, secondary medium, micro suppressed
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const p = y * w + x;
-      const gx =
-        -gray[p - w - 1] - 2 * gray[p - 1] - gray[p + w - 1] +
-         gray[p - w + 1] + 2 * gray[p + 1] + gray[p + w + 1];
-      const gy =
-        -gray[p - w - 1] - 2 * gray[p - w] - gray[p - w + 1] +
-         gray[p + w - 1] + 2 * gray[p + w] + gray[p + w + 1];
-      const mag = Math.sqrt(gx * gx + gy * gy);
-      if (mag > edgeThresh) {
-        const i = p * 4;
-        const k = Math.min(1, (mag - edgeThresh) / 40) * (0.7 + t * 0.3);
-        // Push toward pure black outlines
-        const ink = 0;
-        data[i] = clamp8(data[i] * (1 - k) + ink * k);
-        data[i + 1] = clamp8(data[i + 1] * (1 - k) + ink * k);
-        data[i + 2] = clamp8(data[i + 2] * (1 - k) + ink * k);
+      const mag = edges[p];
+      const i = p * 4;
+      if (mag > 55) {
+        // Primary structure
+        const k = Math.min(1, (mag - 55) / 40) * (0.75 + t * 0.25);
+        data[i] = clamp8(data[i] * (1 - k));
+        data[i + 1] = clamp8(data[i + 1] * (1 - k));
+        data[i + 2] = clamp8(data[i + 2] * (1 - k));
+      } else if (mag > 28) {
+        // Secondary
+        const k = Math.min(1, (mag - 28) / 40) * (0.35 + t * 0.15);
+        data[i] = clamp8(data[i] * (1 - k) + 40 * k);
+        data[i + 1] = clamp8(data[i + 1] * (1 - k) + 40 * k);
+        data[i + 2] = clamp8(data[i + 2] * (1 - k) + 40 * k);
+      }
+      // micro < 28: leave graphite base (no equal edge weight)
+    }
+  }
+
+  // Light cross-hatch bias in deep shadows only
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const p = y * w + x;
+      if (gray[p] < 70 && edges[p] < 40) {
+        if (((x + y) % 4) === 0 || ((x - y + 1024) % 5) === 0) {
+          const i = p * 4;
+          const k = 0.12 + t * 0.1;
+          data[i] = clamp8(data[i] * (1 - k));
+          data[i + 1] = clamp8(data[i + 1] * (1 - k));
+          data[i + 2] = clamp8(data[i + 2] * (1 - k));
+        }
       }
     }
   }
+}
+
+/**
+ * Oil / painterly (Ghibli-direction safe): soft fields, warm atmosphere,
+ * structure-preserving edges — composition and identity retained.
+ */
+function applyOilPaintingStyle(image: RGBAImage, intensity: number) {
+  const w = image.width;
+  const h = image.height;
+  const data = image.data;
+  const t = Math.max(0.4, Math.min(1, intensity / 100));
+  const src = new Uint8ClampedArray(data);
+  const gray = luminanceGray(src, w, h);
+  const edges = edgeMagnitude(gray, w, h);
+
+  structurePreserveSmooth(image, edges, 22 + t * 28);
+  adaptiveRegionQuantize(data, edges, 8, 0.4 + t * 0.12, 0.12 + t * 0.06);
+
+  // Warm sunlight bias + gentle green lift in midtones (environmental, not full recolor)
+  for (let i = 0; i < data.length; i += 4) {
+    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    if (y > 50 && y < 210) {
+      data[i] = clamp8(data[i] + (6 + t * 8));
+      data[i + 1] = clamp8(data[i + 1] + (4 + t * 5));
+      data[i + 2] = clamp8(data[i + 2] - (2 + t * 2));
+    }
+  }
+  applySaturationVibrance(data, 10 + t * 10, 10 + t * 8);
+  applyContrastish(data, 6 + t * 6);
+  // Very soft contour — illustrated silhouette, not heavy ink
+  inkOutlines(data, edges, w, h, 50 - t * 4, 60, 0.18 + t * 0.1);
 }
 
 export function applyStyle(image: RGBAImage, style: string | undefined, intensity: number) {
@@ -220,10 +358,10 @@ export function applyStyle(image: RGBAImage, style: string | undefined, intensit
     applyAnimeStyle(image, t);
   } else if (style === 'comic') {
     applyComicStyle(image, t);
+  } else if (style === 'cartoon') {
+    applyCartoonStyle(image, t);
   } else if (style === 'oil') {
-    applySoftBlur(image, 40 + t * 0.3);
-    applyPosterize(image.data, 8);
-    applySaturationVibrance(image.data, 12, 8);
+    applyOilPaintingStyle(image, t);
   } else if (style === 'watercolor') {
     applySoftBlur(image, 50 + t * 0.2);
     applySaturationVibrance(image.data, 20, 15);
@@ -232,10 +370,7 @@ export function applyStyle(image: RGBAImage, style: string | undefined, intensit
     applyNeonStyle(image.data, 60 + t * 0.3);
     applyContrastish(image.data, 20);
   } else if (style === 'painting') {
-    applySoftBlur(image, 18 + t * 0.25);
-    applySaturationVibrance(image.data, 8 + t * 0.12, 10);
-    applyContrastish(image.data, 12 + t * 0.1);
-    applySketchStyle(image, Math.min(70, 35 + t * 0.35));
+    applyOilPaintingStyle(image, Math.min(100, 55 + t * 0.35));
   }
 }
 
