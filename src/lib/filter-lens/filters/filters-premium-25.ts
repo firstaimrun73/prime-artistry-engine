@@ -98,16 +98,16 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
     { grain: 26, fade: 10, contrast: 14, temperature: 4, vignette: 12, saturation: -4 }),
 
   p('filter-090', 'Sketch', 'Sketch',
-    'Artistic pencil-sketch linework that keeps recognizable facial structure.',
+    'Full-frame pencil sketch — graphite tone, stroke hierarchy, drawn background.',
     { style: 'sketch' }),
 
   p('filter-091', 'Oil Painting', 'Art',
-    'Painterly brush texture and rich oil-paint color while keeping the subject clear.',
-    { style: 'oil', saturation: 10, contrast: 8 }),
+    'Full-frame oil painting — brush fields, painterly color, preserved identity.',
+    { style: 'oil', saturation: 8, contrast: 6 }),
 
   p('filter-092', 'Cartoon', 'Comic',
-    'Clean illustrated cartoon shapes with structure-aware color regions — identity preserved.',
-    { style: 'cartoon', saturation: 12, contrast: 10, vibrance: 10 }),
+    'Full-frame cartoon render with structure-aware color regions.',
+    { style: 'cartoon', saturation: 10, contrast: 8, vibrance: 8 }),
 
   p('filter-093', 'Watercolor', 'Art',
     'Soft watercolor washes and fluid color transitions with paper-like character.',
@@ -118,9 +118,9 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
     { saturation: 26, vibrance: 30, contrast: 12, bloom: 10,
       splitToning: { shadowsHue: 280, shadowsSaturation: 40, highlightsHue: 50, highlightsSaturation: 45, balance: 0 } }, true),
 
-  p('filter-095', 'Glitch', 'Art',
-    'Controlled digital glitch feel with RGB edge energy — subject remains readable.',
-    { contrast: 20, saturation: 18, clarity: 12, edgeAmount: 22, temperature: -4, vignette: 10 }, true),
+  p('filter-095', 'Retro 3D', 'Art',
+    'Original early-3D open-world game-art look — simplified materials, baked light, silhouette clarity. Not affiliated with any game brand.',
+    { style: 'retro3d', contrast: 12, saturation: 6 }, true),
 
   p('filter-096', 'Lens Flare', 'Cinematic',
     'Cinematic optical flare and glow that complements the frame without covering faces.',
