@@ -31,15 +31,11 @@ import {
   applyBloom,
   applySoftBlur,
   applyDuotone,
-  applyNeonStyle,
-  applyContrastish,
   applyDenoise,
   applyDynamicRange,
   applyAtmosphere,
 } from './engine-ops-extra';
 import {
-  applyComicStyle,
-  applySketchStyle,
   applyStyle,
   scaleProfile,
 } from './engine-ops-style';
