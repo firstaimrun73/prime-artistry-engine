@@ -3,6 +3,8 @@
  * Common: photographic grades.
  * AI+: graphic style keys where the catalog look is transformative.
  * Premium slots 076–100 are owned by filters-premium-25.ts (not overridden here).
+ *
+ * NOTE: filter-064 is NOT cyberpunk — Premium Cyberpunk (filter-083) owns that look.
  */
 import type { ProcessingProfile } from '../shared/processing-types';
 
@@ -162,9 +164,8 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     },
   },
 
-  // ——— AI+ graphic / neon (structure recipes, not photo+numbers) ———
+  // ——— AI+ graphic / neon (structure recipes) ———
   'filter-050': {
-    // Rain Neon — localized neon rim + cool night
     style: 'neon',
     contrast: 18,
     saturation: 14,
@@ -183,12 +184,24 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     saturation: 16,
     temperature: 8,
   },
+  // City Reflect — wet-night photo grade (NOT cyberpunk; Premium owns that)
   'filter-064': {
-    // City Reflect / cyber — full cyberpunk graphic pipeline
-    style: 'cyberpunk',
+    contrast: 28,
+    saturation: 14,
+    vibrance: 12,
+    temperature: -8,
+    vignette: 16,
+    shadows: 6,
+    bloom: 12,
+    splitToning: {
+      shadowsHue: 220,
+      shadowsSaturation: 28,
+      highlightsHue: 40,
+      highlightsSaturation: 22,
+      balance: 0,
+    },
   },
 
-  // Creative photo grades (still adjustment-oriented)
   'filter-073': {
     saturation: 52,
     vibrance: 55,
@@ -206,7 +219,6 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     shadows: 8,
     bloom: 12,
   },
-  // Rangoli / Prism — jewel color mapping (photo-supporting; structure via split)
   'filter-075': {
     saturation: 48,
     vibrance: 42,
@@ -255,6 +267,7 @@ export const FILTER_NAME_OVERRIDES: Record<string, string> = {
   'filter-039': 'Yellow',
   'filter-043': 'Night Flare',
   'filter-055': 'Red Tint',
-  'filter-064': 'Cyber City',
+  // Was "Cyber City" — renamed to avoid duplicate with Premium Cyberpunk
+  'filter-064': 'City Night',
   'filter-075': 'Rangoli',
 };
