@@ -81,7 +81,7 @@ function OrangeSlider({
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   return (
     <div className="relative flex h-8 flex-1 items-center">
-      <div className="pointer-events-none absolute inset-x-0 h-1.5 rounded-full bg-[#E8E0D8] dark:bg-[#2A2826]" />
+      <div className="pointer-events-none absolute inset-x-0 h-1.5 rounded-full bg-[#E8E0D8]" />
       <div className="pointer-events-none absolute left-0 h-1.5 rounded-full bg-[#FF5A1F]" style={{ width: `${pct}%` }} />
       <input type="range" min={min} max={max} step={1} value={value} aria-label={ariaLabel}
         onChange={(e) => onChange(Number(e.target.value))}
@@ -357,30 +357,30 @@ export function EffectStudioPage({
 
   if (!items || items.length === 0) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-[#FFFBF7] dark:bg-[#0F0E0D]">
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-[#FFFBF7]">
         <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
-        <p className="text-sm text-[#6F6862] dark:text-[#A39E97]">Loading filters…</p>
+        <p className="text-sm text-[#6F6862]">Loading filters…</p>
       </div>
     );
   }
 
   if (!hasPhoto) {
     return (
-      <div className="flex min-h-[100dvh] flex-col bg-[#FFFBF7] dark:bg-[#0F0E0D] text-[#161412] dark:text-[#F5F0EA]">
-        <header className="flex items-center gap-3 border-b border-[#E8E0D8] dark:border-[#2A2826] px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918]" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
+      <div className="flex min-h-[100dvh] flex-col bg-[#FFFBF7] text-[#161412]">
+        <header className="flex items-center gap-3 border-b border-[#E8E0D8] px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] bg-white" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
             <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
           </div>
         </header>
         <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 min-h-0">
-          <p className="mb-5 max-w-sm text-center text-sm text-[#6F6862] dark:text-[#A39E97]">AI-powered filters · live preview on your photo</p>
+          <p className="mb-5 max-w-sm text-center text-sm text-[#6F6862]">AI-powered filters · live preview on your photo</p>
           <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
-            className="flex w-full flex-col items-center gap-3 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/40 bg-[#FFF1E6] dark:bg-[#1A1510] px-6 py-14 text-[#FF5A1F] transition active:scale-[0.99]">
-            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[#FF5A1F] text-white shadow-lg shadow-[#FF5A1F]/25">{busy ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}</span>
+            className="flex w-full flex-col items-center gap-4 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/45 bg-[#FFF1E6] px-6 py-16 transition hover:border-[#FF5A1F] hover:bg-[#FFE6DA]">
+            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[#FF5A1F]/15 text-[#FF5A1F]">{busy ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}</span>
             <span className="text-base font-semibold">Drop image or tap to upload</span>
-            <span className="max-w-xs text-center text-sm text-[#6F6862] dark:text-[#A39E97]">Looks unlock after you upload</span>
+            <span className="max-w-xs text-center text-sm text-[#6F6862]">Looks unlock after you upload</span>
           </button>
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
         </main>
@@ -389,151 +389,162 @@ export function EffectStudioPage({
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-[#FFFBF7] dark:bg-[#0F0E0D] text-[#161412] dark:text-[#F5F0EA]">
-      <header className="flex shrink-0 items-center gap-3 border-b border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918]" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
+    <div className="flex min-h-[100dvh] flex-col bg-[#FFFBF7] text-[#161412]">
+      <header className="flex shrink-0 items-center gap-3 border-b border-[#E8E0D8] bg-white px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] bg-white" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
         <div className="min-w-0 flex-1">
           <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
         </div>
-        <button type="button" onClick={onUndo} disabled={!canUndo} className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] disabled:opacity-40" aria-label="Undo"><Undo2 className="h-4 w-4" /></button>
-        <button type="button" onClick={onRedo} disabled={!canRedo} className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] disabled:opacity-40" aria-label="Redo"><Redo2 className="h-4 w-4" /></button>
+        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#E8E0D8] bg-white px-3 text-xs font-semibold">
+          <ImagePlus className="h-3.5 w-3.5" /> Change
+        </button>
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
       </header>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-[#F5F0EA] dark:bg-black/40">
-        {comparing && sourceUrl && processedUrl ? (
-          <CompareSlider before={sourceUrl} after={processedUrl} className="h-full max-h-[min(52vh,520px)] w-full" />
+      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-[#141210] px-2 py-2">
+        {phase === "result" && sourceUrl && displayResultUrl ? (
+          comparing ? (
+            <CompareSlider before={sourceUrl} after={displayResultUrl} className="h-full max-h-full w-full max-w-full" />
+          ) : (
+            <img src={displayResultUrl} alt="Result" className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain" draggable={false} />
+          )
         ) : (
-          <img
-            src={phase === "result" ? (displayResultUrl || processedUrl || sourceUrl)! : (previewUrl || sourceUrl)!}
-            alt="Preview"
-            className="mx-auto max-h-[min(52vh,520px)] w-full object-contain"
-          />
+          <img src={processedUrl || sourceUrl!} alt="Preview" className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain" draggable={false} />
         )}
         {busy && (
-          <div className="absolute inset-0 grid place-items-center bg-black/25">
-            <Loader2 className="h-8 w-8 animate-spin text-white" />
+          <div className="absolute inset-0 grid place-items-center bg-black/35">
+            <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
           </div>
         )}
       </div>
 
       {phase === "result" ? (
-        <div className="border-t border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="mx-auto flex max-w-md flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <button type="button" onClick={() => setComparing((c) => !c)} className="inline-flex items-center gap-1.5 rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] px-3 py-2 text-sm font-medium">
-                <Columns2 className="h-4 w-4" /> Compare
-              </button>
-              <button type="button" onClick={onDownload} className="inline-flex items-center gap-1.5 rounded-full bg-[#FF5A1F] px-4 py-2 text-sm font-semibold text-white">
-                <Download className="h-4 w-4" /> Download
-              </button>
-              <button type="button" onClick={() => void onShare()} className="inline-flex items-center gap-1.5 rounded-full border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] px-3 py-2 text-sm font-medium">
-                <Share2 className="h-4 w-4" /> Share
-              </button>
-              <button type="button" onClick={onRestart} className="text-sm font-medium text-[#6F6862] dark:text-[#A39E97]">Edit again</button>
-            </div>
-            <label className="flex items-center justify-center gap-2 text-xs text-[#6F6862] dark:text-[#A39E97]">
-              <input type="checkbox" checked={showWm} disabled={freeUser} onChange={(e) => {
+        <div className="shrink-0 border-t border-[#E8E0D8] bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md">
+          <div className="mb-3 flex items-center justify-center gap-3">
+            <button type="button" onClick={onRestart} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Restart"><RotateCcw className="h-5 w-5" /></button>
+            <button type="button" onClick={() => setComparing((v) => !v)} className={cn("grid h-11 w-11 place-items-center rounded-xl", comparing && "bg-[#FFE6DA] text-[#FF5A1F]")} aria-label="Compare"><Columns2 className="h-5 w-5" /></button>
+            <button type="button" onClick={onDownload} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Download"><Download className="h-5 w-5" /></button>
+            <button type="button" onClick={() => void onShare()} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Share"><Share2 className="h-5 w-5" /></button>
+            <button
+              type="button"
+              disabled={freeUser}
+              onClick={() => {
                 if (freeUser) { toast.message("Free plan watermark cannot be removed"); return; }
-                setWmEnabled(e.target.checked);
-              }} />
+                setWmEnabled((v) => !v);
+              }}
+              className={cn(
+                "inline-flex h-11 items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold",
+                freeUser ? "cursor-not-allowed border-[#E8E0D8] bg-[#F5F0EB] text-[#6F6862] opacity-90" : showWm ? "border-[#FF5A1F]/40 bg-[#FFE8DA] text-[#FF5A1F]" : "border-[#E8E0D8] bg-white text-[#161412]",
+              )}
+              aria-label={freeUser ? "Watermark locked on free plan" : "Toggle watermark"}
+            >
               Watermark
-            </label>
-            {freeUser ? <p className="text-center text-[10px] text-[#6F6862] dark:text-[#A39E97]">Free plan includes Motio2edit watermark</p> : null}
+              {freeUser ? <span className="text-[10px] font-medium opacity-80">Locked</span> : null}
+            </button>
           </div>
+          {freeUser ? <p className="text-center text-[10px] text-[#6F6862]">Free plan includes Motio2edit watermark</p> : null}
+          <button type="button" onClick={onRestart} className="mt-2 flex w-full items-center justify-center rounded-2xl border border-[#E8E0D8] bg-white py-3 text-sm font-semibold">
+            Edit again
+          </button>
         </div>
       ) : (
         <>
-          <div className="flex gap-2 border-t border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918] px-3 py-2">
-            <button type="button" onClick={() => setEditorTab("filter")} className={cn("rounded-full px-3 py-1.5 text-sm font-semibold", editorTab === "filter" ? "bg-[#FF5A1F] text-white" : "text-[#6F6862] dark:text-[#A39E97]")}>Filters</button>
-            <button type="button" onClick={() => setEditorTab("adjust")} className={cn("rounded-full px-3 py-1.5 text-sm font-semibold", editorTab === "adjust" ? "bg-[#FF5A1F] text-white" : "text-[#6F6862] dark:text-[#A39E97]")}>Adjust</button>
+          <div className="flex shrink-0 items-center justify-center gap-10 border-t border-[#E8E0D8]/80 bg-white/90 px-4 py-1.5 backdrop-blur-sm">
+            <button type="button" onClick={onUndo} disabled={!canUndo} className="grid h-9 w-9 place-items-center rounded-full disabled:opacity-40" aria-label="Undo"><Undo2 className="h-4 w-4" /></button>
+            <button type="button" onClick={onRedo} disabled={!canRedo} className="grid h-9 w-9 place-items-center rounded-full disabled:opacity-40" aria-label="Redo"><Redo2 className="h-4 w-4" /></button>
           </div>
-
-          {editorTab === "filter" && (
-            <div className="bg-white dark:bg-[#1A1918] px-3 pb-2">
-              <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
-                <button type="button" onClick={() => setCategory("all")} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === "all" ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918]")}>All</button>
-                {sortedCategories.map((c) => (
-                  <button key={c} type="button" onClick={() => setCategory(c)} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === c ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] dark:border-[#2A2826] bg-white dark:bg-[#1A1918]")}>{c}</button>
-                ))}
+          <div className="shrink-0 border-t border-[#E8E0D8]/60 bg-white/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md">
+            <div className="mb-2 flex gap-6 px-4">
+              <button type="button" onClick={() => setEditorTab("filter")} className={cn("relative pb-2 text-[15px] font-semibold uppercase tracking-wide", editorTab === "filter" ? "text-[#FF5A1F]" : "text-[#6F6862]")}>
+                Filters{editorTab === "filter" && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded bg-[#FF5A1F]" />}
+              </button>
+              <button type="button" onClick={() => setEditorTab("adjust")} className={cn("relative pb-2 text-[15px] font-semibold uppercase tracking-wide", editorTab === "adjust" ? "text-[#FF5A1F]" : "text-[#6F6862]")}>
+                Adjust{editorTab === "adjust" && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded bg-[#FF5A1F]" />}
+              </button>
+            </div>
+            {editorTab === "filter" ? (
+              <div className="space-y-3 px-3">
+                <div className="flex gap-2 overflow-x-auto px-1 scrollbar-none">
+                  <button type="button" onClick={() => setCategory("all")} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === "all" ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] bg-white")}>All</button>
+                  {sortedCategories.map((c) => (
+                    <button key={c} type="button" onClick={() => setCategory(c)} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === c ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] bg-white")}>{c}</button>
+                  ))}
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto px-1 pb-1 pt-0.5 scrollbar-none">
+                  {filtered.map((item) => {
+                    const thumb = thumbMap[item.id];
+                    const isSel = selectedId === item.id;
+                    return (
+                      <button key={item.id} type="button" onClick={() => selectFilter(item)} className="w-[78px] shrink-0 text-left">
+                        <div className={cn("relative aspect-[1/1.05] overflow-hidden rounded-lg bg-[#141210]", isSel && "outline outline-2 outline-offset-1 outline-[#FF5A1F]")}>
+                          {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-[#E8E0D8]" />}
+                          {isSel && <span className="absolute right-1 top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#FF5A1F] text-[11px] font-bold text-white">✓</span>}
+                          {!item.isFree && item.badge && (
+                            item.badge === "ai+" ? (
+                              <span className="absolute left-1 top-1 inline-flex items-center rounded bg-[#FF5A1F]/95 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white ring-1 ring-[#FF5A1F]/50">AI+</span>
+                            ) : (
+                              <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-gradient-to-r from-[#8B6914] to-[#C9A227] px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#FFF8E7] shadow-sm">
+                                <svg className="h-2.5 w-2.5 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                                  <path d="M8 1.5l1.6 3.6 3.9.3-3 2.7.9 3.8L8 9.8l-3.4 2.1.9-3.8-3-2.7 3.9-.3L8 1.5z" />
+                                </svg>
+                                Premium
+                              </span>
+                            )
+                          )}
+                          <span className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center text-[9px] font-semibold uppercase tracking-wide text-white truncate">{item.name}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-3 px-1">
+                  <span className="w-16 shrink-0 text-[11px] font-semibold text-[#6F6862]">Intensity</span>
+                  <OrangeSlider value={intensity} min={0} max={100} onChange={(v) => { bumpToEdit(); setIntensity(v); pushHistoryDebounced({ selectedId, intensity: v, adj: { ...adj }, highlightColorId, shadowColorId }); }} ariaLabel="Intensity" />
+                  <span className="w-8 shrink-0 text-right text-xs font-bold tabular-nums text-[#161412]">{intensity}</span>
+                </div>
+                <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white shadow-md shadow-[#FF5A1F]/20 disabled:opacity-40">
+                  {busy ? (<><Loader2 className="h-4 w-4 animate-spin" /> Applying…</>) : ("Apply filter")}
+                </button>
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                {filtered.map((item) => {
-                  const locked = !isUnlocked(item);
-                  const active = item.id === selectedId;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => selectFilter(item)}
-                      className={cn(
-                        "relative shrink-0 w-[72px] overflow-hidden rounded-xl border-2 transition",
-                        active ? "border-[#FF5A1F]" : "border-[#E8E0D8] dark:border-[#2A2826]",
-                        locked && "opacity-70",
-                      )}
-                    >
-                      <div className="aspect-square w-full bg-[#F5F0EA] dark:bg-[#0F0E0D]">
-                        {thumbMap[item.id] ? (
-                          <img src={thumbMap[item.id]} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="grid h-full place-items-center text-[10px] text-[#6F6862] dark:text-[#A39E97]">{thumbsBusy ? "…" : item.name.slice(0, 3)}</div>
-                        )}
-                      </div>
-                      <p className="truncate px-1 py-0.5 text-center text-[10px] font-medium">{item.name}</p>
-                      {item.badge && (
-                        <span className="absolute right-0.5 top-0.5 rounded bg-black/70 px-1 text-[8px] font-bold uppercase text-white">{item.badge}</span>
-                      )}
+            ) : (
+              <div className="space-y-3 px-3">
+                <div className="px-1">
+                  <OrangeSlider value={adj[adjKey]} min={adjMeta.min} max={adjMeta.max} onChange={(v) => { bumpToEdit(); const next = { ...adj, [adjKey]: v }; setAdj(next); pushHistoryDebounced({ selectedId, intensity, adj: next, highlightColorId, shadowColorId }); }} ariaLabel={adjMeta.label} />
+                </div>
+                <div className="flex gap-1 overflow-x-auto px-1 scrollbar-none">
+                  {ADJUST_META.map((m) => (
+                    <button key={m.key} type="button" onClick={() => setAdjKey(m.key)} className={cn("flex min-w-[64px] shrink-0 flex-col items-center gap-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide", adjKey === m.key ? "text-[#FF5A1F]" : "text-[#6F6862]")}>
+                      <m.icon className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
+                      <span className="leading-tight">{m.label}</span>
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+                {(adjKey === "color" || adjKey === "hue") && (
+                  <div className="px-1">
+                    <p className="mb-1 text-[11px] font-semibold text-[#6F6862]">Tint</p>
+                    <div className="flex flex-wrap gap-2">
+                      {COLOR_SWATCHES.map((s) => {
+                        const activeId = colorTarget === "highlight" ? highlightColorId : shadowColorId;
+                        return (
+                          <button key={s.id} type="button" onClick={() => {
+                            bumpToEdit();
+                            if (colorTarget === "highlight") { setHighlightColorId(s.id); pushHistory({ selectedId, intensity, adj: { ...adj }, highlightColorId: s.id, shadowColorId }); }
+                            else { setShadowColorId(s.id); pushHistory({ selectedId, intensity, adj: { ...adj }, highlightColorId, shadowColorId: s.id }); }
+                          }} className={cn("h-7 w-7 rounded-full border-2", activeId === s.id ? "border-white shadow-[0_0_0_2px_#FF5A1F] scale-110" : "border-transparent")} style={{ background: `rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})` }} aria-label={s.id} />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <button type="button" onClick={resetAdjust} className="text-center text-xs text-[#6F6862] underline">Reset adjustments</button>
+                <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-40">
+                  {busy ? "Applying…" : "Apply filter"}
+                </button>
               </div>
-              <div className="flex items-center gap-2 py-1">
-                <span className="w-16 shrink-0 text-[11px] font-semibold text-[#6F6862] dark:text-[#A39E97]">Intensity</span>
-                <OrangeSlider value={intensity} min={0} max={100} onChange={(v) => { bumpToEdit(); setIntensity(v); pushHistoryDebounced({ selectedId, intensity: v, adj: { ...adj }, highlightColorId, shadowColorId }); }} ariaLabel="Intensity" />
-                <span className="w-8 text-right text-xs font-semibold">{intensity}</span>
-              </div>
-              <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white shadow-md shadow-[#FF5A1F]/20 disabled:opacity-40">
-                {busy ? (<><Loader2 className="h-4 w-4 animate-spin" /> Applying…</>) : ("Apply filter")}
-              </button>
-            </div>
-          )}
-
-          {editorTab === "adjust" && (
-            <div className="bg-white dark:bg-[#1A1918] px-3 pb-3">
-              <div className="flex gap-1.5 overflow-x-auto pb-2">
-                {ADJUST_META.map((m) => (
-                  <button key={m.key} type="button" onClick={() => setAdjKey(m.key)}
-                    className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold", adjKey === m.key ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] dark:border-[#2A2826] text-[#6F6862] dark:text-[#A39E97]")}>
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 py-1">
-                <span className="w-16 shrink-0 text-[11px] font-semibold text-[#6F6862] dark:text-[#A39E97]">{adjMeta.label}</span>
-                <OrangeSlider
-                  value={adj[adjKey]}
-                  min={adjMeta.min}
-                  max={adjMeta.max}
-                  onChange={(v) => {
-                    const next = { ...adj, [adjKey]: v };
-                    setAdj(next);
-                    pushHistoryDebounced({ selectedId, intensity, adj: next, highlightColorId, shadowColorId });
-                  }}
-                  ariaLabel={adjMeta.label}
-                />
-                <span className="w-8 text-right text-xs font-semibold">{adj[adjKey]}</span>
-              </div>
-              <button type="button" onClick={resetAdjust} className="mt-1 text-xs font-medium text-[#6F6862] dark:text-[#A39E97]">
-                <RotateCcw className="mr-1 inline h-3 w-3" /> Reset adjustments
-              </button>
-              <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-40">
-                {busy ? "Applying…" : "Apply filter"}
-              </button>
-            </div>
-          )}
-          <div className="h-[max(0.5rem,env(safe-area-inset-bottom))]" />
+            )}
+          </div>
         </>
       )}
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
     </div>
   );
 }
