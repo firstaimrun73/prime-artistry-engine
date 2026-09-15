@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   Download,
   ImagePlus,
   Loader2,
@@ -69,6 +68,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
   const previewBusy = useRef(false);
+  const didAutoStart = useRef(false);
 
   const [phase, setPhase] = useState<"idle" | "ready" | "processing" | "result">("idle");
   const [cameraOn, setCameraOn] = useState(false);
@@ -95,12 +95,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     setIsPaid(!!plan && plan !== "free");
     if (!plan || plan === "free") setWantWm(true);
   }, [user]);
-
-  // Auto-start front camera like Snapchat
-  useEffect(() => {
-    void startCamera("user");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const stopCamera = useCallback(() => {
     if (liveRafRef.current != null) {
@@ -161,6 +155,13 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     },
     [facingMode, stopCamera],
   );
+
+  // Auto-start front camera once (Snapchat-style)
+  useEffect(() => {
+    if (didAutoStart.current) return;
+    didAutoStart.current = true;
+    void startCamera("user");
+  }, [startCamera]);
 
   // Upload still preview
   useEffect(() => {
@@ -358,7 +359,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
 
   return (
     <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
-      {/* ── Top bar (minimal, Snapchat-like) ── */}
+      {/* Top bar — minimal */}
       <header className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
         <Link
           to="/studio/image/lenses"
@@ -382,9 +383,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         </button>
       </header>
 
-      {/* ── Full-bleed stage ── */}
+      {/* Full-bleed stage */}
       <div className="relative min-h-0 flex-1">
-        {/* Live camera */}
         <video
           ref={videoRef}
           playsInline
@@ -401,7 +401,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           style={{ display: "none" }}
         />
 
-        {/* Still / result */}
         {showStill && (
           <img
             src={stillSrc!}
@@ -410,7 +409,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           />
         )}
 
-        {/* Idle fallback when no camera */}
         {phase === "idle" && !cameraOn && !stillSrc && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-zinc-950 px-6">
             <p className="text-center text-sm text-white/60">
@@ -435,14 +433,12 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           </div>
         )}
 
-        {/* Processing overlay */}
         {phase === "processing" && (
           <div className="absolute inset-0 z-20 grid place-items-center bg-black/50 backdrop-blur-sm">
             <Loader2 className="h-10 w-10 animate-spin text-white" />
           </div>
         )}
 
-        {/* Lens name chip */}
         {nameChip && phase !== "result" && (
           <div className="pointer-events-none absolute left-1/2 top-[22%] z-20 -translate-x-1/2">
             <span className="rounded-full bg-black/55 px-4 py-1.5 text-sm font-semibold tracking-wide text-white backdrop-blur-xl">
@@ -451,7 +447,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           </div>
         )}
 
-        {/* Flip camera — Snapchat style right side */}
         {showCamera && (
           <button
             type="button"
@@ -466,10 +461,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         )}
       </div>
 
-      {/* ── Bottom controls ── */}
+      {/* Bottom controls */}
       {phase !== "result" && (
         <div className="absolute bottom-0 left-0 right-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {/* Lens carousel */}
           <div
             ref={carouselRef}
             className="mb-3 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -490,9 +484,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
                     )}
                     style={
                       selected
-                        ? {
-                            background: `linear-gradient(135deg, ${l.color}, #fff6)`,
-                          }
+                        ? { background: `linear-gradient(135deg, ${l.color}, #fff6)` }
                         : undefined
                     }
                   >
@@ -519,7 +511,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
             })}
           </div>
 
-          {/* Shutter row */}
           <div className="flex items-center justify-center gap-10 px-6">
             <button
               type="button"
@@ -530,16 +521,13 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
               <ImagePlus className="h-5 w-5 text-white/90" />
             </button>
 
-            {/* Big Snapchat-style shutter */}
             <button
               type="button"
               disabled={phase === "processing" || !lens}
               onClick={() => void onShutter()}
               className={cn(
                 "relative grid h-[4.5rem] w-[4.5rem] place-items-center rounded-full",
-                phase === "processing" || !lens
-                  ? "opacity-40"
-                  : "active:scale-95",
+                phase === "processing" || !lens ? "opacity-40" : "active:scale-95",
               )}
               aria-label="Capture"
             >
@@ -572,7 +560,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         </div>
       )}
 
-      {/* ── Result screen ── */}
+      {/* Result screen */}
       {phase === "result" && resultUrl && (
         <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col gap-3 bg-gradient-to-t from-black via-black/90 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-16">
           <div className="flex gap-3">
