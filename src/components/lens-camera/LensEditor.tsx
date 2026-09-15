@@ -1,7 +1,7 @@
 /**
  * Motio2edit Lenses — Snapchat-style full-screen camera UI.
  * Swipe left/right on camera or shutter area to change lens.
- * Live optical preview. Watermark only on final free-tier output.
+ * Single full-bleed preview (no split). Torch when supported.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -14,6 +14,7 @@ import {
   Share2,
   SwitchCamera,
   X,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -112,6 +113,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const [nameChip, setNameChip] = useState<string | null>(null);
   const [isPaid, setIsPaid] = useState(false);
   const [wantWm, setWantWm] = useState(true);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [liveFxOn, setLiveFxOn] = useState(false);
   const nameChipTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -132,6 +136,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
+    setLiveFxOn(false);
+    setTorchOn(false);
   }, []);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
@@ -161,6 +167,14 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           }
         }
         streamRef.current = stream;
+        setTorchOn(false);
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = track?.getCapabilities?.() as { torch?: boolean } | undefined;
+          setTorchSupported(face === "environment" && !!caps?.torch);
+        } catch {
+          setTorchSupported(false);
+        }
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.style.transform = face === "user" ? "scaleX(-1)" : "none";
@@ -230,6 +244,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         liveRafRef.current = null;
       }
       if (liveCanvasRef.current) liveCanvasRef.current.style.display = "none";
+      setLiveFxOn(false);
       return;
     }
     const video = videoRef.current;
@@ -281,6 +296,10 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(out, 0, 0);
         canvas.style.display = "block";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        canvas.style.objectFit = "cover";
+        setLiveFxOn(true);
       } catch {
         /* keep last */
       }
@@ -340,13 +359,37 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       const dy = clientY - swipeStartY.current;
       swipeStartX.current = null;
       swipeStartY.current = null;
-      if (Math.abs(dx) < 48) return;
-      if (Math.abs(dx) < Math.abs(dy) * 1.15) return;
+      if (Math.abs(dx) < 36) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.35) return;
       if (dx < 0) stepLens(1);
       else stepLens(-1);
     },
     [stepLens],
   );
+
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()?.[0];
+    if (!track) return;
+    try {
+      const next = !torchOn;
+      await track.applyConstraints({
+        // @ts-expect-error torch is non-standard but supported on many mobile browsers
+        advanced: [{ torch: next }],
+      } as MediaTrackConstraints);
+      setTorchOn(next);
+    } catch {
+      try {
+        await track.applyConstraints({
+          // @ts-expect-error torch constraint
+          torch: !torchOn,
+        } as MediaTrackConstraints);
+        setTorchOn((v) => !v);
+      } catch {
+        toast.message("Flash not available on this camera");
+        setTorchSupported(false);
+      }
+    }
+  }, [torchOn]);
 
   const onPick = (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -480,7 +523,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       </header>
 
       <div
-        className="relative min-h-0 flex-1 pb-[11.5rem] touch-pan-y"
+        className="relative min-h-0 flex-1 overflow-hidden pb-[11.5rem] touch-pan-y"
         onTouchStart={(e) => {
           const t = e.changedTouches[0];
           if (t) onSwipeStart(t.clientX, t.clientY);
@@ -495,12 +538,15 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           playsInline
           muted
           autoPlay
-          className={cn("absolute inset-0 h-full w-full object-cover", !showCamera && "invisible")}
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover",
+            (!showCamera || liveFxOn) && "invisible",
+          )}
         />
         <canvas
           ref={liveCanvasRef}
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-          style={{ display: "none" }}
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ display: "none", objectFit: "cover" }}
         />
 
         {showStill && (
@@ -544,14 +590,29 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         )}
 
         {showCamera && (
-          <button
-            type="button"
-            onClick={() => void startCamera(facingMode === "user" ? "environment" : "user")}
-            className="absolute right-4 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] z-20 grid h-11 w-11 place-items-center rounded-full bg-black/45 backdrop-blur-md"
-            aria-label="Flip camera"
-          >
-            <SwitchCamera className="h-5 w-5" />
-          </button>
+          <div className="absolute right-4 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] z-20 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => void startCamera(facingMode === "user" ? "environment" : "user")}
+              className="grid h-11 w-11 place-items-center rounded-full bg-black/45 backdrop-blur-md"
+              aria-label="Flip camera"
+            >
+              <SwitchCamera className="h-5 w-5" />
+            </button>
+            {torchSupported && (
+              <button
+                type="button"
+                onClick={() => void toggleTorch()}
+                className={cn(
+                  "grid h-11 w-11 place-items-center rounded-full backdrop-blur-md",
+                  torchOn ? "bg-amber-400 text-black" : "bg-black/45 text-white",
+                )}
+                aria-label="Toggle light"
+              >
+                <Zap className={cn("h-5 w-5", torchOn && "fill-current")} />
+              </button>
+            )}
+          </div>
         )}
       </div>
 
