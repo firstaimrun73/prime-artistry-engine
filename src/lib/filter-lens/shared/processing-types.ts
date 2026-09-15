@@ -66,6 +66,7 @@ export interface ProcessingParameters {
   pixelSize?: number;
   softBlur?: number;
   duotone?: { shadow: [number, number, number]; highlight: [number, number, number] };
+  /** Graphic style recipe key — each maps to a multi-stage pipeline. */
   style?:
     | 'none'
     | 'sketch'
@@ -73,11 +74,13 @@ export interface ProcessingParameters {
     | 'anime'
     | 'cartoon'
     | 'oil'
+    | 'ghibli'
     | 'watercolor'
     | 'neon'
     | 'painting'
     | 'retro3d'
-    | 'cyberpunk';
+    | 'cyberpunk'
+    | 'flatvector';
 }
 
 export type ProcessingProfile = ProcessingParameters;
