@@ -1,283 +1,274 @@
 /**
  * engine-npr-core.ts
- * NPR cores — oil (intensity-bin, every pixel), bilateral, adaptive edges, watercolor darken.
- * Avoids step-skipping and harsh gradient banding that destroyed faces / created rings.
+ * Core NPR primitives: stats, blur, bilateral, oil paint, soft quantize+dither.
+ * ImgBuf-based pure functions (immutable out).
  */
-import type { RGBAImage } from '../shared/processing-types';
-import { clamp8 } from './engine-ops-basic';
 
-/** Fast separable box blur. */
-export function boxBlur(src: Uint8ClampedArray, w: number, h: number, radius: number): Uint8ClampedArray {
-  if (radius < 1) return new Uint8ClampedArray(src);
-  let cur = new Uint8ClampedArray(src);
-  const passes = Math.min(3, 1 + ((radius / 2) | 0));
-  for (let pass = 0; pass < passes; pass++) {
-    const r = Math.max(1, (radius / passes) | 0);
-    const horiz = new Uint8ClampedArray(cur.length);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        let rs = 0, gs = 0, bs = 0, n = 0;
-        for (let dx = -r; dx <= r; dx++) {
-          const xx = Math.min(w - 1, Math.max(0, x + dx));
-          const i = (y * w + xx) * 4;
-          rs += cur[i]; gs += cur[i + 1]; bs += cur[i + 2]; n++;
-        }
-        const o = (y * w + x) * 4;
-        horiz[o] = (rs / n) | 0;
-        horiz[o + 1] = (gs / n) | 0;
-        horiz[o + 2] = (bs / n) | 0;
-        horiz[o + 3] = cur[o + 3];
-      }
-    }
-    const next = new Uint8ClampedArray(cur.length);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        let rs = 0, gs = 0, bs = 0, n = 0;
-        for (let dy = -r; dy <= r; dy++) {
-          const yy = Math.min(h - 1, Math.max(0, y + dy));
-          const i = (yy * w + x) * 4;
-          rs += horiz[i]; gs += horiz[i + 1]; bs += horiz[i + 2]; n++;
-        }
-        const o = (y * w + x) * 4;
-        next[o] = (rs / n) | 0;
-        next[o + 1] = (gs / n) | 0;
-        next[o + 2] = (bs / n) | 0;
-        next[o + 3] = horiz[o + 3];
-      }
-    }
-    cur = next;
+export interface ImgBuf {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
+export interface ImageStats {
+  meanLuma: number;
+  edgeDensity: number;
+  lowContrast: boolean;
+}
+
+function idx(x: number, y: number, width: number): number {
+  return (y * width + x) * 4;
+}
+
+export function clampCoord(v: number, max: number): number {
+  return v < 0 ? 0 : v > max ? max : v;
+}
+
+export function luma(r: number, g: number, b: number): number {
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+/** Sobel gradient magnitude, one value per pixel. */
+export function sobelMagnitude(img: ImgBuf): Float32Array {
+  const { data, width, height } = img;
+  const gray = new Float32Array(width * height);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    gray[p] = luma(data[i], data[i + 1], data[i + 2]);
   }
-  return cur;
+  const mag = new Float32Array(width * height);
+  const gx = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+  const gy = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let sx = 0,
+        sy = 0,
+        k = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const v = gray[(y + dy) * width + (x + dx)];
+          sx += v * gx[k];
+          sy += v * gy[k];
+          k++;
+        }
+      }
+      mag[y * width + x] = Math.sqrt(sx * sx + sy * sy);
+    }
+  }
+  return mag;
+}
+
+/** Cheap adaptive stats used to drive every style recipe. */
+export function computeImageStats(img: ImgBuf): ImageStats {
+  const { data, width, height } = img;
+  let sumLuma = 0;
+  let minL = 255,
+    maxL = 0;
+  const n = width * height;
+  for (let i = 0; i < data.length; i += 4) {
+    const l = luma(data[i], data[i + 1], data[i + 2]);
+    sumLuma += l;
+    if (l < minL) minL = l;
+    if (l > maxL) maxL = l;
+  }
+  const meanLuma = sumLuma / n;
+  const mag = sobelMagnitude(img);
+  const edgeThresh = 40;
+  let edgePixels = 0;
+  for (let i = 0; i < mag.length; i++) {
+    if (mag[i] > edgeThresh) edgePixels++;
+  }
+  const edgeDensity = edgePixels / n;
+  const lowContrast = maxL - minL < 60;
+  return { meanLuma, edgeDensity, lowContrast };
+}
+
+/** Separable box blur. */
+export function boxBlur(img: ImgBuf, radius: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  const tmp = new Float32Array(data.length);
+  const r = Math.max(1, radius | 0);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let rr = 0,
+        gg = 0,
+        bb = 0,
+        aa = 0,
+        count = 0;
+      for (let dx = -r; dx <= r; dx++) {
+        const xx = clampCoord(x + dx, width - 1);
+        const i = idx(xx, y, width);
+        rr += data[i];
+        gg += data[i + 1];
+        bb += data[i + 2];
+        aa += data[i + 3];
+        count++;
+      }
+      const o = idx(x, y, width);
+      tmp[o] = rr / count;
+      tmp[o + 1] = gg / count;
+      tmp[o + 2] = bb / count;
+      tmp[o + 3] = aa / count;
+    }
+  }
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      let rr = 0,
+        gg = 0,
+        bb = 0,
+        aa = 0,
+        count = 0;
+      for (let dy = -r; dy <= r; dy++) {
+        const yy = clampCoord(y + dy, height - 1);
+        const i = idx(x, yy, width);
+        rr += tmp[i];
+        gg += tmp[i + 1];
+        bb += tmp[i + 2];
+        aa += tmp[i + 3];
+        count++;
+      }
+      const o = idx(x, y, width);
+      out[o] = rr / count;
+      out[o + 1] = gg / count;
+      out[o + 2] = bb / count;
+      out[o + 3] = aa / count;
+    }
+  }
+  return { data: out, width, height };
+}
+
+/** Approximate bilateral filter: edge-preserving smooth. */
+export function bilateralApprox(img: ImgBuf, radius: number, sigmaColor: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  const r = Math.max(1, Math.min(4, radius | 0));
+  const twoSigmaColorSq = 2 * Math.max(8, sigmaColor) * Math.max(8, sigmaColor);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const ci = idx(x, y, width);
+      const cr = data[ci],
+        cg = data[ci + 1],
+        cb = data[ci + 2];
+      let sumR = 0,
+        sumG = 0,
+        sumB = 0,
+        sumW = 0;
+      for (let dy = -r; dy <= r; dy++) {
+        const yy = clampCoord(y + dy, height - 1);
+        for (let dx = -r; dx <= r; dx++) {
+          const xx = clampCoord(x + dx, width - 1);
+          const ni = idx(xx, yy, width);
+          const nr = data[ni],
+            ng = data[ni + 1],
+            nb = data[ni + 2];
+          const colorDistSq =
+            (nr - cr) * (nr - cr) + (ng - cg) * (ng - cg) + (nb - cb) * (nb - cb);
+          const spatialDistSq = dx * dx + dy * dy;
+          const w = Math.exp(
+            -spatialDistSq / (2 * r * r + 1) - colorDistSq / twoSigmaColorSq,
+          );
+          sumR += nr * w;
+          sumG += ng * w;
+          sumB += nb * w;
+          sumW += w;
+        }
+      }
+      out[ci] = sumR / sumW;
+      out[ci + 1] = sumG / sumW;
+      out[ci + 2] = sumB / sumW;
+      out[ci + 3] = data[ci + 3];
+    }
+  }
+  return { data: out, width, height };
 }
 
 /**
- * Classic oil-paint: intensity bins + dominant-bin mean color.
- * Processes EVERY pixel (no step fill) to avoid face/block artifacts.
- * Radius clamped for mobile performance.
+ * Classic intensity-binned oil paint. Processes EVERY pixel — no step-and-fill.
  */
-export function oilPaintFilter(
-  image: RGBAImage,
-  radius: number,
-  intensityLevels: number,
-): void {
-  const w = image.width;
-  const h = image.height;
-  const src = new Uint8ClampedArray(image.data);
-  const data = image.data;
+export function oilPaint(img: ImgBuf, radius: number, levels: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
   const r = Math.max(1, Math.min(5, radius | 0));
-  const levels = Math.max(6, Math.min(24, intensityLevels | 0));
+  const lv = Math.max(4, Math.min(16, levels | 0));
+  const levelScale = (lv - 1) / 255;
 
-  // Reuse bin arrays to cut GC pressure
-  const intensityCount = new Int32Array(levels);
-  const sumR = new Float32Array(levels);
-  const sumG = new Float32Array(levels);
-  const sumB = new Float32Array(levels);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const binCount = new Int32Array(lv);
+      const binR = new Float64Array(lv);
+      const binG = new Float64Array(lv);
+      const binB = new Float64Array(lv);
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      intensityCount.fill(0);
-      sumR.fill(0);
-      sumG.fill(0);
-      sumB.fill(0);
-
-      const y0 = Math.max(0, y - r);
-      const y1 = Math.min(h - 1, y + r);
-      const x0 = Math.max(0, x - r);
-      const x1 = Math.min(w - 1, x + r);
-
-      for (let yy = y0; yy <= y1; yy++) {
-        for (let xx = x0; xx <= x1; xx++) {
-          const i = (yy * w + xx) * 4;
-          const intensity = ((src[i] + src[i + 1] + src[i + 2]) / 3) | 0;
-          const bin = Math.min(levels - 1, ((intensity * levels) / 256) | 0);
-          intensityCount[bin]++;
-          sumR[bin] += src[i];
-          sumG[bin] += src[i + 1];
-          sumB[bin] += src[i + 2];
+      for (let dy = -r; dy <= r; dy++) {
+        const yy = clampCoord(y + dy, height - 1);
+        for (let dx = -r; dx <= r; dx++) {
+          const xx = clampCoord(x + dx, width - 1);
+          const i = idx(xx, yy, width);
+          const rr = data[i],
+            gg = data[i + 1],
+            bb = data[i + 2];
+          const l = luma(rr, gg, bb);
+          const bin = Math.min(lv - 1, Math.max(0, Math.round(l * levelScale)));
+          binCount[bin]++;
+          binR[bin] += rr;
+          binG[bin] += gg;
+          binB[bin] += bb;
         }
       }
 
-      let maxCount = 0;
-      let maxBin = 0;
-      for (let b = 0; b < levels; b++) {
-        if (intensityCount[b] > maxCount) {
-          maxCount = intensityCount[b];
-          maxBin = b;
+      let bestBin = 0,
+        bestCount = -1;
+      for (let bi = 0; bi < lv; bi++) {
+        if (binCount[bi] > bestCount) {
+          bestCount = binCount[bi];
+          bestBin = bi;
         }
       }
-      if (maxCount < 1) continue;
-      const o = (y * w + x) * 4;
-      data[o] = clamp8(sumR[maxBin] / maxCount);
-      data[o + 1] = clamp8(sumG[maxBin] / maxCount);
-      data[o + 2] = clamp8(sumB[maxBin] / maxCount);
+      const o = idx(x, y, width);
+      out[o] = binR[bestBin] / bestCount;
+      out[o + 1] = binG[bestBin] / bestCount;
+      out[o + 2] = binB[bestBin] / bestCount;
+      out[o + 3] = data[o + 3];
     }
   }
+  return { data: out, width, height };
 }
 
-/** Edge-preserving bilateral approximation (OpenCV bilateral role). */
-export function bilateralApprox(
-  image: RGBAImage,
-  radius: number,
-  lumaSigma: number,
-  iterations: number,
-): void {
-  const w = image.width;
-  const h = image.height;
-  const r = Math.max(1, Math.min(4, radius | 0));
-  const sigma = Math.max(10, lumaSigma);
-  const inv = 1 / (2 * sigma * sigma);
-  let src = new Uint8ClampedArray(image.data);
-  const data = image.data;
-  const iters = Math.max(1, Math.min(3, iterations | 0));
+/** Soft quantize with Bayer dither — reduces ring banding / color crush. */
+export function softQuantize(img: ImgBuf, levels: number, ditherAmount: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  const lv = Math.max(4, levels);
+  const step = 255 / (lv - 1);
+  const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(
+    (v) => v / 16 - 0.5,
+  );
 
-  for (let iter = 0; iter < iters; iter++) {
-    const next = new Uint8ClampedArray(src.length);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        const lc = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
-        let wr = 0, wg = 0, wb = 0, wt = 0;
-        for (let dy = -r; dy <= r; dy++) {
-          const yy = y + dy;
-          if (yy < 0 || yy >= h) continue;
-          for (let dx = -r; dx <= r; dx++) {
-            const xx = x + dx;
-            if (xx < 0 || xx >= w) continue;
-            const j = (yy * w + xx) * 4;
-            const ln = 0.299 * src[j] + 0.587 * src[j + 1] + 0.114 * src[j + 2];
-            const dl = ln - lc;
-            const weight = Math.exp(-(dx * dx + dy * dy) * 0.18 - dl * dl * inv);
-            wr += src[j] * weight;
-            wg += src[j + 1] * weight;
-            wb += src[j + 2] * weight;
-            wt += weight;
-          }
-        }
-        next[i] = clamp8(wr / wt);
-        next[i + 1] = clamp8(wg / wt);
-        next[i + 2] = clamp8(wb / wt);
-        next[i + 3] = src[i + 3];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = idx(x, y, width);
+      const d = bayer[(y % 4) * 4 + (x % 4)] * step * ditherAmount;
+      for (let c = 0; c < 3; c++) {
+        const v = data[i + c] + d;
+        out[i + c] = Math.round(v / step) * step;
       }
-    }
-    src = next;
-  }
-  data.set(src);
-}
-
-/** Adaptive threshold edge mask (0 = ink, 1 = keep). */
-export function adaptiveEdgeMask(
-  gray: Float32Array,
-  w: number,
-  h: number,
-  block: number,
-  C: number,
-): Uint8Array {
-  const mask = new Uint8Array(w * h);
-  const b = Math.max(3, block | 0);
-  const half = (b / 2) | 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let sum = 0;
-      let n = 0;
-      for (let dy = -half; dy <= half; dy++) {
-        const yy = Math.min(h - 1, Math.max(0, y + dy));
-        for (let dx = -half; dx <= half; dx++) {
-          const xx = Math.min(w - 1, Math.max(0, x + dx));
-          sum += gray[yy * w + xx];
-          n++;
-        }
-      }
-      const mean = sum / n;
-      mask[y * w + x] = gray[y * w + x] < mean - C ? 0 : 1;
+      out[i + 3] = data[i + 3];
     }
   }
-  return mask;
+  return { data: out, width, height };
 }
 
-export function applyEdgeMaskInk(
-  data: Uint8ClampedArray,
-  mask: Uint8Array,
-  strength: number,
-): void {
-  const k = Math.max(0, Math.min(1, strength));
-  for (let p = 0, i = 0; p < mask.length; p++, i += 4) {
-    if (mask[p] === 0) {
-      data[i] = clamp8(data[i] * (1 - k));
-      data[i + 1] = clamp8(data[i + 1] * (1 - k));
-      data[i + 2] = clamp8(data[i + 2] * (1 - k));
-    }
+/** Blend two buffers by t (0 = a, 1 = b). */
+export function blend(a: ImgBuf, b: ImgBuf, t: number): ImgBuf {
+  const out = new Uint8ClampedArray(a.data.length);
+  const k = Math.max(0, Math.min(1, t));
+  for (let i = 0; i < a.data.length; i += 4) {
+    out[i] = a.data[i] + (b.data[i] - a.data[i]) * k;
+    out[i + 1] = a.data[i + 1] + (b.data[i + 1] - a.data[i + 1]) * k;
+    out[i + 2] = a.data[i + 2] + (b.data[i + 2] - a.data[i + 2]) * k;
+    out[i + 3] = a.data[i + 3];
   }
-}
-
-export function watercolorEdgeDarken(
-  data: Uint8ClampedArray,
-  edges: Float32Array,
-  strength: number,
-): void {
-  const k = Math.max(0, Math.min(1, strength));
-  for (let p = 0, i = 0; p < edges.length; p++, i += 4) {
-    const e = edges[p];
-    if (e < 18) continue;
-    const t = Math.min(1, (e - 18) / 70) * k;
-    data[i] = clamp8(data[i] * (1 - t * 0.4));
-    data[i + 1] = clamp8(data[i + 1] * (1 - t * 0.4));
-    data[i + 2] = clamp8(data[i + 2] * (1 - t * 0.4));
-  }
-}
-
-/** Soft quantize with ordered dither to reduce concentric banding on gradients. */
-export function softQuantize(data: Uint8ClampedArray, levels: number, blend: number): void {
-  const step = 255 / Math.max(2, levels - 1);
-  const b = Math.max(0, Math.min(1, blend));
-  // 2x2 Bayer dither matrix scaled
-  const bayer = [0, 2, 3, 1];
-  for (let i = 0; i < data.length; i += 4) {
-    const px = (i / 4) | 0;
-    // approximate x,y from linear index is not needed for mild dither — use px
-    const d = (bayer[px & 3] - 1.5) * (step * 0.12);
-    for (let c = 0; c < 3; c++) {
-      const o = data[i + c] + d;
-      const q = Math.round(o / step) * step;
-      data[i + c] = clamp8(data[i + c] * (1 - b) + q * b);
-    }
-  }
-}
-
-export function grayFromImage(data: Uint8ClampedArray, w: number, h: number): Float32Array {
-  const g = new Float32Array(w * h);
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    g[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-  }
-  return g;
-}
-
-/** Simple image stats for adaptive strength (portrait vs landscape etc.). */
-export function analyzeImageStats(data: Uint8ClampedArray, w: number, h: number): {
-  meanLuma: number;
-  edgeDensity: number;
-  isLowContrast: boolean;
-} {
-  let sum = 0;
-  let edgeSum = 0;
-  let n = 0;
-  for (let y = 1; y < h - 1; y += 2) {
-    for (let x = 1; x < w - 1; x += 2) {
-      const i = (y * w + x) * 4;
-      const y0 = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      const iR = (y * w + x + 1) * 4;
-      const yR = 0.299 * data[iR] + 0.587 * data[iR + 1] + 0.114 * data[iR + 2];
-      const iD = ((y + 1) * w + x) * 4;
-      const yD = 0.299 * data[iD] + 0.587 * data[iD + 1] + 0.114 * data[iD + 2];
-      sum += y0;
-      edgeSum += Math.abs(yR - y0) + Math.abs(yD - y0);
-      n++;
-    }
-  }
-  const meanLuma = n ? sum / n : 128;
-  const edgeDensity = n ? edgeSum / n : 20;
-  return {
-    meanLuma,
-    edgeDensity,
-    isLowContrast: edgeDensity < 18,
-  };
+  return { data: out, width: a.width, height: a.height };
 }
