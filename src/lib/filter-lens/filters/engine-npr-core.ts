@@ -1,24 +1,19 @@
 /**
  * engine-npr-core.ts
- * Non-photorealistic rendering cores based on established algorithms:
- * - Oil: intensity-bin dominant color (classic oil-paint filter)
- * - Watercolor: edge-preserving wash + edge darkening (pigment at boundaries)
- * - Cartoon: bilateral-style smooth + adaptive edge mask (OpenCV-style)
- *
- * Not photo grades (contrast/sat/vignette).
+ * NPR cores — oil (intensity-bin, every pixel), bilateral, adaptive edges, watercolor darken.
+ * Avoids step-skipping and harsh gradient banding that destroyed faces / created rings.
  */
 import type { RGBAImage } from '../shared/processing-types';
 import { clamp8 } from './engine-ops-basic';
 
-/** Fast box blur (separable-ish multi-pass) for NPR prep. */
-function boxBlur(src: Uint8ClampedArray, w: number, h: number, radius: number): Uint8ClampedArray {
+/** Fast separable box blur. */
+export function boxBlur(src: Uint8ClampedArray, w: number, h: number, radius: number): Uint8ClampedArray {
   if (radius < 1) return new Uint8ClampedArray(src);
   let cur = new Uint8ClampedArray(src);
-  const passes = Math.min(3, 1 + (radius / 2) | 0);
+  const passes = Math.min(3, 1 + ((radius / 2) | 0));
   for (let pass = 0; pass < passes; pass++) {
-    const next = new Uint8ClampedArray(cur.length);
     const r = Math.max(1, (radius / passes) | 0);
-    // horizontal
+    const horiz = new Uint8ClampedArray(cur.length);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         let rs = 0, gs = 0, bs = 0, n = 0;
@@ -28,38 +23,37 @@ function boxBlur(src: Uint8ClampedArray, w: number, h: number, radius: number): 
           rs += cur[i]; gs += cur[i + 1]; bs += cur[i + 2]; n++;
         }
         const o = (y * w + x) * 4;
-        next[o] = (rs / n) | 0;
-        next[o + 1] = (gs / n) | 0;
-        next[o + 2] = (bs / n) | 0;
-        next[o + 3] = cur[o + 3];
+        horiz[o] = (rs / n) | 0;
+        horiz[o + 1] = (gs / n) | 0;
+        horiz[o + 2] = (bs / n) | 0;
+        horiz[o + 3] = cur[o + 3];
       }
     }
-    cur = next;
-    const next2 = new Uint8ClampedArray(cur.length);
-    // vertical
+    const next = new Uint8ClampedArray(cur.length);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         let rs = 0, gs = 0, bs = 0, n = 0;
         for (let dy = -r; dy <= r; dy++) {
           const yy = Math.min(h - 1, Math.max(0, y + dy));
           const i = (yy * w + x) * 4;
-          rs += cur[i]; gs += cur[i + 1]; bs += cur[i + 2]; n++;
+          rs += horiz[i]; gs += horiz[i + 1]; bs += horiz[i + 2]; n++;
         }
         const o = (y * w + x) * 4;
-        next2[o] = (rs / n) | 0;
-        next2[o + 1] = (gs / n) | 0;
-        next2[o + 2] = (bs / n) | 0;
-        next2[o + 3] = cur[o + 3];
+        next[o] = (rs / n) | 0;
+        next[o + 1] = (gs / n) | 0;
+        next[o + 2] = (bs / n) | 0;
+        next[o + 3] = horiz[o + 3];
       }
     }
-    cur = next2;
+    cur = next;
   }
   return cur;
 }
 
 /**
- * Classic oil-paint filter (intensity bins + dominant bin mean color).
- * Ref: common NPR oil algorithm (radius + intensity levels).
+ * Classic oil-paint: intensity bins + dominant-bin mean color.
+ * Processes EVERY pixel (no step fill) to avoid face/block artifacts.
+ * Radius clamped for mobile performance.
  */
 export function oilPaintFilter(
   image: RGBAImage,
@@ -70,18 +64,21 @@ export function oilPaintFilter(
   const h = image.height;
   const src = new Uint8ClampedArray(image.data);
   const data = image.data;
-  const r = Math.max(1, Math.min(8, radius | 0));
-  const levels = Math.max(4, Math.min(40, intensityLevels | 0));
+  const r = Math.max(1, Math.min(5, radius | 0));
+  const levels = Math.max(6, Math.min(24, intensityLevels | 0));
 
-  // Process on a mild grid for speed at large sizes; fill neighbors
-  const step = w * h > 400_000 ? 2 : 1;
+  // Reuse bin arrays to cut GC pressure
+  const intensityCount = new Int32Array(levels);
+  const sumR = new Float32Array(levels);
+  const sumG = new Float32Array(levels);
+  const sumB = new Float32Array(levels);
 
-  for (let y = 0; y < h; y += step) {
-    for (let x = 0; x < w; x += step) {
-      const intensityCount = new Int32Array(levels);
-      const sumR = new Float32Array(levels);
-      const sumG = new Float32Array(levels);
-      const sumB = new Float32Array(levels);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      intensityCount.fill(0);
+      sumR.fill(0);
+      sumG.fill(0);
+      sumB.fill(0);
 
       const y0 = Math.max(0, y - r);
       const y1 = Math.min(h - 1, y + r);
@@ -113,27 +110,11 @@ export function oilPaintFilter(
       data[o] = clamp8(sumR[maxBin] / maxCount);
       data[o + 1] = clamp8(sumG[maxBin] / maxCount);
       data[o + 2] = clamp8(sumB[maxBin] / maxCount);
-
-      // Fill step block
-      if (step > 1) {
-        for (let dy = 0; dy < step && y + dy < h; dy++) {
-          for (let dx = 0; dx < step && x + dx < w; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            const j = ((y + dy) * w + (x + dx)) * 4;
-            data[j] = data[o];
-            data[j + 1] = data[o + 1];
-            data[j + 2] = data[o + 2];
-          }
-        }
-      }
     }
   }
 }
 
-/**
- * Approximate bilateral filter: spatial blur that skips large luminance jumps.
- * Used for cartoon / watercolor base (OpenCV bilateral role).
- */
+/** Edge-preserving bilateral approximation (OpenCV bilateral role). */
 export function bilateralApprox(
   image: RGBAImage,
   radius: number,
@@ -142,13 +123,14 @@ export function bilateralApprox(
 ): void {
   const w = image.width;
   const h = image.height;
-  const r = Math.max(1, Math.min(6, radius | 0));
-  const sigma = Math.max(8, lumaSigma);
+  const r = Math.max(1, Math.min(4, radius | 0));
+  const sigma = Math.max(10, lumaSigma);
   const inv = 1 / (2 * sigma * sigma);
   let src = new Uint8ClampedArray(image.data);
   const data = image.data;
+  const iters = Math.max(1, Math.min(3, iterations | 0));
 
-  for (let iter = 0; iter < iterations; iter++) {
+  for (let iter = 0; iter < iters; iter++) {
     const next = new Uint8ClampedArray(src.length);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
@@ -164,7 +146,7 @@ export function bilateralApprox(
             const j = (yy * w + xx) * 4;
             const ln = 0.299 * src[j] + 0.587 * src[j + 1] + 0.114 * src[j + 2];
             const dl = ln - lc;
-            const weight = Math.exp(-(dx * dx + dy * dy) * 0.15 - dl * dl * inv);
+            const weight = Math.exp(-(dx * dx + dy * dy) * 0.18 - dl * dl * inv);
             wr += src[j] * weight;
             wg += src[j + 1] * weight;
             wb += src[j + 2] * weight;
@@ -182,7 +164,7 @@ export function bilateralApprox(
   data.set(src);
 }
 
-/** Adaptive-threshold style edge mask (0 = edge ink, 1 = keep color). */
+/** Adaptive threshold edge mask (0 = ink, 1 = keep). */
 export function adaptiveEdgeMask(
   gray: Float32Array,
   w: number,
@@ -190,7 +172,7 @@ export function adaptiveEdgeMask(
   block: number,
   C: number,
 ): Uint8Array {
-  const mask = new Uint8Array(w * h); // 1 = not edge
+  const mask = new Uint8Array(w * h);
   const b = Math.max(3, block | 0);
   const half = (b / 2) | 0;
   for (let y = 0; y < h; y++) {
@@ -206,15 +188,12 @@ export function adaptiveEdgeMask(
         }
       }
       const mean = sum / n;
-      const g = gray[y * w + x];
-      // edge if darker than local mean - C (OpenCV adaptive THRESH_BINARY logic)
-      mask[y * w + x] = g < mean - C ? 0 : 1;
+      mask[y * w + x] = gray[y * w + x] < mean - C ? 0 : 1;
     }
   }
   return mask;
 }
 
-/** Apply black ink where mask is 0. */
 export function applyEdgeMaskInk(
   data: Uint8ClampedArray,
   mask: Uint8Array,
@@ -230,10 +209,6 @@ export function applyEdgeMaskInk(
   }
 }
 
-/**
- * Watercolor edge darkening: pigment accumulates at structure boundaries.
- * Ref: watercolor NPR literature (edge darkening from surface tension).
- */
 export function watercolorEdgeDarken(
   data: Uint8ClampedArray,
   edges: Float32Array,
@@ -242,23 +217,28 @@ export function watercolorEdgeDarken(
   const k = Math.max(0, Math.min(1, strength));
   for (let p = 0, i = 0; p < edges.length; p++, i += 4) {
     const e = edges[p];
-    if (e < 20) continue;
-    const t = Math.min(1, (e - 20) / 60) * k;
-    data[i] = clamp8(data[i] * (1 - t * 0.45));
-    data[i + 1] = clamp8(data[i + 1] * (1 - t * 0.45));
-    data[i + 2] = clamp8(data[i + 2] * (1 - t * 0.45));
+    if (e < 18) continue;
+    const t = Math.min(1, (e - 18) / 70) * k;
+    data[i] = clamp8(data[i] * (1 - t * 0.4));
+    data[i + 1] = clamp8(data[i + 1] * (1 - t * 0.4));
+    data[i + 2] = clamp8(data[i + 2] * (1 - t * 0.4));
   }
 }
 
-/** Soft quantize for wash / cel regions. */
+/** Soft quantize with ordered dither to reduce concentric banding on gradients. */
 export function softQuantize(data: Uint8ClampedArray, levels: number, blend: number): void {
   const step = 255 / Math.max(2, levels - 1);
   const b = Math.max(0, Math.min(1, blend));
+  // 2x2 Bayer dither matrix scaled
+  const bayer = [0, 2, 3, 1];
   for (let i = 0; i < data.length; i += 4) {
+    const px = (i / 4) | 0;
+    // approximate x,y from linear index is not needed for mild dither — use px
+    const d = (bayer[px & 3] - 1.5) * (step * 0.12);
     for (let c = 0; c < 3; c++) {
-      const o = data[i + c];
+      const o = data[i + c] + d;
       const q = Math.round(o / step) * step;
-      data[i + c] = clamp8(o * (1 - b) + q * b);
+      data[i + c] = clamp8(data[i + c] * (1 - b) + q * b);
     }
   }
 }
@@ -271,4 +251,33 @@ export function grayFromImage(data: Uint8ClampedArray, w: number, h: number): Fl
   return g;
 }
 
-export { boxBlur };
+/** Simple image stats for adaptive strength (portrait vs landscape etc.). */
+export function analyzeImageStats(data: Uint8ClampedArray, w: number, h: number): {
+  meanLuma: number;
+  edgeDensity: number;
+  isLowContrast: boolean;
+} {
+  let sum = 0;
+  let edgeSum = 0;
+  let n = 0;
+  for (let y = 1; y < h - 1; y += 2) {
+    for (let x = 1; x < w - 1; x += 2) {
+      const i = (y * w + x) * 4;
+      const y0 = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      const iR = (y * w + x + 1) * 4;
+      const yR = 0.299 * data[iR] + 0.587 * data[iR + 1] + 0.114 * data[iR + 2];
+      const iD = ((y + 1) * w + x) * 4;
+      const yD = 0.299 * data[iD] + 0.587 * data[iD + 1] + 0.114 * data[iD + 2];
+      sum += y0;
+      edgeSum += Math.abs(yR - y0) + Math.abs(yD - y0);
+      n++;
+    }
+  }
+  const meanLuma = n ? sum / n : 128;
+  const edgeDensity = n ? edgeSum / n : 20;
+  return {
+    meanLuma,
+    edgeDensity,
+    isLowContrast: edgeDensity < 18,
+  };
+}
