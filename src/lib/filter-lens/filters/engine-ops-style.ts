@@ -20,7 +20,7 @@ import {
   applyLumaPalette,
 } from './engine-graphic-primitives';
 
-/** Sketch: graphite tonal field + stroke hierarchy + cross-hatch + paper grain behavior */
+/** Sketch: graphite tonal field + stroke hierarchy + cross-hatch */
 export function applySketchStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height, data = image.data;
   const t = Math.max(0.55, Math.min(1, intensity / 100));
@@ -55,8 +55,8 @@ export function applySketchStyle(image: RGBAImage, intensity: number) {
     const out = clamp8(g);
     data[i] = out; data[i + 1] = out; data[i + 2] = out;
   }
-  applyInkContours(data, edges, w, h, { threshold: 48 - t * 6, strength: 0.82 + t * 0.18, ink: 8, secondary: 24 });
-  applyCrossHatch(data, gray, w, h, { maxLum: 100, density: 0.45 + t * 0.35, strength: 0.18 + t * 0.16 });
+  applyInkContours(data, edges, w, h, { threshold: 42 - t * 6, strength: 0.7 + t * 0.2, ink: 12, secondary: 22 });
+  applyCrossHatch(data, gray, w, h, { maxLum: 120, density: 0.5 + t * 0.35, strength: 0.22 + t * 0.18 });
 }
 
 /** Cartoon: color cells + cel bands + contours */
@@ -66,8 +66,8 @@ export function applyCartoonStyle(image: RGBAImage, intensity: number) {
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-  structureSmooth(image, edges, 14 + t * 18);
-  applyColorCells(data, edges, 4 + Math.round(t), 0.72 + t * 0.12, 0.28 + t * 0.1);
+  structureSmooth(image, edges, 16 + t * 20, 0.22);
+  applyColorCells(data, edges, 4 + Math.round(t), 0.78 + t * 0.1, 0.48 + t * 0.12);
   applyCelBands(data, 4, 0.55 + t * 0.2);
   applySaturationVibrance(data, 18 + t * 16, 16 + t * 14);
   applyContrastish(data, 12 + t * 12);
@@ -81,8 +81,8 @@ export function applyAnimeStyle(image: RGBAImage, intensity: number) {
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-  structureSmooth(image, edges, 12 + t * 16);
-  applyColorCells(data, edges, 6, 0.58 + t * 0.14, 0.2 + t * 0.1);
+  structureSmooth(image, edges, 12 + t * 16, 0.25);
+  applyColorCells(data, edges, 6, 0.65 + t * 0.12, 0.35 + t * 0.1);
   applyCelBands(data, 5, 0.4 + t * 0.15);
   for (let i = 0; i < data.length; i += 4) {
     const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
@@ -97,15 +97,15 @@ export function applyAnimeStyle(image: RGBAImage, intensity: number) {
   applyInkContours(data, edges, w, h, { threshold: 40 - t * 5, strength: 0.42 + t * 0.18, ink: 36 });
 }
 
-/** Comic: cells + cel + halftone + dual ink */
+/** Comic: cells + cel + haltone + dual ink */
 export function applyComicStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height, data = image.data;
   const t = Math.max(0.5, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-  structureSmooth(image, edges, 7 + t * 8);
-  applyColorCells(data, edges, 5, 0.58 + t * 0.12, 0.24 + t * 0.1);
+  structureSmooth(image, edges, 7 + t * 8, 0.2);
+  applyColorCells(data, edges, 5, 0.65 + t * 0.12, 0.4 + t * 0.1);
   applyCelBands(data, 4, 0.5 + t * 0.2);
   applySaturationVibrance(data, 16 + t * 16, 12 + t * 12);
   applyContrastish(data, 16 + t * 14);
@@ -113,17 +113,18 @@ export function applyComicStyle(image: RGBAImage, intensity: number) {
   applyInkContours(data, edges, w, h, { threshold: 24 - t * 4, strength: 0.85 + t * 0.12, ink: 4, secondary: 46 });
 }
 
-/** Oil: multi-pass paint smear + cells + soft contour */
+/** Oil: full-frame paint including face */
 function applyOilPaintingStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.5, Math.min(1, intensity / 100));
+  const t = Math.max(0.55, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-  structureSmooth(image, edges, 28 + t * 36);
-  applyColorCells(data, edges, 7, 0.52 + t * 0.14, 0.16 + t * 0.08);
-  applyPaintSmear(data, edges, w, h, 0.2 + t * 0.14);
-  applyPaintSmear(data, edges, w, h, 0.12 + t * 0.08);
+  structureSmooth(image, edges, 34 + t * 40, 0.18);
+  applyColorCells(data, edges, 6, 0.7 + t * 0.12, 0.45 + t * 0.15);
+  applyPaintSmear(data, edges, w, h, 0.32 + t * 0.18);
+  applyPaintSmear(data, edges, w, h, 0.22 + t * 0.12);
+  applyPaintSmear(data, edges, w, h, 0.14 + t * 0.08);
   for (let i = 0; i < data.length; i += 4) {
     const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     if (y > 45 && y < 220) {
@@ -136,34 +137,24 @@ function applyOilPaintingStyle(image: RGBAImage, intensity: number) {
   applyInkContours(data, edges, w, h, { threshold: 48 - t * 4, strength: 0.22 + t * 0.12, ink: 55 });
 }
 
-/**
- * Ghibli-direction storybook paint (ORIGINAL — no IP characters/scenes).
- * Full-frame: region paint + atmosphere + soft contours — not oil+warmth.
- */
 function applyGhibliStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height, data = image.data;
   const t = Math.max(0.55, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-
-  // Heavy photographic-detail reduction + painted fields
-  structureSmooth(image, edges, 32 + t * 40);
-  applyColorCells(data, edges, 8, 0.48 + t * 0.14, 0.14 + t * 0.08);
+  structureSmooth(image, edges, 36 + t * 42, 0.12);
+  applyColorCells(data, edges, 7, 0.65 + t * 0.12, 0.4 + t * 0.12);
   applyPaintSmear(data, edges, w, h, 0.22 + t * 0.14);
   applyPaintSmear(data, edges, w, h, 0.16 + t * 0.1);
-
-  // Natural storybook palette: warm sun + soft greens + sky lift
   for (let i = 0; i < data.length; i += 4) {
     const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     const n = y / 255;
-    // Sky-ish upper lift (brighter cools slightly toward painted sky)
     if (n > 0.65 && edges[(i / 4) | 0] < 25) {
       data[i] = clamp8(data[i] * 0.92 + 40 * t);
       data[i + 1] = clamp8(data[i + 1] * 0.95 + 55 * t);
       data[i + 2] = clamp8(data[i + 2] * 0.98 + 70 * t);
     }
-    // Mid vegetation / warm sun
     if (n > 0.25 && n < 0.75) {
       data[i] = clamp8(data[i] + (6 + t * 8));
       data[i + 1] = clamp8(data[i + 1] + (8 + t * 10));
@@ -171,19 +162,17 @@ function applyGhibliStyle(image: RGBAImage, intensity: number) {
     }
   }
   applySaturationVibrance(data, 8 + t * 10, 10 + t * 10);
-  // Soft illustrated contours only
   applyInkContours(data, edges, w, h, { threshold: 52 - t * 4, strength: 0.16 + t * 0.1, ink: 70 });
 }
 
-/** Retro early-3D game-art (original, no game IP). */
 export function applyRetro3dStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height, data = image.data;
   const t = Math.max(0.5, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-  structureSmooth(image, edges, 8 + t * 10);
-  applyColorCells(data, edges, 5, 0.55 + t * 0.12, 0.22 + t * 0.1);
+  structureSmooth(image, edges, 10 + t * 12, 0.2);
+  applyColorCells(data, edges, 5, 0.65 + t * 0.12, 0.4 + t * 0.1);
   applyCelBands(data, 4, 0.45 + t * 0.2);
   for (let i = 0; i < data.length; i += 4) {
     const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
@@ -220,16 +209,15 @@ export function applyRetro3dStyle(image: RGBAImage, intensity: number) {
   }
 }
 
-/** Cyberpunk: cells + cyan/magenta palette + halftone + bold ink + neon rim */
 export function applyCyberpunkStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height, data = image.data;
   const t = Math.max(0.55, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-  structureSmooth(image, edges, 8 + t * 10);
-  applyColorCells(data, edges, 5, 0.62 + t * 0.14, 0.24 + t * 0.1);
-  applyCelBands(data, 4, 0.5 + t * 0.2);
+  structureSmooth(image, edges, 10 + t * 12, 0.2);
+  applyColorCells(data, edges, 5, 0.72 + t * 0.12, 0.5 + t * 0.12);
+  applyCelBands(data, 4, 0.55 + t * 0.2);
   applyLumaPalette(data, [
     { at: 0, rgb: [18, 8, 40] },
     { at: 0.35, rgb: [40, 30, 120] },
@@ -244,45 +232,43 @@ export function applyCyberpunkStyle(image: RGBAImage, intensity: number) {
   applyNeonRim(data, edges, w, h, { threshold: 50, strength: 0.35 * t, rgb: [80, 40, 220] });
 }
 
-/** Flat vector: hard cells + hard contours */
 function applyFlatVectorStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height, data = image.data;
   const t = Math.max(0.5, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-  structureSmooth(image, edges, 10 + t * 12);
-  applyColorCells(data, edges, 3 + Math.round(t), 0.85 + t * 0.1, 0.4 + t * 0.15);
+  structureSmooth(image, edges, 10 + t * 12, 0.15);
+  applyColorCells(data, edges, 3 + Math.round(t), 0.85 + t * 0.1, 0.5 + t * 0.15);
   applyCelBands(data, 3, 0.75 + t * 0.2);
   applyInkContours(data, edges, w, h, { threshold: 28 - t * 4, strength: 0.7 + t * 0.2, ink: 15 });
 }
 
-/** Watercolor: wash diffusion + pigment pooling feel */
 function applyWatercolorStyle(image: RGBAImage, intensity: number) {
   const w = image.width, h = image.height, data = image.data;
-  const t = Math.max(0.45, Math.min(1, intensity / 100));
+  const t = Math.max(0.55, Math.min(1, intensity / 100));
   const src = new Uint8ClampedArray(data);
   const gray = grayLuma(src, w, h);
   const edges = extractEdges(gray, w, h);
-  structureSmooth(image, edges, 20 + t * 30);
-  applyColorCells(data, edges, 9, 0.4 + t * 0.12, 0.12 + t * 0.06);
-  // Edge diffusion (bleed)
+  structureSmooth(image, edges, 36 + t * 42, 0.08);
+  applyColorCells(data, edges, 8, 0.62 + t * 0.14, 0.38 + t * 0.12);
+  applyPaintSmear(data, edges, w, h, 0.28 + t * 0.16);
   const snap = new Uint8ClampedArray(data);
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const p = y * w + x;
-      if (edges[p] > 30 && edges[p] < 70) {
+      if (edges[p] < 90) {
         const i = p * 4;
-        const j = ((y + 1) * w + x) * 4;
-        const k = 0.15 + t * 0.12;
+        const j = ((y + 1) * w + (x + (y % 2))) * 4;
+        const k = (0.2 + t * 0.18) * (edges[p] < 40 ? 1 : 0.55);
         data[i] = clamp8(snap[i] * (1 - k) + snap[j] * k);
         data[i + 1] = clamp8(snap[i + 1] * (1 - k) + snap[j + 1] * k);
         data[i + 2] = clamp8(snap[i + 2] * (1 - k) + snap[j + 2] * k);
       }
     }
   }
-  applySaturationVibrance(data, 14 + t * 12, 12 + t * 10);
-  applyFade(data, 8 + t * 8);
+  applySaturationVibrance(data, 10 + t * 10, 10 + t * 8);
+  applyFade(data, 12 + t * 12);
 }
 
 export function applyStyle(image: RGBAImage, style: string | undefined, intensity: number) {
