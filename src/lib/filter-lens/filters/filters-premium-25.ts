@@ -1,7 +1,7 @@
 /**
  * filters-premium-25.ts
  * Exact 25 Premium Motio2edit filter effects (product reference).
- * Real image processing via existing engine — not placeholders.
+ * Graphic filters use style recipes (multi-stage). Photo-grade Premium stays photographic.
  */
 import type { FilterDefinition } from './filter-types';
 import { createAttribution, createUnlockMetadata } from '../shared/metadata';
@@ -37,7 +37,7 @@ function p(
   };
 }
 
-/** 25 Premium filters — IDs filter-076 … filter-100 to preserve catalog count */
+/** 25 Premium filters — IDs filter-076 … filter-100 */
 export const FILTERS_PREMIUM_25: FilterDefinition[] = [
   p('filter-076', 'Cinematic', 'Cinematic',
     'Movie-like tones with rich contrast, controlled highlights, and natural skin.',
@@ -64,11 +64,11 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
     { bloom: 28, softBlur: 10, clarity: -8, fade: 6, temperature: 6, contrast: 8, shadows: 10, saturation: 4 }),
 
   p('filter-082', 'Neon', 'Neon',
-    'Bold neon pink/blue/purple nightlife atmosphere with glowing highlights.',
-    { style: 'neon', saturation: 28, contrast: 24, bloom: 20, temperature: -6, vignette: 14, vibrance: 16 }, true),
+    'Localized neon rim lighting on structure — not global color wash.',
+    { style: 'neon' }, true),
 
   p('filter-083', 'Cyberpunk', 'Neon',
-    'Full-frame illustrated cyberpunk — comic color cells, cyan/magenta neon, pop-art halftone, bold contours.',
+    'Full-frame illustrated cyberpunk — color cells, cyan/magenta palette, halftone, bold contours, neon rim.',
     { style: 'cyberpunk' }, true),
 
   p('filter-084', 'Aqua', 'Cool',
@@ -97,20 +97,20 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
     { grain: 26, fade: 10, contrast: 14, temperature: 4, vignette: 12, saturation: -4 }),
 
   p('filter-090', 'Sketch', 'Sketch',
-    'Full-frame pencil sketch — graphite tone, stroke hierarchy, drawn background.',
+    'Full-frame graphite sketch — tonal field, stroke hierarchy, cross-hatch (not edge overlay).',
     { style: 'sketch' }),
 
   p('filter-091', 'Oil Painting', 'Art',
-    'Full-frame oil painting — brush fields, painterly color, preserved identity.',
-    { style: 'oil', saturation: 8, contrast: 6 }),
+    'Full-frame oil — multi-pass brush smear, color cells, soft painterly contours.',
+    { style: 'oil' }),
 
   p('filter-092', 'Cartoon', 'Comic',
-    'Full-frame cartoon render with structure-aware color regions.',
-    { style: 'cartoon', saturation: 10, contrast: 8, vibrance: 8 }),
+    'Full-frame cartoon — color cells, cel bands, clean contours.',
+    { style: 'cartoon' }),
 
   p('filter-093', 'Watercolor', 'Art',
-    'Soft watercolor washes and fluid color transitions with paper-like character.',
-    { style: 'watercolor', saturation: 14, softBlur: 22, fade: 10, contrast: 6 }),
+    'Wash diffusion, pigment-style pooling, soft edges — full-frame watercolor.',
+    { style: 'watercolor' }),
 
   p('filter-094', 'Rainbow', 'Art',
     'Smooth multicolor spectrum highlights — vibrant but subject stays clear.',
@@ -118,8 +118,8 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
       splitToning: { shadowsHue: 280, shadowsSaturation: 40, highlightsHue: 50, highlightsSaturation: 45, balance: 0 } }, true),
 
   p('filter-095', 'Retro 3D', 'Art',
-    'Original early-3D open-world game-art look — simplified materials, baked light, silhouette clarity. Not affiliated with any game brand.',
-    { style: 'retro3d', contrast: 12, saturation: 6 }, true),
+    'Original early-3D game-art — color cells, cel bands, baked light, soft block materials. Not affiliated with any game brand.',
+    { style: 'retro3d' }, true),
 
   p('filter-096', 'Lens Flare', 'Cinematic',
     'Cinematic optical flare and glow that complements the frame without covering faces.',
