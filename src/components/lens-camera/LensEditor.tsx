@@ -22,6 +22,7 @@ import {
   isAiLens,
   type CameraLensDef,
 } from "@/lib/lens-camera/roster";
+import { getLensSampleCards } from "@/lib/lens-camera/lens-samples";
 import {
   applyLensOpticalEnhanced,
   canvasToBlob,
@@ -62,7 +63,11 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
   return img;
 }
 
-/** Free lenses first, then AI — easier discovery */
+const SAMPLE_BY_ID = Object.fromEntries(
+  getLensSampleCards().map((s) => [s.lensId, s.imageUrl]),
+);
+
+/** Free lenses first, then AI */
 const ORDERED_ROSTER = [
   ...CAMERA_LENS_ROSTER.filter((l) => l.tier === "normal"),
   ...CAMERA_LENS_ROSTER.filter((l) => l.tier === "ai"),
@@ -138,15 +143,15 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: { ideal: face },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
             },
             audio: false,
           });
         } catch {
           try {
             stream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: face },
+              video: { facingMode: face, width: { ideal: 1280 }, height: { ideal: 720 } },
               audio: false,
             });
           } catch {
@@ -200,11 +205,11 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       try {
         const img = await loadImage(sourceUrl);
         const canvas = document.createElement("canvas");
-        canvas.width = Math.min(img.naturalWidth, 960);
+        canvas.width = Math.min(img.naturalWidth, 1280);
         canvas.height = Math.round((canvas.width / img.naturalWidth) * img.naturalHeight);
         canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
         const out = applyLensOpticalEnhanced(canvas, lens, "native", { watermark: false });
-        const blob = await canvasToBlob(out, "image/jpeg", 0.82);
+        const blob = await canvasToBlob(out, "image/jpeg", 0.88);
         if (cancelled) return;
         const url = URL.createObjectURL(blob);
         setPreviewUrl((prev) => {
@@ -224,7 +229,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     };
   }, [lens, sourceUrl, phase, cameraOn]);
 
-  // Live optical preview — reused buffer, lower res for heavy warps
+  // Live optical preview — higher quality, still safe on heavy warps
   useEffect(() => {
     if (!cameraOn || !lens || phase === "processing" || phase === "result") {
       if (liveRafRef.current != null) {
@@ -239,7 +244,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     if (!video || !canvas) return;
 
     const heavy = HEAVY_LENS_IDS.has(lens.id);
-    const LIVE_MAX_W = heavy ? 280 : 400;
+    // Higher preview quality (was 280/400 — too soft)
+    const LIVE_MAX_W = heavy ? 480 : 720;
     let frame = 0;
     const tmp = document.createElement("canvas");
 
@@ -249,7 +255,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         return;
       }
       frame++;
-      if (heavy && frame % 2 === 0) {
+      // Heavy warps only: skip every 3rd frame
+      if (heavy && frame % 3 === 0) {
         liveRafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -443,7 +450,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         </button>
       </header>
 
-      <div className="relative min-h-0 flex-1">
+      {/* Camera stage — stops above bottom controls */}
+      <div className="relative min-h-0 flex-1 pb-[11.5rem]">
         <video
           ref={videoRef}
           playsInline
@@ -520,63 +528,74 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         )}
       </div>
 
+      {/* Bottom chrome — carousel swipe isolated from shutter */}
       {phase !== "result" && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black via-black/85 to-transparent pt-16 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div
-            ref={carouselRef}
-            className="mb-3 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {ORDERED_ROSTER.map((l) => {
-              const selected = lensId === l.id;
-              const isAi = l.tier === "ai";
-              return (
-                <button
-                  key={l.id}
-                  type="button"
-                  data-lens-id={l.id}
-                  onClick={() => selectLens(l.id, l.name)}
-                  className="flex w-[4.25rem] shrink-0 flex-col items-center gap-1.5 transition-transform active:scale-95"
-                >
-                  <div
-                    className={cn(
-                      "relative grid h-[3.35rem] w-[3.35rem] place-items-center rounded-full transition-all",
-                      selected ? "scale-110 p-[3px]" : "p-0",
-                    )}
-                    style={
-                      selected
-                        ? { background: `linear-gradient(135deg, ${l.color}, #fff6)` }
-                        : undefined
-                    }
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+          {/* Swipe only lives in this strip */}
+          <div className="pointer-events-none bg-gradient-to-t from-black via-black/80 to-transparent pt-10">
+            <div
+              ref={carouselRef}
+              className="pointer-events-auto mb-2 flex touch-pan-x gap-3 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {ORDERED_ROSTER.map((l) => {
+                const selected = lensId === l.id;
+                const isAi = l.tier === "ai";
+                const thumb = SAMPLE_BY_ID[l.id];
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    data-lens-id={l.id}
+                    onClick={() => selectLens(l.id, l.name)}
+                    className="flex w-[4.4rem] shrink-0 flex-col items-center gap-1.5 transition-transform active:scale-95"
                   >
                     <div
                       className={cn(
-                        "grid h-full w-full place-items-center rounded-full text-[11px] font-bold tracking-wide",
-                        selected ? "bg-zinc-900" : "bg-zinc-800/90 ring-1 ring-white/15",
+                        "relative h-[3.5rem] w-[3.5rem] overflow-hidden rounded-full transition-all",
+                        selected
+                          ? "scale-110 ring-[3px] ring-white shadow-lg"
+                          : "ring-1 ring-white/25",
                       )}
-                      style={{ color: l.color }}
+                      style={selected ? { boxShadow: `0 0 0 2px ${l.color}` } : undefined}
                     >
-                      {l.code}
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          draggable={false}
+                        />
+                      ) : (
+                        <div
+                          className="grid h-full w-full place-items-center bg-zinc-800 text-[11px] font-bold"
+                          style={{ color: l.color }}
+                        >
+                          {l.code}
+                        </div>
+                      )}
+                      {isAi && (
+                        <span className="absolute bottom-0 left-0 right-0 bg-orange-500/90 py-0.5 text-center text-[8px] font-bold text-white">
+                          AI
+                        </span>
+                      )}
                     </div>
-                    {isAi && (
-                      <span className="absolute -right-0.5 -top-0.5 rounded-full bg-orange-500 px-1 text-[8px] font-bold leading-3 text-white">
-                        AI
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      "line-clamp-1 max-w-full text-center text-[10px] font-medium",
-                      selected ? "text-white" : "text-white/55",
-                    )}
-                  >
-                    {l.name}
-                  </span>
-                </button>
-              );
-            })}
+                    <span
+                      className={cn(
+                        "line-clamp-1 max-w-full text-center text-[10px] font-medium",
+                        selected ? "text-white" : "text-white/55",
+                      )}
+                    >
+                      {l.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex items-center justify-center gap-10 px-6">
+          {/* Shutter row — no horizontal scroll, separate touch target */}
+          <div className="pointer-events-auto flex items-center justify-center gap-10 bg-black/90 px-6 pt-1">
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
