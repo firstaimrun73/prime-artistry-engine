@@ -1,7 +1,6 @@
 /**
  * engine-graphic-primitives.ts
  * Reusable GRAPHIC rendering stages (not photo grades).
- * Used by AI+ / Premium style recipes — each filter composes its own pipeline.
  */
 import type { RGBAImage } from '../shared/processing-types';
 import { clamp8 } from './engine-ops-basic';
@@ -15,7 +14,6 @@ export function grayLuma(src: Uint8ClampedArray, w: number, h: number): Float32A
   return g;
 }
 
-/** Structural edge magnitude (Sobel). */
 export function extractEdges(gray: Float32Array, w: number, h: number): Float32Array {
   const mag = new Float32Array(w * h);
   for (let y = 1; y < h - 1; y++) {
@@ -33,7 +31,6 @@ export function extractEdges(gray: Float32Array, w: number, h: number): Float32A
   return mag;
 }
 
-/** Ink / contour lines on meaningful structure only. */
 export function applyInkContours(
   data: Uint8ClampedArray,
   edges: Float32Array,
@@ -63,7 +60,6 @@ export function applyInkContours(
   }
 }
 
-/** Quantize color cells; stronger on low-edge (smooth) regions. */
 export function applyColorCells(
   data: Uint8ClampedArray,
   edges: Float32Array,
@@ -84,12 +80,7 @@ export function applyColorCells(
   }
 }
 
-/** Cel shading: discrete luminance bands. */
-export function applyCelBands(
-  data: Uint8ClampedArray,
-  bands: number,
-  hardness: number,
-) {
+export function applyCelBands(data: Uint8ClampedArray, bands: number, hardness: number) {
   const n = Math.max(2, Math.min(8, bands | 0));
   const step = 255 / (n - 1);
   const h = Math.max(0.2, Math.min(1, hardness));
@@ -97,14 +88,12 @@ export function applyCelBands(
     const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
     const q = Math.round(y / step) * step;
     const scale = (q + 1e-3) / (y + 1e-3);
-    const k = h;
     for (let c = 0; c < 3; c++) {
-      data[i + c] = clamp8(data[i + c] * (1 - k) + data[i + c] * scale * k);
+      data[i + c] = clamp8(data[i + c] * (1 - h) + data[i + c] * scale * h);
     }
   }
 }
 
-/** True luminance-responsive halftone dots (not grain). */
 export function applyHalftone(
   data: Uint8ClampedArray,
   gray: Float32Array,
@@ -136,14 +125,24 @@ export function applyHalftone(
   }
 }
 
-/** Structure-preserving smooth (blur flats, keep edges). */
-export function structureSmooth(image: RGBAImage, edges: Float32Array, blurAmount: number) {
+/**
+ * Blur flats; optionally restore some edge detail.
+ * edgeRestore 0 = full paint blur (faces included)
+ * edgeRestore 1 = strong photo edge restore (old behavior — left faces photographic)
+ */
+export function structureSmooth(
+  image: RGBAImage,
+  edges: Float32Array,
+  blurAmount: number,
+  edgeRestore = 0.35,
+) {
   const data = image.data;
   const snap = new Uint8ClampedArray(data);
   applySoftBlur(image, blurAmount);
+  if (edgeRestore <= 0) return;
   for (let p = 0, i = 0; p < edges.length; p++, i += 4) {
-    if (edges[p] > 32) {
-      const k = Math.min(1, (edges[p] - 32) / 65);
+    if (edges[p] > 40) {
+      const k = Math.min(1, (edges[p] - 40) / 70) * edgeRestore;
       data[i] = clamp8(data[i] * (1 - k) + snap[i] * k);
       data[i + 1] = clamp8(data[i + 1] * (1 - k) + snap[i + 1] * k);
       data[i + 2] = clamp8(data[i + 2] * (1 - k) + snap[i + 2] * k);
@@ -151,7 +150,6 @@ export function structureSmooth(image: RGBAImage, edges: Float32Array, blurAmoun
   }
 }
 
-/** Directional cross-hatch in shadow tones. */
 export function applyCrossHatch(
   data: Uint8ClampedArray,
   gray: Float32Array,
@@ -177,7 +175,6 @@ export function applyCrossHatch(
   }
 }
 
-/** Localized neon rim on strong edges only. */
 export function applyNeonRim(
   data: Uint8ClampedArray,
   edges: Float32Array,
@@ -199,7 +196,7 @@ export function applyNeonRim(
   }
 }
 
-/** Directional paint smear on low-edge regions (painterly). */
+/** Directional paint smear — works across most of the frame, weaker on strongest edges. */
 export function applyPaintSmear(
   data: Uint8ClampedArray,
   edges: Float32Array,
@@ -211,10 +208,13 @@ export function applyPaintSmear(
   for (let y = 2; y < h - 2; y++) {
     for (let x = 2; x < w - 2; x++) {
       const p = y * w + x;
-      if (edges[p] >= 42) continue;
+      const e = edges[p];
+      // Previously skipped e>=42 → faces stayed photo. Now always smear, scale by edge.
+      const edgeFade = e > 80 ? 0.25 : e > 50 ? 0.55 : 1;
+      const k = strength * edgeFade;
+      if (k < 0.02) continue;
       const i = p * 4;
       const j = ((y - 1) * w + (x + 1)) * 4;
-      const k = strength;
       data[i] = clamp8(snap[i] * (1 - k) + snap[j] * k);
       data[i + 1] = clamp8(snap[i + 1] * (1 - k) + snap[j + 1] * k);
       data[i + 2] = clamp8(snap[i + 2] * (1 - k) + snap[j + 2] * k);
@@ -222,7 +222,6 @@ export function applyPaintSmear(
   }
 }
 
-/** Palette remap by luminance to fixed RGB anchors (graphic identity). */
 export function applyLumaPalette(
   data: Uint8ClampedArray,
   stops: { at: number; rgb: [number, number, number] }[],
