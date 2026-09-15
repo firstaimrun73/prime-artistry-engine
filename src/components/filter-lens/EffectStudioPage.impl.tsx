@@ -31,7 +31,6 @@ import {
 import { getFilterById } from "@/lib/filter-lens/filters/filter-registry";
 import type { RGBAImage } from "@/lib/filter-lens/shared/processing-types";
 import { CompareSlider } from "@/components/CompareSlider";
-import { Header } from "@/components/Header";
 import {
   type CatalogItem,
   filterToCatalogItem,
@@ -89,6 +88,34 @@ function OrangeSlider({
       />
     </div>
   );
+}
+
+/** Fit full image into square canvas (letterbox) so filter thumbs never crop content. */
+async function rgbaToSquareThumbUrl(image: RGBAImage, size = 160): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return rgbaImageToObjectUrl(image);
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(0, 0, size, size);
+  const scale = Math.min(size / image.width, size / image.height);
+  const w = Math.max(1, Math.round(image.width * scale));
+  const h = Math.max(1, Math.round(image.height * scale));
+  const ox = ((size - w) / 2) | 0;
+  const oy = ((size - h) / 2) | 0;
+  const tmp = document.createElement("canvas");
+  tmp.width = image.width;
+  tmp.height = image.height;
+  const tctx = tmp.getContext("2d");
+  if (!tctx) return rgbaImageToObjectUrl(image);
+  const id = tctx.createImageData(image.width, image.height);
+  id.data.set(image.data);
+  tctx.putImageData(id, 0, 0);
+  ctx.drawImage(tmp, 0, 0, image.width, image.height, ox, oy, w, h);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(URL.createObjectURL(b)) : reject(new Error("thumb encode failed"))), "image/jpeg", 0.88);
+  });
 }
 
 export function EffectStudioPage({
@@ -250,7 +277,7 @@ export function EffectStudioPage({
           try {
             const out = applyProcessingProfile(base, def.processingProfile, { intensity: 85, mode: "preview", previewMaxDimension: 160, seed: 42 });
             if (out.cancelled) return;
-            next[item.id] = await rgbaImageToObjectUrl(out.image);
+            next[item.id] = await rgbaToSquareThumbUrl(out.image, 160);
           } catch (e) { console.warn("[Motio2edit] thumb failed", item.id, e); }
         }));
         if (cancelled || gen !== thumbGen.current) { for (const u of Object.values(next)) revokeUrl(u); return; }
@@ -359,7 +386,6 @@ export function EffectStudioPage({
   if (!items || items.length === 0) {
     return (
       <div className="flex min-h-[60vh] flex-col bg-background text-foreground">
-        <Header />
         <div className="flex flex-1 flex-col items-center justify-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
           <p className="text-sm text-muted-foreground">Loading filters…</p>
@@ -371,7 +397,6 @@ export function EffectStudioPage({
   if (!hasPhoto) {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
-        <Header />
         <header className="flex items-center gap-3 border-b border-border px-3 py-3">
           <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
           <div className="min-w-0 flex-1">
@@ -395,14 +420,12 @@ export function EffectStudioPage({
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
-      <Header />
       <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-3 py-2.5">
         <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio<span className="text-[#FF5A1F]">2</span>edit</p>
           <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
         </div>
-        {/* Change only in editor — not on output screen (bottom action has Change there) */}
         {phase !== "result" ? (
           <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-semibold">
             <ImagePlus className="h-3.5 w-3.5" /> Change
@@ -411,8 +434,8 @@ export function EffectStudioPage({
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
       </header>
 
-      {/* Visual workspace behind the image: always white (not dark-mode canvas) */}
-      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-white px-2 py-2">
+      {/* Image workspace: light zinc in light mode, dark zinc in dark mode — not forced pure white */}
+      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-zinc-100 dark:bg-zinc-900 px-2 py-2">
         {phase === "result" && sourceUrl && displayResultUrl ? (
           comparing ? (
             <CompareSlider before={sourceUrl} after={displayResultUrl} className="h-full max-h-full w-full max-w-full" />
@@ -490,7 +513,7 @@ export function EffectStudioPage({
                     return (
                       <button key={item.id} type="button" onClick={() => selectFilter(item)} className="w-[78px] shrink-0 text-left">
                         <div className={cn("relative aspect-[1/1.05] overflow-hidden rounded-lg bg-muted", isSel && "outline outline-2 outline-offset-1 outline-[#FF5A1F]")}>
-                          {thumb ? <img src={thumb} alt="" className="h-full w-full object-contain" /> : <div className="h-full w-full bg-muted" />}
+                          {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-muted" />}
                           {isSel && <span className="absolute right-1 top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#FF5A1F] text-[11px] font-bold text-white">✓</span>}
                           {!item.isFree && item.badge && (
                             item.badge === "ai+" ? (
@@ -541,7 +564,7 @@ export function EffectStudioPage({
                         return (
                           <button key={s.id} type="button" onClick={() => {
                             bumpToEdit();
-                            if (colorTarget === "highlight") { setHighlightColorId(s.id); pushHistory({ selectedId, intensity, adj: { ...adj }, highlightColorId: s.id, shadowColorId }); }
+                            if (colorTarget === "highlight") { setHighlightColorId(s.id); pushHistory({ selectedId, intensity, adj: { ...adj }, highlightColorId: s.id, shadowColorId: s.id }); }
                             else { setShadowColorId(s.id); pushHistory({ selectedId, intensity, adj: { ...adj }, highlightColorId, shadowColorId: s.id }); }
                           }} className={cn("h-7 w-7 rounded-full border-2", activeId === s.id ? "border-white shadow-[0_0_0_2px_#FF5A1F] scale-110" : "border-transparent")} style={{ background: `rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})` }} aria-label={s.id} />
                         );
