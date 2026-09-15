@@ -1,251 +1,272 @@
 /**
  * engine-graphic-primitives.ts
- * Reusable GRAPHIC rendering stages (not photo grades).
+ * Higher-level graphic primitives on engine-npr-core.
  */
-import type { RGBAImage } from '../shared/processing-types';
-import { clamp8 } from './engine-ops-basic';
-import { applySoftBlur } from './engine-ops-extra';
+import {
+  ImgBuf,
+  clampCoord,
+  luma,
+  sobelMagnitude,
+  boxBlur,
+} from './engine-npr-core';
 
-export function grayLuma(src: Uint8ClampedArray, w: number, h: number): Float32Array {
-  const g = new Float32Array(w * h);
-  for (let i = 0, p = 0; i < src.length; i += 4, p++) {
-    g[p] = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
-  }
-  return g;
+function idx(x: number, y: number, width: number): number {
+  return (y * width + x) * 4;
 }
 
-export function extractEdges(gray: Float32Array, w: number, h: number): Float32Array {
-  const mag = new Float32Array(w * h);
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const p = y * w + x;
-      const gx =
-        -gray[p - w - 1] - 2 * gray[p - 1] - gray[p + w - 1] +
-         gray[p - w + 1] + 2 * gray[p + 1] + gray[p + w + 1];
-      const gy =
-        -gray[p - w - 1] - 2 * gray[p - w] - gray[p - w + 1] +
-         gray[p + w - 1] + 2 * gray[p + w] + gray[p + w + 1];
-      mag[p] = Math.sqrt(gx * gx + gy * gy);
-    }
-  }
-  return mag;
-}
-
-export function applyInkContours(
-  data: Uint8ClampedArray,
-  edges: Float32Array,
-  w: number,
-  h: number,
-  opts: { threshold: number; strength: number; ink: number; secondary?: number },
-) {
-  const { threshold, strength, ink } = opts;
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const p = y * w + x;
-      const m = edges[p];
-      if (m <= threshold) continue;
-      const i = p * 4;
-      const k = Math.min(1, (m - threshold) / 50) * strength;
-      data[i] = clamp8(data[i] * (1 - k) + ink * k);
-      data[i + 1] = clamp8(data[i + 1] * (1 - k) + ink * k);
-      data[i + 2] = clamp8(data[i + 2] * (1 - k) + ink * k);
-    }
-  }
-  if (opts.secondary != null) {
-    applyInkContours(data, edges, w, h, {
-      threshold: opts.secondary,
-      strength: strength * 0.35,
-      ink: Math.min(255, ink + 40),
-    });
-  }
-}
-
-export function applyColorCells(
-  data: Uint8ClampedArray,
-  edges: Float32Array,
-  levels: number,
-  blendSmooth: number,
-  blendEdge: number,
-) {
-  const step = 255 / Math.max(2, levels - 1);
-  for (let p = 0, i = 0; p < edges.length; p++, i += 4) {
-    const t = Math.min(1, edges[p] / 90);
-    const blend = blendSmooth * (1 - t) + blendEdge * t;
-    const keep = 1 - blend;
-    for (let c = 0; c < 3; c++) {
-      const o = data[i + c];
-      const q = Math.round(o / step) * step;
-      data[i + c] = clamp8(o * keep + q * blend);
-    }
-  }
-}
-
-export function applyCelBands(data: Uint8ClampedArray, bands: number, hardness: number) {
-  const n = Math.max(2, Math.min(8, bands | 0));
-  const step = 255 / (n - 1);
-  const h = Math.max(0.2, Math.min(1, hardness));
+/** Adaptive-threshold edge mask (0..1). */
+export function adaptiveEdgeMask(
+  img: ImgBuf,
+  blockRadius: number,
+  bias: number,
+): Float32Array {
+  const { width, height, data } = img;
+  const grayImg: ImgBuf = {
+    data: new Uint8ClampedArray(data.length),
+    width,
+    height,
+  };
   for (let i = 0; i < data.length; i += 4) {
-    const y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    const q = Math.round(y / step) * step;
-    const scale = (q + 1e-3) / (y + 1e-3);
-    for (let c = 0; c < 3; c++) {
-      data[i + c] = clamp8(data[i + c] * (1 - h) + data[i + c] * scale * h);
+    const l = luma(data[i], data[i + 1], data[i + 2]);
+    grayImg.data[i] = grayImg.data[i + 1] = grayImg.data[i + 2] = l;
+    grayImg.data[i + 3] = 255;
+  }
+  const localMean = boxBlur(grayImg, Math.max(1, blockRadius));
+  const mask = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = idx(x, y, width);
+      const l = grayImg.data[i];
+      const m = localMean.data[i];
+      const diff = m - l - bias;
+      mask[y * width + x] = diff > 0 ? Math.min(1, diff / 40) : 0;
     }
   }
+  return mask;
 }
 
-export function applyHalftone(
-  data: Uint8ClampedArray,
-  gray: Float32Array,
-  edges: Float32Array,
-  w: number,
-  h: number,
-  opts: { period: number; maxLum: number; density: number; inkBoost?: number },
-) {
-  const period = Math.max(2, opts.period | 0);
-  const maxLum = opts.maxLum;
-  const dens = opts.density;
-  const boost = opts.inkBoost ?? 0.65;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const p = y * w + x;
-      const g = gray[p];
-      if (g >= maxLum || edges[p] > 55) continue;
-      const cx = x % period;
-      const cy = y % period;
-      const dist = Math.sqrt((cx - period / 2) ** 2 + (cy - period / 2) ** 2);
-      const rad = ((maxLum - g) / maxLum) * (period * 0.45) * dens;
-      if (dist < rad) {
-        const i = p * 4;
-        data[i] = clamp8(data[i] * boost);
-        data[i + 1] = clamp8(data[i + 1] * boost);
-        data[i + 2] = clamp8(data[i + 2] * boost);
-      }
-    }
-  }
-}
-
-/**
- * Blur flats; optionally restore some edge detail.
- * edgeRestore 0 = full paint blur (faces included)
- * edgeRestore 1 = strong photo edge restore (old behavior — left faces photographic)
- */
-export function structureSmooth(
-  image: RGBAImage,
-  edges: Float32Array,
-  blurAmount: number,
-  edgeRestore = 0.35,
-) {
-  const data = image.data;
-  const snap = new Uint8ClampedArray(data);
-  applySoftBlur(image, blurAmount);
-  if (edgeRestore <= 0) return;
-  for (let p = 0, i = 0; p < edges.length; p++, i += 4) {
-    if (edges[p] > 40) {
-      const k = Math.min(1, (edges[p] - 40) / 70) * edgeRestore;
-      data[i] = clamp8(data[i] * (1 - k) + snap[i] * k);
-      data[i + 1] = clamp8(data[i + 1] * (1 - k) + snap[i + 1] * k);
-      data[i + 2] = clamp8(data[i + 2] * (1 - k) + snap[i + 2] * k);
-    }
-  }
-}
-
-export function applyCrossHatch(
-  data: Uint8ClampedArray,
-  gray: Float32Array,
-  w: number,
-  h: number,
-  opts: { maxLum: number; density: number; strength: number },
-) {
-  const { maxLum, density, strength } = opts;
-  const step = density > 0.6 ? 3 : density > 0.35 ? 4 : 5;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const p = y * w + x;
-      if (gray[p] >= maxLum) continue;
-      const dens = (maxLum - gray[p]) / maxLum;
-      if ((x + y) % step === 0 || (x - y + 4096) % (step + 1) === 0) {
-        const i = p * 4;
-        const k = dens * strength;
-        data[i] = clamp8(data[i] * (1 - k));
-        data[i + 1] = clamp8(data[i + 1] * (1 - k));
-        data[i + 2] = clamp8(data[i + 2] * (1 - k));
-      }
-    }
-  }
-}
-
-export function applyNeonRim(
-  data: Uint8ClampedArray,
-  edges: Float32Array,
-  w: number,
-  h: number,
-  opts: { threshold: number; strength: number; rgb: [number, number, number] },
-) {
-  const [nr, ng, nb] = opts.rgb;
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const p = y * w + x;
-      if (edges[p] <= opts.threshold) continue;
-      const i = p * 4;
-      const k = Math.min(1, (edges[p] - opts.threshold) / 70) * opts.strength;
-      data[i] = clamp8(data[i] * (1 - k) + nr * k);
-      data[i + 1] = clamp8(data[i + 1] * (1 - k) + ng * k);
-      data[i + 2] = clamp8(data[i + 2] * (1 - k) + nb * k);
-    }
-  }
-}
-
-/** Directional paint smear — works across most of the frame, weaker on strongest edges. */
-export function applyPaintSmear(
-  data: Uint8ClampedArray,
-  edges: Float32Array,
-  w: number,
-  h: number,
+/** Sobel ink mask scaled by strength. */
+export function sobelInkMask(
+  img: ImgBuf,
   strength: number,
-) {
-  const snap = new Uint8ClampedArray(data);
-  for (let y = 2; y < h - 2; y++) {
-    for (let x = 2; x < w - 2; x++) {
-      const p = y * w + x;
-      const e = edges[p];
-      // Previously skipped e>=42 → faces stayed photo. Now always smear, scale by edge.
-      const edgeFade = e > 80 ? 0.25 : e > 50 ? 0.55 : 1;
-      const k = strength * edgeFade;
-      if (k < 0.02) continue;
-      const i = p * 4;
-      const j = ((y - 1) * w + (x + 1)) * 4;
-      data[i] = clamp8(snap[i] * (1 - k) + snap[j] * k);
-      data[i + 1] = clamp8(snap[i + 1] * (1 - k) + snap[j + 1] * k);
-      data[i + 2] = clamp8(snap[i + 2] * (1 - k) + snap[j + 2] * k);
-    }
+  threshold: number,
+): Float32Array {
+  const mag = sobelMagnitude(img);
+  const out = new Float32Array(mag.length);
+  for (let i = 0; i < mag.length; i++) {
+    const v = Math.max(0, mag[i] - threshold) / 255;
+    out[i] = Math.min(1, v * strength);
   }
+  return out;
 }
 
-export function applyLumaPalette(
-  data: Uint8ClampedArray,
-  stops: { at: number; rgb: [number, number, number] }[],
-  blend: number,
-) {
-  const sorted = [...stops].sort((a, b) => a.at - b.at);
-  for (let i = 0; i < data.length; i += 4) {
-    const y = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
-    let r = sorted[0].rgb[0], g = sorted[0].rgb[1], b = sorted[0].rgb[2];
-    for (let s = 0; s < sorted.length - 1; s++) {
-      const a = sorted[s], c = sorted[s + 1];
-      if (y >= a.at && y <= c.at) {
-        const u = (y - a.at) / Math.max(1e-6, c.at - a.at);
-        r = a.rgb[0] + (c.rgb[0] - a.rgb[0]) * u;
-        g = a.rgb[1] + (c.rgb[1] - a.rgb[1]) * u;
-        b = a.rgb[2] + (c.rgb[2] - a.rgb[2]) * u;
-        break;
-      }
-      if (y > c.at) {
-        r = c.rgb[0]; g = c.rgb[1]; b = c.rgb[2];
+/** Composite 0..1 ink mask toward inkColor. */
+export function compositeInk(
+  img: ImgBuf,
+  mask: Float32Array,
+  inkColor: [number, number, number] = [15, 15, 20],
+): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  for (let p = 0, i = 0; i < data.length; i += 4, p++) {
+    const m = mask[p];
+    out[i] = data[i] + (inkColor[0] - data[i]) * m;
+    out[i + 1] = data[i + 1] + (inkColor[1] - data[i + 1]) * m;
+    out[i + 2] = data[i + 2] + (inkColor[2] - data[i + 2]) * m;
+    out[i + 3] = data[i + 3];
+  }
+  return { data: out, width, height };
+}
+
+/** Cross-hatch for Sketch; strength 0..1. */
+export function crossHatch(img: ImgBuf, strength: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data);
+  if (strength <= 0) return { data: out, width, height };
+
+  const spacing = Math.max(2, Math.round(6 - strength * 3));
+  const darkThresh = 170 - strength * 60;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = idx(x, y, width);
+      const l = luma(data[i], data[i + 1], data[i + 2]);
+      if (l > darkThresh) continue;
+      const darkness = 1 - l / darkThresh;
+      const onDiag1 = (x + y) % spacing === 0;
+      const onDiag2 = strength > 0.5 && (x - y + height) % spacing === 0;
+      if (onDiag1 || onDiag2) {
+        const amt = Math.min(1, darkness * strength * 1.4);
+        out[i] = data[i] * (1 - amt);
+        out[i + 1] = data[i + 1] * (1 - amt);
+        out[i + 2] = data[i + 2] * (1 - amt);
       }
     }
-    data[i] = clamp8(data[i] * (1 - blend) + r * blend);
-    data[i + 1] = clamp8(data[i + 1] * (1 - blend) + g * blend);
-    data[i + 2] = clamp8(data[i + 2] * (1 - blend) + b * blend);
   }
+  return { data: out, width, height };
 }
+
+/** Soft color cells with blend back toward original. */
+export function colorCells(img: ImgBuf, cellSize: number, blendAmt: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  const cs = Math.max(2, cellSize | 0);
+  const k = Math.max(0, Math.min(1, blendAmt));
+
+  for (let by = 0; by < height; by += cs) {
+    for (let bx = 0; bx < width; bx += cs) {
+      let r = 0,
+        g = 0,
+        b = 0,
+        count = 0;
+      const yEnd = Math.min(height, by + cs);
+      const xEnd = Math.min(width, bx + cs);
+      for (let y = by; y < yEnd; y++) {
+        for (let x = bx; x < xEnd; x++) {
+          const i = idx(x, y, width);
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+          count++;
+        }
+      }
+      r /= count;
+      g /= count;
+      b /= count;
+      for (let y = by; y < yEnd; y++) {
+        for (let x = bx; x < xEnd; x++) {
+          const i = idx(x, y, width);
+          out[i] = data[i] + (r - data[i]) * k;
+          out[i + 1] = data[i + 1] + (g - data[i + 1]) * k;
+          out[i + 2] = data[i + 2] + (b - data[i + 2]) * k;
+          out[i + 3] = data[i + 3];
+        }
+      }
+    }
+  }
+  return { data: out, width, height };
+}
+
+/** Halftone dots in shadows only. */
+export function halftoneShadows(
+  img: ImgBuf,
+  dotSize: number,
+  threshold: number,
+  strength: number,
+): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data);
+  const ds = Math.max(2, dotSize | 0);
+  const k = Math.max(0, Math.min(1, strength));
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = idx(x, y, width);
+      const l = luma(data[i], data[i + 1], data[i + 2]);
+      if (l >= threshold) continue;
+      const cx = Math.floor(x / ds) * ds + ds / 2;
+      const cy = Math.floor(y / ds) * ds + ds / 2;
+      const dist = Math.hypot(x - cx, y - cy);
+      const radius = (1 - l / threshold) * (ds / 2);
+      if (dist < radius) {
+        out[i] = data[i] * (1 - k);
+        out[i + 1] = data[i + 1] * (1 - k);
+        out[i + 2] = data[i + 2] * (1 - k);
+      }
+    }
+  }
+  return { data: out, width, height };
+}
+
+/** Local neon rim — magenta/cyan on edges only. */
+export function neonRim(
+  img: ImgBuf,
+  strength: number,
+  colorA: [number, number, number] = [255, 0, 200],
+  colorB: [number, number, number] = [0, 220, 255],
+): ImgBuf {
+  const { width, height, data } = img;
+  const mag = sobelMagnitude(img);
+  const out = new Uint8ClampedArray(data);
+  let maxMag = 1;
+  for (let i = 0; i < mag.length; i++) if (mag[i] > maxMag) maxMag = mag[i];
+  const k = Math.max(0, Math.min(1, strength));
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = y * width + x;
+      const e = Math.min(1, mag[p] / (maxMag * 0.5));
+      if (e < 0.05) continue;
+      const i = idx(x, y, width);
+      const useA = (x + y) % 2 === 0;
+      const [cr, cg, cb] = useA ? colorA : colorB;
+      const amt = e * k;
+      out[i] = data[i] + (cr - data[i]) * amt;
+      out[i + 1] = data[i + 1] + (cg - data[i + 1]) * amt;
+      out[i + 2] = data[i + 2] + (cb - data[i + 2]) * amt;
+    }
+  }
+  return { data: out, width, height };
+}
+
+/** Midtone darken for night feel. */
+export function midtoneDarken(img: ImgBuf, amount: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  const a = Math.max(0, Math.min(1, amount));
+  for (let i = 0; i < data.length; i += 4) {
+    for (let c = 0; c < 3; c++) {
+      const v = data[i + c] / 255;
+      const w = 4 * v * (1 - v);
+      out[i + c] = data[i + c] * (1 - a * w * 0.6);
+    }
+    out[i + 3] = data[i + 3];
+  }
+  return { data: out, width, height };
+}
+
+/** Partial cyan-magenta-violet palette blend. */
+export function cyberpunkPaletteBlend(img: ImgBuf, amount: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  const a = Math.max(0, Math.min(1, amount));
+  for (let i = 0; i < data.length; i += 4) {
+    const l = luma(data[i], data[i + 1], data[i + 2]) / 255;
+    let pr: number, pg: number, pb: number;
+    if (l < 0.5) {
+      const t = l / 0.5;
+      pr = 60 + (220 - 60) * t;
+      pg = 10 + (0 - 10) * t;
+      pb = 90 + (170 - 90) * t;
+    } else {
+      const t = (l - 0.5) / 0.5;
+      pr = 220 + (0 - 220) * t;
+      pg = 0 + (220 - 0) * t;
+      pb = 170 + (255 - 170) * t;
+    }
+    out[i] = data[i] + (pr - data[i]) * a;
+    out[i + 1] = data[i + 1] + (pg - data[i + 1]) * a;
+    out[i + 2] = data[i + 2] + (pb - data[i + 2]) * a;
+    out[i + 3] = data[i + 3];
+  }
+  return { data: out, width, height };
+}
+
+/** Warm + green midtone lift (Ghibli storybook). */
+export function warmGreenLift(img: ImgBuf, amount: number): ImgBuf {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  const a = Math.max(0, Math.min(1, amount));
+  for (let i = 0; i < data.length; i += 4) {
+    const l = luma(data[i], data[i + 1], data[i + 2]) / 255;
+    const w = Math.sin(Math.PI * l);
+    out[i] = Math.min(255, data[i] + 12 * a * w);
+    out[i + 1] = Math.min(255, data[i + 1] + 10 * a * w);
+    out[i + 2] = Math.max(0, data[i + 2] - 6 * a * w);
+    out[i + 3] = data[i + 3];
+  }
+  return { data: out, width, height };
+}
+
+// Keep clampCoord export for any residual imports
+export { clampCoord };
