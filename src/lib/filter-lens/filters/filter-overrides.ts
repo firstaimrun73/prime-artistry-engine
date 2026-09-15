@@ -1,13 +1,13 @@
 /**
- * filter-overrides.ts — recipes only (UI locked).
- * 80s: magenta/cyan split, grain, neon contrast.
- * Rangoli: high-sat multi-hue rainbow blushes.
- * Anime/Comic/Sketch: face-preserving style ops.
+ * filter-overrides.ts — processing recipes only (UI locked).
+ * Common: photographic grades.
+ * AI+: graphic style keys where the catalog look is transformative.
+ * Premium slots 076–100 are owned by filters-premium-25.ts (not overridden here).
  */
 import type { ProcessingProfile } from '../shared/processing-types';
 
 export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
-  // ——— Pure neutral grayscale ———
+  // ——— Pure neutral grayscale (Common) ———
   'filter-010': {
     monochrome: true,
     contrast: 24,
@@ -44,7 +44,7 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     clarity: 14,
   },
 
-  // ——— 80s retro (synth / neon era grade — no IP names) ———
+  // ——— 80s retro grade (Common/AI photo era) ———
   'filter-015': {
     temperature: -6,
     tint: 18,
@@ -162,7 +162,33 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     },
   },
 
-  // ——— Creative ———
+  // ——— AI+ graphic / neon (structure recipes, not photo+numbers) ———
+  'filter-050': {
+    // Rain Neon — localized neon rim + cool night
+    style: 'neon',
+    contrast: 18,
+    saturation: 14,
+    temperature: -10,
+    shadows: -8,
+  },
+  'filter-051': {
+    style: 'neon',
+    contrast: 16,
+    saturation: 12,
+    temperature: -14,
+  },
+  'filter-052': {
+    style: 'neon',
+    contrast: 18,
+    saturation: 16,
+    temperature: 8,
+  },
+  'filter-064': {
+    // City Reflect / cyber — full cyberpunk graphic pipeline
+    style: 'cyberpunk',
+  },
+
+  // Creative photo grades (still adjustment-oriented)
   'filter-073': {
     saturation: 52,
     vibrance: 55,
@@ -180,45 +206,20 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     shadows: 8,
     bloom: 12,
   },
-  // Rangoli — rainbow color blushes (magenta / cyan / gold)
+  // Rangoli / Prism — jewel color mapping (photo-supporting; structure via split)
   'filter-075': {
-    saturation: 62,
-    vibrance: 58,
-    contrast: 22,
+    saturation: 48,
+    vibrance: 42,
+    contrast: 18,
     temperature: 4,
     tint: 10,
-    bloom: 18,
-    clarity: 8,
-    softBlur: 3,
+    bloom: 12,
     splitToning: {
       shadowsHue: 285,
       shadowsSaturation: 72,
       highlightsHue: 48,
       highlightsSaturation: 68,
       balance: -12,
-    },
-    channelAdjustments: {
-      red: { gain: 1.08 },
-      green: { gain: 1.04 },
-      blue: { gain: 1.12 },
-    },
-  },
-  'filter-064': {
-    temperature: -18,
-    tint: 18,
-    contrast: 30,
-    shadows: -12,
-    highlights: -8,
-    saturation: 22,
-    vibrance: 18,
-    vignette: 20,
-    bloom: 14,
-    splitToning: {
-      shadowsHue: 280,
-      shadowsSaturation: 45,
-      highlightsHue: 190,
-      highlightsSaturation: 50,
-      balance: -4,
     },
   },
   'filter-043': {
@@ -243,68 +244,7 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     temperature: 4,
   },
 
-  // Anime — soft cel, luminous skin
-  'filter-095': {
-    style: 'anime',
-    contrast: 12,
-    saturation: 22,
-    vibrance: 18,
-    temperature: 8,
-    softBlur: 3,
-    bloom: 8,
-  },
-  // Comic — graphic ink, readable faces
-  'filter-099': {
-    style: 'comic',
-    contrast: 22,
-    saturation: 24,
-    vibrance: 14,
-    clarity: 6,
-  },
-  // Sketch — stronger black line weight
-  'filter-100': {
-    style: 'sketch',
-    contrast: 18,
-    grain: 4,
-  },
-
-  // Premium non-mono
-  'filter-091': {
-    monochrome: false,
-    temperature: -16,
-    tint: -6,
-    contrast: 26,
-    saturation: 12,
-    shadows: -8,
-    highlights: -6,
-    vignette: 18,
-    clarity: 12,
-    splitToning: {
-      shadowsHue: 230,
-      shadowsSaturation: 35,
-      highlightsHue: 200,
-      highlightsSaturation: 22,
-      balance: -6,
-    },
-  },
-  'filter-092': {
-    monochrome: false,
-    temperature: 14,
-    tint: 6,
-    contrast: 18,
-    saturation: 6,
-    fade: 8,
-    softBlur: 6,
-    vignette: 14,
-    clarity: 8,
-    splitToning: {
-      shadowsHue: 35,
-      shadowsSaturation: 22,
-      highlightsHue: 45,
-      highlightsSaturation: 18,
-      balance: 4,
-    },
-  },
+  // NOTE: filter-076…filter-100 recipes live in filters-premium-25.ts only.
 };
 
 export const FILTER_NAME_OVERRIDES: Record<string, string> = {
@@ -317,7 +257,4 @@ export const FILTER_NAME_OVERRIDES: Record<string, string> = {
   'filter-055': 'Red Tint',
   'filter-064': 'Cyber City',
   'filter-075': 'Rangoli',
-  'filter-091': 'Sapphire',
-  'filter-092': 'Champagne',
-  'filter-095': 'Anime',
 };
