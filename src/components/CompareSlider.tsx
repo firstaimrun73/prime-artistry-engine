@@ -7,10 +7,9 @@ type Props = {
 };
 
 /**
- * BEFORE ← slider → AFTER.
- * Shared aspect-ratio frame constrained by available width AND height.
+ * BEFORE ← slider → AFTER in ONE shared frame.
+ * Both images use identical inset geometry; only clip boundary moves.
  * Divider + handle use Filters brand orange #FF5A1F.
- * Before and After share identical geometry for every aspect ratio.
  */
 export function CompareSlider({ before, after, className }: Props) {
   const [pos, setPos] = useState(50);
@@ -99,9 +98,10 @@ export function CompareSlider({ before, after, className }: Props) {
   }, [update, endDrag]);
 
   const frameH = ratio && frameW > 0 ? Math.round(frameW / ratio) : undefined;
-  // Keep labels clear of the handle at extremes (0% / 100%)
   const showBefore = pos > 14;
   const showAfter = pos < 86;
+  // clip from the right so left side shows BEFORE
+  const clipRight = Math.max(0, Math.min(100, 100 - pos));
 
   return (
     <div
@@ -129,6 +129,7 @@ export function CompareSlider({ before, after, className }: Props) {
           update(e.touches[0].clientX);
         }}
       >
+        {/* AFTER — full frame base */}
         <img
           src={after}
           alt="After"
@@ -136,20 +137,17 @@ export function CompareSlider({ before, after, className }: Props) {
           className="pointer-events-none absolute inset-0 h-full w-full"
           style={{ objectFit: "fill" }}
         />
+        {/* BEFORE — same full-frame geometry, clipped by slider */}
         <div
-          className="pointer-events-none absolute inset-0 overflow-hidden"
-          style={{ width: `${pos}%` }}
+          className="pointer-events-none absolute inset-0"
+          style={{ clipPath: `inset(0 ${clipRight}% 0 0)` }}
         >
           <img
             src={before}
             alt="Before"
             draggable={false}
-            className="absolute left-0 top-0 h-full max-w-none"
-            style={{
-              width: frameW > 0 ? frameW : "100%",
-              height: "100%",
-              objectFit: "fill",
-            }}
+            className="absolute inset-0 h-full w-full"
+            style={{ objectFit: "fill" }}
           />
         </div>
         <div
@@ -157,7 +155,6 @@ export function CompareSlider({ before, after, className }: Props) {
           style={{ left: `${pos}%` }}
         >
           <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-[#FF5A1F] shadow-md">
-            {/* BEFORE ↔ AFTER compare arrows */}
             <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden className="text-white">
               <path d="M6 1L1 6l5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M10 1l5 5-5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
