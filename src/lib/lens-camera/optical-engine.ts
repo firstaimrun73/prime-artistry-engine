@@ -2,11 +2,17 @@
  * Motio2edit Lens public API — quality kernels in opt-*.ts
  */
 import type { CameraLensDef, LensAspectId } from "./roster";
-import { captureVideoFrame, cropToAspect, canvasToBlob, clone } from "./opt-core";
+import {
+  captureVideoFrame,
+  cropToAspect,
+  canvasToBlob,
+  clone,
+  normalizeCaptureSize,
+} from "./opt-core";
 import { applyLensById } from "./opt-switch";
 import { infrared } from "./opt-fx1";
 
-export { captureVideoFrame, cropToAspect, canvasToBlob };
+export { captureVideoFrame, cropToAspect, canvasToBlob, normalizeCaptureSize };
 
 /** Free-tier watermark — bottom-right, subtle, Motio2edit branded */
 export function applyFreeLensWatermark(src: HTMLCanvasElement): HTMLCanvasElement {
@@ -33,9 +39,10 @@ export function applyLensOpticalEnhanced(
   source: HTMLCanvasElement,
   lens: CameraLensDef,
   aspectId: LensAspectId = "native",
-  opts?: { watermark?: boolean },
+  opts?: { watermark?: boolean; maxEdge?: number },
 ): HTMLCanvasElement {
-  let result = applyLensById(source, lens.id, aspectId);
+  const prepared = normalizeCaptureSize(source, opts?.maxEdge ?? 2560);
+  let result = applyLensById(prepared, lens.id, aspectId);
   if (opts?.watermark === true) result = applyFreeLensWatermark(result);
   return result;
 }
