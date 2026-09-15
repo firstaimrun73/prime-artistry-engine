@@ -159,6 +159,7 @@ export function EffectStudioPage({
   const [resultWmUrl, setResultWmUrl] = useState<string | null>(null);
   const [intensity, setIntensity] = useState(85);
   const [busy, setBusy] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [thumbsBusy, setThumbsBusy] = useState(false);
   const [phase, setPhase] = useState<"idle" | "edit" | "result">("idle");
   const [comparing, setComparing] = useState(false);
@@ -327,6 +328,7 @@ export function EffectStudioPage({
   const onApply = async () => {
     if (!file || !selected || !sourceRgba.current) return;
     if (!isUnlocked(selected)) { toast.message("Unlock this filter to apply"); return; }
+    setApplying(true);
     setBusy(true);
     try {
       const def = getFilterById(selected.id); if (!def) throw new Error("Filter not found");
@@ -344,7 +346,7 @@ export function EffectStudioPage({
       if (freeUser) setWmEnabled(true);
       setPhase("result"); setComparing(false); toast.success("Filter applied");
     } catch (err) { toast.error(err instanceof Error ? err.message : "Apply failed"); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setApplying(false); }
   };
   const onRestart = () => {
     setPhase("edit");
@@ -434,7 +436,6 @@ export function EffectStudioPage({
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
       </header>
 
-      {/* Image workspace: light zinc in light mode, dark zinc in dark mode — not forced pure white */}
       <div className="relative flex min-h-0 flex-1 items-center justify-center bg-zinc-100 dark:bg-zinc-900 px-2 py-2">
         {phase === "result" && sourceUrl && displayResultUrl ? (
           comparing ? (
@@ -538,8 +539,8 @@ export function EffectStudioPage({
                   <OrangeSlider value={intensity} min={0} max={100} onChange={(v) => { bumpToEdit(); setIntensity(v); pushHistoryDebounced({ selectedId, intensity: v, adj: { ...adj }, highlightColorId, shadowColorId }); }} ariaLabel="Intensity" />
                   <span className="w-8 shrink-0 text-right text-xs font-bold tabular-nums">{intensity}</span>
                 </div>
-                <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white shadow-md shadow-[#FF5A1F]/20 disabled:opacity-40">
-                  {busy ? (<><Loader2 className="h-4 w-4 animate-spin" /> Applying…</>) : ("Apply filter")}
+                <button type="button" disabled={applying || busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white shadow-md shadow-[#FF5A1F]/20 disabled:opacity-40">
+                  {applying || busy ? (<><Loader2 className="h-4 w-4 animate-spin text-white" aria-hidden /> Applying…</>) : ("Apply filter")}
                 </button>
               </div>
             ) : (
@@ -564,7 +565,7 @@ export function EffectStudioPage({
                         return (
                           <button key={s.id} type="button" onClick={() => {
                             bumpToEdit();
-                            if (colorTarget === "highlight") { setHighlightColorId(s.id); pushHistory({ selectedId, intensity, adj: { ...adj }, highlightColorId: s.id, shadowColorId: s.id }); }
+                            if (colorTarget === "highlight") { setHighlightColorId(s.id); pushHistory({ selectedId, intensity, adj: { ...adj }, highlightColorId: s.id, shadowColorId }); }
                             else { setShadowColorId(s.id); pushHistory({ selectedId, intensity, adj: { ...adj }, highlightColorId, shadowColorId: s.id }); }
                           }} className={cn("h-7 w-7 rounded-full border-2", activeId === s.id ? "border-white shadow-[0_0_0_2px_#FF5A1F] scale-110" : "border-transparent")} style={{ background: `rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})` }} aria-label={s.id} />
                         );
@@ -573,8 +574,8 @@ export function EffectStudioPage({
                   </div>
                 )}
                 <button type="button" onClick={resetAdjust} className="text-center text-xs text-muted-foreground underline">Reset adjustments</button>
-                <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-40">
-                  {busy ? "Applying…" : "Apply filter"}
+                <button type="button" disabled={applying || busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-40">
+                  {applying || busy ? (<><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Applying…</>) : ("Apply filter")}
                 </button>
               </div>
             )}
