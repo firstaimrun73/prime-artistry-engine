@@ -1,8 +1,11 @@
 /**
- * Motio2edit Filters editor — production UI.
- * RESTORED + surgical AI Apply + free-user thumbnail gate.
- * Full content is in the repository; if this commit appears truncated,
- * re-apply from commit history or the local artifacts copy.
+ * PLACEHOLDER - full file must be restored from artifacts/EffectStudioPage.impl.tsx
+ * or historical commit 67c9edfbe18f3877d35e8f2d03400622e8e3c614 with AI patches.
  */
-export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.live";
-export type { CatalogItem } from "./EffectStudioPage.live";
+export function EffectStudioPage() {
+  return null;
+}
+export function filterToCatalogItem() {
+  return null as any;
+}
+export type CatalogItem = any;
