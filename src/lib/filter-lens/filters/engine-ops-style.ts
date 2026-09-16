@@ -36,6 +36,9 @@ export type StyleKey =
   | 'neon'
   | 'ghibli'
   | 'retro3d'
+  | 'rangoli'
+  | 'glassy'
+  | 'origami'
   | 'flatvector'
   | 'painting'
   | 'none';
@@ -62,21 +65,24 @@ function writeBack(image: RGBAImage, buf: ImgBuf): void {
 function applySketch(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
-  const base = bilateralApprox(img, 2, 28);
+  const base = bilateralApprox(img, 2, 32);
   const { width, height, data } = base;
   const paper = new Uint8ClampedArray(data.length);
   for (let i = 0; i < data.length; i += 4) {
     const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    const g = 210 + (l / 255) * 35 - (255 - l) * 0.15 * t;
-    paper[i] = paper[i + 1] = paper[i + 2] = Math.max(180, Math.min(250, g));
+    const grain = ((i * 13) % 17) - 8;
+    const g = 205 + (l / 255) * 40 - (255 - l) * 0.22 * t + grain * 0.4;
+    paper[i] = paper[i + 1] = paper[i + 2] = Math.max(170, Math.min(248, g));
     paper[i + 3] = data[i + 3];
   }
   let out: ImgBuf = { data: paper, width, height };
-  const inkStrength = 0.85 + t * 1.4;
-  const threshold = 12 + stats.edgeDensity * 22;
+  const inkStrength = 1.05 + t * 1.55;
+  const threshold = 8 + stats.edgeDensity * 18;
   const inkMask = sobelInkMask(img, inkStrength, threshold);
-  out = compositeInk(out, inkMask, [28, 26, 32]);
-  if (t > 0.2) out = crossHatch(out, Math.min(1, (t - 0.2) / 0.55 + 0.25));
+  out = compositeInk(out, inkMask, [18, 16, 22]);
+  const fineMask = sobelInkMask(img, 0.55 + t * 0.7, 22);
+  out = compositeInk(out, scaleMask(fineMask, 0.55), [35, 32, 38]);
+  if (t > 0.15) out = crossHatch(out, Math.min(1, (t - 0.15) / 0.5 + 0.35));
   return out;
 }
 
@@ -84,13 +90,13 @@ function applyOil(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
   const edgeAdj = stats.edgeDensity > 0.12 ? -1 : 0;
-  const radius = Math.max(2, Math.min(4, Math.round(2 + t * 2 + edgeAdj)));
-  const levels = stats.lowContrast ? 10 : 8;
+  const radius = Math.max(3, Math.min(6, Math.round(3 + t * 2.5 + edgeAdj)));
+  const levels = stats.lowContrast ? 9 : 7;
   let out = oilPaint(img, radius, levels);
-  if (t > 0.7) {
-    const second = oilPaint(out, radius + 1, levels);
-    out = blend(out, second, ((t - 0.7) / 0.3) * 0.5);
-  }
+  const second = oilPaint(out, radius + 1, Math.max(5, levels - 1));
+  out = blend(out, second, 0.35 + t * 0.35);
+  const edgeMask = adaptiveEdgeMask(img, 2, 8);
+  out = compositeInk(out, scaleMask(edgeMask, 0.25 + t * 0.25), [40, 28, 20]);
   return out;
 }
 
@@ -120,7 +126,6 @@ function applyCartoon(img: ImgBuf, intensity: number): ImgBuf {
   return out;
 }
 
-/** Comic = cartoon structure + stronger ink + halftone shadows */
 function applyComic(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   let out = applyCartoon(img, intensity);
@@ -153,21 +158,25 @@ function applyNeon(img: ImgBuf, intensity: number): ImgBuf {
 function applyGhibli(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
-  const radius = stats.edgeDensity > 0.12 ? 2 : 3;
-  const painterly = oilPaint(img, radius, 9);
-  let out = blend(img, painterly, 0.7 + t * 0.25);
-  out = bilateralApprox(out, 2, 18);
-  out = warmGreenLift(out, 0.45 + t * 0.45);
+  const radius = stats.edgeDensity > 0.12 ? 3 : 4;
+  const painterly = oilPaint(img, radius, 8);
+  let out = blend(img, painterly, 0.82 + t * 0.15);
+  out = bilateralApprox(out, 3, 22);
+  out = softQuantize(out, 11, 0.28);
+  out = warmGreenLift(out, 0.55 + t * 0.4);
   const { width, height, data } = out;
   const faded = new Uint8ClampedArray(data.length);
-  const fadeAmt = 0.1 + t * 0.1;
+  const fadeAmt = 0.12 + t * 0.14;
   for (let i = 0; i < data.length; i += 4) {
-    faded[i] = data[i] + (245 - data[i]) * fadeAmt * 0.35 + 12 * fadeAmt;
-    faded[i + 1] = data[i + 1] + (245 - data[i + 1]) * fadeAmt * 0.35 + 10 * fadeAmt;
-    faded[i + 2] = data[i + 2] + (245 - data[i + 2]) * fadeAmt * 0.25;
+    faded[i] = Math.min(255, data[i] + (248 - data[i]) * fadeAmt * 0.4 + 14 * fadeAmt);
+    faded[i + 1] = Math.min(255, data[i + 1] + (250 - data[i + 1]) * fadeAmt * 0.38 + 12 * fadeAmt);
+    faded[i + 2] = Math.min(255, data[i + 2] + (240 - data[i + 2]) * fadeAmt * 0.22);
     faded[i + 3] = data[i + 3];
   }
-  return { data: faded, width, height };
+  out = { data: faded, width, height };
+  const edgeMask = adaptiveEdgeMask(img, 2, 10);
+  out = compositeInk(out, scaleMask(edgeMask, 0.2 + t * 0.2), [55, 45, 40]);
+  return out;
 }
 
 function applyRetro3d(img: ImgBuf, intensity: number): ImgBuf {
@@ -187,6 +196,47 @@ function applyAnime(img: ImgBuf, intensity: number): ImgBuf {
   out = softQuantize(out, 9, 0.25);
   const inkMask = sobelInkMask(img, 0.4 + t * 0.45, 26);
   out = compositeInk(out, inkMask, [15, 12, 18]);
+  return out;
+}
+
+function applyRangoli(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  let out = bilateralApprox(img, 2, 30);
+  out = softQuantize(out, 8, 0.3);
+  out = colorCells(out, 4, 0.45 + t * 0.25);
+  out = cyberpunkPaletteBlend(out, 0.4 + t * 0.35);
+  const inkMask = sobelInkMask(img, 0.7 + t * 0.9, 16);
+  out = compositeInk(out, inkMask, [40, 10, 50]);
+  out = neonRim(out, 0.25 + t * 0.35);
+  return out;
+}
+
+function applyGlassy(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  let out = bilateralApprox(img, 2, 25);
+  out = midtoneDarken(out, 0.12 + t * 0.18);
+  const { data, width, height } = out;
+  const d = new Uint8ClampedArray(data);
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = Math.min(255, d[i] * 0.85 + 20 * t);
+    d[i + 1] = Math.min(255, d[i + 1] * 0.95 + 35 * t);
+    d[i + 2] = Math.min(255, d[i + 2] * 1.05 + 55 * t);
+  }
+  out = { data: d, width, height };
+  out = neonRim(out, 0.45 + t * 0.55);
+  const edgeMask = adaptiveEdgeMask(img, 2, 9);
+  out = compositeInk(out, scaleMask(edgeMask, 0.3 + t * 0.25), [180, 230, 255]);
+  return out;
+}
+
+function applyOrigami(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  let out = bilateralApprox(img, 2, 35);
+  out = softQuantize(out, 6, 0.4);
+  out = colorCells(out, 5 + Math.round(t * 2), 0.55 + t * 0.25);
+  const inkMask = sobelInkMask(img, 0.85 + t * 0.9, 14);
+  out = compositeInk(out, inkMask, [30, 28, 25]);
+  out = midtoneDarken(out, 0.08 + t * 0.12);
   return out;
 }
 
@@ -213,6 +263,12 @@ function applyStyleBuf(img: ImgBuf, style: string, intensity: number): ImgBuf {
       return applyRetro3d(img, intensity);
     case 'anime':
       return applyAnime(img, intensity);
+    case 'rangoli':
+      return applyRangoli(img, intensity);
+    case 'glassy':
+      return applyGlassy(img, intensity);
+    case 'origami':
+      return applyOrigami(img, intensity);
     case 'flatvector':
       return applyCartoon(img, intensity);
     default:
