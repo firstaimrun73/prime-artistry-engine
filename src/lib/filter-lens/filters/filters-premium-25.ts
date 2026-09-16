@@ -68,7 +68,7 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
     { style: 'neon' }, true),
 
   p('filter-083', 'Cyberpunk', 'Neon',
-    'Full-frame illustrated cyberpunk — color cells, cyan/magenta palette, halftone, bold contours, neon rim.',
+    'Illustrated cyberpunk — cyan/magenta lighting, reflective surfaces, atmospheric depth, color cells. Distinct from Neon City.',
     { style: 'cyberpunk' }, true),
 
   p('filter-084', 'Aqua', 'Cool',
@@ -88,20 +88,20 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
     'Darker cinematic shadows, muted colors, dramatic atmosphere.',
     { contrast: 24, saturation: -18, shadows: -10, vignette: 22, fade: 8, grain: 6, temperature: -4 }),
 
-  p('filter-088', 'Pastel', 'Soft',
-    'Soft pastel colors, lower contrast, gentle dreamy highlights.',
-    { softBlur: 8, fade: 14, saturation: -12, temperature: 6, bloom: 12, contrast: 6, clarity: -6 }),
+  p('filter-088', 'Rangoli', 'Art',
+    'Elaborate Rangoli-inspired decorative art — ornamental geometry, vibrant jewel motifs, intricate linework. AI transforms on Apply.',
+    { style: 'rangoli' }),
 
   p('filter-089', 'Film Grain', 'Film',
     'Authentic fine film grain with subtle film color character — sharp subjects.',
     { grain: 26, fade: 10, contrast: 14, temperature: 4, vignette: 12, saturation: -4 }),
 
   p('filter-090', 'Sketch', 'Sketch',
-    'Graphite sketch — intensity controls outline darkness and hatch strength.',
+    'Full-image hand-drawn graphite sketch — natural contours, variable line weight, cross-hatch shading. AI transforms on Apply.',
     { style: 'sketch' }),
 
   p('filter-091', 'Oil Painting', 'Art',
-    'Oil paint patches via intensity-bin NPR — readable faces, painterly fields.',
+    'Full-image oil painting — visible brush strokes, impasto texture, painterly color mix. AI transforms on Apply.',
     { style: 'oil' }),
 
   p('filter-092', 'Cartoon', 'Comic',
@@ -112,22 +112,21 @@ export const FILTERS_PREMIUM_25: FilterDefinition[] = [
     'Soft wash diffusion, pigment edge darkening — full-frame watercolor.',
     { style: 'watercolor' }),
 
-  p('filter-094', 'Rainbow', 'Art',
-    'Smooth multicolor spectrum highlights — vibrant but subject stays clear.',
-    { saturation: 26, vibrance: 30, contrast: 12, bloom: 10,
-      splitToning: { shadowsHue: 280, shadowsSaturation: 40, highlightsHue: 50, highlightsSaturation: 45, balance: 0 } }, true),
+  p('filter-094', 'Neon City', 'Neon',
+    'Cinematic night city — neon signage glow, wet-street reflections, atmospheric depth, distinct from Cyberpunk graphic cells.',
+    { style: 'neon', contrast: 28, saturation: 22, bloom: 16, temperature: -10, vignette: 18, shadows: 6,
+      splitToning: { shadowsHue: 220, shadowsSaturation: 28, highlightsHue: 35, highlightsSaturation: 22, balance: -4 } }, true),
 
-  p('filter-095', 'Retro 3D', 'Art',
-    'Early-3D game-art — color cells, cel bands, baked light. Not affiliated with any game brand.',
-    { style: 'retro3d' }, true),
+  p('filter-095', 'Glassy Fish', 'Art',
+    'Translucent glassy aquatic treatment — refractive highlights, liquid reflections, iridescent speculars. Composition preserved; not an object paste.',
+    { style: 'glassy' }, true),
 
-  p('filter-096', 'Lens Flare', 'Cinematic',
-    'Cinematic optical flare and glow that complements the frame without covering faces.',
-    { bloom: 32, highlights: 8, temperature: 10, contrast: 12, softBlur: 4, vignette: 6 }),
+  p('filter-096', 'Origami', 'Art',
+    'Folded-paper reconstruction — angular facets, crease lines, paper shadows, coherent geometric lighting.',
+    { style: 'origami' }),
 
-  // Was Soft Focus — Ghibli Art flagship painterly storybook look (original, not IP copy)
   p('filter-097', 'Ghibli Art', 'Art',
-    'Warm hand-painted storybook atmosphere — soft painterly fields, natural greens, sunlight depth.',
+    'Original hand-painted storybook illustration — full-scene painterly transform of sky, surfaces, vegetation. AI on Apply.',
     { style: 'ghibli' }),
 
   p('filter-098', 'Film Noir', 'Black & White',
