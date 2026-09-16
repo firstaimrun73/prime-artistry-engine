@@ -1,9 +1,12 @@
 /**
  * AI+ filter Apply path — Cloudflare Workers AI img2img (server-only).
  * Preview stays local NPR; final Apply may use this when style is transformative.
+ * Server verifies auth + rejects free-tier abuse; credentials never client-exposed.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isAdminClaims } from "@/lib/admin-guard.server";
 import { isAiPlusStyle, type AiPlusStyleKey } from "@/lib/filter-lens/filters/ai-plus-styles";
 import { runAiPlusImg2Img } from "@/lib/filter-lens/server/cloudflare-workers-ai";
 
@@ -17,10 +20,25 @@ const inputSchema = z.object({
 });
 
 export const applyAiPlusFilter = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => inputSchema.parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     if (!isAiPlusStyle(data.style)) {
       throw new Error("This filter does not use AI processing.");
+    }
+
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("plan, credits, email")
+      .eq("id", userId)
+      .single();
+
+    const isAdmin = isAdminClaims({ email: profile?.email ?? undefined });
+    const plan = (profile?.plan ?? "free").toLowerCase();
+    // Free users must not reach Workers AI (client isUnlocked should already block).
+    if (!isAdmin && (plan === "free" || plan === "")) {
+      throw new Error("AI filters require a paid plan.");
     }
 
     const style = data.style as AiPlusStyleKey;
