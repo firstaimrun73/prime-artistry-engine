@@ -1,10 +1,7 @@
 /**
  * engine-ops-style.ts
- * Style recipes from Claude NPR engine. Intensity scales GRAPHIC stages.
- * Public applyStyle keeps RGBAImage in-place API for filter-engine.ts.
- *
- * 2026-09: Sketch / Ghibli / Cartoon strengthened for visible transformation
- * on soft studio portraits (lower thresholds, higher graphic blend).
+ * Style recipes — intensity scales GRAPHIC stages.
+ * Local NPR path (preview + AI fallback).
  */
 import type { RGBAImage, ProcessingProfile } from '../shared/processing-types';
 import {
@@ -62,41 +59,27 @@ function writeBack(image: RGBAImage, buf: ImgBuf): void {
   image.data.set(buf.data);
 }
 
-// ── SKETCH ──────────────────────────────────────────────────────────────────
-// Stronger ink + lower threshold so soft portraits get visible pencil lines.
-// Intensity directly scales outline darkness and hatch density.
 function applySketch(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
-  // Soften photo slightly so paper base is clean
   const base = bilateralApprox(img, 2, 28);
   const { width, height, data } = base;
   const paper = new Uint8ClampedArray(data.length);
-  // Higher contrast paper (less washed-out gray)
   for (let i = 0; i < data.length; i += 4) {
     const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    // Map to 210–245 range with more midtone separation
     const g = 210 + (l / 255) * 35 - (255 - l) * 0.15 * t;
     paper[i] = paper[i + 1] = paper[i + 2] = Math.max(180, Math.min(250, g));
     paper[i + 3] = data[i + 3];
   }
   let out: ImgBuf = { data: paper, width, height };
-
-  // Much stronger ink — was too weak on soft edges
-  const inkStrength = 0.85 + t * 1.4; // was 0.3 + t*1.1
-  // Lower threshold so more edges become lines
-  const threshold = 12 + stats.edgeDensity * 22; // was 25 +
+  const inkStrength = 0.85 + t * 1.4;
+  const threshold = 12 + stats.edgeDensity * 22;
   const inkMask = sobelInkMask(img, inkStrength, threshold);
   out = compositeInk(out, inkMask, [28, 26, 32]);
-
-  // Cross-hatch earlier and denser (starts at 20% intensity)
-  if (t > 0.2) {
-    out = crossHatch(out, Math.min(1, (t - 0.2) / 0.55 + 0.25));
-  }
+  if (t > 0.2) out = crossHatch(out, Math.min(1, (t - 0.2) / 0.55 + 0.25));
   return out;
 }
 
-// ── OIL ─────────────────────────────────────────────────────────────────────
 function applyOil(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
@@ -111,14 +94,12 @@ function applyOil(img: ImgBuf, intensity: number): ImgBuf {
   return out;
 }
 
-// ── WATERCOLOR ──────────────────────────────────────────────────────────────
 function applyWatercolor(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
   const radius = 3 + Math.round(t * 3);
   const sigmaColor = 25 + t * 25;
   let out = bilateralApprox(img, radius, sigmaColor);
-  // Higher levels reduce ring banding on smooth studio backgrounds
   const levels = stats.lowContrast ? 12 : 10;
   out = softQuantize(out, levels, 0.45);
   const edgeMask = adaptiveEdgeMask(img, 3, 6);
@@ -126,16 +107,12 @@ function applyWatercolor(img: ImgBuf, intensity: number): ImgBuf {
   return out;
 }
 
-// ── CARTOON / COMIC ─────────────────────────────────────────────────────────
-// Higher quantize levels + stronger outlines. Fewer concentric rings on flat bg.
 function applyCartoon(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
   const smoothed = bilateralApprox(img, 3, 42);
-  // More levels = less posterization / rings on smooth gradients
-  const levels = stats.lowContrast ? 12 : 9; // was 9 / 7
-  let out = softQuantize(smoothed, levels, 0.22); // less dither noise
-  // Stronger black outlines
+  const levels = stats.lowContrast ? 12 : 9;
+  let out = softQuantize(smoothed, levels, 0.22);
   const inkStrength = 0.75 + t * 1.15;
   const threshold = 14 + stats.edgeDensity * 24;
   const inkMask = sobelInkMask(img, inkStrength, threshold);
@@ -143,7 +120,16 @@ function applyCartoon(img: ImgBuf, intensity: number): ImgBuf {
   return out;
 }
 
-// ── CYBERPUNK ───────────────────────────────────────────────────────────────
+/** Comic = cartoon structure + stronger ink + halftone shadows */
+function applyComic(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  let out = applyCartoon(img, intensity);
+  out = halftoneShadows(out, 5, 100, 0.35 + t * 0.4);
+  const inkMask = sobelInkMask(img, 0.9 + t * 1.2, 12);
+  out = compositeInk(out, inkMask, [5, 5, 8]);
+  return out;
+}
+
 function applyCyberpunk(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
@@ -157,7 +143,6 @@ function applyCyberpunk(img: ImgBuf, intensity: number): ImgBuf {
   return out;
 }
 
-// ── NEON ────────────────────────────────────────────────────────────────────
 function applyNeon(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   let out = midtoneDarken(img, 0.25 + t * 0.35);
@@ -165,18 +150,13 @@ function applyNeon(img: ImgBuf, intensity: number): ImgBuf {
   return out;
 }
 
-// ── GHIBLI ART ──────────────────────────────────────────────────────────────
-// Was almost invisible (blend 0.4–0.7 of mild oil). Now clearly painterly.
 function applyGhibli(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
-  // Larger paint radius for visible brush structure
   const radius = stats.edgeDensity > 0.12 ? 2 : 3;
   const painterly = oilPaint(img, radius, 9);
-  // Much higher blend toward paint (was 0.4 + t*0.3 → max 0.7)
-  let out = blend(img, painterly, 0.7 + t * 0.25); // 0.70 → 0.95
+  let out = blend(img, painterly, 0.7 + t * 0.25);
   out = bilateralApprox(out, 2, 18);
-  // Stronger storybook warm-green
   out = warmGreenLift(out, 0.45 + t * 0.45);
   const { width, height, data } = out;
   const faded = new Uint8ClampedArray(data.length);
@@ -190,7 +170,6 @@ function applyGhibli(img: ImgBuf, intensity: number): ImgBuf {
   return { data: faded, width, height };
 }
 
-// ── RETRO 3D / ANIME (lightweight) ──────────────────────────────────────────
 function applyRetro3d(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
@@ -221,8 +200,9 @@ function applyStyleBuf(img: ImgBuf, style: string, intensity: number): ImgBuf {
     case 'watercolor':
       return applyWatercolor(img, intensity);
     case 'cartoon':
-    case 'comic':
       return applyCartoon(img, intensity);
+    case 'comic':
+      return applyComic(img, intensity);
     case 'cyberpunk':
       return applyCyberpunk(img, intensity);
     case 'neon':
@@ -240,9 +220,6 @@ function applyStyleBuf(img: ImgBuf, style: string, intensity: number): ImgBuf {
   }
 }
 
-/**
- * Public API used by filter-engine.ts — mutates RGBAImage in place.
- */
 export function applyStyle(
   image: RGBAImage,
   style: string | undefined,
