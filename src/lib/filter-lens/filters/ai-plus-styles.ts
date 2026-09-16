@@ -1,4 +1,4 @@
-/** Client-safe list of processingProfile.style values that use AI on final Apply. */
+/** Client-safe list of processingProfile.style values that use AI on final Apply only. */
 export const AI_PLUS_STYLE_KEYS = [
   "sketch",
   "oil",
@@ -7,8 +7,7 @@ export const AI_PLUS_STYLE_KEYS = [
   "comic",
   "anime",
   "ghibli",
-  "cyberpunk",
-  "neon",
+  "rangoli",
   "retro3d",
 ] as const;
 
