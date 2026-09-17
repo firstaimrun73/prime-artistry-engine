@@ -36,8 +36,6 @@ import {
   filterToCatalogItem,
   type AdjustValues,
   DEFAULT_ADJ,
-  applyUserAdjustments,
-  hasAdj,
   applyOutputWatermark,
 } from "./filter-editor-core";
 
@@ -81,7 +79,6 @@ export function EffectStudioPage({
   const [comparing, setComparing] = useState(false);
   const [wmEnabled, setWmEnabled] = useState(true);
   const [category, setCategory] = useState<string | "all">("all");
-  const [adj] = useState<AdjustValues>({ ...DEFAULT_ADJ });
   const sourceRgba = useRef<RGBAImage | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const previewGen = useRef(0);
