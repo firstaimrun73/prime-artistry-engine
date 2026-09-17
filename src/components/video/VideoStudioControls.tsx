@@ -57,20 +57,20 @@ export function VideoStudioControls({
             className={cn("min-h-[36px] rounded-full px-3.5 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400",
               tier === "standard" ? "bg-white text-zinc-900" : "text-zinc-400")}>Standard</button>
           <button type="button" disabled={disabled} aria-pressed={tier === "premium"}
-            aria-label={premiumLocked ? "Premium locked — view plans" : "Premium"}
+            aria-label={premiumLocked ? "Exclusive locked — view plans" : "Exclusive"}
             onClick={() => { if (premiumLocked) onPremiumLockedClick?.(); else setTier("premium"); }}
             className={cn("min-h-[36px] rounded-full px-3.5 py-1 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400",
               tier === "premium" ? "bg-gradient-to-r from-amber-400 to-orange-500 text-zinc-900 shadow shadow-amber-500/25" : "text-zinc-400",
-              premiumLocked && "opacity-60")}>Premium{premiumLocked ? " 🔒" : ""}</button>
+              premiumLocked && "opacity-60")}>Exclusive{premiumLocked ? " 🔒" : ""}</button>
         </div>
         <button type="button" disabled={disabled || !audioSupported}
           onClick={() => audioSupported && setAudioOn(!audioOn)}
           aria-pressed={audioOn && audioSupported}
-          aria-label={!audioSupported ? "Audio unavailable" : audioOn ? "Audio on" : "Audio off"}
+          aria-label={!audioSupported ? "Sound unavailable" : audioOn ? "Sound on" : "Sound off"}
           className={cn("min-h-[36px] rounded-full border px-3.5 py-1 text-[11px] font-semibold transition",
             audioOn && audioSupported ? "border-red-400/50 bg-red-500/20 text-red-200" : "border-white/10 bg-black/30 text-zinc-400",
             !audioSupported && "opacity-40")}>
-          Audio {audioOn && audioSupported ? "On" : "Off"}
+          Sound {audioOn && audioSupported ? "On" : "Off"}
         </button>
       </div>
 
