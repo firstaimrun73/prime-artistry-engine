@@ -1,10 +1,15 @@
 /**
  * Motio2edit generation billing types.
  *
- * Provider COGS ≠ customer Motio2edit credits.
- * Final economics (margins, reserves, plan multipliers) are CONFIGURABLE
- * and will be finalized after cross-review (ChatGPT + Grok + Claude).
- * Do not hardcode final business prices into product code paths.
+ * Universal Motio2edit credits across all studios.
+ * Spend conversion (NOT purchase pricing):
+ *   Image Studio: 1 credit face = 1.45¢  ($0.0145)
+ *   Video Studio: 1 credit face = 1.86¢  ($0.0186)
+ *
+ * Video spend rule (owner-defined):
+ *   credits = ceil(provider_cogs_usd * 100)
+ *   Example: fal COGS $0.50 → 50 credits deducted after successful delivery.
+ * Purchase pack pricing is separate and unchanged by these face values.
  */
 
 export type BillingProduct =
@@ -103,7 +108,12 @@ export type InsufficientCreditsError = {
 };
 
 export type BillingConfig = {
+  /** Display / accounting face value of 1 Motio2edit credit in USD (spend side) */
   creditFaceUsd: number;
+  /** Image Studio spend face value (1 credit = 1.45¢) */
+  imageCreditFaceUsd: number;
+  /** Video Studio spend face value (1 credit = 1.86¢) */
+  videoCreditFaceUsd: number;
   minRealizedCreditUsd: number;
   targetGrossMargin: number;
   operatingReserveUsd: number;
@@ -114,25 +124,30 @@ export type BillingConfig = {
 };
 
 /**
- * FINAL ECONOMICS TO BE DESIGNED AFTER CROSS-REVIEW BY CHATGPT + GROK + CLAUDE.
+ * Spend-side Motio2edit credit economics (universal wallet).
+ * Does NOT change how users purchase credit packs.
  *
- * These defaults are SCAFFOLDING ONLY.
- * Do NOT treat them as approved Motio2edit plan prices.
- * Do NOT hardcode "5s = N credits" or fixed video floors in product code.
- * productMinimumCredits.video is intentionally 0 until economics are approved.
- * The MotioCreditPricingEngine remains the single conversion point:
- *   provider COGS → (configurable formula) → customer Motio2edit credits.
+ * Video: 1 Motio2edit credit = 1.86¢ face; charge = ceil(fal_cogs_usd × 100)
+ * Image: 1 Motio2edit credit = 1.45¢ face
  */
 export const DEFAULT_BILLING_CONFIG: BillingConfig = {
-  creditFaceUsd: 0.011,
-  minRealizedCreditUsd: 0.0099,
-  targetGrossMargin: 0.45,
-  operatingReserveUsd: 0.05,
-  roundingStep: 10,
-  // No permanent product floors until final economics review.
+  creditFaceUsd: 0.0186,
+  imageCreditFaceUsd: 0.0145,
+  videoCreditFaceUsd: 0.0186,
+  minRealizedCreditUsd: 0.0186,
+  targetGrossMargin: 0,
+  operatingReserveUsd: 0,
+  roundingStep: 1,
   productMinimumCredits: {
-    video: 0,
+    video: 25,
+    image_standard: 10,
+    image_premium: 15,
   },
   quoteTtlSeconds: 300,
-  pricingVersion: "2026-09-scaffold-v1",
+  pricingVersion: "2026-09-motio-spend-v1",
 };
+
+/** Video Studio: 1 credit = 1.86¢ (spend accounting only) */
+export const VIDEO_CREDIT_FACE_CENTS = 1.86;
+/** Image Studio: 1 credit = 1.45¢ (spend accounting only) */
+export const IMAGE_CREDIT_FACE_CENTS = 1.45;
