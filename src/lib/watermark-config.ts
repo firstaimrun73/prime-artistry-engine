@@ -9,6 +9,8 @@
  */
 
 export const WATERMARK_BRAND_TEXT = "Motio2edit" as const;
+/** Exact label for Video Studio burned-in watermark (spec §21) */
+export const VIDEO_WATERMARK_LABEL = "Motio2edit Video Studio" as const;
 export const WATERMARK_BRAND_ORANGE = "#f97316";
 
 /** Supported aspect-ratio keys for asset selection (final output dimensions). */
