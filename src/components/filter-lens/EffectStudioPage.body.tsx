@@ -34,8 +34,6 @@ import { CompareSlider } from "@/components/CompareSlider";
 import {
   type CatalogItem,
   filterToCatalogItem,
-  type AdjustValues,
-  DEFAULT_ADJ,
   applyOutputWatermark,
 } from "./filter-editor-core";
 
@@ -449,9 +447,7 @@ export function EffectStudioPage({
                         {item.badge === "ai+" && (
                           <span className="absolute left-0 top-0 rounded bg-[#FF5A1F] px-1 text-[8px] font-bold text-white">AI+</span>
                         )}
-                        {locked && (
-                          <span className="absolute right-0 top-0 text-[10px]">🔒</span>
-                        )}
+                        {locked && <span className="absolute right-0 top-0 text-[10px]">🔒</span>}
                       </button>
                     );
                   })}
