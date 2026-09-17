@@ -2,7 +2,7 @@
  * Motio2edit Filters editor — production UI.
  * Uses filter-editor-core for Adjust pipeline + output-only watermark.
  * Header locked. No implementation disclosure. No filter credits.
- * Full UI: output icon bar + Watermark + bottom Undo/Redo. AI+ on Apply only.
+ * Recovered from debea276 (last UI adjustments before placeholder). AI+ on Apply only.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -382,32 +382,40 @@ export function EffectStudioPage({
         setResultWmUrl((prev) => { revokeUrl(prev); return wm; });
       } catch { setResultWmUrl(url); }
       if (freeUser) setWmEnabled(true);
-      setPhase("result"); setComparing(false); toast.success("Filter applied");
-    } catch (err) { toast.error(err instanceof Error ? err.message : "Apply failed"); }
-    finally { setBusy(false); setApplying(false); }
+      setPhase("result"); setComparing(false);
+      toast.success("Filter applied");
+    } catch (err) {
+      console.error("[Motio2edit] apply failed", err);
+      toast.error("Could not apply filter");
+    } finally {
+      setApplying(false);
+      setBusy(false);
+    }
   };
   const onRestart = () => {
     setPhase("edit");
     setResultUrl((prev) => { revokeUrl(prev); return null; });
     setResultWmUrl((prev) => { revokeUrl(prev); return null; });
-    setEditorTab("filter"); setComparing(false);
+    setComparing(false);
   };
   const onDownload = () => {
-    const preferWm = freeUser || wmEnabled;
-    const url = preferWm ? (resultWmUrl || resultUrl || previewUrl) : (resultUrl || resultWmUrl || previewUrl);
+    const url = (wmEnabled ? resultWmUrl : resultUrl) || resultUrl;
     if (!url) return;
     const a = document.createElement("a");
-    a.href = url; a.download = `motio2edit-${selected?.name ?? "filter"}.jpg`; a.click();
+    a.href = url;
+    a.download = `motio2edit-${selected?.name || "filter"}-${Date.now()}.jpg`;
+    a.click();
+    toast.success("Downloaded");
   };
   const onShare = async () => {
-    const preferWm = freeUser || wmEnabled;
-    const url = preferWm ? (resultWmUrl || resultUrl || previewUrl) : (resultUrl || resultWmUrl || previewUrl);
+    const url = (wmEnabled ? resultWmUrl : resultUrl) || resultUrl;
     if (!url) return;
     try {
-      const blob = await fetch(url).then((r) => r.blob());
-      const shareFile = new File([blob], `motio2edit-${selected?.name ?? "filter"}.jpg`, { type: "image/jpeg" });
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const shareFile = new File([blob], `motio2edit-${selected?.name || "filter"}.jpg`, { type: blob.type || "image/jpeg" });
       if (navigator.share && navigator.canShare?.({ files: [shareFile] })) {
-        await navigator.share({ files: [shareFile], title: "Motio2edit Filters" });
+        await navigator.share({ files: [shareFile], title: "Motio2edit" });
       } else { onDownload(); toast.message("Saved — share from your gallery"); }
     } catch { onDownload(); }
   };
@@ -415,76 +423,50 @@ export function EffectStudioPage({
     setAdj({ ...DEFAULT_ADJ });
     setHighlightColorId("neutral");
     setShadowColorId("neutral");
+    setColorTarget("highlight");
     pushHistory({ selectedId, intensity, adj: { ...DEFAULT_ADJ }, highlightColorId: "neutral", shadowColorId: "neutral" });
   };
-  const processedUrl = resultUrl || previewUrl;
-  const showWm = freeUser || wmEnabled;
-  const displayResultUrl = showWm ? (resultWmUrl || resultUrl) : (resultUrl || resultWmUrl);
-  const hasPhoto = !!sourceUrl;
-  const adjMeta = ADJUST_META.find((m) => m.key === adjKey)!;
-
-  if (!items || items.length === 0) {
-    return (
-      <div className="flex min-h-[60vh] flex-col bg-background text-foreground">
-        <div className="flex flex-1 flex-col items-center justify-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
-          <p className="text-sm text-muted-foreground">Loading filters…</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!hasPhoto) {
-    return (
-      <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
-        <header className="flex items-center gap-3 border-b border-border px-3 py-3">
-          <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold tracking-[0.16em] text-foreground uppercase">Motio<span className="text-[#FF5A1F]">2</span>edit</p>
-            <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
-          </div>
-        </header>
-        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 min-h-0">
-          <p className="mb-5 max-w-sm text-center text-sm text-muted-foreground">AI-powered filters · live preview on your photo</p>
-          <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
-            className="flex w-full flex-col items-center gap-4 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/45 bg-[#FFF1E6] px-6 py-16 transition hover:border-[#FF5A1F] hover:bg-[#FFE6DA] dark:bg-card dark:hover:bg-muted">
-            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[#FF5A1F]/15 text-[#FF5A1F]">{busy ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}</span>
-            <span className="text-base font-bold">Upload a photo</span>
-            <span className="text-xs text-muted-foreground">JPG · PNG · WebP</span>
-          </button>
-          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
-        </main>
-      </div>
-    );
-  }
+  const displayResultUrl = wmEnabled && resultWmUrl ? resultWmUrl : resultUrl;
+  const showWm = wmEnabled && !!resultWmUrl;
+  const adjMeta = ADJUST_META.find((m) => m.key === adjKey) ?? ADJUST_META[0];
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
-      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-3 py-2.5">
-        <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
+    <div className="flex h-[100dvh] flex-col bg-background text-foreground">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border/80 bg-card/90 px-3 py-2.5 backdrop-blur-md">
+        <Link to="/" className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:bg-muted">
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio<span className="text-[#FF5A1F]">2</span>edit</p>
-          <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
+          <FiltersTitle className="text-lg font-bold tracking-tight" />
+          <p className="truncate text-[11px] text-muted-foreground">Motio2edit</p>
         </div>
-        {phase !== "result" ? (
-          <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-semibold">
+        {file ? (
+          <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold">
             <ImagePlus className="h-3.5 w-3.5" /> Change
           </button>
         ) : null}
         <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
       </header>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center bg-zinc-100 dark:bg-zinc-900 px-2 py-2">
-        {phase === "result" && sourceUrl && displayResultUrl ? (
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-950">
+        {!file ? (
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
+            <button type="button" onClick={() => inputRef.current?.click()} className="flex flex-col items-center gap-3 rounded-3xl border-2 border-dashed border-border/60 bg-card/40 px-10 py-12">
+              <ImagePlus className="h-10 w-10 text-[#FF5A1F]" />
+              <span className="text-sm font-semibold">Upload a photo</span>
+              <span className="text-xs text-muted-foreground">JPG, PNG or WebP</span>
+            </button>
+          </div>
+        ) : phase === "result" && sourceUrl && displayResultUrl ? (
           comparing ? (
             <CompareSlider before={sourceUrl} after={displayResultUrl} className="h-full max-h-full w-full max-w-full" />
           ) : (
-            <img src={displayResultUrl} alt="Result" className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain" draggable={false} />
+            <img src={displayResultUrl} alt="Result" className="h-full w-full object-contain" />
           )
-        ) : (
-          <img src={processedUrl || sourceUrl!} alt="Preview" className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain" draggable={false} />
-        )}
-        {busy && (
+        ) : previewUrl || sourceUrl ? (
+          <img src={previewUrl || sourceUrl || ""} alt="Preview" className="h-full w-full object-contain" />
+        ) : null}
+        {(busy || applying) && (
           <div className="absolute inset-0 grid place-items-center bg-black/35">
             <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
           </div>
@@ -538,39 +520,42 @@ export function EffectStudioPage({
               </button>
             </div>
             {editorTab === "filter" ? (
-              <div className="space-y-3 px-3 pb-3">
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <div className="space-y-3 px-3">
+                <div className="flex gap-2 overflow-x-auto px-1 scrollbar-none">
                   <button type="button" onClick={() => setCategory("all")} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === "all" ? "bg-[#FF5A1F] text-white" : "border border-border bg-card")}>All</button>
                   {sortedCategories.map((c) => (
                     <button key={c} type="button" onClick={() => setCategory(c)} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === c ? "bg-[#FF5A1F] text-white" : "border border-border bg-card")}>{c}</button>
                   ))}
                 </div>
-                <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+                <div className="flex gap-2.5 overflow-x-auto px-1 pb-1 pt-0.5 scrollbar-none">
                   {filtered.map((item) => {
                     const thumb = thumbMap[item.id];
-                    const locked = !isUnlocked(item);
                     const isSel = selectedId === item.id;
                     return (
                       <button key={item.id} type="button" onClick={() => selectFilter(item)} className="w-[78px] shrink-0 text-left">
                         <div className={cn("relative aspect-[1/1.05] overflow-hidden rounded-lg bg-muted", isSel && "outline outline-2 outline-offset-1 outline-[#FF5A1F]")}>
-                          {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" draggable={false} /> : <div className="h-full w-full bg-muted" />}
+                          {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-muted" />}
                           {isSel && <span className="absolute right-1 top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#FF5A1F] text-[11px] font-bold text-white">✓</span>}
                           {!item.isFree && item.badge && (
                             item.badge === "ai+" ? (
-                              <span className="absolute left-1 top-1 rounded bg-[#FF5A1F] px-1 py-0.5 text-[8px] font-bold text-white">AI+</span>
+                              <span className="absolute left-1 top-1 inline-flex items-center rounded bg-[#FF5A1F]/95 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white ring-1 ring-[#FF5A1F]/50">AI+</span>
                             ) : (
-                              <span className="absolute left-1 top-1 rounded bg-foreground/80 px-1 py-0.5 text-[8px] font-bold text-background">{item.badge}</span>
+                              <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-gradient-to-r from-[#8B6914] to-[#C9A227] px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#FFF8E7] shadow-sm">
+                                <svg className="h-2.5 w-2.5 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                                  <path d="M8 1.5l1.6 3.6 3.9.3-3 2.7.9 3.8L8 9.8l-3.4 2.1.9-3.8-3-2.7 3.9-.3L8 1.5z" />
+                                </svg>
+                                Premium
+                              </span>
                             )
                           )}
-                          {locked && <span className="absolute bottom-1 right-1 text-[11px]">🔒</span>}
+                          <span className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center text-[9px] font-semibold uppercase tracking-wide text-white truncate">{item.name}</span>
                         </div>
-                        <span className="mt-1 block max-w-[78px] truncate text-center text-[11px] font-medium">{item.name}</span>
                       </button>
                     );
                   })}
                 </div>
                 <div className="flex items-center gap-3 px-1">
-                  <span className="w-16 shrink-0 text-xs font-semibold text-muted-foreground">Intensity</span>
+                  <span className="w-16 shrink-0 text-[11px] font-semibold text-muted-foreground">Intensity</span>
                   <OrangeSlider value={intensity} min={0} max={100} onChange={(v) => { bumpToEdit(); setIntensity(v); pushHistoryDebounced({ selectedId, intensity: v, adj: { ...adj }, highlightColorId, shadowColorId }); }} ariaLabel="Intensity" />
                   <span className="w-8 shrink-0 text-right text-xs font-bold tabular-nums">{intensity}</span>
                 </div>
@@ -579,8 +564,11 @@ export function EffectStudioPage({
                 </button>
               </div>
             ) : (
-              <div className="space-y-3 px-3 pb-3">
-                <div className="flex gap-1 overflow-x-auto pb-1">
+              <div className="space-y-3 px-3">
+                <div className="px-1">
+                  <OrangeSlider value={adj[adjKey]} min={adjMeta.min} max={adjMeta.max} onChange={(v) => { bumpToEdit(); const next = { ...adj, [adjKey]: v }; setAdj(next); pushHistoryDebounced({ selectedId, intensity, adj: next, highlightColorId, shadowColorId }); }} ariaLabel={adjMeta.label} />
+                </div>
+                <div className="flex gap-1 overflow-x-auto px-1 scrollbar-none">
                   {ADJUST_META.map((m) => (
                     <button key={m.key} type="button" onClick={() => setAdjKey(m.key)} className={cn("flex min-w-[64px] shrink-0 flex-col items-center gap-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide", adjKey === m.key ? "text-[#FF5A1F]" : "text-muted-foreground")}>
                       <m.icon className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
@@ -588,16 +576,8 @@ export function EffectStudioPage({
                     </button>
                   ))}
                 </div>
-                <div className="flex items-center gap-3 px-1">
-                  <OrangeSlider value={adj[adjKey]} min={adjMeta.min} max={adjMeta.max} onChange={(v) => { bumpToEdit(); const next = { ...adj, [adjKey]: v }; setAdj(next); pushHistoryDebounced({ selectedId, intensity, adj: next, highlightColorId, shadowColorId }); }} ariaLabel={adjMeta.label} />
-                  <span className="w-10 text-right text-xs font-bold tabular-nums">{adj[adjKey]}</span>
-                </div>
                 {(adjKey === "color" || adjKey === "hue") && (
                   <div className="px-1">
-                    <div className="mb-2 flex gap-2">
-                      <button type="button" onClick={() => setColorTarget("highlight")} className={cn("rounded-full px-3 py-1 text-[11px] font-semibold", colorTarget === "highlight" ? "bg-[#FF5A1F] text-white" : "border border-border")}>Highlight</button>
-                      <button type="button" onClick={() => setColorTarget("shadow")} className={cn("rounded-full px-3 py-1 text-[11px] font-semibold", colorTarget === "shadow" ? "bg-[#FF5A1F] text-white" : "border border-border")}>Shadow</button>
-                    </div>
                     <p className="mb-1 text-[11px] font-semibold text-muted-foreground">Tint</p>
                     <div className="flex flex-wrap gap-2">
                       {COLOR_SWATCHES.map((s) => {
