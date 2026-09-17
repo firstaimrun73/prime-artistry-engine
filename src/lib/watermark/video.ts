@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { WatermarkMode } from "./types";
-import { WATERMARK_BRAND_TEXT, WATERMARK_BRAND_ORANGE } from "@/lib/watermark-config";
+import { VIDEO_WATERMARK_LABEL, WATERMARK_BRAND_ORANGE } from "@/lib/watermark-config";
 
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -31,7 +31,7 @@ export async function renderVideoWatermark(input: Buffer, mode: WatermarkMode): 
   try {
     await writeFile(inPath, input);
     const primary =
-      `drawtext=text='${WATERMARK_BRAND_TEXT}':fontsize=h*0.032:fontcolor=white@0.92:` +
+      `drawtext=text='${VIDEO_WATERMARK_LABEL}':fontsize=h*0.032:fontcolor=white@0.92:` +
       `borderw=2:bordercolor=black@0.55:x=w-tw-28:y=h-th-28`;
     const accent =
       `drawtext=text='2':fontsize=h*0.028:fontcolor=${WATERMARK_BRAND_ORANGE.replace("#", "0x")}@0.9:` +
