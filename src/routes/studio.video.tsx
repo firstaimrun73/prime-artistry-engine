@@ -1,17 +1,16 @@
 /**
- * Motio2edit Video Studio — scroll-free premium creative workspace.
- * Wiring matches live component APIs + generateMedia server schema.
- * Billing: server quote → reserve → finalize (authoritative). Credits UI deferred.
- * Historical UI: ad8a25d3 (pre pixel-match / auto-detect redesign).
- * Restored once — old compact three-mode Video Studio (Text/Image/Video → Video).
+ * Motio2edit Video Studio — light UI (mode cards + Features panel).
+ * Three modes: Text → Video / Image → Video / Video → Video.
+ * Generation via existing generateMedia pipeline.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, Lock, Sparkles, Video } from "lucide-react";
+import { Lock, Sparkles, Video } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { StudioBackLink } from "@/components/StudioBackLink";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, isPaidPlan } from "@/lib/policy";
 import { generateMedia } from "@/lib/generate.functions";
@@ -23,7 +22,7 @@ import {
   STANDARD_VIDEO_PROMPT_MAX,
   PREMIUM_VIDEO_PROMPT_MAX,
 } from "@/components/video/VideoPromptBar";
-import { VideoStudioControls } from "@/components/video/VideoStudioControls";
+import { VideoFeaturePanel } from "@/components/video/VideoFeaturePanel";
 import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
 import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
 import { VideoOutputView } from "@/components/video/VideoOutputView";
@@ -50,7 +49,6 @@ import {
   validateTimingAgainstDuration,
 } from "@/lib/video/prompt-timing";
 import type { VideoStudioResult } from "@/components/video/video-studio-types";
-import { VIDEO_PROMPT_SUGGESTIONS } from "@/components/video/video-studio-types";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
 export const Route = createFileRoute("/studio/video")({
@@ -60,7 +58,7 @@ export const Route = createFileRoute("/studio/video")({
       { title: "Video Studio — Motio2edit" },
       {
         name: "description",
-        content: "Create AI video from text or image. Sound, duration, and quality in one place.",
+        content: "Create AI video from text, image, or video. Sound, duration, and quality in one place.",
       },
     ],
   }),
@@ -149,12 +147,15 @@ function VideoStudioPage() {
 
   const creditsEstimate = price.supported ? price.credits : 0;
 
-  const onPickSource = useCallback((file: File) => {
-    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-    const url = URL.createObjectURL(file);
-    setSourceFile(file);
-    setSourceUrl(url);
-  }, [sourceUrl]);
+  const onPickSource = useCallback(
+    (file: File) => {
+      if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+      const url = URL.createObjectURL(file);
+      setSourceFile(file);
+      setSourceUrl(url);
+    },
+    [sourceUrl],
+  );
 
   const onClearSource = useCallback(() => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
@@ -166,6 +167,7 @@ function VideoStudioPage() {
     (m: VideoGenMode) => {
       setMode(m);
       if (m === "text") onClearSource();
+      setResult(null);
     },
     [onClearSource],
   );
@@ -319,11 +321,6 @@ function VideoStudioPage() {
     }
   }, [result]);
 
-  const applySuggestion = (s: string) => {
-    if (busy) return;
-    setPrompt(s);
-  };
-
   if (!user) {
     return (
       <div className="flex min-h-[70dvh] flex-col items-center justify-center gap-4 p-6">
@@ -351,7 +348,7 @@ function VideoStudioPage() {
         </div>
         <p className="text-center text-lg font-semibold">Video Studio is on paid plans</p>
         <p className="max-w-sm text-center text-sm text-muted-foreground">
-          Unlock text-to-video and image-to-video with Standard and Exclusive modes.
+          Unlock text-to-video and image-to-video with Standard and Premium modes.
         </p>
         <Button asChild className="rounded-full px-6">
           <Link to="/pricing">View plans</Link>
@@ -366,40 +363,15 @@ function VideoStudioPage() {
     (mode === "video" ? !!sourceUrl : price.supported && (mode === "text" || !!sourceUrl));
 
   return (
-    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-zinc-950 text-white">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(239,68,68,0.18), transparent 55%)",
-        }}
-      />
+    <div className="mx-auto w-full min-w-0 max-w-lg px-4 py-4 pb-28 sm:px-5">
+      <StudioBackLink className="mb-3" />
 
-      <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-white/8 px-3 backdrop-blur-md">
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-zinc-300 hover:text-white" asChild>
-          <Link to="/studio" aria-label="Back to Studio">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold tracking-wide">Video Studio</p>
-          <p className="truncate text-[11px] text-zinc-500">
-            Motion Engine · Powered by Motio2edit AI
-          </p>
-        </div>
-        {welcomeFree && !paid && (
-          <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-            Welcome free
-          </span>
-        )}
-      </header>
+      <div className="mb-4">
+        <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
+      </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-28 pt-3">
-        <div className="flex items-center justify-between gap-2">
-          <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
-        </div>
-
-        {(mode === "image" || mode === "video") && (
+      {(mode === "image" || mode === "video") && (
+        <div className="mb-4">
           <VideoSourceUpload
             mode={mode === "video" ? "video" : "image"}
             file={sourceFile}
@@ -408,8 +380,13 @@ function VideoStudioPage() {
             onClear={onClearSource}
             disabled={busy}
           />
-        )}
+        </div>
+      )}
 
+      <section className="mb-4 space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Prompt
+        </p>
         <VideoPromptBar
           value={prompt}
           onChange={setPrompt}
@@ -422,90 +399,74 @@ function VideoStudioPage() {
               ? "Describe how the image should move…"
               : mode === "video"
                 ? "Describe how to transform this video…"
-                : "Describe your video — lighting, motion, mood…"
+                : "A cinematic drone shot over a mountain range at sunrise…"
           }
         />
+      </section>
 
-        {!prompt && !busy && mode !== "video" && (
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-            {VIDEO_PROMPT_SUGGESTIONS.slice(0, 4).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => applySuggestion(s)}
-                className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-zinc-400 transition hover:border-white/20 hover:text-zinc-200"
-              >
-                {s.length > 42 ? `${s.slice(0, 40)}…` : s}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <VideoStudioControls
+      <div className="mb-5">
+        <VideoFeaturePanel
           tier={tier}
           setTier={setTier}
           premiumLocked={premiumLocked}
           onPremiumLockedClick={() => {
-            toast.message("Exclusive is on paid plans", {
-              description: "Upgrade to unlock 15s and higher quality paths.",
+            toast.message("Premium is on paid plans", {
+              description: "Upgrade to unlock longer clips and higher quality.",
               action: {
                 label: "Plans",
                 onClick: () => navigate({ to: "/pricing" }),
               },
             });
           }}
-          aspects={caps.aspects.filter((a) => a === "16:9" || a === "9:16" || a === "1:1") as VideoAspect[]}
-          resolutions={caps.resolutions.filter((r) => r === "480p" || r === "720p" || r === "1080p") as VideoResolution[]}
+          aspects={
+            (caps.aspects.length
+              ? caps.aspects
+              : ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]) as VideoAspect[]
+          }
+          resolutions={
+            (caps.resolutions.length
+              ? caps.resolutions
+              : ["480p", "720p", "1080p"]) as VideoResolution[]
+          }
           aspect={aspect}
           setAspect={setAspect}
           resolution={resolution}
           setResolution={setResolution}
           duration={duration}
           setDuration={setDuration}
-          durations={durations}
-          audioOn={audioOn}
-          setAudioOn={setAudioOn}
-          audioSupported={caps.audioSupported}
+          soundOn={audioOn}
+          setSoundOn={setAudioOn}
           styleId={styleId}
           setStyleId={setStyleId}
           disabled={busy}
         />
-
-        <div className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px]">
-          <span className="text-zinc-500">
-            {mode === "video"
-              ? `${duration}s · enhance path`
-              : price.supported
-                ? `${duration}s · ${resolution} · ${aspect}${audioOn ? " · Sound" : ""}`
-                : price.reason ?? "Adjust settings"}
-          </span>
-          <span className="font-semibold tabular-nums text-zinc-200">
-            {mode === "video" ? "—" : price.supported ? `~${creditsEstimate} credits` : "—"}
-          </span>
-        </div>
       </div>
 
       {!result && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-zinc-950/90 p-3 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-lg items-center gap-3">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/95 p-3 backdrop-blur-xl pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto max-w-lg">
             <button
               type="button"
               disabled={!canGenerate}
               onClick={() => void onGenerate()}
               className={cn(
-                "flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition",
+                "flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-semibold transition",
                 canGenerate
-                  ? "bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg shadow-red-500/25 active:scale-[0.98]"
-                  : "cursor-not-allowed bg-white/10 text-zinc-500",
+                  ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/25 active:scale-[0.98]"
+                  : "cursor-not-allowed bg-muted text-muted-foreground",
               )}
             >
               <Sparkles className="h-4 w-4" aria-hidden />
-              {busy ? "Generating…" : "Generate Video"}
+              {busy
+                ? "Generating…"
+                : price.supported && mode !== "video"
+                  ? `Generate Video · ~${creditsEstimate} credits`
+                  : "Generate Video"}
             </button>
+            <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
+              Charged only when your video is delivered
+            </p>
           </div>
-          <p className="mx-auto mt-1.5 max-w-lg text-center text-[10px] text-zinc-600">
-            Charged only when your video is delivered
-          </p>
         </div>
       )}
 
