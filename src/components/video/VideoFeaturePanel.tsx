@@ -2,7 +2,18 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-registry";
 import { VIDEO_STYLE_MODIFIERS } from "@/lib/video-model-registry";
-import { TIER_COPY } from "@/lib/motio-video-credits";
+
+/** Local copy — avoid circular import with motio-video-credits at module init */
+const TIER_LABELS = {
+  standard: {
+    title: "Standard",
+    supporting: "Fast clips · SD/HD · from 125 credits",
+  },
+  premium: {
+    title: "Premium",
+    supporting: "Higher quality · longer clips · from 200 credits",
+  },
+} as const;
 
 function ChipGroup<T extends string>({
   label,
@@ -17,7 +28,7 @@ function ChipGroup<T extends string>({
   onChange: (v: T) => void;
   disabled?: boolean;
 }) {
-  if (options.length === 0) return null;
+  if (!options?.length) return null;
   return (
     <div>
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -45,7 +56,7 @@ function ChipGroup<T extends string>({
   );
 }
 
-function AspectShape({ ratio, active }: { ratio: VideoAspect; active: boolean }) {
+function AspectShape({ ratio, active }: { ratio: string; active: boolean }) {
   const map: Record<string, { w: number; h: number }> = {
     "16:9": { w: 22, h: 12 },
     "9:16": { w: 10, h: 18 },
@@ -83,11 +94,11 @@ export function VideoFeaturePanel({
   setResolution,
   duration,
   setDuration,
-  size,
+  size = "medium",
   setSize,
   soundOn,
   setSoundOn,
-  styleId,
+  styleId = "",
   setStyleId,
   disabled,
 }: {
@@ -97,25 +108,29 @@ export function VideoFeaturePanel({
   onPremiumLockedClick?: () => void;
   aspects: VideoAspect[];
   resolutions: VideoResolution[];
-  durations: number[];
+  durations?: number[];
   aspect: VideoAspect;
   setAspect: (v: VideoAspect) => void;
   resolution: VideoResolution;
   setResolution: (v: VideoResolution) => void;
   duration: number;
   setDuration: (v: number) => void;
-  size: VideoSizeOption;
-  setSize: (v: VideoSizeOption) => void;
+  size?: VideoSizeOption;
+  setSize?: (v: VideoSizeOption) => void;
   soundOn: boolean;
   setSoundOn: (v: boolean) => void;
-  styleId: string;
-  setStyleId: (v: string) => void;
+  styleId?: string;
+  setStyleId?: (v: string) => void;
   disabled?: boolean;
 }) {
-  const safeAspect = (aspects.includes(aspect) ? aspect : aspects[0] ?? "16:9") as VideoAspect;
-  const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
-  const durationOpts = durations.length ? durations : [5, 10];
+  const aspectList = aspects?.length ? aspects : (["16:9", "9:16", "1:1"] as VideoAspect[]);
+  const resList = resolutions?.length ? resolutions : (["720p", "1080p"] as VideoResolution[]);
+  const safeAspect = (aspectList.includes(aspect) ? aspect : aspectList[0]) as VideoAspect;
+  const safeRes = (resList.includes(resolution) ? resolution : resList[0]) as VideoResolution;
+  const durationOpts = durations?.length ? durations : [5, 10];
   const isPremium = tier === "premium";
+  const safeSize = size ?? "medium";
+  const styleKeys = VIDEO_STYLE_MODIFIERS ? Object.keys(VIDEO_STYLE_MODIFIERS) : [];
 
   return (
     <div
@@ -142,8 +157,8 @@ export function VideoFeaturePanel({
                 : "border-border/70 bg-background hover:border-red-400/40",
             )}
           >
-            <p className="text-sm font-bold">{TIER_COPY.standard.title}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{TIER_COPY.standard.supporting}</p>
+            <p className="text-sm font-bold">{TIER_LABELS.standard.title}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{TIER_LABELS.standard.supporting}</p>
           </button>
           <button
             type="button"
@@ -160,12 +175,12 @@ export function VideoFeaturePanel({
             )}
           >
             <p className="text-sm font-bold">
-              {premiumLocked ? "Premium 🔒" : `👑 ${TIER_COPY.premium.title}`}
+              {premiumLocked ? "Premium 🔒" : `👑 ${TIER_LABELS.premium.title}`}
               {!premiumLocked && (
                 <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
               )}
             </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{TIER_COPY.premium.supporting}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{TIER_LABELS.premium.supporting}</p>
           </button>
         </div>
       </div>
@@ -204,7 +219,7 @@ export function VideoFeaturePanel({
       <div>
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aspect ratio</p>
         <div className="flex flex-wrap gap-2">
-          {aspects.map((a) => {
+          {aspectList.map((a) => {
             const active = safeAspect === a;
             return (
               <button
@@ -230,7 +245,7 @@ export function VideoFeaturePanel({
 
       <ChipGroup
         label="Quality"
-        options={resolutions.map((r) => ({
+        options={resList.map((r) => ({
           id: r,
           label: r === "720p" || r === "1080p" ? r : r === "480p" ? "SD" : r,
         }))}
@@ -239,17 +254,19 @@ export function VideoFeaturePanel({
         disabled={disabled}
       />
 
-      <ChipGroup
-        label="Size"
-        options={[
-          { id: "small" as VideoSizeOption, label: "Small" },
-          { id: "medium" as VideoSizeOption, label: "Medium" },
-          { id: "large" as VideoSizeOption, label: "Large" },
-        ]}
-        value={size}
-        onChange={setSize}
-        disabled={disabled}
-      />
+      {setSize && (
+        <ChipGroup
+          label="Size"
+          options={[
+            { id: "small" as VideoSizeOption, label: "Small" },
+            { id: "medium" as VideoSizeOption, label: "Medium" },
+            { id: "large" as VideoSizeOption, label: "Large" },
+          ]}
+          value={safeSize}
+          onChange={setSize}
+          disabled={disabled}
+        />
+      )}
 
       <ChipGroup
         label="Duration"
@@ -259,38 +276,42 @@ export function VideoFeaturePanel({
         disabled={disabled}
       />
 
-      <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style</p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => setStyleId("")}
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-semibold",
-              !styleId ? "border-red-500 bg-red-500 text-white" : "border-border bg-background text-muted-foreground",
-            )}
-          >
-            None
-          </button>
-          {Object.keys(VIDEO_STYLE_MODIFIERS).map((id) => (
+      {setStyleId && (
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style</p>
+          <div className="flex flex-wrap gap-2">
             <button
-              key={id}
               type="button"
               disabled={disabled}
-              onClick={() => setStyleId(id)}
+              onClick={() => setStyleId("")}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-semibold capitalize",
-                styleId === id
+                "rounded-full border px-3 py-1.5 text-xs font-semibold",
+                !styleId
                   ? "border-red-500 bg-red-500 text-white"
                   : "border-border bg-background text-muted-foreground",
               )}
             >
-              {id}
+              None
             </button>
-          ))}
+            {styleKeys.map((id) => (
+              <button
+                key={id}
+                type="button"
+                disabled={disabled}
+                onClick={() => setStyleId(id)}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-xs font-semibold capitalize",
+                  styleId === id
+                    ? "border-red-500 bg-red-500 text-white"
+                    : "border-border bg-background text-muted-foreground",
+                )}
+              >
+                {id}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
