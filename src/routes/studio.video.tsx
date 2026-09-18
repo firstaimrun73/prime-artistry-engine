@@ -2,12 +2,13 @@
  * Motio2edit Video Studio — scroll-free premium creative workspace.
  * Wiring matches live component APIs + generateMedia server schema.
  * Billing: server quote → reserve → finalize (authoritative). Credits UI deferred.
+ * Historical UI: ad8a25d3 (pre pixel-match / auto-detect redesign).
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, Lock, Sparkles, Video, Info } from "lucide-react";
+import { ArrowLeft, Lock, Sparkles, Video } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -104,7 +105,6 @@ function VideoStudioPage() {
       .catch(() => {});
   }, [user, welcomeStatus]);
 
-  // Exclusive (premium) locked for non-paid unless admin
   const premiumLocked = !paid && !admin;
 
   const caps = useMemo(() => capabilitiesForMode(tier), [tier]);
@@ -115,7 +115,6 @@ function VideoStudioPage() {
   );
   const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
 
-  // Clamp duration when tier / max changes
   useEffect(() => {
     if (duration > maxDur && maxDur > 0) {
       setDuration(maxDur);
@@ -124,7 +123,6 @@ function VideoStudioPage() {
     }
   }, [maxDur, duration, durations]);
 
-  // Keep aspect/resolution in capability set
   useEffect(() => {
     if (caps.aspects.length && !caps.aspects.includes(aspect)) {
       setAspect((caps.aspects.find((a) => a === "16:9") ?? caps.aspects[0]) as VideoAspect);
@@ -136,17 +134,7 @@ function VideoStudioPage() {
     }
   }, [caps, aspect, resolution]);
 
-  // V2V honesty: mode "video" is not available yet
-  const v2vUnavailable = mode === "video";
-
   const price = useMemo(() => {
-    if (v2vUnavailable) {
-      return {
-        credits: 0,
-        supported: false,
-        reason: "Video to Video isn’t available yet. Try Text to Video or Image to Video.",
-      };
-    }
     return computeMotioVideoCredits({
       tier,
       durationSec: duration,
@@ -156,7 +144,7 @@ function VideoStudioPage() {
       resolution,
       aspect,
     });
-  }, [tier, duration, resolution, audioOn, mode, aspect, v2vUnavailable]);
+  }, [tier, duration, resolution, audioOn, mode, aspect]);
 
   const creditsEstimate = price.supported ? price.credits : 0;
 
@@ -173,14 +161,8 @@ function VideoStudioPage() {
     setSourceUrl(null);
   }, [sourceUrl]);
 
-  // Auto-switch mode when user picks image vs stays on text
   const onModeChange = useCallback(
     (m: VideoGenMode) => {
-      if (m === "video") {
-        toast.message("Video to Video is coming soon", {
-          description: "Use Text to Video or Image to Video for now.",
-        });
-      }
       setMode(m);
       if (m === "text") onClearSource();
     },
@@ -193,10 +175,6 @@ function VideoStudioPage() {
       navigate({ to: "/pricing" });
       return;
     }
-    if (v2vUnavailable) {
-      toast.error("Video to Video isn’t available yet. Try Text or Image mode.");
-      return;
-    }
     const p = prompt.trim();
     if (!p) {
       toast.error("Add a prompt describing your video");
@@ -206,7 +184,11 @@ function VideoStudioPage() {
       toast.error("Upload a source image first");
       return;
     }
-    if (!price.supported) {
+    if (mode === "video" && !sourceUrl) {
+      toast.error("Upload a source video first");
+      return;
+    }
+    if (mode !== "video" && !price.supported) {
       toast.error(price.reason || videoSelectionUnavailableMessage());
       return;
     }
@@ -222,17 +204,19 @@ function VideoStudioPage() {
       return;
     }
 
-    const selection = selectVideoModel({
-      mode,
-      tier,
-      durationSec: duration,
-      resolution,
-      aspect,
-      soundOn: audioOn,
-    });
-    if (!selection) {
-      toast.error(videoSelectionUnavailableMessage());
-      return;
+    if (mode !== "video") {
+      const selection = selectVideoModel({
+        mode,
+        tier,
+        durationSec: duration,
+        resolution,
+        aspect,
+        soundOn: audioOn,
+      });
+      if (!selection) {
+        toast.error(videoSelectionUnavailableMessage());
+        return;
+      }
     }
 
     setBusy(true);
@@ -244,11 +228,10 @@ function VideoStudioPage() {
     }, 9000);
 
     try {
-      // Upload source to a public URL if needed (blob → data URL for small files)
       let imageUrl: string | undefined;
-      if (mode === "image" && sourceFile) {
+      if ((mode === "image" || mode === "video") && sourceFile) {
         imageUrl = await fileToDataUrl(sourceFile);
-      } else if (mode === "image" && sourceUrl?.startsWith("http")) {
+      } else if ((mode === "image" || mode === "video") && sourceUrl?.startsWith("http")) {
         imageUrl = sourceUrl;
       }
 
@@ -263,7 +246,7 @@ function VideoStudioPage() {
           videoAspectRatio: aspect,
           videoStyleId: styleId || undefined,
           videoGenerateAudio: audioOn,
-          sourceKind: mode === "image" ? "image" : undefined,
+          sourceKind: mode === "video" ? "video" : mode === "image" ? "image" : undefined,
           studioTier: tier === "premium" ? "premium" : "standard",
         },
       });
@@ -285,7 +268,7 @@ function VideoStudioPage() {
 
       setResult({
         outputUrl,
-        mode: mode === "image" ? "image" : "text",
+        mode: mode === "video" ? "video" : mode === "image" ? "image" : "text",
         prompt: p,
         duration: (duration === 15 ? 15 : duration === 10 ? 10 : 5) as 5 | 10 | 15,
         aspect: (aspect === "9:16" || aspect === "1:1" ? aspect : "16:9") as
@@ -310,7 +293,6 @@ function VideoStudioPage() {
   }, [
     allowed,
     welcomeFree,
-    v2vUnavailable,
     prompt,
     mode,
     sourceUrl,
@@ -380,13 +362,10 @@ function VideoStudioPage() {
   const canGenerate =
     !busy &&
     !!prompt.trim() &&
-    !v2vUnavailable &&
-    price.supported &&
-    (mode !== "image" || !!sourceUrl);
+    (mode === "video" ? !!sourceUrl : price.supported && (mode === "text" || !!sourceUrl));
 
   return (
     <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-zinc-950 text-white">
-      {/* Ambient glow */}
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{
@@ -415,18 +394,13 @@ function VideoStudioPage() {
       </header>
 
       <div className="relative z-10 mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-28 pt-3">
-        {/* Mode */}
         <div className="flex items-center justify-between gap-2">
           <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
-          {v2vUnavailable && (
-            <span className="text-[10px] font-medium text-amber-400/90">V2V soon</span>
-          )}
         </div>
 
-        {/* Source upload for image mode */}
-        {mode === "image" && (
+        {(mode === "image" || mode === "video") && (
           <VideoSourceUpload
-            mode="image"
+            mode={mode === "video" ? "video" : "image"}
             file={sourceFile}
             previewUrl={sourceUrl}
             onPick={onPickSource}
@@ -435,32 +409,22 @@ function VideoStudioPage() {
           />
         )}
 
-        {mode === "video" && (
-          <div className="flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[12px] text-amber-100">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <p>
-              <strong className="font-semibold">Video to Video</strong> is not available yet.
-              Switch to Text or Image mode to generate.
-            </p>
-          </div>
-        )}
-
-        {/* Prompt */}
         <VideoPromptBar
           value={prompt}
           onChange={setPrompt}
           maxChars={promptMax}
-          disabled={busy || v2vUnavailable}
+          disabled={busy}
           durationSec={duration}
           audioActive={audioOn}
           placeholder={
             mode === "image"
               ? "Describe how the image should move…"
-              : "Describe your video — lighting, motion, mood…"
+              : mode === "video"
+                ? "Describe how to transform this video…"
+                : "Describe your video — lighting, motion, mood…"
           }
         />
 
-        {/* Suggestions */}
         {!prompt && !busy && mode !== "video" && (
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             {VIDEO_PROMPT_SUGGESTIONS.slice(0, 4).map((s) => (
@@ -476,7 +440,6 @@ function VideoStudioPage() {
           </div>
         )}
 
-        {/* Controls: Standard/Exclusive, Sound, quality, aspect, duration, style */}
         <VideoStudioControls
           tier={tier}
           setTier={setTier}
@@ -504,23 +467,23 @@ function VideoStudioPage() {
           audioSupported={caps.audioSupported}
           styleId={styleId}
           setStyleId={setStyleId}
-          disabled={busy || v2vUnavailable}
+          disabled={busy}
         />
 
-        {/* Estimate strip — simple, credit system details later */}
         <div className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px]">
           <span className="text-zinc-500">
-            {price.supported
-              ? `${duration}s · ${resolution} · ${aspect}${audioOn ? " · Sound" : ""}`
-              : price.reason ?? "Adjust settings"}
+            {mode === "video"
+              ? `${duration}s · enhance path`
+              : price.supported
+                ? `${duration}s · ${resolution} · ${aspect}${audioOn ? " · Sound" : ""}`
+                : price.reason ?? "Adjust settings"}
           </span>
           <span className="font-semibold tabular-nums text-zinc-200">
-            {price.supported ? `~${creditsEstimate} credits` : "—"}
+            {mode === "video" ? "—" : price.supported ? `~${creditsEstimate} credits` : "—"}
           </span>
         </div>
       </div>
 
-      {/* Generate bar */}
       {!result && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-zinc-950/90 p-3 backdrop-blur-xl">
           <div className="mx-auto flex max-w-lg items-center gap-3">
@@ -536,7 +499,7 @@ function VideoStudioPage() {
               )}
             >
               <Sparkles className="h-4 w-4" aria-hidden />
-              {busy ? "Generating…" : "Generate"}
+              {busy ? "Generating…" : "Generate Video"}
             </button>
           </div>
           <p className="mx-auto mt-1.5 max-w-lg text-center text-[10px] text-zinc-600">
@@ -564,7 +527,6 @@ function VideoStudioPage() {
   );
 }
 
-/** Convert local File to data URL for generateMedia imageUrl field. */
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
