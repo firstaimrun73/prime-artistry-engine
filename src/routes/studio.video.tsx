@@ -3,6 +3,7 @@
  * Wiring matches live component APIs + generateMedia server schema.
  * Billing: server quote → reserve → finalize (authoritative). Credits UI deferred.
  * Historical UI: ad8a25d3 (pre pixel-match / auto-detect redesign).
+ * Restored once — old compact three-mode Video Studio (Text/Image/Video → Video).
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
