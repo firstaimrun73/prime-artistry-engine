@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-registry";
-import { VIDEO_STYLE_MODIFIERS, resolutionUiLabel } from "@/lib/video-model-registry";
-import { allowedDurationsForTier, TIER_COPY } from "@/lib/motio-video-credits";
+import { VIDEO_STYLE_MODIFIERS } from "@/lib/video-model-registry";
+import { TIER_COPY } from "@/lib/motio-video-credits";
 
 function ChipGroup<T extends string>({
   label,
@@ -12,7 +12,7 @@ function ChipGroup<T extends string>({
   disabled,
 }: {
   label: string;
-  options: { id: T; label: string; node?: ReactNode; locked?: boolean }[];
+  options: { id: T; label: string; node?: ReactNode }[];
   value: T;
   onChange: (v: T) => void;
   disabled?: boolean;
@@ -26,21 +26,18 @@ function ChipGroup<T extends string>({
           <button
             key={o.id}
             type="button"
-            disabled={disabled || o.locked}
-            onClick={() => {
-              if (!o.locked) onChange(o.id);
-            }}
+            disabled={disabled}
+            onClick={() => onChange(o.id)}
             className={cn(
               "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
               value === o.id
                 ? "border-red-500 bg-red-500 text-white"
                 : "border-border bg-background text-muted-foreground hover:border-red-400/50",
-              (disabled || o.locked) && "opacity-40",
+              disabled && "opacity-40",
             )}
           >
             {o.node}
             {o.label}
-            {o.locked ? " 🔒" : ""}
           </button>
         ))}
       </div>
@@ -49,7 +46,7 @@ function ChipGroup<T extends string>({
 }
 
 function AspectShape({ ratio, active }: { ratio: VideoAspect; active: boolean }) {
-  const map: Record<VideoAspect, { w: number; h: number }> = {
+  const map: Record<string, { w: number; h: number }> = {
     "16:9": { w: 22, h: 12 },
     "9:16": { w: 10, h: 18 },
     "1:1": { w: 14, h: 14 },
@@ -70,14 +67,7 @@ function AspectShape({ ratio, active }: { ratio: VideoAspect; active: boolean })
   );
 }
 
-const ASPECT_LABELS: Partial<Record<VideoAspect, string>> = {
-  "16:9": "16:9",
-  "9:16": "9:16",
-  "1:1": "1:1",
-  "4:3": "4:3",
-  "3:4": "3:4",
-  "21:9": "21:9",
-};
+export type VideoSizeOption = "small" | "medium" | "large";
 
 export function VideoFeaturePanel({
   tier,
@@ -86,12 +76,15 @@ export function VideoFeaturePanel({
   onPremiumLockedClick,
   aspects,
   resolutions,
+  durations,
   aspect,
   setAspect,
   resolution,
   setResolution,
   duration,
   setDuration,
+  size,
+  setSize,
   soundOn,
   setSoundOn,
   styleId,
@@ -104,12 +97,15 @@ export function VideoFeaturePanel({
   onPremiumLockedClick?: () => void;
   aspects: VideoAspect[];
   resolutions: VideoResolution[];
+  durations: number[];
   aspect: VideoAspect;
   setAspect: (v: VideoAspect) => void;
   resolution: VideoResolution;
   setResolution: (v: VideoResolution) => void;
   duration: number;
   setDuration: (v: number) => void;
+  size: VideoSizeOption;
+  setSize: (v: VideoSizeOption) => void;
   soundOn: boolean;
   setSoundOn: (v: boolean) => void;
   styleId: string;
@@ -118,19 +114,15 @@ export function VideoFeaturePanel({
 }) {
   const safeAspect = (aspects.includes(aspect) ? aspect : aspects[0] ?? "16:9") as VideoAspect;
   const safeRes = (resolutions.includes(resolution) ? resolution : resolutions[0] ?? "720p") as VideoResolution;
+  const durationOpts = durations.length ? durations : [5, 10];
   const isPremium = tier === "premium";
-
-  const durationOpts = allowedDurationsForTier(tier).map((d) => ({
-    id: String(d) as `${number}`,
-    label: `${d}s`,
-  }));
 
   return (
     <div
       className={cn(
         "space-y-4 rounded-2xl border p-4 transition-all duration-300",
         isPremium
-          ? "border-amber-500/30 bg-gradient-to-br from-card via-amber-500/5 to-violet-500/5 shadow-[0_0_40px_-12px_rgba(245,158,11,0.35)]"
+          ? "border-amber-500/40 bg-gradient-to-br from-card via-amber-500/5 to-orange-500/5 shadow-[0_0_40px_-12px_rgba(245,158,11,0.3)]"
           : "border-border/70 bg-card/80",
       )}
     >
@@ -144,7 +136,7 @@ export function VideoFeaturePanel({
             disabled={disabled}
             onClick={() => setTier("standard")}
             className={cn(
-              "rounded-2xl border p-3 text-left transition-all duration-200",
+              "rounded-2xl border p-3 text-left transition-colors",
               tier === "standard"
                 ? "border-red-500 bg-red-500/10 ring-1 ring-red-500/30"
                 : "border-border/70 bg-background hover:border-red-400/40",
@@ -161,9 +153,9 @@ export function VideoFeaturePanel({
               else setTier("premium");
             }}
             className={cn(
-              "rounded-2xl border p-3 text-left transition-all duration-200",
+              "rounded-2xl border p-3 text-left transition-colors",
               tier === "premium"
-                ? "border-amber-500 bg-gradient-to-br from-amber-500/15 to-violet-500/10 ring-1 ring-amber-500/40 shadow-sm"
+                ? "border-amber-500 bg-gradient-to-br from-amber-500/15 to-orange-500/10 ring-1 ring-amber-500/40"
                 : "border-border/70 bg-background hover:border-amber-400/40",
             )}
           >
@@ -180,29 +172,29 @@ export function VideoFeaturePanel({
 
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">Audio</p>
+          <p className="text-sm font-medium">Sound</p>
           <p className="text-[11px] text-muted-foreground">
             {soundOn
-              ? "Native audio when the model supports it (+ credits)"
-              : "Silent · audio words in the prompt can still enable audio"}
+              ? "Native sound when the model supports it (+ credits)"
+              : "Silent · prompt sound words still request audio"}
           </p>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={soundOn}
-          aria-label={soundOn ? "Audio on" : "Audio off"}
+          aria-label={soundOn ? "Sound on" : "Sound off"}
           disabled={disabled}
           onClick={() => setSoundOn(!soundOn)}
           className={cn(
-            "relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200 ease-out motion-reduce:transition-none",
+            "relative h-7 w-12 shrink-0 rounded-full transition-colors",
             soundOn ? "bg-red-500" : "bg-muted",
             disabled && "opacity-50",
           )}
         >
           <span
             className={cn(
-              "pointer-events-none absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ease-out motion-reduce:transition-none",
+              "pointer-events-none absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform",
               soundOn && "translate-x-5",
             )}
           />
@@ -229,7 +221,7 @@ export function VideoFeaturePanel({
                 )}
               >
                 <AspectShape ratio={a} active={active} />
-                {ASPECT_LABELS[a] ?? a}
+                {a}
               </button>
             );
           })}
@@ -240,16 +232,28 @@ export function VideoFeaturePanel({
         label="Quality"
         options={resolutions.map((r) => ({
           id: r,
-          label: resolutionUiLabel(r),
+          label: r === "720p" || r === "1080p" ? r : r === "480p" ? "SD" : r,
         }))}
         value={safeRes}
-        onChange={(v) => setResolution(v)}
+        onChange={setResolution}
+        disabled={disabled}
+      />
+
+      <ChipGroup
+        label="Size"
+        options={[
+          { id: "small" as VideoSizeOption, label: "Small" },
+          { id: "medium" as VideoSizeOption, label: "Medium" },
+          { id: "large" as VideoSizeOption, label: "Large" },
+        ]}
+        value={size}
+        onChange={setSize}
         disabled={disabled}
       />
 
       <ChipGroup
         label="Duration"
-        options={durationOpts}
+        options={durationOpts.map((d) => ({ id: String(d) as `${number}`, label: `${d}s` }))}
         value={String(duration) as `${number}`}
         onChange={(v) => setDuration(parseInt(v, 10))}
         disabled={disabled}
