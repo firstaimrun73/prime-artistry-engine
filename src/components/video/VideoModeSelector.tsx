@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 import type { VideoGenMode } from "@/lib/video-model-registry";
 
 const MODES: { id: VideoGenMode; label: string; icon: typeof Sparkles }[] = [
-  { id: "text", label: "Text", icon: Sparkles },
-  { id: "image", label: "Image", icon: Camera },
-  { id: "video", label: "Video", icon: Film },
+  { id: "text", label: "Text → Video", icon: Sparkles },
+  { id: "image", label: "Image → Video", icon: Camera },
+  { id: "video", label: "Video → Video", icon: Film },
 ];
 
 export function VideoModeSelector({
@@ -37,7 +37,7 @@ export function VideoModeSelector({
             disabled={disabled}
             onClick={() => onChange(id)}
             className={cn(
-              "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition",
+              "flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[10px] font-semibold transition sm:gap-1.5 sm:px-3 sm:text-[11px]",
               active
                 ? "bg-red-500/20 text-red-200 shadow-sm"
                 : "text-zinc-400 hover:text-zinc-200",
