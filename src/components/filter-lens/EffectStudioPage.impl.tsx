@@ -1,5 +1,6 @@
 /**
  * Motio2edit Filters editor — production UI entry.
+ * Uses safe input-first implementation while body is restored.
  */
-export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.body";
-export type { CatalogItem } from "./EffectStudioPage.body";
+export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.safe";
+export type { CatalogItem } from "./EffectStudioPage.safe";
