@@ -1,7 +1,8 @@
 /**
  * Motio2edit Video Studio — light UI (mode cards + Features panel).
- * Three modes: Text → Video / Image → Video / Video → Video.
- * Generation via existing generateMedia pipeline.
+ * Screenshot target: Text/Image/Video cards, PROMPT, Features Standard/Premium,
+ * Sound, Aspect, Quality, Size, Duration, Generate Video.
+ * Three modes wired to existing generateMedia pipeline.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -22,7 +23,10 @@ import {
   STANDARD_VIDEO_PROMPT_MAX,
   PREMIUM_VIDEO_PROMPT_MAX,
 } from "@/components/video/VideoPromptBar";
-import { VideoFeaturePanel } from "@/components/video/VideoFeaturePanel";
+import {
+  VideoFeaturePanel,
+  type VideoSizeOption,
+} from "@/components/video/VideoFeaturePanel";
 import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
 import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
 import { VideoOutputView } from "@/components/video/VideoOutputView";
@@ -30,7 +34,6 @@ import { getWelcomeFreeVideoStatus } from "@/lib/billing/welcome-free-video-stat
 import {
   selectVideoModel,
   videoSelectionUnavailableMessage,
-  capabilitiesForMode,
   availableMaxDurationFor,
   promptMentionsAudio,
   applyVideoStyle,
@@ -50,6 +53,10 @@ import {
 } from "@/lib/video/prompt-timing";
 import type { VideoStudioResult } from "@/components/video/video-studio-types";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
+
+/** Screenshot control set */
+const STUDIO_ASPECTS: VideoAspect[] = ["16:9", "9:16", "1:1"];
+const STUDIO_RESOLUTIONS: VideoResolution[] = ["720p", "1080p"];
 
 export const Route = createFileRoute("/studio/video")({
   ssr: false,
@@ -82,6 +89,7 @@ function VideoStudioPage() {
   const [duration, setDuration] = useState(5);
   const [aspect, setAspect] = useState<VideoAspect>("16:9");
   const [resolution, setResolution] = useState<VideoResolution>("720p");
+  const [size, setSize] = useState<VideoSizeOption>("medium");
   const [audioOn, setAudioOn] = useState(false);
   const [styleId, setStyleId] = useState("");
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
@@ -106,8 +114,10 @@ function VideoStudioPage() {
 
   const premiumLocked = !paid && !admin;
 
-  const caps = useMemo(() => capabilitiesForMode(tier), [tier]);
-  const durations = useMemo(() => allowedDurationsForTier(tier), [tier]);
+  const durations = useMemo(() => {
+    const base = allowedDurationsForTier(tier).filter((d) => d === 5 || d === 10 || d === 15);
+    return base.length ? base : [5, 10];
+  }, [tier]);
   const maxDur = useMemo(
     () => availableMaxDurationFor(tier, resolution, audioOn),
     [tier, resolution, audioOn],
@@ -121,17 +131,6 @@ function VideoStudioPage() {
       setDuration(durations[0]);
     }
   }, [maxDur, duration, durations]);
-
-  useEffect(() => {
-    if (caps.aspects.length && !caps.aspects.includes(aspect)) {
-      setAspect((caps.aspects.find((a) => a === "16:9") ?? caps.aspects[0]) as VideoAspect);
-    }
-    if (caps.resolutions.length && !caps.resolutions.includes(resolution)) {
-      setResolution(
-        (caps.resolutions.find((r) => r === "720p") ?? caps.resolutions[0]) as VideoResolution,
-      );
-    }
-  }, [caps, aspect, resolution]);
 
   const price = useMemo(() => {
     return computeMotioVideoCredits({
@@ -278,8 +277,8 @@ function VideoStudioPage() {
           | "16:9"
           | "9:16"
           | "1:1",
-        quality: resolution === "1080p" ? "1080p" : resolution === "480p" ? "480p" : "720p",
-        size: resolution === "1080p" ? "large" : resolution === "720p" ? "medium" : "small",
+        quality: resolution === "1080p" ? "1080p" : "720p",
+        size,
         soundRequested: audioOn || promptMentionsAudio(p),
         creditsUsed: typeof charged === "number" ? charged : creditsEstimate,
         sourcePreview: sourceUrl,
@@ -303,6 +302,7 @@ function VideoStudioPage() {
     duration,
     aspect,
     resolution,
+    size,
     tier,
     audioOn,
     styleId,
@@ -418,22 +418,17 @@ function VideoStudioPage() {
               },
             });
           }}
-          aspects={
-            (caps.aspects.length
-              ? caps.aspects
-              : ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]) as VideoAspect[]
-          }
-          resolutions={
-            (caps.resolutions.length
-              ? caps.resolutions
-              : ["480p", "720p", "1080p"]) as VideoResolution[]
-          }
+          aspects={STUDIO_ASPECTS}
+          resolutions={STUDIO_RESOLUTIONS}
+          durations={durations}
           aspect={aspect}
           setAspect={setAspect}
           resolution={resolution}
           setResolution={setResolution}
           duration={duration}
           setDuration={setDuration}
+          size={size}
+          setSize={setSize}
           soundOn={audioOn}
           setSoundOn={setAudioOn}
           styleId={styleId}
