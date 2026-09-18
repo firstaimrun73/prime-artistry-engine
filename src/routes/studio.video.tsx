@@ -2,7 +2,6 @@
  * Motio2edit Video Studio — light UI (mode cards + Features panel).
  * Screenshot target: Text/Image/Video cards, PROMPT, Features Standard/Premium,
  * Sound, Aspect, Quality, Size, Duration, Generate Video.
- * Three modes wired to existing generateMedia pipeline.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -54,7 +53,6 @@ import {
 import type { VideoStudioResult } from "@/components/video/video-studio-types";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
-/** Screenshot control set */
 const STUDIO_ASPECTS: VideoAspect[] = ["16:9", "9:16", "1:1"];
 const STUDIO_RESOLUTIONS: VideoResolution[] = ["720p", "1080p"];
 
@@ -73,7 +71,7 @@ export const Route = createFileRoute("/studio/video")({
 });
 
 function VideoStudioPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const admin = isAdminEmail(profile?.email ?? user?.email);
   const allowed = canAccessVideo({
@@ -115,13 +113,23 @@ function VideoStudioPage() {
   const premiumLocked = !paid && !admin;
 
   const durations = useMemo(() => {
-    const base = allowedDurationsForTier(tier).filter((d) => d === 5 || d === 10 || d === 15);
-    return base.length ? base : [5, 10];
+    try {
+      const base = allowedDurationsForTier(tier).filter((d) => d === 5 || d === 10 || d === 15);
+      return base.length ? base : [5, 10];
+    } catch {
+      return tier === "premium" ? [5, 10, 15] : [5, 10];
+    }
   }, [tier]);
-  const maxDur = useMemo(
-    () => availableMaxDurationFor(tier, resolution, audioOn),
-    [tier, resolution, audioOn],
-  );
+
+  const maxDur = useMemo(() => {
+    try {
+      const m = availableMaxDurationFor(tier, resolution, audioOn);
+      return typeof m === "number" && m > 0 ? m : tier === "premium" ? 15 : 10;
+    } catch {
+      return tier === "premium" ? 15 : 10;
+    }
+  }, [tier, resolution, audioOn]);
+
   const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
 
   useEffect(() => {
@@ -133,15 +141,34 @@ function VideoStudioPage() {
   }, [maxDur, duration, durations]);
 
   const price = useMemo(() => {
-    return computeMotioVideoCredits({
-      tier,
-      durationSec: duration,
-      quality: qualityFromResolution(resolution),
-      soundOn: audioOn,
-      mode,
-      resolution,
-      aspect,
-    });
+    try {
+      return computeMotioVideoCredits({
+        tier,
+        durationSec: duration,
+        quality: qualityFromResolution(resolution),
+        soundOn: audioOn,
+        mode,
+        resolution,
+        aspect,
+      });
+    } catch {
+      return {
+        credits: 0,
+        usd: 0,
+        supported: false,
+        reason: "Pricing unavailable",
+        breakdown: {
+          tier,
+          mode,
+          durationSec: duration,
+          quality: qualityFromResolution(resolution),
+          soundOn: audioOn,
+          baseCredits: 0,
+          soundSurcharge: 0,
+          formula: "error",
+        },
+      };
+    }
   }, [tier, duration, resolution, audioOn, mode, aspect]);
 
   const creditsEstimate = price.supported ? price.credits : 0;
@@ -320,6 +347,14 @@ function VideoStudioPage() {
       toast.error("Download failed");
     }
   }, [result]);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[70dvh] items-center justify-center p-6">
+        <p className="text-sm text-muted-foreground">Loading Video Studio…</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
