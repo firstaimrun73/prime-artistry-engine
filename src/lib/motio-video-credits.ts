@@ -140,7 +140,7 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
       supported: false,
       reason:
         tier === "standard"
-          ? "This combination isn’t available on Standard. Try a shorter duration or Exclusive."
+          ? "This combination isn’t available on Standard. Try a shorter duration or Premium."
           : "This combination isn’t available right now. Try a shorter duration or lower quality.",
       breakdown: {
         tier,
@@ -209,11 +209,11 @@ export const TIER_COPY = {
   standard: {
     title: "Standard",
     headline: "Fast, dependable generations for everyday ideas.",
-    supporting: "Great quality. Great value. SD/HD · 5s & 10s",
+    supporting: "Fast clips · SD/HD · from 125 credits",
   },
   premium: {
-    title: "Exclusive",
+    title: "Premium",
     headline: "More detail, stronger image preservation and better prompt adherence.",
-    supporting: "Made for your final shots · up to 15s · HD",
+    supporting: "Higher quality · longer clips · from 200 credits",
   },
 } as const;
