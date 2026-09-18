@@ -1,13 +1,26 @@
 /**
- * Motio2edit Video Studio — scroll-free premium creative workspace.
- * Wiring matches live component APIs + generateMedia server schema.
- * Billing: server quote → reserve → finalize (authoritative). Credits UI deferred.
+ * Motio2edit Video Studio — advanced auto-detect creative workspace.
+ * No mode toggles. Detects Txt-video / Img-video / Video-video from file + prompt.
+ * Floating label on prompt bar. Aspect-aware generation stage. Result only after generate.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowLeft, Lock, Sparkles, Video, Info } from "lucide-react";
+import {
+  ArrowLeft,
+  Lock,
+  Sparkles,
+  Video,
+  ImagePlus,
+  Film,
+  X,
+  Replace,
+  Download,
+  Share2,
+  RotateCcw,
+  Maximize2,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -15,16 +28,12 @@ import { canAccessVideo, isPaidPlan } from "@/lib/policy";
 import { generateMedia } from "@/lib/generate.functions";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { cn } from "@/lib/utils";
-import { VideoModeSelector } from "@/components/video/VideoModeSelector";
 import {
   VideoPromptBar,
   STANDARD_VIDEO_PROMPT_MAX,
   PREMIUM_VIDEO_PROMPT_MAX,
 } from "@/components/video/VideoPromptBar";
 import { VideoStudioControls } from "@/components/video/VideoStudioControls";
-import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
-import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
-import { VideoOutputView } from "@/components/video/VideoOutputView";
 import { getWelcomeFreeVideoStatus } from "@/lib/billing/welcome-free-video-status.functions";
 import {
   selectVideoModel,
@@ -58,12 +67,43 @@ export const Route = createFileRoute("/studio/video")({
       { title: "Video Studio — Motio2edit" },
       {
         name: "description",
-        content: "Create AI video from text or image. Sound, duration, and quality in one place.",
+        content:
+          "Create AI video from text, image or video. Auto-detects mode. Sound, duration, quality and aspect in one place.",
       },
     ],
   }),
   component: VideoStudioPage,
 });
+
+const STAGES = ["Preparing scene", "Building motion", "Rendering video", "Finishing"] as const;
+
+const ASPECT_FRAME: Record<string, { w: string; maxH: string }> = {
+  "16:9": { w: "100%", maxH: "min(42dvh, 280px)" },
+  "9:16": { w: "min(100%, 200px)", maxH: "min(52dvh, 360px)" },
+  "1:1": { w: "min(100%, 260px)", maxH: "min(42dvh, 260px)" },
+  "4:3": { w: "100%", maxH: "min(40dvh, 260px)" },
+  "3:4": { w: "min(100%, 220px)", maxH: "min(48dvh, 320px)" },
+  "21:9": { w: "100%", maxH: "min(32dvh, 200px)" },
+};
+
+function detectMode(file: File | null, hasPrompt: boolean): VideoGenMode {
+  if (!file) return "text";
+  if (file.type.startsWith("video/")) return "video";
+  if (file.type.startsWith("image/")) return "image";
+  return "text";
+}
+
+function modeLabel(mode: VideoGenMode): string {
+  if (mode === "image") return "Img-video";
+  if (mode === "video") return "Video-video";
+  return "Txt-video";
+}
+
+function modeColor(mode: VideoGenMode): string {
+  if (mode === "image") return "border-sky-400/50 bg-sky-500/15 text-sky-200";
+  if (mode === "video") return "border-violet-400/50 bg-violet-500/15 text-violet-200";
+  return "border-red-400/50 bg-red-500/15 text-red-200";
+}
 
 function VideoStudioPage() {
   const { user, profile } = useAuth();
@@ -76,7 +116,6 @@ function VideoStudioPage() {
   });
   const paid = isPaidPlan(profile?.plan) || admin;
 
-  const [mode, setMode] = useState<VideoGenMode>("text");
   const [prompt, setPrompt] = useState("");
   const [tier, setTier] = useState<VideoTier>("standard");
   const [duration, setDuration] = useState(5);
@@ -91,9 +130,19 @@ function VideoStudioPage() {
   const [eta, setEta] = useState(45);
   const [result, setResult] = useState<VideoStudioResult | null>(null);
   const [welcomeFree, setWelcomeFree] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const generate = useServerFn(generateMedia);
   const welcomeStatus = useServerFn(getWelcomeFreeVideoStatus);
+
+  // Auto-detected mode — no toggles
+  const mode = useMemo(
+    () => detectMode(sourceFile, prompt.trim().length > 0),
+    [sourceFile, prompt],
+  );
+  const floatingLabel = modeLabel(mode);
+  const v2vUnavailable = mode === "video";
 
   useEffect(() => {
     if (!user) return;
@@ -104,7 +153,6 @@ function VideoStudioPage() {
       .catch(() => {});
   }, [user, welcomeStatus]);
 
-  // Exclusive (premium) locked for non-paid unless admin
   const premiumLocked = !paid && !admin;
 
   const caps = useMemo(() => capabilitiesForMode(tier), [tier]);
@@ -115,7 +163,6 @@ function VideoStudioPage() {
   );
   const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
 
-  // Clamp duration when tier / max changes
   useEffect(() => {
     if (duration > maxDur && maxDur > 0) {
       setDuration(maxDur);
@@ -124,7 +171,6 @@ function VideoStudioPage() {
     }
   }, [maxDur, duration, durations]);
 
-  // Keep aspect/resolution in capability set
   useEffect(() => {
     if (caps.aspects.length && !caps.aspects.includes(aspect)) {
       setAspect((caps.aspects.find((a) => a === "16:9") ?? caps.aspects[0]) as VideoAspect);
@@ -136,15 +182,12 @@ function VideoStudioPage() {
     }
   }, [caps, aspect, resolution]);
 
-  // V2V honesty: mode "video" is not available yet
-  const v2vUnavailable = mode === "video";
-
   const price = useMemo(() => {
     if (v2vUnavailable) {
       return {
         credits: 0,
         supported: false,
-        reason: "Video to Video isn’t available yet. Try Text to Video or Image to Video.",
+        reason: "Video-video isn’t available yet. Use Txt-video or Img-video.",
       };
     }
     return computeMotioVideoCredits({
@@ -160,32 +203,37 @@ function VideoStudioPage() {
 
   const creditsEstimate = price.supported ? price.credits : 0;
 
-  const onPickSource = useCallback((file: File) => {
-    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
-    const url = URL.createObjectURL(file);
-    setSourceFile(file);
-    setSourceUrl(url);
-  }, [sourceUrl]);
+  const onPickSource = useCallback(
+    (file: File) => {
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+      if (!isImage && !isVideo) {
+        toast.error("Upload an image or video file");
+        return;
+      }
+      if (file.size > 40 * 1024 * 1024) {
+        toast.error("Max 40 MB");
+        return;
+      }
+      if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+      const url = URL.createObjectURL(file);
+      setSourceFile(file);
+      setSourceUrl(url);
+      setResult(null);
+      if (isVideo) {
+        toast.message("Video-video detected", {
+          description: "Coming soon — try Txt-video or Img-video for now.",
+        });
+      }
+    },
+    [sourceUrl],
+  );
 
   const onClearSource = useCallback(() => {
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     setSourceFile(null);
     setSourceUrl(null);
   }, [sourceUrl]);
-
-  // Auto-switch mode when user picks image vs stays on text
-  const onModeChange = useCallback(
-    (m: VideoGenMode) => {
-      if (m === "video") {
-        toast.message("Video to Video is coming soon", {
-          description: "Use Text to Video or Image to Video for now.",
-        });
-      }
-      setMode(m);
-      if (m === "text") onClearSource();
-    },
-    [onClearSource],
-  );
 
   const onGenerate = useCallback(async () => {
     if (!allowed && !welcomeFree) {
@@ -194,7 +242,7 @@ function VideoStudioPage() {
       return;
     }
     if (v2vUnavailable) {
-      toast.error("Video to Video isn’t available yet. Try Text or Image mode.");
+      toast.error("Video-video isn’t available yet. Use Txt-video or Img-video.");
       return;
     }
     const p = prompt.trim();
@@ -236,6 +284,7 @@ function VideoStudioPage() {
     }
 
     setBusy(true);
+    setResult(null);
     setStageIdx(0);
     setEta(duration <= 5 ? 45 : duration <= 10 ? 75 : 110);
     startGeneration("video");
@@ -244,7 +293,6 @@ function VideoStudioPage() {
     }, 9000);
 
     try {
-      // Upload source to a public URL if needed (blob → data URL for small files)
       let imageUrl: string | undefined;
       if (mode === "image" && sourceFile) {
         imageUrl = await fileToDataUrl(sourceFile);
@@ -336,6 +384,20 @@ function VideoStudioPage() {
     }
   }, [result]);
 
+  const share = useCallback(async () => {
+    if (!result?.outputUrl) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Motio2edit Video", url: result.outputUrl });
+      } else {
+        await navigator.clipboard.writeText(result.outputUrl);
+        toast.success("Link copied");
+      }
+    } catch {
+      /* cancelled */
+    }
+  }, [result]);
+
   const applySuggestion = (s: string) => {
     if (busy) return;
     setPrompt(s);
@@ -384,14 +446,21 @@ function VideoStudioPage() {
     price.supported &&
     (mode !== "image" || !!sourceUrl);
 
+  const frame = ASPECT_FRAME[aspect] ?? ASPECT_FRAME["16:9"];
+  const showStage = busy || !!result;
+
   return (
     <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-zinc-950 text-white">
-      {/* Ambient glow */}
+      {/* Ambient glow — shifts with mode */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-40"
+        className="pointer-events-none absolute inset-0 opacity-40 transition-all duration-700"
         style={{
           background:
-            "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(239,68,68,0.18), transparent 55%)",
+            mode === "image"
+              ? "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56,189,248,0.16), transparent 55%)"
+              : mode === "video"
+                ? "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(167,139,250,0.16), transparent 55%)"
+                : "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(239,68,68,0.18), transparent 55%)",
         }}
       />
 
@@ -415,53 +484,135 @@ function VideoStudioPage() {
       </header>
 
       <div className="relative z-10 mx-auto flex w-full max-w-lg min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-28 pt-3">
-        {/* Mode */}
-        <div className="flex items-center justify-between gap-2">
-          <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
-          {v2vUnavailable && (
-            <span className="text-[10px] font-medium text-amber-400/90">V2V soon</span>
+        {/* Unified source upload — auto detects image vs video */}
+        <div className="w-full">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/*,video/mp4,video/webm,video/*"
+            className="hidden"
+            disabled={busy}
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              e.target.value = "";
+              if (f) onPickSource(f);
+            }}
+          />
+          {sourceUrl && sourceFile ? (
+            <div className="relative overflow-hidden rounded-2xl border border-white/12 bg-black/40">
+              {sourceFile.type.startsWith("video/") ? (
+                <video
+                  src={sourceUrl}
+                  className="mx-auto max-h-28 w-full object-contain"
+                  muted
+                  playsInline
+                  controls={false}
+                />
+              ) : (
+                <img
+                  src={sourceUrl}
+                  alt="Source"
+                  className="mx-auto max-h-28 w-full object-contain"
+                />
+              )}
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 to-transparent px-2 py-2">
+                <p className="truncate text-[10px] text-zinc-300">
+                  {sourceFile.name}
+                  <span className="ml-1.5 opacity-70">
+                    · {sourceFile.type.startsWith("video/") ? "Video" : "Image"}
+                  </span>
+                </p>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-white/10"
+                    aria-label="Replace"
+                  >
+                    <Replace className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onClearSource}
+                    className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-white/10"
+                    aria-label="Remove"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!busy) setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                if (busy) return;
+                const f = e.dataTransfer.files?.[0] ?? null;
+                if (f) onPickSource(f);
+              }}
+              className={cn(
+                "flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed px-3 py-4 transition",
+                dragOver
+                  ? "border-red-400/50 bg-red-500/10"
+                  : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/8",
+                busy && "opacity-50",
+              )}
+            >
+              <div className="flex items-center gap-2 text-zinc-400">
+                <ImagePlus className="h-5 w-5" />
+                <Film className="h-5 w-5" />
+              </div>
+              <span className="text-[11px] font-medium text-zinc-300">
+                Drop image or video (optional)
+              </span>
+              <span className="text-[10px] text-zinc-500">
+                Auto-detects Img-video or Video-video · max 40MB
+              </span>
+            </button>
           )}
         </div>
 
-        {/* Source upload for image mode */}
-        {mode === "image" && (
-          <VideoSourceUpload
-            mode="image"
-            file={sourceFile}
-            previewUrl={sourceUrl}
-            onPick={onPickSource}
-            onClear={onClearSource}
-            disabled={busy}
-          />
-        )}
-
-        {mode === "video" && (
-          <div className="flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[12px] text-amber-100">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <p>
-              <strong className="font-semibold">Video to Video</strong> is not available yet.
-              Switch to Text or Image mode to generate.
-            </p>
+        {/* Prompt + floating mode label */}
+        <div className="relative">
+          <div
+            className={cn(
+              "absolute -top-2.5 left-3 z-10 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold tracking-wide shadow-sm transition-all duration-300",
+              modeColor(mode),
+            )}
+          >
+            {floatingLabel}
+            {v2vUnavailable && <span className="ml-1 opacity-80">· soon</span>}
           </div>
-        )}
+          <VideoPromptBar
+            value={prompt}
+            onChange={setPrompt}
+            maxChars={promptMax}
+            disabled={busy || v2vUnavailable}
+            durationSec={duration}
+            audioActive={audioOn}
+            placeholder={
+              mode === "image"
+                ? "Describe how the image should move…"
+                : mode === "video"
+                  ? "Video-video coming soon — clear source for Txt-video"
+                  : "Describe your video — lighting, motion, mood…"
+            }
+          />
+        </div>
 
-        {/* Prompt */}
-        <VideoPromptBar
-          value={prompt}
-          onChange={setPrompt}
-          maxChars={promptMax}
-          disabled={busy || v2vUnavailable}
-          durationSec={duration}
-          audioActive={audioOn}
-          placeholder={
-            mode === "image"
-              ? "Describe how the image should move…"
-              : "Describe your video — lighting, motion, mood…"
-          }
-        />
-
-        {/* Suggestions */}
-        {!prompt && !busy && mode !== "video" && (
+        {/* Suggestions — only when empty and not busy */}
+        {!prompt && !busy && !v2vUnavailable && (
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             {VIDEO_PROMPT_SUGGESTIONS.slice(0, 4).map((s) => (
               <button
@@ -476,7 +627,7 @@ function VideoStudioPage() {
           </div>
         )}
 
-        {/* Controls: Standard/Exclusive, Sound, quality, aspect, duration, style */}
+        {/* All generation possibilities: tier, sound, quality, aspect, duration, style */}
         <VideoStudioControls
           tier={tier}
           setTier={setTier}
@@ -490,8 +641,16 @@ function VideoStudioPage() {
               },
             });
           }}
-          aspects={caps.aspects.filter((a) => a === "16:9" || a === "9:16" || a === "1:1") as VideoAspect[]}
-          resolutions={caps.resolutions.filter((r) => r === "480p" || r === "720p" || r === "1080p") as VideoResolution[]}
+          aspects={
+            caps.aspects.filter(
+              (a) => a === "16:9" || a === "9:16" || a === "1:1",
+            ) as VideoAspect[]
+          }
+          resolutions={
+            caps.resolutions.filter(
+              (r) => r === "480p" || r === "720p" || r === "1080p",
+            ) as VideoResolution[]
+          }
           aspect={aspect}
           setAspect={setAspect}
           resolution={resolution}
@@ -507,7 +666,7 @@ function VideoStudioPage() {
           disabled={busy || v2vUnavailable}
         />
 
-        {/* Estimate strip — simple, credit system details later */}
+        {/* Live estimate */}
         <div className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px]">
           <span className="text-zinc-500">
             {price.supported
@@ -518,9 +677,121 @@ function VideoStudioPage() {
             {price.supported ? `~${creditsEstimate} credits` : "—"}
           </span>
         </div>
+
+        {/* Stage / Result frame — only visible while generating or after success */}
+        {showStage && (
+          <div className="flex flex-col items-center gap-3">
+            <div
+              className={cn(
+                "relative overflow-hidden rounded-2xl border bg-black shadow-2xl transition-all duration-500",
+                busy
+                  ? "border-red-500/40 shadow-red-500/20"
+                  : "border-white/12",
+              )}
+              style={{
+                width: frame.w,
+                maxHeight: frame.maxH,
+                aspectRatio:
+                  aspect === "9:16"
+                    ? "9/16"
+                    : aspect === "1:1"
+                      ? "1/1"
+                      : aspect === "21:9"
+                        ? "21/9"
+                        : aspect === "3:4"
+                          ? "3/4"
+                          : aspect === "4:3"
+                            ? "4/3"
+                            : "16/9",
+              }}
+            >
+              {busy && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 backdrop-blur-sm">
+                  <div
+                    className={cn(
+                      "relative grid h-14 w-14 place-items-center rounded-2xl border border-red-500/40 bg-red-500/10",
+                      "motion-safe:animate-pulse",
+                    )}
+                  >
+                    <Video className="h-6 w-6 text-red-400" />
+                    <span className="pointer-events-none absolute inset-0 rounded-2xl shadow-[0_0_28px_rgba(239,68,68,0.4)] motion-safe:animate-pulse" />
+                  </div>
+                  <div className="w-full max-w-[200px] space-y-1.5 px-4 text-center">
+                    <p className="text-xs font-semibold text-white">{STAGES[stageIdx]}</p>
+                    <p className="text-[10px] text-zinc-400">
+                      {aspect} · ~{eta}s
+                    </p>
+                    <div className="mt-2 flex justify-center gap-1">
+                      {STAGES.map((_, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            "h-1 w-5 rounded-full transition-colors",
+                            i <= stageIdx ? "bg-red-500" : "bg-white/15",
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {result && !busy && (
+                <video
+                  src={result.outputUrl}
+                  controls
+                  playsInline
+                  autoPlay
+                  className="h-full w-full object-contain"
+                />
+              )}
+            </div>
+
+            {result && !busy && (
+              <div className="flex w-full flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onDownload()}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500 px-4 py-2 text-xs font-bold text-white"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void share()}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white"
+                >
+                  <Share2 className="h-3.5 w-3.5" /> Share
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onGenerate()}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Another
+                </button>
+                <a
+                  href={result.outputUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" /> Full
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setResult(null)}
+                  className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-xs text-zinc-400 hover:text-white"
+                >
+                  <X className="h-3.5 w-3.5" /> Clear
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Generate bar */}
+      {/* Generate bar — always visible when no result or after clear */}
       {!result && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-zinc-950/90 p-3 backdrop-blur-xl">
           <div className="mx-auto flex max-w-lg items-center gap-3">
@@ -536,35 +807,18 @@ function VideoStudioPage() {
               )}
             >
               <Sparkles className="h-4 w-4" aria-hidden />
-              {busy ? "Generating…" : "Generate"}
+              {busy ? "Generating…" : `Generate ${floatingLabel}`}
             </button>
           </div>
           <p className="mx-auto mt-1.5 max-w-lg text-center text-[10px] text-zinc-600">
-            Charged only when your video is delivered
+            Charged only when your video is delivered · {floatingLabel}
           </p>
         </div>
-      )}
-
-      {busy && (
-        <VideoGeneratingOverlay
-          stageIndex={stageIdx}
-          etaSeconds={eta}
-          prompt={prompt.trim()}
-        />
-      )}
-      {result && !busy && (
-        <VideoOutputView
-          result={result}
-          onClose={() => setResult(null)}
-          onRegenerate={() => void onGenerate()}
-          onDownload={() => void onDownload()}
-        />
       )}
     </div>
   );
 }
 
-/** Convert local File to data URL for generateMedia imageUrl field. */
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
