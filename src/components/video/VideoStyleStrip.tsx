@@ -1,7 +1,8 @@
 /**
  * Horizontal style strip — R2 thumbnails, tier badges, locks, selected preview loop.
+ * Phase U: ring not clipped; scroll-driven edge fade (no solid white).
  */
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Lock, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,39 @@ export function VideoStyleStrip({
   const styles = videoStylesForStrip();
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [lockedStyle, setLockedStyle] = useState<VideoStyleUi | null>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [fadeL, setFadeL] = useState(false);
+  const [fadeR, setFadeR] = useState(true);
+
+  const updateFades = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const { scrollLeft, clientWidth, scrollWidth } = el;
+    setFadeL(scrollLeft > 2);
+    setFadeR(scrollLeft + clientWidth < scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    updateFades();
+    el.addEventListener("scroll", updateFades, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateFades) : null;
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateFades);
+      ro?.disconnect();
+    };
+  }, [updateFades, styles.length]);
+
+  const maskImage =
+    fadeL && fadeR
+      ? "linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)"
+      : fadeL
+        ? "linear-gradient(to right, transparent, black 16px, black 100%)"
+        : fadeR
+          ? "linear-gradient(to right, black 0%, black calc(100% - 16px), transparent)"
+          : "none";
 
   return (
     <section className="mb-4">
@@ -51,7 +85,16 @@ export function VideoStyleStrip({
         Style
       </p>
       <div className="relative">
-        <div className="studio-hide-scroll -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
+        <div
+          ref={scrollerRef}
+          className="studio-hide-scroll -mx-1 -my-2 flex gap-2.5 overflow-x-auto px-1 py-2 snap-x snap-mandatory"
+          style={{
+            WebkitMaskImage: maskImage === "none" ? undefined : maskImage,
+            maskImage: maskImage === "none" ? undefined : maskImage,
+            paddingRight: 20,
+          }}
+          onScroll={updateFades}
+        >
           {styles.map((s) => {
             const active = styleId === s.id;
             const locked = !canUseStyle(plan, s.tier, isAdmin);
@@ -73,97 +116,82 @@ export function VideoStyleStrip({
                   onSelect(s.id);
                 }}
                 className={cn(
-                  "flex w-[96px] shrink-0 snap-start flex-col items-center gap-1 transition-transform duration-200",
+                  "flex min-w-[104px] w-[104px] shrink-0 snap-start flex-col items-center gap-1 transition-transform duration-200",
                   active && !locked && "scale-[1.04]",
                   locked && "opacity-85",
                 )}
               >
                 <span
                   className={cn(
-                    "relative block h-[54px] w-[96px] overflow-hidden rounded-xl",
-                    active && !locked && "ring-2 ring-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
+                    "relative block h-[54px] w-[96px] rounded-xl",
+                    active &&
+                      !locked &&
+                      "ring-2 ring-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
                     s.id === "none" && GLASS,
                   )}
                 >
-                  {s.id === "none" ? (
-                    <span className="flex h-full w-full items-center justify-center">
-                      <X className="h-5 w-5 text-slate-400" aria-hidden />
-                    </span>
-                  ) : showPreview ? (
-                    <video
-                      key={s.preview}
-                      src={s.preview}
-                      poster={s.thumb ?? undefined}
-                      className="h-full w-full object-cover"
-                      muted
-                      loop
-                      playsInline
-                      autoPlay
-                    />
-                  ) : s.thumb && !imgFailed ? (
-                    <img
-                      src={s.thumb}
-                      alt=""
-                      width={96}
-                      height={54}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                      onError={() => setFailed((prev) => ({ ...prev, [s.id]: true }))}
-                    />
-                  ) : (
-                    <span className={cn("block h-full w-full bg-gradient-to-br", grad)} />
-                  )}
+                  <span className="absolute inset-0 overflow-hidden rounded-xl">
+                    {s.id === "none" ? (
+                      <span className="flex h-full w-full items-center justify-center">
+                        <X className="h-5 w-5 text-slate-400" aria-hidden />
+                      </span>
+                    ) : showPreview ? (
+                      <video
+                        key={s.preview}
+                        src={s.preview}
+                        poster={s.thumb ?? undefined}
+                        className="h-full w-full object-cover"
+                        muted
+                        loop
+                        playsInline
+                        autoPlay
+                      />
+                    ) : s.thumb && !imgFailed ? (
+                      <img
+                        src={s.thumb}
+                        alt=""
+                        width={96}
+                        height={54}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={() => setFailed((prev) => ({ ...prev, [s.id]: true }))}
+                      />
+                    ) : (
+                      <span className={cn("block h-full w-full bg-gradient-to-br", grad)} />
+                    )}
 
-                  {/* badges */}
-                  <span className="absolute left-1 top-1 flex items-center gap-0.5">
-                    {locked && (
-                      <span className="grid h-5 w-5 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm">
-                        <Lock className="h-3 w-3" aria-hidden />
-                      </span>
-                    )}
-                    {badge && (
-                      <span
-                        className={cn(
-                          "rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-800",
-                          "border border-white/70 bg-white/75 backdrop-blur-md",
-                          "dark:border-white/20 dark:bg-black/50 dark:text-white",
-                        )}
-                      >
-                        {badge}
-                      </span>
-                    )}
+                    <span className="absolute left-1 top-1 flex items-center gap-0.5">
+                      {locked && (
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-black/55 text-white">
+                          <Lock className="h-3 w-3" aria-hidden />
+                        </span>
+                      )}
+                      {badge && (
+                        <span className="rounded-full border border-white/70 bg-white/80 px-1.5 py-0.5 text-[9px] font-bold text-slate-700 dark:border-white/20 dark:bg-black/55 dark:text-white">
+                          {badge}
+                        </span>
+                      )}
+                    </span>
                   </span>
                 </span>
-                <span
-                  className={cn(
-                    "w-full truncate text-center text-[11px] font-semibold",
-                    active && !locked
-                      ? "bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] bg-clip-text text-transparent"
-                      : "text-slate-600 dark:text-zinc-300",
-                  )}
-                >
+                <span className="w-full truncate px-0.5 text-center text-[10px] font-semibold leading-tight text-slate-700 dark:text-zinc-200">
                   {s.name}
                 </span>
               </button>
             );
           })}
         </div>
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#FFF1E8] to-transparent dark:from-[#0A0B14]"
-          aria-hidden
-        />
       </div>
 
-      {/* Locked style upgrade sheet */}
       {lockedStyle && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal>
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
           <button
             type="button"
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
             aria-label="Close"
             onClick={() => setLockedStyle(null)}
           />
-          <div className={cn("relative z-10 w-full max-w-lg rounded-t-[24px] p-5", GLASS)}>
+          <div className={cn("relative z-10 w-full max-w-lg rounded-t-[24px] p-5 sm:rounded-[24px]", GLASS)}>
             <div className="flex gap-3">
               <div className="h-[54px] w-[96px] shrink-0 overflow-hidden rounded-xl">
                 {lockedStyle.thumb ? (
