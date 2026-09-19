@@ -1,16 +1,16 @@
 /**
- * Motio2edit Video Studio — glass UI + sticky generate + credits sheet.
+ * Motio2edit Video Studio v2 — glass UI on video-studio-v2 branch.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Info, Lock, Sparkles, Video, X } from "lucide-react";
+import { Grid3x3, Info, Lock, Sparkles, Video, X, Lock as LockIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { StudioBackLink } from "@/components/StudioBackLink";
 import { isAdminEmail } from "@/lib/admin-config";
-import { canAccessVideo, isPaidPlan } from "@/lib/policy";
+import { canAccessVideo } from "@/lib/policy";
 import { generateMedia } from "@/lib/generate.functions";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { cn } from "@/lib/utils";
@@ -42,10 +42,7 @@ import {
   parsePromptTiming,
   validateTimingAgainstDuration,
 } from "@/lib/video/prompt-timing";
-import {
-  videoStylesForUi,
-  applyVideoStyleFromRegistry,
-} from "@/lib/video/video-style-registry";
+import { VIDEO_STYLE_UI, STYLE_FALLBACK_GRADIENT } from "@/lib/videoStyles";
 import type { VideoStudioResult } from "@/components/video/video-studio-types";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
@@ -60,28 +57,32 @@ export const Route = createFileRoute("/studio/video")({
   component: VideoStudioPage,
 });
 
-const STYLE_THUMB: Record<string, string> = {
-  neutral: "from-zinc-200 via-zinc-300 to-zinc-400",
-  classic: "from-amber-100 via-stone-300 to-stone-500",
-  retro: "from-pink-400 via-orange-400 to-orange-600",
-  vintage: "from-yellow-200 via-amber-400 to-amber-800",
-  cinematic: "from-slate-600 via-indigo-800 to-black",
-  documentary: "from-emerald-300 via-teal-500 to-teal-800",
-  anime: "from-fuchsia-400 via-sky-400 to-sky-600",
-  product: "from-white via-zinc-200 to-zinc-400",
-  social: "from-rose-400 via-violet-500 to-violet-700",
-};
-
 const PROMPT_IDEAS = [
-  { id: "drone", label: "Drone sunrise", text: "A cinematic drone shot over a mountain range at sunrise, golden light, smooth camera glide" },
-  { id: "city", label: "Neon city", text: "A stylish woman walks through a neon-lit Tokyo street at night, reflections on wet pavement" },
-  { id: "ocean", label: "Ocean waves", text: "Powerful waves crash against dark rocks at golden hour, spray catching the light" },
-  { id: "forest", label: "Misty forest", text: "Slow push through a misty pine forest at dawn, volumetric light rays through the trees" },
+  {
+    id: "drone",
+    label: "Drone sunrise",
+    text: "A cinematic drone shot over a mountain range at sunrise, golden light, smooth camera glide",
+  },
+  {
+    id: "city",
+    label: "Neon city",
+    text: "A stylish woman walks through a neon-lit Tokyo street at night, reflections on wet pavement",
+  },
+  {
+    id: "ocean",
+    label: "Ocean waves",
+    text: "Powerful waves crash against dark rocks at golden hour, spray catching the light",
+  },
+  {
+    id: "forest",
+    label: "Misty forest",
+    text: "Slow push through a misty pine forest at dawn, volumetric light rays through the trees",
+  },
 ];
 
 function aspectBoxClass(aspect: VideoAspect): string {
-  if (aspect === "9:16") return "aspect-[9/16] max-h-[280px] w-auto mx-auto";
-  if (aspect === "1:1") return "aspect-square max-h-[240px] w-full max-w-[240px] mx-auto";
+  if (aspect === "9:16") return "aspect-[9/16] max-h-[320px] w-auto mx-auto";
+  if (aspect === "1:1") return "aspect-square max-h-[280px] w-full max-w-[280px] mx-auto";
   return "aspect-video w-full";
 }
 
@@ -94,7 +95,6 @@ function VideoStudioPage() {
     email: profile?.email,
     isAdmin: admin,
   });
-  const paid = isPaidPlan(profile?.plan) || admin;
 
   const [mode, setMode] = useState<VideoGenMode>("text");
   const [prompt, setPrompt] = useState("");
@@ -102,7 +102,7 @@ function VideoStudioPage() {
   const [aspect, setAspect] = useState<VideoAspect>("16:9");
   const [resolution, setResolution] = useState<VideoResolution>("720p");
   const [audioOn, setAudioOn] = useState(false);
-  const [styleId, setStyleId] = useState("");
+  const [styleId, setStyleId] = useState("none");
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,9 +111,12 @@ function VideoStudioPage() {
   const [result, setResult] = useState<VideoStudioResult | null>(null);
   const [welcomeFree, setWelcomeFree] = useState(false);
   const [creditsOpen, setCreditsOpen] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [thumbFailed, setThumbFailed] = useState<Record<string, boolean>>({});
 
-  /** Product tier derived from settings (no UI dropdown). 15s or 1080p → premium. */
-  const tier: VideoTier = duration >= 15 || resolution === "1080p" ? "premium" : "standard";
+  /** Internal routing only — no tier UI. 15s or 1080p → premium models. */
+  const tier: VideoTier =
+    duration >= 15 || resolution === "1080p" ? "premium" : "standard";
 
   const generate = useServerFn(generateMedia);
   const welcomeStatus = useServerFn(getWelcomeFreeVideoStatus);
@@ -133,7 +136,7 @@ function VideoStudioPage() {
     } catch {
       return {
         durations: [5, 10, 15],
-        resolutions: ["720p", "1080p"] as VideoResolution[],
+        resolutions: ["480p", "720p", "1080p"] as VideoResolution[],
         aspects: ["16:9", "9:16", "1:1"] as VideoAspect[],
         audioSupported: true,
         videoInputSupported: mode === "video",
@@ -143,29 +146,45 @@ function VideoStudioPage() {
     }
   }, [tier, mode]);
 
-  /** Always show 5 / 10 / 15 so 15s is always tappable */
+  /** Always offer full control set; disable only when capability lacks support */
   const durations = [5, 10, 15];
-  const aspectOptions = (caps.aspects.length ? caps.aspects : ["16:9", "9:16", "1:1"]) as VideoAspect[];
-  const resolutionOptions = (caps.resolutions.length
-    ? caps.resolutions
-    : ["720p", "1080p"]) as VideoResolution[];
+  const resolutionOptions: VideoResolution[] = ["480p", "720p", "1080p"];
+  const aspectOptions = (caps.aspects.length
+    ? caps.aspects
+    : ["16:9", "9:16", "1:1"]) as VideoAspect[];
+
+  const disabledDurations = useMemo(() => {
+    const map: Partial<Record<number, string>> = {};
+    for (const d of durations) {
+      if (caps.durations.length && !caps.durations.includes(d)) {
+        map[d] = "Not available for this mode/quality yet";
+      }
+    }
+    return map;
+  }, [caps.durations]);
+
+  const disabledResolutions = useMemo(() => {
+    const map: Partial<Record<string, string>> = {};
+    for (const r of resolutionOptions) {
+      if (caps.resolutions.length && !caps.resolutions.includes(r)) {
+        map[r] = "Not available for this mode yet";
+      }
+    }
+    return map;
+  }, [caps.resolutions]);
 
   useEffect(() => {
     if (!aspectOptions.includes(aspect) && aspectOptions[0]) setAspect(aspectOptions[0]);
   }, [aspectOptions, aspect]);
 
   useEffect(() => {
-    if (!resolutionOptions.includes(resolution) && resolutionOptions[0]) {
-      setResolution(resolutionOptions[0]);
-    }
-  }, [resolutionOptions, resolution]);
-
-  useEffect(() => {
     if (!caps.audioSupported && audioOn) setAudioOn(false);
   }, [caps.audioSupported, audioOn]);
 
-  const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
-  const styles = useMemo(() => videoStylesForUi(mode), [mode]);
+  const promptMax =
+    duration >= 15 || resolution === "1080p"
+      ? PREMIUM_VIDEO_PROMPT_MAX
+      : STANDARD_VIDEO_PROMPT_MAX;
 
   const price = useMemo(() => {
     try {
@@ -183,7 +202,7 @@ function VideoStudioPage() {
         credits: 0,
         usd: 0,
         supported: true,
-        reason: undefined,
+        reason: undefined as string | undefined,
         breakdown: {
           tier,
           mode,
@@ -200,52 +219,49 @@ function VideoStudioPage() {
 
   const creditsEstimate = price.supported ? price.credits : 0;
 
-  /** Credit breakdown for the ⓘ sheet */
   const creditRows = useMemo(() => {
     const rows: { label: string; credits: number }[] = [];
-    for (const d of [5, 10, 15]) {
-      try {
-        const r = computeMotioVideoCredits({
-          tier: d >= 15 ? "premium" : "standard",
-          durationSec: d,
-          quality: qualityFromResolution(resolution),
-          soundOn: false,
-          mode,
-          resolution,
-          aspect,
-        });
-        if (r.supported) rows.push({ label: `${d}s · ${resolution}`, credits: r.credits });
-      } catch {
-        /* skip */
-      }
-    }
     try {
-      const withSound = computeMotioVideoCredits({
+      const cur = computeMotioVideoCredits({
         tier,
         durationSec: duration,
         quality: qualityFromResolution(resolution),
-        soundOn: true,
+        soundOn: audioOn,
         mode,
         resolution,
         aspect,
       });
-      if (withSound.supported && withSound.credits > creditsEstimate) {
+      if (cur.supported) {
         rows.push({
-          label: `Sound add-on (current settings)`,
-          credits: withSound.credits - creditsEstimate,
+          label: `Current · ${mode} · ${duration}s · ${resolution === "480p" ? "SD" : resolution}${audioOn ? " · Sound" : ""}`,
+          credits: cur.credits,
         });
+      }
+      for (const d of [5, 10, 15]) {
+        if (d === duration) continue;
+        const r = computeMotioVideoCredits({
+          tier: d >= 15 ? "premium" : "standard",
+          durationSec: d,
+          quality: qualityFromResolution(resolution),
+          soundOn: audioOn,
+          mode,
+          resolution,
+          aspect,
+        });
+        if (r.supported) rows.push({ label: `${d}s · same quality`, credits: r.credits });
       }
     } catch {
       /* skip */
     }
     return rows;
-  }, [resolution, mode, aspect, tier, duration, creditsEstimate]);
+  }, [tier, duration, resolution, audioOn, mode, aspect]);
 
   const onPickSource = useCallback(
     (file: File) => {
       if (sourceUrl) URL.revokeObjectURL(sourceUrl);
       setSourceFile(file);
       setSourceUrl(URL.createObjectURL(file));
+      setResult(null);
     },
     [sourceUrl],
   );
@@ -261,7 +277,6 @@ function VideoStudioPage() {
       setMode(m);
       if (m === "text") onClearSource();
       setResult(null);
-      setStyleId("");
     },
     [onClearSource],
   );
@@ -330,16 +345,16 @@ function VideoStudioPage() {
         imageUrl = sourceUrl;
       }
 
-      const styled = applyVideoStyleFromRegistry(p, styleId || null);
+      /** Style id only — do not rewrite the user prompt */
       const res = await generate({
         data: {
           type: "video",
-          prompt: styled,
+          prompt: p,
           imageUrl,
           videoDurationSeconds: duration,
           videoResolution: resolution,
           videoAspectRatio: aspect,
-          videoStyleId: styleId || undefined,
+          videoStyleId: styleId && styleId !== "none" ? styleId : undefined,
           videoGenerateAudio: audioOn,
           sourceKind: mode === "video" ? "video" : mode === "image" ? "image" : undefined,
           studioTier: tier === "premium" ? "premium" : "standard",
@@ -370,7 +385,7 @@ function VideoStudioPage() {
           | "16:9"
           | "9:16"
           | "1:1",
-        quality: resolution === "1080p" ? "1080p" : "720p",
+        quality: resolution === "1080p" ? "1080p" : resolution === "480p" ? "720p" : "720p",
         size: "medium",
         soundRequested: audioOn,
         creditsUsed: typeof charged === "number" ? charged : creditsEstimate,
@@ -451,19 +466,22 @@ function VideoStudioPage() {
   const canGenerate =
     !busy &&
     !!prompt.trim() &&
-    (mode === "video" ? !!sourceUrl : (mode === "text" || !!sourceUrl));
+    (mode === "video" ? !!sourceUrl : mode === "text" || !!sourceUrl);
+
+  const glassCard =
+    "rounded-[20px] border border-border/40 bg-background/55 shadow-[0_8px_32px_rgba(15,23,42,0.08)] backdrop-blur-[16px] dark:border-white/15 dark:bg-white/10 dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)]";
 
   return (
     <div className="relative min-h-[100dvh]">
-      {/* Soft gradient so glass blur is visible */}
       <div
-        className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-br from-orange-100/80 via-rose-50/90 to-violet-100/80 dark:from-orange-950/40 dark:via-zinc-950 dark:to-violet-950/50"
+        className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-br from-orange-100/90 via-rose-50 to-violet-100/90 dark:from-orange-950/50 dark:via-zinc-950 dark:to-violet-950/60"
         aria-hidden
       />
 
-      <div className="mx-auto w-full min-w-0 max-w-lg px-4 py-4 pb-36 sm:px-5">
+      <div className="mx-auto w-full min-w-0 max-w-lg px-4 py-4 pb-40 sm:px-5">
         <StudioBackLink className="mb-3" />
 
+        {/* 1. Header */}
         <header className="mb-4">
           <div className="flex items-center gap-2.5">
             <span className="studio-cam-icon inline-flex text-2xl" aria-hidden>
@@ -482,48 +500,44 @@ function VideoStudioPage() {
           />
         </header>
 
+        {/* 2. Mode tabs */}
         <div className="mb-4">
           <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
         </div>
 
-        {/* Preview canvas — aspect-aware, rule of thirds */}
-        <div
-          className={cn(
-            "mb-4 overflow-hidden rounded-[20px] border border-white/20 bg-white/40 shadow-[0_8px_32px_rgba(15,23,42,0.08)] backdrop-blur-[16px] dark:bg-white/5",
-            aspectBoxClass(aspect),
-          )}
-        >
-          <div className="relative h-full w-full min-h-[120px]">
-            {result?.outputUrl ? (
-              <video
-                src={result.outputUrl}
-                className="h-full w-full object-contain"
-                controls
-                playsInline
-              />
-            ) : sourceUrl && mode !== "text" ? (
-              mode === "video" ? (
-                <video src={sourceUrl} className="h-full w-full object-contain" muted playsInline />
-              ) : (
-                <img src={sourceUrl} alt="Source" className="h-full w-full object-contain" />
-              )
-            ) : (
-              <div className="flex h-full min-h-[140px] flex-col items-center justify-center gap-1 px-4 text-center">
-                <p className="text-xs font-medium text-muted-foreground">Preview canvas</p>
-                <p className="text-[10px] text-muted-foreground/80">{aspect} · generated video appears here</p>
+        {/* 3. Canvas */}
+        {result?.outputUrl ? (
+          <div className={cn("relative mb-4 overflow-hidden", glassCard, aspectBoxClass(aspect))}>
+            <div className="absolute right-2 top-2 z-10">
+              <button
+                type="button"
+                onClick={() => setShowGrid((g) => !g)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold",
+                  showGrid
+                    ? "border-red-500/60 bg-red-500/15 text-red-600"
+                    : "border-border/50 bg-background/70 text-muted-foreground",
+                )}
+              >
+                <Grid3x3 className="h-3 w-3" /> Grid
+              </button>
+            </div>
+            <video
+              src={result.outputUrl}
+              className="h-full w-full object-contain"
+              controls
+              playsInline
+            />
+            {showGrid && (
+              <div className="pointer-events-none absolute inset-0 opacity-25" aria-hidden>
+                <div className="absolute left-1/3 top-0 h-full w-px bg-foreground" />
+                <div className="absolute left-2/3 top-0 h-full w-px bg-foreground" />
+                <div className="absolute left-0 top-1/3 h-px w-full bg-foreground" />
+                <div className="absolute left-0 top-2/3 h-px w-full bg-foreground" />
               </div>
             )}
-            {/* Rule of thirds */}
-            <div className="pointer-events-none absolute inset-0 opacity-[0.18]" aria-hidden>
-              <div className="absolute left-1/3 top-0 h-full w-px bg-white" />
-              <div className="absolute left-2/3 top-0 h-full w-px bg-white" />
-              <div className="absolute left-0 top-1/3 h-px w-full bg-white" />
-              <div className="absolute left-0 top-2/3 h-px w-full bg-white" />
-            </div>
           </div>
-        </div>
-
-        {(mode === "image" || mode === "video") && (
+        ) : mode === "image" || mode === "video" ? (
           <div className="mb-4">
             <VideoSourceUpload
               mode={mode === "video" ? "video" : "image"}
@@ -532,11 +546,14 @@ function VideoStudioPage() {
               onPick={onPickSource}
               onClear={onClearSource}
               disabled={busy}
+              aspect={aspect === "9:16" || aspect === "1:1" ? aspect : "16:9"}
+              showGrid={showGrid}
+              onToggleGrid={() => setShowGrid((g) => !g)}
             />
           </div>
-        )}
+        ) : null}
 
-        {/* Prompt idea cards */}
+        {/* 4. Prompt ideas + prompt box */}
         <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
           {PROMPT_IDEAS.map((idea) => (
             <button
@@ -544,16 +561,22 @@ function VideoStudioPage() {
               type="button"
               disabled={busy}
               onClick={() => setPrompt(idea.text)}
-              className="snap-start shrink-0 rounded-2xl border border-white/25 bg-white/50 px-3 py-2 text-left shadow-sm backdrop-blur-md dark:bg-white/10"
+              className={cn(
+                "snap-start shrink-0 rounded-2xl border border-border/40 bg-background/50 px-3 py-2 text-left shadow-sm backdrop-blur-md dark:border-white/15 dark:bg-white/10",
+              )}
             >
               <p className="text-[11px] font-semibold text-foreground">{idea.label}</p>
-              <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-muted-foreground">{idea.text}</p>
+              <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-muted-foreground">
+                {idea.text}
+              </p>
             </button>
           ))}
         </div>
 
         <section className="mb-4 space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Prompt
+          </p>
           <VideoPromptBar
             value={prompt}
             onChange={setPrompt}
@@ -570,40 +593,69 @@ function VideoStudioPage() {
           />
         </section>
 
-        {/* Style strip with overlaid labels + snap */}
+        {/* 5. Style strip — horizontal snap */}
         <section className="mb-4">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Style
+          </p>
           <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
-            {styles.map((s) => {
-              const active = (styleId || "none") === s.id || (!styleId && s.id === "none");
+            {VIDEO_STYLE_UI.map((s) => {
+              const active = styleId === s.id || (!styleId && s.id === "none");
+              const failed = thumbFailed[s.id];
+              const grad =
+                STYLE_FALLBACK_GRADIENT[s.id] ?? STYLE_FALLBACK_GRADIENT.none;
               return (
                 <button
                   key={s.id}
                   type="button"
-                  disabled={busy}
-                  onClick={() => setStyleId(s.id === "none" ? "" : s.id)}
+                  disabled={busy || s.locked}
+                  onClick={() => {
+                    if (!s.locked) setStyleId(s.id);
+                  }}
                   className={cn(
                     "relative w-[88px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-transform duration-200",
                     active
                       ? "scale-105 border-red-500 shadow-[0_0_16px_rgba(239,68,68,0.4)] ring-2 ring-red-500/50"
-                      : "border-white/25",
+                      : "border-border/40 dark:border-white/15",
+                    s.locked && "opacity-60",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "block aspect-video w-full bg-gradient-to-br",
-                      STYLE_THUMB[s.thumbnail] ?? STYLE_THUMB.neutral,
-                    )}
-                  />
-                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-4 text-center text-[10px] font-semibold text-white">
-                    {s.name}
+                  {s.id === "none" || !s.thumbnail || failed ? (
+                    <span
+                      className={cn(
+                        "flex aspect-video w-full items-center justify-center bg-gradient-to-br",
+                        grad,
+                      )}
+                    >
+                      {s.id === "none" && (
+                        <X className="h-5 w-5 text-muted-foreground" aria-hidden />
+                      )}
+                    </span>
+                  ) : (
+                    <img
+                      src={s.thumbnail}
+                      alt=""
+                      className="aspect-video w-full object-cover"
+                      onError={() =>
+                        setThumbFailed((prev) => ({ ...prev, [s.id]: true }))
+                      }
+                    />
+                  )}
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1 pb-1.5 pt-5 text-center text-[10px] font-semibold text-white">
+                    {s.displayName}
                   </span>
+                  {s.locked && (
+                    <span className="absolute right-1 top-1 rounded-full bg-black/50 p-0.5">
+                      <LockIcon className="h-3 w-3 text-white" />
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
         </section>
 
+        {/* 6. Features */}
         <div className="mb-5">
           <VideoFeaturePanel
             aspects={aspectOptions}
@@ -617,15 +669,17 @@ function VideoStudioPage() {
             setDuration={setDuration}
             soundOn={audioOn}
             setSoundOn={setAudioOn}
-            soundAvailable={caps.audioSupported}
+            soundAvailable={caps.audioSupported !== false}
             disabled={busy}
+            disabledDurations={disabledDurations}
+            disabledResolutions={disabledResolutions}
           />
         </div>
       </div>
 
-      {/* Sticky generate bar */}
+      {/* 7. Sticky generate bar */}
       {!result && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 bg-white/70 p-3 backdrop-blur-[16px] dark:bg-zinc-950/80 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/75 p-3 backdrop-blur-[16px] dark:border-white/10 dark:bg-zinc-950/80 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto flex max-w-lg items-center gap-2">
             <button
               type="button"
@@ -653,7 +707,7 @@ function VideoStudioPage() {
             <button
               type="button"
               onClick={() => setCreditsOpen(true)}
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/30 bg-white/50 text-muted-foreground backdrop-blur-md dark:bg-white/10"
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-border/50 bg-background/60 text-muted-foreground backdrop-blur-md dark:border-white/15 dark:bg-white/10"
               aria-label="Credit costs"
             >
               <Info className="h-5 w-5" />
@@ -665,7 +719,6 @@ function VideoStudioPage() {
         </div>
       )}
 
-      {/* Credits bottom sheet */}
       {creditsOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal>
           <button
@@ -674,9 +727,13 @@ function VideoStudioPage() {
             aria-label="Close"
             onClick={() => setCreditsOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-lg rounded-t-[24px] border border-white/25 bg-white/90 p-5 shadow-2xl backdrop-blur-[20px] dark:bg-zinc-900/95">
+          <div
+            className={cn(
+              "relative z-10 w-full max-w-lg rounded-t-[24px] border border-border/40 bg-background/95 p-5 shadow-2xl backdrop-blur-[20px] dark:border-white/15 dark:bg-zinc-900/95",
+            )}
+          >
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-bold">Credit costs</p>
+              <p className="text-sm font-bold">Credit estimate</p>
               <button
                 type="button"
                 onClick={() => setCreditsOpen(false)}
@@ -690,7 +747,7 @@ function VideoStudioPage() {
               {creditRows.map((row) => (
                 <li
                   key={row.label}
-                  className="flex items-center justify-between rounded-xl border border-white/20 bg-white/50 px-3 py-2.5 dark:bg-white/5"
+                  className="flex items-center justify-between rounded-xl border border-border/40 bg-background/50 px-3 py-2.5 dark:bg-white/5"
                 >
                   <span className="text-muted-foreground">{row.label}</span>
                   <span className="font-semibold tabular-nums">~{row.credits}</span>
