@@ -86,6 +86,36 @@ function aspectBoxClass(aspect: VideoAspect): string {
   return "aspect-video w-full";
 }
 
+function unionCaps(mode: VideoGenMode) {
+  const empty = {
+    durations: [5, 10, 15] as number[],
+    resolutions: ["480p", "720p", "1080p"] as VideoResolution[],
+    aspects: ["16:9", "9:16", "1:1"] as VideoAspect[],
+    audioSupported: true,
+  };
+  try {
+    const a = capabilitiesForGenMode("standard", mode);
+    const b = capabilitiesForGenMode("premium", mode);
+    const durations = Array.from(new Set([...(a.durations ?? []), ...(b.durations ?? [])])).sort(
+      (x, y) => x - y,
+    );
+    const resolutions = Array.from(
+      new Set([...(a.resolutions ?? []), ...(b.resolutions ?? [])]),
+    ) as VideoResolution[];
+    const aspects = Array.from(
+      new Set([...(a.aspects ?? []), ...(b.aspects ?? [])]),
+    ) as VideoAspect[];
+    return {
+      durations: durations.length ? durations : empty.durations,
+      resolutions: resolutions.length ? resolutions : empty.resolutions,
+      aspects: aspects.length ? aspects : empty.aspects,
+      audioSupported: Boolean(a.audioSupported || b.audioSupported),
+    };
+  } catch {
+    return empty;
+  }
+}
+
 function VideoStudioPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -130,34 +160,21 @@ function VideoStudioPage() {
       .catch(() => {});
   }, [user, welcomeStatus]);
 
-  const caps = useMemo(() => {
-    try {
-      return capabilitiesForGenMode(tier, mode);
-    } catch {
-      return {
-        durations: [5, 10, 15],
-        resolutions: ["480p", "720p", "1080p"] as VideoResolution[],
-        aspects: ["16:9", "9:16", "1:1"] as VideoAspect[],
-        audioSupported: true,
-        videoInputSupported: mode === "video",
-        firstFrameSupported: false,
-        lastFrameSupported: false,
-      };
-    }
-  }, [tier, mode]);
+  const caps = useMemo(() => unionCaps(mode), [mode]);
 
-  /** Always offer full control set; disable only when capability lacks support */
+  /** Always show 5 / 10 / 15 and SD / 720p / 1080p */
   const durations = [5, 10, 15];
   const resolutionOptions: VideoResolution[] = ["480p", "720p", "1080p"];
   const aspectOptions = (caps.aspects.length
     ? caps.aspects
     : ["16:9", "9:16", "1:1"]) as VideoAspect[];
 
+  /** Disable only if neither standard nor premium supports the option for this mode */
   const disabledDurations = useMemo(() => {
     const map: Partial<Record<number, string>> = {};
     for (const d of durations) {
       if (caps.durations.length && !caps.durations.includes(d)) {
-        map[d] = "Not available for this mode/quality yet";
+        map[d] = "Not available for this mode yet";
       }
     }
     return map;
@@ -385,7 +402,7 @@ function VideoStudioPage() {
           | "16:9"
           | "9:16"
           | "1:1",
-        quality: resolution === "1080p" ? "1080p" : resolution === "480p" ? "720p" : "720p",
+        quality: resolution === "1080p" ? "1080p" : "720p",
         size: "medium",
         soundRequested: audioOn,
         creditsUsed: typeof charged === "number" ? charged : creditsEstimate,
@@ -481,7 +498,6 @@ function VideoStudioPage() {
       <div className="mx-auto w-full min-w-0 max-w-lg px-4 py-4 pb-40 sm:px-5">
         <StudioBackLink className="mb-3" />
 
-        {/* 1. Header */}
         <header className="mb-4">
           <div className="flex items-center gap-2.5">
             <span className="studio-cam-icon inline-flex text-2xl" aria-hidden>
@@ -500,12 +516,10 @@ function VideoStudioPage() {
           />
         </header>
 
-        {/* 2. Mode tabs */}
         <div className="mb-4">
           <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
         </div>
 
-        {/* 3. Canvas */}
         {result?.outputUrl ? (
           <div className={cn("relative mb-4 overflow-hidden", glassCard, aspectBoxClass(aspect))}>
             <div className="absolute right-2 top-2 z-10">
@@ -553,7 +567,6 @@ function VideoStudioPage() {
           </div>
         ) : null}
 
-        {/* 4. Prompt ideas + prompt box */}
         <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
           {PROMPT_IDEAS.map((idea) => (
             <button
@@ -561,9 +574,7 @@ function VideoStudioPage() {
               type="button"
               disabled={busy}
               onClick={() => setPrompt(idea.text)}
-              className={cn(
-                "snap-start shrink-0 rounded-2xl border border-border/40 bg-background/50 px-3 py-2 text-left shadow-sm backdrop-blur-md dark:border-white/15 dark:bg-white/10",
-              )}
+              className="snap-start shrink-0 rounded-2xl border border-border/40 bg-background/50 px-3 py-2 text-left shadow-sm backdrop-blur-md dark:border-white/15 dark:bg-white/10"
             >
               <p className="text-[11px] font-semibold text-foreground">{idea.label}</p>
               <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-muted-foreground">
@@ -593,7 +604,6 @@ function VideoStudioPage() {
           />
         </section>
 
-        {/* 5. Style strip — horizontal snap */}
         <section className="mb-4">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Style
@@ -655,7 +665,6 @@ function VideoStudioPage() {
           </div>
         </section>
 
-        {/* 6. Features */}
         <div className="mb-5">
           <VideoFeaturePanel
             aspects={aspectOptions}
@@ -677,7 +686,6 @@ function VideoStudioPage() {
         </div>
       </div>
 
-      {/* 7. Sticky generate bar */}
       {!result && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/75 p-3 backdrop-blur-[16px] dark:border-white/10 dark:bg-zinc-950/80 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto flex max-w-lg items-center gap-2">
@@ -727,11 +735,7 @@ function VideoStudioPage() {
             aria-label="Close"
             onClick={() => setCreditsOpen(false)}
           />
-          <div
-            className={cn(
-              "relative z-10 w-full max-w-lg rounded-t-[24px] border border-border/40 bg-background/95 p-5 shadow-2xl backdrop-blur-[20px] dark:border-white/15 dark:bg-zinc-900/95",
-            )}
-          >
+          <div className="relative z-10 w-full max-w-lg rounded-t-[24px] border border-border/40 bg-background/95 p-5 shadow-2xl backdrop-blur-[20px] dark:border-white/15 dark:bg-zinc-900/95">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-bold">Credit estimate</p>
               <button
