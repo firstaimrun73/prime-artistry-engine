@@ -1,5 +1,6 @@
 /**
- * Compact source upload for Image→Video / Video→Video — drag-drop + preview.
+ * Reel-style media slot for Image→Video / Video→Video.
+ * Canvas is clickable; Add action is always obvious.
  */
 import { useCallback, useRef, useState } from "react";
 import { ImagePlus, Film, X, Replace, AlertCircle } from "lucide-react";
@@ -30,7 +31,7 @@ export function VideoSourceUpload({
     mode === "image"
       ? "image/jpeg,image/png,image/webp,image/*"
       : "video/mp4,video/webm,video/*";
-  const label = mode === "image" ? "Add image" : "Add video";
+  const addLabel = mode === "image" ? "Add Image" : "Add Video";
   const Icon = mode === "image" ? ImagePlus : Film;
 
   const validateAndPick = useCallback(
@@ -56,16 +57,12 @@ export function VideoSourceUpload({
     [mode, onPick],
   );
 
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    if (disabled) return;
-    const f = e.dataTransfer.files?.[0] ?? null;
-    validateAndPick(f);
+  const openPicker = () => {
+    if (!disabled) inputRef.current?.click();
   };
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full">
       <input
         ref={inputRef}
         type="file"
@@ -78,42 +75,44 @@ export function VideoSourceUpload({
           validateAndPick(f);
         }}
       />
+
       {previewUrl ? (
-        <div className="relative overflow-hidden rounded-2xl border border-white/12 bg-black/40">
-          {mode === "video" ? (
-            <video
-              src={previewUrl}
-              className="mx-auto max-h-28 w-full object-contain"
-              muted
-              playsInline
-              controls={false}
-            />
-          ) : (
-            <img
-              src={previewUrl}
-              alt="Source"
-              className="mx-auto max-h-28 w-full object-contain"
-            />
-          )}
-          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 to-transparent px-2 py-2">
-            <p className="truncate text-[10px] text-zinc-300">
-              {file?.name ?? "Source"}
+        <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-muted/40 shadow-sm dark:border-white/12 dark:bg-black/40">
+          <div className="flex min-h-[140px] items-center justify-center bg-gradient-to-b from-muted/30 to-muted/10 dark:from-black/20 dark:to-black/40">
+            {mode === "video" ? (
+              <video
+                src={previewUrl}
+                className="mx-auto max-h-40 w-full object-contain"
+                muted
+                playsInline
+                controls={false}
+              />
+            ) : (
+              <img
+                src={previewUrl}
+                alt="Source"
+                className="mx-auto max-h-40 w-full object-contain"
+              />
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-2 border-t border-border/50 px-3 py-2 dark:border-white/10">
+            <p className="min-w-0 truncate text-[11px] text-muted-foreground">
+              {file?.name ?? "Source ready"}
             </p>
-            <div className="flex gap-1">
+            <div className="flex shrink-0 gap-1.5">
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => inputRef.current?.click()}
-                className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-white/10"
-                aria-label="Replace"
+                onClick={openPicker}
+                className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-2.5 py-1.5 text-[11px] font-semibold"
               >
-                <Replace className="h-3.5 w-3.5" />
+                <Replace className="h-3 w-3" /> Replace
               </button>
               <button
                 type="button"
                 disabled={disabled}
                 onClick={onClear}
-                className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-white/10"
+                className="grid h-8 w-8 place-items-center rounded-full border border-border/70 bg-background text-muted-foreground"
                 aria-label="Remove"
               >
                 <X className="h-3.5 w-3.5" />
@@ -125,28 +124,41 @@ export function VideoSourceUpload({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => inputRef.current?.click()}
+          onClick={openPicker}
           onDragOver={(e) => {
             e.preventDefault();
             if (!disabled) setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (disabled) return;
+            validateAndPick(e.dataTransfer.files?.[0] ?? null);
+          }}
           className={cn(
-            "flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed px-3 py-4 transition",
+            "group flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-8 transition",
             dragging
-              ? "border-red-400/50 bg-red-500/10"
-              : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/8",
+              ? "border-orange-500/60 bg-orange-500/10"
+              : "border-border/80 bg-muted/30 hover:border-orange-400/50 hover:bg-orange-500/5",
+            "dark:border-white/15 dark:bg-white/5 dark:hover:border-white/25",
             disabled && "opacity-50",
           )}
         >
-          <Icon className="h-5 w-5 text-zinc-400" />
-          <span className="text-[11px] font-medium text-zinc-300">{label}</span>
-          <span className="text-[10px] text-zinc-500">Tap or drop · max {MAX_MB}MB</span>
+          <span className="grid h-14 w-14 place-items-center rounded-2xl border border-border/60 bg-background shadow-sm dark:border-white/10 dark:bg-white/5">
+            <Icon className="h-6 w-6 text-orange-500" />
+          </span>
+          <span className="text-sm font-bold text-foreground">{addLabel}</span>
+          <span className="text-center text-[11px] text-muted-foreground">
+            Tap the canvas or drop a file
+            <br />
+            max {MAX_MB}MB
+          </span>
         </button>
       )}
+
       {error && (
-        <p className="mt-1.5 flex items-center gap-1 text-[11px] text-amber-400">
+        <p className="mt-1.5 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
           <AlertCircle className="h-3 w-3 shrink-0" />
           {error}
         </p>
