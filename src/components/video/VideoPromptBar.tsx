@@ -1,8 +1,8 @@
 /**
- * Video Studio prompt bar — glass, mic, empty-state idea chips, char counter.
- * Phase U: textarea min 72px, max 168px auto-grow, then scroll.
+ * Video Studio prompt bar — glass, mic, empty-state idea chips.
+ * D1-1: single VIDEO_PROMPT_MAX=3000; counter hidden until length >= 2700.
  */
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import {
@@ -12,8 +12,14 @@ import {
   type TimingCue,
 } from "@/lib/video/prompt-timing";
 
-export const STANDARD_VIDEO_PROMPT_MAX = 3000;
-export const PREMIUM_VIDEO_PROMPT_MAX = 10000;
+/** Fixed prompt limit for all modes / durations / qualities (D1-1). */
+export const VIDEO_PROMPT_MAX = 3000;
+/** @deprecated use VIDEO_PROMPT_MAX */
+export const STANDARD_VIDEO_PROMPT_MAX = VIDEO_PROMPT_MAX;
+/** @deprecated use VIDEO_PROMPT_MAX */
+export const PREMIUM_VIDEO_PROMPT_MAX = VIDEO_PROMPT_MAX;
+
+const COUNTER_SHOW_AT = 2700;
 
 export const PROMPT_IDEA_CHIPS = [
   {
@@ -43,18 +49,21 @@ function timingAria(cue: TimingCue): string {
   return `Timing interval from ${cue.startSec} to ${cue.endSec} seconds`;
 }
 
+function formatCount(n: number): string {
+  return n.toLocaleString("en-US");
+}
+
 export function VideoPromptBar({
   value,
   onChange,
-  maxChars,
+  maxChars = VIDEO_PROMPT_MAX,
   disabled,
   placeholder,
-  compact,
   durationSec,
 }: {
   value: string;
   onChange: (v: string) => void;
-  maxChars: number;
+  maxChars?: number;
   disabled?: boolean;
   placeholder?: string;
   compact?: boolean;
@@ -62,6 +71,7 @@ export function VideoPromptBar({
   audioActive?: boolean;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const limit = Math.min(maxChars, VIDEO_PROMPT_MAX);
   const timing = useMemo(() => parsePromptTiming(value), [value]);
   const durationErrors = useMemo(() => {
     if (!durationSec || durationSec <= 0) return [] as string[];
@@ -82,6 +92,18 @@ export function VideoPromptBar({
   );
 
   const empty = !value.trim();
+  const showCounter = value.length >= COUNTER_SHOW_AT;
+
+  const syncHeight = () => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(168, Math.max(72, el.scrollHeight))}px`;
+  };
+
+  useEffect(() => {
+    syncHeight();
+  }, [value]);
 
   return (
     <div
@@ -129,14 +151,10 @@ export function VideoPromptBar({
         ref={taRef}
         id="video-prompt"
         value={value}
-        maxLength={maxChars}
+        maxLength={limit}
         onChange={(e) => {
-          onChange(e.target.value.slice(0, maxChars));
-          const el = taRef.current;
-          if (el) {
-            el.style.height = "auto";
-            el.style.height = `${Math.min(168, Math.max(72, el.scrollHeight))}px`;
-          }
+          onChange(e.target.value.slice(0, limit));
+          requestAnimationFrame(syncHeight);
         }}
         disabled={disabled}
         rows={3}
@@ -159,16 +177,20 @@ export function VideoPromptBar({
 
       <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span
-            className={cn(
-              "text-[10px] tabular-nums",
-              value.length > maxChars * 0.9
-                ? "text-amber-600 dark:text-amber-400"
-                : "text-slate-400 dark:text-zinc-500",
-            )}
-          >
-            {value.length}/{maxChars}
-          </span>
+          {showCounter ? (
+            <span
+              className={cn(
+                "text-[10px] tabular-nums",
+                value.length > limit * 0.95
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-slate-400 dark:text-zinc-500",
+              )}
+            >
+              {formatCount(value.length)} / {formatCount(limit)}
+            </span>
+          ) : (
+            <span className="h-3" aria-hidden />
+          )}
           <div
             className={cn(
               "studio-hide-scroll flex gap-1.5 overflow-x-auto transition-opacity duration-200",
@@ -181,7 +203,7 @@ export function VideoPromptBar({
                 type="button"
                 disabled={disabled || !empty}
                 onClick={() => {
-                  onChange(idea.text.slice(0, maxChars));
+                  onChange(idea.text.slice(0, limit));
                   requestAnimationFrame(() => taRef.current?.focus());
                 }}
                 className="h-7 shrink-0 rounded-full border border-white/70 bg-white/70 px-2.5 text-[11px] font-semibold text-slate-600 backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:text-zinc-300"
@@ -195,7 +217,7 @@ export function VideoPromptBar({
           disabled={disabled}
           onTranscript={(text) => {
             const next = value.trim() ? `${value.trim()} ${text}` : text;
-            onChange(next.slice(0, maxChars));
+            onChange(next.slice(0, limit));
           }}
           className={cn(
             "!h-10 !w-10 !min-h-[40px] !rounded-full border",
