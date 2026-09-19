@@ -1,7 +1,5 @@
 /**
- * Motio2edit Video Studio — light UI (mode cards + Features panel).
- * Screenshot target: Text/Image/Video cards, PROMPT, Features Standard/Premium,
- * Sound, Aspect, Quality, Size, Duration, Generate Video.
+ * Motio2edit Video Studio — light UI foundation + surgical upgrades.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -34,27 +32,26 @@ import {
   selectVideoModel,
   videoSelectionUnavailableMessage,
   availableMaxDurationFor,
-  promptMentionsAudio,
-  applyVideoStyle,
   type VideoGenMode,
   type VideoAspect,
   type VideoResolution,
   type VideoTier,
 } from "@/lib/video-model-registry";
+import { capabilitiesForGenMode } from "@/lib/video/video-capability-registry";
 import {
   computeMotioVideoCredits,
   qualityFromResolution,
-  allowedDurationsForTier,
 } from "@/lib/motio-video-credits";
 import {
   parsePromptTiming,
   validateTimingAgainstDuration,
 } from "@/lib/video/prompt-timing";
+import {
+  videoStylesForUi,
+  applyVideoStyleFromRegistry,
+} from "@/lib/video/video-style-registry";
 import type { VideoStudioResult } from "@/components/video/video-studio-types";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
-
-const STUDIO_ASPECTS: VideoAspect[] = ["16:9", "9:16", "1:1"];
-const STUDIO_RESOLUTIONS: VideoResolution[] = ["720p", "1080p"];
 
 export const Route = createFileRoute("/studio/video")({
   ssr: false,
@@ -63,12 +60,24 @@ export const Route = createFileRoute("/studio/video")({
       { title: "Video Studio — Motio2edit" },
       {
         name: "description",
-        content: "Create AI video from text, image, or video. Sound, duration, and quality in one place.",
+        content: "Create AI video from text, image, or video.",
       },
     ],
   }),
   component: VideoStudioPage,
 });
+
+const STYLE_THUMB: Record<string, string> = {
+  neutral: "bg-gradient-to-br from-zinc-200 to-zinc-400",
+  classic: "bg-gradient-to-br from-amber-100 to-stone-400",
+  retro: "bg-gradient-to-br from-pink-400 to-orange-500",
+  vintage: "bg-gradient-to-br from-yellow-200 to-amber-700",
+  cinematic: "bg-gradient-to-br from-slate-700 to-indigo-900",
+  documentary: "bg-gradient-to-br from-emerald-300 to-teal-700",
+  anime: "bg-gradient-to-br from-fuchsia-400 to-sky-500",
+  product: "bg-gradient-to-br from-white to-zinc-300",
+  social: "bg-gradient-to-br from-rose-400 to-violet-600",
+};
 
 function VideoStudioPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -112,14 +121,51 @@ function VideoStudioPage() {
 
   const premiumLocked = !paid && !admin;
 
-  const durations = useMemo(() => {
+  const caps = useMemo(() => {
     try {
-      const base = allowedDurationsForTier(tier).filter((d) => d === 5 || d === 10 || d === 15);
-      return base.length ? base : [5, 10];
+      return capabilitiesForGenMode(tier, mode);
     } catch {
-      return tier === "premium" ? [5, 10, 15] : [5, 10];
+      return {
+        durations: tier === "premium" ? [5, 10, 15] : [5, 10],
+        resolutions: ["720p", "1080p"] as VideoResolution[],
+        aspects: ["16:9", "9:16", "1:1"] as VideoAspect[],
+        audioSupported: true,
+        videoInputSupported: mode === "video",
+        firstFrameSupported: false,
+        lastFrameSupported: false,
+      };
     }
-  }, [tier]);
+  }, [tier, mode]);
+
+  const durations = caps.durations.length ? caps.durations : [5, 10];
+  const aspectOptions = (caps.aspects.length
+    ? caps.aspects
+    : ["16:9", "9:16", "1:1"]) as VideoAspect[];
+  const resolutionOptions = (caps.resolutions.length
+    ? caps.resolutions
+    : ["720p", "1080p"]) as VideoResolution[];
+
+  useEffect(() => {
+    if (!aspectOptions.includes(aspect) && aspectOptions[0]) {
+      setAspect(aspectOptions[0]);
+    }
+  }, [aspectOptions, aspect]);
+
+  useEffect(() => {
+    if (!resolutionOptions.includes(resolution) && resolutionOptions[0]) {
+      setResolution(resolutionOptions[0]);
+    }
+  }, [resolutionOptions, resolution]);
+
+  useEffect(() => {
+    if (!durations.includes(duration) && durations[0]) {
+      setDuration(durations[0]);
+    }
+  }, [durations, duration]);
+
+  useEffect(() => {
+    if (!caps.audioSupported && audioOn) setAudioOn(false);
+  }, [caps.audioSupported, audioOn]);
 
   const maxDur = useMemo(() => {
     try {
@@ -131,14 +177,11 @@ function VideoStudioPage() {
   }, [tier, resolution, audioOn]);
 
   const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
+  const styles = useMemo(() => videoStylesForUi(mode), [mode]);
 
   useEffect(() => {
-    if (duration > maxDur && maxDur > 0) {
-      setDuration(maxDur);
-    } else if (!durations.includes(duration) && durations.length > 0) {
-      setDuration(durations[0]);
-    }
-  }, [maxDur, duration, durations]);
+    if (duration > maxDur && maxDur > 0) setDuration(maxDur);
+  }, [maxDur, duration]);
 
   const price = useMemo(() => {
     try {
@@ -155,7 +198,7 @@ function VideoStudioPage() {
       return {
         credits: 0,
         usd: 0,
-        supported: false,
+        supported: mode === "video",
         reason: "Pricing unavailable",
         breakdown: {
           tier,
@@ -194,6 +237,7 @@ function VideoStudioPage() {
       setMode(m);
       if (m === "text") onClearSource();
       setResult(null);
+      setStyleId("");
     },
     [onClearSource],
   );
@@ -217,7 +261,7 @@ function VideoStudioPage() {
       toast.error("Upload a source video first");
       return;
     }
-    if (mode !== "video" && !price.supported) {
+    if (!price.supported && mode !== "video") {
       toast.error(price.reason || videoSelectionUnavailableMessage());
       return;
     }
@@ -233,19 +277,17 @@ function VideoStudioPage() {
       return;
     }
 
-    if (mode !== "video") {
-      const selection = selectVideoModel({
-        mode,
-        tier,
-        durationSec: duration,
-        resolution,
-        aspect,
-        soundOn: audioOn,
-      });
-      if (!selection) {
-        toast.error(videoSelectionUnavailableMessage());
-        return;
-      }
+    const selection = selectVideoModel({
+      mode,
+      tier,
+      durationSec: duration,
+      resolution,
+      aspect,
+      soundOn: audioOn,
+    });
+    if (!selection && mode !== "video") {
+      toast.error(videoSelectionUnavailableMessage());
+      return;
     }
 
     setBusy(true);
@@ -264,7 +306,7 @@ function VideoStudioPage() {
         imageUrl = sourceUrl;
       }
 
-      const styled = applyVideoStyle(p, styleId || null);
+      const styled = applyVideoStyleFromRegistry(p, styleId || null);
       const res = await generate({
         data: {
           type: "video",
@@ -306,7 +348,7 @@ function VideoStudioPage() {
           | "1:1",
         quality: resolution === "1080p" ? "1080p" : "720p",
         size,
-        soundRequested: audioOn || promptMentionsAudio(p),
+        soundRequested: audioOn,
         creditsUsed: typeof charged === "number" ? charged : creditsEstimate,
         sourcePreview: sourceUrl,
       });
@@ -365,9 +407,6 @@ function VideoStudioPage() {
         <p className="text-center text-base font-semibold text-foreground">
           Sign in to open Video Studio
         </p>
-        <p className="max-w-xs text-center text-sm text-muted-foreground">
-          Create cinematic motion from a prompt or a still image.
-        </p>
         <Button asChild className="rounded-full px-6">
           <Link to="/auth">Sign in</Link>
         </Button>
@@ -382,9 +421,6 @@ function VideoStudioPage() {
           <Lock className="h-7 w-7 text-amber-400" />
         </div>
         <p className="text-center text-lg font-semibold">Video Studio is on paid plans</p>
-        <p className="max-w-sm text-center text-sm text-muted-foreground">
-          Unlock text-to-video and image-to-video with Standard and Premium modes.
-        </p>
         <Button asChild className="rounded-full px-6">
           <Link to="/pricing">View plans</Link>
         </Button>
@@ -400,6 +436,11 @@ function VideoStudioPage() {
   return (
     <div className="mx-auto w-full min-w-0 max-w-lg px-4 py-4 pb-28 sm:px-5">
       <StudioBackLink className="mb-3" />
+
+      <header className="mb-4">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">🎥 Video Studio</h1>
+        <p className="text-[12px] text-muted-foreground">by Motion2Ai</p>
+      </header>
 
       <div className="mb-4">
         <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
@@ -428,7 +469,6 @@ function VideoStudioPage() {
           maxChars={promptMax}
           disabled={busy}
           durationSec={duration}
-          audioActive={audioOn}
           placeholder={
             mode === "image"
               ? "Describe how the image should move…"
@@ -437,6 +477,40 @@ function VideoStudioPage() {
                 : "A cinematic drone shot over a mountain range at sunrise…"
           }
         />
+      </section>
+
+      {/* Horizontal style strip — UI only id/name/thumbnail */}
+      <section className="mb-4">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Style
+        </p>
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          {styles.map((s) => {
+            const active = (styleId || "none") === s.id || (!styleId && s.id === "none");
+            return (
+              <button
+                key={s.id}
+                type="button"
+                disabled={busy}
+                onClick={() => setStyleId(s.id === "none" ? "" : s.id)}
+                className={cn(
+                  "flex w-[72px] shrink-0 flex-col items-center gap-1 rounded-xl border p-1.5 transition",
+                  active
+                    ? "border-orange-500 ring-1 ring-orange-500/40"
+                    : "border-border/60 hover:border-orange-400/40",
+                )}
+              >
+                <span
+                  className={cn(
+                    "aspect-video w-full rounded-lg",
+                    STYLE_THUMB[s.thumbnail] ?? STYLE_THUMB.neutral,
+                  )}
+                />
+                <span className="text-[10px] font-medium text-foreground">{s.name}</span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       <div className="mb-5">
@@ -453,8 +527,8 @@ function VideoStudioPage() {
               },
             });
           }}
-          aspects={STUDIO_ASPECTS}
-          resolutions={STUDIO_RESOLUTIONS}
+          aspects={aspectOptions}
+          resolutions={resolutionOptions}
           durations={durations}
           aspect={aspect}
           setAspect={setAspect}
@@ -466,8 +540,7 @@ function VideoStudioPage() {
           setSize={setSize}
           soundOn={audioOn}
           setSoundOn={setAudioOn}
-          styleId={styleId}
-          setStyleId={setStyleId}
+          soundAvailable={caps.audioSupported}
           disabled={busy}
         />
       </div>
@@ -489,7 +562,7 @@ function VideoStudioPage() {
               <Sparkles className="h-4 w-4" aria-hidden />
               {busy
                 ? "Generating…"
-                : price.supported && mode !== "video"
+                : price.supported
                   ? `Generate Video · ~${creditsEstimate} credits`
                   : "Generate Video"}
             </button>
