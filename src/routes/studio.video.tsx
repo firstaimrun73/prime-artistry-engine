@@ -1,5 +1,5 @@
 /**
- * Motio2edit Video Studio v2 — UI round 2 (video-studio-v2 branch).
+ * Motio2edit Video Studio v2 — UI round 2 + Phase 1 style strip.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -14,7 +14,6 @@ import {
   Sparkles,
   Video,
   X,
-  Lock as LockIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -33,6 +32,7 @@ import { VideoFeaturePanel } from "@/components/video/VideoFeaturePanel";
 import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
 import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
 import { VideoOutputView } from "@/components/video/VideoOutputView";
+import { VideoStyleStrip } from "@/components/video/VideoStyleStrip";
 import { getWelcomeFreeVideoStatus } from "@/lib/billing/welcome-free-video-status.functions";
 import {
   selectVideoModel,
@@ -51,11 +51,6 @@ import {
   parsePromptTiming,
   validateTimingAgainstDuration,
 } from "@/lib/video/prompt-timing";
-import {
-  VIDEO_STYLE_UI,
-  STYLE_FALLBACK_GRADIENT,
-  styleThumbSrc,
-} from "@/lib/videoStyles";
 import {
   isDurationAllowed,
   planRequiredForDuration,
@@ -134,7 +129,6 @@ function VideoStudioPage() {
   const [welcomeFree, setWelcomeFree] = useState(false);
   const [creditsOpen, setCreditsOpen] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
-  const [thumbFailed, setThumbFailed] = useState<Record<string, boolean>>({});
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const tier: VideoTier =
@@ -348,6 +342,7 @@ function VideoStudioPage() {
         imageUrl = sourceUrl;
       }
 
+      /** styleId only — never rewrite user prompt on the client */
       const res = await generate({
         data: {
           type: "video",
@@ -484,7 +479,6 @@ function VideoStudioPage() {
 
   return (
     <div className="video-studio-root relative min-h-[100dvh]">
-      {/* Scoped page bg + blobs */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
         <div className="absolute inset-0 bg-[linear-gradient(160deg,#FFF1E8,#F3E8FF_55%,#E6F0FF)] dark:bg-[#0A0B14]" />
         <div className="absolute -left-20 top-10 h-72 w-72 rounded-full bg-[#FF8A4C]/[0.35] blur-[80px] dark:bg-[#FF8A4C]/[0.25]" />
@@ -493,7 +487,6 @@ function VideoStudioPage() {
       </div>
 
       <div className="mx-auto w-full min-w-0 max-w-lg px-4 py-4 pb-40 sm:px-5">
-        {/* Header: back | title | credits */}
         <header className="mb-4">
           <div className="flex items-center gap-3">
             <Link
@@ -543,7 +536,6 @@ function VideoStudioPage() {
           <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
         </div>
 
-        {/* Canvas: only while busy or has result (Text mode has none before gen) */}
         {showCanvas && (
           <div
             ref={canvasRef}
@@ -610,7 +602,6 @@ function VideoStudioPage() {
           </div>
         )}
 
-        {/* Upload for image/video when not showing result canvas takeover */}
         {(mode === "image" || mode === "video") && !result?.outputUrl && (
           <div className={cn("mb-4", busy && "pointer-events-none opacity-50")}>
             <VideoSourceUpload
@@ -647,87 +638,13 @@ function VideoStudioPage() {
           />
         </section>
 
-        {/* Style strip */}
-        <section className="mb-4">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
-            Style
-          </p>
-          <div className="relative">
-            <div className="studio-hide-scroll -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
-              {VIDEO_STYLE_UI.map((s) => {
-                const active = styleId === s.id;
-                const src = styleThumbSrc(s.id);
-                const failed = thumbFailed[s.id];
-                const grad =
-                  STYLE_FALLBACK_GRADIENT[s.id] ?? STYLE_FALLBACK_GRADIENT.none;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    disabled={busy || s.locked}
-                    onClick={() => {
-                      if (!s.locked) setStyleId(s.id);
-                    }}
-                    className={cn(
-                      "flex w-[96px] shrink-0 snap-start flex-col items-center gap-1 transition-transform duration-200",
-                      active && "scale-[1.04]",
-                      s.locked && "opacity-60",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "relative block w-full overflow-hidden rounded-xl",
-                        active && "ring-2 ring-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
-                      )}
-                    >
-                      {s.id === "none" || !src || failed ? (
-                        <span
-                          className={cn(
-                            "flex aspect-video w-full items-center justify-center bg-gradient-to-br",
-                            grad,
-                            s.id === "none" && glass,
-                          )}
-                        >
-                          {s.id === "none" && (
-                            <X className="h-5 w-5 text-slate-400" aria-hidden />
-                          )}
-                        </span>
-                      ) : (
-                        <img
-                          src={src}
-                          alt=""
-                          className="aspect-video w-full object-cover"
-                          onError={() =>
-                            setThumbFailed((prev) => ({ ...prev, [s.id]: true }))
-                          }
-                        />
-                      )}
-                      {s.locked && (
-                        <span className="absolute right-1 top-1 rounded-full bg-black/50 p-0.5">
-                          <LockIcon className="h-3 w-3 text-white" />
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-center text-[11px] font-semibold",
-                        active
-                          ? "bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] bg-clip-text text-transparent"
-                          : "text-slate-600 dark:text-zinc-300",
-                      )}
-                    >
-                      {s.displayName}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div
-              className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#FFF1E8] to-transparent dark:from-[#0A0B14]"
-              aria-hidden
-            />
-          </div>
-        </section>
+        <VideoStyleStrip
+          styleId={styleId}
+          onSelect={setStyleId}
+          plan={profile?.plan}
+          isAdmin={admin}
+          disabled={busy}
+        />
 
         <div className="mb-5">
           <VideoFeaturePanel
@@ -750,7 +667,6 @@ function VideoStudioPage() {
         </div>
       </div>
 
-      {/* Sticky bar */}
       {!result && (
         <div
           className={cn(
