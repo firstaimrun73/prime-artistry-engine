@@ -7,7 +7,7 @@
  *   Video Studio: 1 credit face = 1.86¢  ($0.0186)
  *
  * Video spend rule (Phase 3 owner-defined):
- *   credits = max(25, ceil(provider_cogs_usd * videoCreditsPerUsd))
+ *   credits = max(50, ceil(provider_cogs_usd * videoCreditsPerUsd))
  *   videoCreditsPerUsd = 180  e.g. $0.25 → 45 credits, $0.50 → 90 credits.
  * Purchase pack pricing is separate and unchanged by these face values.
  */
@@ -129,7 +129,7 @@ export type BillingConfig = {
  * Spend-side Motio2edit credit economics (universal wallet).
  * Does NOT change how users purchase credit packs.
  *
- * Video: 1 Motio2edit credit = 1.86¢ face; charge = max(25, ceil(fal_cogs_usd × 180))
+ * Video: 1 Motio2edit credit = 1.86¢ face; charge = max(50, ceil(fal_cogs_usd × 180))
  * Image: 1 Motio2edit credit = 1.45¢ face
  */
 export const DEFAULT_BILLING_CONFIG: BillingConfig = {
@@ -142,7 +142,7 @@ export const DEFAULT_BILLING_CONFIG: BillingConfig = {
   operatingReserveUsd: 0,
   roundingStep: 1,
   productMinimumCredits: {
-    video: 25,
+    video: 50,
     image_standard: 10,
     image_premium: 15,
   },
