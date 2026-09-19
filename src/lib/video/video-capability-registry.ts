@@ -6,12 +6,7 @@
  * - Standard / Premium are PRODUCT modes (duration/quality ceilings), NOT model pools.
  * - Never auto-route to expensive flagship endpoints (Veo, Sora, Seedance high tiers, Kling O3 Pro).
  * - Server selects the cheapest approved model that satisfies the requested capability.
- * - Provider COGS is recorded for every route; retail credits come from the quote engine.
  * - Capabilities shown in UI must match what the selected endpoint can actually do.
- *
- * Pricing sources verified against fal.ai public pages (Sep 2026).
- * Conservative post-promo rates used where temporary discounts exist.
- * Update COGS constants when fal changes pricing — do not hardcode stale research.
  */
 
 export type VideoGenMode = "text" | "image" | "video";
@@ -21,12 +16,11 @@ export type VideoTier = VideoProductMode;
 export type VideoResolution = "480p" | "720p" | "1080p";
 export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 
-export const VIDEO_REGISTRY_VERSION = "2026-09-v3";
+export const VIDEO_REGISTRY_VERSION = "2026-09-v4";
 export const PRODUCT_DURATIONS_STANDARD = [5, 10] as const;
 export const PRODUCT_DURATIONS_PREMIUM = [5, 10, 15] as const;
 export const USER_MAX_DURATION_SEC = 15;
 
-/** Quality display labels — must match actual backend resolution */
 export function resolutionUiLabel(r: VideoResolution): string {
   if (r === "1080p") return "FHD · 1080p";
   if (r === "720p") return "HD · 720p";
@@ -39,16 +33,10 @@ export function qualityShortLabel(r: VideoResolution): string {
   return "SD";
 }
 
-/**
- * Pricing formula types supported by the quote engine.
- * Do not assume every provider is usdPerSec × duration.
- */
 export type PricingFormula =
   | {
       type: "per_second";
-      /** USD per second of output video by resolution */
       usdPerSecByRes: Partial<Record<VideoResolution, number>>;
-      /** Multiplier when native audio is requested (1 = no extra) */
       audioMult?: number;
     }
   | {
@@ -66,7 +54,6 @@ export type VideoModelDef = {
   id: string;
   name: string;
   provider: string;
-  /** Display-only ranking preference (lower = preferred when capabilities equal) */
   costRank: number;
   textEndpoint: string | null;
   imageEndpoint: string | null;
@@ -83,12 +70,16 @@ export type VideoModelDef = {
   available: boolean;
   supportsNegativePrompt?: boolean;
   supportsSeed?: boolean;
+  /** Capability-driven: only true when endpoint schema supports start image keyframe */
+  supportsFirstFrame?: boolean;
+  /** Capability-driven: only true when endpoint schema supports end image keyframe */
+  supportsLastFrame?: boolean;
   notes?: string;
 };
 
 /**
  * Economical approved pool only.
- * Explicitly exclude Veo / Sora / Seedance high tiers / Kling O3 Pro from auto-routing.
+ * V2V: fal-ai/hunyuan-video/video-to-video (verified public fal docs).
  */
 export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
   {
@@ -98,8 +89,8 @@ export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
     costRank: 10,
     textEndpoint: "fal-ai/hunyuan-video",
     imageEndpoint: "fal-ai/hunyuan-video/image-to-video",
-    videoEndpoint: null,
-    modes: ["text", "image"],
+    videoEndpoint: "fal-ai/hunyuan-video/video-to-video",
+    modes: ["text", "image", "video"],
     resolutions: ["480p", "720p"],
     aspects: ["16:9", "9:16", "1:1"],
     durations: [5, 10],
@@ -110,9 +101,9 @@ export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
       usdPerSecByRes: { "480p": 0.025, "720p": 0.04 },
       audioMult: 1,
     },
-    pricingSource: "fal public 2026-09 (conservative post-promo; not independently live-verified in this session)",
+    pricingSource: "fal public 2026-09",
     available: true,
-    notes: "Fast economical T2V/I2V; no native audio. COGS conservative.",
+    notes: "T2V/I2V/V2V; no native audio. V2V endpoint verified on fal.",
   },
   {
     id: "h3-max",
@@ -121,8 +112,8 @@ export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
     costRank: 20,
     textEndpoint: "fal-ai/hunyuan-video",
     imageEndpoint: "fal-ai/hunyuan-video/image-to-video",
-    videoEndpoint: null,
-    modes: ["text", "image"],
+    videoEndpoint: "fal-ai/hunyuan-video/video-to-video",
+    modes: ["text", "image", "video"],
     resolutions: ["480p", "720p"],
     aspects: ["16:9", "9:16", "1:1"],
     durations: [5, 10],
@@ -250,7 +241,6 @@ export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
   },
 ];
 
-/** Hard-blocked endpoint prefixes — never auto-route */
 export const BLOCKED_ENDPOINT_PREFIXES = [
   "fal-ai/veo",
   "fal-ai/sora",
@@ -287,10 +277,6 @@ export type SelectVideoRouteResult = {
   productMode: VideoProductMode;
 };
 
-/**
- * Select the cheapest approved model that can satisfy the request.
- * productMode only constrains duration ceilings (Standard 5/10, Premium 5/10/15).
- */
 export function selectApprovedVideoRoute(
   input: SelectVideoRouteInput,
 ): SelectVideoRouteResult | null {
@@ -360,8 +346,12 @@ export function computeProviderCogsUsd(opts: {
   return +base.toFixed(6);
 }
 
-export function capabilitiesForMode(productMode: VideoProductMode) {
-  const durations =
+/** Capability snapshot filtered by generation mode. */
+export function capabilitiesForGenMode(
+  productMode: VideoProductMode,
+  genMode: VideoGenMode,
+) {
+  const productDurations =
     productMode === "premium"
       ? [...PRODUCT_DURATIONS_PREMIUM]
       : [...PRODUCT_DURATIONS_STANDARD];
@@ -369,20 +359,49 @@ export function capabilitiesForMode(productMode: VideoProductMode) {
   const resSet = new Set<VideoResolution>();
   const aspectSet = new Set<VideoAspect>();
   let audioSupported = false;
+  let videoInputSupported = false;
+  let firstFrameSupported = false;
+  let lastFrameSupported = false;
 
   for (const m of APPROVED_VIDEO_MODELS) {
     if (!m.available) continue;
+    if (!m.modes.includes(genMode)) continue;
+    let ep: string | null = null;
+    if (genMode === "text") ep = m.textEndpoint;
+    else if (genMode === "image") ep = m.imageEndpoint;
+    else ep = m.videoEndpoint;
+    if (!ep || isEndpointBlocked(ep)) continue;
     for (const r of m.resolutions) resSet.add(r);
     for (const a of m.aspects) aspectSet.add(a);
     if (m.nativeAudio) audioSupported = true;
+    if (genMode === "video" && m.videoEndpoint) videoInputSupported = true;
+    if (m.supportsFirstFrame) firstFrameSupported = true;
+    if (m.supportsLastFrame) lastFrameSupported = true;
   }
 
+  const durations = productDurations.filter((d) =>
+    APPROVED_VIDEO_MODELS.some(
+      (m) =>
+        m.available &&
+        m.modes.includes(genMode) &&
+        m.durations.includes(d) &&
+        d <= m.maxDurationSec,
+    ),
+  );
+
   return {
-    durations,
+    durations: durations.length ? durations : productDurations,
     resolutions: Array.from(resSet),
     aspects: Array.from(aspectSet),
     audioSupported,
+    videoInputSupported,
+    firstFrameSupported,
+    lastFrameSupported,
   };
+}
+
+export function capabilitiesForMode(productMode: VideoProductMode) {
+  return capabilitiesForGenMode(productMode, "text");
 }
 
 export function uiOptionsFor(productMode: VideoProductMode) {
@@ -423,6 +442,7 @@ export function availableMaxDurationFor(
 const AUDIO_INTENT_RE =
   /\b(music|song|soundtrack|dialogue|dialog|voice|speech|speak|talk|sing|singing|laugh|laughing|rain|thunder|sound|audio|sfx|effects?|ambient|noise|whisper|scream|cry|crying)\b/i;
 
+/** Detects audio-related words in prompt — for analytics only. Must NOT force Sound ON. */
 export function promptMentionsAudio(prompt: string | null | undefined): boolean {
   if (!prompt || !prompt.trim()) return false;
   return AUDIO_INTENT_RE.test(prompt);
