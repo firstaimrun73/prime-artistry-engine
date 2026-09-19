@@ -355,7 +355,7 @@ export function VideoFeaturePanel({
             if (!Number.isNaN(n)) setDuration(n);
           }}
           onLocked={(o) =>
-            onLockedOption?({
+            onLockedOption?.({
               kind: "duration",
               id: o.id,
               reason: o.reason ?? "Upgrade to unlock",
