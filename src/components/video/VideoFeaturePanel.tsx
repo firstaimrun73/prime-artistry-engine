@@ -1,19 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { VideoResolution, VideoAspect, VideoTier } from "@/lib/video-model-registry";
-import { VIDEO_STYLE_MODIFIERS } from "@/lib/video-model-registry";
-
-/** Local copy — avoid circular import with motio-video-credits at module init */
-const TIER_LABELS = {
-  standard: {
-    title: "Standard",
-    supporting: "Fast clips · SD/HD · from 125 credits",
-  },
-  premium: {
-    title: "Premium",
-    supporting: "Higher quality · longer clips · from 200 credits",
-  },
-} as const;
 
 function ChipGroup<T extends string>({
   label,
@@ -98,8 +85,7 @@ export function VideoFeaturePanel({
   setSize,
   soundOn,
   setSoundOn,
-  styleId = "",
-  setStyleId,
+  soundAvailable = true,
   disabled,
 }: {
   tier: VideoTier;
@@ -119,8 +105,8 @@ export function VideoFeaturePanel({
   setSize?: (v: VideoSizeOption) => void;
   soundOn: boolean;
   setSoundOn: (v: boolean) => void;
-  styleId?: string;
-  setStyleId?: (v: string) => void;
+  /** When false, Sound control is hidden (no route supports audio). */
+  soundAvailable?: boolean;
   disabled?: boolean;
 }) {
   const aspectList = aspects?.length ? aspects : (["16:9", "9:16", "1:1"] as VideoAspect[]);
@@ -128,96 +114,85 @@ export function VideoFeaturePanel({
   const safeAspect = (aspectList.includes(aspect) ? aspect : aspectList[0]) as VideoAspect;
   const safeRes = (resList.includes(resolution) ? resolution : resList[0]) as VideoResolution;
   const durationOpts = durations?.length ? durations : [5, 10];
-  const isPremium = tier === "premium";
   const safeSize = size ?? "medium";
-  const styleKeys = VIDEO_STYLE_MODIFIERS ? Object.keys(VIDEO_STYLE_MODIFIERS) : [];
 
   return (
-    <div
-      className={cn(
-        "space-y-4 rounded-2xl border p-4 transition-all duration-300",
-        isPremium
-          ? "border-amber-500/40 bg-gradient-to-br from-card via-amber-500/5 to-orange-500/5 shadow-[0_0_40px_-12px_rgba(245,158,11,0.3)]"
-          : "border-border/70 bg-card/80",
-      )}
-    >
+    <div className="space-y-4 rounded-2xl border border-border/70 bg-card/80 p-4">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Features</p>
 
+      {/* Compact Generation selector — Standard / Premium only */}
       <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Generation</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <button
-            type="button"
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Generation
+        </p>
+        <div className="relative">
+          <select
+            value={tier}
             disabled={disabled}
-            onClick={() => setTier("standard")}
-            className={cn(
-              "rounded-2xl border p-3 text-left transition-colors",
-              tier === "standard"
-                ? "border-red-500 bg-red-500/10 ring-1 ring-red-500/30"
-                : "border-border/70 bg-background hover:border-red-400/40",
-            )}
-          >
-            <p className="text-sm font-bold">{TIER_LABELS.standard.title}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{TIER_LABELS.standard.supporting}</p>
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => {
-              if (premiumLocked) onPremiumLockedClick?.();
-              else setTier("premium");
+            onChange={(e) => {
+              const v = e.target.value as VideoTier;
+              if (v === "premium" && premiumLocked) {
+                onPremiumLockedClick?.();
+                return;
+              }
+              setTier(v);
             }}
             className={cn(
-              "rounded-2xl border p-3 text-left transition-colors",
-              tier === "premium"
-                ? "border-amber-500 bg-gradient-to-br from-amber-500/15 to-orange-500/10 ring-1 ring-amber-500/40"
-                : "border-border/70 bg-background hover:border-amber-400/40",
+              "w-full appearance-none rounded-xl border border-border/70 bg-background px-3 py-2.5 pr-8 text-sm font-semibold",
+              "focus:outline-none focus:ring-2 focus:ring-orange-500/30",
+              disabled && "opacity-50",
+            )}
+            aria-label="Generation level"
+          >
+            <option value="standard">Standard</option>
+            <option value="premium">{premiumLocked ? "Premium (locked)" : "Premium"}</option>
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            ↓
+          </span>
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          {tier === "premium"
+            ? "Higher quality · longer clips · from 200 credits"
+            : "Fast clips · from 125 credits"}
+        </p>
+      </div>
+
+      {soundAvailable && (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Sound</p>
+            <p className="text-[11px] text-muted-foreground">
+              {soundOn ? "Sound on when supported" : "Silent (default)"}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={soundOn}
+            aria-label={soundOn ? "Sound on" : "Sound off"}
+            disabled={disabled}
+            onClick={() => setSoundOn(!soundOn)}
+            className={cn(
+              "relative h-7 w-12 shrink-0 rounded-full transition-colors",
+              soundOn ? "bg-red-500" : "bg-muted",
+              disabled && "opacity-50",
             )}
           >
-            <p className="text-sm font-bold">
-              {premiumLocked ? "Premium 🔒" : `👑 ${TIER_LABELS.premium.title}`}
-              {!premiumLocked && (
-                <span className="ml-1.5 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+            <span
+              className={cn(
+                "pointer-events-none absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform",
+                soundOn && "translate-x-5",
               )}
-            </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{TIER_LABELS.premium.supporting}</p>
+            />
           </button>
         </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">Sound</p>
-          <p className="text-[11px] text-muted-foreground">
-            {soundOn
-              ? "Native sound when the model supports it (+ credits)"
-              : "Silent · prompt sound words still request audio"}
-          </p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={soundOn}
-          aria-label={soundOn ? "Sound on" : "Sound off"}
-          disabled={disabled}
-          onClick={() => setSoundOn(!soundOn)}
-          className={cn(
-            "relative h-7 w-12 shrink-0 rounded-full transition-colors",
-            soundOn ? "bg-red-500" : "bg-muted",
-            disabled && "opacity-50",
-          )}
-        >
-          <span
-            className={cn(
-              "pointer-events-none absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform",
-              soundOn && "translate-x-5",
-            )}
-          />
-        </button>
-      </div>
+      )}
 
       <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aspect ratio</p>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Aspect ratio
+        </p>
         <div className="flex flex-wrap gap-2">
           {aspectList.map((a) => {
             const active = safeAspect === a;
@@ -275,43 +250,6 @@ export function VideoFeaturePanel({
         onChange={(v) => setDuration(parseInt(v, 10))}
         disabled={disabled}
       />
-
-      {setStyleId && (
-        <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => setStyleId("")}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-semibold",
-                !styleId
-                  ? "border-red-500 bg-red-500 text-white"
-                  : "border-border bg-background text-muted-foreground",
-              )}
-            >
-              None
-            </button>
-            {styleKeys.map((id) => (
-              <button
-                key={id}
-                type="button"
-                disabled={disabled}
-                onClick={() => setStyleId(id)}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-semibold capitalize",
-                  styleId === id
-                    ? "border-red-500 bg-red-500 text-white"
-                    : "border-border bg-background text-muted-foreground",
-                )}
-              >
-                {id}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
