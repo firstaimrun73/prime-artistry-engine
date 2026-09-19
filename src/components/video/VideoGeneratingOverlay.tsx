@@ -1,20 +1,40 @@
 /**
- * In-canvas generation state — breathing accent dot only.
- * No spinner, no percentage, no Stop/Cancel.
+ * In-canvas generation state — breathing dot + Estimated progress (D5).
+ * fal has no real percent; we show a soft estimate capped at 95% until done.
  */
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function VideoGeneratingOverlay({
   className,
+  etaSeconds = 90,
+  startedAt,
 }: {
-  /** @deprecated ignored */
   stageIndex?: number;
-  /** @deprecated ignored */
   etaSeconds?: number;
-  /** @deprecated ignored */
+  startedAt?: number;
   prompt?: string;
   className?: string;
 }) {
+  const [pct, setPct] = useState(2);
+  const [label, setLabel] = useState("Waiting in queue");
+
+  useEffect(() => {
+    const start = startedAt ?? Date.now();
+    const eta = Math.max(30, etaSeconds || 90);
+    const tick = () => {
+      const elapsed = (Date.now() - start) / 1000;
+      // pct = min(95, round(100 * (1 - exp(-elapsed / (eta / 2.2)))))
+      const p = Math.min(95, Math.round(100 * (1 - Math.exp(-elapsed / (eta / 2.2)))));
+      setPct(Math.max(2, p));
+      if (elapsed < 4) setLabel("Waiting in queue");
+      else setLabel("Creating your video");
+    };
+    tick();
+    const id = window.setInterval(tick, 500);
+    return () => window.clearInterval(id);
+  }, [etaSeconds, startedAt]);
+
   return (
     <div
       className={cn(
@@ -24,10 +44,13 @@ export function VideoGeneratingOverlay({
       )}
       role="status"
       aria-live="polite"
-      aria-label="Creating your video"
+      aria-label={`${label}, estimated ${pct}%`}
     >
       <span className="studio-breathe-dot h-3.5 w-3.5 rounded-full bg-white shadow-[0_0_16px_rgba(255,122,69,0.8)]" />
-      <p className="text-[12px] font-medium text-white/90">Creating your video…</p>
+      <p className="text-[12px] font-medium text-white/90">{label}…</p>
+      <p className="text-[11px] tabular-nums text-white/70">
+        {pct}% <span className="text-white/50">Estimated</span>
+      </p>
       <style>{`
         @keyframes studio-breathe {
           0%, 100% { transform: scale(1); opacity: 1; }
