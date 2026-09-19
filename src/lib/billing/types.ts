@@ -6,9 +6,9 @@
  *   Image Studio: 1 credit face = 1.45¢  ($0.0145)
  *   Video Studio: 1 credit face = 1.86¢  ($0.0186)
  *
- * Video spend rule (owner-defined):
- *   credits = ceil(provider_cogs_usd * 100)
- *   Example: fal COGS $0.50 → 50 credits deducted after successful delivery.
+ * Video spend rule (Phase 3 owner-defined):
+ *   credits = max(25, ceil(provider_cogs_usd * videoCreditsPerUsd))
+ *   videoCreditsPerUsd = 180  e.g. $0.25 → 45 credits, $0.50 → 90 credits.
  * Purchase pack pricing is separate and unchanged by these face values.
  */
 
@@ -114,6 +114,8 @@ export type BillingConfig = {
   imageCreditFaceUsd: number;
   /** Video Studio spend face value (1 credit = 1.86¢) */
   videoCreditFaceUsd: number;
+  /** Motio2edit credits per $1 of provider COGS for video (Phase 3). */
+  videoCreditsPerUsd: number;
   minRealizedCreditUsd: number;
   targetGrossMargin: number;
   operatingReserveUsd: number;
@@ -127,13 +129,14 @@ export type BillingConfig = {
  * Spend-side Motio2edit credit economics (universal wallet).
  * Does NOT change how users purchase credit packs.
  *
- * Video: 1 Motio2edit credit = 1.86¢ face; charge = ceil(fal_cogs_usd × 100)
+ * Video: 1 Motio2edit credit = 1.86¢ face; charge = max(25, ceil(fal_cogs_usd × 180))
  * Image: 1 Motio2edit credit = 1.45¢ face
  */
 export const DEFAULT_BILLING_CONFIG: BillingConfig = {
   creditFaceUsd: 0.0186,
   imageCreditFaceUsd: 0.0145,
   videoCreditFaceUsd: 0.0186,
+  videoCreditsPerUsd: 180,
   minRealizedCreditUsd: 0.0186,
   targetGrossMargin: 0,
   operatingReserveUsd: 0,
