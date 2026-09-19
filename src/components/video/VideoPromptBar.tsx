@@ -1,5 +1,6 @@
 /**
  * Video Studio prompt bar — glass, mic, empty-state idea chips, char counter.
+ * Phase U: textarea min 72px, max 168px auto-grow, then scroll.
  */
 import { useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
@@ -90,7 +91,7 @@ export function VideoPromptBar({
         "ring-1 ring-black/5",
         "dark:border-white/[0.12] dark:bg-white/[0.06] dark:ring-white/[0.06]",
         "focus-within:ring-[#FF7A45]/30",
-        compact ? "min-h-[5.5rem]" : "min-h-[7rem]",
+        "min-h-[9.5rem] max-h-[10.75rem]",
       )}
     >
       {timing.cues.length > 0 && (
@@ -128,18 +129,26 @@ export function VideoPromptBar({
         ref={taRef}
         id="video-prompt"
         value={value}
-        disabled={disabled}
         maxLength={maxChars}
-        rows={compact ? 3 : 5}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value.slice(0, maxChars));
+          const el = taRef.current;
+          if (el) {
+            el.style.height = "auto";
+            el.style.height = `${Math.min(168, Math.max(72, el.scrollHeight))}px`;
+          }
+        }}
+        disabled={disabled}
+        rows={3}
         placeholder={placeholder ?? "Describe your video…"}
         className={cn(
-          "w-full flex-1 resize-none overflow-y-auto bg-transparent px-3.5 pb-14 pt-3 text-sm leading-relaxed",
+          "w-full resize-none overflow-y-auto bg-transparent px-3.5 pb-14 pt-3 text-sm leading-relaxed",
           "text-slate-800 placeholder:text-slate-400",
           "dark:text-white dark:placeholder:text-zinc-500",
           "focus:outline-none",
           disabled && "opacity-60",
         )}
+        style={{ minHeight: 72, maxHeight: 168 }}
       />
 
       {(timing.errors[0] || durationErrors[0]) && (
