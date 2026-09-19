@@ -7,8 +7,8 @@
  * Video Studio spend: 1 credit face = 1.86¢
  *
  * Video charge rule (owner-defined):
- *   credits = max(productMinimum, ceil(provider_cogs_usd × 100))
- *   Example: fal COGS $0.50 → 50 credits after successful delivery.
+ *   credits = max(productMinimum, ceil(provider_cogs_usd × videoCreditsPerUsd))  // 180
+ *   Example: fal COGS $0.25 → 45 credits after successful delivery.
  *
  * Image charge rule:
  *   credits = max(productMinimum, ceil(provider_cogs_usd / 0.0145))
@@ -66,10 +66,11 @@ export function providerCogsToCustomerCredits(
   let formula: string;
 
   if (product === "video") {
-    // 1 credit per 1¢ of fal COGS (owner example: $0.50 → 50 credits)
+    // Phase 3: credits = ceil(cogs_usd × videoCreditsPerUsd), min productMinimum (25)
+    const perUsd = config.videoCreditsPerUsd ?? 180;
     creditFaceCents = (config.videoCreditFaceUsd ?? 0.0186) * 100;
-    rawCredits = cogsCents;
-    formula = "video: ceil(cogs_usd × 100) credits; face 1.86¢/credit";
+    rawCredits = cogs * perUsd;
+    formula = `video: ceil(cogs_usd × ${perUsd}) credits; face 1.86¢/credit`;
   } else if (isImageProduct(product)) {
     // 1 credit covers 1.45¢ of backend cost
     const faceUsd = config.imageCreditFaceUsd ?? 0.0145;
