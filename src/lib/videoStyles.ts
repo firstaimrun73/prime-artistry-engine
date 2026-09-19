@@ -1,42 +1,48 @@
 /**
  * Video Studio — UI style registry only.
- * id / displayName / thumbnail / locked. No recipes, no provider names.
  * Selecting a style sets styleId only; never rewrites the user prompt.
  */
+
+/** Set later to CDN/base path, e.g. "https://cdn.example.com/styles/video" */
+export const VIDEO_STYLE_THUMB_BASE = "";
 
 export type VideoStyleUi = {
   id: string;
   displayName: string;
-  /** Path under public, e.g. /styles/video/cinematic.webp */
-  thumbnail: string | null;
+  /** Resolved as `${VIDEO_STYLE_THUMB_BASE}/${id}.webp` when BASE is set */
   locked: boolean;
 };
 
 export const VIDEO_STYLE_UI: VideoStyleUi[] = [
-  { id: "none", displayName: "None", thumbnail: null, locked: false },
-  { id: "cinematic", displayName: "Cinematic", thumbnail: "/styles/video/cinematic.webp", locked: false },
-  { id: "dreamy", displayName: "Dreamy", thumbnail: "/styles/video/dreamy.webp", locked: false },
-  { id: "vibrant", displayName: "Vibrant", thumbnail: "/styles/video/vibrant.webp", locked: false },
-  { id: "vintage-film", displayName: "Vintage Film", thumbnail: "/styles/video/vintage-film.webp", locked: false },
-  { id: "futuristic", displayName: "Futuristic", thumbnail: "/styles/video/futuristic.webp", locked: false },
-  { id: "cyberpunk", displayName: "Cyberpunk", thumbnail: "/styles/video/cyberpunk.webp", locked: false },
-  { id: "documentary", displayName: "Documentary", thumbnail: "/styles/video/documentary.webp", locked: false },
-  { id: "fantasy", displayName: "Fantasy", thumbnail: "/styles/video/fantasy.webp", locked: false },
-  { id: "dark-fantasy", displayName: "Dark Fantasy", thumbnail: "/styles/video/dark-fantasy.webp", locked: false },
-  { id: "anime-inspired", displayName: "Anime-Inspired", thumbnail: "/styles/video/anime-inspired.webp", locked: false },
-  { id: "watercolor", displayName: "Watercolor", thumbnail: "/styles/video/watercolor.webp", locked: false },
-  { id: "oil-painting", displayName: "Oil Painting", thumbnail: "/styles/video/oil-painting.webp", locked: false },
-  { id: "minimal", displayName: "Minimal", thumbnail: "/styles/video/minimal.webp", locked: false },
-  { id: "luxury", displayName: "Luxury", thumbnail: "/styles/video/luxury.webp", locked: false },
-  { id: "nature", displayName: "Nature", thumbnail: "/styles/video/nature.webp", locked: false },
-  { id: "noir", displayName: "Noir", thumbnail: "/styles/video/noir.webp", locked: false },
-  { id: "retro-future", displayName: "Retro Future", thumbnail: "/styles/video/retro-future.webp", locked: false },
-  { id: "epic-adventure", displayName: "Epic Adventure", thumbnail: "/styles/video/epic-adventure.webp", locked: false },
-  { id: "soft-portrait", displayName: "Soft Portrait", thumbnail: "/styles/video/soft-portrait.webp", locked: false },
-  { id: "graphic-editorial", displayName: "Graphic Editorial", thumbnail: "/styles/video/graphic-editorial.webp", locked: false },
+  { id: "none", displayName: "None", locked: false },
+  { id: "cinematic", displayName: "Cinematic", locked: false },
+  { id: "dreamy", displayName: "Dreamy", locked: false },
+  { id: "vibrant", displayName: "Vibrant", locked: false },
+  { id: "vintage-film", displayName: "Vintage Film", locked: false },
+  { id: "futuristic", displayName: "Futuristic", locked: false },
+  { id: "cyberpunk", displayName: "Cyberpunk", locked: false },
+  { id: "documentary", displayName: "Documentary", locked: false },
+  { id: "fantasy", displayName: "Fantasy", locked: false },
+  { id: "dark-fantasy", displayName: "Dark Fantasy", locked: false },
+  { id: "anime-inspired", displayName: "Anime-Inspired", locked: false },
+  { id: "watercolor", displayName: "Watercolor", locked: false },
+  { id: "oil-painting", displayName: "Oil Painting", locked: false },
+  { id: "minimal", displayName: "Minimal", locked: false },
+  { id: "luxury", displayName: "Luxury", locked: false },
+  { id: "nature", displayName: "Nature", locked: false },
+  { id: "noir", displayName: "Noir", locked: false },
+  { id: "retro-future", displayName: "Retro Future", locked: false },
+  { id: "epic-adventure", displayName: "Epic Adventure", locked: false },
+  { id: "soft-portrait", displayName: "Soft Portrait", locked: false },
+  { id: "graphic-editorial", displayName: "Graphic Editorial", locked: false },
 ];
 
-/** Neutral gradient fallbacks when /public/styles/video/<id>.webp is missing */
+export function styleThumbSrc(id: string): string | null {
+  if (id === "none" || !VIDEO_STYLE_THUMB_BASE) return null;
+  return `${VIDEO_STYLE_THUMB_BASE}/${id}.webp`;
+}
+
+/** Neutral gradient fallbacks when thumbnail missing */
 export const STYLE_FALLBACK_GRADIENT: Record<string, string> = {
   none: "from-zinc-200/80 to-zinc-400/60 dark:from-zinc-700 dark:to-zinc-900",
   cinematic: "from-slate-600 via-indigo-800 to-black",
