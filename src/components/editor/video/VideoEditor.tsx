@@ -192,7 +192,6 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
         mediaUrl = await uploadToStorage(inputFile);
         sourceKind = "video";
       } else if (inputPreview?.startsWith("https://")) {
-        // Reuse from history (URL only)
         mediaUrl = inputPreview;
         sourceKind = "video";
       }
@@ -234,14 +233,7 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
     }
   };
 
-  const handleStop = () => {
-    runIdRef.current++;
-    setState("idle");
-    endGeneration();
-    setProgress(0);
-    setStage(0);
-    toast("Generation stopped.");
-  };
+  /* Phase 2: Stop / Cancel removed — job runs to completion or fails with refund. */
 
   const handleClear = () => {
     runIdRef.current++;
@@ -388,7 +380,7 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
           <EditorGenerationControls
             loading={loading}
             onGenerate={runGenerate}
-            onStop={handleStop}
+            hideStop
             videoLocked={videoLocked}
             noCredits={noCredits}
           />

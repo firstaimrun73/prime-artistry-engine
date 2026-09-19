@@ -1,52 +1,55 @@
 /**
- * Product-level generation stages — not provider internals.
+ * In-canvas generation state — breathing accent dot only.
+ * No spinner, no percentage, no Stop/Cancel.
  */
 import { cn } from "@/lib/utils";
-import { Video } from "lucide-react";
-
-const STAGES = ["Preparing scene", "Building motion", "Rendering video", "Finishing"] as const;
 
 export function VideoGeneratingOverlay({
-  stageIndex,
-  etaSeconds,
-  prompt,
+  className,
 }: {
-  stageIndex: number;
+  /** @deprecated ignored */
+  stageIndex?: number;
+  /** @deprecated ignored */
   etaSeconds?: number;
+  /** @deprecated ignored */
   prompt?: string;
+  className?: string;
 }) {
-  const idx = Math.min(Math.max(0, stageIndex), STAGES.length - 1);
   return (
-    <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-5 bg-zinc-950/90 px-6 backdrop-blur-md">
-      <div
-        className={cn(
-          "relative grid h-16 w-16 place-items-center rounded-2xl border border-red-500/40 bg-red-500/10",
-          "motion-safe:animate-pulse",
-        )}
-      >
-        <Video className="h-7 w-7 text-red-400" />
-        <span className="pointer-events-none absolute inset-0 rounded-2xl shadow-[0_0_28px_rgba(239,68,68,0.35)] motion-safe:animate-pulse" />
-      </div>
-      <div className="w-full max-w-xs space-y-2 text-center">
-        <p className="text-sm font-semibold text-white">{STAGES[idx]}</p>
-        {etaSeconds != null && etaSeconds > 0 && (
-          <p className="text-[11px] text-zinc-400">About {etaSeconds}s · keep this tab open</p>
-        )}
-        {prompt && (
-          <p className="line-clamp-2 text-[11px] text-zinc-500">“{prompt}”</p>
-        )}
-        <div className="mt-3 flex justify-center gap-1.5">
-          {STAGES.map((_, i) => (
-            <span
-              key={i}
-              className={cn(
-                "h-1 w-6 rounded-full transition-colors",
-                i <= idx ? "bg-red-500" : "bg-white/15",
-              )}
-            />
-          ))}
-        </div>
-      </div>
+    <div
+      className={cn(
+        "absolute inset-0 z-20 flex flex-col items-center justify-center gap-3",
+        "studio-shift-bg",
+        className,
+      )}
+      role="status"
+      aria-live="polite"
+      aria-label="Creating your video"
+    >
+      <span className="studio-breathe-dot h-3.5 w-3.5 rounded-full bg-white shadow-[0_0_16px_rgba(255,122,69,0.8)]" />
+      <p className="text-[12px] font-medium text-white/90">Creating your video…</p>
+      <style>{`
+        @keyframes studio-breathe {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.35); opacity: 0.6; }
+        }
+        .studio-breathe-dot {
+          animation: studio-breathe 1.2s ease-in-out infinite;
+        }
+        @keyframes studio-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .studio-shift-bg {
+          background: linear-gradient(120deg, #1a0a12, #2a1040, #0f1a2e, #1a0a12);
+          background-size: 300% 300%;
+          animation: studio-shift 8s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .studio-breathe-dot, .studio-shift-bg { animation: none; }
+        }
+      `}</style>
     </div>
   );
 }

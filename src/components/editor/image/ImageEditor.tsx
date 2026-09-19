@@ -571,20 +571,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     });
   };
 
-  const handleStop = () => {
-    runIdRef.current++;
-    setState("idle");
-    endGeneration();
-    setProgress(0);
-    setStage(0);
-    setPremiumCompleteHold(false);
-    setPremiumGenError(null);
-    setUltraCompleteHold(false);
-    setUltraGenError(null);
-    setStandardCompleteHold(false);
-    setStandardGenError(null);
-    toast("Generation stopped.");
-  };
+  /* Phase 2: Stop / Cancel removed — job runs to completion or fails with refund. */
 
   const handleDismissPremiumError = () => {
     setPremiumGenError(null);
@@ -894,7 +881,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               <EditorGenerationControls
                 loading={loading}
                 onGenerate={runGenerate}
-                onStop={handleStop}
+                hideStop
                 videoLocked={false}
                 noCredits={noCredits}
                 generateClassName={studioGenerateClass(studioTier)}

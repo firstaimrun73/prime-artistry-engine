@@ -1,16 +1,24 @@
 /**
- * Motio2edit Video Studio — glass UI + sticky generate + credits sheet.
+ * Motio2edit Video Studio v2 — UI round 2 + Phase 1 style strip.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Info, Lock, Sparkles, Video, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Coins,
+  Grid3x3,
+  Info,
+  Lock,
+  Sparkles,
+  Video,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { StudioBackLink } from "@/components/StudioBackLink";
 import { isAdminEmail } from "@/lib/admin-config";
-import { canAccessVideo, isPaidPlan } from "@/lib/policy";
+import { canAccessVideo } from "@/lib/policy";
 import { generateMedia } from "@/lib/generate.functions";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { cn } from "@/lib/utils";
@@ -24,6 +32,7 @@ import { VideoFeaturePanel } from "@/components/video/VideoFeaturePanel";
 import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
 import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
 import { VideoOutputView } from "@/components/video/VideoOutputView";
+import { VideoStyleStrip } from "@/components/video/VideoStyleStrip";
 import { getWelcomeFreeVideoStatus } from "@/lib/billing/welcome-free-video-status.functions";
 import {
   selectVideoModel,
@@ -43,9 +52,9 @@ import {
   validateTimingAgainstDuration,
 } from "@/lib/video/prompt-timing";
 import {
-  videoStylesForUi,
-  applyVideoStyleFromRegistry,
-} from "@/lib/video/video-style-registry";
+  isDurationAllowed,
+  planRequiredForDuration,
+} from "@/lib/video-options";
 import type { VideoStudioResult } from "@/components/video/video-studio-types";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
@@ -60,29 +69,40 @@ export const Route = createFileRoute("/studio/video")({
   component: VideoStudioPage,
 });
 
-const STYLE_THUMB: Record<string, string> = {
-  neutral: "from-zinc-200 via-zinc-300 to-zinc-400",
-  classic: "from-amber-100 via-stone-300 to-stone-500",
-  retro: "from-pink-400 via-orange-400 to-orange-600",
-  vintage: "from-yellow-200 via-amber-400 to-amber-800",
-  cinematic: "from-slate-600 via-indigo-800 to-black",
-  documentary: "from-emerald-300 via-teal-500 to-teal-800",
-  anime: "from-fuchsia-400 via-sky-400 to-sky-600",
-  product: "from-white via-zinc-200 to-zinc-400",
-  social: "from-rose-400 via-violet-500 to-violet-700",
-};
-
-const PROMPT_IDEAS = [
-  { id: "drone", label: "Drone sunrise", text: "A cinematic drone shot over a mountain range at sunrise, golden light, smooth camera glide" },
-  { id: "city", label: "Neon city", text: "A stylish woman walks through a neon-lit Tokyo street at night, reflections on wet pavement" },
-  { id: "ocean", label: "Ocean waves", text: "Powerful waves crash against dark rocks at golden hour, spray catching the light" },
-  { id: "forest", label: "Misty forest", text: "Slow push through a misty pine forest at dawn, volumetric light rays through the trees" },
-];
-
 function aspectBoxClass(aspect: VideoAspect): string {
-  if (aspect === "9:16") return "aspect-[9/16] max-h-[280px] w-auto mx-auto";
-  if (aspect === "1:1") return "aspect-square max-h-[240px] w-full max-w-[240px] mx-auto";
-  return "aspect-video w-full";
+  if (aspect === "9:16") return "aspect-[9/16] max-h-[42vh] w-auto mx-auto";
+  if (aspect === "1:1") return "aspect-square max-h-[42vh] w-full max-w-[min(100%,42vh)] mx-auto";
+  return "aspect-video w-full max-h-[42vh]";
+}
+
+function unionCaps(mode: VideoGenMode) {
+  const empty = {
+    durations: [5, 10, 15] as number[],
+    resolutions: ["480p", "720p", "1080p"] as VideoResolution[],
+    aspects: ["16:9", "9:16", "1:1"] as VideoAspect[],
+    audioSupported: true,
+  };
+  try {
+    const a = capabilitiesForGenMode("standard", mode);
+    const b = capabilitiesForGenMode("premium", mode);
+    const durations = Array.from(
+      new Set([...(a.durations ?? []), ...(b.durations ?? [])]),
+    ).sort((x, y) => x - y);
+    const resolutions = Array.from(
+      new Set([...(a.resolutions ?? []), ...(b.resolutions ?? [])]),
+    ) as VideoResolution[];
+    const aspects = Array.from(
+      new Set([...(a.aspects ?? []), ...(b.aspects ?? [])]),
+    ) as VideoAspect[];
+    return {
+      durations: durations.length ? durations : empty.durations,
+      resolutions: resolutions.length ? resolutions : empty.resolutions,
+      aspects: aspects.length ? aspects : empty.aspects,
+      audioSupported: Boolean(a.audioSupported || b.audioSupported),
+    };
+  } catch {
+    return empty;
+  }
 }
 
 function VideoStudioPage() {
@@ -94,7 +114,6 @@ function VideoStudioPage() {
     email: profile?.email,
     isAdmin: admin,
   });
-  const paid = isPaidPlan(profile?.plan) || admin;
 
   const [mode, setMode] = useState<VideoGenMode>("text");
   const [prompt, setPrompt] = useState("");
@@ -102,18 +121,18 @@ function VideoStudioPage() {
   const [aspect, setAspect] = useState<VideoAspect>("16:9");
   const [resolution, setResolution] = useState<VideoResolution>("720p");
   const [audioOn, setAudioOn] = useState(false);
-  const [styleId, setStyleId] = useState("");
+  const [styleId, setStyleId] = useState("none");
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
-  const [stageIdx, setStageIdx] = useState(0);
-  const [eta, setEta] = useState(45);
   const [result, setResult] = useState<VideoStudioResult | null>(null);
   const [welcomeFree, setWelcomeFree] = useState(false);
   const [creditsOpen, setCreditsOpen] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
-  /** Product tier derived from settings (no UI dropdown). 15s or 1080p → premium. */
-  const tier: VideoTier = duration >= 15 || resolution === "1080p" ? "premium" : "standard";
+  const tier: VideoTier =
+    duration >= 15 || resolution === "1080p" ? "premium" : "standard";
 
   const generate = useServerFn(generateMedia);
   const welcomeStatus = useServerFn(getWelcomeFreeVideoStatus);
@@ -127,45 +146,55 @@ function VideoStudioPage() {
       .catch(() => {});
   }, [user, welcomeStatus]);
 
-  const caps = useMemo(() => {
-    try {
-      return capabilitiesForGenMode(tier, mode);
-    } catch {
-      return {
-        durations: [5, 10, 15],
-        resolutions: ["720p", "1080p"] as VideoResolution[],
-        aspects: ["16:9", "9:16", "1:1"] as VideoAspect[],
-        audioSupported: true,
-        videoInputSupported: mode === "video",
-        firstFrameSupported: false,
-        lastFrameSupported: false,
-      };
+  useEffect(() => {
+    if (busy && canvasRef.current) {
+      canvasRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [tier, mode]);
+  }, [busy]);
 
-  /** Always show 5 / 10 / 15 so 15s is always tappable */
+  const caps = useMemo(() => unionCaps(mode), [mode]);
   const durations = [5, 10, 15];
-  const aspectOptions = (caps.aspects.length ? caps.aspects : ["16:9", "9:16", "1:1"]) as VideoAspect[];
-  const resolutionOptions = (caps.resolutions.length
-    ? caps.resolutions
-    : ["720p", "1080p"]) as VideoResolution[];
+  const resolutionOptions: VideoResolution[] = ["480p", "720p", "1080p"];
+  const aspectOptions = (caps.aspects.length
+    ? caps.aspects
+    : ["16:9", "9:16", "1:1"]) as VideoAspect[];
+
+  const disabledDurations = useMemo(() => {
+    const map: Partial<Record<number, string>> = {};
+    for (const d of durations) {
+      if (caps.durations.length && !caps.durations.includes(d)) {
+        map[d] = "Not available for this mode yet";
+        continue;
+      }
+      if (!isDurationAllowed(profile?.plan, d, admin)) {
+        map[d] = `Requires ${planRequiredForDuration(d)} plan`;
+      }
+    }
+    return map;
+  }, [caps.durations, profile?.plan, admin]);
+
+  const disabledResolutions = useMemo(() => {
+    const map: Partial<Record<string, string>> = {};
+    for (const r of resolutionOptions) {
+      if (caps.resolutions.length && !caps.resolutions.includes(r)) {
+        map[r] = "Not available for this mode yet";
+      }
+    }
+    return map;
+  }, [caps.resolutions]);
 
   useEffect(() => {
     if (!aspectOptions.includes(aspect) && aspectOptions[0]) setAspect(aspectOptions[0]);
   }, [aspectOptions, aspect]);
 
   useEffect(() => {
-    if (!resolutionOptions.includes(resolution) && resolutionOptions[0]) {
-      setResolution(resolutionOptions[0]);
-    }
-  }, [resolutionOptions, resolution]);
-
-  useEffect(() => {
     if (!caps.audioSupported && audioOn) setAudioOn(false);
   }, [caps.audioSupported, audioOn]);
 
-  const promptMax = tier === "premium" ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
-  const styles = useMemo(() => videoStylesForUi(mode), [mode]);
+  const promptMax =
+    duration >= 15 || resolution === "1080p"
+      ? PREMIUM_VIDEO_PROMPT_MAX
+      : STANDARD_VIDEO_PROMPT_MAX;
 
   const price = useMemo(() => {
     try {
@@ -183,7 +212,7 @@ function VideoStudioPage() {
         credits: 0,
         usd: 0,
         supported: true,
-        reason: undefined,
+        reason: undefined as string | undefined,
         breakdown: {
           tier,
           mode,
@@ -200,52 +229,36 @@ function VideoStudioPage() {
 
   const creditsEstimate = price.supported ? price.credits : 0;
 
-  /** Credit breakdown for the ⓘ sheet */
   const creditRows = useMemo(() => {
     const rows: { label: string; credits: number }[] = [];
-    for (const d of [5, 10, 15]) {
-      try {
-        const r = computeMotioVideoCredits({
-          tier: d >= 15 ? "premium" : "standard",
-          durationSec: d,
-          quality: qualityFromResolution(resolution),
-          soundOn: false,
-          mode,
-          resolution,
-          aspect,
-        });
-        if (r.supported) rows.push({ label: `${d}s · ${resolution}`, credits: r.credits });
-      } catch {
-        /* skip */
-      }
-    }
     try {
-      const withSound = computeMotioVideoCredits({
+      const cur = computeMotioVideoCredits({
         tier,
         durationSec: duration,
         quality: qualityFromResolution(resolution),
-        soundOn: true,
+        soundOn: audioOn,
         mode,
         resolution,
         aspect,
       });
-      if (withSound.supported && withSound.credits > creditsEstimate) {
+      if (cur.supported) {
         rows.push({
-          label: `Sound add-on (current settings)`,
-          credits: withSound.credits - creditsEstimate,
+          label: `Current · ${mode} · ${duration}s · ${resolution === "480p" ? "SD" : resolution}${audioOn ? " · Sound" : ""}`,
+          credits: cur.credits,
         });
       }
     } catch {
       /* skip */
     }
     return rows;
-  }, [resolution, mode, aspect, tier, duration, creditsEstimate]);
+  }, [tier, duration, resolution, audioOn, mode, aspect]);
 
   const onPickSource = useCallback(
     (file: File) => {
       if (sourceUrl) URL.revokeObjectURL(sourceUrl);
       setSourceFile(file);
       setSourceUrl(URL.createObjectURL(file));
+      setResult(null);
     },
     [sourceUrl],
   );
@@ -261,7 +274,6 @@ function VideoStudioPage() {
       setMode(m);
       if (m === "text") onClearSource();
       setResult(null);
-      setStyleId("");
     },
     [onClearSource],
   );
@@ -283,6 +295,10 @@ function VideoStudioPage() {
     }
     if (mode === "video" && !sourceUrl) {
       toast.error("Upload a source video first");
+      return;
+    }
+    if (disabledDurations[duration]) {
+      toast.error(disabledDurations[duration]);
       return;
     }
     if (!price.supported && mode !== "video") {
@@ -314,13 +330,9 @@ function VideoStudioPage() {
       return;
     }
 
+    setResult(null);
     setBusy(true);
-    setStageIdx(0);
-    setEta(duration <= 5 ? 45 : duration <= 10 ? 75 : 110);
-    startGeneration("video");
-    const stageTimer = window.setInterval(() => {
-      setStageIdx((i) => Math.min(i + 1, 3));
-    }, 9000);
+    startGeneration("video", "/studio/video");
 
     try {
       let imageUrl: string | undefined;
@@ -330,16 +342,16 @@ function VideoStudioPage() {
         imageUrl = sourceUrl;
       }
 
-      const styled = applyVideoStyleFromRegistry(p, styleId || null);
+      /** styleId only — never rewrite user prompt on the client */
       const res = await generate({
         data: {
           type: "video",
-          prompt: styled,
+          prompt: p,
           imageUrl,
           videoDurationSeconds: duration,
           videoResolution: resolution,
           videoAspectRatio: aspect,
-          videoStyleId: styleId || undefined,
+          videoStyleId: styleId && styleId !== "none" ? styleId : undefined,
           videoGenerateAudio: audioOn,
           sourceKind: mode === "video" ? "video" : mode === "image" ? "image" : undefined,
           studioTier: tier === "premium" ? "premium" : "standard",
@@ -361,6 +373,9 @@ function VideoStudioPage() {
         (res as { credits?: number })?.credits ??
         creditsEstimate;
 
+      const qualityOut: "480p" | "720p" | "1080p" =
+        resolution === "1080p" ? "1080p" : resolution === "480p" ? "480p" : "720p";
+
       setResult({
         outputUrl,
         mode: mode === "video" ? "video" : mode === "image" ? "image" : "text",
@@ -370,7 +385,7 @@ function VideoStudioPage() {
           | "16:9"
           | "9:16"
           | "1:1",
-        quality: resolution === "1080p" ? "1080p" : "720p",
+        quality: qualityOut,
         size: "medium",
         soundRequested: audioOn,
         creditsUsed: typeof charged === "number" ? charged : creditsEstimate,
@@ -380,7 +395,6 @@ function VideoStudioPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not generate video");
     } finally {
-      window.clearInterval(stageTimer);
       setBusy(false);
       endGeneration();
     }
@@ -401,6 +415,7 @@ function VideoStudioPage() {
     creditsEstimate,
     generate,
     navigate,
+    disabledDurations,
   ]);
 
   const onDownload = useCallback(async () => {
@@ -451,33 +466,68 @@ function VideoStudioPage() {
   const canGenerate =
     !busy &&
     !!prompt.trim() &&
-    (mode === "video" ? !!sourceUrl : (mode === "text" || !!sourceUrl));
+    !disabledDurations[duration] &&
+    (mode === "video" ? !!sourceUrl : mode === "text" || !!sourceUrl);
+
+  const glass =
+    "rounded-[22px] border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:border-white/[0.12] dark:bg-white/[0.06] dark:ring-white/[0.06]";
+
+  const creditBalance =
+    typeof profile?.credits === "number" ? profile.credits : null;
+
+  const showCanvas = busy || !!result?.outputUrl;
 
   return (
-    <div className="relative min-h-[100dvh]">
-      {/* Soft gradient so glass blur is visible */}
-      <div
-        className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-br from-orange-100/80 via-rose-50/90 to-violet-100/80 dark:from-orange-950/40 dark:via-zinc-950 dark:to-violet-950/50"
-        aria-hidden
-      />
+    <div className="video-studio-root relative min-h-[100dvh]">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
+        <div className="absolute inset-0 bg-[linear-gradient(160deg,#FFF1E8,#F3E8FF_55%,#E6F0FF)] dark:bg-[#0A0B14]" />
+        <div className="absolute -left-20 top-10 h-72 w-72 rounded-full bg-[#FF8A4C]/[0.35] blur-[80px] dark:bg-[#FF8A4C]/[0.25]" />
+        <div className="absolute right-0 top-40 h-80 w-80 rounded-full bg-[#8B5CF6]/[0.35] blur-[80px] dark:bg-[#8B5CF6]/[0.25]" />
+        <div className="absolute bottom-20 left-1/3 h-64 w-64 rounded-full bg-[#38BDF8]/[0.35] blur-[80px] dark:bg-[#38BDF8]/[0.25]" />
+      </div>
 
-      <div className="mx-auto w-full min-w-0 max-w-lg px-4 py-4 pb-36 sm:px-5">
-        <StudioBackLink className="mb-3" />
-
+      <div className="mx-auto w-full min-w-0 max-w-lg px-4 py-4 pb-40 sm:px-5">
         <header className="mb-4">
-          <div className="flex items-center gap-2.5">
-            <span className="studio-cam-icon inline-flex text-2xl" aria-hidden>
-              🎥
-            </span>
-            <div>
-              <h1 className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-xl font-bold tracking-tight text-transparent">
-                Video Studio
-              </h1>
-              <p className="text-[12px] text-muted-foreground">by Motion2Ai</p>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/"
+              className={cn(
+                "grid h-10 w-10 shrink-0 place-items-center rounded-full",
+                glass,
+                "text-slate-700 dark:text-zinc-200",
+              )}
+              aria-label="Back to Home"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="studio-cam-icon text-xl" aria-hidden>
+                  🎥
+                </span>
+                <div className="min-w-0">
+                  <h1 className="bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] bg-clip-text text-lg font-bold tracking-tight text-transparent sm:text-xl">
+                    Video Studio
+                  </h1>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">by Motion2Ai</p>
+                </div>
+              </div>
             </div>
+            {creditBalance != null && (
+              <div
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12px] font-semibold tabular-nums",
+                  glass,
+                  "text-slate-700 dark:text-zinc-200",
+                )}
+              >
+                <Coins className="h-3.5 w-3.5 text-[#FF7A45]" aria-hidden />
+                {creditBalance}
+              </div>
+            )}
           </div>
           <div
-            className="mt-3 h-px w-full bg-gradient-to-r from-transparent via-orange-400/60 to-transparent"
+            className="mt-3 h-px w-full bg-gradient-to-r from-transparent via-[#FF7A45]/70 to-transparent"
             aria-hidden
           />
         </header>
@@ -486,45 +536,74 @@ function VideoStudioPage() {
           <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
         </div>
 
-        {/* Preview canvas — aspect-aware, rule of thirds */}
-        <div
-          className={cn(
-            "mb-4 overflow-hidden rounded-[20px] border border-white/20 bg-white/40 shadow-[0_8px_32px_rgba(15,23,42,0.08)] backdrop-blur-[16px] dark:bg-white/5",
-            aspectBoxClass(aspect),
-          )}
-        >
-          <div className="relative h-full w-full min-h-[120px]">
-            {result?.outputUrl ? (
-              <video
-                src={result.outputUrl}
-                className="h-full w-full object-contain"
-                controls
-                playsInline
-              />
-            ) : sourceUrl && mode !== "text" ? (
-              mode === "video" ? (
-                <video src={sourceUrl} className="h-full w-full object-contain" muted playsInline />
-              ) : (
-                <img src={sourceUrl} alt="Source" className="h-full w-full object-contain" />
-              )
-            ) : (
-              <div className="flex h-full min-h-[140px] flex-col items-center justify-center gap-1 px-4 text-center">
-                <p className="text-xs font-medium text-muted-foreground">Preview canvas</p>
-                <p className="text-[10px] text-muted-foreground/80">{aspect} · generated video appears here</p>
-              </div>
+        {showCanvas && (
+          <div
+            ref={canvasRef}
+            className={cn(
+              "relative mb-4 overflow-hidden transition-all duration-300",
+              glass,
+              aspectBoxClass(aspect),
+              busy && "animate-in fade-in zoom-in-95",
             )}
-            {/* Rule of thirds */}
-            <div className="pointer-events-none absolute inset-0 opacity-[0.18]" aria-hidden>
-              <div className="absolute left-1/3 top-0 h-full w-px bg-white" />
-              <div className="absolute left-2/3 top-0 h-full w-px bg-white" />
-              <div className="absolute left-0 top-1/3 h-px w-full bg-white" />
-              <div className="absolute left-0 top-2/3 h-px w-full bg-white" />
-            </div>
+          >
+            {result?.outputUrl && !busy ? (
+              <>
+                <div className="absolute right-2 top-2 z-10">
+                  <button
+                    type="button"
+                    onClick={() => setShowGrid((g) => !g)}
+                    className={cn(
+                      "grid h-9 w-9 place-items-center rounded-full border border-white/70 bg-white/70 backdrop-blur-md dark:border-white/20 dark:bg-black/50",
+                      showGrid && "ring-2 ring-[#F43F5E]",
+                    )}
+                    aria-label="Toggle grid"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </button>
+                </div>
+                <video
+                  src={result.outputUrl}
+                  className="h-full w-full object-contain"
+                  controls
+                  playsInline
+                />
+                {showGrid && (
+                  <div className="pointer-events-none absolute inset-0 opacity-30" aria-hidden>
+                    <div className="absolute left-1/3 top-0 h-full w-px bg-white" />
+                    <div className="absolute left-2/3 top-0 h-full w-px bg-white" />
+                    <div className="absolute left-0 top-1/3 h-px w-full bg-white" />
+                    <div className="absolute left-0 top-2/3 h-px w-full bg-white" />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {sourceUrl && mode !== "text" && (
+                  <div className="absolute inset-0">
+                    {mode === "video" ? (
+                      <video
+                        src={sourceUrl}
+                        className="h-full w-full object-cover opacity-40 blur-[2px]"
+                        muted
+                        playsInline
+                      />
+                    ) : (
+                      <img
+                        src={sourceUrl}
+                        alt=""
+                        className="h-full w-full object-cover opacity-40 blur-[2px]"
+                      />
+                    )}
+                  </div>
+                )}
+                <VideoGeneratingOverlay />
+              </>
+            )}
           </div>
-        </div>
+        )}
 
-        {(mode === "image" || mode === "video") && (
-          <div className="mb-4">
+        {(mode === "image" || mode === "video") && !result?.outputUrl && (
+          <div className={cn("mb-4", busy && "pointer-events-none opacity-50")}>
             <VideoSourceUpload
               mode={mode === "video" ? "video" : "image"}
               file={sourceFile}
@@ -532,28 +611,17 @@ function VideoStudioPage() {
               onPick={onPickSource}
               onClear={onClearSource}
               disabled={busy}
+              aspect={aspect === "9:16" || aspect === "1:1" ? aspect : "16:9"}
+              showGrid={showGrid}
+              onToggleGrid={() => setShowGrid((g) => !g)}
             />
           </div>
         )}
 
-        {/* Prompt idea cards */}
-        <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
-          {PROMPT_IDEAS.map((idea) => (
-            <button
-              key={idea.id}
-              type="button"
-              disabled={busy}
-              onClick={() => setPrompt(idea.text)}
-              className="snap-start shrink-0 rounded-2xl border border-white/25 bg-white/50 px-3 py-2 text-left shadow-sm backdrop-blur-md dark:bg-white/10"
-            >
-              <p className="text-[11px] font-semibold text-foreground">{idea.label}</p>
-              <p className="mt-0.5 max-w-[140px] truncate text-[10px] text-muted-foreground">{idea.text}</p>
-            </button>
-          ))}
-        </div>
-
         <section className="mb-4 space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+            Prompt
+          </p>
           <VideoPromptBar
             value={prompt}
             onChange={setPrompt}
@@ -570,39 +638,13 @@ function VideoStudioPage() {
           />
         </section>
 
-        {/* Style strip with overlaid labels + snap */}
-        <section className="mb-4">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Style</p>
-          <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
-            {styles.map((s) => {
-              const active = (styleId || "none") === s.id || (!styleId && s.id === "none");
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setStyleId(s.id === "none" ? "" : s.id)}
-                  className={cn(
-                    "relative w-[88px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-transform duration-200",
-                    active
-                      ? "scale-105 border-red-500 shadow-[0_0_16px_rgba(239,68,68,0.4)] ring-2 ring-red-500/50"
-                      : "border-white/25",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "block aspect-video w-full bg-gradient-to-br",
-                      STYLE_THUMB[s.thumbnail] ?? STYLE_THUMB.neutral,
-                    )}
-                  />
-                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1.5 pt-4 text-center text-[10px] font-semibold text-white">
-                    {s.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+        <VideoStyleStrip
+          styleId={styleId}
+          onSelect={setStyleId}
+          plan={profile?.plan}
+          isAdmin={admin}
+          disabled={busy}
+        />
 
         <div className="mb-5">
           <VideoFeaturePanel
@@ -617,55 +659,56 @@ function VideoStudioPage() {
             setDuration={setDuration}
             soundOn={audioOn}
             setSoundOn={setAudioOn}
-            soundAvailable={caps.audioSupported}
+            soundAvailable={caps.audioSupported !== false}
             disabled={busy}
+            disabledDurations={disabledDurations}
+            disabledResolutions={disabledResolutions}
           />
         </div>
       </div>
 
-      {/* Sticky generate bar */}
       {!result && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/20 bg-white/70 p-3 backdrop-blur-[16px] dark:bg-zinc-950/80 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-30 border-t border-white/40 p-3",
+            "bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-[#0A0B14]/85",
+            "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+          )}
+        >
           <div className="mx-auto flex max-w-lg items-center gap-2">
             <button
               type="button"
               disabled={!canGenerate}
               onClick={() => void onGenerate()}
               className={cn(
-                "relative flex h-12 flex-1 items-center justify-center gap-2 overflow-hidden rounded-2xl text-sm font-semibold transition",
-                canGenerate
-                  ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/25 active:scale-[0.98]"
-                  : "cursor-not-allowed bg-muted text-muted-foreground",
+                "relative flex h-12 flex-1 items-center justify-center gap-2 overflow-hidden rounded-2xl text-sm font-semibold text-white transition",
+                "bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
+                !canGenerate && "opacity-45",
+                canGenerate && "active:scale-[0.98]",
               )}
             >
-              {canGenerate && (
-                <span className="studio-shimmer pointer-events-none absolute inset-0" aria-hidden />
-              )}
-              <Sparkles className="relative h-4 w-4" aria-hidden />
-              <span className="relative">
-                {busy
-                  ? "Generating…"
-                  : creditsEstimate > 0
-                    ? `Generate · ~${creditsEstimate} credits`
-                    : "Generate Video"}
-              </span>
+              <Sparkles className="h-4 w-4" aria-hidden />
+              {busy
+                ? "Generating…"
+                : creditsEstimate > 0
+                  ? `Generate · ~${creditsEstimate} credits`
+                  : "Generate Video"}
             </button>
             <button
               type="button"
               onClick={() => setCreditsOpen(true)}
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/30 bg-white/50 text-muted-foreground backdrop-blur-md dark:bg-white/10"
+              className={cn("grid h-12 w-12 shrink-0 place-items-center", glass)}
               aria-label="Credit costs"
             >
-              <Info className="h-5 w-5" />
+              <Info className="h-5 w-5 text-slate-600 dark:text-zinc-300" />
             </button>
           </div>
-          <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-            Charged only when your video is delivered
+          <p className="mt-1.5 text-center text-[10px] text-slate-500 dark:text-zinc-400">
+            Credits are refunded if generation fails
           </p>
         </div>
       )}
 
-      {/* Credits bottom sheet */}
       {creditsOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal>
           <button
@@ -674,13 +717,13 @@ function VideoStudioPage() {
             aria-label="Close"
             onClick={() => setCreditsOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-lg rounded-t-[24px] border border-white/25 bg-white/90 p-5 shadow-2xl backdrop-blur-[20px] dark:bg-zinc-900/95">
+          <div className={cn("relative z-10 w-full max-w-lg rounded-t-[24px] p-5", glass)}>
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-bold">Credit costs</p>
+              <p className="text-sm font-bold">Credit estimate</p>
               <button
                 type="button"
                 onClick={() => setCreditsOpen(false)}
-                className="grid h-8 w-8 place-items-center rounded-full border border-border"
+                className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 dark:border-white/15"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
@@ -690,26 +733,23 @@ function VideoStudioPage() {
               {creditRows.map((row) => (
                 <li
                   key={row.label}
-                  className="flex items-center justify-between rounded-xl border border-white/20 bg-white/50 px-3 py-2.5 dark:bg-white/5"
+                  className="flex items-center justify-between rounded-xl border border-white/50 bg-white/40 px-3 py-2.5 dark:border-white/10 dark:bg-white/5"
                 >
-                  <span className="text-muted-foreground">{row.label}</span>
+                  <span className="text-slate-500 dark:text-zinc-400">{row.label}</span>
                   <span className="font-semibold tabular-nums">~{row.credits}</span>
                 </li>
               ))}
               {creditRows.length === 0 && (
-                <li className="text-muted-foreground">Estimates update with your settings.</li>
+                <li className="text-slate-500">Estimates update with your settings.</li>
               )}
             </ul>
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Current selection: ~{creditsEstimate} credits · charged only on delivery
+            <p className="mt-3 text-[11px] text-slate-500 dark:text-zinc-400">
+              Current: ~{creditsEstimate} credits · refunded if generation fails
             </p>
           </div>
         </div>
       )}
 
-      {busy && (
-        <VideoGeneratingOverlay stageIndex={stageIdx} etaSeconds={eta} prompt={prompt.trim()} />
-      )}
       {result && !busy && (
         <VideoOutputView
           result={result}
@@ -720,24 +760,23 @@ function VideoStudioPage() {
       )}
 
       <style>{`
+        .video-studio-root .studio-hide-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .video-studio-root .studio-hide-scroll::-webkit-scrollbar {
+          display: none;
+        }
         @keyframes studio-cam-pulse {
           0%, 100% { transform: rotate(-4deg) scale(1); filter: drop-shadow(0 0 0 transparent); }
-          50% { transform: rotate(4deg) scale(1.06); filter: drop-shadow(0 0 8px rgba(249,115,22,0.55)); }
+          50% { transform: rotate(4deg) scale(1.06); filter: drop-shadow(0 0 8px rgba(255,122,69,0.55)); }
         }
         .studio-cam-icon {
           animation: studio-cam-pulse 2.6s ease-in-out infinite;
           display: inline-block;
         }
-        @keyframes studio-shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        .studio-shimmer {
-          background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.35) 50%, transparent 60%);
-          animation: studio-shimmer 2.4s ease-in-out infinite;
-        }
         @media (prefers-reduced-motion: reduce) {
-          .studio-cam-icon, .studio-shimmer { animation: none; }
+          .studio-cam-icon { animation: none; }
         }
       `}</style>
     </div>

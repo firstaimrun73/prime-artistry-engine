@@ -1,8 +1,7 @@
 /**
- * Video Studio prompt bar — light/dark glass, timing surface labels, voice.
- * Timing chips only remove their token; never clear the whole prompt.
+ * Video Studio prompt bar — glass, mic, empty-state idea chips, char counter.
  */
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import {
@@ -14,6 +13,29 @@ import {
 
 export const STANDARD_VIDEO_PROMPT_MAX = 3000;
 export const PREMIUM_VIDEO_PROMPT_MAX = 10000;
+
+export const PROMPT_IDEA_CHIPS = [
+  {
+    id: "drone",
+    label: "Drone sunrise",
+    text: "A cinematic drone shot over a mountain range at sunrise, golden light, smooth camera glide",
+  },
+  {
+    id: "city",
+    label: "Neon city",
+    text: "A stylish woman walks through a neon-lit Tokyo street at night, reflections on wet pavement",
+  },
+  {
+    id: "ocean",
+    label: "Ocean waves",
+    text: "Powerful waves crash against dark rocks at golden hour, spray catching the light",
+  },
+  {
+    id: "forest",
+    label: "Misty forest",
+    text: "Slow push through a misty pine forest at dawn, volumetric light rays through the trees",
+  },
+] as const;
 
 function timingAria(cue: TimingCue): string {
   if (cue.kind === "timestamp") return `Timing marker at ${cue.startSec} seconds`;
@@ -36,16 +58,15 @@ export function VideoPromptBar({
   placeholder?: string;
   compact?: boolean;
   durationSec?: number;
-  /** @deprecated ignored — prompt words must not drive audio */
   audioActive?: boolean;
 }) {
+  const taRef = useRef<HTMLTextAreaElement>(null);
   const timing = useMemo(() => parsePromptTiming(value), [value]);
   const durationErrors = useMemo(() => {
     if (!durationSec || durationSec <= 0) return [] as string[];
     return validateTimingAgainstDuration(timing.cues, durationSec);
   }, [timing.cues, durationSec]);
 
-  /** Remove only the matching timing token — never the whole prompt. */
   const removeCue = (cue: TimingCue) => {
     const next = value
       .replace(cue.raw, "")
@@ -56,26 +77,24 @@ export function VideoPromptBar({
   };
 
   const invalidRaws = new Set(
-    durationErrors
-      .map((e) => e.match(/^(#\S+)/)?.[1])
-      .filter(Boolean) as string[],
+    durationErrors.map((e) => e.match(/^(#\S+)/)?.[1]).filter(Boolean) as string[],
   );
+
+  const empty = !value.trim();
 
   return (
     <div
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-2xl border transition-shadow duration-300",
-        "border-border/70 bg-white/80 shadow-[0_8px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl",
-        "ring-1 ring-black/[0.04]",
-        "dark:border-white/12 dark:bg-[#0B0F1E]/85 dark:shadow-[0_8px_32px_rgba(0,0,0,0.45)]",
-        "dark:ring-white/[0.06]",
-        "focus-within:border-orange-400/50 focus-within:ring-orange-500/20",
-        "dark:focus-within:border-red-500/35 dark:focus-within:ring-red-500/25",
+        "relative flex flex-col overflow-hidden rounded-[22px] border transition-shadow duration-300",
+        "border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150",
+        "ring-1 ring-black/5",
+        "dark:border-white/[0.12] dark:bg-white/[0.06] dark:ring-white/[0.06]",
+        "focus-within:ring-[#FF7A45]/30",
         compact ? "min-h-[5.5rem]" : "min-h-[7rem]",
       )}
     >
       {timing.cues.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-b border-border/40 px-3 pb-2 pt-2.5 dark:border-white/10">
+        <div className="flex flex-wrap gap-1.5 border-b border-black/5 px-3 pb-2 pt-2.5 dark:border-white/10">
           {timing.cues.map((c, i) => {
             const invalid = invalidRaws.has(c.raw);
             return (
@@ -86,13 +105,10 @@ export function VideoPromptBar({
                 onClick={() => removeCue(c)}
                 aria-label={`${timingAria(c)}. Tap to remove this timing tag only.`}
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold shadow-sm",
-                  "backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400",
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
                   invalid
-                    ? "border-red-500/50 bg-red-500/15 text-red-700 dark:text-red-200"
-                    : c.kind === "interval"
-                      ? "border-violet-400/40 bg-violet-500/10 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200"
-                      : "border-sky-400/40 bg-sky-500/10 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200",
+                    ? "border-red-500/50 bg-red-500/15 text-red-700"
+                    : "border-slate-200 bg-white/70 text-slate-700 dark:border-white/15 dark:bg-white/10 dark:text-zinc-200",
                 )}
               >
                 {timingChipLabel(c)}
@@ -109,6 +125,7 @@ export function VideoPromptBar({
         Describe your video
       </label>
       <textarea
+        ref={taRef}
         id="video-prompt"
         value={value}
         disabled={disabled}
@@ -117,8 +134,8 @@ export function VideoPromptBar({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? "Describe your video…"}
         className={cn(
-          "w-full flex-1 resize-none overflow-y-auto bg-transparent px-3.5 pb-12 pt-3 text-sm leading-relaxed",
-          "text-foreground placeholder:text-muted-foreground",
+          "w-full flex-1 resize-none overflow-y-auto bg-transparent px-3.5 pb-14 pt-3 text-sm leading-relaxed",
+          "text-slate-800 placeholder:text-slate-400",
           "dark:text-white dark:placeholder:text-zinc-500",
           "focus:outline-none",
           disabled && "opacity-60",
@@ -131,7 +148,40 @@ export function VideoPromptBar({
         </p>
       )}
 
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
+      <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span
+            className={cn(
+              "text-[10px] tabular-nums",
+              value.length > maxChars * 0.9
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-slate-400 dark:text-zinc-500",
+            )}
+          >
+            {value.length}/{maxChars}
+          </span>
+          <div
+            className={cn(
+              "studio-hide-scroll flex gap-1.5 overflow-x-auto transition-opacity duration-200",
+              empty ? "opacity-100" : "pointer-events-none h-0 opacity-0",
+            )}
+          >
+            {PROMPT_IDEA_CHIPS.map((idea) => (
+              <button
+                key={idea.id}
+                type="button"
+                disabled={disabled || !empty}
+                onClick={() => {
+                  onChange(idea.text.slice(0, maxChars));
+                  requestAnimationFrame(() => taRef.current?.focus());
+                }}
+                className="h-7 shrink-0 rounded-full border border-white/70 bg-white/70 px-2.5 text-[11px] font-semibold text-slate-600 backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:text-zinc-300"
+              >
+                {idea.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <VoiceInputButton
           disabled={disabled}
           onTranscript={(text) => {
@@ -140,20 +190,10 @@ export function VideoPromptBar({
           }}
           className={cn(
             "!h-10 !w-10 !min-h-[40px] !rounded-full border",
-            "border-border/70 bg-background/80 text-foreground hover:bg-muted",
-            "dark:border-white/15 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10",
+            "border-white/70 bg-white/70 text-slate-700",
+            "dark:border-white/15 dark:bg-white/10 dark:text-zinc-200",
           )}
         />
-        <span
-          className={cn(
-            "text-[10px] tabular-nums",
-            value.length > maxChars * 0.9
-              ? "text-amber-600 dark:text-amber-400"
-              : "text-muted-foreground",
-          )}
-        >
-          {value.length}/{maxChars}
-        </span>
       </div>
     </div>
   );
