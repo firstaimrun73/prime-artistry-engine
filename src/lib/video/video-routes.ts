@@ -2,7 +2,7 @@
  * Phase 3 — pure video route + quote module.
  * Server quote, reserved credits, and UI estimate all call quoteVideoCredits().
  *
- * Formula: credits = max(25, ceil(providerCostUsd * videoCreditsPerUsd))
+ * Formula: credits = max(50, ceil(providerCostUsd * videoCreditsPerUsd))
  * videoCreditsPerUsd comes from DEFAULT_BILLING_CONFIG (180).
  *
  * Route selection uses the existing capability registry (no invented endpoints).
