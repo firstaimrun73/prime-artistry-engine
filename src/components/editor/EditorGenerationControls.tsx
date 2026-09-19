@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 interface EditorGenerationControlsProps {
   loading: boolean;
   onGenerate: () => void;
-  onStop: () => void;
+  /** Required when hideStop is false (default). Unused when hideStop is true. */
+  onStop?: () => void;
   videoLocked: boolean;
   noCredits: boolean;
   /** Image Studio Auto mode (separate from Global Auto page) */
@@ -16,6 +17,12 @@ interface EditorGenerationControlsProps {
   showAutoToggle?: boolean;
   /** Optional Experience-specific generate button classes (Premium/Ultra AI). */
   generateClassName?: string;
+  /**
+   * When true, never show Stop / Cancel while generating.
+   * Used by Image Studio and legacy Video Editor (Phase 2).
+   * Default false so any other consumer keeps the previous Stop button.
+   */
+  hideStop?: boolean;
 }
 
 export function EditorGenerationControls({
@@ -28,6 +35,7 @@ export function EditorGenerationControls({
   onAutoModeChange,
   showAutoToggle = true,
   generateClassName,
+  hideStop = false,
 }: EditorGenerationControlsProps) {
   return (
     <section className="space-y-3 pt-1">
@@ -65,9 +73,24 @@ export function EditorGenerationControls({
       )}
 
       {loading ? (
-        <Button variant="destructive" className="min-h-[48px] w-full text-base" onClick={onStop}>
-          <Square className="mr-1.5 h-4 w-4 fill-current" /> Stop Generation
-        </Button>
+        hideStop ? (
+          <Button
+            className={cn("min-h-[48px] w-full text-base", generateClassName)}
+            disabled
+            aria-busy="true"
+          >
+            <Sparkles className="mr-1.5 h-4 w-4 animate-pulse" />
+            Generating…
+          </Button>
+        ) : (
+          <Button
+            variant="destructive"
+            className="min-h-[48px] w-full text-base"
+            onClick={onStop}
+          >
+            <Square className="mr-1.5 h-4 w-4 fill-current" /> Stop Generation
+          </Button>
+        )
       ) : (
         <Button
           className={cn("min-h-[48px] w-full text-base hover-scale", generateClassName)}
