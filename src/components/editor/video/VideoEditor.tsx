@@ -1,34 +1,37 @@
 /**
  * Video Editor workspace — independent of Image Editor.
- * Extracted from _authenticated.editor.tsx without behavior/UI redesign.
+ * UPLOAD → PROMPT → SELECT → GENERATE → OUTPUT
+ * Media type is locked to video for the lifetime of this component.
  */
-import { Link } from "@tanstack/react-router";
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
-import { getPlan, CREDIT_COST } from "@/lib/plans";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
-import {
-  videoResolutionMultiplier,
-  type VideoResolution,
-} from "@/lib/quality-options";
+import { CREDIT_COST } from "@/lib/plans";
+import { secureDownloadImage } from "@/lib/download.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
-import {
-  videoCreditCost,
-  type VideoDuration,
-  type VideoAspectRatio,
-} from "@/lib/video-options";
 import { toast } from "sonner";
 import { RotateCcw } from "lucide-react";
+import { StudioBackLink } from "@/components/StudioBackLink";
 import type { GenState } from "@/lib/editor/editor.types";
-import { LOADING_MESSAGES, MAX_VIDEO_MB } from "@/lib/editor/editor.constants";
-import { uploadToStorage as uploadToStorageUtil } from "@/lib/editor/editor.utils";
+import {
+  WATERMARK_PREF_KEY,
+  LOADING_MESSAGES,
+  MAX_VIDEO_MB,
+  VIDEO_DURATIONS,
+  VIDEO_ASPECTS,
+  VIDEO_RESOLUTIONS,
+  type VideoDuration,
+  type VideoAspect,
+  type VideoResolution,
+} from "@/lib/editor/editor.constants";
+import { readAsDataUrl, uploadToStorage as uploadToStorageUtil } from "@/lib/editor/editor.utils";
 import { getEditorStages } from "@/lib/editor/editor.helpers";
 import {
   EditorUpload,
@@ -47,6 +50,7 @@ export type VideoEditorProps = {
 export function VideoEditor({ bootstrap }: VideoEditorProps) {
   const { profile, refreshProfile } = useAuth();
   const generate = useServerFn(generateMedia);
+  const secureDl = useServerFn(secureDownloadImage);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,8 +66,8 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
   const [state, setState] = useState<GenState>("idle");
   const [downloaded, setDownloaded] = useState(false);
   const [videoDuration, setVideoDuration] = useState<VideoDuration>(5);
-  const [videoAspect, setVideoAspect] = useState<VideoAspectRatio>("16:9");
-  const [videoResolution, setVideoResolution] = useState<VideoResolution>("1080p");
+  const [videoAspect, setVideoAspect] = useState<VideoAspect>("16:9");
+  const [videoResolution, setVideoResolution] = useState<VideoResolution>("720p");
 
   const [msgIdx, setMsgIdx] = useState(0);
   const [stage, setStage] = useState(0);
@@ -72,7 +76,7 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
 
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
-  const stages = getEditorStages(false);
+  const stages = getEditorStages(!!inputPreview);
 
   useEffect(() => {
     if (bootstrap?.reuseUrl && bootstrap.reuseKind === "video") {
@@ -87,8 +91,8 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
     if (adminNow || !profile) return;
     try {
       if (sessionStorage.getItem(LOW_CREDIT_TOAST_KEY) === "1") return;
-      if (creditsNow <= 0) toast.error("🚨 No credits left. Upgrade now.");
-      else if (creditsNow < 30) toast.warning(`⚠️ Low credits: ${creditsNow} remaining`);
+      if (creditsNow <= 0) toast.error("No credits left. Upgrade now.");
+      else if (creditsNow < 30) toast.warning(`Low credits: ${creditsNow} remaining`);
       else return;
       sessionStorage.setItem(LOW_CREDIT_TOAST_KEY, "1");
     } catch {
@@ -118,130 +122,106 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
     };
   }, [state, stages.length]);
 
+  const cost = useMemo(() => {
+    // Legacy video editor: enhance path uses flat credit cost
+    return CREDIT_COST.video_enhance ?? 200;
+  }, []);
+
   if (!profile) return null;
 
-  const plan = getPlan(profile.plan);
-  const isVideoEnhance = inputKind === "video" && !!inputFile;
-  const cost = isVideoEnhance
-    ? CREDIT_COST.video_enhance
-    : Math.round(videoCreditCost(videoDuration) * videoResolutionMultiplier(videoResolution));
   const noCredits = !isAdmin && profile.credits < cost;
-  const videoLocked = !isAdmin && !plan.video;
   const loading = state === "loading" || state === "analyzing";
+  const videoLocked = false;
   const suggestions = getSmartSuggestions(prompt);
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length === 0) return;
+    const file = e.target.files?.[0];
     e.target.value = "";
-
-    const first = files[0];
-    if (!first.type.startsWith("video")) {
-      return toast.error("This workspace accepts video only. Use Image Editor for photos.");
+    if (!file) return;
+    if (!file.type.startsWith("video")) {
+      return toast.error("This workspace accepts video only. Use Image Editor for images.");
     }
-    if (first.size > MAX_VIDEO_MB * 1024 * 1024) {
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
       return toast.error(
-        `File is too large (${(first.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_VIDEO_MB} MB for videos.`,
+        `Video is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_VIDEO_MB} MB.`,
       );
     }
+    setInputFile(file);
+    setInputPreview(URL.createObjectURL(file));
+    setInputKind("video");
     setOutput(null);
     setDownloaded(false);
     setState("idle");
-    setInputPreview(URL.createObjectURL(first));
-    setInputFile(first);
-    setInputKind("video");
-    toast.success("📁 Upload complete!");
+    toast.success("Video uploaded");
   };
 
   const runGenerate = async () => {
-    if (!prompt.trim()) return toast.error("Enter a prompt first.");
-    if (videoLocked) {
-      setState("blocked");
-      return toast.error("Video generation requires a paid plan.");
-    }
     if (noCredits) {
       setState("blocked");
       return toast.error(`Not enough credits. This costs ${cost} credits.`);
+    }
+    if (!inputFile && !inputPreview) {
+      return toast.error("Upload a video first.");
     }
 
     const runId = ++runIdRef.current;
     setState("analyzing");
     setOutput(null);
     setDownloaded(false);
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 400));
     if (runId !== runIdRef.current) return;
 
     setState("loading");
-    toast("🎬 Generating your video...");
+    toast("Enhancing your video…");
     startGeneration("video", "/editor");
-    const progressTimers = [
-      setTimeout(() => {
-        if (runId === runIdRef.current) toast("⏳ Still working — high quality takes a moment...");
-      }, 30_000),
-      setTimeout(() => {
-        if (runId === runIdRef.current)
-          toast("🔁 Taking longer than usual — retrying automatically...");
-      }, 75_000),
-    ];
     try {
       let mediaUrl: string | undefined;
-      let sourceKind: "image" | "video" | undefined;
-
-      if (inputKind === "video" && inputFile) {
+      if (inputFile) {
         mediaUrl = await uploadToStorage(inputFile);
-        sourceKind = "video";
       } else if (inputPreview?.startsWith("https://")) {
-        // Reuse from history (URL only)
         mediaUrl = inputPreview;
-        sourceKind = "video";
+      } else if (inputPreview) {
+        const res = await fetch(inputPreview);
+        const blob = await res.blob();
+        const file = new File([blob], `vid-${Date.now()}.mp4`, { type: blob.type || "video/mp4" });
+        mediaUrl = await uploadToStorage(file);
       }
-
-      if (mediaUrl && !mediaUrl.startsWith("https://")) {
-        throw new Error("Upload failed. Please re-upload and try again.");
-      }
-      if (runId !== runIdRef.current) return;
+      if (!mediaUrl) throw new Error("Please upload a video first.");
 
       const res = await generate({
         data: {
-          prompt,
           type: "video",
+          prompt: prompt.trim() || "Enhance this video",
           imageUrl: mediaUrl,
-          sourceKind,
           videoDurationSeconds: videoDuration,
-          videoAspectRatio: videoAspect,
           videoResolution,
+          videoAspectRatio: videoAspect,
+          sourceKind: "video",
         },
       });
 
       if (runId !== runIdRef.current) return;
-      setProgress(100);
-      setStage(stages.length);
-      setOutput(res.outputUrl);
+      const url =
+        (res as { outputUrl?: string })?.outputUrl ??
+        (res as { url?: string })?.url ??
+        null;
+      if (!url) throw new Error((res as { error?: string })?.error || "No video returned");
+      setOutput(url);
       setState("success");
-      await refreshProfile();
-      toast.success("✅ Video ready!");
-      endGeneration();
+      setProgress(100);
+      toast.success("Video ready");
+      void refreshProfile();
     } catch (err) {
       if (runId !== runIdRef.current) return;
-      setState("idle");
-      endGeneration();
-      toast.error(
-        err instanceof Error ? `❌ ${err.message}` : "❌ Failed. Credits not charged.",
-      );
+      setState("error");
+      toast.error(err instanceof Error ? err.message : "Generation failed");
     } finally {
-      progressTimers.forEach(clearTimeout);
+      endGeneration();
     }
   };
 
-  const handleStop = () => {
-    runIdRef.current++;
-    setState("idle");
-    endGeneration();
-    setProgress(0);
-    setStage(0);
-    toast("Generation stopped.");
-  };
+  /* Phase 2: Stop / Cancel removed — job runs to completion or fails with refund. */
 
   const handleClear = () => {
     runIdRef.current++;
@@ -254,15 +234,14 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
     setDownloaded(false);
     setProgress(0);
     setStage(0);
-    if (fileRef.current) fileRef.current.value = "";
   };
 
   const handleDownload = async () => {
     if (!output) return;
     try {
-      await triggerBrowserDownload(output, `motio2edit-${Date.now()}.mp4`);
+      await triggerBrowserDownload(output, `motio2edit-video-${Date.now()}.mp4`);
       setDownloaded(true);
-      toast.success("⬇️ Download started!");
+      toast.success("Download started!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Download failed.");
     }
@@ -278,7 +257,7 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
         toast.success("Link copied to clipboard.");
       }
     } catch {
-      /* user cancelled */
+      /* user cancelled share sheet — not generation */
     }
   };
 
@@ -298,71 +277,37 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
       <div className="flex flex-wrap items-center justify-between gap-3 animate-fade-in">
         <h1 className="text-2xl font-bold">Video Editor</h1>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold">
-            {isAdmin ? "∞ credits" : `${profile.credits} credits`}
-          </span>
-          <span className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground">
-            Video {cost} credits ({videoDuration}s)
-          </span>
-          <Button size="sm" variant="ghost" onClick={handleClear}>
-            <RotateCcw className="mr-1.5 h-4 w-4" /> New Project
-          </Button>
-        </div>
+        <StudioBackLink />
       </div>
 
-      <div className="mt-4">
-        <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
-      </div>
+      <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
+      <EditorDisclaimer />
 
-      {videoLocked && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm animate-fade-in">
-          <span className="text-destructive-foreground">Video generation is a paid feature.</span>
-          <Button asChild size="sm">
-            <Link to="/pricing">Upgrade</Link>
-          </Button>
-        </div>
-      )}
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-8">
-        <div className="order-1 space-y-5">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className="order-1 space-y-4">
           <EditorUpload
             fileRef={fileRef}
             mediaType="video"
-            videoLocked={videoLocked}
-            loading={loading}
+            onFile={onFile}
+            disabled={loading}
             inputPreview={inputPreview}
             inputKind={inputKind}
-            maxImageMb={25}
-            maxVideoMb={MAX_VIDEO_MB}
-            onFile={onFile}
-            gallery={[]}
-            activeImage={0}
-            maxGalleryImages={1}
-            onSwitchImage={() => {}}
-            onRemoveImage={() => {}}
+            onClear={handleClear}
           />
 
           <EditorPromptPanel
-            mediaType="video"
-            loading={loading}
-            inputDataUrl={null}
             prompt={prompt}
             setPrompt={setPrompt}
             taRef={taRef}
             suggestions={suggestions}
-            onSelectTool={(tool) => {
-              if (tool.prompt.startsWith("__") && tool.prompt.endsWith("__")) return;
-              setPrompt(tool.prompt);
-            }}
+            disabled={loading}
+            mediaType="video"
           />
 
           <EditorOptionsPanel
             mediaType="video"
-            loading={loading}
-            inputDataUrl={null}
             aspectRatio={noopAspect}
-            setAspectRatio={noopSetAspect as never}
+            setAspectRatio={noopSetAspect}
             imageQuality={noopQuality}
             setImageQuality={noopSetQuality as never}
             strength={noopStrength}
@@ -383,14 +328,16 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
             keepWatermark={noopWm}
             setKeepWatermark={noopSetWm}
             isFree={isFree}
+            disabled={loading}
           />
 
           <EditorGenerationControls
             loading={loading}
             onGenerate={runGenerate}
-            onStop={handleStop}
+            hideStop
             videoLocked={videoLocked}
             noCredits={noCredits}
+            showAutoToggle={false}
           />
         </div>
 
@@ -408,25 +355,24 @@ export function VideoEditor({ bootstrap }: VideoEditorProps) {
             inputKind={inputKind}
             isAdmin={isAdmin}
             isFree={isFree}
-            keepWatermark={false}
           />
 
-          <EditorResult
-            output={output}
-            loading={loading}
-            onDownload={handleDownload}
-            onRegenerate={runGenerate}
-            onEditAgain={() => {
-              setState("idle");
-              setDownloaded(false);
-            }}
-            onShare={handleShare}
-            onClear={handleClear}
-            isFree={isFree}
-            downloaded={downloaded}
-          />
+          {output && state === "success" && (
+            <EditorResult
+              output={output}
+              outputIsVideo
+              onDownload={handleDownload}
+              onShare={handleShare}
+              downloaded={downloaded}
+            />
+          )}
+
+          {state === "error" && (
+            <Button variant="outline" className="w-full" onClick={() => setState("idle")}>
+              <RotateCcw className="mr-2 h-4 w-4" /> Try again
+            </Button>
+          )}
         </div>
-        <EditorDisclaimer />
       </div>
     </div>
   );
