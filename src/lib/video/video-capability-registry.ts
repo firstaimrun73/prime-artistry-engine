@@ -16,7 +16,7 @@ export type VideoTier = VideoProductMode;
 export type VideoResolution = "480p" | "720p" | "1080p";
 export type VideoAspect = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 
-export const VIDEO_REGISTRY_VERSION = "2026-09-v4";
+export const VIDEO_REGISTRY_VERSION = "2026-09-v5-b2";
 export const PRODUCT_DURATIONS_STANDARD = [5, 10] as const;
 export const PRODUCT_DURATIONS_PREMIUM = [5, 10, 15] as const;
 export const USER_MAX_DURATION_SEC = 15;
@@ -70,9 +70,7 @@ export type VideoModelDef = {
   available: boolean;
   supportsNegativePrompt?: boolean;
   supportsSeed?: boolean;
-  /** Capability-driven: only true when endpoint schema supports start image keyframe */
   supportsFirstFrame?: boolean;
-  /** Capability-driven: only true when endpoint schema supports end image keyframe */
   supportsLastFrame?: boolean;
   notes?: string;
 };
@@ -80,6 +78,7 @@ export type VideoModelDef = {
 /**
  * Economical approved pool only.
  * V2V: fal-ai/hunyuan-video/video-to-video (verified public fal docs).
+ * B2: Hunyuan T2V/I2V disabled per backend master PDF.
  */
 export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
   {
@@ -90,7 +89,7 @@ export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
     textEndpoint: "fal-ai/hunyuan-video",
     imageEndpoint: "fal-ai/hunyuan-video/image-to-video",
     videoEndpoint: "fal-ai/hunyuan-video/video-to-video",
-    modes: ["text", "image", "video"],
+    modes: ["video"],
     resolutions: ["480p", "720p"],
     aspects: ["16:9", "9:16", "1:1"],
     durations: [5, 10],
@@ -103,7 +102,7 @@ export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
     },
     pricingSource: "fal public 2026-09",
     available: true,
-    notes: "T2V/I2V/V2V; no native audio. V2V endpoint verified on fal.",
+    notes: "B2: Hunyuan T2V/I2V disabled per backend PDF; V2V only. UNVERIFIED vs ltx23-v2v megapixel rate.",
   },
   {
     id: "h3-max",
@@ -113,7 +112,7 @@ export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
     textEndpoint: "fal-ai/hunyuan-video",
     imageEndpoint: "fal-ai/hunyuan-video/image-to-video",
     videoEndpoint: "fal-ai/hunyuan-video/video-to-video",
-    modes: ["text", "image", "video"],
+    modes: ["video"],
     resolutions: ["480p", "720p"],
     aspects: ["16:9", "9:16", "1:1"],
     durations: [5, 10],
@@ -126,6 +125,7 @@ export const APPROVED_VIDEO_MODELS: VideoModelDef[] = [
     },
     pricingSource: "fal public 2026-09",
     available: true,
+    notes: "B2: Hunyuan T2V/I2V disabled per backend PDF; V2V only.",
   },
   {
     id: "ltx-2-3-fast",
@@ -346,7 +346,6 @@ export function computeProviderCogsUsd(opts: {
   return +base.toFixed(6);
 }
 
-/** Capability snapshot filtered by generation mode. */
 export function capabilitiesForGenMode(
   productMode: VideoProductMode,
   genMode: VideoGenMode,
@@ -442,7 +441,6 @@ export function availableMaxDurationFor(
 const AUDIO_INTENT_RE =
   /\b(music|song|soundtrack|dialogue|dialog|voice|speech|speak|talk|sing|singing|laugh|laughing|rain|thunder|sound|audio|sfx|effects?|ambient|noise|whisper|scream|cry|crying)\b/i;
 
-/** Detects audio-related words in prompt — for analytics only. Must NOT force Sound ON. */
 export function promptMentionsAudio(prompt: string | null | undefined): boolean {
   if (!prompt || !prompt.trim()) return false;
   return AUDIO_INTENT_RE.test(prompt);
