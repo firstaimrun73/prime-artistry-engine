@@ -537,11 +537,16 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           style={{ width: 1, height: 1, left: -9999, top: -9999 }}
         />
         {/* Only visible surface */}
-        <canvas
-          ref={liveCanvasRef}
-          className="absolute inset-0 h-full w-full bg-black"
-          style={{ objectFit: "cover" }}
-        />
+         <canvas
+  ref={liveCanvasRef}
+  className="absolute inset-0 block h-full w-full bg-black"
+  style={{
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    objectPosition: "center",
+  }}
+/>
 
         {showStill && (
           <img src={stillSrc!} alt="" className="absolute inset-0 h-full w-full object-cover" />
