@@ -1,13 +1,13 @@
 /**
- * Lens generation billing — AI tier = 20 credits per successful apply.
- * Normal (on-device) tier = 0 credits, never charged.
+ * Lens generation billing — 20 credits per successful Apply when creditCost > 0.
  * Single server deduction via existing deduct_credits RPC.
+ * Selection/swipe/preview do not charge.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isAdminClaims } from "@/lib/admin-guard.server";
-import { getCameraLensById, isAiLens } from "@/lib/lens-camera/roster";
+import { getCameraLensById } from "@/lib/lens-camera/roster";
 
 const chargeSchema = z.object({
   lensId: z.string().min(1).max(64),
@@ -25,8 +25,8 @@ export const chargeLensGeneration = createServerFn({ method: "POST" })
     if (!lens) throw new Error("Unknown lens.");
     if (lens.status === "coming-soon") throw new Error("This lens is not available yet.");
 
-    // Normal tier is free — no charge path.
-    if (!isAiLens(lens) || lens.creditCost <= 0) {
+    // Every active lens with creditCost > 0 charges once per successful Apply.
+    if (lens.creditCost <= 0) {
       return {
         ok: true as const,
         credits: 0,
