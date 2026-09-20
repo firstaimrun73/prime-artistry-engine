@@ -47,7 +47,6 @@ function sampleUrl(file: string): string {
 
 /** Explicit lensId → thumbnail (never reuse wrong assets). */
 const EXPLICIT_THUMB_BY_ID: Record<string, string> = {
-  lens_sumo: sampleUrl("KrodGXvxURN-dTx1umDDf_EIGfgGUj.png"),
   lens_infraglow: sampleUrl("0Gb5oNcmBst75vPAC8i4J_1ydKb8fI.png"),
 };
 

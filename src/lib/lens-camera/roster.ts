@@ -1,6 +1,6 @@
 /**
- * Motio2edit Lens roster — 21 lenses, two tiers (SUMO is the only cutout AI+ board).
- * Tier 1 (AI): 20 credits. Tier 2 (Normal): 0 credits, on-device.
+ * Motio2edit Lens roster — 20 lenses, two tiers.
+ * Every lens costs 20 credits per successful Apply.
  * Default selection = NONE (no auto-apply).
  */
 
@@ -8,7 +8,7 @@ export type LensOpticalConcept =
   | "widevista" | "ultrawide" | "fisheye" | "natural" | "portrait"
   | "cinematic" | "farreach" | "macro" | "tilt-shift" | "architect"
   | "dreamsoft" | "glowmist" | "starflare" | "prism" | "swirl"
-  | "vintage" | "infrared" | "longglass" | "perspective" | "selective" | "sumo";
+  | "vintage" | "infrared" | "longglass" | "perspective" | "selective";
 
 export type LensTier = "ai" | "normal";
 export type LensImplementationStatus = "full" | "preview-only" | "coming-soon";
@@ -41,17 +41,16 @@ export const CAMERA_LENS_ROSTER: CameraLensDef[] = [
   { id: "lens_longglass_detail", name: "LongGlass Detail", code: "LG", color: "#3E5C76", concept: "longglass", shortDescription: "Sharp distant detail", status: "full", creditCost: 20, tier: "ai" },
   { id: "lens_perspective_stretch", name: "Perspective Stretch", code: "PS", color: "#4A6FA5", concept: "perspective", shortDescription: "Dramatic wide stretch", status: "full", creditCost: 20, tier: "ai" },
   { id: "lens_selective_focus", name: "Selective Focus", code: "SF", color: "#556B2F", concept: "selective", shortDescription: "One-point soft blur", status: "full", creditCost: 20, tier: "ai" },
-  { id: "lens_natural_frame", name: "Natural Frame", code: "NF", color: "#6C757D", concept: "natural", shortDescription: "Clean baseline view", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_microreveal", name: "MicroReveal", code: "MR", color: "#B8860B", concept: "macro", shortDescription: "Macro focus falloff", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_miniature_shift", name: "Miniature Shift", code: "MS", color: "#A0522D", concept: "tilt-shift", shortDescription: "Tilt-shift miniature", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_architect_align", name: "Architect Align", code: "AA", color: "#34495E", concept: "architect", shortDescription: "Straighten verticals", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_dreamsoft", name: "DreamSoft", code: "DS", color: "#9B7EBD", concept: "dreamsoft", shortDescription: "Gentle overall softness", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_glowmist", name: "GlowMist", code: "GM", color: "#7D5BA6", concept: "glowmist", shortDescription: "Diffusion light bloom", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_starflare", name: "Starflare", code: "ST", color: "#D97742", concept: "starflare", shortDescription: "Star-shaped flares", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_prism_echo", name: "Prism Echo", code: "PE", color: "#5DA9E9", concept: "prism", shortDescription: "Chromatic edge echo", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_vintage_halation", name: "Vintage Halation", code: "VH", color: "#8B5E3C", concept: "vintage", shortDescription: "Warm film glow", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_infraglow", name: "InfraGlow", code: "IG", color: "#B33F62", concept: "infrared", shortDescription: "Infrared foliage sky", status: "full", creditCost: 0, tier: "normal" },
-  { id: "lens_sumo", name: "Sumo", code: "SU", color: "#E85D04", concept: "sumo", shortDescription: "Face-in-cutout Sumo board", status: "full", creditCost: 20, tier: "ai" },
+  { id: "lens_natural_frame", name: "Natural Frame", code: "NF", color: "#6C757D", concept: "natural", shortDescription: "Clean baseline view", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_microreveal", name: "MicroReveal", code: "MR", color: "#B8860B", concept: "macro", shortDescription: "Macro focus falloff", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_miniature_shift", name: "Miniature Shift", code: "MS", color: "#A0522D", concept: "tilt-shift", shortDescription: "Tilt-shift miniature", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_architect_align", name: "Architect Align", code: "AA", color: "#34495E", concept: "architect", shortDescription: "Straighten verticals", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_dreamsoft", name: "DreamSoft", code: "DS", color: "#9B7EBD", concept: "dreamsoft", shortDescription: "Gentle overall softness", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_glowmist", name: "GlowMist", code: "GM", color: "#7D5BA6", concept: "glowmist", shortDescription: "Diffusion light bloom", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_starflare", name: "Starflare", code: "ST", color: "#D97742", concept: "starflare", shortDescription: "Star-shaped flares", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_prism_echo", name: "Prism Echo", code: "PE", color: "#5DA9E9", concept: "prism", shortDescription: "Chromatic edge echo", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_vintage_halation", name: "Vintage Halation", code: "VH", color: "#8B5E3C", concept: "vintage", shortDescription: "Warm film glow", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_infraglow", name: "InfraGlow", code: "IG", color: "#B33F62", concept: "infrared", shortDescription: "Infrared foliage sky", status: "full", creditCost: 20, tier: "normal" },
 ];
 
 export function getDefaultCameraLens(): CameraLensDef | null { return null; }
