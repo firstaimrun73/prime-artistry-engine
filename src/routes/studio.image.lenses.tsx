@@ -54,9 +54,9 @@ function MoreLensesPage() {
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-4">
         <div className="mb-4 flex items-center gap-3">
           <Link
-            to="/"
+            to="/studio/image/lens-editor"
             className="grid h-9 w-9 place-items-center rounded-full border border-border"
-            aria-label="Back to home"
+            aria-label="Back to lens camera"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -69,13 +69,11 @@ function MoreLensesPage() {
         </div>
 
         {!paid && (
-          <div className="mb-4 rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 text-xs text-muted-foreground">
-            <Lock className="mr-1 inline h-3.5 w-3.5 text-primary" />
-            Free optical lenses are open. AI lenses need an{" "}
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            AI lenses need a paid plan. Free optical lenses work for everyone.{" "}
             <Link to="/pricing" className="font-semibold text-primary underline">
-              upgraded plan
+              Upgrade
             </Link>
-            .
           </div>
         )}
 
@@ -84,9 +82,8 @@ function MoreLensesPage() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search lenses"
-            className="w-full rounded-xl border border-border bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary/50"
-            aria-label="Search lenses"
+            placeholder="Search lenses…"
+            className="h-11 w-full rounded-full border border-border bg-card pl-10 pr-4 text-sm outline-none focus:border-primary"
           />
         </div>
 
@@ -96,17 +93,23 @@ function MoreLensesPage() {
             const locked = isAi && !paid;
             const body = (
               <>
-                <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-full border border-border bg-muted shadow-sm">
-                  <img
-                    src={l.imageUrl}
-                    alt={`${l.name} — ${l.about}`}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      console.warn("[more-lenses] failed", l.imageUrl);
-                      (e.currentTarget as HTMLImageElement).style.opacity = "0.25";
-                    }}
-                  />
+                <div className="relative mx-auto aspect-square w-full max-w-[7.5rem] overflow-hidden rounded-full border border-border bg-muted shadow-sm">
+                  {l.imageUrl ? (
+                    <img
+                      src={l.imageUrl}
+                      alt={`${l.name} — ${l.about}`}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        console.warn("[more-lenses] failed", l.imageUrl);
+                        (e.currentTarget as HTMLImageElement).style.opacity = "0.25";
+                      }}
+                    />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center text-xs font-bold" style={{ color: l.color }}>
+                      {l.code}
+                    </div>
+                  )}
                   {locked && (
                     <span className="absolute inset-0 flex items-center justify-center bg-black/40">
                       <Lock className="h-4 w-4 text-white" />
