@@ -55,6 +55,13 @@ export function VideoOutputView({
             playsInline
             className="mx-auto max-h-[min(52dvh,480px)] w-full object-contain"
           />
+          {/* Watermark overlay — matches studio background branding */}
+          <div
+            className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/35 px-2 py-1 text-[10px] font-semibold tracking-wide text-white/90 backdrop-blur-sm"
+            aria-hidden
+          >
+            Motio2edit
+          </div>
         </div>
       </div>
 
