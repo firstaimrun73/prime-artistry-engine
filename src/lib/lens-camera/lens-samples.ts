@@ -46,20 +46,21 @@ function sampleUrl(file: string): string {
 }
 
 /**
- * Pair each roster lens with a unique R2 sample (index-aligned).
- * Extra lenses beyond file count get a deterministic fallback from the list end.
+ * Pair roster lenses with unique R2 samples by index.
+ * If roster is longer than the sample list, remaining lenses get an empty imageUrl
+ * so the UI falls back to the deterministic code/brand chip — never a wrong lens image.
  */
 export function getLensSampleCards(
   roster: CameraLensDef[] = CAMERA_LENS_ROSTER,
 ): LensSampleCard[] {
   const n = LENS_SAMPLE_FILES.length;
   return roster.map((lens, i) => {
-    const file = LENS_SAMPLE_FILES[Math.min(i, n - 1)];
+    const file = i < n ? LENS_SAMPLE_FILES[i] : null;
     return {
       id: `sample-${lens.id}`,
       name: lens.name,
       about: lens.shortDescription,
-      imageUrl: sampleUrl(file),
+      imageUrl: file ? sampleUrl(file) : "",
       lensId: lens.id,
       tier: lens.tier,
       creditCost: lens.creditCost,
