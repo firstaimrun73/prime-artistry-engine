@@ -1,5 +1,6 @@
 /**
- * Phase 3 — pure video route + quote module.
+ * B2 pricing engine — pure video route + quote module.
+ * Catalog lives in video-capability-registry; this module is the shared quote path.
  * Server quote, reserved credits, and UI estimate all call quoteVideoCredits().
  *
  * Formula: credits = max(50, ceil(providerCostUsd * videoCreditsPerUsd))
