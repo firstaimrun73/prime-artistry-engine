@@ -1,4 +1,4 @@
- /**
+/**
  * Motio2edit Lenses — Snapchat-style full-screen camera UI.
  * Single canvas preview only (no split). Swipe to change lens. Torch when supported.
  *
@@ -14,7 +14,7 @@
  *  - Output-only Watermark control on the result screen (free = locked ON, paid = toggle).
  *    Toggling never re-charges credits and never touches the live preview.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent, type ChangeEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -258,19 +258,37 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   }, []);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
-  const startCamera = useCallback(async () => {
-    if (cameraOn || didAutoStart.current) return;
-    didAutoStart.current = true;
+
+  const startCamera = useCallback(async (face?: "user" | "environment") => {
+    const mode = face ?? facingMode;
+
+    // Stop any existing stream before (re)starting so flip / retake work.
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setTorchOn(false);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: mode },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
+        });
+      } catch {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false,
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+      }
 
       streamRef.current = stream;
 
@@ -283,115 +301,141 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
 
       await video.play();
 
-      const track = stream.getVideoTracks()[0];
-      const capabilities = track.getCapabilities?.() as MediaTrackCapabilities & {
-        torch?: boolean;
-      };
+      try {
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & {
+          torch?: boolean;
+        };
+        setTorchSupported(mode === "environment" && Boolean(capabilities?.torch));
+      } catch {
+        setTorchSupported(false);
+      }
 
-      setTorchSupported(Boolean(capabilities?.torch));
+      setFacingMode(mode);
       setCameraOn(true);
       setPhase("ready");
+      setResultUrl(null);
     } catch (error) {
-      didAutoStart.current = false;
       console.error("[Lenses] camera start failed", error);
-      toast.error("Camera access is required to use Lenses.");
+      toast.error("Camera unavailable — try Upload");
+      setPhase("idle");
     }
-  }, [cameraOn, facingMode]);
+  }, [facingMode]);
 
   useEffect(() => {
-    void startCamera();
+    if (didAutoStart.current) return;
+    didAutoStart.current = true;
+    void startCamera("user");
   }, [startCamera]);
 
   const switchCamera = useCallback(async () => {
-    stopCamera();
-    didAutoStart.current = false;
-
     const next = facingMode === "user" ? "environment" : "user";
-    setFacingMode(next);
+    void startCamera(next);
+  }, [facingMode, startCamera]);
 
-    setTimeout(() => {
-      void startCamera();
-    }, 50);
-  }, [facingMode, startCamera, stopCamera]);
-
-  const toggleTorch = useCallback(async () => {
-    const track = streamRef.current?.getVideoTracks()[0];
-    if (!track || !torchSupported) return;
-
-    try {
-      const next = !torchOn;
-      await track.applyConstraints({
-        advanced: [{ torch: next } as MediaTrackConstraintSet],
-      });
-      setTorchOn(next);
-    } catch (error) {
-      console.error("[Lenses] torch failed", error);
-      toast.error("Flash is not available on this camera.");
-    }
-  }, [torchOn, torchSupported]);
-
-  const drawLivePreview = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = liveCanvasRef.current;
-
-    if (!video || !canvas || !cameraOn) {
-      liveRafRef.current = requestAnimationFrame(drawLivePreview);
+  // Geometry-aware live preview — fill visible area, crop viewport, apply optical lens
+  useEffect(() => {
+    if (!cameraOn || phase === "processing" || phase === "result") {
+      if (liveRafRef.current != null) {
+        cancelAnimationFrame(liveRafRef.current);
+        liveRafRef.current = null;
+      }
+      setLiveFxOn(false);
       return;
     }
 
-    if (
-      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-      video.videoWidth > 0 &&
-      video.videoHeight > 0
-    ) {
-      const ctx = canvas.getContext("2d", { alpha: false });
+    const video = videoRef.current;
+    const canvas = liveCanvasRef.current;
+    if (!video || !canvas) return;
 
-      if (ctx) {
-        if (
-          canvas.width !== video.videoWidth ||
-          canvas.height !== video.videoHeight
-        ) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-        }
+    const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
+    const LIVE_MAX_W = heavy ? 560 : 960;
 
-        ctx.save();
+    let frame = 0;
+    const tmp = document.createElement("canvas");
 
-        if (facingMode === "user") {
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-        }
-
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        ctx.restore();
-
-        if (liveFxOn && lens) {
-          /*
-           * The live preview is intentionally lightweight.
-           * Final capture still goes through the full optical engine.
-           */
-          ctx.save();
-          ctx.globalAlpha = 0.08;
-
-          if (isAiLens(lens)) {
-            ctx.fillStyle = "#ff5a1f";
-          } else {
-            ctx.fillStyle = "#ffffff";
-          }
-
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.restore();
-        }
+    const tick = () => {
+      if (!video.videoWidth || !video.videoHeight) {
+        liveRafRef.current = requestAnimationFrame(tick);
+        return;
       }
-    }
 
-    liveRafRef.current = requestAnimationFrame(drawLivePreview);
-  }, [cameraOn, facingMode, lens, liveFxOn]);
+      frame++;
+      if (heavy && frame % 3 === 0) {
+        liveRafRef.current = requestAnimationFrame(tick);
+        return;
+      }
 
-  useEffect(() => {
-    if (!cameraOn) return;
+      const rect = canvas.getBoundingClientRect();
+      const viewW = Math.max(1, Math.round(rect.width));
+      const viewH = Math.max(1, Math.round(rect.height));
 
-    liveRafRef.current = requestAnimationFrame(drawLivePreview);
+      const scale = Math.min(1, LIVE_MAX_W / video.videoWidth);
+      const srcW = Math.round(video.videoWidth * scale);
+      const srcH = Math.round(video.videoHeight * scale);
+
+      if (tmp.width !== srcW || tmp.height !== srcH) {
+        tmp.width = srcW;
+        tmp.height = srcH;
+      }
+
+      if (canvas.width !== viewW || canvas.height !== viewH) {
+        canvas.width = viewW;
+        canvas.height = viewH;
+      }
+
+      const tctx = tmp.getContext("2d")!;
+      tctx.imageSmoothingEnabled = true;
+      tctx.imageSmoothingQuality = "high";
+      tctx.setTransform(1, 0, 0, 1, 0, 0);
+      tctx.clearRect(0, 0, srcW, srcH);
+
+      if (facingMode === "user") {
+        tctx.translate(srcW, 0);
+        tctx.scale(-1, 1);
+      }
+
+      tctx.drawImage(video, 0, 0, srcW, srcH);
+
+      try {
+        const out = lens
+          ? applyLensOpticalEnhanced(tmp, lens, "native", {
+              watermark: false,
+              maxEdge: LIVE_MAX_W,
+            })
+          : tmp;
+
+        const outAspect = out.width / out.height;
+        const viewAspect = viewW / viewH;
+
+        let sx = 0;
+        let sy = 0;
+        let sw = out.width;
+        let sh = out.height;
+
+        if (outAspect > viewAspect) {
+          sw = Math.round(out.height * viewAspect);
+          sx = Math.round((out.width - sw) / 2);
+        } else {
+          sh = Math.round(out.width / viewAspect);
+          sy = Math.round((out.height - sh) / 2);
+        }
+
+        const ctx = canvas.getContext("2d")!;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, viewW, viewH);
+        ctx.drawImage(out, sx, sy, sw, sh, 0, 0, viewW, viewH);
+        setLiveFxOn(true);
+      } catch {
+        /* keep last frame */
+      }
+
+      liveRafRef.current = requestAnimationFrame(tick);
+    };
+
+    liveRafRef.current = requestAnimationFrame(tick);
 
     return () => {
       if (liveRafRef.current != null) {
@@ -399,7 +443,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         liveRafRef.current = null;
       }
     };
-  }, [cameraOn, drawLivePreview]);
+  }, [cameraOn, lens, phase, facingMode]);
 
   const showLensName = useCallback((value: CameraLensDef | null) => {
     if (!value) return;
@@ -461,7 +505,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   );
 
   const handleTouchStart = useCallback(
-    (event: React.TouchEvent<HTMLDivElement>) => {
+    (event: TouchEvent<HTMLDivElement>) => {
       const touch = event.touches[0];
       if (!touch) return;
 
@@ -472,7 +516,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   );
 
   const handleTouchEnd = useCallback(
-    (event: React.TouchEvent<HTMLDivElement>) => {
+    (event: TouchEvent<HTMLDivElement>) => {
+      if (phase === "result" || phase === "processing") return;
       if (swipeStartX.current == null || swipeStartY.current == null) return;
 
       const touch = event.changedTouches[0];
@@ -488,7 +533,27 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
 
       moveLens(dx < 0 ? 1 : -1);
     },
-    [moveLens],
+    [moveLens, phase],
+  );
+
+  // Aliases used by JSX (clientX/clientY style) — same swipe system, no duplicates
+  const onSwipeStart = useCallback((clientX: number, clientY: number) => {
+    swipeStartX.current = clientX;
+    swipeStartY.current = clientY;
+  }, []);
+
+  const onSwipeEnd = useCallback(
+    (clientX: number, clientY: number) => {
+      if (phase === "result" || phase === "processing") return;
+      if (swipeStartX.current == null || swipeStartY.current == null) return;
+      const dx = clientX - swipeStartX.current;
+      const dy = clientY - swipeStartY.current;
+      swipeStartX.current = null;
+      swipeStartY.current = null;
+      if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy)) return;
+      moveLens(dx < 0 ? 1 : -1);
+    },
+    [moveLens, phase],
   );
 
   const getCurrentFrame = useCallback(async (): Promise<Blob | null> => {
@@ -509,21 +574,25 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
 
   const makeOutputCanvas = useCallback(
     async (input: Blob): Promise<HTMLCanvasElement> => {
-      if (!lens) {
-        const img = await loadImage(URL.createObjectURL(input));
+      const objectUrl = URL.createObjectURL(input);
+      try {
+        const img = await loadImage(objectUrl);
         const canvas = document.createElement("canvas");
-
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
-
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas unavailable");
-
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, 0, 0);
-        return canvas;
+        if (!lens) return canvas;
+        return applyLensOpticalEnhanced(canvas, lens, "native", {
+          watermark: false,
+          maxEdge: 2560,
+        });
+      } finally {
+        URL.revokeObjectURL(objectUrl);
       }
-
-      return applyLensOpticalEnhanced(input, lens);
     },
     [lens],
   );
@@ -665,14 +734,15 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     }
 
     try {
-      if (isAiLens(selectedLens)) {
-        const charge = await chargeLensGeneration({
-          lensId: selectedLens.id,
-          userId: user?.id ?? null,
-        });
-
-        if (!charge?.allowed) {
-          toast.error(charge?.message || "You need credits to use this AI lens.");
+      if (isAiLens(selectedLens) && selectedLens.creditCost > 0) {
+        const generationId = `lens_${selectedLens.id}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        try {
+          const charged = await chargeLensGeneration({
+            data: { lensId: selectedLens.id, generationId },
+          });
+          if (charged?.charged) toast.success(`${selectedLens.name} · ${charged.charged} credits`);
+        } catch (chargeErr) {
+          toast.error(chargeErr instanceof Error ? chargeErr.message : "Could not charge credits");
           return;
         }
       }
@@ -685,7 +755,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   }, [getCurrentFrame, lens, processBlob, user?.id]);
 
   const handleUpload = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
+    async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
 
       event.target.value = "";
@@ -708,6 +778,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     },
     [processBlob],
   );
+
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()?.[0];
     if (!track) return;
@@ -740,6 +811,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     clearResultVariants();
     setSourceUrl(URL.createObjectURL(file));
     setPreviewUrl(null);
+    setResultFromUpload(true);
     setPhase("ready");
   };
 
@@ -902,7 +974,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   return (
     <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
       <header className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
-        {/* X / close -> Home */}
         <Link
           to={HOME_ROUTE}
           className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
@@ -948,13 +1019,19 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           <div
             className="absolute inset-0 z-10 bg-black"
             style={{
-              paddingTop: "calc(max(0.75rem, env(safe-area-inset-top)) + 3rem)",
-              paddingBottom: phase === "result" ? "12.5rem" : "13rem",
+              bottom: "11.5rem",
             }}
           >
-            <img src={stillSrc!} alt="" className="h-full w-full object-contain" />
+            <img
+              src={stillSrc!}
+              alt=""
+              className="h-full w-full object-contain"
+              draggable={false}
+            />
           </div>
-        )}        {phase === "idle" && !cameraOn && !stillSrc && (
+        )}
+
+        {phase === "idle" && !cameraOn && !stillSrc && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-zinc-950 px-6">
             <p className="text-center text-sm text-white/60">Allow camera or upload a photo</p>
             <div className="flex gap-3">
@@ -977,7 +1054,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         )}
 
         {phase === "processing" && (
-          <div className="absolute inset-0 z-20 grid place-items-center bg-black/50 backdrop-blur-sm">
+          <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-black/35">
             <ApertureLoader />
           </div>
         )}
@@ -1042,7 +1119,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
                     key={l.id}
                     type="button"
                     data-lens-id={l.id}
-                    onClick={() => selectLens(l.id, l.name)}
+                    onClick={() => selectLens(l.id)}
                     className="flex w-[4.4rem] shrink-0 flex-col items-center gap-1.5 transition-transform active:scale-95"
                   >
                     <div
