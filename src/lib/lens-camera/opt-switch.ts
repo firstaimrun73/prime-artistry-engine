@@ -3,7 +3,7 @@ import type { LensAspectId } from "./roster";
 import { cropToAspect, grade, teleCrop } from "./opt-core";
 import { radialMap, fisheye360, sharpen } from "./opt-warp";
 import { portraitBloom, dreamSoft, glowMist, vintage, infrared, microReveal } from "./opt-fx1";
-import { tiltShift, prismEcho, starflare, radialBokeh, architectAlign } from "./opt-fx2";
+import { tiltShift, prismEcho, starflare, radialBokeh, architectAlign, sumoCutout } from "./opt-fx2";
 
 export function applyLensById(
   source: HTMLCanvasElement,
@@ -53,6 +53,8 @@ export function applyLensById(
       return architectAlign(base);
     case "lens_starflare":
       return starflare(base);
+    case "lens_sumo":
+      return sumoCutout(base);
     case "lens_selective_focus":
       return radialBokeh(grade(base, "contrast(1.14) saturate(1.08)"), 1.05);
     default:
