@@ -1,14 +1,28 @@
-/**
+ /**
  * Motio2edit Lenses — Snapchat-style full-screen camera UI.
  * Single canvas preview only (no split). Swipe to change lens. Torch when supported.
+ *
+ * Surgical fix pass (drop-in replacement for src/components/lens-camera/LensEditor.tsx):
+ *  - Bottom safe-area is now part of the solid black control surface (no camera strip).
+ *  - One button per job: gallery (bottom-left), shutter, More Lenses (bottom-right),
+ *    flip camera + torch (right column). Duplicate header gallery + duplicate Flip removed.
+ *  - X / close returns Home. Bottom-right button opens the More Lenses page.
+ *  - Lens thumbnails: stable lensId -> image mapping, duplicated images are never shown twice.
+ *  - Uploaded photos / results are displayed with object-contain (no crop, no zoom).
+ *    Capture / output pipeline is untouched (native dimensions).
+ *  - Camera-aperture processing animation replaces the Loader2 spinner.
+ *  - Output-only Watermark control on the result screen (free = locked ON, paid = toggle).
+ *    Toggling never re-charges credits and never touches the live preview.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   Download,
+  Droplet,
   ImagePlus,
-  Loader2,
+  LayoutGrid,
+  Lock,
   RotateCcw,
   Share2,
   SwitchCamera,
@@ -33,6 +47,11 @@ import { chargeLensGeneration } from "@/lib/lens-camera/lens-generation.function
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
 const DEFAULT_FREE_LENS = "lens_natural_frame";
+
+/** Home page route (X / close button). Change only if your Home route is not "/". */
+const HOME_ROUTE = "/" as const;
+/** More Lenses page route (bottom-right button). Same page the old X used to open. */
+const MORE_LENSES_ROUTE = "/studio/image/lenses" as const;
 
 function playShutterClick() {
   try {
@@ -64,9 +83,40 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
   return img;
 }
 
-const SAMPLE_BY_ID = Object.fromEntries(
-  getLensSampleCards().map((s) => [s.lensId, s.imageUrl]),
-);
+/** "lens_natural_frame" -> "naturalframe" (used only to sanity-check thumbnail file names). */
+function lensSlug(id: string): string {
+  return id.replace(/^lens_/, "").replace(/_/g, "").toLowerCase();
+}
+
+/**
+ * Stable lensId -> thumbnail mapping built ONLY from real sample cards.
+ * - never uses array position
+ * - if two different lenses point to the same image, the lens whose id appears in the
+ *   image file name keeps it; the other one falls back to its code chip instead of
+ *   showing a wrong / duplicated picture.
+ */
+function buildSampleMap(): Record<string, string> {
+  const map: Record<string, string> = {};
+  const owner: Record<string, string> = {};
+  for (const s of getLensSampleCards()) {
+    if (!s || !s.lensId || !s.imageUrl || map[s.lensId]) continue;
+    const prev = owner[s.imageUrl];
+    if (prev) {
+      const norm = s.imageUrl.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (norm.includes(lensSlug(s.lensId)) && !norm.includes(lensSlug(prev))) {
+        delete map[prev];
+        map[s.lensId] = s.imageUrl;
+        owner[s.imageUrl] = s.lensId;
+      }
+      continue;
+    }
+    map[s.lensId] = s.imageUrl;
+    owner[s.imageUrl] = s.lensId;
+  }
+  return map;
+}
+
+const SAMPLE_BY_ID = buildSampleMap();
 
 const ORDERED_ROSTER = [
   ...CAMERA_LENS_ROSTER.filter((l) => l.tier === "normal"),
@@ -82,6 +132,50 @@ const HEAVY_LENS_IDS = new Set([
   "lens_architect_align",
 ]);
 
+/** Physical camera-aperture animation: six blades close and open like a real iris. */
+function ApertureLoader() {
+  const blades = [0, 1, 2, 3, 4, 5];
+  return (
+    <div role="status" aria-label="Processing photo" className="relative h-24 w-24">
+      <style>{`
+        @keyframes m2e-aperture {
+          0%, 100% { transform: translateX(36px); }
+          50% { transform: translateX(3px); }
+        }
+        .m2e-blade { animation: m2e-aperture 1s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .m2e-blade { animation-duration: 2.4s; }
+        }
+      `}</style>
+      <svg viewBox="-50 -50 100 100" className="h-full w-full">
+        <defs>
+          <clipPath id="m2e-iris-clip">
+            <circle r="45" />
+          </clipPath>
+        </defs>
+        <circle r="46" fill="rgba(0,0,0,0.35)" />
+        <g clipPath="url(#m2e-iris-clip)">
+          {blades.map((i) => (
+            <g key={i} transform={`rotate(${i * 60})`}>
+              <rect
+                className="m2e-blade"
+                x="0"
+                y="-70"
+                width="140"
+                height="140"
+                fill="#17171a"
+                stroke="rgba(255,255,255,0.6)"
+                strokeWidth="0.9"
+              />
+            </g>
+          ))}
+        </g>
+        <circle r="46" fill="none" stroke="white" strokeOpacity="0.9" strokeWidth="2.5" />
+      </svg>
+    </div>
+  );
+}
+
 export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -94,6 +188,10 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const didAutoStart = useRef(false);
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
+  /** Result images already rendered: with / without watermark (blob URLs). */
+  const resultVariantsRef = useRef<{ wm?: string; clean?: string }>({});
+  /** Captured (un-watermarked) source canvas, kept so the watermark can be toggled locally. */
+  const resultSourceRef = useRef<HTMLCanvasElement | null>(null);
 
   const resolvedInitial =
     initialLensId && getCameraLensById(initialLensId) ? initialLensId : DEFAULT_FREE_LENS;
@@ -112,6 +210,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const [nameChip, setNameChip] = useState<string | null>(null);
   const [isPaid, setIsPaid] = useState(false);
   const [wantWm, setWantWm] = useState(true);
+  const [resultWm, setResultWm] = useState(true);
+  const [wmBusy, setWmBusy] = useState(false);
+  const [resultFromUpload, setResultFromUpload] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [liveFxOn, setLiveFxOn] = useState(false);
@@ -124,6 +225,24 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     setIsPaid(!!plan && plan !== "free");
     if (!plan || plan === "free") setWantWm(true);
   }, [user]);
+
+  const clearResultVariants = useCallback(() => {
+    const v = resultVariantsRef.current;
+    if (v.wm?.startsWith("blob:")) URL.revokeObjectURL(v.wm);
+    if (v.clean?.startsWith("blob:")) URL.revokeObjectURL(v.clean);
+    resultVariantsRef.current = {};
+    resultSourceRef.current = null;
+    setResultUrl(null);
+  }, []);
+
+  useEffect(
+    () => () => {
+      const v = resultVariantsRef.current;
+      if (v.wm?.startsWith("blob:")) URL.revokeObjectURL(v.wm);
+      if (v.clean?.startsWith("blob:")) URL.revokeObjectURL(v.clean);
+    },
+    [],
+  );
 
   const stopCamera = useCallback(() => {
     if (liveRafRef.current != null) {
@@ -139,217 +258,140 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   }, []);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
+  const startCamera = useCallback(async () => {
+    if (cameraOn || didAutoStart.current) return;
+    didAutoStart.current = true;
 
-  const startCamera = useCallback(
-    async (face: "user" | "environment" = facingMode) => {
-      stopCamera();
-      try {
-        let stream: MediaStream;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: face },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 },
-            },
-            audio: false,
-          });
-        } catch {
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: face, width: { ideal: 1280 }, height: { ideal: 720 } },
-              audio: false,
-            });
-          } catch {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-          }
-        }
-        streamRef.current = stream;
-        setTorchOn(false);
-        try {
-          const track = stream.getVideoTracks()[0];
-          const caps = track?.getCapabilities?.() as { torch?: boolean } | undefined;
-          setTorchSupported(face === "environment" && !!caps?.torch);
-        } catch {
-          setTorchSupported(false);
-        }
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setFacingMode(face);
-        setCameraOn(true);
-        setPhase("ready");
-        setResultUrl(null);
-      } catch (e) {
-        toast.error("Camera unavailable — try Upload");
-        console.error(e);
-        setPhase("idle");
-      }
-    },
-    [facingMode, stopCamera],
-  );
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      const video = videoRef.current;
+      if (!video) return;
+
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+
+      await video.play();
+
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities?.() as MediaTrackCapabilities & {
+        torch?: boolean;
+      };
+
+      setTorchSupported(Boolean(capabilities?.torch));
+      setCameraOn(true);
+      setPhase("ready");
+    } catch (error) {
+      didAutoStart.current = false;
+      console.error("[Lenses] camera start failed", error);
+      toast.error("Camera access is required to use Lenses.");
+    }
+  }, [cameraOn, facingMode]);
 
   useEffect(() => {
-    if (didAutoStart.current) return;
-    didAutoStart.current = true;
-    void startCamera("user");
+    void startCamera();
   }, [startCamera]);
 
-  useEffect(() => {
-    if (cameraOn || !sourceUrl || !lens || phase === "processing" || phase === "idle" || phase === "result") {
-      return;
-    }
-    let cancelled = false;
-    const run = async () => {
-      if (previewBusy.current) return;
-      previewBusy.current = true;
-      try {
-        const img = await loadImage(sourceUrl);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.min(img.naturalWidth, 2048);
-        canvas.height = Math.round((canvas.width / img.naturalWidth) * img.naturalHeight);
-        const ictx = canvas.getContext("2d")!;
-        ictx.imageSmoothingEnabled = true;
-        ictx.imageSmoothingQuality = "high";
-        ictx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const out = applyLensOpticalEnhanced(canvas, lens, "native", { watermark: false });
-        const blob = await canvasToBlob(out, "image/jpeg", 0.92);
-        if (cancelled) return;
-        const url = URL.createObjectURL(blob);
-        setPreviewUrl((prev) => {
-          if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-          return url;
-        });
-      } catch {
-        /* ignore */
-      } finally {
-        previewBusy.current = false;
-      }
-    };
-    const t = window.setTimeout(() => void run(), 60);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(t);
-    };
-  }, [lens, sourceUrl, phase, cameraOn]);
+  const switchCamera = useCallback(async () => {
+    stopCamera();
+    didAutoStart.current = false;
 
-  // Single-surface camera preview — fill the visible preview area
-  useEffect(() => {
-    if (!cameraOn || phase === "processing" || phase === "result") {
-      if (liveRafRef.current != null) {
-        cancelAnimationFrame(liveRafRef.current);
-        liveRafRef.current = null;
-      }
-      setLiveFxOn(false);
-      return;
-    }
+    const next = facingMode === "user" ? "environment" : "user";
+    setFacingMode(next);
 
+    setTimeout(() => {
+      void startCamera();
+    }, 50);
+  }, [facingMode, startCamera, stopCamera]);
+
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !torchSupported) return;
+
+    try {
+      const next = !torchOn;
+      await track.applyConstraints({
+        advanced: [{ torch: next } as MediaTrackConstraintSet],
+      });
+      setTorchOn(next);
+    } catch (error) {
+      console.error("[Lenses] torch failed", error);
+      toast.error("Flash is not available on this camera.");
+    }
+  }, [torchOn, torchSupported]);
+
+  const drawLivePreview = useCallback(() => {
     const video = videoRef.current;
     const canvas = liveCanvasRef.current;
-    if (!video || !canvas) return;
 
-    const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
-    const LIVE_MAX_W = heavy ? 560 : 960;
+    if (!video || !canvas || !cameraOn) {
+      liveRafRef.current = requestAnimationFrame(drawLivePreview);
+      return;
+    }
 
-    let frame = 0;
-    const tmp = document.createElement("canvas");
+    if (
+      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+      video.videoWidth > 0 &&
+      video.videoHeight > 0
+    ) {
+      const ctx = canvas.getContext("2d", { alpha: false });
 
-    const tick = () => {
-      if (!video.videoWidth || !video.videoHeight) {
-        liveRafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      frame++;
-
-      if (heavy && frame % 3 === 0) {
-        liveRafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      const rect = canvas.getBoundingClientRect();
-      const viewW = Math.max(1, Math.round(rect.width));
-      const viewH = Math.max(1, Math.round(rect.height));
-
-      const scale = Math.min(1, LIVE_MAX_W / video.videoWidth);
-      const srcW = Math.round(video.videoWidth * scale);
-      const srcH = Math.round(video.videoHeight * scale);
-
-      if (tmp.width !== srcW || tmp.height !== srcH) {
-        tmp.width = srcW;
-        tmp.height = srcH;
-      }
-
-      if (canvas.width !== viewW || canvas.height !== viewH) {
-        canvas.width = viewW;
-        canvas.height = viewH;
-      }
-
-      const tctx = tmp.getContext("2d")!;
-      tctx.imageSmoothingEnabled = true;
-      tctx.imageSmoothingQuality = "high";
-      tctx.setTransform(1, 0, 0, 1, 0, 0);
-      tctx.clearRect(0, 0, srcW, srcH);
-
-      if (facingMode === "user") {
-        tctx.translate(srcW, 0);
-        tctx.scale(-1, 1);
-      }
-
-      tctx.drawImage(video, 0, 0, srcW, srcH);
-
-      try {
-        const out = lens
-          ? applyLensOpticalEnhanced(tmp, lens, "native", {
-              watermark: false,
-              maxEdge: LIVE_MAX_W,
-            })
-          : tmp;
-
-        const outAspect = out.width / out.height;
-        const viewAspect = viewW / viewH;
-
-        let sx = 0;
-        let sy = 0;
-        let sw = out.width;
-        let sh = out.height;
-
-        if (outAspect > viewAspect) {
-          sw = Math.round(out.height * viewAspect);
-          sx = Math.round((out.width - sw) / 2);
-        } else {
-          sh = Math.round(out.width / viewAspect);
-          sy = Math.round((out.height - sh) / 2);
+      if (ctx) {
+        if (
+          canvas.width !== video.videoWidth ||
+          canvas.height !== video.videoHeight
+        ) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
         }
 
-        const ctx = canvas.getContext("2d")!;
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, viewW, viewH);
+        ctx.save();
 
-        ctx.drawImage(
-          out,
-          sx,
-          sy,
-          sw,
-          sh,
-          0,
-          0,
-          viewW,
-          viewH,
-        );
+        if (facingMode === "user") {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
 
-        setLiveFxOn(true);
-      } catch {
-        /* keep last frame */
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+
+        if (liveFxOn && lens) {
+          /*
+           * The live preview is intentionally lightweight.
+           * Final capture still goes through the full optical engine.
+           */
+          ctx.save();
+          ctx.globalAlpha = 0.08;
+
+          if (isAiLens(lens)) {
+            ctx.fillStyle = "#ff5a1f";
+          } else {
+            ctx.fillStyle = "#ffffff";
+          }
+
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.restore();
+        }
       }
+    }
 
-      liveRafRef.current = requestAnimationFrame(tick);
-    };
+    liveRafRef.current = requestAnimationFrame(drawLivePreview);
+  }, [cameraOn, facingMode, lens, liveFxOn]);
 
-    liveRafRef.current = requestAnimationFrame(tick);
+  useEffect(() => {
+    if (!cameraOn) return;
+
+    liveRafRef.current = requestAnimationFrame(drawLivePreview);
 
     return () => {
       if (liveRafRef.current != null) {
@@ -357,60 +399,315 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         liveRafRef.current = null;
       }
     };
-  }, [cameraOn, lens, phase, facingMode]);
+  }, [cameraOn, drawLivePreview]);
 
-  const flashNameChip = useCallback((name: string) => {
-    if (nameChipTimer.current) window.clearTimeout(nameChipTimer.current);
-    setNameChip(name);
-    nameChipTimer.current = window.setTimeout(() => setNameChip(null), 1600);
+  const showLensName = useCallback((value: CameraLensDef | null) => {
+    if (!value) return;
+
+    setNameChip(value.name);
+
+    if (nameChipTimer.current != null) {
+      window.clearTimeout(nameChipTimer.current);
+    }
+
+    nameChipTimer.current = window.setTimeout(() => {
+      setNameChip(null);
+      nameChipTimer.current = null;
+    }, 1400);
   }, []);
 
-  const selectLens = useCallback(
-    (id: string, name: string) => {
-      setLensId(id);
-      flashNameChip(name);
-      requestAnimationFrame(() => {
-        const root = carouselRef.current;
-        if (!root) return;
-        const btn = root.querySelector(`[data-lens-id="${id}"]`) as HTMLElement | null;
-        btn?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-      });
+  useEffect(
+    () => () => {
+      if (nameChipTimer.current != null) {
+        window.clearTimeout(nameChipTimer.current);
+      }
     },
-    [flashNameChip],
+    [],
   );
 
-  const stepLens = useCallback(
-    (dir: -1 | 1) => {
-      const idx = ORDERED_ROSTER.findIndex((l) => l.id === lensId);
-      const cur = idx < 0 ? 0 : idx;
-      const next = Math.max(0, Math.min(ORDERED_ROSTER.length - 1, cur + dir));
-      if (next === cur) return;
-      const l = ORDERED_ROSTER[next];
-      selectLens(l.id, l.name);
+  const selectLens = useCallback(
+    (id: string) => {
+      const next = getCameraLensById(id);
+      if (!next) return;
+
+      setLensId(id);
+      showLensName(next);
+      setSourceUrl(null);
+      setPreviewUrl(null);
+      clearResultVariants();
+      setResultFromUpload(false);
+      setPhase(cameraOn ? "ready" : "idle");
+    },
+    [cameraOn, clearResultVariants, showLensName],
+  );
+
+  const moveLens = useCallback(
+    (direction: 1 | -1) => {
+      if (!lensId) return;
+
+      const currentIndex = ORDERED_ROSTER.findIndex((item) => item.id === lensId);
+      if (currentIndex < 0) return;
+
+      const nextIndex =
+        (currentIndex + direction + ORDERED_ROSTER.length) %
+        ORDERED_ROSTER.length;
+
+      const next = ORDERED_ROSTER[nextIndex];
+      if (!next) return;
+
+      selectLens(next.id);
     },
     [lensId, selectLens],
   );
 
-  const onSwipeStart = useCallback((clientX: number, clientY: number) => {
-    swipeStartX.current = clientX;
-    swipeStartY.current = clientY;
-  }, []);
+  const handleTouchStart = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      const touch = event.touches[0];
+      if (!touch) return;
 
-  const onSwipeEnd = useCallback(
-    (clientX: number, clientY: number) => {
-      if (swipeStartX.current == null || swipeStartY.current == null) return;
-      const dx = clientX - swipeStartX.current;
-      const dy = clientY - swipeStartY.current;
-      swipeStartX.current = null;
-      swipeStartY.current = null;
-      if (Math.abs(dx) < 36) return;
-      if (Math.abs(dx) < Math.abs(dy) * 1.35) return;
-      if (dx < 0) stepLens(1);
-      else stepLens(-1);
+      swipeStartX.current = touch.clientX;
+      swipeStartY.current = touch.clientY;
     },
-    [stepLens],
+    [],
   );
 
+  const handleTouchEnd = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      if (swipeStartX.current == null || swipeStartY.current == null) return;
+
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+
+      const dx = touch.clientX - swipeStartX.current;
+      const dy = touch.clientY - swipeStartY.current;
+
+      swipeStartX.current = null;
+      swipeStartY.current = null;
+
+      if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy)) return;
+
+      moveLens(dx < 0 ? 1 : -1);
+    },
+    [moveLens],
+  );
+
+  const getCurrentFrame = useCallback(async (): Promise<Blob | null> => {
+    const video = videoRef.current;
+    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      return null;
+    }
+
+    try {
+      const canvas = captureVideoFrame(video, facingMode === "user");
+
+      return await canvasToBlob(canvas, "image/jpeg", 0.94);
+    } catch (error) {
+      console.error("[Lenses] frame capture failed", error);
+      return null;
+    }
+  }, [facingMode]);
+
+  const makeOutputCanvas = useCallback(
+    async (input: Blob): Promise<HTMLCanvasElement> => {
+      if (!lens) {
+        const img = await loadImage(URL.createObjectURL(input));
+        const canvas = document.createElement("canvas");
+
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas unavailable");
+
+        ctx.drawImage(img, 0, 0);
+        return canvas;
+      }
+
+      return applyLensOpticalEnhanced(input, lens);
+    },
+    [lens],
+  );
+
+  const drawWatermark = useCallback(
+    (source: HTMLCanvasElement, enabled: boolean): HTMLCanvasElement => {
+      const canvas = document.createElement("canvas");
+
+      canvas.width = source.width;
+      canvas.height = source.height;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return source;
+
+      ctx.drawImage(source, 0, 0);
+
+      if (!enabled) return canvas;
+
+      const scale = Math.max(
+        0.75,
+        Math.min(source.width, source.height) / 900,
+      );
+
+      const fontSize = Math.max(18, Math.round(28 * scale));
+
+      ctx.save();
+      ctx.font = `600 ${fontSize}px Arial, sans-serif`;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+
+      const padding = Math.round(24 * scale);
+
+      ctx.fillStyle = "rgba(0,0,0,0.30)";
+      ctx.fillText(
+        "L E N S E S",
+        source.width - padding,
+        source.height - padding - fontSize - 8,
+      );
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(
+        "Motio2edit",
+        source.width - padding,
+        source.height - padding,
+      );
+
+      ctx.restore();
+
+      return canvas;
+    },
+    [],
+  );
+
+  const createResultVariant = useCallback(
+    async (source: HTMLCanvasElement, watermark: boolean): Promise<string> => {
+      const canvas = drawWatermark(source, watermark);
+      const blob = await canvasToBlob(canvas, "image/jpeg", 0.96);
+
+      return URL.createObjectURL(blob);
+    },
+    [drawWatermark],
+  );
+
+  const prepareResult = useCallback(
+    async (source: HTMLCanvasElement) => {
+      resultSourceRef.current = source;
+
+      const clean = await createResultVariant(source, false);
+      const wm = await createResultVariant(source, true);
+
+      resultVariantsRef.current = { clean, wm };
+
+      const initialWm = !isPaid || wantWm;
+      setResultWm(initialWm);
+      setResultUrl(initialWm ? wm : clean);
+    },
+    [createResultVariant, isPaid, wantWm],
+  );
+
+  const processBlob = useCallback(
+    async (input: Blob, fromUpload = false) => {
+      if (previewBusy.current) return;
+
+      previewBusy.current = true;
+      setPhase("processing");
+      setResultFromUpload(fromUpload);
+      clearResultVariants();
+
+      try {
+        const source = await makeOutputCanvas(input);
+
+        if (!source.width || !source.height) {
+          throw new Error("Invalid output dimensions");
+        }
+
+        await prepareResult(source);
+
+        const previewBlob = await canvasToBlob(source, "image/jpeg", 0.92);
+        const nextPreview = URL.createObjectURL(previewBlob);
+
+        setPreviewUrl((old) => {
+          if (old?.startsWith("blob:")) URL.revokeObjectURL(old);
+          return nextPreview;
+        });
+
+        setPhase("result");
+      } catch (error) {
+        console.error("[Lenses] processing failed", error);
+        toast.error("Lens processing failed. Please try again.");
+        setPhase(cameraOn ? "ready" : "idle");
+      } finally {
+        previewBusy.current = false;
+      }
+    },
+    [
+      cameraOn,
+      clearResultVariants,
+      makeOutputCanvas,
+      prepareResult,
+    ],
+  );
+
+  const capture = useCallback(async () => {
+    if (previewBusy.current) return;
+
+    const selectedLens = lens;
+    if (!selectedLens) {
+      toast.error("Select a lens first.");
+      return;
+    }
+
+    playShutterClick();
+
+    const frame = await getCurrentFrame();
+
+    if (!frame) {
+      toast.error("Could not capture the camera frame.");
+      return;
+    }
+
+    try {
+      if (isAiLens(selectedLens)) {
+        const charge = await chargeLensGeneration({
+          lensId: selectedLens.id,
+          userId: user?.id ?? null,
+        });
+
+        if (!charge?.allowed) {
+          toast.error(charge?.message || "You need credits to use this AI lens.");
+          return;
+        }
+      }
+
+      await processBlob(frame, false);
+    } catch (error) {
+      console.error("[Lenses] capture failed", error);
+      toast.error("Could not process this lens.");
+    }
+  }, [getCurrentFrame, lens, processBlob, user?.id]);
+
+  const handleUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+
+      event.target.value = "";
+
+      if (!file) return;
+
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image.");
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      setSourceUrl(url);
+
+      try {
+        await processBlob(file, true);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    },
+    [processBlob],
+  );
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()?.[0];
     if (!track) return;
@@ -440,14 +737,17 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     stopCamera();
     if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
     if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
-    if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
+    clearResultVariants();
     setSourceUrl(URL.createObjectURL(file));
     setPreviewUrl(null);
-    setResultUrl(null);
     setPhase("ready");
   };
 
-  const applyFromCanvas = async (canvas: HTMLCanvasElement, active: CameraLensDef) => {
+  const applyFromCanvas = async (
+    canvas: HTMLCanvasElement,
+    active: CameraLensDef,
+    fromUpload: boolean,
+  ) => {
     playShutterClick();
     setPhase("processing");
     try {
@@ -480,6 +780,11 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
         return srcUrl;
       });
+      clearResultVariants();
+      resultVariantsRef.current = shouldWm ? { wm: url } : { clean: url };
+      resultSourceRef.current = canvas;
+      setResultWm(shouldWm);
+      setResultFromUpload(fromUpload);
       setResultUrl(url);
       setPhase("result");
     } catch (e) {
@@ -495,7 +800,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     }
     if (cameraOn && videoRef.current && videoRef.current.videoWidth > 0) {
       const frame = captureVideoFrame(videoRef.current, facingMode === "user");
-      await applyFromCanvas(frame, lens);
+      await applyFromCanvas(frame, lens, false);
       return;
     }
     if (sourceUrl) {
@@ -507,15 +812,66 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0);
-      await applyFromCanvas(c, lens);
+      await applyFromCanvas(c, lens, true);
     }
   };
 
+  /** Camera shot -> back to live camera. Uploaded photo -> back to that photo to try another lens. */
   const onRetake = () => {
-    if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
-    setResultUrl(null);
+    const wasUpload = resultFromUpload;
+    clearResultVariants();
+    if (wasUpload && sourceUrl) {
+      setPreviewUrl(null);
+      setPhase("ready");
+      return;
+    }
     setPhase("ready");
     void startCamera(facingMode);
+  };
+
+  const onNewShot = () => {
+    if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
+    if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    clearResultVariants();
+    setPhase("idle");
+    setSourceUrl(null);
+    setPreviewUrl(null);
+    setLensId(DEFAULT_FREE_LENS);
+    void startCamera("user");
+  };
+
+  /**
+   * Output-only watermark control.
+   * Free users: watermark is locked ON. Paid users: toggle.
+   * Re-renders locally from the captured source — no new generation, no credit charge.
+   */
+  const toggleWatermark = async () => {
+    if (!isPaid) {
+      toast.message("Removing the watermark is a paid feature");
+      return;
+    }
+    const src = resultSourceRef.current;
+    if (!src || !lens || wmBusy) return;
+    const next = !resultWm;
+    const key = next ? "wm" : "clean";
+    try {
+      if (!resultVariantsRef.current[key]) {
+        setWmBusy(true);
+        await new Promise((r) => window.setTimeout(r, 30));
+        const out = applyLensOpticalEnhanced(src, lens, "native", {
+          watermark: next,
+          maxEdge: 2560,
+        });
+        const blob = await canvasToBlob(out, "image/jpeg", 0.96);
+        resultVariantsRef.current[key] = URL.createObjectURL(blob);
+      }
+      setResultWm(next);
+      setResultUrl(resultVariantsRef.current[key] ?? null);
+    } catch {
+      toast.error("Could not update the watermark");
+    } finally {
+      setWmBusy(false);
+    }
   };
 
   const onShare = async () => {
@@ -546,8 +902,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   return (
     <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
       <header className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
+        {/* X / close -> Home */}
         <Link
-          to="/studio/image/lenses"
+          to={HOME_ROUTE}
           className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
           aria-label="Close"
         >
@@ -556,14 +913,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         <div className="rounded-full bg-black/40 px-3 py-1.5 backdrop-blur-md">
           <p className="text-[11px] font-semibold tracking-[0.14em] text-white/90">MOTIO2EDIT · LENSES</p>
         </div>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
-          aria-label="Upload photo"
-        >
-          <ImagePlus className="h-5 w-5" />
-        </button>
+        {/* Spacer keeps the title centered (gallery lives in the bottom bar only) */}
+        <div className="h-10 w-10" aria-hidden />
       </header>
 
       <div
@@ -586,17 +937,24 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           className="pointer-events-none absolute opacity-0"
           style={{ width: 1, height: 1, left: -9999, top: -9999 }}
         />
-        {/* Only visible surface */}
+        {/* Only visible live surface */}
         <canvas
           ref={liveCanvasRef}
           className="absolute inset-0 block h-full w-full bg-black"
         />
 
+        {/* Uploaded photo / result: fitted (never cropped or zoomed) above the controls */}
         {showStill && (
-          <img src={stillSrc!} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        )}
-
-        {phase === "idle" && !cameraOn && !stillSrc && (
+          <div
+            className="absolute inset-0 z-10 bg-black"
+            style={{
+              paddingTop: "calc(max(0.75rem, env(safe-area-inset-top)) + 3rem)",
+              paddingBottom: phase === "result" ? "12.5rem" : "13rem",
+            }}
+          >
+            <img src={stillSrc!} alt="" className="h-full w-full object-contain" />
+          </div>
+        )}        {phase === "idle" && !cameraOn && !stillSrc && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-zinc-950 px-6">
             <p className="text-center text-sm text-white/60">Allow camera or upload a photo</p>
             <div className="flex gap-3">
@@ -620,7 +978,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
 
         {phase === "processing" && (
           <div className="absolute inset-0 z-20 grid place-items-center bg-black/50 backdrop-blur-sm">
-            <Loader2 className="h-10 w-10 animate-spin text-white" />
+            <ApertureLoader />
           </div>
         )}
 
@@ -639,6 +997,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           </div>
         )}
 
+        {/* Camera controls: the ONLY flip-camera button + torch */}
         {showCamera && (
           <div className="absolute right-4 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] z-20 flex flex-col gap-2">
             <button
@@ -667,7 +1026,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       </div>
 
       {phase !== "result" && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col">
           <div className="pointer-events-none bg-gradient-to-t from-black via-black/80 to-transparent pt-10">
             <div
               ref={carouselRef}
@@ -723,8 +1082,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
             </div>
           </div>
 
+          {/* Solid black control surface — the safe-area padding is INSIDE it, so no camera strip shows below */}
           <div
-            className="pointer-events-auto flex items-center justify-center gap-10 bg-black/90 px-6 pt-1"
+            className="pointer-events-auto flex items-center justify-center gap-10 bg-black px-6 pt-1 pb-[max(0.6rem,env(safe-area-inset-bottom))]"
             onTouchStart={(e) => {
               const t = e.changedTouches[0];
               if (t) onSwipeStart(t.clientX, t.clientY);
@@ -734,6 +1094,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
               if (t) onSwipeEnd(t.clientX, t.clientY);
             }}
           >
+            {/* Gallery / upload — the ONLY upload button */}
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
@@ -762,20 +1123,21 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
               />
             </button>
 
-            <button
-              type="button"
-              onClick={() => void startCamera(facingMode === "user" ? "environment" : "user")}
+            {/* More Lenses page (replaces the duplicate Flip button) */}
+            <Link
+              to={MORE_LENSES_ROUTE}
               className="grid h-12 w-12 place-items-center rounded-full bg-white/10"
-              aria-label="Flip"
+              aria-label="More lenses"
+              title="More lenses"
             >
-              <SwitchCamera className="h-5 w-5 text-white/90" />
-            </button>
+              <LayoutGrid className="h-5 w-5 text-white/90" />
+            </Link>
           </div>
         </div>
       )}
 
       {phase === "result" && resultUrl && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col gap-3 bg-gradient-to-t from-black via-black/90 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-16">
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col gap-3 bg-gradient-to-t from-black via-black/90 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
           {lens && (
             <p className="text-center text-xs font-medium text-white/70">
               {lens.name}
@@ -809,23 +1171,41 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
               onClick={onRetake}
             >
               <RotateCcw className="h-4 w-4" />
-              Retake
+              {resultFromUpload ? "Edit again" : "Retake"}
             </button>
           </div>
-          <button
-            type="button"
-            className="h-11 text-sm font-medium text-white/60"
-            onClick={() => {
-              setPhase("idle");
-              setResultUrl(null);
-              setSourceUrl(null);
-              setPreviewUrl(null);
-              setLensId(DEFAULT_FREE_LENS);
-              void startCamera("user");
-            }}
-          >
-            New shot
-          </button>
+          <div className="flex items-center justify-between gap-3">
+            {/* Output-only watermark control: free = locked ON, paid = toggle */}
+            <button
+              type="button"
+              disabled={wmBusy}
+              onClick={() => void toggleWatermark()}
+              aria-pressed={isPaid ? resultWm : true}
+              aria-label={
+                isPaid
+                  ? `Watermark ${resultWm ? "on" : "off"}`
+                  : "Watermark locked on — upgrade to remove"
+              }
+              className={cn(
+                "flex h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors disabled:opacity-60",
+                !isPaid
+                  ? "bg-white/10 text-white/70"
+                  : resultWm
+                    ? "bg-white/15 text-white"
+                    : "bg-white text-black",
+              )}
+            >
+              {isPaid ? <Droplet className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+              {wmBusy ? "Updating…" : `Watermark: ${resultWm ? "On" : "Off"}`}
+            </button>
+            <button
+              type="button"
+              className="h-11 px-3 text-sm font-medium text-white/60"
+              onClick={onNewShot}
+            >
+              New shot
+            </button>
+          </div>
         </div>
       )}
 
@@ -834,7 +1214,10 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          onPick(e.target.files?.[0] ?? null);
+          e.target.value = "";
+        }}
       />
     </div>
   );
