@@ -1,5 +1,5 @@
 /**
- * Motio2edit Lens roster — 20 lenses, two tiers.
+ * Motio2edit Lens roster — 21 lenses, two tiers (SUMO is the only cutout AI+ board).
  * Tier 1 (AI): 20 credits. Tier 2 (Normal): 0 credits, on-device.
  * Default selection = NONE (no auto-apply).
  */
@@ -8,7 +8,7 @@ export type LensOpticalConcept =
   | "widevista" | "ultrawide" | "fisheye" | "natural" | "portrait"
   | "cinematic" | "farreach" | "macro" | "tilt-shift" | "architect"
   | "dreamsoft" | "glowmist" | "starflare" | "prism" | "swirl"
-  | "vintage" | "infrared" | "longglass" | "perspective" | "selective";
+  | "vintage" | "infrared" | "longglass" | "perspective" | "selective" | "sumo";
 
 export type LensTier = "ai" | "normal";
 export type LensImplementationStatus = "full" | "preview-only" | "coming-soon";
@@ -51,6 +51,7 @@ export const CAMERA_LENS_ROSTER: CameraLensDef[] = [
   { id: "lens_prism_echo", name: "Prism Echo", code: "PE", color: "#5DA9E9", concept: "prism", shortDescription: "Chromatic edge echo", status: "full", creditCost: 0, tier: "normal" },
   { id: "lens_vintage_halation", name: "Vintage Halation", code: "VH", color: "#8B5E3C", concept: "vintage", shortDescription: "Warm film glow", status: "full", creditCost: 0, tier: "normal" },
   { id: "lens_infraglow", name: "InfraGlow", code: "IG", color: "#B33F62", concept: "infrared", shortDescription: "Infrared foliage sky", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_sumo", name: "Sumo", code: "SU", color: "#E85D04", concept: "sumo", shortDescription: "Face-in-cutout Sumo board", status: "full", creditCost: 20, tier: "ai" },
 ];
 
 export function getDefaultCameraLens(): CameraLensDef | null { return null; }
