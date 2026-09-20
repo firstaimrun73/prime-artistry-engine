@@ -2,7 +2,7 @@
  * Motio2edit Lenses — Snapchat-style full-screen camera UI.
  * Single canvas preview only (no split). Swipe to change lens. Torch when supported.
  *
- * Includes SUMO AI+ face-cutout, pure-white front fill light, source image persistence.
+ * Source image persists across lens changes. Output-only watermark. 20 credits per Apply.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent, type ChangeEvent } from "react";
 import { Link } from "@tanstack/react-router";
@@ -34,7 +34,6 @@ import {
   captureVideoFrame,
   estimateBrightness,
 } from "@/lib/lens-camera/optical-engine";
-import { ensureSumoBoard } from "@/lib/lens-camera/opt-fx2";
 import { chargeLensGeneration } from "@/lib/lens-camera/lens-generation.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
@@ -182,12 +181,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [liveFxOn, setLiveFxOn] = useState(false);
-  const [fillLightOpacity, setFillLightOpacity] = useState(0);
-  const [faceGuideMsg, setFaceGuideMsg] = useState<string | null>(null);
-  const faceMsgCooldown = useRef(0);
-  const fillLightTarget = useRef(0);
-  const fillLightRaf = useRef<number | null>(null);
-  const lastBrightSample = useRef(0);
   const nameChipTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -285,7 +278,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     void startCamera("user");
   }, [startCamera]);
 
-  // Geometry-aware live preview
+  // Geometry-aware live preview — never watermark on live frames
   useEffect(() => {
     if (!cameraOn || phase === "processing" || phase === "result") {
       if (liveRafRef.current != null) {
@@ -371,71 +364,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     };
   }, [cameraOn, lens, phase, facingMode]);
 
-  // Pure white front-camera fill light with circular face window
-  useEffect(() => {
-    const active =
-      cameraOn && facingMode === "user" && phase !== "processing" && phase !== "result";
-    if (!active) {
-      fillLightTarget.current = 0;
-      setFillLightOpacity(0);
-      if (fillLightRaf.current != null) {
-        cancelAnimationFrame(fillLightRaf.current);
-        fillLightRaf.current = null;
-      }
-      return;
-    }
-    let cancelled = false;
-    let lastCheck = 0;
-    const tick = (now: number) => {
-      if (cancelled) return;
-      if (now - lastCheck > 250) {
-        lastCheck = now;
-        const video = videoRef.current;
-        if (video && video.videoWidth > 0) {
-          try {
-            const bright = estimateBrightness(video);
-            lastBrightSample.current = bright;
-            const faceLens =
-              lensId === "lens_infraglow" ||
-              lensId === "lens_sumo" ||
-              lensId === "lens_portrait_bloom";
-            if (faceLens || bright < 0.28) {
-              fillLightTarget.current = 1;
-            } else if (bright > 0.4) {
-              fillLightTarget.current = 0;
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-      setFillLightOpacity((prev) => {
-        const target = fillLightTarget.current;
-        const next = prev + (target - prev) * 0.12;
-        if (Math.abs(next - target) < 0.008) return target;
-        return next;
-      });
-      fillLightRaf.current = requestAnimationFrame(tick);
-    };
-    fillLightRaf.current = requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-      if (fillLightRaf.current != null) {
-        cancelAnimationFrame(fillLightRaf.current);
-        fillLightRaf.current = null;
-      }
-    };
-  }, [cameraOn, facingMode, phase, lensId]);
-
-  useEffect(() => {
-    if (lensId !== "lens_sumo" || phase === "result" || phase === "processing") {
-      setFaceGuideMsg(null);
-      return;
-    }
-    setFaceGuideMsg("Place your face inside the frame");
-    void ensureSumoBoard();
-  }, [lensId, phase]);
-
   const showLensName = useCallback((value: CameraLensDef | null) => {
     if (!value) return;
     setNameChip(value.name);
@@ -462,7 +390,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       showLensName(next);
       setPreviewUrl(null);
       clearResultVariants();
-      if (id === "lens_sumo") void ensureSumoBoard();
       if (sourceUrl) {
         setPhase("ready");
       } else {
@@ -558,7 +485,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       const srcUrl = URL.createObjectURL(srcBlob);
       const url = URL.createObjectURL(blob);
 
-      if (isAiLens(active) && active.creditCost > 0) {
+      // Charge exactly once per successful Apply (20 credits when creditCost > 0)
+      if (active.creditCost > 0) {
         const generationId = `lens_${active.id}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
         try {
           const charged = await chargeLensGeneration({
@@ -595,29 +523,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       toast.error("Pick a lens first");
       return;
     }
-    if (lens.id === "lens_sumo") {
-      await ensureSumoBoard();
-    }
-    const runCapture = async (frame: HTMLCanvasElement, fromUpload: boolean) => {
-      if (lens.id === "lens_sumo") {
-        const { detectPrimaryFace } = await import("@/lib/lens-camera/opt-core");
-        const face = detectPrimaryFace(frame);
-        const now = Date.now();
-        if (!face || face.confidence < 0.1) {
-          if (now - faceMsgCooldown.current > 2500) {
-            faceMsgCooldown.current = now;
-            toast.message("Couldn't focus on your face — move closer or improve lighting.");
-          }
-          setFaceGuideMsg("Move your face inside the frame");
-          return;
-        }
-        setFaceGuideMsg(null);
-      }
-      await applyFromCanvas(frame, lens, fromUpload);
-    };
     if (cameraOn && videoRef.current && videoRef.current.videoWidth > 0) {
       const frame = captureVideoFrame(videoRef.current, facingMode === "user");
-      await runCapture(frame, false);
+      await applyFromCanvas(frame, lens, false);
       return;
     }
     if (sourceUrl) {
@@ -629,7 +537,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0);
-      await runCapture(c, true);
+      await applyFromCanvas(c, lens, true);
     }
   };
 
@@ -740,21 +648,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         <video ref={videoRef} playsInline muted autoPlay className="pointer-events-none absolute opacity-0" style={{ width: 1, height: 1, left: -9999, top: -9999 }} />
         <canvas ref={liveCanvasRef} className="absolute inset-0 block h-full w-full bg-black" />
 
-        {fillLightOpacity > 0.01 && showCamera && (
-          <div
-            className="pointer-events-none absolute inset-0 z-[5] bg-white"
-            style={{
-              opacity: fillLightOpacity,
-              transition: "opacity 120ms linear",
-              WebkitMaskImage:
-                "radial-gradient(circle at 50% 38%, transparent min(34vw, 28vh), black min(34vw, 28vh))",
-              maskImage:
-                "radial-gradient(circle at 50% 38%, transparent min(34vw, 28vh), black min(34vw, 28vh))",
-            }}
-            aria-hidden
-          />
-        )}
-
         {showStill && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black" style={{ bottom: "11.5rem" }}>
             <img src={stillSrc!} alt="" className="max-h-full max-w-full object-contain" draggable={false} />
@@ -786,19 +679,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
             <span className="rounded-full bg-black/55 px-4 py-1.5 text-sm font-semibold tracking-wide text-white shadow-lg backdrop-blur-xl">{nameChip}</span>
           </div>
         )}
-        {faceGuideMsg && phase === "ready" && lensId === "lens_sumo" && (
-          <div className="pointer-events-none absolute left-1/2 top-[28%] z-20 -translate-x-1/2">
-            <span className="rounded-full bg-black/60 px-4 py-1.5 text-xs font-medium text-white/90 backdrop-blur-md">{faceGuideMsg}</span>
-          </div>
-        )}
-        {lensId === "lens_sumo" && showCamera && phase === "ready" && (
-          <div
-            className="pointer-events-none absolute left-1/2 z-20 rounded-full border-2 border-white/70"
-            style={{ top: "38%", width: "min(68vw, 56vh)", height: "min(68vw, 56vh)", transform: "translate(-50%, -50%)" }}
-            aria-hidden
-          />
-        )}
-        {showCamera && !nameChip && phase === "ready" && lensId !== "lens_sumo" && (
+        {showCamera && !nameChip && phase === "ready" && (
           <div className="pointer-events-none absolute left-1/2 top-[20%] z-20 -translate-x-1/2">
             <span className="rounded-full bg-black/40 px-3 py-1 text-[11px] font-medium text-white/70 backdrop-blur-md">← Swipe to change lens →</span>
           </div>
@@ -867,7 +748,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col gap-3 bg-gradient-to-t from-black via-black/90 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
           {lens && (
             <p className="text-center text-xs font-medium text-white/70">
-              {lens.name}{lens.tier === "ai" ? " · AI" : " · Free"}
+              {lens.name} · 20 credits
             </p>
           )}
           <div className="flex gap-3">
