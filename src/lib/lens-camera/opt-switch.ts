@@ -3,7 +3,7 @@ import type { LensAspectId } from "./roster";
 import { cropToAspect, grade, teleCrop } from "./opt-core";
 import { radialMap, fisheye360, sharpen } from "./opt-warp";
 import { portraitBloom, dreamSoft, glowMist, vintage, infrared, microReveal } from "./opt-fx1";
-import { tiltShift, prismEcho, starflare, radialBokeh, architectAlign, sumoCutout } from "./opt-fx2";
+import { tiltShift, prismEcho, starflare, radialBokeh, architectAlign } from "./opt-fx2";
 
 export function applyLensById(
   source: HTMLCanvasElement,
@@ -13,12 +13,10 @@ export function applyLensById(
   const base = cropToAspect(source, aspectId);
   switch (lensId) {
     case "lens_perspective_stretch":
-      // Optical wide-angle character without horizontal scaleX distortion
       return grade(radialMap(base, 1.38), "contrast(1.22) saturate(1.18) brightness(1.03)");
     case "lens_fisheye_orbit":
       return grade(fisheye360(base), "contrast(1.28) saturate(1.22) brightness(1.03)");
     case "lens_ultrawide_horizon":
-      // Mild barrel only — preserves proportions, no axis stretch
       return grade(radialMap(base, 1.28), "contrast(1.2) saturate(1.22) brightness(1.04)");
     case "lens_portrait_bloom":
       return portraitBloom(base);
@@ -47,14 +45,11 @@ export function applyLensById(
     case "lens_prism_echo":
       return prismEcho(base);
     case "lens_swirl_depth":
-      // inward swirl-like radial + soft edge blur
       return grade(radialBokeh(radialMap(base, 0.72), 0.95), "contrast(1.2) saturate(1.22)");
     case "lens_architect_align":
       return architectAlign(base);
     case "lens_starflare":
       return starflare(base);
-    case "lens_sumo":
-      return sumoCutout(base);
     case "lens_selective_focus":
       return radialBokeh(grade(base, "contrast(1.14) saturate(1.08)"), 1.05);
     default:
