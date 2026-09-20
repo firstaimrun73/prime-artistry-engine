@@ -13,11 +13,13 @@ export function applyLensById(
   const base = cropToAspect(source, aspectId);
   switch (lensId) {
     case "lens_perspective_stretch":
-      return grade(radialMap(base, 1.95), "contrast(1.28) saturate(1.22) brightness(1.04)");
+      // Optical wide-angle character without horizontal scaleX distortion
+      return grade(radialMap(base, 1.38), "contrast(1.22) saturate(1.18) brightness(1.03)");
     case "lens_fisheye_orbit":
       return grade(fisheye360(base), "contrast(1.28) saturate(1.22) brightness(1.03)");
     case "lens_ultrawide_horizon":
-      return grade(radialMap(base, 1.7), "contrast(1.26) saturate(1.35) brightness(1.06)");
+      // Mild barrel only — preserves proportions, no axis stretch
+      return grade(radialMap(base, 1.28), "contrast(1.2) saturate(1.22) brightness(1.04)");
     case "lens_portrait_bloom":
       return portraitBloom(base);
     case "lens_natural_frame":
@@ -27,7 +29,7 @@ export function applyLensById(
     case "lens_dreamsoft":
       return dreamSoft(base);
     case "lens_widevista":
-      return grade(radialMap(base, 1.42), "contrast(1.24) saturate(1.22) brightness(1.04)");
+      return grade(radialMap(base, 1.22), "contrast(1.18) saturate(1.15) brightness(1.03)");
     case "lens_farreach":
       return grade(sharpen(teleCrop(base, 3.2), 1.55), "contrast(1.3) saturate(1.12) brightness(1.02)");
     case "lens_microreveal":
