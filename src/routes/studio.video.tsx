@@ -175,18 +175,13 @@ function VideoStudioPage() {
 
   const disabledResolutions = useMemo(() => {
     const map: Partial<Record<string, string>> = {};
-    const planKey = (profile?.plan ?? "free").toLowerCase();
-    const can1080 =
-      admin || ["pro", "studio", "business"].includes(planKey);
     for (const r of resolutionOptions) {
       if (caps.resolutions.length && !caps.resolutions.includes(r)) {
         map[r] = "Not available for this mode yet";
-      } else if (r === "1080p" && !can1080) {
-        map[r] = "Requires Pro plan or higher";
       }
     }
     return map;
-  }, [caps.resolutions, profile?.plan, admin]);
+  }, [caps.resolutions]);
 
   useEffect(() => {
     if (!aspectOptions.includes(aspect) && aspectOptions[0]) setAspect(aspectOptions[0]);
@@ -196,15 +191,10 @@ function VideoStudioPage() {
     if (!caps.audioSupported && audioOn) setAudioOn(false);
   }, [caps.audioSupported, audioOn]);
 
-  const planKey = (profile?.plan ?? "free").toLowerCase();
-  const planAllowsLongPrompt =
-    admin ||
-    ["plus", "pro", "studio", "business"].includes(planKey) ||
-    duration >= 15 ||
-    resolution === "1080p";
-  const promptMax = planAllowsLongPrompt
-    ? PREMIUM_VIDEO_PROMPT_MAX
-    : STANDARD_VIDEO_PROMPT_MAX;
+  const promptMax =
+    duration >= 15 || resolution === "1080p"
+      ? PREMIUM_VIDEO_PROMPT_MAX
+      : STANDARD_VIDEO_PROMPT_MAX;
 
   const price = useMemo(() => {
     try {
@@ -546,9 +536,256 @@ function VideoStudioPage() {
           <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
         </div>
 
-        {/* REST OF FILE CONTINUES IN REPO - this is truncated in tool for size; use local full file */}
-        <p>INCOMPLETE - DO NOT USE</p>
+        {showCanvas && (
+          <div
+            ref={canvasRef}
+            className={cn(
+              "relative mb-4 overflow-hidden transition-all duration-300",
+              glass,
+              aspectBoxClass(aspect),
+              busy && "animate-in fade-in zoom-in-95",
+            )}
+          >
+            {result?.outputUrl && !busy ? (
+              <>
+                <div className="absolute right-2 top-2 z-10">
+                  <button
+                    type="button"
+                    onClick={() => setShowGrid((g) => !g)}
+                    className={cn(
+                      "grid h-9 w-9 place-items-center rounded-full border border-white/70 bg-white/70 backdrop-blur-md dark:border-white/20 dark:bg-black/50 dark:text-white",
+                      showGrid && "ring-2 ring-[#F43F5E]",
+                    )}
+                    aria-label="Toggle grid"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </button>
+                </div>
+                <video
+                  src={result.outputUrl}
+                  className="h-full w-full object-cover"
+                  controls
+                  playsInline
+                  autoPlay
+                  muted
+                  loop
+                />
+                {showGrid && (
+                  <div className="pointer-events-none absolute inset-0 z-[5] opacity-30" aria-hidden>
+                    <div className="absolute left-1/3 top-0 h-full w-px bg-white" />
+                    <div className="absolute left-2/3 top-0 h-full w-px bg-white" />
+                    <div className="absolute left-0 top-1/3 h-px w-full bg-white" />
+                    <div className="absolute left-0 top-2/3 h-px w-full bg-white" />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {mode !== "text" && sourceUrl && (
+                  <div className="absolute inset-0">
+                    {mode === "video" ? (
+                      <video
+                        src={sourceUrl}
+                        className="h-full w-full object-cover opacity-40 blur-[2px]"
+                        muted
+                        playsInline
+                      />
+                    ) : (
+                      <img
+                        src={sourceUrl}
+                        alt=""
+                        className="h-full w-full object-cover opacity-40 blur-[2px]"
+                      />
+                    )}
+                  </div>
+                )}
+                <VideoGeneratingOverlay />
+              </>
+            )}
+          </div>
+        )}
+
+        {(mode === "image" || mode === "video") && (
+          <div className="mb-4">
+            <VideoSourceUpload
+              mode={mode === "video" ? "video" : "image"}
+              file={sourceFile}
+              previewUrl={sourceUrl}
+              onPick={onPickSource}
+              onClear={onClearSource}
+              disabled={busy}
+              aspect={aspect === "9:16" || aspect === "1:1" ? aspect : "16:9"}
+              showGrid={showGrid}
+              onToggleGrid={() => setShowGrid((g) => !g)}
+            />
+          </div>
+        )}
+
+        <section className="mb-4 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+            Prompt
+          </p>
+          <VideoPromptBar
+            value={prompt}
+            onChange={setPrompt}
+            maxChars={promptMax}
+            disabled={busy}
+            durationSec={duration}
+            placeholder={
+              mode === "image"
+                ? "Describe how the image should move…"
+                : mode === "video"
+                  ? "Describe how to transform this video…"
+                  : "A cinematic drone shot over a mountain range at sunrise…"
+            }
+          />
+        </section>
+
+        <VideoStyleStrip
+          styleId={styleId}
+          onSelect={setStyleId}
+          plan={profile?.plan}
+          isAdmin={admin}
+          disabled={busy}
+        />
+
+        <div className="mb-5">
+          <VideoFeaturePanel
+            aspects={aspectOptions}
+            resolutions={resolutionOptions}
+            durations={durations}
+            aspect={aspect}
+            setAspect={setAspect}
+            resolution={resolution}
+            setResolution={setResolution}
+            duration={duration}
+            setDuration={setDuration}
+            soundOn={audioOn}
+            setSoundOn={setAudioOn}
+            soundAvailable={caps.audioSupported !== false}
+            disabled={busy}
+            disabledDurations={disabledDurations}
+            disabledResolutions={disabledResolutions}
+          />
+        </div>
       </div>
+
+      {!result && (
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-30 border-t border-white/40 p-3",
+            "bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-[#0A0B14]/85",
+            "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+          )}
+        >
+          <div className="mx-auto flex max-w-lg items-center gap-2">
+            <button
+              type="button"
+              disabled={!canGenerate}
+              onClick={() => void onGenerate()}
+              className={cn(
+                "relative flex h-12 flex-1 items-center justify-center gap-2 overflow-hidden rounded-2xl text-sm font-semibold text-white transition",
+                "bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
+                !canGenerate && "opacity-45",
+                canGenerate && "active:scale-[0.98]",
+              )}
+            >
+              <Sparkles className="h-4 w-4" aria-hidden />
+              {busy
+                ? "Generating…"
+                : creditsEstimate > 0
+                  ? `Generate · ~${creditsEstimate} credits`
+                  : "Generate Video"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreditsOpen(true)}
+              className={cn(
+                "grid h-12 w-12 shrink-0 place-items-center rounded-2xl",
+                glass,
+                "text-slate-700 dark:text-zinc-200",
+              )}
+              aria-label="Credit estimate"
+            >
+              <Info className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="mx-auto mt-1.5 max-w-lg text-center text-[10px] text-slate-500 dark:text-zinc-400">
+            Credits are refunded if generation fails
+          </p>
+        </div>
+      )}
+
+      {creditsOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal>
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close"
+            onClick={() => setCreditsOpen(false)}
+          />
+          <div className={cn("relative z-10 w-full max-w-lg rounded-t-[24px] p-5", glass)}>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-bold">Credit estimate</p>
+              <button
+                type="button"
+                onClick={() => setCreditsOpen(false)}
+                className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 dark:border-white/15"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <ul className="space-y-2 text-sm">
+              {creditRows.map((row) => (
+                <li
+                  key={row.label}
+                  className="flex items-center justify-between rounded-xl border border-white/50 bg-white/40 px-3 py-2.5 dark:border-white/10 dark:bg-white/5"
+                >
+                  <span className="text-slate-500 dark:text-zinc-400">{row.label}</span>
+                  <span className="font-semibold tabular-nums">~{row.credits}</span>
+                </li>
+              ))}
+              {creditRows.length === 0 && (
+                <li className="text-slate-500">Estimates update with your settings.</li>
+              )}
+            </ul>
+            <p className="mt-3 text-[11px] text-slate-500 dark:text-zinc-400">
+              Current: ~{creditsEstimate} credits · refunded if generation fails
+            </p>
+          </div>
+        </div>
+      )}
+
+      {result && !busy && (
+        <VideoOutputView
+          result={result}
+          onClose={() => setResult(null)}
+          onRegenerate={() => void onGenerate()}
+          onDownload={() => void onDownload()}
+        />
+      )}
+
+      <style>{`
+        .video-studio-root .studio-hide-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .video-studio-root .studio-hide-scroll::-webkit-scrollbar {
+          display: none;
+        }
+        @keyframes studio-cam-pulse {
+          0%, 100% { transform: rotate(-4deg) scale(1); filter: drop-shadow(0 0 0 transparent); }
+          50% { transform: rotate(4deg) scale(1.06); filter: drop-shadow(0 0 8px rgba(255,122,69,0.55)); }
+        }
+        .studio-cam-icon {
+          animation: studio-cam-pulse 2.6s ease-in-out infinite;
+          display: inline-block;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .studio-cam-icon { animation: none; }
+        }
+      `}</style>
     </div>
   );
 }
