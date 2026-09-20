@@ -43,10 +43,11 @@ export function VideoModeSelector({
       >
         <span
           aria-hidden
-          className="pointer-events-none absolute top-1 bottom-1 rounded-[16px] bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)] transition-all duration-[250ms] ease-out"
+          className="pointer-events-none absolute top-1 bottom-1 rounded-[16px] bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)] transition-transform duration-[250ms] ease-out"
           style={{
-            left: `calc(${activeIdx} * 33.333% + 4px)`,
-            width: "calc(33.333% - 8px)",
+            left: 4,
+            width: "calc((100% - 8px) / 3)",
+            transform: `translateX(${activeIdx * 100}%)`,
           }}
         />
         {MODES.map((m) => {
