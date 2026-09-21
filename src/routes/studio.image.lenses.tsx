@@ -1,6 +1,6 @@
 /**
  * More Lenses — circular R2 samples, deep-link to Lens Editor.
- * Free optical open for everyone (20 credits per Apply).
+ * Common lenses are free for everyone. AI+ uses daily plan entitlement.
  * AI+ lenses require upgraded plan (or admin) — no per-Apply credit charge.
  */
 import { useMemo, useState } from "react";
@@ -69,7 +69,7 @@ function MoreLensesPage() {
 
         {!paid && (
           <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            AI+ lenses need a paid plan. Free optical lenses work for everyone (20 credits per Apply).{" "}
+            AI+ lenses need a paid plan (5 successful uses per day). Common lenses are free for everyone.{" "}
             <Link to="/pricing" className="font-semibold text-primary underline">
               Upgrade
             </Link>

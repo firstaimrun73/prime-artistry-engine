@@ -34,35 +34,35 @@ export const LENS_GENERATION_CREDITS = 20 as const;
 export const LENS_AI_PLUS_ATTEMPT_LIMIT = 5 as const;
 
 export const CAMERA_LENS_ROSTER: CameraLensDef[] = [
-  { id: "lens_natural_frame", name: "Natural Frame", code: "NF", color: "#6C757D", concept: "natural", shortDescription: "Clean baseline view", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_windows_colour", name: "Windows Colour", code: "WC", color: "#00A4EF", concept: "windowscolour", shortDescription: "Clean modern digital colour", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_colour_negative", name: "Colour Negative", code: "CN", color: "#9B59B6", concept: "colournegative", shortDescription: "True RGB colour negative", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_date_time", name: "Day & Time", code: "DT", color: "#F0A030", concept: "datetime", shortDescription: "Centered day and time stamp", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_snake_view", name: "Snake View", code: "SV", color: "#FF6B2C", concept: "snake", shortDescription: "Heat-vision colour map", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_retro_80s", name: "Retro 80s", code: "R8", color: "#E040A0", concept: "retro80s", shortDescription: "Synthwave sunset grade", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_natural_frame", name: "Natural Frame", code: "NF", color: "#6C757D", concept: "natural", shortDescription: "Clean baseline view", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_windows_colour", name: "Windows Colour", code: "WC", color: "#00A4EF", concept: "windowscolour", shortDescription: "Clean modern digital colour", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_colour_negative", name: "Colour Negative", code: "CN", color: "#9B59B6", concept: "colournegative", shortDescription: "True RGB colour negative", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_date_time", name: "Day & Time", code: "DT", color: "#F0A030", concept: "datetime", shortDescription: "Centered day and time stamp", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_snake_view", name: "Snake View", code: "SV", color: "#FF6B2C", concept: "snake", shortDescription: "Heat-vision colour map", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_retro_80s", name: "Retro 80s", code: "R8", color: "#E040A0", concept: "retro80s", shortDescription: "Synthwave sunset grade", status: "full", creditCost: 0, tier: "normal" },
   { id: "lens_microreveal", name: "MicroReveal", code: "MR", color: "#B8860B", concept: "macro", shortDescription: "AI macro detail enhancement", status: "full", creditCost: 0, tier: "ai" },
-  { id: "lens_miniature_shift", name: "Miniature Shift", code: "MS", color: "#A0522D", concept: "tilt-shift", shortDescription: "Tilt-shift miniature", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_architect_align", name: "Architect Align", code: "AA", color: "#34495E", concept: "architect", shortDescription: "Straighten verticals", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_dreamsoft", name: "DreamSoft", code: "DS", color: "#9B7EBD", concept: "dreamsoft", shortDescription: "Gentle overall softness", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_glowmist", name: "GlowMist", code: "GM", color: "#7D5BA6", concept: "glowmist", shortDescription: "Soft luminous glow", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_starflare", name: "Starflare", code: "SF", color: "#F4D35E", concept: "starflare", shortDescription: "Highlight star rays", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_prism_echo", name: "Prism Echo", code: "PE", color: "#E74C3C", concept: "prism", shortDescription: "Chromatic prism shift", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_swirl_drift", name: "Swirl Drift", code: "SD", color: "#1ABC9C", concept: "swirl", shortDescription: "Gentle radial swirl", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_vintage_grade", name: "Vintage Grade", code: "VG", color: "#C4A484", concept: "vintage", shortDescription: "Warm film grade", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_infraglow", name: "InfraGlow", code: "IG", color: "#E8F5E9", concept: "infrared", shortDescription: "Infrared foliage/sky", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_longglass", name: "LongGlass", code: "LG", color: "#5D6D7E", concept: "longglass", shortDescription: "Telephoto compression", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_perspective_stretch", name: "Perspective Stretch", code: "PS", color: "#2C3E50", concept: "perspective", shortDescription: "Perspective exaggeration", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_selective_focus", name: "Selective Focus", code: "SF2", color: "#16A085", concept: "selective", shortDescription: "Center subject isolation", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_portrait_bloom", name: "Portrait Bloom", code: "PB", color: "#E91E63", concept: "portrait", shortDescription: "Subject soft background", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_fisheye_orbit", name: "Fisheye Orbit", code: "FO", color: "#3498DB", concept: "fisheye", shortDescription: "Radial fisheye curve", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_ultrawide_vista", name: "Ultrawide Vista", code: "UV", color: "#2980B9", concept: "ultrawide", shortDescription: "Wide field without stretch", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_miniature_shift", name: "Miniature Shift", code: "MS", color: "#A0522D", concept: "tilt-shift", shortDescription: "Tilt-shift miniature", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_architect_align", name: "Architect Align", code: "AA", color: "#34495E", concept: "architect", shortDescription: "Straighten verticals", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_dreamsoft", name: "DreamSoft", code: "DS", color: "#9B7EBD", concept: "dreamsoft", shortDescription: "Gentle overall softness", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_glowmist", name: "GlowMist", code: "GM", color: "#7D5BA6", concept: "glowmist", shortDescription: "Soft luminous glow", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_starflare", name: "Starflare", code: "SF", color: "#F4D35E", concept: "starflare", shortDescription: "Highlight star rays", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_prism_echo", name: "Prism Echo", code: "PE", color: "#E74C3C", concept: "prism", shortDescription: "Chromatic prism shift", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_swirl_drift", name: "Swirl Drift", code: "SD", color: "#1ABC9C", concept: "swirl", shortDescription: "Gentle radial swirl", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_vintage_grade", name: "Vintage Grade", code: "VG", color: "#C4A484", concept: "vintage", shortDescription: "Warm film grade", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_infraglow", name: "InfraGlow", code: "IG", color: "#E8F5E9", concept: "infrared", shortDescription: "Infrared foliage/sky", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_longglass", name: "LongGlass", code: "LG", color: "#5D6D7E", concept: "longglass", shortDescription: "Telephoto compression", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_perspective_stretch", name: "Perspective Stretch", code: "PS", color: "#2C3E50", concept: "perspective", shortDescription: "Perspective exaggeration", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_selective_focus", name: "Selective Focus", code: "SF2", color: "#16A085", concept: "selective", shortDescription: "Center subject isolation", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_portrait_bloom", name: "Portrait Bloom", code: "PB", color: "#E91E63", concept: "portrait", shortDescription: "Subject soft background", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_fisheye_orbit", name: "Fisheye Orbit", code: "FO", color: "#3498DB", concept: "fisheye", shortDescription: "Radial fisheye curve", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_ultrawide_vista", name: "Ultrawide Vista", code: "UV", color: "#2980B9", concept: "ultrawide", shortDescription: "Wide field without stretch", status: "full", creditCost: 0, tier: "normal" },
   { id: "lens_hd_4k", name: "4K HD", code: "4K", color: "#F39C12", concept: "hd4k", shortDescription: "AI clarity enhancement", status: "full", creditCost: 0, tier: "ai" },
   { id: "lens_farreach", name: "FarReach", code: "FR", color: "#E67E22", concept: "farreach", shortDescription: "AI computational zoom", status: "full", creditCost: 0, tier: "ai" },
-  { id: "lens_windows_paint", name: "Windows Paint", code: "WP", color: "#FF6B9D", concept: "windowspaint", shortDescription: "Flat colour cartoon outline", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_mirror", name: "Mirror", code: "MI", color: "#7EC8E3", concept: "mirror", shortDescription: "Repeated mirrored sections", status: "full", creditCost: 20, tier: "normal" },
-  { id: "lens_crown", name: "Crown", code: "CR", color: "#FFD700", concept: "crown", shortDescription: "On-device forehead crown", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_windows_paint", name: "Windows Paint", code: "WP", color: "#FF6B9D", concept: "windowspaint", shortDescription: "Flat colour cartoon outline", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_mirror", name: "Mirror", code: "MI", color: "#7EC8E3", concept: "mirror", shortDescription: "Repeated mirrored sections", status: "full", creditCost: 0, tier: "normal" },
+  { id: "lens_crown", name: "Crown", code: "CR", color: "#FFD700", concept: "crown", shortDescription: "On-device forehead crown", status: "full", creditCost: 0, tier: "normal" },
   { id: "lens_origami", name: "Origami", code: "OR", color: "#F5C6A5", concept: "origami", shortDescription: "AI paper-fold art transform", status: "full", creditCost: 0, tier: "ai" },
-  { id: "lens_sketch", name: "Sketch", code: "SK", color: "#95A5A6", concept: "sketch", shortDescription: "Pencil sketch outline", status: "full", creditCost: 20, tier: "normal" },
+  { id: "lens_sketch", name: "Sketch", code: "SK", color: "#95A5A6", concept: "sketch", shortDescription: "Pencil sketch outline", status: "full", creditCost: 0, tier: "normal" },
 ];
 
 export function getCameraLensById(id: string): CameraLensDef | undefined {
@@ -113,5 +113,8 @@ export const LENS_ASPECT_OPTIONS = [
   { id: "4:3", label: "4:3" },
   { id: "16:9", label: "16:9" },
 ] as const;
+
+/** Alias for opt-core and optical pipeline consumers */
+export const LENS_ASPECTS = LENS_ASPECT_OPTIONS;
 
 export type LensAspectId = (typeof LENS_ASPECT_OPTIONS)[number]["id"];
