@@ -1,7 +1,8 @@
 /**
- * Lens generation billing + AI+ daily entitlement + Image Edit for AI+ lenses.
- * Normal: 20 credits after successful Apply only.
- * AI+: paid/admin, 5 successful attempts per day — charged only after generation succeeds.
+ * Lens Apply entitlements + AI+ Image Edit.
+ * Common lenses: free for everyone — no credits, no FAL, no AI+ usage.
+ * AI+: paid/admin only; 5 successful generations per calendar day TOTAL across all AI+ lenses.
+ * Failed/empty/invalid outputs consume zero usage. No credit charges for AI+.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -91,59 +92,20 @@ const AI_PROMPTS: Record<string, string> = {
 export const chargeLensGeneration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => chargeSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  .handler(async ({ data }) => {
+    // Common lenses are free. This endpoint is retained for compatibility only
+    // and never deducts credits for Lens Apply.
     const lens = getCameraLensById(data.lensId);
-    if (!lens) throw new Error("Unknown lens.");
-    if (lens.status === "coming-soon") throw new Error("This lens is not available yet.");
-    if (isAiLens(lens) || lens.creditCost <= 0) {
-      return {
-        ok: true as const,
-        credits: 0,
-        charged: 0,
-        generationId: data.generationId,
-        lensName: lens.name,
-        cost: 0,
-      };
-    }
-    const cost = lens.creditCost;
-    const { data: profile, error: pErr } = await supabase
-      .from("profiles")
-      .select("plan, credits, email")
-      .eq("id", userId)
-      .single();
-    if (pErr || !profile) throw new Error("Could not load your account.");
-    const isAdmin = isAdminClaims({ email: profile.email ?? undefined });
-    if (!isAdmin && (profile.credits as number) < cost) {
-      throw new Error(`Not enough credits. ${lens.name} costs ${cost} credits.`);
-    }
-    let newCredits = profile.credits as number;
-    let charged = 0;
-    if (!isAdmin) {
-      const { data: deduction, error: dErr } = await supabaseAdmin.rpc("deduct_credits", {
-        _amount: cost,
-        _gen_type: "image",
-        _user_id: userId,
-      });
-      if (dErr || !deduction) {
-        if (dErr?.message?.includes("INSUFFICIENT_CREDITS")) {
-          throw new Error(`Not enough credits. ${lens.name} costs ${cost} credits.`);
-        }
-        throw new Error("Could not charge credits. Please try again.");
-      }
-      newCredits = (deduction as { credits: number }).credits;
-      charged = cost;
-    }
     return {
       ok: true as const,
-      credits: newCredits,
-      charged,
+      credits: 0,
+      charged: 0,
       generationId: data.generationId,
-      lensName: lens.name,
-      cost,
+      lensName: lens?.name ?? data.lensId,
+      cost: 0,
     };
   });
+
 
 export const runLensAiPlusGeneration = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -164,6 +126,39 @@ export const runLensAiPlusGeneration = createServerFn({ method: "POST" })
     const paid = isAdmin || isPaidPlan(profile.plan);
     if (!paid) {
       throw new Error("AI+ lenses require a paid plan. Upgrade to unlock.");
+    }
+    // Idempotent replay: same generationId must not create a second provider call
+    {
+      const { data: prior } = await supabaseAdmin
+        .from("generation_history")
+        .select("output_path, status")
+        .eq("user_id", userId)
+        .eq("type", "lens_ai_plus")
+        .eq("prompt", `${lens.id}:${data.generationId}`)
+        .eq("status", "success")
+        .maybeSingle();
+      if (prior?.output_path) {
+        const dayStartReplay = startOfLocalDayIso();
+        const { count: usedReplay } = await supabaseAdmin
+          .from("generation_history")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("type", "lens_ai_plus")
+          .eq("status", "success")
+          .gte("created_at", dayStartReplay);
+        return {
+          ok: true as const,
+          outputUrl: prior.output_path as string,
+          lensName: lens.name,
+          generationId: data.generationId,
+          used: usedReplay ?? 0,
+          limit: isAdmin ? null : LENS_AI_PLUS_ATTEMPT_LIMIT,
+          remaining: isAdmin
+            ? null
+            : Math.max(0, LENS_AI_PLUS_ATTEMPT_LIMIT - (usedReplay ?? 0)),
+          replayed: true as const,
+        };
+      }
     }
     const dayStart = startOfLocalDayIso();
     if (!isAdmin) {
@@ -203,7 +198,7 @@ export const runLensAiPlusGeneration = createServerFn({ method: "POST" })
       type: "lens_ai_plus",
       status: "success",
       prompt: `${lens.id}:${data.generationId}`,
-      output_url: outputUrl.slice(0, 500),
+      output_path: outputUrl.slice(0, 500),
     });
     const { count: usedNow } = await supabaseAdmin
       .from("generation_history")
