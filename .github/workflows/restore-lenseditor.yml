@@ -1,0 +1,28 @@
+name: Restore LensEditor
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.restore/**'
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reassemble LensEditor
+        run: |
+          cat .restore/le_part0.txt .restore/le_part1.txt .restore/le_part2.txt .restore/le_part3.txt > src/components/lens-camera/LensEditor.tsx
+          wc -c src/components/lens-camera/LensEditor.tsx
+          wc -l src/components/lens-camera/LensEditor.tsx
+          grep -c "runLensAiPlusGeneration" src/components/lens-camera/LensEditor.tsx
+          grep -c "LensEditor restore incomplete\|PLACEHOLDER" src/components/lens-camera/LensEditor.tsx || true
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/components/lens-camera/LensEditor.tsx
+          git diff --cached --stat
+          git commit -m "fix: restore LensEditor and finalize lens entitlement" || exit 0
+          git push
