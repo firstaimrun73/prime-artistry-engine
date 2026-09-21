@@ -98,10 +98,7 @@ function buildSampleMap(): Record<string, string> {
 
 const SAMPLE_BY_ID = buildSampleMap();
 
-const ORDERED_ROSTER = [
-  ...CAMERA_LENS_ROSTER.filter((l) => l.tier === "normal"),
-  ...CAMERA_LENS_ROSTER.filter((l) => l.tier === "ai"),
-];
+const ORDERED_ROSTER = CAMERA_LENS_ROSTER;
 
 const HEAVY_LENS_IDS = new Set([
   "lens_perspective_stretch",
@@ -110,6 +107,19 @@ const HEAVY_LENS_IDS = new Set([
   "lens_widevista",
   "lens_swirl_depth",
   "lens_architect_align",
+]);
+
+const LIGHTWEIGHT_LENS_IDS = new Set([
+  "lens_hd_4k",
+  "lens_retro_80s",
+  "lens_snake_view",
+  "lens_date_time",
+  "lens_golden_hour",
+  "lens_film_noir",
+  "lens_neon_dream",
+  "lens_chrome_pop",
+  "lens_dream_glow",
+  "lens_prism_color",
 ]);
 
 function ApertureLoader() {
@@ -292,7 +302,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     const canvas = liveCanvasRef.current;
     if (!video || !canvas) return;
     const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
-    const LIVE_MAX_W = heavy ? 560 : 960;
+    const light = lens ? LIGHTWEIGHT_LENS_IDS.has(lens.id) : false;
+    const LIVE_MAX_W = heavy ? 560 : light ? 720 : 960;
     let frame = 0;
     const tmp = document.createElement("canvas");
     const tick = () => {
@@ -485,7 +496,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       const srcUrl = URL.createObjectURL(srcBlob);
       const url = URL.createObjectURL(blob);
 
-      // Charge exactly once per successful Apply (20 credits when creditCost > 0)
       if (active.creditCost > 0) {
         const generationId = `lens_${active.id}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
         try {
@@ -631,11 +641,29 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         <div className="rounded-full bg-black/40 px-3 py-1.5 backdrop-blur-md">
           <p className="text-[11px] font-semibold tracking-[0.14em] text-white/90">MOTIO2EDIT · LENSES</p>
         </div>
-        <div className="h-10 w-10" aria-hidden />
+        {phase === "result" ? (
+          <button
+            type="button"
+            disabled={wmBusy}
+            onClick={() => void toggleWatermark()}
+            aria-pressed={isPaid ? resultWm : true}
+            className={cn(
+              "flex h-10 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors disabled:opacity-60",
+              !isPaid || resultWm
+                ? "bg-amber-400 text-black"
+                : "border border-amber-400 bg-transparent text-amber-400",
+            )}
+          >
+            {isPaid ? <Droplet className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+            {wmBusy ? "…" : "WM"}
+          </button>
+        ) : (
+          <div className="h-10 w-10" aria-hidden />
+        )}
       </header>
 
       <div
-        className="relative min-h-0 flex-1 overflow-hidden pb-[11.5rem] touch-pan-y"
+        className="relative min-h-0 flex-1 overflow-hidden touch-pan-y"
         onTouchStart={(e) => {
           const t = e.changedTouches[0];
           if (t) onSwipeStart(t.clientX, t.clientY);
@@ -646,10 +674,15 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         }}
       >
         <video ref={videoRef} playsInline muted autoPlay className="pointer-events-none absolute opacity-0" style={{ width: 1, height: 1, left: -9999, top: -9999 }} />
-        <canvas ref={liveCanvasRef} className="absolute inset-0 block h-full w-full bg-black" />
+        <canvas ref={liveCanvasRef} className={cn("absolute inset-0 block h-full w-full bg-black", phase === "result" && "invisible pointer-events-none")} />
 
         {showStill && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black" style={{ bottom: "11.5rem" }}>
+          <div
+            className={cn(
+              "absolute inset-0 z-10 flex items-center justify-center bg-black",
+              phase === "result" ? "pb-[9rem]" : "pb-[11.5rem]",
+            )}
+          >
             <img src={stillSrc!} alt="" className="max-h-full max-w-full object-contain" draggable={false} />
           </div>
         )}
@@ -700,8 +733,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       </div>
 
       {phase !== "result" && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col">
-          <div className="pointer-events-none bg-gradient-to-t from-black via-black/80 to-transparent pt-10">
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col bg-gradient-to-t from-black/55 via-black/35 to-transparent pt-16">
+          <div className="pointer-events-none">
             <div ref={carouselRef} className="pointer-events-auto mb-2 flex touch-pan-x gap-3 overflow-x-auto overscroll-x-contain px-4 pt-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" style={{ WebkitOverflowScrolling: "touch" }}>
               {ORDERED_ROSTER.map((l) => {
                 const selected = lensId === l.id;
@@ -729,15 +762,15 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
             </div>
           </div>
 
-          <div className="pointer-events-auto flex items-center justify-center gap-10 bg-black px-6 pt-1 pb-[max(0.6rem,env(safe-area-inset-bottom))]">
-            <button type="button" onClick={() => inputRef.current?.click()} className="grid h-12 w-12 place-items-center rounded-full bg-white/10" aria-label="Gallery">
+          <div className="pointer-events-auto flex items-center justify-center gap-10 px-6 pt-1 pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+            <button type="button" onClick={() => inputRef.current?.click()} className="grid h-12 w-12 place-items-center rounded-full bg-black/40 backdrop-blur-md" aria-label="Gallery">
               <ImagePlus className="h-5 w-5 text-white/90" />
             </button>
             <button type="button" disabled={phase === "processing" || !lens} onClick={() => void onShutter()} className={cn("relative grid h-[4.5rem] w-[4.5rem] place-items-center rounded-full transition-transform", phase === "processing" || !lens ? "opacity-40" : "active:scale-90")} aria-label="Capture">
               <span className="absolute inset-0 rounded-full border-[3px] border-white" />
               <span className={cn("h-[3.55rem] w-[3.55rem] rounded-full bg-white", phase === "processing" && "opacity-60")} />
             </button>
-            <Link to={MORE_LENSES_ROUTE} className="grid h-12 w-12 place-items-center rounded-full bg-white/10" aria-label="More lenses" title="More lenses">
+            <Link to={MORE_LENSES_ROUTE} className="grid h-12 w-12 place-items-center rounded-full bg-black/40 backdrop-blur-md" aria-label="More lenses" title="More lenses">
               <LayoutGrid className="h-5 w-5 text-white/90" />
             </Link>
           </div>
@@ -745,40 +778,27 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       )}
 
       {phase === "result" && resultUrl && (
-        <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col gap-3 bg-gradient-to-t from-black via-black/90 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
+        <div className="absolute bottom-0 left-0 right-0 z-30 flex h-[9rem] flex-col justify-end gap-2 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6">
           {lens && (
-            <p className="text-center text-xs font-medium text-white/70">
+            <p className="text-center text-[11px] font-medium text-white/70">
               {lens.name} · 20 credits
             </p>
           )}
-          <div className="flex gap-3">
-            <button type="button" className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black" onClick={() => void triggerBrowserDownload(resultUrl, `motio-lens-${lensId ?? "shot"}.jpg`)}>
+          <div className="flex gap-2">
+            <button type="button" className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black" onClick={() => void triggerBrowserDownload(resultUrl, `motio-lens-${lensId ?? "shot"}.jpg`)}>
               <Download className="h-4 w-4" /> Download
             </button>
             {canShare && (
-              <button type="button" className="flex h-12 items-center justify-center gap-2 rounded-full bg-white/15 px-5 text-sm font-semibold text-white" onClick={() => void onShare()}>
+              <button type="button" className="flex h-11 items-center justify-center gap-2 rounded-full bg-white/15 px-4 text-sm font-semibold text-white" onClick={() => void onShare()}>
                 <Share2 className="h-4 w-4" /> Share
               </button>
             )}
-            <button type="button" className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-white/15 text-sm font-semibold text-white" onClick={onRetake}>
+            <button type="button" className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white/15 text-sm font-semibold text-white" onClick={onRetake}>
               <RotateCcw className="h-4 w-4" /> {resultFromUpload ? "Edit again" : "Retake"}
             </button>
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              disabled={wmBusy}
-              onClick={() => void toggleWatermark()}
-              aria-pressed={isPaid ? resultWm : true}
-              className={cn(
-                "flex h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors disabled:opacity-60",
-                !isPaid ? "bg-white/10 text-white/70" : resultWm ? "bg-white/15 text-white" : "bg-white text-black",
-              )}
-            >
-              {isPaid ? <Droplet className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-              {wmBusy ? "Updating…" : `Watermark: ${resultWm ? "On" : "Off"}`}
-            </button>
-            <button type="button" className="h-11 px-3 text-sm font-medium text-white/60" onClick={onNewShot}>
+          <div className="flex items-center justify-center">
+            <button type="button" className="h-9 px-3 text-sm font-medium text-white/60" onClick={onNewShot}>
               New shot
             </button>
           </div>
