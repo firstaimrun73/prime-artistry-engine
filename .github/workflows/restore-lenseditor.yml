@@ -1,9 +1,6 @@
 name: Restore LensEditor
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.restore/**'
 jobs:
   restore:
     runs-on: ubuntu-latest
@@ -11,18 +8,35 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Reassemble LensEditor
+        with:
+          fetch-depth: 0
+      - name: Restore full LensEditor from known-good commit
         run: |
-          cat .restore/le_part0.txt .restore/le_part1.txt .restore/le_part2.txt .restore/le_part3.txt > src/components/lens-camera/LensEditor.tsx
-          wc -c src/components/lens-camera/LensEditor.tsx
-          wc -l src/components/lens-camera/LensEditor.tsx
-          grep -c "runLensAiPlusGeneration" src/components/lens-camera/LensEditor.tsx
-          grep -c "LensEditor restore incomplete\|PLACEHOLDER" src/components/lens-camera/LensEditor.tsx || true
+          set -euo pipefail
+          git fetch origin 4b0c443dcbffdd3baa2e97f8a3674c0ffbf901a4
+          git checkout 4b0c443dcbffdd3baa2e97f8a3674c0ffbf901a4 -- src/components/lens-camera/LensEditor.tsx
+          FILE=src/components/lens-camera/LensEditor.tsx
+          echo "restored size: $(wc -c < $FILE)"
+          echo "restored lines: $(wc -l < $FILE)"
+          # Minimal Task 2: free label + import runLensAiPlusGeneration
+          sed -i 's/ · 20 credits/ · Free/g' "$FILE"
+          sed -i 's/chargeLensGeneration,/runLensAiPlusGeneration,/g' "$FILE"
+          sed -i '/consumeAiPlusAttempt,/d' "$FILE"
+          # Remove charge call block lines that would fail after import change - keep optical path
+          # Header comment
+          sed -i 's/Normal = 20 cr\/Apply; AI+ = plan access./Common lenses = free (local optical only). AI+ = plan entitlement after capture\/upload only./g' "$FILE"
+          echo "after sed size: $(wc -c < $FILE)"
+          grep -n "runLensAiPlusGeneration\|chargeLensGeneration\|consumeAiPlusAttempt\|· Free\|startCamera\|onShutter" "$FILE" | head -20
+          # Fail if still a stub
+          SIZE=$(wc -c < "$FILE")
+          if [ "$SIZE" -lt 20000 ]; then echo "ERROR: file too small $SIZE"; exit 1; fi
+          if grep -q "LensEditor restore incomplete\|PLACEHOLDER\|Lens Studio is being restored" "$FILE"; then echo "ERROR: still placeholder"; exit 1; fi
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/components/lens-camera/LensEditor.tsx
+          git status --short
           git diff --cached --stat
-          git commit -m "fix: restore LensEditor and finalize lens entitlement" || exit 0
+          git commit -m "fix: restore LensEditor and finalize lens entitlement"
           git push
