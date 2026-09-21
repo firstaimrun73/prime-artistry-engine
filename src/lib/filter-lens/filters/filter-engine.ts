@@ -1,62 +1,46 @@
 /**
- * filter-engine.ts
- * Core processing pipeline for Motio2edit Filters.
+ * filters/filter-engine.ts — Motio2edit programmatic image processing.
+ * Never mutates input; preserves alpha; preview + full modes.
  */
-import type { RGBAImage } from '../shared/processing-types';
-import type { ProcessingProfile, ProcessOptions, ProcessResult } from './filter-types';
-import { downscale, cloneImage } from './engine-ops-basic';
 import {
+  ProcessingProfile,
+  ProcessOptions,
+  ProcessResult,
+  RGBAImage,
+} from '../shared/processing-types';
+import {
+  cloneImage,
+  downscale,
   applyExposureContrast,
   applyHighlightsShadows,
   applyTemperatureTint,
   applySaturationVibrance,
+  applyMonochromeSepia,
   applySplitToning,
-  applyAtmosphere,
+} from './engine-ops-basic';
+import {
   applyFade,
-  applySoftBlur,
-  applyDenoise,
-  applyDynamicRange,
-  applyBloom,
+  applyGrain,
+  applyVignette,
   applySharpen,
   applyPosterize,
   applyEdgeMix,
   applyPixelate,
-  applyDuotone,
-  applyMonochromeSepia,
-  applyVignette,
-  applyGrain,
 } from './engine-ops-basic-b';
-import { applyStyle } from './engine-ops-style';
+import {
+  applyBloom,
+  applySoftBlur,
+  applyDuotone,
+  applyDenoise,
+  applyDynamicRange,
+  applyAtmosphere,
+} from './engine-ops-extra';
+import {
+  applyStyle,
+  scaleProfile,
+} from './engine-ops-style';
 
-function scaleProfile(profile: ProcessingProfile, intensity: number): ProcessingProfile {
-  const t = Math.max(0, Math.min(1, intensity / 100));
-  const s = (v: number | undefined) => (v == null ? undefined : v * t);
-  return {
-    ...profile,
-    exposure: s(profile.exposure),
-    contrast: s(profile.contrast),
-    brightness: s(profile.brightness),
-    highlights: s(profile.highlights),
-    shadows: s(profile.shadows),
-    temperature: s(profile.temperature),
-    tint: s(profile.tint),
-    saturation: s(profile.saturation),
-    vibrance: s(profile.vibrance),
-    fade: s(profile.fade),
-    softBlur: s(profile.softBlur),
-    denoise: s(profile.denoise),
-    dynamicRange: s(profile.dynamicRange),
-    bloom: s(profile.bloom),
-    clarity: s(profile.clarity),
-    microcontrast: s(profile.microcontrast),
-    sharpening: s(profile.sharpening),
-    edgeAmount: s(profile.edgeAmount),
-    grain: s(profile.grain),
-    vignette: s(profile.vignette),
-    sepia: s(profile.sepia),
-    atmosphere: s(profile.atmosphere),
-  };
-}
+export { cloneImage, downscale };
 
 export function applyProcessingProfile(
   image: RGBAImage,
