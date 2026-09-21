@@ -1,13 +1,12 @@
 /**
  * More Lenses — circular R2 samples, deep-link to Lens Editor.
- * Free optical (tier=normal, 0 cr) open for everyone.
- * AI lenses (20 cr) require upgraded plan (or admin).
+ * Free optical open for everyone (20 credits per Apply).
+ * AI+ lenses require upgraded plan (or admin) — no per-Apply credit charge.
  */
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Search, Lock } from "lucide-react";
 import { Header } from "@/components/Header";
-import { LENS_GENERATION_CREDITS } from "@/lib/lens-camera/roster";
 import { getLensSampleCards } from "@/lib/lens-camera/lens-samples";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -63,14 +62,14 @@ function MoreLensesPage() {
           <div>
             <h1 className="text-lg font-extrabold tracking-tight">More Lenses</h1>
             <p className="text-xs text-muted-foreground">
-              {freeCount} free optical · {aiCount} AI ({LENS_GENERATION_CREDITS} cr)
+              {freeCount} free optical · {aiCount} AI (plan access)
             </p>
           </div>
         </div>
 
         {!paid && (
           <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            AI lenses need a paid plan. Free optical lenses work for everyone.{" "}
+            AI+ lenses need a paid plan. Free optical lenses work for everyone (20 credits per Apply).{" "}
             <Link to="/pricing" className="font-semibold text-primary underline">
               Upgrade
             </Link>
@@ -122,7 +121,7 @@ function MoreLensesPage() {
                   )}
                   {isAi && !locked && (
                     <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-orange-500/90 px-1.5 py-0.5 text-[8px] font-bold text-white">
-                      AI {l.creditCost}
+                      AI+
                     </span>
                   )}
                 </div>
