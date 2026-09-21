@@ -1,46 +1,62 @@
 /**
- * filters/filter-engine.ts — Motio2edit programmatic image processing.
- * Never mutates input; preserves alpha; preview + full modes.
+ * filter-engine.ts
+ * Core processing pipeline for Motio2edit Filters.
  */
+import type { RGBAImage } from '../shared/processing-types';
+import type { ProcessingProfile, ProcessOptions, ProcessResult } from './filter-types';
+import { downscale, cloneImage } from './engine-ops-basic';
 import {
-  ProcessingProfile,
-  ProcessOptions,
-  ProcessResult,
-  RGBAImage,
-} from '../shared/processing-types';
-import {
-  cloneImage,
-  downscale,
   applyExposureContrast,
   applyHighlightsShadows,
   applyTemperatureTint,
   applySaturationVibrance,
-  applyMonochromeSepia,
   applySplitToning,
-} from './engine-ops-basic';
-import {
+  applyAtmosphere,
   applyFade,
-  applyGrain,
-  applyVignette,
+  applySoftBlur,
+  applyDenoise,
+  applyDynamicRange,
+  applyBloom,
   applySharpen,
   applyPosterize,
   applyEdgeMix,
   applyPixelate,
-} from './engine-ops-basic-b';
-import {
-  applyBloom,
-  applySoftBlur,
   applyDuotone,
-  applyDenoise,
-  applyDynamicRange,
-  applyAtmosphere,
-} from './engine-ops-extra';
-import {
-  applyStyle,
-  scaleProfile,
-} from './engine-ops-style';
+  applyMonochromeSepia,
+  applyVignette,
+  applyGrain,
+} from './engine-ops-basic-b';
+import { applyStyle } from './engine-ops-style';
 
-export { cloneImage, downscale };
+function scaleProfile(profile: ProcessingProfile, intensity: number): ProcessingProfile {
+  const t = Math.max(0, Math.min(1, intensity / 100));
+  const s = (v: number | undefined) => (v == null ? undefined : v * t);
+  return {
+    ...profile,
+    exposure: s(profile.exposure),
+    contrast: s(profile.contrast),
+    brightness: s(profile.brightness),
+    highlights: s(profile.highlights),
+    shadows: s(profile.shadows),
+    temperature: s(profile.temperature),
+    tint: s(profile.tint),
+    saturation: s(profile.saturation),
+    vibrance: s(profile.vibrance),
+    fade: s(profile.fade),
+    softBlur: s(profile.softBlur),
+    denoise: s(profile.denoise),
+    dynamicRange: s(profile.dynamicRange),
+    bloom: s(profile.bloom),
+    clarity: s(profile.clarity),
+    microcontrast: s(profile.microcontrast),
+    sharpening: s(profile.sharpening),
+    edgeAmount: s(profile.edgeAmount),
+    grain: s(profile.grain),
+    vignette: s(profile.vignette),
+    sepia: s(profile.sepia),
+    atmosphere: s(profile.atmosphere),
+  };
+}
 
 export function applyProcessingProfile(
   image: RGBAImage,
@@ -75,10 +91,16 @@ export function applyProcessingProfile(
   if (p.edgeAmount) applyEdgeMix(working, p.edgeAmount);
   if (p.pixelSize) applyPixelate(working, p.pixelSize);
   if (!isMono && p.duotone) applyDuotone(data, p.duotone.shadow, p.duotone.highlight);
-  if (!isMono && p.style && p.style !== 'none') applyStyle(working, p.style, options.intensity);
-  // Pure grayscale LAST so nothing reintroduces brown/color cast
-  if (isMono) applyMonochromeSepia(data, true, 0);
-  else applyMonochromeSepia(data, false, p.sepia ?? 0);
+  // Always apply distinct style pipelines (Sketch / Cyberpunk / Ghibli / Rangoli / etc.)
+  // so monochrome flag cannot collapse them into the same grayscale look.
+  const GRAPHIC_STYLES = new Set([
+    'sketch', 'cyberpunk', 'ghibli', 'rangoli', 'oil', 'painting', 'watercolor',
+    'cartoon', 'comic', 'neon', 'anime', 'glassy', 'origami', 'flatvector', 'retro3d',
+  ]);
+  if (p.style && p.style !== 'none') applyStyle(working, p.style, options.intensity);
+  // Pure grayscale LAST only when mono is requested AND no graphic style owns the look
+  if (isMono && !(p.style && GRAPHIC_STYLES.has(p.style))) applyMonochromeSepia(data, true, 0);
+  else if (!isMono) applyMonochromeSepia(data, false, p.sepia ?? 0);
   applyVignette(working, p.vignette ?? 0, p.vignetteFeather ?? 50);
   applyGrain(data, p.grain ?? 0, options.seed ?? 42);
 
