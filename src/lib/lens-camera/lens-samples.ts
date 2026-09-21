@@ -1,6 +1,7 @@
 /**
  * Central lens sample catalog — Cloudflare R2 public assets.
- * One unique sample image per roster lens (no shared thumbnails).
+ * One unique sample image per roster lens when a genuine asset exists.
+ * New lenses without approved assets use code-chip fallback (no invented URLs).
  */
 import { CAMERA_LENS_ROSTER, type CameraLensDef } from "@/lib/lens-camera/roster";
 
@@ -45,15 +46,16 @@ function sampleUrl(file: string): string {
   return `${R2_BASE}/${file}`;
 }
 
-/** Explicit lensId → thumbnail (never reuse wrong assets). */
+/**
+ * Explicit lensId → thumbnail (never reuse wrong assets).
+ * lens_hd_4k and lens_windows_colour intentionally omitted → code-chip fallback.
+ */
 const EXPLICIT_THUMB_BY_ID: Record<string, string> = {
   lens_infraglow: sampleUrl("0Gb5oNcmBst75vPAC8i4J_1ydKb8fI.png"),
 };
 
-/**
- * Pair roster lenses with unique R2 samples.
- * Explicit map wins; remaining lenses take unused index files.
- */
+const CODE_CHIP_ONLY = new Set(["lens_hd_4k", "lens_windows_colour"]);
+
 export function getLensSampleCards(
   roster: CameraLensDef[] = CAMERA_LENS_ROSTER,
 ): LensSampleCard[] {
@@ -61,15 +63,18 @@ export function getLensSampleCards(
   const used = new Set(Object.values(EXPLICIT_THUMB_BY_ID));
   let fileIdx = 0;
   return roster.map((lens) => {
-    let imageUrl = EXPLICIT_THUMB_BY_ID[lens.id] ?? "";
-    if (!imageUrl) {
-      while (fileIdx < n) {
-        const candidate = sampleUrl(LENS_SAMPLE_FILES[fileIdx]);
-        fileIdx++;
-        if (!used.has(candidate)) {
-          imageUrl = candidate;
-          used.add(candidate);
-          break;
+    let imageUrl = "";
+    if (!CODE_CHIP_ONLY.has(lens.id)) {
+      imageUrl = EXPLICIT_THUMB_BY_ID[lens.id] ?? "";
+      if (!imageUrl) {
+        while (fileIdx < n) {
+          const candidate = sampleUrl(LENS_SAMPLE_FILES[fileIdx]);
+          fileIdx++;
+          if (!used.has(candidate)) {
+            imageUrl = candidate;
+            used.add(candidate);
+            break;
+          }
         }
       }
     }
