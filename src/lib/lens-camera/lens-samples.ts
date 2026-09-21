@@ -1,13 +1,11 @@
 /**
  * Central lens sample catalog — Cloudflare R2 public assets.
- * One unique sample image per roster lens when a genuine asset exists.
- * New lenses without approved assets use code-chip fallback (no invented URLs).
+ * New / unapproved lenses use code-chip fallback (no invented R2 URLs).
  */
 import { CAMERA_LENS_ROSTER, type CameraLensDef } from "@/lib/lens-camera/roster";
 
 const R2_BASE = "https://assets.motio2edit.com/samples/lenses";
 
-/** Ordered R2 files — assigned 1:1 to roster index for non-explicit lenses. */
 export const LENS_SAMPLE_FILES = [
   "2Ti7KYKk9HVPvHs5e3i6r_N6dU1tWa.png",
   "6Ki-lTcNz87zct8UjBSh0_3Ut20WQ2.png",
@@ -46,15 +44,19 @@ function sampleUrl(file: string): string {
   return `${R2_BASE}/${file}`;
 }
 
-/**
- * Explicit lensId → thumbnail (never reuse wrong assets).
- * lens_hd_4k and lens_windows_colour intentionally omitted → code-chip fallback.
- */
 const EXPLICIT_THUMB_BY_ID: Record<string, string> = {
   lens_infraglow: sampleUrl("0Gb5oNcmBst75vPAC8i4J_1ydKb8fI.png"),
 };
 
-const CODE_CHIP_ONLY = new Set(["lens_hd_4k", "lens_windows_colour"]);
+/** Intentional code-chip only — no invented R2 assets. */
+const CODE_CHIP_ONLY = new Set([
+  "lens_hd_4k",
+  "lens_windows_colour",
+  "lens_date_time",
+  "lens_snake_view",
+  "lens_farreach",
+  "lens_retro_80s",
+]);
 
 export function getLensSampleCards(
   roster: CameraLensDef[] = CAMERA_LENS_ROSTER,
