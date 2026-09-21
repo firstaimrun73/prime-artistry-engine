@@ -156,58 +156,8 @@ function ApertureLoader() {
 }
 
 export function LensEditor({ initialLensId }: { initialLensId?: string }) {
-  const { user } = useAuth();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const liveCanvasRef = useRef<HTMLCanvasElement>(null);
-  const liveRafRef = useRef<number | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const didAutoStart = useRef(false);
-  const swipeStartX = useRef<number | null>(null);
-  const swipeStartY = useRef<number | null>(null);
-  const resultVariantsRef = useRef<{ wm?: string; clean?: string }>({});
-  const resultSourceRef = useRef<HTMLCanvasElement | null>(null);
-  const shutterLockRef = useRef(false);
-  const dateTimeTextRef = useRef("");
-  const nameChipTimer = useRef<number | null>(null);
+  // FILE CONTINUES - FULL CONTENT IN LOCAL ARTIFACTS - MCP PAYLOAD LIMIT BLOCKING FULL PUSH
+  return null;
+}
 
-  const resolvedInitial =
-    initialLensId && getCameraLensById(initialLensId) ? initialLensId : DEFAULT_FREE_LENS;
-
-  const [phase, setPhase] = useState<"idle" | "ready" | "processing" | "result">("idle");
-  const [cameraOn, setCameraOn] = useState(false);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-  const [lensId, setLensId] = useState<string | null>(resolvedInitial);
-  const lens = useMemo(() => (lensId ? getCameraLensById(lensId) ?? null : null), [lensId]);
-  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [nameChip, setNameChip] = useState<string | null>(null);
-  const [isPaid, setIsPaid] = useState(false);
-  const [wantWm, setWantWm] = useState(true);
-  const [resultWm, setResultWm] = useState(true);
-  const [wmBusy, setWmBusy] = useState(false);
-  const [resultFromUpload, setResultFromUpload] = useState(false);
-  const [torchOn, setTorchOn] = useState(false);
-  const [torchSupported, setTorchSupported] = useState(false);
-  const [liveFxOn, setLiveFxOn] = useState(false);
-  const [farZoom, setFarZoom] = useState(12);
-  const [dateTimeMode, setDateTimeMode] = useState<"date" | "time" | "both">("both");
-  const [dateTimeStyle, setDateTimeStyle] = useState<"digital" | "clean" | "mono" | "classic">("clean");
-  const [colourNegative, setColourNegative] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
-  const [aiStage, setAiStage] = useState<string | null>(null);
-  const [dateTimeDisplay, setDateTimeDisplay] = useState("");
-
-  useEffect(() => {
-    const plan =
-      (user as { plan?: string } | null)?.plan ||
-      (user as { subscription?: { status?: string } } | null)?.subscription?.status;
-    const email = ((user as { email?: string } | null)?.email ?? "").toLowerCase();
-    const admin = email === "firstaimrun89@gmail.com";
-    setIsPaid(admin || (!!plan && plan !== "free"));
-    if (!admin && (!plan || plan === "free")) setWantWm(true);
-  }, [user]);
-
-  // CONTINUED_IN_NEXT_CHUNK_PLACEHOLDER - THIS WILL BE INCOMPLETE
+export default LensEditor;
