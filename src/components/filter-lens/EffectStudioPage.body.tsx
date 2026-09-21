@@ -1,614 +1,703 @@
 /**
- * Motio2edit Filters — Effect Studio UI restored from commit
- * cf7a27c3fd7bd501595ce20b8102f6b665aba911
- * ("ui(filters): restore glass EffectStudioPage (full premium floating deck)").
- * Surgical UI restore only. Minimal adaptations: local dark detection (no @/lib/theme),
- * unlock payload itemId (current server schema). No engine/backend redesign.
+ * Motio2edit Filters editor — production UI.
+ * Restored from historical Pass-2 body (84cbba1c), as intended by a5cbe07
+ * (category chips, thumb previews, watermark, result phase).
+ * Uses filter-editor-core for Adjust pipeline + output-only watermark.
+ * Header locked. No implementation disclosure. No filter credits.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { useServerFn } from "@tanstack/react-start";
 import {
-  ArrowLeft, Lock, Search, Upload, X, Loader2, Download,
+  ArrowLeft,
+  Columns2,
+  Download,
+  ImagePlus,
+  Loader2,
+  Redo2,
+  RotateCcw,
+  Share2,
+  Undo2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { cn } from "@/lib/utils";
-import { fileToRGBAImage, rgbaImageToObjectUrl, meanAbsDiff } from "@/lib/filter-lens/client/image-bridge";
-import { cloneImage, downscale } from "@/lib/filter-lens/filters/filter-engine";
 import {
-  ClientFilterUnlockStore,
-  ClientLensUnlockStore,
-} from "@/lib/filter-lens/client/unlock-client";
-import { canUseFilter } from "@/lib/filter-lens/filters/filter-unlock";
-import { canUseLens } from "@/lib/filter-lens/lenses/lens-unlock";
-import { renderPreview, renderFullResolution } from "@/lib/filter-lens/filters/filter-engine";
-import { renderLensPreview, renderLensFullResolution } from "@/lib/filter-lens/lenses/lens-engine";
-import type { ProcessingProfile } from "@/lib/filter-lens/shared/processing-types";
-import { unlockFilterOrLens } from "@/lib/filter-lens/unlock.functions";
-import { triggerBrowserDownload } from "@/lib/secure-image-download";
-import type { FilterDefinition } from "@/lib/filter-lens/filters/filter-types";
+  fileToRGBAImage,
+  rgbaImageToObjectUrl,
+  downscale,
+} from "@/lib/filter-lens/client/image-bridge";
+import {
+  applyProcessingProfile,
+  renderFullResolution,
+} from "@/lib/filter-lens/filters/filter-engine";
+import { getFilterById } from "@/lib/filter-lens/filters/filter-registry";
+import type { RGBAImage } from "@/lib/filter-lens/shared/processing-types";
+import { CompareSlider } from "@/components/CompareSlider";
+import {
+  type CatalogItem,
+  filterToCatalogItem,
+  type AdjustValues,
+  type AdjustKey,
+  DEFAULT_ADJ,
+  COLOR_SWATCHES,
+  ADJUST_META,
+  applyUserAdjustments,
+  hasAdj,
+  applyOutputWatermark,
+} from "./filter-editor-core";
 
-
-/** Local dark detection — @/lib/theme not present on current main; avoids new modules. */
-function useIsDark(): boolean {
-  const [isDark, setIsDark] = useState(() =>
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
-  );
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const el = document.documentElement;
-    const sync = () => setIsDark(el.classList.contains("dark"));
-    sync();
-    const mo = new MutationObserver(sync);
-    mo.observe(el, { attributes: true, attributeFilter: ["class"] });
-    return () => mo.disconnect();
-  }, []);
-  return isDark;
-}
-
-export type EffectKind = "filter" | "lens";
-
-export type CatalogItem = {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  visualDescription: string;
-  isFree: boolean;
-  unlockCost: number;
-  profile: ProcessingProfile;
-  intensityDefault: number;
-  intensityMin: number;
-  intensityMax: number;
-  bestFor?: string;
-};
-
-export function filterToCatalogItem(f: FilterDefinition, _index = 0): CatalogItem {
-  return {
-    id: f.id,
-    name: f.name,
-    category: f.category,
-    description: f.description,
-    visualDescription: f.visualDescription,
-    isFree: f.unlock.isFree,
-    unlockCost: f.unlock.unlockCost,
-    profile: f.processingProfile,
-    intensityDefault: f.intensityRange.default,
-    intensityMin: f.intensityRange.min,
-    intensityMax: f.intensityRange.max,
-  };
-}
+export type { CatalogItem };
+export { filterToCatalogItem };
 
 type Props = {
-  kind: EffectKind;
+  kind: "filter" | "lens";
+  pageMode: "discover" | "edit";
   title: string;
   subtitle: string;
   items: CatalogItem[];
   categories: string[];
-  pageMode?: "discover" | "edit";
   initialSelectedId?: string | null;
 };
 
-export function EffectStudioPage({
-  kind,
-  title,
-  subtitle,
-  items,
-  categories,
-  pageMode = "discover",
-  initialSelectedId = null,
-}: Props) {
-  const { user, profile, refreshProfile } = useAuth();
-  const isDark = useIsDark();
-  const isAdmin = isAdminEmail(profile?.email);
-  const unlockFn = useServerFn(unlockFilterOrLens);
+function FiltersTitle({ className }: { className?: string }) {
+  return (
+    <h1 className={className}>
+      F
+      <span className="relative inline-block">
+        i
+        <svg className="pointer-events-none absolute -right-1.5 -top-1 h-2.5 w-2.5 text-[#FF5A1F]" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+          <path d="M6 0.5l0.7 3.2 3.3.2-2.5 2.2.8 3.2L6 7.5 3.7 9.3l.8-3.2L2 3.9l3.3-.2L6 0.5z" opacity="0.9" />
+        </svg>
+      </span>
+      lters
+    </h1>
+  );
+}
 
-  const [query, setQuery] = useState("");
+function OrangeSlider({
+  value, min, max, onChange, ariaLabel,
+}: {
+  value: number; min: number; max: number; onChange: (v: number) => void; ariaLabel: string;
+}) {
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  return (
+    <div className="relative flex h-8 flex-1 items-center">
+      <div className="pointer-events-none absolute inset-x-0 h-1.5 rounded-full bg-[#E8E0D8]" />
+      <div className="pointer-events-none absolute left-0 h-1.5 rounded-full bg-[#FF5A1F]" style={{ width: `${pct}%` }} />
+      <input type="range" min={min} max={max} step={1} value={value} aria-label={ariaLabel}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="relative z-10 h-8 w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#FF5A1F] [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[#FF5A1F] [&::-webkit-slider-runnable-track]:bg-transparent [&::-moz-range-track]:bg-transparent"
+      />
+    </div>
+  );
+}
+
+export function EffectStudioPage({
+  kind, pageMode: _pageMode, title, subtitle: _subtitle, items, categories, initialSelectedId = null,
+}: Props) {
+  const { profile, user } = useAuth();
+  const isAdmin = isAdminEmail(user?.email ?? profile?.email);
+  // Free = no paid plan and not admin. Admin treated as fully unlocked for testing.
+  const freeUser = !isAdmin && (!profile || profile.plan === "free" || !profile.plan);
   const [category, setCategory] = useState<string | "all">("all");
+  const [editorTab, setEditorTab] = useState<"filter" | "adjust">("filter");
+  const [adj, setAdj] = useState<AdjustValues>({ ...DEFAULT_ADJ });
+  const [adjKey, setAdjKey] = useState<AdjustKey>("light");
+  const [colorTarget, setColorTarget] = useState<"highlight" | "shadow">("highlight");
+  const [highlightColorId, setHighlightColorId] = useState("neutral");
+  const [shadowColorId, setShadowColorId] = useState("neutral");
+  type EditSnapshot = {
+    selectedId: string | null;
+    intensity: number;
+    adj: AdjustValues;
+    highlightColorId: string;
+    shadowColorId: string;
+  };
+  const historyRef = useRef<EditSnapshot[]>([]);
+  const historyIdxRef = useRef(-1);
+  const [historyTick, setHistoryTick] = useState(0);
+  const histDebounceRef = useRef<number | null>(null);
+  const sortedCategories = useMemo(() => {
+    const preferred = ["Natural", "Portrait", "Cinematic", "Film", "Vintage", "Moody", "Comic", "Sketch", "Retro", "Art", "Neon", "Black & White"];
+    const head = preferred.filter((c) => categories.includes(c));
+    const rest = categories.filter((c) => !preferred.includes(c));
+    return [...head, ...rest];
+  }, [categories]);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [intensity, setIntensity] = useState(80);
-  const [busy, setBusy] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [showOriginal, setShowOriginal] = useState(false);
-  const [lastMad, setLastMad] = useState<number | null>(null);
-  const [credits, setCredits] = useState(profile?.credits ?? 0);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [resultWmUrl, setResultWmUrl] = useState<string | null>(null);
+  const [intensity, setIntensity] = useState(85);
+  const [busy, setBusy] = useState(false);
+  const [thumbsBusy, setThumbsBusy] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "edit" | "result">("idle");
+  const [comparing, setComparing] = useState(false);
+  const [wmEnabled, setWmEnabled] = useState(true);
+  const [thumbMap, setThumbMap] = useState<Record<string, string>>({});
+  const inputRef = useRef<HTMLInputElement>(null);
   const previewGen = useRef(0);
-
-  useEffect(() => {
-    setCredits(profile?.credits ?? 0);
-  }, [profile?.credits]);
-
-  const userId = profile?.id ?? user?.id ?? "anon";
-  const filterStore = useMemo(
-    () => new ClientFilterUnlockStore(userId, credits, setCredits),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userId, profile?.credits],
-  );
-  const lensStore = useMemo(
-    () => new ClientLensUnlockStore(userId, credits, setCredits),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userId, profile?.credits],
-  );
-
-  const selected = items.find((i) => i.id === selectedId) ?? null;
-
-  const isUnlocked = useCallback(
-    (id: string, free: boolean) => {
-      if (free || isAdmin) return true;
-      if (kind === "filter") return canUseFilter(id, filterStore);
-      return canUseLens(id, lensStore);
-    },
-    [kind, filterStore, lensStore, isAdmin],
-  );
-
-  const filtered = useMemo(() => {
-    let list = items;
-    if (category !== "all") list = list.filter((i) => i.category === category);
-    const q = query.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (i) =>
-          i.name.toLowerCase().includes(q) ||
-          i.description.toLowerCase().includes(q) ||
-          i.category.toLowerCase().includes(q) ||
-          i.id.includes(q),
-      );
+  const thumbGen = useRef(0);
+  const sourceRgba = useRef<RGBAImage | null>(null);
+  const thumbRgba = useRef<RGBAImage | null>(null);
+  const selectLock = useRef(false);
+  const selected = useMemo(() => items.find((i) => i.id === selectedId) ?? null, [items, selectedId]);
+  const isUnlocked = useCallback((item: CatalogItem) => isAdmin || item.isFree === true, [isAdmin]);
+  const filtered = useMemo(() => (category === "all" ? items : items.filter((i) => i.category === category)), [items, category]);
+  const highlightTint = useMemo(() => {
+    const sw = COLOR_SWATCHES.find((s) => s.id === highlightColorId);
+    if (!sw || sw.id === "neutral") return null;
+    return sw.rgb;
+  }, [highlightColorId]);
+  const shadowTint = useMemo(() => {
+    const sw = COLOR_SWATCHES.find((s) => s.id === shadowColorId);
+    if (!sw || sw.id === "neutral") return null;
+    return sw.rgb;
+  }, [shadowColorId]);
+  const revokeUrl = (url: string | null | undefined) => { if (url?.startsWith("blob:")) URL.revokeObjectURL(url); };
+  const clearThumbs = () => { setThumbMap((prev) => { for (const u of Object.values(prev)) revokeUrl(u); return {}; }); };
+  const pushHistory = useCallback((snap: EditSnapshot) => {
+    const stack = historyRef.current.slice(0, historyIdxRef.current + 1);
+    const last = stack[stack.length - 1];
+    if (
+      last &&
+      last.selectedId === snap.selectedId &&
+      last.intensity === snap.intensity &&
+      last.highlightColorId === snap.highlightColorId &&
+      last.shadowColorId === snap.shadowColorId &&
+      JSON.stringify(last.adj) === JSON.stringify(snap.adj)
+    ) {
+      return;
     }
-    return list;
-  }, [items, category, query]);
-
-  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (sourceUrl?.startsWith("blob:")) URL.revokeObjectURL(sourceUrl);
-    if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
-    if (resultUrl?.startsWith("blob:")) URL.revokeObjectURL(resultUrl);
-    setFile(f);
-    setSourceUrl(URL.createObjectURL(f));
-    setPreviewUrl(null);
-    setResultUrl(null);
-    setLastMad(null);
-    setShowOriginal(false);
+    stack.push(snap);
+    if (stack.length > 40) stack.shift();
+    historyRef.current = stack;
+    historyIdxRef.current = stack.length - 1;
+    setHistoryTick((t) => t + 1);
+  }, []);
+  const pushHistoryDebounced = useCallback((snap: EditSnapshot) => {
+    if (histDebounceRef.current) window.clearTimeout(histDebounceRef.current);
+    histDebounceRef.current = window.setTimeout(() => {
+      pushHistory(snap);
+      histDebounceRef.current = null;
+    }, 280);
+  }, [pushHistory]);
+  const canUndo = historyIdxRef.current > 0;
+  const canRedo = historyIdxRef.current >= 0 && historyIdxRef.current < historyRef.current.length - 1;
+  void historyTick;
+  const bumpToEdit = () => {
+    if (phase === "result") {
+      setPhase("edit");
+      setResultUrl((prev) => { revokeUrl(prev); return null; });
+      setResultWmUrl((prev) => { revokeUrl(prev); return null; });
+      setComparing(false);
+    }
   };
-
+  const applySnapshot = (snap: EditSnapshot) => {
+    setSelectedId(snap.selectedId);
+    setIntensity(snap.intensity);
+    setAdj({ ...snap.adj });
+    setHighlightColorId(snap.highlightColorId);
+    setShadowColorId(snap.shadowColorId);
+  };
+  const onUndo = () => {
+    if (historyIdxRef.current <= 0) return;
+    historyIdxRef.current -= 1;
+    const snap = historyRef.current[historyIdxRef.current];
+    if (snap) applySnapshot(snap);
+    setHistoryTick((t) => t + 1);
+    bumpToEdit();
+  };
+  const onRedo = () => {
+    if (historyIdxRef.current >= historyRef.current.length - 1) return;
+    historyIdxRef.current += 1;
+    const snap = historyRef.current[historyIdxRef.current];
+    if (snap) applySnapshot(snap);
+    setHistoryTick((t) => t + 1);
+    bumpToEdit();
+  };
+  const onPick = async (f: File | null) => {
+    if (!f || !f.type.startsWith("image/")) { toast.error("Please choose an image (JPG, PNG, WebP)"); return; }
+    setBusy(true);
+    try {
+      revokeUrl(sourceUrl); revokeUrl(previewUrl); revokeUrl(resultUrl); revokeUrl(resultWmUrl); clearThumbs();
+      const rgba = await fileToRGBAImage(f);
+      sourceRgba.current = rgba;
+      thumbRgba.current = downscale(rgba, 160);
+      const url = URL.createObjectURL(f);
+      setFile(f); setSourceUrl(url); setPreviewUrl(null); setResultUrl(null); setResultWmUrl(null);
+      setPhase("edit"); setEditorTab("filter"); setAdj({ ...DEFAULT_ADJ });
+      setHighlightColorId("neutral"); setShadowColorId("neutral"); setColorTarget("highlight");
+      setComparing(false);
+      const initId = selectedId || items[0]?.id || null;
+      const initIntensity = items.find((i) => i.id === initId)?.intensityDefault ?? 85;
+      if (!selectedId && items[0]) { setSelectedId(items[0].id); setIntensity(items[0].intensityDefault); }
+      historyRef.current = [{
+        selectedId: initId,
+        intensity: initIntensity,
+        adj: { ...DEFAULT_ADJ },
+        highlightColorId: "neutral",
+        shadowColorId: "neutral",
+      }];
+      historyIdxRef.current = 0;
+      setHistoryTick((t) => t + 1);
+      toast.success("Photo ready — pick a look");
+    } catch (err) { console.error(err); toast.error("Could not read that photo"); }
+    finally { setBusy(false); }
+  };
   useEffect(() => {
-    if (!file || !selected || !sourceUrl) {
-      setPreviewUrl(null);
-      setLastMad(null);
-      return;
-    }
-    if (!isUnlocked(selected.id, selected.isFree)) {
-      setPreviewUrl(null);
-      setLastMad(null);
-      return;
-    }
-    if (!selected.profile || Object.keys(selected.profile).length === 0) {
-      toast.error("This effect has no processing profile");
-      setPreviewUrl(null);
-      return;
-    }
-    const gen = ++previewGen.current;
-    let cancelled = false;
-    const safeIntensity = Number.isFinite(intensity) ? Math.max(0, Math.min(100, intensity)) : 85;
-    (async () => {
-      try {
-        setBusy(true);
-        const rgba = await fileToRGBAImage(file);
-        const opts = {
-          intensity: safeIntensity,
-          mode: "preview" as const,
-          previewMaxDimension: 720,
-          seed: 42,
-          isCancelled: () => cancelled || gen !== previewGen.current,
-        };
-        const before = downscale(rgba, opts.previewMaxDimension);
-        let result =
-          kind === "filter"
-            ? renderPreview(rgba, selected.profile, opts)
-            : renderLensPreview(rgba, selected.profile, opts);
-        if (result.cancelled || gen !== previewGen.current) return;
-        let mad = meanAbsDiff(before, result.image);
-        if (mad < 2.5 && safeIntensity < 100) {
-          const boostOpts = { ...opts, intensity: 100 };
-          result =
-            kind === "filter"
-              ? renderPreview(rgba, selected.profile, boostOpts)
-              : renderLensPreview(rgba, selected.profile, boostOpts);
-          if (result.cancelled || gen !== previewGen.current) return;
-          mad = meanAbsDiff(before, result.image);
-        }
-        const url = await rgbaImageToObjectUrl(result.image);
-        if (gen !== previewGen.current) return;
-        setPreviewUrl((prev) => {
-          if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-          return url;
-        });
-        setLastMad(mad);
-        setShowOriginal(false);
-      } catch (err) {
-        console.error("[Motio2edit] preview failed", err);
-        if (!cancelled) toast.error(err instanceof Error ? err.message : "Preview failed");
-      } finally {
-        if (gen === previewGen.current) setBusy(false);
+    if (!file || !thumbRgba.current || kind !== "filter") return;
+    const gen = ++thumbGen.current; let cancelled = false; setThumbsBusy(true);
+    const run = async () => {
+      const base = thumbRgba.current; if (!base) return;
+      const batch = 8;
+      for (let i = 0; i < items.length; i += batch) {
+        if (cancelled || gen !== thumbGen.current) return;
+        const slice = items.slice(i, i + batch);
+        const next: Record<string, string> = {};
+        await Promise.all(slice.map(async (item) => {
+          const def = getFilterById(item.id); if (!def) return;
+          try {
+            const out = applyProcessingProfile(base, def.processingProfile, { intensity: item.intensityDefault, mode: "preview", previewMaxDimension: 160, seed: 42 });
+            if (out.cancelled) return;
+            next[item.id] = await rgbaImageToObjectUrl(out.image);
+          } catch (e) { console.warn("[Motio2edit] thumb failed", item.id, e); }
+        }));
+        if (cancelled || gen !== thumbGen.current) { for (const u of Object.values(next)) revokeUrl(u); return; }
+        setThumbMap((prev) => ({ ...prev, ...next }));
       }
-    })();
-    return () => {
-      cancelled = true;
+      if (gen === thumbGen.current) setThumbsBusy(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file, selectedId, intensity, kind]);
-
-  const onUnlock = async () => {
-    if (!selected || !user) {
-      toast.message("Sign in to unlock");
+    void run(); return () => { cancelled = true; };
+  }, [file, items, kind]);
+  useEffect(() => {
+    if (!file || !selected || kind !== "filter" || phase === "result") return;
+    if (!isUnlocked(selected) || !sourceRgba.current) return;
+    const gen = ++previewGen.current; let cancelled = false;
+    const run = async () => {
+      setBusy(true);
+      try {
+        const def = getFilterById(selected.id); if (!def) return;
+        const scaled = downscale(sourceRgba.current!, 720);
+        let out = applyProcessingProfile(scaled, def.processingProfile, { intensity, mode: "preview", previewMaxDimension: 720, seed: 42 });
+        if (cancelled || gen !== previewGen.current || out.cancelled) return;
+        if (hasAdj(adj, highlightColorId, shadowColorId)) {
+          out = { ...out, image: applyUserAdjustments(out.image, adj, highlightTint, shadowTint) };
+        }
+        const url = await rgbaImageToObjectUrl(out.image);
+        if (gen !== previewGen.current) { revokeUrl(url); return; }
+        setPreviewUrl((prev) => { revokeUrl(prev); return url; });
+      } catch (err) { console.error("[Motio2edit] preview failed", err); }
+      finally { if (gen === previewGen.current) setBusy(false); }
+    };
+    const t = window.setTimeout(() => void run(), 60);
+    return () => { cancelled = true; window.clearTimeout(t); };
+  }, [file, selected, intensity, kind, phase, isUnlocked, adj, highlightColorId, shadowColorId, highlightTint, shadowTint]);
+  const selectFilter = (item: CatalogItem) => {
+    if (selectLock.current) return;
+    selectLock.current = true;
+    window.setTimeout(() => { selectLock.current = false; }, 280);
+    if (!isUnlocked(item)) {
+      toast.message(item.badge === "ai+" ? "AI+ filter — upgrade to unlock" : "Premium filter — upgrade to unlock");
       return;
     }
-    if (isUnlocked(selected.id, selected.isFree)) return;
-    try {
-      setBusy(true);
-      const res = await unlockFn({ data: { kind, itemId: selected.id } });
-      if (!res?.ok) {
-        toast.error((res as { error?: string })?.error || "Unlock failed");
-        return;
-      }
-      if (kind === "filter") {
-        filterStore.markUnlockedFromServer(selected.id, res.credits ?? credits);
-      } else {
-        lensStore.markUnlockedFromServer(selected.id, res.credits ?? credits);
-      }
-      if (typeof res.credits === "number") setCredits(res.credits);
-      await refreshProfile?.();
-      toast.success("Unlocked");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Unlock failed");
-    } finally {
-      setBusy(false);
-    }
+    bumpToEdit();
+    setSelectedId(item.id);
+    setIntensity(item.intensityDefault);
+    setEditorTab("filter");
+    pushHistory({
+      selectedId: item.id,
+      intensity: item.intensityDefault,
+      adj: { ...adj },
+      highlightColorId,
+      shadowColorId,
+    });
   };
-
   const onApply = async () => {
-    if (!file || !selected) return;
-    if (!isUnlocked(selected.id, selected.isFree)) {
-      toast.message("Unlock this effect first");
-      return;
-    }
+    if (!file || !selected || !sourceRgba.current) return;
+    if (!isUnlocked(selected)) { toast.message("Unlock this filter to apply"); return; }
+    setBusy(true);
     try {
-      setBusy(true);
-      const rgba = await fileToRGBAImage(file);
-      const before = cloneImage(rgba);
-      const safeIntensity = Number.isFinite(intensity) ? Math.max(0, Math.min(100, intensity)) : 100;
-      const opts = { intensity: safeIntensity, mode: "full" as const, seed: 42 };
-      let result =
-        kind === "filter"
-          ? renderFullResolution(rgba, selected.profile, opts)
-          : renderLensFullResolution(rgba, selected.profile, opts);
-      if (result.cancelled) return;
-      let mad = meanAbsDiff(before, result.image);
-      if (mad < 2.5) {
-        result =
-          kind === "filter"
-            ? renderFullResolution(rgba, selected.profile, { ...opts, intensity: 100 })
-            : renderLensFullResolution(rgba, selected.profile, { ...opts, intensity: 100 });
-        mad = meanAbsDiff(before, result.image);
+      const def = getFilterById(selected.id); if (!def) throw new Error("Filter not found");
+      let out = renderFullResolution(sourceRgba.current, def.processingProfile, { intensity, mode: "full", seed: 42 });
+      if (out.cancelled) throw new Error("Cancelled");
+      if (hasAdj(adj, highlightColorId, shadowColorId)) {
+        out = { ...out, image: applyUserAdjustments(out.image, adj, highlightTint, shadowTint) };
       }
-      const url = await rgbaImageToObjectUrl(result.image);
-      setResultUrl((prev) => {
-        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-        return url;
-      });
-      setLastMad(mad);
-      setShowOriginal(false);
-      toast.success(`Applied · Δ ${mad.toFixed(1)}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Apply failed");
-    } finally {
-      setBusy(false);
-    }
+      const url = await rgbaImageToObjectUrl(out.image);
+      setResultUrl((prev) => { revokeUrl(prev); return url; });
+      try {
+        const wm = await applyOutputWatermark(url);
+        setResultWmUrl((prev) => { revokeUrl(prev); return wm; });
+      } catch { setResultWmUrl(url); }
+      if (freeUser) setWmEnabled(true);
+      setPhase("result"); setComparing(false); toast.success("Filter applied");
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Apply failed"); }
+    finally { setBusy(false); }
   };
-
+  const onRestart = () => {
+    setPhase("edit");
+    setResultUrl((prev) => { revokeUrl(prev); return null; });
+    setResultWmUrl((prev) => { revokeUrl(prev); return null; });
+    setEditorTab("filter"); setComparing(false);
+  };
+  const onDownload = () => {
+    const preferWm = freeUser || wmEnabled;
+    const url = preferWm ? (resultWmUrl || resultUrl || previewUrl) : (resultUrl || resultWmUrl || previewUrl);
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url; a.download = `motio2edit-${selected?.name ?? "filter"}.jpg`; a.click();
+  };
+  const onShare = async () => {
+    const preferWm = freeUser || wmEnabled;
+    const url = preferWm ? (resultWmUrl || resultUrl || previewUrl) : (resultUrl || resultWmUrl || previewUrl);
+    if (!url) return;
+    try {
+      const blob = await fetch(url).then((r) => r.blob());
+      const file = new File([blob], `motio2edit-${selected?.name ?? "filter"}.jpg`, { type: "image/jpeg" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Motio2edit Filters" });
+      } else { onDownload(); toast.message("Saved — share from your gallery"); }
+    } catch { onDownload(); }
+  };
+  const resetAdjust = () => {
+    setAdj({ ...DEFAULT_ADJ });
+    setHighlightColorId("neutral");
+    setShadowColorId("neutral");
+    pushHistory({
+      selectedId,
+      intensity,
+      adj: { ...DEFAULT_ADJ },
+      highlightColorId: "neutral",
+      shadowColorId: "neutral",
+    });
+  };
   const processedUrl = resultUrl || previewUrl;
-  const displayUrl = showOriginal ? sourceUrl : processedUrl || sourceUrl;
+  const showWm = freeUser || wmEnabled;
+  const displayResultUrl = showWm ? (resultWmUrl || resultUrl) : (resultUrl || resultWmUrl);
+  const hasPhoto = !!sourceUrl;
+  const adjMeta = ADJUST_META.find((m) => m.key === adjKey)!;
 
-  const glassPanel = isDark
-    ? "border-white/15 bg-black/45 text-white shadow-[0_8px_40px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
-    : "border-black/10 bg-white/55 text-[#1A1C24] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-2xl";
-  const glassChip = isDark
-    ? "border-white/12 bg-white/8 text-white/80 hover:bg-white/14"
-    : "border-black/8 bg-white/70 text-[#3A3F4C] hover:bg-white/90";
-  const glassChipActive =
-    "border-orange-400/70 bg-orange-500/90 text-white shadow-[0_0_20px_rgba(249,115,22,0.45)] scale-[1.04]";
-  const scrollHide =
-    "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden";
+  if (!hasPhoto) {
+    return (
+      <div className="flex min-h-[100dvh] flex-col bg-[#FFFBF7] text-[#161412]">
+        <header className="flex items-center gap-3 border-b border-[#E8E0D8] px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8] bg-white" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
+            <FiltersTitle className="truncate text-lg font-bold tracking-tight" />
+          </div>
+        </header>
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 min-h-0">
+          <p className="mb-5 max-w-sm text-center text-sm text-[#6F6862]">AI-powered filters · live preview on your photo</p>
+          <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
+            className="flex w-full flex-col items-center gap-4 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/45 bg-[#FFF1E6] px-6 py-16 transition hover:border-[#FF5A1F] hover:bg-[#FFE6DA]">
+            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[#FF5A1F]/15 text-[#FF5A1F]">{busy ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}</span>
+            <span className="text-base font-semibold">Drop image or tap to upload</span>
+            <span className="max-w-xs text-center text-sm text-[#6F6862]">Looks unlock after you upload</span>
+          </button>
+          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className={cn(
-        "relative flex min-h-[100dvh] flex-col overflow-hidden",
-        isDark
-          ? "bg-[radial-gradient(ellipse_80%_60%_at_20%_10%,rgba(249,115,22,0.18),transparent_50%),radial-gradient(ellipse_70%_50%_at_90%_80%,rgba(139,92,246,0.14),transparent_45%),linear-gradient(160deg,#0a0a0c_0%,#141018_50%,#1a0f0a_100%)] text-white"
-          : "bg-[radial-gradient(ellipse_80%_50%_at_15%_0%,rgba(249,115,22,0.12),transparent_45%),radial-gradient(ellipse_60%_40%_at_90%_100%,rgba(139,92,246,0.1),transparent_40%),linear-gradient(180deg,#f8f6f3_0%,#efeae4_100%)] text-[#1A1C24]",
-      )}
-    >
-      <header
-        className={cn(
-          "relative z-30 flex items-center gap-2 border-b px-3 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top))]",
-          isDark ? "border-white/10 bg-black/30 backdrop-blur-xl" : "border-black/8 bg-white/50 backdrop-blur-xl",
-        )}
-      >
-        <Link
-          to="/"
-          className={cn(
-            "grid h-10 w-10 place-items-center rounded-full border transition active:scale-95",
-            isDark ? "border-white/15 bg-white/10" : "border-black/10 bg-white/80",
-          )}
-          aria-label="Back to home"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#FFFBF7] text-[#161412]">
+      <header className="flex shrink-0 items-center gap-3 border-b border-[#E8E0D8] bg-white px-3 py-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <Link to="/" className="grid h-9 w-9 place-items-center rounded-full border border-[#E8E0D8]" aria-label="Back"><ArrowLeft className="h-4 w-4" /></Link>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-500">Motio2edit</p>
-          <h1 className="truncate text-base font-extrabold tracking-tight sm:text-lg">{title}</h1>
+          <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FF5A1F] uppercase">Motio2edit</p>
+          <FiltersTitle className="truncate text-base font-bold" />
         </div>
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className={cn("hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold sm:inline-flex", glassChip)}
-        >
-          <Upload className="h-3.5 w-3.5" /> Upload
-        </button>
-        <div
-          className={cn(
-            "rounded-full border px-2.5 py-1 text-[11px] font-semibold tabular-nums",
-            isDark ? "border-white/12 bg-white/10" : "border-black/8 bg-white/80",
-          )}
-        >
-          {isAdmin ? "Admin" : `${credits} cr`}
-        </div>
+        {phase !== "result" ? (
+          <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#E8E0D8] bg-white px-3 text-xs font-semibold">
+            <ImagePlus className="h-3.5 w-3.5" /> Photo
+          </button>
+        ) : null}
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
       </header>
 
-      <div className="relative flex flex-1 items-center justify-center px-3 pb-[min(42vh,22rem)] pt-3 sm:pb-48">
-        <div
-          className={cn(
-            "relative flex w-full max-w-3xl items-center justify-center overflow-hidden rounded-[1.35rem] border",
-            isDark ? "border-white/10 bg-black/40" : "border-black/8 bg-white/40",
-            "shadow-[0_20px_60px_-20px_rgba(0,0,0,0.45)]",
-          )}
-        >
-          {displayUrl ? (
-            <div className="relative flex max-h-[min(52dvh,560px)] w-full items-center justify-center p-2">
-              <img
-                key={displayUrl}
-                src={displayUrl}
-                alt={showOriginal ? "Original" : "Filtered"}
-                className="max-h-[min(52dvh,560px)] max-w-full object-contain transition duration-300"
-                draggable={false}
-              />
-              {processedUrl && sourceUrl ? (
-                <button
-                  type="button"
-                  className="absolute bottom-3 right-3 rounded-full border border-white/20 bg-black/50 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-md"
-                  onPointerDown={() => setShowOriginal(true)}
-                  onPointerUp={() => setShowOriginal(false)}
-                  onPointerLeave={() => setShowOriginal(false)}
-                >
-                  {showOriginal ? "Original" : "Hold = Original"}
-                </button>
-              ) : null}
-            </div>
+      <section className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-3 py-2">
+        {phase === "result" && sourceUrl && displayResultUrl ? (
+          comparing ? (
+            <CompareSlider before={sourceUrl} after={displayResultUrl} className="h-full max-h-full w-full max-w-full" />
           ) : (
+            <img
+              src={displayResultUrl}
+              alt="Result"
+              className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain"
+              draggable={false}
+            />
+          )
+        ) : (
+          <img
+            src={processedUrl || sourceUrl!}
+            alt="Preview"
+            className="h-auto max-h-full w-auto max-w-full rounded-xl object-contain"
+            draggable={false}
+          />
+        )}
+        {busy && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#FFFBF7]/40">
+            <Loader2 className="h-8 w-8 animate-spin text-[#FF5A1F]" />
+          </div>
+        )}
+      </section>
+
+      {phase === "result" ? (
+        <div className="shrink-0 border-t border-[#E8E0D8] bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md">
+          <div className="mb-3 flex items-center justify-center gap-5">
+            <button type="button" onClick={onRestart} className="grid h-11 w-11 place-items-center rounded-xl" aria-label="Restart"><RotateCcw className="h-5 w-5" /></button>
+            <button type="button" onClick={() => setComparing((v) => !v)} className={cn("grid h-11 w-11 place-items-center rounded-xl", comparing && "bg-[#FFE6DA] text-[#FF5A1F]")} aria-label="Compare"><Columns2 className="h-5 w-5" /></button>
+            <button type="button" onClick={onDownload} className="grid h-11 w-11 place-items-center rounded-xl bg-[#FFE8DA]" aria-label="Download"><Download className="h-5 w-5" /></button>
+          </div>
+          <div className="mb-3 flex flex-col items-center gap-1">
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
+              disabled={freeUser}
+              onClick={() => {
+                if (freeUser) {
+                  toast.message("Free plan watermark cannot be removed");
+                  return;
+                }
+                setWmEnabled((v) => !v);
+              }}
               className={cn(
-                "m-4 flex w-full max-w-sm flex-col items-center gap-3 rounded-3xl border border-dashed px-6 py-16 text-center transition",
-                isDark
-                  ? "border-orange-400/35 bg-orange-500/5 hover:border-orange-400/55 hover:bg-orange-500/10"
-                  : "border-orange-500/40 bg-orange-500/5 hover:border-orange-500/60 hover:bg-orange-500/10",
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold",
+                freeUser
+                  ? "cursor-not-allowed border-[#E8E0D8] bg-[#F5F0EB] text-[#6F6862] opacity-90"
+                  : showWm
+                    ? "border-[#FF5A1F]/40 bg-[#FFE8DA] text-[#FF5A1F]"
+                    : "border-[#E8E0D8] bg-white text-[#161412]",
               )}
+              aria-pressed={showWm}
+              aria-label={freeUser ? "Watermark locked on free plan" : "Toggle watermark"}
             >
-              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-orange-500/20 text-orange-500">
-                <Upload className="h-7 w-7" />
+              <span
+                className={cn(
+                  "relative inline-flex h-4 w-7 items-center rounded-full transition",
+                  showWm ? "bg-[#FF5A1F]" : "bg-[#D4CDC4]",
+                )}
+                aria-hidden
+              >
+                <span
+                  className={cn(
+                    "absolute h-3 w-3 rounded-full bg-white shadow transition",
+                    showWm ? "right-0.5" : "left-0.5",
+                  )}
+                />
               </span>
-              <span className="text-sm font-bold">Drop image or tap to upload</span>
-              <span className={cn("text-xs", isDark ? "text-white/50" : "text-black/50")}>
-                On-device filters · no generative AI
-              </span>
+              Watermark
+              {freeUser ? <span className="text-[10px] font-medium opacity-80">Locked</span> : null}
             </button>
-          )}
-          {busy && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-              <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
-
-      <div
-        className={cn(
-          "fixed inset-x-0 bottom-0 z-40 border-t px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3",
-          glassPanel,
-        )}
-      >
-        <div className="mx-auto max-w-3xl space-y-2.5">
-          <div
-            className={cn(
-              "flex items-center gap-2 rounded-2xl border px-3 py-2",
-              isDark ? "border-white/10 bg-white/5" : "border-black/8 bg-white/60",
-            )}
-          >
-            <Search className={cn("h-4 w-4 shrink-0", isDark ? "text-white/45" : "text-black/40")} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Search ${kind === "filter" ? "filters" : "lenses"}…`}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:opacity-50"
-            />
-            {query ? (
-              <button type="button" onClick={() => setQuery("")} aria-label="Clear search">
-                <X className="h-4 w-4 opacity-60" />
-              </button>
+            {freeUser ? (
+              <p className="text-center text-[10px] text-[#6F6862]">Free plan includes Motio2edit watermark</p>
             ) : null}
           </div>
-
-          <div className={cn("flex gap-1.5 overflow-x-auto pb-0.5", scrollHide)}>
+          <div className="flex gap-2">
+            <button type="button" onClick={onDownload} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white"><Download className="h-4 w-4" /> Download</button>
+            <button type="button" onClick={() => void onShare()} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[#E8E0D8] bg-white py-3 text-sm font-bold text-[#161412]"><Share2 className="h-4 w-4" /> Share</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex shrink-0 items-center justify-center gap-10 border-t border-[#E8E0D8]/80 bg-white/90 px-4 py-1.5 backdrop-blur-sm">
             <button
               type="button"
-              onClick={() => setCategory("all")}
-              className={cn(
-                "shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold transition",
-                category === "all" ? glassChipActive : glassChip,
-              )}
+              onClick={onUndo}
+              disabled={!canUndo}
+              className="grid h-10 w-10 place-items-center rounded-xl disabled:opacity-30"
+              aria-label="Undo"
             >
-              All
+              <Undo2 className="h-5 w-5" />
             </button>
-            {categories.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategory(c)}
-                className={cn(
-                  "shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold transition",
-                  category === c ? glassChipActive : glassChip,
-                )}
-              >
-                {c}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={onRedo}
+              disabled={!canRedo}
+              className="grid h-10 w-10 place-items-center rounded-xl disabled:opacity-30"
+              aria-label="Redo"
+            >
+              <Redo2 className="h-5 w-5" />
+            </button>
           </div>
-
-          <div className={cn("flex gap-2 overflow-x-auto py-1", scrollHide)} role="listbox" aria-label="Filters">
-            {filtered.map((item) => {
-              const active = selectedId === item.id;
-              const locked = !isUnlocked(item.id, item.isFree);
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  onClick={() => {
-                    setSelectedId(item.id);
-                    setIntensity(item.intensityDefault);
-                    setResultUrl(null);
-                  }}
-                  className={cn(
-                    "relative flex w-[4.75rem] shrink-0 flex-col items-center gap-1 rounded-2xl border p-2 transition duration-200",
-                    active ? glassChipActive : glassChip,
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid h-10 w-10 place-items-center rounded-xl text-[9px] font-black uppercase tracking-wide",
-                      active
-                        ? "bg-white/25 text-white"
-                        : isDark
-                          ? "bg-orange-500/15 text-orange-300"
-                          : "bg-orange-500/12 text-orange-600",
-                    )}
-                  >
-                    {item.name.slice(0, 2)}
-                  </span>
-                  <span className="w-full truncate text-center text-[10px] font-semibold leading-tight">{item.name}</span>
-                  {item.isFree ? (
-                    <span className="text-[8px] font-bold text-emerald-400">Free</span>
-                  ) : locked ? (
-                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-orange-300">
-                      <Lock className="h-2.5 w-2.5" />
-                      {item.unlockCost}
-                    </span>
-                  ) : (
-                    <span className="text-[8px] font-bold text-orange-300">Owned</span>
-                  )}
+          <div className="shrink-0 border-t border-[#E8E0D8]/60 bg-white/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md">
+            <div className="mb-2 flex items-center gap-6 px-4">
+              <button type="button" onClick={() => setEditorTab("filter")} className={cn("relative pb-2 text-[15px] font-semibold uppercase tracking-wide", editorTab === "filter" ? "text-[#FF5A1F]" : "text-[#6F6862]")}>
+                Filter{editorTab === "filter" && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded bg-[#FF5A1F]" />}
+              </button>
+              <button type="button" onClick={() => setEditorTab("adjust")} className={cn("relative pb-2 text-[15px] font-semibold uppercase tracking-wide", editorTab === "adjust" ? "text-[#FF5A1F]" : "text-[#6F6862]")}>
+                Adjust{editorTab === "adjust" && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded bg-[#FF5A1F]" />}
+              </button>
+            </div>
+            {editorTab === "filter" ? (
+              <div className="space-y-3 px-3">
+                <div className="flex gap-2 overflow-x-auto px-1 scrollbar-none">
+                  <button type="button" onClick={() => setCategory("all")} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === "all" ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] bg-white")}>All</button>
+                  {sortedCategories.map((c) => (
+                    <button key={c} type="button" onClick={() => setCategory(c)} className={cn("h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium", category === c ? "bg-[#FF5A1F] text-white" : "border border-[#E8E0D8] bg-white")}>{c}</button>
+                  ))}
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto px-1 pb-1 pt-0.5 scrollbar-none">
+                  {filtered.map((item) => {
+                    const thumb = thumbMap[item.id];
+                    const isSel = selectedId === item.id;
+                    return (
+                      <button key={item.id} type="button" onClick={() => selectFilter(item)} className="w-[78px] shrink-0 text-left">
+                        <div className={cn("relative aspect-[1/1.05] overflow-hidden rounded-lg bg-[#141210]", isSel && "outline outline-2 outline-offset-1 outline-[#FF5A1F]")}>
+                          {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-[#E8E0D8]" />}
+                          {isSel && <span className="absolute right-1 top-1 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#FF5A1F] text-[11px] font-bold text-white">✓</span>}
+                          {!item.isFree && item.badge && (
+                            item.badge === "ai+" ? (
+                              <span className="absolute left-1 top-1 inline-flex items-center rounded bg-[#1B3A6B]/90 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#7EC8FF] ring-1 ring-[#7EC8FF]/40">AI+</span>
+                            ) : (
+                              <span className="absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-gradient-to-r from-[#8B6914] to-[#C9A227] px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#FFF8E7] shadow-sm">
+                                <svg className="h-2.5 w-2.5 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                                  <path d="M8 1.5l1.6 3.6 3.9.3-3 2.7.9 3.8L8 9.8l-3.4 2.1.9-3.8-3-2.7 3.9-.3L8 1.5z" />
+                                </svg>
+                                Premium
+                              </span>
+                            )
+                          )}
+                          <span className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center text-[9px] font-semibold uppercase tracking-wide text-white truncate">{item.name}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-3 px-1">
+                  <span className="w-16 shrink-0 text-[11px] font-semibold text-[#6F6862]">Intensity</span>
+                  <OrangeSlider
+                    value={intensity}
+                    min={0}
+                    max={100}
+                    onChange={(v) => {
+                      bumpToEdit();
+                      setIntensity(v);
+                      pushHistoryDebounced({
+                        selectedId,
+                        intensity: v,
+                        adj: { ...adj },
+                        highlightColorId,
+                        shadowColorId,
+                      });
+                    }}
+                    ariaLabel="Intensity"
+                  />
+                  <span className="w-8 shrink-0 text-right text-xs font-bold tabular-nums text-[#161412]">{intensity}</span>
+                </div>
+                <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white shadow-md shadow-[#FF5A1F]/20 disabled:opacity-40">
+                  {busy ? (<><Loader2 className="h-4 w-4 animate-spin" /> Applying…</>) : ("Apply filter")}
                 </button>
-              );
-            })}
-            {filtered.length === 0 && (
-              <p className={cn("px-2 py-4 text-xs", isDark ? "text-white/45" : "text-black/45")}>
-                No filters match.
-              </p>
+              </div>
+            ) : (
+              <div className="space-y-3 px-3">
+                <div className="px-1">
+                  <OrangeSlider
+                    value={adj[adjKey]}
+                    min={adjMeta.min}
+                    max={adjMeta.max}
+                    onChange={(v) => {
+                      bumpToEdit();
+                      const next = { ...adj, [adjKey]: v };
+                      setAdj(next);
+                      pushHistoryDebounced({
+                        selectedId,
+                        intensity,
+                        adj: next,
+                        highlightColorId,
+                        shadowColorId,
+                      });
+                    }}
+                    ariaLabel={adjMeta.label}
+                  />
+                </div>
+                <div className="flex gap-1 overflow-x-auto px-1 scrollbar-none">
+                  {ADJUST_META.map((m) => (
+                    <button key={m.key} type="button" onClick={() => setAdjKey(m.key)} className={cn("flex min-w-[64px] shrink-0 flex-col items-center gap-1 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide", adjKey === m.key ? "text-[#FF5A1F]" : "text-[#6F6862]")}>
+                      <m.icon className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
+                      <span className="leading-tight">{m.label}</span>
+                      <span className={cn("h-1 w-1 rounded-full", adjKey === m.key || adj[m.key] !== 0 ? "bg-[#FF5A1F]" : "bg-transparent")} />
+                    </button>
+                  ))}
+                </div>
+                {adjKey === "color" && (
+                  <div className="mx-1 rounded-2xl border border-[#FF5A1F]/15 bg-gradient-to-b from-[#FFF5EE] to-[#FFEEE4] p-3">
+                    <div className="mb-3 flex justify-center gap-6">
+                      <button
+                        type="button"
+                        onClick={() => setColorTarget("highlight")}
+                        className={cn(
+                          "text-xs font-semibold uppercase tracking-wide",
+                          colorTarget === "highlight" ? "text-[#FF5A1F]" : "text-[#6F6862]",
+                        )}
+                      >
+                        Highlight
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setColorTarget("shadow")}
+                        className={cn(
+                          "text-xs font-semibold uppercase tracking-wide",
+                          colorTarget === "shadow" ? "text-[#FF5A1F]" : "text-[#6F6862]",
+                        )}
+                      >
+                        Shadow
+                      </button>
+                    </div>
+                    <div className="mb-3 flex flex-wrap justify-center gap-2.5">
+                      {COLOR_SWATCHES.map((s) => {
+                        const activeId = colorTarget === "highlight" ? highlightColorId : shadowColorId;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              bumpToEdit();
+                              if (colorTarget === "highlight") {
+                                setHighlightColorId(s.id);
+                                pushHistory({
+                                  selectedId,
+                                  intensity,
+                                  adj: { ...adj },
+                                  highlightColorId: s.id,
+                                  shadowColorId,
+                                });
+                              } else {
+                                setShadowColorId(s.id);
+                                pushHistory({
+                                  selectedId,
+                                  intensity,
+                                  adj: { ...adj },
+                                  highlightColorId,
+                                  shadowColorId: s.id,
+                                });
+                              }
+                            }}
+                            className={cn(
+                              "h-7 w-7 rounded-full border-2",
+                              activeId === s.id ? "border-white shadow-[0_0_0_2px_#FF5A1F] scale-110" : "border-transparent",
+                            )}
+                            style={{ background: `rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})` }}
+                            aria-label={s.id}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <button type="button" onClick={resetAdjust} className="text-center text-xs text-[#6F6862] underline">Reset adjustments</button>
+                <button type="button" disabled={busy || (selected ? !isUnlocked(selected) : true)} onClick={() => void onApply()} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-40">
+                  {busy ? "Applying…" : "Apply filter"}
+                </button>
+              </div>
             )}
           </div>
-
-          {selected ? (
-            <div className="space-y-2 border-t border-white/10 pt-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold">{selected.name}</p>
-                  <p className={cn("truncate text-[11px]", isDark ? "text-white/50" : "text-black/50")}>
-                    {selected.description}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(null)}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full opacity-60"
-                  aria-label="Deselect"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <label className="flex items-center gap-3 text-[11px] font-medium">
-                <span className="w-16 shrink-0 opacity-70">Intensity</span>
-                <input
-                  type="range"
-                  min={selected.intensityMin}
-                  max={selected.intensityMax}
-                  value={intensity}
-                  onChange={(e) => setIntensity(Number(e.target.value))}
-                  className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-orange-500/25 accent-orange-500"
-                />
-                <span className="w-8 text-right tabular-nums text-orange-400">{intensity}</span>
-              </label>
-              <div className="flex gap-2">
-                {!selected.isFree && !isUnlocked(selected.id, selected.isFree) ? (
-                  <button
-                    type="button"
-                    onClick={() => void onUnlock()}
-                    disabled={busy}
-                    className="flex-1 rounded-2xl bg-orange-500 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] disabled:opacity-40"
-                  >
-                    Unlock · {selected.unlockCost} credits
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void onApply()}
-                    disabled={busy || !file}
-                    className="flex-1 rounded-2xl bg-orange-500 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] disabled:opacity-40"
-                  >
-                    {busy ? "Working…" : file ? "Apply filter" : "Upload image first"}
-                  </button>
-                )}
-                {resultUrl ? (
-                  <button
-                    type="button"
-                    onClick={() => void triggerBrowserDownload(resultUrl, `motio2edit-${selected.id}.jpg`)}
-                    className={cn(
-                      "grid h-11 w-11 place-items-center rounded-2xl border",
-                      isDark ? "border-white/15 bg-white/10" : "border-black/10 bg-white/70",
-                    )}
-                    aria-label="Download"
-                  >
-                    <Download className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <p className={cn("pb-1 text-center text-[11px]", isDark ? "text-white/40" : "text-black/40")}>
-              Upload a photo · pick a floating filter · adjust intensity
-            </p>
-          )}
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }
