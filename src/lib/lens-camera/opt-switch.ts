@@ -37,6 +37,7 @@ export function applyLensById(
     case "lens_glowmist":
       return glowMist(base);
     case "lens_vintage_halation":
+    case "lens_vintage_grade":
       return vintage(base);
     case "lens_infraglow":
       return infrared(base);
