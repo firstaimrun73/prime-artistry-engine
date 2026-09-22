@@ -1,15 +1,19 @@
 /**
  * Shared on-device face tracking for Lens AR overlays.
- * - Prefer browser FaceDetector (Shape Detection API) when available.
- * - Fallback: multi-scale skin-tone detection + dark-spot eye refinement.
- * - No network, no external APIs, no frame uploads.
- * - Temporal smoother for live preview stability.
+ *
+ * Primary: MediaPipe Face Landmarker (WASM, @mediapipe/tasks-vision)
+ *   - 478 real landmarks, facial transformation matrix
+ *   - Inference runs entirely in the browser; camera frames never leave the device
+ *   - Model WASM files are fetched once from the official CDN (not a tracking API)
+ *
+ * Fallback: YCbCr skin bounds + dark-spot eye refine (only if MediaPipe fails to load)
+ *
+ * No paid APIs, no API keys, no remote frame upload.
  */
 
 export type FacePoint = { x: number; y: number };
 
 export type FaceLandmarks = {
-  /** Normalized face bounding box in source pixel space */
   bounds: { x: number; y: number; w: number; h: number };
   faceCentre: FacePoint;
   forehead: FacePoint;
@@ -18,37 +22,240 @@ export type FaceLandmarks = {
   rightEye: FacePoint;
   leftEyeOuter: FacePoint;
   rightEyeOuter: FacePoint;
-  /** Approx scale = face width in px */
+  /** Face width in source pixels */
   scale: number;
-  /** Roll in radians (positive = clockwise), estimated */
+  /** Roll radians (positive = clockwise) */
   roll: number;
-  /** Pitch proxy -1..1 (positive = looking up), weak estimate */
+  /** Pitch proxy roughly -1..1 */
   pitch: number;
-  /** 0..1 confidence */
+  /** Yaw proxy roughly -1..1 */
+  yaw: number;
   confidence: number;
-  /** detector used */
-  source: "facedetector" | "skin" | "fallback";
+  source: "mediapipe" | "skin" | "fallback";
 };
 
-type FaceDetectorLike = {
-  detect: (source: CanvasImageSource) => Promise<Array<{ boundingBox: DOMRectReadOnly }>>;
+// --- MediaPipe Face Mesh landmark indices (canonical face model) ---
+const IDX = {
+  forehead: 10,
+  foreheadUpper: 9,
+  noseTip: 1,
+  chin: 152,
+  leftOuter: 33,
+  leftInner: 133,
+  leftUpper: 159,
+  leftLower: 145,
+  rightOuter: 263,
+  rightInner: 362,
+  rightUpper: 386,
+  rightLower: 374,
+  leftCheek: 234,
+  rightCheek: 454,
+} as const;
+
+const WASM_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm";
+const MODEL_URL =
+  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+
+type LandmarkList = Array<{ x: number; y: number; z?: number }>;
+
+type FaceLandmarkerInstance = {
+  detect: (image: HTMLCanvasElement | HTMLVideoElement | HTMLImageElement) => {
+    faceLandmarks: LandmarkList[];
+    facialTransformationMatrixes?: Array<{ data: Float32Array | number[] }>;
+  };
+  detectForVideo: (
+    image: HTMLCanvasElement | HTMLVideoElement | HTMLImageElement,
+    timestampMs: number,
+  ) => {
+    faceLandmarks: LandmarkList[];
+    facialTransformationMatrixes?: Array<{ data: Float32Array | number[] }>;
+  };
+  close?: () => void;
 };
 
-let detectorPromise: Promise<FaceDetectorLike | null> | null = null;
+let landmarker: FaceLandmarkerInstance | null = null;
+let initPromise: Promise<FaceLandmarkerInstance | null> | null = null;
+let initFailed = false;
+let videoTimestamp = 0;
 
-function getFaceDetector(): Promise<FaceDetectorLike | null> {
-  if (detectorPromise) return detectorPromise;
-  detectorPromise = (async () => {
+function avgPt(lms: LandmarkList, indices: number[], W: number, H: number): FacePoint {
+  let x = 0;
+  let y = 0;
+  let n = 0;
+  for (const i of indices) {
+    const p = lms[i];
+    if (!p) continue;
+    x += p.x * W;
+    y += p.y * H;
+    n++;
+  }
+  if (n === 0) return { x: W * 0.5, y: H * 0.5 };
+  return { x: x / n, y: y / n };
+}
+
+function pt(lms: LandmarkList, i: number, W: number, H: number): FacePoint {
+  const p = lms[i];
+  if (!p) return { x: W * 0.5, y: H * 0.5 };
+  return { x: p.x * W, y: p.y * H };
+}
+
+/** Extract roll/pitch/yaw from 4x4 column-major facial transformation matrix. */
+function poseFromMatrix(data: Float32Array | number[] | undefined): {
+  roll: number;
+  pitch: number;
+  yaw: number;
+} {
+  if (!data || data.length < 16) return { roll: 0, pitch: 0, yaw: 0 };
+  const r00 = data[0];
+  const r01 = data[4];
+  const r02 = data[8];
+  const r10 = data[1];
+  const r11 = data[5];
+  const r12 = data[9];
+  const r20 = data[2];
+  const r21 = data[6];
+  const r22 = data[10];
+  const pitch = Math.asin(Math.max(-1, Math.min(1, -r12)));
+  const roll = Math.atan2(r02, r22);
+  const yaw = Math.atan2(r10, r11);
+  return { roll, pitch, yaw };
+}
+
+function landmarksFromMediaPipe(
+  lms: LandmarkList,
+  matrix: Float32Array | number[] | undefined,
+  W: number,
+  H: number,
+): FaceLandmarks {
+  const leftEye = avgPt(lms, [IDX.leftOuter, IDX.leftInner, IDX.leftUpper, IDX.leftLower], W, H);
+  const rightEye = avgPt(
+    lms,
+    [IDX.rightOuter, IDX.rightInner, IDX.rightUpper, IDX.rightLower],
+    W,
+    H,
+  );
+  const leftOuter = pt(lms, IDX.leftOuter, W, H);
+  const rightOuter = pt(lms, IDX.rightOuter, W, H);
+  const forehead = pt(lms, IDX.forehead, W, H);
+  const foreheadUpper = pt(lms, IDX.foreheadUpper, W, H);
+  const chin = pt(lms, IDX.chin, W, H);
+  const leftCheek = pt(lms, IDX.leftCheek, W, H);
+  const rightCheek = pt(lms, IDX.rightCheek, W, H);
+  const nose = pt(lms, IDX.noseTip, W, H);
+
+  const xs = [leftCheek.x, rightCheek.x, leftOuter.x, rightOuter.x, forehead.x, chin.x];
+  const ys = [foreheadUpper.y, forehead.y, chin.y, leftOuter.y, rightOuter.y];
+  let minX = Math.min(...xs);
+  let maxX = Math.max(...xs);
+  let minY = Math.min(...ys);
+  let maxY = Math.max(...ys);
+  const padX = (maxX - minX) * 0.08;
+  const padYTop = (maxY - minY) * 0.18;
+  minX = Math.max(0, minX - padX);
+  maxX = Math.min(W, maxX + padX);
+  minY = Math.max(0, minY - padYTop);
+  maxY = Math.min(H, maxY + (maxY - minY) * 0.05);
+
+  const scale = Math.max(8, maxX - minX);
+  const pose = poseFromMatrix(matrix);
+
+  let roll = pose.roll;
+  if (!matrix || matrix.length < 16) {
+    roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x);
+  }
+
+  const midX = (leftEye.x + rightEye.x) * 0.5;
+  const headTop = {
+    x: forehead.x * 0.7 + midX * 0.3,
+    y: Math.min(foreheadUpper.y, forehead.y) - scale * 0.12,
+  };
+
+  return {
+    bounds: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
+    faceCentre: { x: nose.x, y: (forehead.y + chin.y) * 0.5 },
+    forehead,
+    headTop,
+    leftEye,
+    rightEye,
+    leftEyeOuter: leftOuter,
+    rightEyeOuter: rightOuter,
+    scale,
+    roll,
+    pitch: pose.pitch,
+    yaw: pose.yaw,
+    confidence: 0.95,
+    source: "mediapipe",
+  };
+}
+
+/**
+ * Lazy-init MediaPipe Face Landmarker (browser only).
+ * Model + WASM download once; all subsequent inference is local.
+ */
+export function ensureFaceLandmarker(): Promise<FaceLandmarkerInstance | null> {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (landmarker) return Promise.resolve(landmarker);
+  if (initFailed) return Promise.resolve(null);
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
     try {
-      const FD = (globalThis as unknown as { FaceDetector?: new (opts?: { fastMode?: boolean; maxDetectedFaces?: number }) => FaceDetectorLike }).FaceDetector;
-      if (!FD) return null;
-      return new FD({ fastMode: true, maxDetectedFaces: 1 });
-    } catch {
+      const vision = await import("@mediapipe/tasks-vision");
+      const { FaceLandmarker, FilesetResolver } = vision;
+      const fileset = await FilesetResolver.forVisionTasks(WASM_CDN);
+      const fl = await FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: {
+          modelAssetPath: MODEL_URL,
+          delegate: "GPU",
+        },
+        runningMode: "IMAGE",
+        numFaces: 1,
+        outputFaceBlendshapes: false,
+        outputFacialTransformationMatrixes: true,
+      });
+      landmarker = fl as unknown as FaceLandmarkerInstance;
+      return landmarker;
+    } catch (err) {
+      console.warn("[face-track] MediaPipe Face Landmarker init failed; using skin fallback", err);
+      initFailed = true;
+      landmarker = null;
       return null;
     }
   })();
-  return detectorPromise;
+
+  return initPromise;
 }
+
+function detectWithLandmarker(
+  src: HTMLCanvasElement | HTMLVideoElement | HTMLImageElement,
+  fl: FaceLandmarkerInstance,
+): FaceLandmarks | null {
+  const W =
+    src instanceof HTMLVideoElement
+      ? src.videoWidth
+      : src instanceof HTMLImageElement
+        ? src.naturalWidth || src.width
+        : src.width;
+  const H =
+    src instanceof HTMLVideoElement
+      ? src.videoHeight
+      : src instanceof HTMLImageElement
+        ? src.naturalHeight || src.height
+        : src.height;
+  if (W < 16 || H < 16) return null;
+
+  try {
+    const result = fl.detect(src);
+    const faces = result?.faceLandmarks;
+    if (!faces || faces.length === 0) return null;
+    const matrix = result.facialTransformationMatrixes?.[0]?.data;
+    return landmarksFromMediaPipe(faces[0], matrix, W, H);
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Skin fallback (only when MediaPipe unavailable) ----------
 
 function isSkin(r: number, g: number, b: number): boolean {
   const y = 0.299 * r + 0.587 * g + 0.114 * b;
@@ -57,18 +264,25 @@ function isSkin(r: number, g: number, b: number): boolean {
   return y > 40 && y < 240 && cb > 77 && cb < 127 && cr > 133 && cr < 173;
 }
 
-function skinBoundsFromImageData(
-  d: Uint8ClampedArray,
-  W: number,
-  H: number,
-): { x: number; y: number; w: number; h: number; score: number } | null {
+function skinFallback(src: HTMLCanvasElement): FaceLandmarks | null {
+  const W = src.width;
+  const H = src.height;
+  if (W < 16 || H < 16) return null;
+  let img: ImageData;
+  try {
+    const ctx = src.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    img = ctx.getImageData(0, 0, W, H);
+  } catch {
+    return null;
+  }
+  const d = img.data;
   const cell = Math.max(3, Math.floor(Math.min(W, H) / 48));
   let best = 0;
   let bx = 0;
   let by = 0;
   let bw = cell * 5;
   let bh = cell * 6;
-
   for (let y = 0; y < H - cell; y += cell) {
     for (let x = 0; x < W - cell; x += cell) {
       let skin = 0;
@@ -90,9 +304,7 @@ function skinBoundsFromImageData(
       }
     }
   }
-
   if (best < 0.28) return null;
-
   const padX = Math.floor(bw * 0.55);
   const padYTop = Math.floor(bh * 0.75);
   const padYBot = Math.floor(bh * 0.55);
@@ -100,206 +312,71 @@ function skinBoundsFromImageData(
   const y = Math.max(0, by - padYTop);
   const w = Math.min(W - x, bw + padX * 2);
   const h = Math.min(H - y, bh + padYTop + padYBot);
-  return { x, y, w, h, score: best };
-}
-
-function refineEyes(
-  d: Uint8ClampedArray,
-  W: number,
-  H: number,
-  box: { x: number; y: number; w: number; h: number },
-): { left: FacePoint; right: FacePoint; roll: number } {
-  const eyeBandY0 = Math.floor(box.y + box.h * 0.28);
-  const eyeBandY1 = Math.floor(box.y + box.h * 0.52);
-  const step = Math.max(2, Math.floor(box.w / 40));
-
-  let leftBest = Infinity;
-  let rightBest = Infinity;
-  let lx = box.x + box.w * 0.32;
-  let ly = box.y + box.h * 0.38;
-  let rx = box.x + box.w * 0.68;
-  let ry = box.y + box.h * 0.38;
-
-  for (let y = eyeBandY0; y < eyeBandY1; y += step) {
-    for (let x = Math.floor(box.x + box.w * 0.08); x < Math.floor(box.x + box.w * 0.48); x += step) {
-      if (x < 0 || y < 0 || x >= W || y >= H) continue;
-      const i = (y * W + x) * 4;
-      const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-      if (luma < leftBest) {
-        leftBest = luma;
-        lx = x;
-        ly = y;
-      }
-    }
-    for (let x = Math.floor(box.x + box.w * 0.52); x < Math.floor(box.x + box.w * 0.92); x += step) {
-      if (x < 0 || y < 0 || x >= W || y >= H) continue;
-      const i = (y * W + x) * 4;
-      const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-      if (luma < rightBest) {
-        rightBest = luma;
-        rx = x;
-        ry = y;
-      }
-    }
-  }
-
-  if (rx - lx < box.w * 0.12) {
-    lx = box.x + box.w * 0.32;
-    rx = box.x + box.w * 0.68;
-    ly = ry = box.y + box.h * 0.38;
-  }
-
-  const roll = Math.atan2(ry - ly, rx - lx);
+  const leftEye = { x: x + w * 0.32, y: y + h * 0.38 };
+  const rightEye = { x: x + w * 0.68, y: y + h * 0.38 };
   return {
-    left: { x: lx, y: ly },
-    right: { x: rx, y: ry },
-    roll,
-  };
-}
-
-function landmarksFromBox(
-  box: { x: number; y: number; w: number; h: number },
-  eyes: { left: FacePoint; right: FacePoint; roll: number },
-  confidence: number,
-  source: FaceLandmarks["source"],
-): FaceLandmarks {
-  const faceCentre = { x: box.x + box.w * 0.5, y: box.y + box.h * 0.48 };
-  const forehead = {
-    x: (eyes.left.x + eyes.right.x) * 0.5,
-    y: Math.min(eyes.left.y, eyes.right.y) - box.h * 0.22,
-  };
-  const headTop = {
-    x: forehead.x,
-    y: box.y + box.h * 0.02,
-  };
-  const eyeSpan = Math.max(8, eyes.right.x - eyes.left.x);
-  return {
-    bounds: box,
-    faceCentre,
-    forehead,
-    headTop,
-    leftEye: eyes.left,
-    rightEye: eyes.right,
-    leftEyeOuter: { x: eyes.left.x - eyeSpan * 0.18, y: eyes.left.y },
-    rightEyeOuter: { x: eyes.right.x + eyeSpan * 0.18, y: eyes.right.y },
-    scale: box.w,
-    roll: eyes.roll,
+    bounds: { x, y, w, h },
+    faceCentre: { x: x + w * 0.5, y: y + h * 0.48 },
+    forehead: { x: x + w * 0.5, y: y + h * 0.18 },
+    headTop: { x: x + w * 0.5, y: y + h * 0.02 },
+    leftEye,
+    rightEye,
+    leftEyeOuter: { x: x + w * 0.22, y: y + h * 0.38 },
+    rightEyeOuter: { x: x + w * 0.78, y: y + h * 0.38 },
+    scale: w,
+    roll: 0,
     pitch: 0,
-    confidence,
-    source,
+    yaw: 0,
+    confidence: Math.min(0.55, 0.3 + best * 0.4),
+    source: "skin",
   };
-}
-
-function readPixels(src: HTMLCanvasElement): ImageData | null {
-  try {
-    const ctx = src.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return null;
-    return ctx.getImageData(0, 0, src.width, src.height);
-  } catch {
-    return null;
-  }
 }
 
 /**
- * Detect a single face + landmarks on a canvas.
- * Always returns null on total failure (caller must handle no-face).
+ * Async detect — prefers MediaPipe (initializes on first call).
+ * Returns null when no face is found.
  */
 export async function detectFaceLandmarks(
   src: HTMLCanvasElement,
-  opts?: { preferDetector?: boolean },
+  _opts?: { preferDetector?: boolean },
 ): Promise<FaceLandmarks | null> {
-  const W = src.width;
-  const H = src.height;
-  if (W < 16 || H < 16) return null;
-
-  const preferDetector = opts?.preferDetector !== false;
-  let box: { x: number; y: number; w: number; h: number } | null = null;
-  let confidence = 0.4;
-  let source: FaceLandmarks["source"] = "fallback";
-
-  if (preferDetector) {
-    try {
-      const det = await getFaceDetector();
-      if (det) {
-        const faces = await det.detect(src);
-        if (faces && faces.length > 0) {
-          const b = faces[0].boundingBox;
-          box = {
-            x: Math.max(0, Math.floor(b.x)),
-            y: Math.max(0, Math.floor(b.y)),
-            w: Math.min(W, Math.floor(b.width)),
-            h: Math.min(H, Math.floor(b.height)),
-          };
-          confidence = 0.85;
-          source = "facedetector";
-        }
-      }
-    } catch {
-      /* fall through */
-    }
+  const fl = await ensureFaceLandmarker();
+  if (fl) {
+    const mp = detectWithLandmarker(src, fl);
+    if (mp) return mp;
+    return null;
   }
-
-  const img = readPixels(src);
-  if (!img) {
-    if (!box) {
-      box = {
-        x: Math.floor(W * 0.28),
-        y: Math.floor(H * 0.12),
-        w: Math.floor(W * 0.44),
-        h: Math.floor(H * 0.5),
-      };
-      confidence = 0.15;
-      source = "fallback";
-    }
-    const eyes = {
-      left: { x: box.x + box.w * 0.32, y: box.y + box.h * 0.38 },
-      right: { x: box.x + box.w * 0.68, y: box.y + box.h * 0.38 },
-      roll: 0,
-    };
-    return landmarksFromBox(box, eyes, confidence, source);
-  }
-
-  if (!box) {
-    const skin = skinBoundsFromImageData(img.data, W, H);
-    if (skin) {
-      box = { x: skin.x, y: skin.y, w: skin.w, h: skin.h };
-      confidence = Math.min(0.75, 0.35 + skin.score * 0.5);
-      source = "skin";
-    } else {
-      return null;
-    }
-  }
-
-  const eyes = refineEyes(img.data, W, H, box);
-  return landmarksFromBox(box, eyes, confidence, source);
+  return skinFallback(src);
 }
 
-/** Synchronous path using skin only (for tight live loops when async is costly). */
+/**
+ * Sync detect for tight live loops.
+ * Uses MediaPipe when already initialized; otherwise triggers init and uses skin fallback once.
+ */
 export function detectFaceLandmarksSync(src: HTMLCanvasElement): FaceLandmarks | null {
-  const W = src.width;
-  const H = src.height;
-  if (W < 16 || H < 16) return null;
-  const img = readPixels(src);
-  if (!img) return null;
-  const skin = skinBoundsFromImageData(img.data, W, H);
-  if (!skin) return null;
-  const box = { x: skin.x, y: skin.y, w: skin.w, h: skin.h };
-  const eyes = refineEyes(img.data, W, H, box);
-  return landmarksFromBox(box, eyes, Math.min(0.7, 0.35 + skin.score * 0.45), "skin");
+  if (landmarker) {
+    const mp = detectWithLandmarker(src, landmarker);
+    if (mp) return mp;
+    return null;
+  }
+  if (typeof window !== "undefined" && !initFailed && !initPromise) {
+    void ensureFaceLandmarker();
+  }
+  return skinFallback(src);
+}
+
+/** Whether MediaPipe landmarker is ready for real landmark inference. */
+export function isMediaPipeReady(): boolean {
+  return landmarker != null;
 }
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
-
 function lerpPt(a: FacePoint, b: FacePoint, t: number): FacePoint {
   return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
 }
 
-/**
- * Temporal smoother for live RAF loops.
- * Call `push` with each new detection; `current` is the stable result.
- */
 export class FaceTrackSmoother {
   private prev: FaceLandmarks | null = null;
   private miss = 0;
@@ -307,7 +384,7 @@ export class FaceTrackSmoother {
   private readonly maxMiss: number;
 
   constructor(opts?: { alpha?: number; maxMiss?: number }) {
-    this.alpha = opts?.alpha ?? 0.35;
+    this.alpha = opts?.alpha ?? 0.4;
     this.maxMiss = opts?.maxMiss ?? 8;
   }
 
@@ -344,6 +421,7 @@ export class FaceTrackSmoother {
       scale: lerp(p.scale, next.scale, t),
       roll: lerp(p.roll, next.roll, t),
       pitch: lerp(p.pitch, next.pitch, t),
+      yaw: lerp(p.yaw ?? 0, next.yaw ?? 0, t),
       confidence: lerp(p.confidence, next.confidence, t),
       source: next.source,
     };
@@ -361,7 +439,6 @@ export class FaceTrackSmoother {
   }
 }
 
-/** Downscale canvas for cheaper tracking (caller draws video/image into this). */
 export function createTrackCanvas(maxEdge = 320): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = maxEdge;
@@ -389,7 +466,6 @@ export function drawScaledForTrack(
   return { scaleX: srcW / tw, scaleY: srcH / th };
 }
 
-/** Map landmarks from track-canvas space back to full-resolution space. */
 export function scaleLandmarks(
   lm: FaceLandmarks,
   scaleX: number,
@@ -413,7 +489,21 @@ export function scaleLandmarks(
     scale: lm.scale * scaleX,
     roll: lm.roll,
     pitch: lm.pitch,
+    yaw: lm.yaw ?? 0,
     confidence: lm.confidence,
     source: lm.source,
   };
+}
+
+/** Release MediaPipe resources (call on leave Lens Studio). */
+export function disposeFaceLandmarker(): void {
+  try {
+    landmarker?.close?.();
+  } catch {
+    /* ignore */
+  }
+  landmarker = null;
+  initPromise = null;
+  initFailed = false;
+  videoTimestamp = 0;
 }
