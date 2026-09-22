@@ -148,3 +148,53 @@ function ApertureLoader() {
           .m2e-blade { animation-duration: 2.4s; }
         }
       `}</style>
+      <svg viewBox="-50 -50 100 100" className="h-full w-full">
+        <defs>
+          <clipPath id="m2e-iris-clip">
+            <circle r="45" />
+          </clipPath>
+        </defs>
+        <circle r="46" fill="rgba(0,0,0,0.35)" />
+        <g clipPath="url(#m2e-iris-clip)">
+          {blades.map((i) => (
+            <g key={i} transform={`rotate(${i * 60})`}>
+              <rect className="m2e-blade" x="0" y="-70" width="140" height="140" fill="#17171a" stroke="rgba(255,255,255,0.6)" strokeWidth="0.9" />
+            </g>
+          ))}
+        </g>
+        <circle r="46" fill="none" stroke="white" strokeOpacity="0.9" strokeWidth="2.5" />
+      </svg>
+    </div>
+  );
+}
+
+export function LensEditor({ initialLensId }: { initialLensId?: string }) {
+  const { user } = useAuth();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const liveCanvasRef = useRef<HTMLCanvasElement>(null);
+  const liveRafRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const didAutoStart = useRef(false);
+  const swipeStartX = useRef<number | null>(null);
+  const swipeStartY = useRef<number | null>(null);
+  const resultVariantsRef = useRef<{ wm?: string; clean?: string }>({});
+  const resultSourceRef = useRef<HTMLCanvasElement | null>(null);
+  const shutterLockRef = useRef(false);
+  const dateTimeTextRef = useRef("");
+  const nameChipTimer = useRef<number | null>(null);
+
+  const resolvedInitial =
+    initialLensId && getCameraLensById(initialLensId) ? initialLensId : DEFAULT_FREE_LENS;
+
+  const [phase, setPhase] = useState<"idle" | "ready" | "processing" | "result">("idle");
+  const [cameraOn, setCameraOn] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [lensId, setLensId] = useState<string | null>(resolvedInitial);
+  const lens = useMemo(() => (lensId ? getCameraLensById(lensId) ?? null : null), [lensId]);
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [nameChip, setNameChip] = useState<string | null>(null);
+  const [isPaid, setIsPaid] = useState(false);
