@@ -1,0 +1,297 @@
+name: Patch LensEditor carousel FarReach performance
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch LensEditor.tsx
+        run: |
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("src/components/lens-camera/LensEditor.tsx")
+          text = p.read_text()
+          assert "LensEditor restore incomplete" not in text and len(text) > 20000
+
+          text = text.replace(
+          '''import {
+            CAMERA_LENS_ROSTER,
+            getCameraLensById,
+            isAiLens,
+            LENS_INFO,
+            type CameraLensDef,
+          } from "@/lib/lens-camera/roster";''',
+          '''import {
+            CAMERA_LENS_ROSTER,
+            getCameraLensById,
+            getMainCameraCarousel,
+            isAiLens,
+            LENS_INFO,
+            type CameraLensDef,
+          } from "@/lib/lens-camera/roster";'''
+          )
+
+          text = text.replace(
+            'const DEFAULT_FREE_LENS = "lens_natural_frame";',
+            'const DEFAULT_FREE_LENS = "lens_crown";'
+          )
+          text = text.replace(
+            'const ORDERED_ROSTER = CAMERA_LENS_ROSTER;',
+            'const ORDERED_ROSTER = getMainCameraCarousel();'
+          )
+
+          if "FACE_HEAVY_LENS_IDS" not in text:
+            text = text.replace(
+          '''const LIGHTWEIGHT_LENS_IDS = new Set([
+            "lens_hd_4k",
+            "lens_windows_colour",
+            "lens_date_time",
+            "lens_snake_view",
+            "lens_retro_80s",
+          ]);''',
+          '''const LIGHTWEIGHT_LENS_IDS = new Set([
+            "lens_hd_4k",
+            "lens_windows_colour",
+            "lens_date_time",
+            "lens_snake_view",
+            "lens_retro_80s",
+            "lens_colour_negative",
+            "lens_vintage_halation",
+            "lens_crayon",
+            "lens_fairytale",
+          ]);
+
+          const FACE_HEAVY_LENS_IDS = new Set([
+            "lens_crown",
+            "lens_thunder_eyes",
+            "lens_hair_shades",
+            "lens_butterfly",
+          ]);'''
+            )
+
+          if "hwZoomSupported" not in text:
+            text = text.replace(
+              'const [farZoom, setFarZoom] = useState(12);',
+              '''const [farZoom, setFarZoom] = useState(1);
+            const [zoomMin, setZoomMin] = useState(1);
+            const [zoomMax, setZoomMax] = useState(1);
+            const [hwZoomSupported, setHwZoomSupported] = useState(false);'''
+            )
+
+          old_caps = '''      try {
+                  const track = stream.getVideoTracks()[0];
+                  const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
+                  setTorchSupported(mode === "environment" && Boolean(capabilities?.torch));
+                } catch {
+                  setTorchSupported(false);
+                }'''
+          new_caps = '''      try {
+                  const track = stream.getVideoTracks()[0];
+                  const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & {
+                    torch?: boolean;
+                    zoom?: { min?: number; max?: number; step?: number };
+                  };
+                  setTorchSupported(mode === "environment" && Boolean(capabilities?.torch));
+                  const z = capabilities?.zoom;
+                  if (z && typeof z.max === "number" && z.max > 1) {
+                    const zMin = typeof z.min === "number" ? z.min : 1;
+                    const zMax = z.max;
+                    setZoomMin(zMin);
+                    setZoomMax(zMax);
+                    setHwZoomSupported(true);
+                    setFarZoom((prev) => Math.min(zMax, Math.max(zMin, prev > 1 ? prev : Math.min(zMax, Math.max(zMin, 2)))));
+                  } else {
+                    setZoomMin(1);
+                    setZoomMax(8);
+                    setHwZoomSupported(false);
+                    setFarZoom((prev) => Math.min(8, Math.max(1, prev)));
+                  }
+                } catch {
+                  setTorchSupported(false);
+                  setHwZoomSupported(false);
+                  setZoomMin(1);
+                  setZoomMax(8);
+                }'''
+          if old_caps in text:
+            text = text.replace(old_caps, new_caps)
+
+          old_live = '''    const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
+              const light = lens ? LIGHTWEIGHT_LENS_IDS.has(lens.id) : false;
+              const LIVE_MAX_W = heavy ? 560 : light ? 720 : 960;
+              let frame = 0;
+              const tmp = document.createElement("canvas");
+              const tick = () => {
+                if (!video.videoWidth || !video.videoHeight) {
+                  liveRafRef.current = requestAnimationFrame(tick);
+                  return;
+                }
+                frame++;
+                if (heavy && frame % 3 === 0) {
+                  liveRafRef.current = requestAnimationFrame(tick);
+                  return;
+                }'''
+          new_live = '''    const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
+              const faceHeavy = lens ? FACE_HEAVY_LENS_IDS.has(lens.id) : false;
+              const light = lens ? LIGHTWEIGHT_LENS_IDS.has(lens.id) : false;
+              const LIVE_MAX_W = heavy ? 480 : faceHeavy ? 560 : light ? 720 : 880;
+              let frame = 0;
+              const tmp = document.createElement("canvas");
+              const tick = () => {
+                if (!video.videoWidth || !video.videoHeight) {
+                  liveRafRef.current = requestAnimationFrame(tick);
+                  return;
+                }
+                frame++;
+                if ((heavy || faceHeavy) && frame % (faceHeavy ? 3 : 2) !== 0) {
+                  liveRafRef.current = requestAnimationFrame(tick);
+                  return;
+                }'''
+          if old_live in text:
+            text = text.replace(old_live, new_live)
+          else:
+            old_basic = '''    const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
+              const light = lens ? LIGHTWEIGHT_LENS_IDS.has(lens.id) : false;
+              const LIVE_MAX_W = heavy ? 560 : light ? 720 : 960;
+              let frame = 0;
+              const tmp = document.createElement("canvas");
+              const tick = () => {
+                if (!video.videoWidth || !video.videoHeight) {
+                  liveRafRef.current = requestAnimationFrame(tick);
+                  return;
+                }'''
+            if old_basic in text:
+              text = text.replace(old_basic, '''    const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
+              const faceHeavy = lens ? FACE_HEAVY_LENS_IDS.has(lens.id) : false;
+              const light = lens ? LIGHTWEIGHT_LENS_IDS.has(lens.id) : false;
+              const LIVE_MAX_W = heavy ? 480 : faceHeavy ? 560 : light ? 720 : 880;
+              let frame = 0;
+              const tmp = document.createElement("canvas");
+              const tick = () => {
+                if (!video.videoWidth || !video.videoHeight) {
+                  liveRafRef.current = requestAnimationFrame(tick);
+                  return;
+                }
+                frame++;
+                if ((heavy || faceHeavy) && frame % (faceHeavy ? 3 : 2) !== 0) {
+                  liveRafRef.current = requestAnimationFrame(tick);
+                  return;
+                }''')
+
+          if 'id === "lens_farreach"' not in text or "FarReach needs the rear camera" not in text:
+            old_sel = '''      if (sourceUrl) {
+                  setPhase("ready");
+                } else {
+                  setPhase(cameraOn ? "ready" : "idle");
+                }
+              },
+              [cameraOn, clearResultVariants, showLensName, sourceUrl, lensId],
+            );'''
+            new_sel = '''      // FarReach: rear/environment camera ONLY — never front
+                if (id === "lens_farreach") {
+                  if (facingMode !== "environment") {
+                    void startCamera("environment").catch(() => {
+                      toast.error("FarReach needs the rear camera");
+                    });
+                  }
+                }
+                if (sourceUrl) {
+                  setPhase("ready");
+                } else {
+                  setPhase(cameraOn ? "ready" : "idle");
+                }
+              },
+              [cameraOn, clearResultVariants, showLensName, sourceUrl, lensId, facingMode, startCamera],
+            );'''
+            if old_sel in text:
+              text = text.replace(old_sel, new_sel)
+
+          old_slider = '''            {lensId === "lens_farreach" && (
+                        <div className="w-[9.5rem] rounded-xl bg-black/60 px-3 py-2 backdrop-blur-md">
+                          <p className="mb-1 text-center text-[10px] font-semibold text-white/80">Zoom {farZoom}×</p>
+                          <input
+                            type="range"
+                            min={1}
+                            max={100}
+                            value={farZoom}
+                            onChange={(e) => setFarZoom(Number(e.target.value))}
+                            className="w-full accent-amber-400"
+                            aria-label="FarReach zoom"
+                          />
+                        </div>
+                      )}'''
+          new_slider = '''            {lensId === "lens_farreach" && (
+                        <div className="w-[9.5rem] rounded-xl bg-black/60 px-3 py-2 backdrop-blur-md">
+                          <p className="mb-1 text-center text-[10px] font-semibold text-white/80">
+                            Zoom {Number(farZoom).toFixed(1)}×{hwZoomSupported ? "" : " (digital)"}
+                          </p>
+                          <input
+                            type="range"
+                            min={zoomMin}
+                            max={zoomMax}
+                            step={hwZoomSupported ? 0.1 : 0.5}
+                            value={farZoom}
+                            onChange={(e) => {
+                              const z = Number(e.target.value);
+                              setFarZoom(z);
+                              if (hwZoomSupported && streamRef.current) {
+                                const track = streamRef.current.getVideoTracks()[0];
+                                try {
+                                  void track?.applyConstraints({ advanced: [{ zoom: z } as MediaTrackConstraintSet] });
+                                } catch {
+                                  /* digital crop fallback via processOpts.zoom */
+                                }
+                              }
+                            }}
+                            className="w-full accent-amber-400"
+                            aria-label="FarReach zoom"
+                          />
+                        </div>
+                      )}'''
+          if old_slider in text:
+            text = text.replace(old_slider, new_slider)
+          elif "max={100}" in text and 'lensId === "lens_farreach"' in text:
+            text = text.replace("max={100}", "max={zoomMax}")
+            text = text.replace("min={1}\n                  max={zoomMax}", "min={zoomMin}\n                  max={zoomMax}")
+
+          p.write_text(text)
+          assert "getMainCameraCarousel()" in text
+          assert "ORDERED_ROSTER = getMainCameraCarousel()" in text
+          assert "ORDERED_ROSTER = CAMERA_LENS_ROSTER" not in text
+          assert "MORE_LENSES_ROUTE" in text
+          assert "getCapabilities" in text
+          assert "max={100}" not in text
+          print("patched OK", len(text))
+          PY
+      - name: Cleanup temporary .restore lens-fix artifacts
+        run: |
+          if [ -d .restore ]; then
+            rm -f .restore/fx.part*.b64 .restore/oe.part*.b64 .restore/le.part*.b64 .restore/src__*.b64 2>/dev/null || true
+            find .restore -name 'fx.part*' -delete 2>/dev/null || true
+            find .restore -name 'manifest.json' -delete 2>/dev/null || true
+            rmdir .restore 2>/dev/null || true
+            echo "cleaned .restore lens-fix staging"
+          fi
+      - name: Verify remote-ready state
+        run: |
+          test -f src/lib/lens-camera/opt-fx-carousel.ts
+          grep -q applyCrown src/lib/lens-camera/opt-fx-carousel.ts
+          grep -q applyCarouselLens src/lib/lens-camera/optical-engine.ts
+          grep -q 'ORDERED_ROSTER = getMainCameraCarousel()' src/components/lens-camera/LensEditor.tsx
+          grep -q getMainCameraCarousel src/components/lens-camera/LensEditor.tsx
+          grep -q MORE_LENSES_ROUTE src/components/lens-camera/LensEditor.tsx
+          grep -q 'zoom?:' src/components/lens-camera/LensEditor.tsx
+          ! grep -q 'max={100}' src/components/lens-camera/LensEditor.tsx
+          ! grep -q 'ORDERED_ROSTER = CAMERA_LENS_ROSTER' src/components/lens-camera/LensEditor.tsx
+          grep -q MAIN_CAMERA_LENS_IDS src/lib/lens-camera/roster.ts
+          echo VERIFY_OK
+      - name: Commit and push
+        run: |
+          git config user.name firstaimrun73
+          git config user.email firstaimrun73@gmail.com
+          git add -A
+          git status --short
+          git commit -m "fix: finalize 10 lens carousel and lens performance" || echo "nothing to commit"
+          git push origin HEAD:main
