@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import {
   CAMERA_LENS_ROSTER,
   getCameraLensById,
+  getMainCameraCarousel,
   isAiLens,
   LENS_INFO,
   type CameraLensDef,
@@ -42,7 +43,7 @@ import {
 } from "@/lib/lens-camera/lens-generation.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 
-const DEFAULT_FREE_LENS = "lens_natural_frame";
+const DEFAULT_FREE_LENS = "lens_crown";
 const HOME_ROUTE = "/" as const;
 const MORE_LENSES_ROUTE = "/studio/image/lenses" as const;
 
@@ -102,7 +103,7 @@ function buildSampleMap(): Record<string, string> {
 }
 
 const SAMPLE_BY_ID = buildSampleMap();
-const ORDERED_ROSTER = CAMERA_LENS_ROSTER;
+const ORDERED_ROSTER = getMainCameraCarousel();
 
 const HEAVY_LENS_IDS = new Set([
   "lens_perspective_stretch",
@@ -119,6 +120,17 @@ const LIGHTWEIGHT_LENS_IDS = new Set([
   "lens_date_time",
   "lens_snake_view",
   "lens_retro_80s",
+  "lens_colour_negative",
+  "lens_vintage_halation",
+  "lens_crayon",
+  "lens_fairytale",
+]);
+
+const FACE_HEAVY_LENS_IDS = new Set([
+  "lens_crown",
+  "lens_thunder_eyes",
+  "lens_hair_shades",
+  "lens_butterfly",
 ]);
 
 function ApertureLoader() {
@@ -192,7 +204,10 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [liveFxOn, setLiveFxOn] = useState(false);
-  const [farZoom, setFarZoom] = useState(12);
+  const [farZoom, setFarZoom] = useState(1);
+  const [zoomMin, setZoomMin] = useState(1);
+  const [zoomMax, setZoomMax] = useState(1);
+  const [hwZoomSupported, setHwZoomSupported] = useState(false);
   const [dateTimeMode, setDateTimeMode] = useState<"date" | "time" | "both">("both");
   const [dateTimeStyle, setDateTimeStyle] = useState<"digital" | "clean" | "mono" | "classic">("clean");
   const [colourNegative, setColourNegative] = useState(false);
@@ -273,10 +288,30 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       await video.play();
       try {
         const track = stream.getVideoTracks()[0];
-        const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
+        const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & {
+          torch?: boolean;
+          zoom?: { min?: number; max?: number; step?: number };
+        };
         setTorchSupported(mode === "environment" && Boolean(capabilities?.torch));
+        const z = capabilities?.zoom;
+        if (z && typeof z.max === "number" && z.max > 1) {
+          const zMin = typeof z.min === "number" ? z.min : 1;
+          const zMax = z.max;
+          setZoomMin(zMin);
+          setZoomMax(zMax);
+          setHwZoomSupported(true);
+          setFarZoom((prev) => Math.min(zMax, Math.max(zMin, prev > 1 ? prev : Math.min(zMax, Math.max(zMin, 2)))));
+        } else {
+          setZoomMin(1);
+          setZoomMax(8);
+          setHwZoomSupported(false);
+          setFarZoom((prev) => Math.min(8, Math.max(1, prev)));
+        }
       } catch {
         setTorchSupported(false);
+        setHwZoomSupported(false);
+        setZoomMin(1);
+        setZoomMax(8);
       }
       setFacingMode(mode);
       setCameraOn(true);
@@ -320,8 +355,9 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     const canvas = liveCanvasRef.current;
     if (!video || !canvas) return;
     const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
+    const faceHeavy = lens ? FACE_HEAVY_LENS_IDS.has(lens.id) : false;
     const light = lens ? LIGHTWEIGHT_LENS_IDS.has(lens.id) : false;
-    const LIVE_MAX_W = heavy ? 560 : light ? 720 : 960;
+    const LIVE_MAX_W = heavy ? 480 : faceHeavy ? 560 : light ? 720 : 880;
     let frame = 0;
     const tmp = document.createElement("canvas");
     const tick = () => {
@@ -330,7 +366,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         return;
       }
       frame++;
-      if (heavy && frame % 3 === 0) {
+      if ((heavy || faceHeavy) && frame % (faceHeavy ? 3 : 2) !== 0) {
         liveRafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -435,13 +471,21 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       } catch {
         /* ignore */
       }
+      // FarReach: rear/environment camera ONLY — never front
+      if (id === "lens_farreach") {
+        if (facingMode !== "environment") {
+          void startCamera("environment").catch(() => {
+            toast.error("FarReach needs the rear camera");
+          });
+        }
+      }
       if (sourceUrl) {
         setPhase("ready");
       } else {
         setPhase(cameraOn ? "ready" : "idle");
       }
     },
-    [cameraOn, clearResultVariants, showLensName, sourceUrl, lensId],
+    [cameraOn, clearResultVariants, showLensName, sourceUrl, lensId, facingMode, startCamera],
   );
 
   const moveLens = useCallback(
@@ -838,13 +882,27 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
             )}
             {lensId === "lens_farreach" && (
               <div className="w-[9.5rem] rounded-xl bg-black/60 px-3 py-2 backdrop-blur-md">
-                <p className="mb-1 text-center text-[10px] font-semibold text-white/80">Zoom {farZoom}×</p>
+                <p className="mb-1 text-center text-[10px] font-semibold text-white/80">
+                  Zoom {Number(farZoom).toFixed(1)}×{hwZoomSupported ? "" : " (digital)"}
+                </p>
                 <input
                   type="range"
-                  min={1}
-                  max={100}
+                  min={zoomMin}
+                  max={zoomMax}
+                  step={hwZoomSupported ? 0.1 : 0.5}
                   value={farZoom}
-                  onChange={(e) => setFarZoom(Number(e.target.value))}
+                  onChange={(e) => {
+                    const z = Number(e.target.value);
+                    setFarZoom(z);
+                    if (hwZoomSupported && streamRef.current) {
+                      const track = streamRef.current.getVideoTracks()[0];
+                      try {
+                        void track?.applyConstraints({ advanced: [{ zoom: z } as MediaTrackConstraintSet] });
+                      } catch {
+                        /* digital crop fallback via processOpts.zoom */
+                      }
+                    }
+                  }}
                   className="w-full accent-amber-400"
                   aria-label="FarReach zoom"
                 />
