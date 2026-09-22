@@ -47,3 +47,54 @@ import { triggerBrowserDownload } from "@/lib/secure-image-download";
 const DEFAULT_FREE_LENS = "lens_crown";
 const HOME_ROUTE = "/" as const;
 const MORE_LENSES_ROUTE = "/studio/image/lenses" as const;
+
+function playShutterClick() {
+  try {
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AC();
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.frequency.value = 880;
+    g.gain.value = 0.04;
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.06);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function loadImage(url: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  await new Promise<void>((res, rej) => {
+    img.onload = () => res();
+    img.onerror = () => rej(new Error("load failed"));
+    img.src = url;
+  });
+  return img;
+}
+
+function lensSlug(id: string): string {
+  return id.replace(/^lens_/, "").replace(/_/g, "").toLowerCase();
+}
+
+function buildSampleMap(): Record<string, string> {
+  const map: Record<string, string> = {};
+  const owner: Record<string, string> = {};
+  for (const s of getLensSampleCards()) {
+    if (!s || !s.lensId || !s.imageUrl || map[s.lensId]) continue;
+    const prev = owner[s.imageUrl];
+    if (prev) {
+      const norm = s.imageUrl.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (norm.includes(lensSlug(s.lensId)) && !norm.includes(lensSlug(prev))) {
+        delete map[prev];
+        map[s.lensId] = s.imageUrl;
+        owner[s.imageUrl] = s.lensId;
+      }
+      continue;
+    }
+    map[s.lensId] = s.imageUrl;
