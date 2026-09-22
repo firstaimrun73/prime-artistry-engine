@@ -1,0 +1,51 @@
+name: Apply Lens Fix
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.restore/**'
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reassemble and commit
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+import base64, json
+from pathlib import Path
+manifest = json.loads(Path('.restore/manifest.json').read_text())
+for item in manifest:
+    prefix = item['prefix']
+    parts = item['parts']
+    path = item['path']
+    b64 = ''
+    for i in range(parts):
+        p = Path(f'.restore/{prefix}.part{i}.b64')
+        if not p.exists():
+            raise SystemExit(f'missing {p}')
+        b64 += p.read_text().strip()
+    data = base64.b64decode(b64)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_bytes(data)
+    print(path, len(data))
+PY
+          test -f src/lib/lens-camera/opt-fx-carousel.ts
+          test -f src/components/lens-camera/LensEditor.tsx
+          SIZE=$(wc -c < src/components/lens-camera/LensEditor.tsx)
+          echo "LE size=$SIZE"
+          test "$SIZE" -gt 30000
+          grep -q getMainCameraCarousel src/components/lens-camera/LensEditor.tsx
+          grep -q applyCrown src/lib/lens-camera/opt-fx-carousel.ts
+          grep -q MAIN_CAMERA_LENS_IDS src/lib/lens-camera/roster.ts
+          ! grep -q 'LensEditor restore incomplete' src/components/lens-camera/LensEditor.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/lib/lens-camera/opt-fx-carousel.ts src/lib/lens-camera/roster.ts src/lib/lens-camera/optical-engine.ts src/components/lens-camera/LensEditor.tsx
+          git status --short
+          git diff --cached --stat
+          git commit -m "fix: finalize lens effects performance and farreach crown" || exit 0
+          git push
