@@ -1,22 +1,22 @@
 [
   {
-    "path": "src/lib/lens-camera/opt-fx-carousel.ts",
-    "parts": 3,
-    "prefix": "src__lib__lens-camera__opt-fx-carousel.ts"
-  },
-  {
     "path": "src/lib/lens-camera/roster.ts",
-    "parts": 3,
-    "prefix": "src__lib__lens-camera__roster.ts"
+    "prefix": "src__lib__lens-camera__roster.ts",
+    "parts": 2
   },
   {
     "path": "src/lib/lens-camera/optical-engine.ts",
-    "parts": 3,
-    "prefix": "src__lib__lens-camera__optical-engine.ts"
+    "prefix": "src__lib__lens-camera__optical-engine.ts",
+    "parts": 2
+  },
+  {
+    "path": "src/lib/lens-camera/opt-fx-carousel.ts",
+    "prefix": "src__lib__lens-camera__opt-fx-carousel.ts",
+    "parts": 4
   },
   {
     "path": "src/components/lens-camera/LensEditor.tsx",
-    "parts": 10,
-    "prefix": "src__components__lens-camera__LensEditor.tsx"
+    "prefix": "src__components__lens-camera__LensEditor.tsx",
+    "parts": 8
   }
 ]
