@@ -4,7 +4,7 @@
  * Continuous Meta-style ring (not dashed). Separate Clear Mask / Clear Image.
  * NO floating pull-down generation lever.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Info, Upload, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -189,15 +189,67 @@ export function CircleEditShell({ creditsLabel, mode, onModeChange, generating, 
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const genLabel = generateLabel || (mode === "remove" ? "Remove Object" : "Add Object");
+
+  // Non-essential tool controls: fade when idle, full opacity on interaction (opacity only).
+  const IDLE_MS = 2800;
+  const IDLE_OPACITY = 0.38;
+  const [toolsIdle, setToolsIdle] = useState(false);
+  const idleTimerRef = useRef<number | null>(null);
+
+  const bumpActivity = useCallback(() => {
+    setToolsIdle(false);
+    if (idleTimerRef.current != null) window.clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = window.setTimeout(() => setToolsIdle(true), IDLE_MS);
+  }, []);
+
+  useEffect(() => {
+    if (generating) {
+      setToolsIdle(false);
+      if (idleTimerRef.current != null) {
+        window.clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+      return;
+    }
+    bumpActivity();
+    const onActivity = () => bumpActivity();
+    window.addEventListener("pointerdown", onActivity, { passive: true });
+    window.addEventListener("pointermove", onActivity, { passive: true });
+    window.addEventListener("keydown", onActivity);
+    window.addEventListener("touchstart", onActivity, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", onActivity);
+      window.removeEventListener("pointermove", onActivity);
+      window.removeEventListener("keydown", onActivity);
+      window.removeEventListener("touchstart", onActivity);
+      if (idleTimerRef.current != null) window.clearTimeout(idleTimerRef.current);
+    };
+  }, [generating, bumpActivity]);
+
+  const idleStyle =
+    !generating && toolsIdle
+      ? { opacity: IDLE_OPACITY, transition: "opacity 0.45s ease" }
+      : { opacity: 1, transition: "opacity 0.25s ease" };
+
   return (
-    <div className={cn("flex h-[100dvh] flex-col overflow-hidden", isDark ? "bg-gradient-to-b from-[#12141A] via-[#14161E] to-[#101218] text-[#F2F2F5]" : "bg-gradient-to-b from-[#F7F8FB] via-[#F2F3F7] to-[#EEEFF4] text-[#1A1C24]")} data-circle-2edit="true" data-theme={theme}>
+    <div
+      className={cn("flex h-[100dvh] flex-col overflow-hidden", isDark ? "bg-gradient-to-b from-[#12141A] via-[#14161E] to-[#101218] text-[#F2F2F5]" : "bg-gradient-to-b from-[#F7F8FB] via-[#F2F3F7] to-[#EEEFF4] text-[#1A1C24]")}
+      data-circle-2edit="true"
+      data-theme={theme}
+      data-tools-idle={toolsIdle && !generating ? "true" : "false"}
+    >
       <header className={cn("flex shrink-0 items-center gap-2.5 border-b px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3", isDark ? "border-white/8 bg-[#181A22]/70 backdrop-blur-xl" : "border-black/[0.05] bg-white/55 backdrop-blur-xl")}>
         <button type="button" onClick={onBack} aria-label="Back" className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl border backdrop-blur-md", isDark ? "border-white/10 bg-white/5 text-[#9AA0B0]" : "border-black/8 bg-white/70 text-[#5C6170]")}><ArrowLeft className="h-4 w-4" /></button>
         <div className="flex min-w-0 flex-1 items-center gap-2.5">{mode !== "add" ? <ContinuousMetaRing size={32} generating={generating} isDark={isDark} /> : null}<Circle2editTitle isDark={isDark} generating={generating} mode={mode} /></div>
         <div className={cn("shrink-0 rounded-xl border px-2.5 py-1 text-[11px] font-medium tabular-nums backdrop-blur-md", isDark ? "border-white/10 bg-white/5" : "border-black/8 bg-white/70")}>{creditsLabel}</div>
       </header>
       {!hideModeToggle && !generating ? (
-        <div className={cn("flex shrink-0 items-center justify-center gap-2 border-b px-3 py-2 sm:px-4", isDark ? "border-white/6 bg-white/[0.02]" : "border-black/[0.04] bg-white/30")}>
+        <div
+          className={cn("flex shrink-0 items-center justify-center gap-2 border-b px-3 py-2 sm:px-4", isDark ? "border-white/6 bg-white/[0.02]" : "border-black/[0.04] bg-white/30")}
+          style={idleStyle}
+          data-circle-idle-fade="mode-toggle"
+          onPointerEnter={bumpActivity}
+        >
           {(["remove", "add"] as const).map((id) => {
             const active = mode === id;
             const locked = id === "add" && !!addLocked;
@@ -206,8 +258,22 @@ export function CircleEditShell({ creditsLabel, mode, onModeChange, generating, 
         </div>
       ) : null}
       <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
-      {controls && !generating ? <div className={cn("shrink-0 border-t px-3 py-2.5 backdrop-blur-xl sm:px-4", isDark ? "border-white/8 bg-[#181A22]/75" : "border-black/[0.05] bg-white/60")} data-circle-toolbar="true">{controls}</div> : null}
-      {!generating ? actionBar : null}
+      {controls && !generating ? (
+        <div
+          className={cn("shrink-0 border-t px-3 py-2.5 backdrop-blur-xl sm:px-4", isDark ? "border-white/8 bg-[#181A22]/75" : "border-black/[0.05] bg-white/60")}
+          data-circle-toolbar="true"
+          data-circle-idle-fade="controls"
+          style={idleStyle}
+          onPointerEnter={bumpActivity}
+        >
+          {controls}
+        </div>
+      ) : null}
+      {!generating && actionBar ? (
+        <div data-circle-idle-fade="action-bar" style={idleStyle} onPointerEnter={bumpActivity}>
+          {actionBar}
+        </div>
+      ) : null}
       {!generating ? sheet : null}
       {onGenerate && !generating ? (
         <div className={cn("flex shrink-0 justify-center border-t px-3 py-3 backdrop-blur-xl", isDark ? "border-white/8 bg-[#181A22]/85" : "border-black/[0.05] bg-white/70")} style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
