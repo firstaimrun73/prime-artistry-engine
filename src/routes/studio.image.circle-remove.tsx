@@ -16,6 +16,7 @@ import { secureDownloadImage } from "@/lib/download.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  CIRCLE_WATERMARK_PURPLE,
   readCircleKeepWatermarkPref,
   writeCircleKeepWatermarkPref,
 } from "@/lib/circle-edit/circle-watermark";
@@ -550,7 +551,6 @@ function Circle2editPage() {
 
   const controls = preview ? (
     <div className="flex flex-col gap-2">
-      {watermarkToggle}
       {mode === "remove" || addConfirmed ? (
         <CircleDrawToolbar
           tool={drawTool}
@@ -709,6 +709,8 @@ function Circle2editPage() {
       </>
     ) : null;
 
+  const showOutputWatermark = watermarkLocked || keepCircleWatermark;
+
   if (phase === "result" && output && preview) {
     return (
       <CircleEditShell
@@ -719,51 +721,91 @@ function Circle2editPage() {
         onBack={goBack}
         controls={null}
         actionBar={
-          <div className="flex w-full flex-wrap items-center justify-center gap-2 px-3 py-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                setPhase("select");
-                setOutput(null);
-              }}
-              className="rounded-xl border px-4 py-2.5 text-sm font-medium backdrop-blur-md"
-            >
-              Edit again
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCompare((v) => !v)}
-              className="rounded-xl border px-4 py-2.5 text-sm font-medium text-[#7B6FE0]"
-            >
-              {showCompare ? "Show result only" : "Compare"}
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                void (async () => {
-                  try {
-                    const res = await secureDl({
-                      data: { imageUrl: output, keepWatermark: watermarkLocked ? true : keepCircleWatermark },
-                    });
-                    await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
-                  } catch (e) {
-                    toast.error(e instanceof Error ? e.message : "Download failed");
-                  }
-                })()
-              }
-              className="rounded-xl bg-[#7B6FE0] px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              Download
-            </button>
+          <div className="flex w-full flex-col items-center gap-2 px-3 py-2.5">
+            {/* Output screen only — watermark toggle never on edit screens */}
+            {watermarkToggle}
+            <div className="flex w-full flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPhase("select");
+                  setOutput(null);
+                }}
+                className="rounded-xl border px-4 py-2.5 text-sm font-medium backdrop-blur-md"
+              >
+                Edit again
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCompare((v) => !v)}
+                className="rounded-xl border px-4 py-2.5 text-sm font-medium text-[#7B6FE0]"
+              >
+                {showCompare ? "Show result only" : "Compare"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void (async () => {
+                    try {
+                      // Static still-frame watermark in export (no animation baked in)
+                      const res = await secureDl({
+                        data: {
+                          imageUrl: output,
+                          keepWatermark: watermarkLocked ? true : keepCircleWatermark,
+                          watermarkBrand: "circle",
+                        },
+                      });
+                      await triggerBrowserDownload(res.downloadUrl, `motio2edit-circle-${Date.now()}.jpg`);
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "Download failed");
+                    }
+                  })()
+                }
+                className="rounded-xl bg-[#7B6FE0] px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                Download
+              </button>
+            </div>
           </div>
         }
       >
         <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center p-3">
-          {showCompare ? (
-            <CompareSlider before={preview} after={output} />
-          ) : (
-            <img src={output} alt="Result" className="max-h-full max-w-full rounded-xl object-contain" />
-          )}
+          <div className="relative inline-flex max-h-full max-w-full items-center justify-center">
+            {showCompare ? (
+              <CompareSlider before={preview} after={output} />
+            ) : (
+              <img src={output} alt="Result" className="max-h-full max-w-full rounded-xl object-contain" />
+            )}
+            {/* On-screen only: rotating circle mark while watermark is shown (export stays static) */}
+            {showOutputWatermark ? (
+              <div
+                className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-lg bg-black/70 px-2 py-1.5 backdrop-blur-sm"
+                aria-hidden
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  className="shrink-0 animate-spin"
+                  style={{ animationDuration: "2.8s", color: CIRCLE_WATERMARK_PURPLE }}
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="8.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.25"
+                    strokeDasharray="12 40"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span className="text-[9px] font-semibold leading-tight text-white">
+                  Motio2edit
+                </span>
+              </div>
+            ) : null}
+          </div>
         </div>
       </CircleEditShell>
     );
