@@ -53,6 +53,16 @@ export function applyLensById(
       return starflare(base);
     case "lens_selective_focus":
       return radialBokeh(grade(base, "contrast(1.14) saturate(1.08)"), 1.05);
+    case "lens_colour_negative":
+      return grade(base, "invert(1) contrast(1.14) saturate(1.18)");
+    case "lens_crown":
+    case "lens_thunder_eyes":
+    case "lens_hair_shades":
+    case "lens_butterfly":
+    case "lens_fairytale":
+    case "lens_crayon":
+      // Handled by optical-engine lightweight path; keep identity fallback
+      return grade(base, "contrast(1.08)");
     default:
       return grade(sharpen(base, 1.0), "contrast(1.12)");
   }
