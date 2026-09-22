@@ -41,7 +41,9 @@ function ContinuousMetaRing({
   generating?: boolean;
   isDark: boolean;
 }) {
-  const stroke = isDark ? "url(#circle2editRingDark)" : "url(#circle2editRingLight)";
+  // Final Circle2edit logo: single clean #7B6FE0 ring, empty center,
+  // animated lavender flame-like motion rotating around the ring.
+  const uid = "c2eLogo";
   return (
     <div
       className="relative grid shrink-0 place-items-center"
@@ -51,69 +53,57 @@ function ContinuousMetaRing({
     >
       <svg viewBox="0 0 32 32" width={size} height={size} className="overflow-visible">
         <defs>
-          <linearGradient id="circle2editRingLight" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#A8A0F0" />
-            <stop offset="45%" stopColor="#7B6FE0" />
-            <stop offset="100%" stopColor="#C8C4E8" />
+          <linearGradient id={`${uid}Flame`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#7B6FE0" stopOpacity="0" />
+            <stop offset="35%" stopColor="#7B6FE0" stopOpacity="0.35" />
+            <stop offset="55%" stopColor="#A89BFF" stopOpacity="0.95" />
+            <stop offset="75%" stopColor="#7B6FE0" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#7B6FE0" stopOpacity="0" />
           </linearGradient>
-          <linearGradient id="circle2editRingDark" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#9B93F0" />
-            <stop offset="50%" stopColor="#7B6FE0" />
-            <stop offset="100%" stopColor="#5C6170" />
-          </linearGradient>
+          <filter id={`${uid}Glow`} x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="1.1" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
+        {/* Base ring outline — solid lavender, empty center */}
         <circle
           cx="16"
           cy="16"
           r="12"
-          fill="none"
-          stroke={stroke}
-          strokeWidth="2"
-          strokeLinecap="round"
-          style={{
-            transformOrigin: "16px 16px",
-            animation: generating
-              ? "circle2edit-ring-spin 2.4s linear infinite"
-              : "circle2edit-ring-spin 8s linear infinite",
-          }}
-        />
-        <circle
-          cx="16"
-          cy="16"
-          r="12"
-          fill="none"
-          stroke={isDark ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.85)"}
-          strokeWidth="1.25"
-          strokeLinecap="round"
-          strokeDasharray="10 66"
-          style={{
-            transformOrigin: "16px 16px",
-            animation: "circle2edit-ring-spin 8s linear infinite",
-          }}
-        />
-        <circle
-          cx="16"
-          cy="16"
-          r="4.5"
           fill="none"
           stroke="#7B6FE0"
-          strokeWidth="1.4"
-          opacity={0.9}
-          style={{
-            animation: generating
-              ? "circle2edit-core-pulse 1.2s ease-in-out infinite"
-              : "circle2edit-core-pulse 2.8s ease-in-out infinite",
-          }}
+          strokeWidth="1.75"
+          opacity={0.55}
         />
+        {/* Flame-like arc rotating around the ring */}
+        <g
+          style={{
+            transformOrigin: "16px 16px",
+            animation: generating
+              ? "circle2edit-flame-spin 1.6s linear infinite"
+              : "circle2edit-flame-spin 3.2s linear infinite",
+          }}
+        >
+          <circle
+            cx="16"
+            cy="16"
+            r="12"
+            fill="none"
+            stroke={`url(#${uid}Flame)`}
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeDasharray="22 54"
+            filter={`url(#${uid}Glow)`}
+          />
+        </g>
       </svg>
       <style>{`
-        @keyframes circle2edit-ring-spin {
+        @keyframes circle2edit-flame-spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
-        }
-        @keyframes circle2edit-core-pulse {
-          0%, 100% { opacity: 0.55; }
-          50% { opacity: 1; }
         }
       `}</style>
     </div>
