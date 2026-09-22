@@ -1,0 +1,28 @@
+# Motio2edit placeholder crown material library
+newmtl gold
+Ka 0.340 0.260 0.052
+Kd 0.850 0.650 0.130
+Ks 0.700 0.700 0.700
+Ns 180
+illum 2
+
+newmtl red
+Ka 0.288 0.024 0.040
+Kd 0.720 0.060 0.100
+Ks 0.700 0.700 0.700
+Ns 180
+illum 2
+
+newmtl blue
+Ka 0.040 0.128 0.300
+Kd 0.100 0.320 0.750
+Ks 0.700 0.700 0.700
+Ns 180
+illum 2
+
+newmtl white
+Ka 0.372 0.372 0.380
+Kd 0.930 0.930 0.950
+Ks 0.700 0.700 0.700
+Ns 180
+illum 2
