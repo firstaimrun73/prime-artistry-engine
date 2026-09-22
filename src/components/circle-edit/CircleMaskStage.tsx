@@ -95,7 +95,7 @@ function smoothPathD(pts: Point[]): string {
 }
 
 export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function CircleMaskStage(
-  { imageUrl, tool, brushSize, disabled, onMaskChange, inkColor = "purple", onHistoryChange },
+  { imageUrl, tool, brushSize, disabled, onMaskChange, onHistoryChange },
   ref,
 ) {
   const shellRef = useRef<HTMLDivElement>(null);
@@ -107,11 +107,13 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const lastPtRef = useRef<Point | null>(null);
   const pathRef = useRef<Point[]>([]);
   const dispScaleRef = useRef(1);
+  const flashTimerRef = useRef<number | null>(null);
   const [ready, setReady] = useState(false);
+  const [natural, setNatural] = useState<Size | null>(null);
   const [aspect, setAspect] = useState<number | null>(null);
   const [livePath, setLivePath] = useState<Point[]>([]);
   const [nearClose, setNearClose] = useState(false);
-  const [closeFlash, setCloseFlash] = useState(false);
+  const [flashOrigin, setFlashOrigin] = useState<Point | null>(null);
   const [displaySize, setDisplaySize] = useState({ w: 0, h: 0 });
 
   const settings = (): BrushSettings => ({
@@ -184,24 +186,32 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
 
   useEffect(() => {
     let cancelled = false;
+    if (flashTimerRef.current != null) {
+      window.clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = null;
+    }
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
       if (cancelled) return;
       imgRef.current = img;
-      const natural: Size = { width: img.naturalWidth, height: img.naturalHeight };
-      maskRef.current = createWorkingMask(natural);
+      const nat: Size = { width: img.naturalWidth, height: img.naturalHeight };
+      maskRef.current = createWorkingMask(nat);
       historyRef.current = { past: [], future: [] };
-      setAspect(natural.width / Math.max(1, natural.height));
+      setNatural(nat);
+      setAspect(nat.width / Math.max(1, nat.height));
       setReady(true);
       setLivePath([]);
       setNearClose(false);
+      setFlashOrigin(null);
       requestAnimationFrame(() => {
         layoutCanvas();
         notify();
       });
     };
-    img.onerror = () => setReady(false);
+    img.onerror = () => {
+      if (!cancelled) setReady(false);
+    };
     img.src = imageUrl;
     return () => {
       cancelled = true;
@@ -240,6 +250,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
         clearWorkingMask(m);
         setLivePath([]);
         setNearClose(false);
+        setFlashOrigin(null);
         redraw();
         notify();
       },
@@ -273,10 +284,11 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
 
   const toNatural = (e: React.PointerEvent): Point | null => {
     const canvas = canvasRef.current;
-    if (!canvas) return null;
+    if (!canvas || !natural) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * (maskRef.current?.natural.width ?? canvas.width);
-    const y = ((e.clientY - rect.top) / rect.height) * (maskRef.current?.natural.height ?? canvas.height);
+    if (rect.width < 1 || rect.height < 1) return null;
+    const x = ((e.clientX - rect.left) / rect.width) * natural.width;
+    const y = ((e.clientY - rect.top) / rect.height) * natural.height;
     return { x, y };
   };
 
@@ -293,7 +305,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       pathRef.current = [p];
       setLivePath([p]);
       setNearClose(false);
-      setCloseFlash(false);
+      setFlashOrigin(null);
     } else {
       stampBrush(maskRef.current, p, kind, settings(), dispScaleRef.current);
       redraw();
@@ -327,10 +339,15 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     drawingRef.current = false;
     const kind = toolKind(tool);
     if (kind === "path" && pathRef.current.length >= 3) {
+      const origin = pathRef.current[0];
       fillClosedPath(maskRef.current, pathRef.current);
       redraw();
-      setCloseFlash(true);
-      window.setTimeout(() => setCloseFlash(false), 420);
+      setFlashOrigin(origin);
+      if (flashTimerRef.current != null) window.clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = window.setTimeout(() => {
+        setFlashOrigin(null);
+        flashTimerRef.current = null;
+      }, 450);
     }
     pathRef.current = [];
     lastPtRef.current = null;
@@ -339,10 +356,11 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     notify();
   };
 
-  const nat = maskRef.current?.natural;
   const pathD = livePath.length > 0 ? smoothPathD(livePath) : "";
   const termA = livePath[0];
   const termB = livePath.length > 1 ? livePath[livePath.length - 1] : null;
+  const showOverlay =
+    !!natural && displaySize.w > 0 && (livePath.length > 0 || flashOrigin != null);
 
   return (
     <div
@@ -370,12 +388,12 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
         />
-        {nat && livePath.length > 0 && displaySize.w > 0 ? (
+        {showOverlay && natural ? (
           <svg
             className="pointer-events-none absolute inset-0"
             width={displaySize.w}
             height={displaySize.h}
-            viewBox={`0 0 ${nat.width} ${nat.height}`}
+            viewBox={`0 0 ${natural.width} ${natural.height}`}
             preserveAspectRatio="none"
             aria-hidden
             data-circle-terminals="true"
@@ -452,8 +470,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
                 </text>
               </g>
             ) : null}
-            {closeFlash && termA ? (
-              <circle cx={termA.x} cy={termA.y} r={8} fill="none" stroke="#A89BFF" strokeWidth={3} opacity={0.9}>
+            {flashOrigin ? (
+              <circle cx={flashOrigin.x} cy={flashOrigin.y} r={8} fill="none" stroke="#A89BFF" strokeWidth={3} opacity={0.9}>
                 <animate attributeName="r" from="8" to="48" dur="0.4s" fill="freeze" />
                 <animate attributeName="opacity" from="0.9" to="0" dur="0.4s" fill="freeze" />
               </circle>
