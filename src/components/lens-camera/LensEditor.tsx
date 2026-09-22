@@ -98,3 +98,53 @@ function buildSampleMap(): Record<string, string> {
       continue;
     }
     map[s.lensId] = s.imageUrl;
+    owner[s.imageUrl] = s.lensId;
+  }
+  return map;
+}
+
+const SAMPLE_BY_ID = buildSampleMap();
+const ORDERED_ROSTER = getMainCameraCarousel();
+
+const HEAVY_LENS_IDS = new Set([
+  "lens_perspective_stretch",
+  "lens_fisheye_orbit",
+  "lens_ultrawide_horizon",
+  "lens_widevista",
+  "lens_swirl_depth",
+  "lens_architect_align",
+]);
+
+const LIGHTWEIGHT_LENS_IDS = new Set([
+  "lens_hd_4k",
+  "lens_windows_colour",
+  "lens_date_time",
+  "lens_snake_view",
+  "lens_retro_80s",
+  "lens_colour_negative",
+  "lens_vintage_halation",
+  "lens_crayon",
+  "lens_fairytale",
+]);
+
+const FACE_HEAVY_LENS_IDS = new Set([
+  "lens_crown",
+  "lens_thunder_eyes",
+  "lens_hair_shades",
+  "lens_butterfly",
+]);
+
+function ApertureLoader() {
+  const blades = [0, 1, 2, 3, 4, 5];
+  return (
+    <div role="status" aria-label="Processing photo" className="relative h-24 w-24">
+      <style>{`
+        @keyframes m2e-aperture {
+          0%, 100% { transform: translateX(36px); }
+          50% { transform: translateX(3px); }
+        }
+        .m2e-blade { animation: m2e-aperture 1s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .m2e-blade { animation-duration: 2.4s; }
+        }
+      `}</style>
