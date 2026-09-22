@@ -208,3 +208,53 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const [farZoom, setFarZoom] = useState(1);
   const [zoomMin, setZoomMin] = useState(1);
   const [zoomMax, setZoomMax] = useState(1);
+  const [hwZoomSupported, setHwZoomSupported] = useState(false);
+  const [dateTimeMode, setDateTimeMode] = useState<"date" | "time" | "both">("both");
+  const [dateTimeStyle, setDateTimeStyle] = useState<"digital" | "clean" | "mono" | "classic">("clean");
+  const [colourNegative, setColourNegative] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const [aiStage, setAiStage] = useState<string | null>(null);
+  const [dateTimeDisplay, setDateTimeDisplay] = useState("");
+
+  useEffect(() => {
+    const plan =
+      (user as { plan?: string } | null)?.plan ||
+      (user as { subscription?: { status?: string } } | null)?.subscription?.status;
+    setIsPaid(!!plan && plan !== "free");
+    if (!plan || plan === "free") setWantWm(true);
+  }, [user]);
+
+  const clearResultVariants = useCallback(() => {
+    const v = resultVariantsRef.current;
+    if (v.wm?.startsWith("blob:")) URL.revokeObjectURL(v.wm);
+    if (v.clean?.startsWith("blob:")) URL.revokeObjectURL(v.clean);
+    resultVariantsRef.current = {};
+    resultSourceRef.current = null;
+    setResultUrl(null);
+  }, []);
+
+  useEffect(
+    () => () => {
+      const v = resultVariantsRef.current;
+      if (v.wm?.startsWith("blob:")) URL.revokeObjectURL(v.wm);
+      if (v.clean?.startsWith("blob:")) URL.revokeObjectURL(v.clean);
+    },
+    [],
+  );
+
+  const stopCamera = useCallback(() => {
+    if (liveRafRef.current != null) {
+      cancelAnimationFrame(liveRafRef.current);
+      liveRafRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraOn(false);
+    setLiveFxOn(false);
+    setTorchOn(false);
+    // Release MediaPipe Face Landmarker when leaving camera / unmounting
+    disposeFaceLandmarker();
+  }, []);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
