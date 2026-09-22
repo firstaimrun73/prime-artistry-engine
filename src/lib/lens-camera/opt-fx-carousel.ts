@@ -1,8 +1,9 @@
 /**
  * Lightweight carousel lens effects (no FAL / no heavy models).
- * Crown uses skin-tone face heuristic + gold crown on forehead.
+ * Face-dependent lenses consume shared on-device face-track landmarks.
  */
 import { clone } from "./opt-core";
+import { detectFaceLandmarksSync, type FaceLandmarks } from "./face-track";
 
 function cssGrade(src: HTMLCanvasElement, filter: string): HTMLCanvasElement {
   const c = clone(src);
@@ -13,43 +14,9 @@ function cssGrade(src: HTMLCanvasElement, filter: string): HTMLCanvasElement {
   return c;
 }
 
-/** Largest skin-tone blob as approximate face box. */
-function findFaceBox(src: HTMLCanvasElement): { x: number; y: number; w: number; h: number } | null {
-  const W = src.width;
-  const H = src.height;
-  if (W < 16 || H < 16) return null;
-  const ctx = src.getContext("2d")!;
-  const img = ctx.getImageData(0, 0, W, H);
-  const d = img.data;
-  const cell = Math.max(4, Math.floor(Math.min(W, H) / 40));
-  let bestScore = 0;
-  let bx = 0, by = 0, bw = Math.floor(W * 0.28), bh = Math.floor(H * 0.32);
-  for (let y = 0; y < H - cell; y += cell) {
-    for (let x = 0; x < W - cell; x += cell) {
-      let skin = 0, tot = 0;
-      for (let dy = 0; dy < cell; dy += 2) {
-        for (let dx = 0; dx < cell; dx += 2) {
-          const i = ((y + dy) * W + (x + dx)) * 4;
-          const r = d[i], g = d[i + 1], b = d[i + 2];
-          tot++;
-          if (r > 60 && g > 30 && b > 15 && r > g && r > b && Math.abs(r - g) > 8) skin++;
-        }
-      }
-      const score = skin / Math.max(1, tot);
-      if (score > 0.35 && score > bestScore) {
-        bestScore = score;
-        bx = x; by = y; bw = cell * 6; bh = cell * 7;
-      }
-    }
-  }
-  if (bestScore < 0.35) {
-    return { x: Math.floor(W * 0.32), y: Math.floor(H * 0.12), w: Math.floor(W * 0.36), h: Math.floor(H * 0.42) };
-  }
-  bx = Math.max(0, bx - Math.floor(bw * 0.3));
-  by = Math.max(0, by - Math.floor(bh * 0.4));
-  bw = Math.min(W - bx, Math.floor(bw * 1.6));
-  bh = Math.min(H - by, Math.floor(bh * 1.5));
-  return { x: bx, y: by, w: bw, h: bh };
+/** Shared sync face landmarks (null = no face; callers must not leave stale overlays). */
+function trackFace(src: HTMLCanvasElement): FaceLandmarks | null {
+  return detectFaceLandmarksSync(src);
 }
 
 function drawGoldCrown(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
@@ -94,12 +61,17 @@ function drawGoldCrown(ctx: CanvasRenderingContext2D, cx: number, cy: number, si
 export function applyCrown(src: HTMLCanvasElement, _live = false): HTMLCanvasElement {
   const c = clone(src);
   const ctx = c.getContext("2d")!;
-  const face = findFaceBox(src);
-  if (!face) return c;
-  const crownX = face.x + face.w * 0.5;
-  const crownY = face.y + face.h * 0.08;
-  const crownSize = Math.max(18, face.w * 0.55);
+  const face = trackFace(src);
+  if (!face || face.confidence < 0.2) return c;
+  const crownX = face.headTop.x;
+  const crownY = face.headTop.y;
+  const crownSize = Math.max(22, face.scale * 0.72);
+  ctx.save();
+  ctx.translate(crownX, crownY);
+  ctx.rotate(face.roll);
+  ctx.translate(-crownX, -crownY);
   drawGoldCrown(ctx, crownX, crownY, crownSize);
+  ctx.restore();
   return c;
 }
 
@@ -158,22 +130,26 @@ export function applyColourNegativeFx(src: HTMLCanvasElement, _live = false): HT
 }
 
 export function applyThunderEyes(src: HTMLCanvasElement, live = false): HTMLCanvasElement {
-  const c = cssGrade(src, live ? "contrast(1.1) saturate(1.15)" : "contrast(1.18) saturate(1.25) brightness(1.02)");
+  // No whole-image blue tint — only local eye glow from tracked landmarks
+  const c = clone(src);
   const ctx = c.getContext("2d")!;
-  const face = findFaceBox(src);
-  if (!face) return c;
-  const eyeY = face.y + face.h * 0.38;
-  const eyeLX = face.x + face.w * 0.32;
-  const eyeRX = face.x + face.w * 0.68;
-  const r = Math.max(8, face.w * 0.14);
-  for (const ex of [eyeLX, eyeRX]) {
-    const g = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, r * 2.2);
+  if (!live) {
+    const graded = cssGrade(src, "contrast(1.08) saturate(1.06) brightness(1.01)");
+    ctx.drawImage(graded, 0, 0);
+  } else {
+    ctx.drawImage(src, 0, 0);
+  }
+  const face = trackFace(src);
+  if (!face || face.confidence < 0.2) return c;
+  const r = Math.max(8, face.scale * 0.12);
+  for (const eye of [face.leftEye, face.rightEye]) {
+    const g = ctx.createRadialGradient(eye.x, eye.y, 0, eye.x, eye.y, r * 2.2);
     g.addColorStop(0, "rgba(100,220,255,0.75)");
     g.addColorStop(0.4, "rgba(40,160,255,0.35)");
     g.addColorStop(1, "rgba(0,80,200,0)");
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(ex, eyeY, r * 2.2, 0, Math.PI * 2);
+    ctx.arc(eye.x, eye.y, r * 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
   return c;
@@ -188,18 +164,37 @@ export function applyRetro80sFx(src: HTMLCanvasElement, live = false): HTMLCanva
 export function applyHairShades(src: HTMLCanvasElement, live = false): HTMLCanvasElement {
   const c = clone(src);
   const ctx = c.getContext("2d")!;
-  const face = findFaceBox(src);
-  if (!face) return cssGrade(c, "hue-rotate(25deg) saturate(1.2)");
-  const bandY = Math.max(0, face.y - face.h * 0.15);
-  const bandH = face.h * 0.45;
+  const face = trackFace(src);
+  if (!face || face.confidence < 0.2) return c;
+  // Hair region: above forehead to top of head, width ~ face scale
+  const hairTop = Math.max(0, face.headTop.y - face.bounds.h * 0.15);
+  const hairBot = face.forehead.y + face.bounds.h * 0.08;
+  const hairLeft = Math.max(0, face.bounds.x - face.scale * 0.08);
+  const hairRight = Math.min(c.width, face.bounds.x + face.bounds.w + face.scale * 0.08);
+  const hairH = Math.max(4, hairBot - hairTop);
+  const hairW = Math.max(4, hairRight - hairLeft);
   const overlay = document.createElement("canvas");
-  overlay.width = c.width; overlay.height = c.height;
+  overlay.width = c.width;
+  overlay.height = c.height;
   const octx = overlay.getContext("2d")!;
   octx.drawImage(src, 0, 0);
+  // Soft elliptical mask over hair zone only (not full-width band)
+  octx.save();
+  octx.beginPath();
+  octx.ellipse(
+    face.headTop.x,
+    (hairTop + hairBot) * 0.5,
+    hairW * 0.48,
+    hairH * 0.55,
+    face.roll,
+    0,
+    Math.PI * 2,
+  );
+  octx.clip();
   octx.globalCompositeOperation = "hue";
-  octx.fillStyle = "rgba(140,60,200,0.85)";
-  octx.fillRect(0, bandY, c.width, bandH);
-  octx.globalCompositeOperation = "source-over";
+  octx.fillStyle = "rgba(140,60,200,0.9)";
+  octx.fillRect(hairLeft, hairTop, hairW, hairH);
+  octx.restore();
   ctx.globalAlpha = live ? 0.35 : 0.55;
   ctx.drawImage(overlay, 0, 0);
   ctx.globalAlpha = 1;
@@ -209,20 +204,18 @@ export function applyHairShades(src: HTMLCanvasElement, live = false): HTMLCanva
 export function applyButterfly(src: HTMLCanvasElement, _live = false): HTMLCanvasElement {
   const c = clone(src);
   const ctx = c.getContext("2d")!;
-  const face = findFaceBox(src);
-  const places: [number, number, number][] = face
-    ? [
-        [face.x + face.w * 0.15, face.y + face.h * 0.1, face.w * 0.18],
-        [face.x + face.w * 0.85, face.y + face.h * 0.15, face.w * 0.16],
-        [face.x + face.w * 0.5, face.y - face.h * 0.05, face.w * 0.14],
-      ]
-    : [
-        [c.width * 0.25, c.height * 0.2, c.width * 0.08],
-        [c.width * 0.75, c.height * 0.25, c.width * 0.07],
-      ];
+  const face = trackFace(src);
+  if (!face || face.confidence < 0.2) return c;
+  const s0 = Math.max(10, face.scale * 0.16);
+  const places: [number, number, number][] = [
+    [face.headTop.x - face.scale * 0.28, face.headTop.y + face.bounds.h * 0.05, s0],
+    [face.headTop.x + face.scale * 0.28, face.headTop.y + face.bounds.h * 0.08, s0 * 0.9],
+    [face.headTop.x, face.headTop.y - face.scale * 0.06, s0 * 0.75],
+  ];
   for (const [x, y, s] of places) {
     ctx.save();
     ctx.translate(x, y);
+    ctx.rotate(face.roll);
     ctx.fillStyle = "rgba(255,105,180,0.85)";
     ctx.beginPath();
     ctx.ellipse(-s * 0.35, 0, s * 0.4, s * 0.25, -0.4, 0, Math.PI * 2);
