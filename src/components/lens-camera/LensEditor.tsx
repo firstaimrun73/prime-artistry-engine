@@ -198,3 +198,13 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [nameChip, setNameChip] = useState<string | null>(null);
   const [isPaid, setIsPaid] = useState(false);
+  const [wantWm, setWantWm] = useState(true);
+  const [resultWm, setResultWm] = useState(true);
+  const [wmBusy, setWmBusy] = useState(false);
+  const [resultFromUpload, setResultFromUpload] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [liveFxOn, setLiveFxOn] = useState(false);
+  const [farZoom, setFarZoom] = useState(1);
+  const [zoomMin, setZoomMin] = useState(1);
+  const [zoomMax, setZoomMax] = useState(1);
