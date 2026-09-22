@@ -13,6 +13,7 @@ import {
 } from "./opt-core";
 import { applyLensById } from "./opt-switch";
 import { infrared } from "./opt-fx1";
+import { applyCarouselLens } from "./opt-fx-carousel";
 
 export { captureVideoFrame, cropToAspect, canvasToBlob, normalizeCaptureSize, estimateBrightness };
 
@@ -22,6 +23,14 @@ const LIGHTWEIGHT_IDS = new Set([
   "lens_date_time",
   "lens_snake_view",
   "lens_retro_80s",
+  "lens_crown",
+  "lens_vintage_halation",
+  "lens_colour_negative",
+  "lens_thunder_eyes",
+  "lens_hair_shades",
+  "lens_butterfly",
+  "lens_fairytale",
+  "lens_crayon",
 ]);
 
 export type LensProcessOpts = {
@@ -222,12 +231,16 @@ function applyLightweightLens(
     case "lens_snake_view":
       return snakeHeat(source);
     case "lens_retro_80s":
-      return cssGrade(
-        source,
-        liveMode
-          ? "sepia(0.25) hue-rotate(-15deg) saturate(1.35) contrast(1.08)"
-          : "sepia(0.35) hue-rotate(-18deg) saturate(1.45) contrast(1.12) brightness(1.02)",
-      );
+      return applyCarouselLens(source, "lens_retro_80s", liveMode);
+    case "lens_crown":
+    case "lens_vintage_halation":
+    case "lens_colour_negative":
+    case "lens_thunder_eyes":
+    case "lens_hair_shades":
+    case "lens_butterfly":
+    case "lens_fairytale":
+    case "lens_crayon":
+      return applyCarouselLens(source, lensId, liveMode);
     default:
       return source;
   }
