@@ -298,3 +298,23 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
         setTorchSupported(mode === "environment" && Boolean(capabilities?.torch));
         const z = capabilities?.zoom;
         if (z && typeof z.max === "number" && z.max > 1) {
+          const zMin = typeof z.min === "number" ? z.min : 1;
+          const zMax = z.max;
+          setZoomMin(zMin);
+          setZoomMax(zMax);
+          setHwZoomSupported(true);
+          setFarZoom((prev) => Math.min(zMax, Math.max(zMin, prev > 1 ? prev : Math.min(zMax, Math.max(zMin, 2)))));
+        } else {
+          setZoomMin(1);
+          setZoomMax(8);
+          setHwZoomSupported(false);
+          setFarZoom((prev) => Math.min(8, Math.max(1, prev)));
+        }
+      } catch {
+        setTorchSupported(false);
+        setHwZoomSupported(false);
+        setZoomMin(1);
+        setZoomMax(8);
+      }
+      setFacingMode(mode);
+      setCameraOn(true);
