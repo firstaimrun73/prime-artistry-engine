@@ -1,6 +1,8 @@
 /**
  * Circle 2edit mask stage — exports required by circle-remove route.
  * Uses authoritative maskCanvas helpers (WorkingMask.canvas-based).
+ * Canvas display: aspect-ratio matched to image, object-fit contain,
+ * max-height capped to available viewport — no fixed square, no letterbox bars.
  */
 import {
   useCallback,
@@ -62,10 +64,24 @@ function toolKind(tool: MaskTool): "brush" | "erase" | "path" {
   return "path";
 }
 
+/** Fit natural size into a box (contain). */
+function containSize(nw: number, nh: number, boxW: number, boxH: number): { w: number; h: number; scale: number } {
+  if (nw <= 0 || nh <= 0 || boxW <= 0 || boxH <= 0) {
+    return { w: Math.max(1, boxW), h: Math.max(1, boxH), scale: 1 };
+  }
+  const scale = Math.min(boxW / nw, boxH / nh);
+  return {
+    w: Math.max(1, Math.round(nw * scale)),
+    h: Math.max(1, Math.round(nh * scale)),
+    scale,
+  };
+}
+
 export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function CircleMaskStage(
   { imageUrl, tool, brushSize, disabled, onMaskChange, inkColor = "purple", onHistoryChange },
   ref,
 ) {
+  const shellRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const maskRef = useRef<WorkingMask | null>(null);
@@ -75,6 +91,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const pathRef = useRef<Point[]>([]);
   const dispScaleRef = useRef(1);
   const [ready, setReady] = useState(false);
+  const [aspect, setAspect] = useState<number | null>(null);
 
   const settings = (): BrushSettings => ({
     sizePx: brushSize,
@@ -118,6 +135,32 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     ctx.restore();
   }, []);
 
+  /** Size display canvas to contain-fit available shell, preserving image aspect. */
+  const layoutCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const shell = shellRef.current;
+    const img = imgRef.current;
+    if (!canvas || !shell || !img) return;
+    const nw = img.naturalWidth || 1;
+    const nh = img.naturalHeight || 1;
+    const rect = shell.getBoundingClientRect();
+    const boxW = Math.max(1, rect.width - 4);
+    const boxH = Math.max(1, rect.height - 4);
+    const { w, h, scale } = containSize(nw, nh, boxW, boxH);
+    const maxEdge = 1440;
+    const resScale = Math.min(1, maxEdge / Math.max(nw, nh));
+    const bufW = Math.max(1, Math.round(nw * resScale));
+    const bufH = Math.max(1, Math.round(nh * resScale));
+    if (canvas.width !== bufW || canvas.height !== bufH) {
+      canvas.width = bufW;
+      canvas.height = bufH;
+    }
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    dispScaleRef.current = scale;
+    redraw();
+  }, [redraw]);
+
   useEffect(() => {
     let cancelled = false;
     const img = new Image();
@@ -128,24 +171,33 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       const natural: Size = { width: img.naturalWidth, height: img.naturalHeight };
       maskRef.current = createWorkingMask(natural);
       historyRef.current = { past: [], future: [] };
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const maxW = Math.min(window.innerWidth - 24, 720);
-        const scale = Math.min(1, maxW / natural.width);
-        canvas.width = Math.round(natural.width * scale);
-        canvas.height = Math.round(natural.height * scale);
-        dispScaleRef.current = scale;
-      }
+      setAspect(natural.width / Math.max(1, natural.height));
       setReady(true);
-      redraw();
-      notify();
+      requestAnimationFrame(() => {
+        layoutCanvas();
+        notify();
+      });
     };
     img.onerror = () => setReady(false);
     img.src = imageUrl;
     return () => {
       cancelled = true;
     };
-  }, [imageUrl, redraw, notify]);
+  }, [imageUrl, layoutCanvas, notify]);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    const ro = new ResizeObserver(() => {
+      layoutCanvas();
+    });
+    ro.observe(shell);
+    window.addEventListener("resize", layoutCanvas);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", layoutCanvas);
+    };
+  }, [layoutCanvas, ready]);
 
   useImperativeHandle(ref, () => ({
     exportMask: () => {
@@ -189,8 +241,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     },
     canUndo: () => historyRef.current.past.length > 0,
     canRedo: () => historyRef.current.future.length > 0,
-    fit: () => redraw(),
-  }), [redraw, notify, pushHistory]);
+    fit: () => layoutCanvas(),
+  }), [redraw, notify, pushHistory, layoutCanvas]);
 
   const toNatural = (e: React.PointerEvent): Point | null => {
     const canvas = canvasRef.current;
@@ -246,11 +298,25 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   };
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden bg-black/40">
+    <div
+      ref={shellRef}
+      className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
+      data-circle-mask-stage="true"
+      style={aspect ? { ["--circle-img-aspect" as string]: String(aspect) } : undefined}
+    >
       <canvas
         ref={canvasRef}
-        className="max-h-full max-w-full touch-none object-contain"
-        style={{ imageRendering: "auto" }}
+        className="touch-none"
+        style={{
+          display: "block",
+          maxWidth: "100%",
+          maxHeight: "100%",
+          width: "auto",
+          height: "auto",
+          objectFit: "contain",
+          imageRendering: "auto",
+          aspectRatio: aspect ? String(aspect) : undefined,
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
