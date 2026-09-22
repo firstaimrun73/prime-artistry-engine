@@ -278,3 +278,23 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
             video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: false,
           });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+      }
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (!video) return;
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+      await video.play();
+      try {
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & {
+          torch?: boolean;
+          zoom?: { min?: number; max?: number; step?: number };
+        };
+        setTorchSupported(mode === "environment" && Boolean(capabilities?.torch));
+        const z = capabilities?.zoom;
+        if (z && typeof z.max === "number" && z.max > 1) {
