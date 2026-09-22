@@ -3,7 +3,11 @@
  * Face-dependent lenses consume shared on-device face-track landmarks.
  */
 import { clone } from "./opt-core";
-import { detectFaceLandmarksSync, type FaceLandmarks } from "./face-track";
+import {
+  detectFaceLandmarksSync,
+  ensureFaceLandmarker,
+  type FaceLandmarks,
+} from "./face-track";
 
 function cssGrade(src: HTMLCanvasElement, filter: string): HTMLCanvasElement {
   const c = clone(src);
@@ -14,8 +18,10 @@ function cssGrade(src: HTMLCanvasElement, filter: string): HTMLCanvasElement {
   return c;
 }
 
-/** Shared sync face landmarks (null = no face; callers must not leave stale overlays). */
+/** Shared face landmarks — prefers MediaPipe once ready; null = no face. */
 function trackFace(src: HTMLCanvasElement): FaceLandmarks | null {
+  // Kick MediaPipe init on first face-dependent effect (non-blocking).
+  void ensureFaceLandmarker();
   return detectFaceLandmarksSync(src);
 }
 
@@ -130,7 +136,6 @@ export function applyColourNegativeFx(src: HTMLCanvasElement, _live = false): HT
 }
 
 export function applyThunderEyes(src: HTMLCanvasElement, live = false): HTMLCanvasElement {
-  // No whole-image blue tint — only local eye glow from tracked landmarks
   const c = clone(src);
   const ctx = c.getContext("2d")!;
   if (!live) {
@@ -166,7 +171,6 @@ export function applyHairShades(src: HTMLCanvasElement, live = false): HTMLCanva
   const ctx = c.getContext("2d")!;
   const face = trackFace(src);
   if (!face || face.confidence < 0.2) return c;
-  // Hair region: above forehead to top of head, width ~ face scale
   const hairTop = Math.max(0, face.headTop.y - face.bounds.h * 0.15);
   const hairBot = face.forehead.y + face.bounds.h * 0.08;
   const hairLeft = Math.max(0, face.bounds.x - face.scale * 0.08);
@@ -178,7 +182,6 @@ export function applyHairShades(src: HTMLCanvasElement, live = false): HTMLCanva
   overlay.height = c.height;
   const octx = overlay.getContext("2d")!;
   octx.drawImage(src, 0, 0);
-  // Soft elliptical mask over hair zone only (not full-width band)
   octx.save();
   octx.beginPath();
   octx.ellipse(
