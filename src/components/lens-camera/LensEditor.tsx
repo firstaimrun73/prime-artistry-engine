@@ -258,3 +258,8 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   }, []);
 
   useEffect(() => () => stopCamera(), [stopCamera]);
+
+  const startCamera = useCallback(async (face?: "user" | "environment") => {
+    const mode = face ?? facingMode;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
