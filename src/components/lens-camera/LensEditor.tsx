@@ -318,3 +318,43 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
       }
       setFacingMode(mode);
       setCameraOn(true);
+      setPhase("ready");
+      setResultUrl(null);
+    } catch (error) {
+      console.error("[Lenses] camera start failed", error);
+      toast.error("Camera unavailable — try Upload");
+      setPhase("idle");
+    }
+  }, [facingMode]);
+
+  useEffect(() => {
+    if (didAutoStart.current) return;
+    didAutoStart.current = true;
+    void startCamera("user");
+  }, [startCamera]);
+
+  useEffect(() => {
+    if (lensId !== "lens_date_time") return;
+    const tick = () => {
+      const t = formatDateTimeOverlay(dateTimeMode);
+      dateTimeTextRef.current = t;
+      setDateTimeDisplay(t);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [lensId, dateTimeMode]);
+
+  useEffect(() => {
+    if (!cameraOn || phase === "processing" || phase === "result") {
+      if (liveRafRef.current != null) {
+        cancelAnimationFrame(liveRafRef.current);
+        liveRafRef.current = null;
+      }
+      setLiveFxOn(false);
+      return;
+    }
+    const video = videoRef.current;
+    const canvas = liveCanvasRef.current;
+    if (!video || !canvas) return;
+    const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
