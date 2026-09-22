@@ -358,3 +358,15 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
     const canvas = liveCanvasRef.current;
     if (!video || !canvas) return;
     const heavy = lens ? HEAVY_LENS_IDS.has(lens.id) : false;
+    const faceHeavy = lens ? FACE_HEAVY_LENS_IDS.has(lens.id) : false;
+    const light = lens ? LIGHTWEIGHT_LENS_IDS.has(lens.id) : false;
+    const LIVE_MAX_W = heavy ? 480 : faceHeavy ? 560 : light ? 720 : 880;
+    let frame = 0;
+    const tmp = document.createElement("canvas");
+    const tick = () => {
+      if (!video.videoWidth || !video.videoHeight) {
+        liveRafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      frame++;
+      if ((heavy || faceHeavy) && frame % (
