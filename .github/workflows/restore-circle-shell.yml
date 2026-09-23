@@ -1,0 +1,129 @@
+name: Restore CircleEditShell
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-circle-shell.yml'
+concurrency:
+  group: restore-circle-shell
+  cancel-in-progress: true
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore full CircleEditShell then apply item-3 ink fix
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Restore known-good shell (pre-placeholder)
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/759e47f7d2ca367c6647798f75aa3a0fad557310/src/components/circle-edit/CircleEditShell.tsx" -o src/components/circle-edit/CircleEditShell.tsx
+          LINES=$(wc -l < src/components/circle-edit/CircleEditShell.tsx)
+          CHARS=$(wc -c < src/components/circle-edit/CircleEditShell.tsx)
+          echo "fetched lines=$LINES chars=$CHARS"
+          test "$LINES" -ge 600
+          test "$CHARS" -ge 20000
+          if grep -q "PLACEHOLDER" src/components/circle-edit/CircleEditShell.tsx; then
+            echo "ERROR: still placeholder"; exit 1
+          fi
+
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("src/components/circle-edit/CircleEditShell.tsx")
+          t = p.read_text()
+          old = '''      {(tool === "brush" || tool === "eraser" || tool === "circle") && onInkColor ? (
+        <div className="flex items-center justify-center gap-2" data-testid="circle-ink">
+          <span className={cn("text-[10px] font-medium", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>
+            Ink
+          </span>
+          {inkColors.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              aria-label={c.label}
+              title={c.label}
+              onClick={() => onInkColor(c.id)}
+              className={cn(
+                "h-7 w-7 rounded-full border-2 shadow-sm transition-transform",
+                inkColor === c.id
+                  ? "border-[#7B6FE0] scale-110 ring-2 ring-[#7B6FE0]/30"
+                  : isDark
+                    ? "border-white/20"
+                    : "border-black/15",
+              )}
+              style={{ background: c.swatch }}
+            />
+          ))}
+        </div>
+      ) : null}'''
+          new = '''      {onInkColor ? (
+        <div className="flex items-center justify-center gap-2" data-testid="circle-ink" data-active-ink={inkColor}>
+          <span className={cn("text-[10px] font-medium", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>
+            Ink
+          </span>
+          {inkColors.map((c) => {
+            const selected = inkColor === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-label={c.label}
+                aria-pressed={selected}
+                title={c.label}
+                data-ink={c.id}
+                data-selected={selected ? "true" : "false"}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onInkColor(c.id);
+                }}
+                className={cn(
+                  "relative h-8 w-8 rounded-full border-2 shadow-sm transition-all",
+                  selected
+                    ? "border-[#7B6FE0] scale-110 ring-2 ring-[#7B6FE0]/45 shadow-[0_0_0_1px_rgba(123,111,224,0.35)]"
+                    : isDark
+                      ? "border-white/25 hover:border-white/40"
+                      : "border-black/20 hover:border-black/35",
+                )}
+                style={{ background: c.swatch }}
+              >
+                {selected ? (
+                  <span
+                    className="pointer-events-none absolute inset-0 grid place-items-center"
+                    aria-hidden
+                  >
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        c.id === "white" ? "bg-[#7B6FE0]" : "bg-white",
+                        c.id === "white" ? "shadow-sm" : "shadow-[0_0_0_1px_rgba(0,0,0,0.25)]",
+                      )}
+                    />
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}'''
+          if old not in t:
+              raise SystemExit("ink block pattern not found")
+          p.write_text(t.replace(old, new, 1))
+          print("item3 applied", len(p.read_text()))
+          PY
+
+          git add src/components/circle-edit/CircleEditShell.tsx
+          git commit -m "Circle2edit item 3: ink colour swatch sticky selection + clear active state"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push && break || sleep 3
+          done
+          echo "=== verify ==="
+          wc -l src/components/circle-edit/CircleEditShell.tsx
+          grep -n "data-active-ink\|aria-pressed\|PLACEHOLDER" src/components/circle-edit/CircleEditShell.tsx | head
+          tail -3 src/components/circle-edit/CircleEditShell.tsx
