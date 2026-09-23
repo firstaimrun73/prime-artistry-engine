@@ -588,29 +588,54 @@ export function CircleDrawToolbar({
           );
         })}
       </div>
-      {(tool === "brush" || tool === "eraser" || tool === "circle") && onInkColor ? (
-        <div className="flex items-center justify-center gap-2" data-testid="circle-ink">
+      {onInkColor ? (
+        <div className="flex items-center justify-center gap-2" data-testid="circle-ink" data-active-ink={inkColor}>
           <span className={cn("text-[10px] font-medium", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>
             Ink
           </span>
-          {inkColors.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              aria-label={c.label}
-              title={c.label}
-              onClick={() => onInkColor(c.id)}
-              className={cn(
-                "h-7 w-7 rounded-full border-2 shadow-sm transition-transform",
-                inkColor === c.id
-                  ? "border-[#7B6FE0] scale-110 ring-2 ring-[#7B6FE0]/30"
-                  : isDark
-                    ? "border-white/20"
-                    : "border-black/15",
-              )}
-              style={{ background: c.swatch }}
-            />
-          ))}
+          {inkColors.map((c) => {
+            const selected = inkColor === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-label={c.label}
+                aria-pressed={selected}
+                title={c.label}
+                data-ink={c.id}
+                data-selected={selected ? "true" : "false"}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onInkColor(c.id);
+                }}
+                className={cn(
+                  "relative h-8 w-8 rounded-full border-2 shadow-sm transition-all",
+                  selected
+                    ? "border-[#7B6FE0] scale-110 ring-2 ring-[#7B6FE0]/45 shadow-[0_0_0_1px_rgba(123,111,224,0.35)]"
+                    : isDark
+                      ? "border-white/25 hover:border-white/40"
+                      : "border-black/20 hover:border-black/35",
+                )}
+                style={{ background: c.swatch }}
+              >
+                {selected ? (
+                  <span
+                    className="pointer-events-none absolute inset-0 grid place-items-center"
+                    aria-hidden
+                  >
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        c.id === "white" ? "bg-[#7B6FE0]" : "bg-white",
+                        c.id === "white" ? "shadow-sm" : "shadow-[0_0_0_1px_rgba(0,0,0,0.25)]",
+                      )}
+                    />
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       ) : null}
       {(tool === "brush" || tool === "eraser") && (
