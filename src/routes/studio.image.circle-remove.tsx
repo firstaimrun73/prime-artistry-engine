@@ -719,6 +719,7 @@ function Circle2editPage() {
         onModeChange={onModeChange}
         addLocked={addLocked}
         onBack={goBack}
+        hasImage={true}
         controls={null}
         actionBar={
           <div className="flex w-full flex-col items-center gap-2 px-3 py-2.5">
@@ -862,11 +863,11 @@ function Circle2editPage() {
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {!preview ? (
-          <div className="flex flex-1 items-center justify-center px-[18px] py-3">
+          <div className="flex flex-1 items-center justify-center px-3 py-2">
             <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
           </div>
         ) : (
-          <div className="relative flex h-full min-h-0 w-full flex-1 flex-col" data-circle-stage-fill="max">
+          <div className="relative flex h-full min-h-0 w-full flex-1 flex-col" p-0" data-circle-stage-fill="max">
             <CircleMaskStage
               ref={maskStageRef}
               imageUrl={preview}
