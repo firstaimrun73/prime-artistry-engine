@@ -22,7 +22,8 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/752671aba9340271673ef178dd7cafdda4a147b4/src/routes/studio.image.circle-remove.tsx" -o src/routes/studio.image.circle-remove.tsx
+          # Prefer good SHA with full file (pre-placeholder)
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/1d622a000d112fd59f06667c0327fde329181b35/src/routes/studio.image.circle-remove.tsx" -o src/routes/studio.image.circle-remove.tsx
           LINES=$(wc -l < src/routes/studio.image.circle-remove.tsx)
           CHARS=$(wc -c < src/routes/studio.image.circle-remove.tsx)
           echo "fetched lines=$LINES chars=$CHARS"
@@ -31,17 +32,20 @@ jobs:
           if grep -q "NOTE: Remaining content truncated" src/routes/studio.image.circle-remove.tsx; then
             echo "ERROR: still a stub"; exit 1
           fi
+          if grep -q "PLACEHOLDER" src/routes/studio.image.circle-remove.tsx; then
+            echo "ERROR: placeholder"; exit 1
+          fi
           git add src/routes/studio.image.circle-remove.tsx
           if git diff --cached --quiet; then
             echo "Pure already matches"
           else
-            git commit -m "fix: restore complete circle-remove route (full working file, no truncation)"
+            git commit -m "fix: restore complete circle-remove route (full working file)"
             for i in 1 2 3 4 5; do
               git pull --rebase origin main && git push && break || sleep 3
             done
             echo "COMMIT1 done"
           fi
-      - name: Commit 2 — item-1 stage max-fill only
+      - name: Commit 2 — ensure max stage fill + hasImage prop
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -51,38 +55,41 @@ jobs:
           from pathlib import Path
           p = Path("src/routes/studio.image.circle-remove.tsx")
           t = p.read_text()
-          old = '''        ) : (\n          <div className="relative flex min-h-0 flex-1 flex-col">\n            <CircleMaskStage\n              ref={maskStageRef}\n              imageUrl={preview}\n              tool={drawToolToMaskTool(drawTool)}\n              brushSize={brushSize}\n              disabled={paintLocked}\n              onMaskChange={setHasMask}\n              inkColor={inkColor}\n              onHistoryChange={onHistoryChange}\n            />\n          </div>\n        )}'''
-          new = '''        ) : (\n          <div className="relative flex h-full min-h-0 w-full flex-1 flex-col" data-circle-stage-fill="max">\n            <CircleMaskStage\n              ref={maskStageRef}\n              imageUrl={preview}\n              tool={drawToolToMaskTool(drawTool)}\n              brushSize={brushSize}\n              disabled={paintLocked}\n              onMaskChange={setHasMask}\n              inkColor={inkColor}\n              onHistoryChange={onHistoryChange}\n            />\n          </div>\n        )}'''
-          # normalize for match - use actual newlines
-          old = old.replace('\\n', '\n')
-          new = new.replace('\\n', '\n')
-          if 'data-circle-stage-fill="max"' in t:
-              print("item1 already applied")
-          elif old in t:
-              p.write_text(t.replace(old, new, 1))
-              print("item1 patch applied", len(p.read_text()))
-          else:
-              # fuzzy: find CircleMaskStage block in select phase
-              import re
-              pat = re.compile(
-                  r'(\s*\) : \(\n\s*)<div className="relative flex min-h-0 flex-1 flex-col">(\n\s*<CircleMaskStage[\s\S]*?</CircleMaskStage>\n\s*</div>\n\s*\)\})',
-                  re.M
+          # hasImage on main shell
+          if "hasImage={!!preview}" not in t:
+              t = t.replace(
+                  "      onBack={goBack}\n      controls={controls}",
+                  "      onBack={goBack}\n      hasImage={!!preview}\n      controls={controls}",
+                  1,
               )
-              m = pat.search(t)
-              if not m:
-                  raise SystemExit("pattern not found")
-              t2 = pat.sub(
-                  r'\1<div className="relative flex h-full min-h-0 w-full flex-1 flex-col" data-circle-stage-fill="max">\2',
-                  t, count=1
+              print("added hasImage main")
+          if 'hasImage={true}' not in t and 'controls={null}' in t:
+              t = t.replace("controls={null}", "hasImage={true}\n        controls={null}", 1)
+              print("added hasImage result")
+          # padding / max fill
+          t = t.replace('px-[18px] py-3', 'px-3 py-2')
+          if 'data-circle-stage-fill="max"' not in t:
+              t = t.replace(
+                  'className="relative flex min-h-0 flex-1 flex-col">\n            <CircleMaskStage',
+                  'className="relative flex h-full min-h-0 w-full flex-1 flex-col p-0" data-circle-stage-fill="max">\n            <CircleMaskStage',
+                  1,
               )
-              p.write_text(t2)
-              print("item1 fuzzy patch applied", len(t2))
+          elif ' p-0" data-circle-stage-fill' not in t:
+              t = t.replace('data-circle-stage-fill="max"', 'p-0" data-circle-stage-fill="max"'.replace('p-0" ', 'p-0" '), 1)
+              # safer:
+              t = t.replace(
+                  'className="relative flex h-full min-h-0 w-full flex-1 flex-col" data-circle-stage-fill="max"',
+                  'className="relative flex h-full min-h-0 w-full flex-1 flex-col p-0" data-circle-stage-fill="max"',
+                  1,
+              )
+          p.write_text(t)
+          print("final", len(t), "hasImage", t.count("hasImage"))
           PY
           git add src/routes/studio.image.circle-remove.tsx
           if git diff --cached --quiet; then
-            echo "No item1 changes"
+            echo "No item2 changes"
           else
-            git commit -m "Circle2edit item 1: maximize canvas stage fill (Add=Remove identical size)"
+            git commit -m "Circle2edit: hasImage compact header + max canvas padding"
             for i in 1 2 3 4 5; do
               git pull --rebase origin main && git push && break || sleep 3
             done
@@ -90,5 +97,4 @@ jobs:
           fi
           echo "=== verify final ==="
           wc -l src/routes/studio.image.circle-remove.tsx
-          grep -n "data-circle-stage-fill" src/routes/studio.image.circle-remove.tsx || true
-          tail -8 src/routes/studio.image.circle-remove.tsx
+          grep -n "hasImage\|data-circle-stage-fill" src/routes/studio.image.circle-remove.tsx || true
