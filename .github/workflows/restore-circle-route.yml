@@ -14,7 +14,7 @@ jobs:
       - name: Fetch known-good route and apply item1 canvas fill
         run: |
           set -euo pipefail
-          curl -fsSL "https://cdn.jsdelivr.net/gh/firstaimrun73/prime-artistry-engine@ea2cc70923becbc38936a64edc2638a2f94f1dcd/src/routes/studio.image.circle-remove.tsx" -o src/routes/studio.image.circle-remove.tsx
+          curl -fsSL "https://cdn.jsdelivr.net/gh/firstaimrun73/prime-artistry-engine@752671aba9340271673ef178dd7cafdda4a147b4/src/routes/studio.image.circle-remove.tsx" -o src/routes/studio.image.circle-remove.tsx
           python3 << 'PY'
           from pathlib import Path
           t = Path("src/routes/studio.image.circle-remove.tsx").read_text()
@@ -33,7 +33,7 @@ jobs:
           </div>
         )}'''
           new = '''        ) : (
-          <div className="relative min-h-0 w-full flex-1" data-circle-stage-fill="max">
+          <div className="relative flex h-full min-h-0 w-full flex-1 flex-col" data-circle-stage-fill="max">
             <CircleMaskStage
               ref={maskStageRef}
               imageUrl={preview}
@@ -47,9 +47,11 @@ jobs:
           </div>
         )}'''
           if old not in t:
-              raise SystemExit("pattern not found")
-          Path("src/routes/studio.image.circle-remove.tsx").write_text(t.replace(old, new))
-          print("restored", len(t))
+              # already patched or different — still keep full file
+              print("pattern not found; keeping fetched file as-is", len(t))
+          else:
+              Path("src/routes/studio.image.circle-remove.tsx").write_text(t.replace(old, new))
+              print("restored+patched", len(t))
           PY
       - name: Commit if changed
         run: |
