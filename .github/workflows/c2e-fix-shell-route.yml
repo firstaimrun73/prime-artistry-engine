@@ -17,31 +17,34 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           GOOD=78683d84f517e774a63244128a03402d9c510ebc
-          # Shell from good + lock icon
           git show "$GOOD:src/components/circle-edit/CircleEditShell.tsx" > src/components/circle-edit/CircleEditShell.tsx
           python3 -c "
           from pathlib import Path
           s=Path('src/components/circle-edit/CircleEditShell.tsx')
           t=s.read_text()
           t=t.replace('import { ArrowLeft, Info, Upload, X, Sparkles } from \"lucide-react\";','import { ArrowLeft, Info, Upload, X, Sparkles, Lock } from \"lucide-react\";')
-          t=t.replace('{id === \"remove\" ? \"Remove\" : locked ? \"Add locked\" : \"Add\"}','{id === \"remove\" ? \"Remove\" : locked ? (<span className=\"inline-flex items-center gap-1\"><Lock className=\"h-3 w-3\" aria-hidden /><span>Add</span></span>) : \"Add\"}')
-          assert 'Add locked' not in t
-          assert 'Lock' in t
+          old='{id === \"remove\" ? \"Remove\" : locked ? \"Add locked\" : \"Add\"}'
+          new='{id === \"remove\" ? \"Remove\" : locked ? (<span className=\"inline-flex items-center gap-1\"><Lock className=\"h-3 w-3\" aria-hidden /><span>Add</span></span>) : \"Add\"}'
+          assert old in t, 'lock text missing'
+          t=t.replace(old,new)
           s.write_text(t)
           print('shell ok')
           "
-          # Route from good + place chip
           git show "$GOOD:src/routes/studio.image.circle-remove.tsx" > src/routes/studio.image.circle-remove.tsx
           python3 << 'PY'
           from pathlib import Path
           r = Path("src/routes/studio.image.circle-remove.tsx")
           rt = r.read_text()
           start = rt.find('{mode === "add" && !addLocked ? (')
-          assert start > 0
-          end_marker = 'Browse objects\n            </button>\n          )}\n        </>\n      ) : null}'
-          end = rt.find(end_marker, start)
-          assert end > 0, repr(rt[start:start+200])
-          end = end + len(end_marker)
+          assert start > 0, 'start missing'
+          # Find end by walking braces is hard; use unique substring near Browse objects end
+          marker = 'Browse objects'
+          bi = rt.find(marker, start)
+          assert bi > 0
+          # Find the : null} after this button block
+          end = rt.find(') : null}', bi)
+          assert end > 0
+          end = end + len(') : null}')
           replacement = '''{mode === "add" && !addLocked && !addConfirmed ? (
         <button
           type="button"
@@ -68,14 +71,15 @@ jobs:
               </div>
             ) : null}
             <CircleMaskStage'''
-          assert old_stage in rt
+          assert old_stage in rt, 'stage missing'
           rt = rt.replace(old_stage, new_stage, 1)
           r.write_text(rt)
           assert "data-circle-place-chip" in rt
           print("route ok")
           PY
           git add src/components/circle-edit/CircleEditShell.tsx src/routes/studio.image.circle-remove.tsx
-          git commit -m "fix(circle2edit): lock icon on Add; Ready-to-place chip overlays canvas (no shrink)"
+          git status
+          git commit -m "fix(circle2edit): lock icon on Add; Ready-to-place chip overlays canvas"
           git pull --rebase origin main || true
           git push
           git rev-parse HEAD
