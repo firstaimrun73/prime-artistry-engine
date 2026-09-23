@@ -1,0 +1,34 @@
+name: c2e-fix3-shell
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-fix3-shell.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          GOOD=78683d84f517e774a63244128a03402d9c510ebc
+          git show "$GOOD:src/components/circle-edit/CircleEditShell.tsx" > src/components/circle-edit/CircleEditShell.tsx
+          python3 -c '
+from pathlib import Path
+s=Path("src/components/circle-edit/CircleEditShell.tsx")
+t=s.read_text()
+t=t.replace("import { ArrowLeft, Info, Upload, X, Sparkles } from \"lucide-react\";", "import { ArrowLeft, Info, Upload, X, Sparkles, Lock } from \"lucide-react\";")
+t=t.replace("locked ? \"Add locked\" : \"Add\"", "locked ? (<span className=\"inline-flex items-center gap-1\"><Lock className=\"h-3 w-3\" aria-hidden /><span>Add</span></span>) : \"Add\"")
+assert "Add locked" not in t
+s.write_text(t)
+print("ok")
+'
+          git add src/components/circle-edit/CircleEditShell.tsx
+          git commit -m "fix(circle2edit): lock icon instead of Add locked text"
+          git pull --rebase origin main || true
+          git push
