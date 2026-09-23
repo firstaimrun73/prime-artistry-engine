@@ -866,7 +866,7 @@ function Circle2editPage() {
             <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
           </div>
         ) : (
-          <div className="relative flex min-h-0 flex-1 flex-col">
+          <div className="relative flex h-full min-h-0 w-full flex-1 flex-col" data-circle-stage-fill="max">
             <CircleMaskStage
               ref={maskStageRef}
               imageUrl={preview}
