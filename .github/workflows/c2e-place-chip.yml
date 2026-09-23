@@ -1,0 +1,56 @@
+name: c2e-place-chip
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-place-chip.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 << 'PY'
+          from pathlib import Path
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          assert "SEE_" not in rt and "PLACEHOLDER" not in rt
+          # Only inject overlay if missing
+          if "data-circle-place-chip" not in rt:
+            old = """          <div className=\"relative flex min-h-0 flex-1 flex-col\">
+            <CircleMaskStage"""
+            new = """          <div className=\"relative flex min-h-0 flex-1 flex-col\">
+            {mode === \"add\" && addConfirmed && selectedAsset ? (
+              <div className=\"pointer-events-none absolute left-0 right-0 top-0 z-20 flex justify-center px-3 pt-2\" data-circle-place-chip=\"true\">
+                <div className={cn(\"pointer-events-auto flex max-w-[min(100%,22rem)] items-center gap-2 rounded-full border px-2.5 py-1 shadow-md backdrop-blur-xl\", isDark ? \"border-[#7B6FE0]/45 bg-[rgba(18,20,28,0.82)]\" : \"border-[#7B6FE0]/35 bg-white/90\")}>
+                  <span className=\"grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.22)]\">
+                    <AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected />
+                  </span>
+                  <span className=\"min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]\">Ready to place {selectedAsset.name}</span>
+                  <button type=\"button\" aria-label=\"Change object\" onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }} className=\"shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90\">Change</button>
+                  <button type=\"button\" aria-label=\"Clear selected object\" onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }} className=\"grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold text-[#7B6FE0]/80\">×</button>
+                </div>
+              </div>
+            ) : null}
+            <CircleMaskStage"""
+            assert old in rt, "stage block missing"
+            rt = rt.replace(old, new, 1)
+          # Slim controls chip when confirmed so it does not add a second row that steals height
+          if "!addConfirmed ?" not in rt:
+            # leave as-is if pattern different
+            pass
+          r.write_text(rt)
+          assert "data-circle-place-chip" in rt
+          print("route ok", len(rt))
+          PY
+          git add src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle2edit): Ready-to-place chip overlays canvas (no stage shrink)" || echo "no change"
+          git pull --rebase origin main || true
+          git push
+          git rev-parse HEAD
