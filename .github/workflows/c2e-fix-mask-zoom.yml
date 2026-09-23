@@ -1,0 +1,166 @@
+name: c2e-fix-mask-zoom
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/c2e-fix-mask-zoom.yml'
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore CircleMaskStage from 78683d84 and patch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          GOOD=78683d84f517e774a63244128a03402d9c510ebc
+          git show ${GOOD}:src/components/circle-edit/CircleMaskStage.tsx > src/components/circle-edit/CircleMaskStage.tsx
+          git show ${GOOD}:src/components/circle-edit/CircleEditShell.tsx > src/components/circle-edit/CircleEditShell.tsx
+          git show ${GOOD}:src/routes/studio.image.circle-remove.tsx > src/routes/studio.image.circle-remove.tsx
+          python3 << 'PY'
+          from pathlib import Path
+
+          # 1) CircleMaskStage mask tint + zoom
+          p = Path("src/components/circle-edit/CircleMaskStage.tsx")
+          t = p.read_text()
+          a = '''    ctx.save();
+    ctx.globalAlpha = 0.42;
+    ctx.drawImage(mask.canvas, 0, 0, w, h);
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = inkStroke;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();'''
+          b = '''    const tint = document.createElement("canvas");
+    tint.width = w;
+    tint.height = h;
+    const tctx = tint.getContext("2d");
+    if (tctx) {
+      tctx.fillStyle = inkStroke;
+      tctx.fillRect(0, 0, w, h);
+      tctx.globalCompositeOperation = "destination-in";
+      tctx.drawImage(mask.canvas, 0, 0, w, h);
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(tint, 0, 0);
+      ctx.restore();
+    }'''
+          if a not in t:
+            raise SystemExit("tint block missing")
+          t = t.replace(a, b)
+          insert = '''  useEffect(() => {
+    if (!ready) return;
+    layoutCanvas();
+  }, [userZoom, ready, layoutCanvas]);
+
+'''
+          anchor = '''  useEffect(() => {
+    redraw();
+  }, [inkStroke, redraw]);'''
+          if insert.strip() not in t:
+            if anchor not in t:
+              raise SystemExit("ink effect missing")
+            t = t.replace(anchor, insert + anchor)
+          # move zoom to shell-fixed
+          oldz = '''        {/* Zoom controls */}
+        <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1.5">
+          <button
+            type="button"
+            aria-label="Zoom in"
+            onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}
+            className="grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/50 text-sm font-bold text-white backdrop-blur-md"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom out"
+            onClick={() => setUserZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
+            className="grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/50 text-sm font-bold text-white backdrop-blur-md"
+          >
+            −
+          </button>
+        </div>
+'''
+          if oldz not in t:
+            raise SystemExit("zoom ui missing")
+          t = t.replace(oldz, "")
+          shell_open = '''      data-circle-canvas-fill="max"
+      style={aspect ? { ["--circle-img-aspect" as string]: String(aspect) } : undefined}
+    >
+'''
+          zoom_fixed = shell_open + '''      <div className="pointer-events-none absolute bottom-3 right-3 z-30 flex flex-col gap-1.5" data-circle-zoom-controls="true" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+        <button type="button" aria-label="Zoom in" onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">+</button>
+        <button type="button" aria-label="Zoom out" onClick={() => setUserZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">−</button>
+      </div>
+'''
+          if shell_open not in t:
+            raise SystemExit("shell open missing")
+          t = t.replace(shell_open, zoom_fixed, 1)
+          p.write_text(t)
+          assert "destination-in" in t and "data-circle-zoom-controls" in t
+
+          # 2) Shell lock icon
+          s = Path("src/components/circle-edit/CircleEditShell.tsx")
+          st = s.read_text()
+          st = st.replace('import { ArrowLeft, Info, Upload, X, Sparkles } from "lucide-react";', 'import { ArrowLeft, Info, Upload, X, Sparkles, Lock } from "lucide-react";')
+          st = st.replace('{id === "remove" ? "Remove" : locked ? "Add locked" : "Add"}', '{id === "remove" ? "Remove" : locked ? (<span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" aria-hidden /><span>Add</span></span>) : "Add"}')
+          s.write_text(st)
+
+          # 3) Route place-chip overlay
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          # Replace large chip in controls with browse-only when not confirmed
+          start = rt.find('{mode === "add" && !addLocked ? (')
+          if start < 0:
+            raise SystemExit("add locked controls missing")
+          # Find matching end of this ternary at controls level - use unique Browse objects end
+          end_marker = 'Browse objects\n            </button>\n          )}\n        </>\n      ) : null}'
+          end = rt.find(end_marker, start)
+          if end < 0:
+            raise SystemExit("browse end missing")
+          end = end + len(end_marker)
+          replacement = '''{mode === "add" && !addLocked && !addConfirmed ? (
+        <button
+          type="button"
+          onClick={() => setAddDrawerOpen(true)}
+          className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+        >
+          Browse objects
+        </button>
+      ) : null}'''
+          rt = rt[:start] + replacement + rt[end:]
+          old_stage = '''          <div className="relative flex min-h-0 flex-1 flex-col">
+            <CircleMaskStage'''
+          new_stage = '''          <div className="relative flex min-h-0 flex-1 flex-col">
+            {mode === "add" && addConfirmed && selectedAsset ? (
+              <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex justify-center px-3 pt-2" data-circle-place-chip="true">
+                <div className={cn("pointer-events-auto flex max-w-[min(100%,22rem)] items-center gap-2 rounded-full border px-2.5 py-1 shadow-md backdrop-blur-xl", isDark ? "border-[#7B6FE0]/45 bg-[rgba(18,20,28,0.82)]" : "border-[#7B6FE0]/35 bg-white/90")}>
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.22)]">
+                    <AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected />
+                  </span>
+                  <span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">Ready to place {selectedAsset.name}</span>
+                  <button type="button" aria-label="Change object" onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90">Change</button>
+                  <button type="button" aria-label="Clear selected object" onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }} className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold text-[#7B6FE0]/80">×</button>
+                </div>
+              </div>
+            ) : null}
+            <CircleMaskStage'''
+          if old_stage not in rt:
+            raise SystemExit("stage missing")
+          rt = rt.replace(old_stage, new_stage, 1)
+          r.write_text(rt)
+          print("all patches ok")
+          PY
+          # keep face-track export
+          grep -q 'export function detectFaceLandmarksSync' src/lib/lens-camera/face-track.ts
+          git add src/components/circle-edit/CircleMaskStage.tsx src/components/circle-edit/CircleEditShell.tsx src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle2edit): mask tint painted-only + ink; zoom; fixed zoom pos; place-chip overlay; lock icon"
+          for i in 1 2 3 4 5; do git pull --rebase origin main && git push && break || sleep 4; done
+          git rev-parse HEAD
