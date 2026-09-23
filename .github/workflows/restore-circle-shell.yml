@@ -22,8 +22,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Restore known-good shell (pre-placeholder)
-          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/759e47f7d2ca367c6647798f75aa3a0fad557310/src/components/circle-edit/CircleEditShell.tsx" -o src/components/circle-edit/CircleEditShell.tsx
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/ada3b6962508a033450086a8fd5a93ec48eec779/src/components/circle-edit/CircleEditShell.tsx" -o src/components/circle-edit/CircleEditShell.tsx
           LINES=$(wc -l < src/components/circle-edit/CircleEditShell.tsx)
           CHARS=$(wc -c < src/components/circle-edit/CircleEditShell.tsx)
           echo "fetched lines=$LINES chars=$CHARS"
