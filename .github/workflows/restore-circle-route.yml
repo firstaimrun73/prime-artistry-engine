@@ -11,16 +11,50 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch known-good route and apply item1 canvas fill
+        with:
+          fetch-depth: 0
+      - name: Commit 1 — restore pure full working route
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/752671aba9340271673ef178dd7cafdda4a147b4/src/routes/studio.image.circle-remove.tsx" -o src/routes/studio.image.circle-remove.tsx
-          wc -l src/routes/studio.image.circle-remove.tsx
+          LINES=$(wc -l < src/routes/studio.image.circle-remove.tsx)
+          CHARS=$(wc -c < src/routes/studio.image.circle-remove.tsx)
+          echo "fetched lines=$LINES chars=$CHARS"
+          if [ "$LINES" -lt 800 ]; then
+            echo "ERROR: fetched file too short"
+            exit 1
+          fi
+          if ! grep -q "CircleMaskStage" src/routes/studio.image.circle-remove.tsx; then
+            echo "ERROR: missing CircleMaskStage"
+            exit 1
+          fi
+          if grep -q "return null" src/routes/studio.image.circle-remove.tsx && grep -q "NOTE: Remaining content truncated" src/routes/studio.image.circle-remove.tsx; then
+            echo "ERROR: still a stub"
+            exit 1
+          fi
+          # ensure pure has original stage (no item1 yet)
+          if grep -q 'data-circle-stage-fill' src/routes/studio.image.circle-remove.tsx; then
+            echo "WARNING: pure already has stage-fill marker"
+          fi
+          git add src/routes/studio.image.circle-remove.tsx
+          if git diff --cached --quiet; then
+            echo "Pure content already matches — no commit 1"
+          else
+            git commit -m "fix: restore complete circle-remove route (full working file, no truncation)"
+            git push
+            echo "COMMIT1 done"
+          fi
+      - name: Commit 2 — item-1 stage max-fill only
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           python3 << 'PY'
           from pathlib import Path
           p = Path("src/routes/studio.image.circle-remove.tsx")
           t = p.read_text()
-          print("fetched", len(t), "chars")
           old = '''        ) : (
           <div className="relative flex min-h-0 flex-1 flex-col">
             <CircleMaskStage
@@ -49,22 +83,24 @@ jobs:
             />
           </div>
         )}'''
-          if old in t:
-              t = t.replace(old, new)
-              print("applied item1 patch")
+          if old not in t:
+              if 'data-circle-stage-fill="max"' in t:
+                  print("item1 already applied")
+              else:
+                  raise SystemExit("pattern not found and item1 not present")
           else:
-              print("pattern not found; file kept as-is")
-          p.write_text(t)
-          print("final", len(t))
+              p.write_text(t.replace(old, new, 1))
+              print("item1 patch applied", len(p.read_text()))
           PY
-      - name: Commit if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/routes/studio.image.circle-remove.tsx
           if git diff --cached --quiet; then
-            echo "No changes"
-            exit 0
+            echo "No item1 changes"
+          else
+            git commit -m "Circle2edit item 1: maximize canvas stage fill (Add=Remove identical size)"
+            git push
+            echo "COMMIT2 done"
           fi
-          git commit -m "fix: restore full circle-remove route + max canvas stage fill (item 1)"
-          git push
+          echo "=== verify final ==="
+          wc -l src/routes/studio.image.circle-remove.tsx
+          grep -n "data-circle-stage-fill" src/routes/studio.image.circle-remove.tsx || true
+          tail -5 src/routes/studio.image.circle-remove.tsx
