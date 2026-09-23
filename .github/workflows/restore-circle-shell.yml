@@ -24,39 +24,31 @@ jobs:
 
           python3 << 'PY'
           from pathlib import Path
+          import re
           p = Path("src/components/circle-edit/CircleEditShell.tsx")
           t = p.read_text()
-          if "PLACEHOLDER" in t and len(t) < 100:
+          print("file len", len(t))
+          if "PLACEHOLDER" in t and len(t) < 500:
               raise SystemExit("shell is placeholder — abort")
           if 'data-active-ink=' in t:
               print("item3 already present")
               raise SystemExit(0)
-          old = '''      {(tool === "brush" || tool === "eraser" || tool === "circle") && onInkColor ? (
-        <div className="flex items-center justify-center gap-2" data-testid="circle-ink">
-          <span className={cn("text-[10px] font-medium", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>
-            Ink
-          </span>
-          {inkColors.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              aria-label={c.label}
-              title={c.label}
-              onClick={() => onInkColor(c.id)}
-              className={cn(
-                "h-7 w-7 rounded-full border-2 shadow-sm transition-transform",
-                inkColor === c.id
-                  ? "border-[#7B6FE0] scale-110 ring-2 ring-[#7B6FE0]/30"
-                  : isDark
-                    ? "border-white/20"
-                    : "border-black/15",
-              )}
-              style={{ background: c.swatch }}
-            />
-          ))}
-        </div>
-      ) : null}'''
-          new = '''      {onInkColor ? (
+
+          # Match the whole ink swatch block flexibly
+          pat = re.compile(
+              r'\{\(tool === "brush" \|\| tool === "eraser" \|\| tool === "circle"\) && onInkColor \? \([\s\S]*?data-testid="circle-ink"[\s\S]*?\) : null\}',
+              re.M,
+          )
+          m = pat.search(t)
+          if not m:
+              # debug
+              idx = t.find('circle-ink')
+              print("circle-ink idx", idx)
+              if idx >= 0:
+                  print(repr(t[idx-80:idx+200]))
+              raise SystemExit("ink block regex not found")
+
+          new = '''{onInkColor ? (
         <div className="flex items-center justify-center gap-2" data-testid="circle-ink" data-active-ink={inkColor}>
           <span className={cn("text-[10px] font-medium", isDark ? "text-[#6B7080]" : "text-[#8A90A0]")}>
             Ink
@@ -106,10 +98,11 @@ jobs:
           })}
         </div>
       ) : null}'''
-          if old not in t:
-              raise SystemExit("ink block pattern not found")
-          p.write_text(t.replace(old, new, 1))
-          print("item3 applied", len(p.read_text()))
+
+          t2 = pat.sub(new, t, count=1)
+          p.write_text(t2)
+          print("item3 applied", len(t2))
+          assert 'data-active-ink=' in t2
           PY
 
           git add src/components/circle-edit/CircleEditShell.tsx
@@ -126,5 +119,5 @@ jobs:
             echo "retry $i"
             sleep 4
           done
-          grep -n "data-active-ink\|aria-pressed" src/components/circle-edit/CircleEditShell.tsx | head
+          grep -n "data-active-ink" src/components/circle-edit/CircleEditShell.tsx | head
           wc -c src/components/circle-edit/CircleEditShell.tsx
