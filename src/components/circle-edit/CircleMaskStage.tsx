@@ -2,6 +2,7 @@
  * Circle 2edit mask stage — exports required by circle-remove route.
  * Canvas: aspect-ratio matched contain-fit (no fixed square / letterbox).
  * Circle tool: freehand A→B path with terminal markers + connecting flash/light.
+ * Stage fills maximum available space (header/toolbar reserved by parent shell).
  */
 import {
   useCallback,
@@ -85,9 +86,11 @@ function smoothPathD(pts: Point[]): string {
   }
   let d = `M${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
   for (let i = 1; i < pts.length - 1; i++) {
-    const midX = (pts[i].x + pts[i + 1].x) / 2;
-    const midY = (pts[i].y + pts[i + 1].y) / 2;
-    d += ` Q${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)} ${midX.toFixed(1)} ${midY.toFixed(1)}`;
+    const p0 = pts[i];
+    const p1 = pts[i + 1];
+    const mx = (p0.x + p1.x) / 2;
+    const my = (p0.y + p1.y) / 2;
+    d += ` Q${p0.x.toFixed(1)} ${p0.y.toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`;
   }
   const last = pts[pts.length - 1];
   d += ` L${last.x.toFixed(1)} ${last.y.toFixed(1)}`;
@@ -95,7 +98,7 @@ function smoothPathD(pts: Point[]): string {
 }
 
 export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function CircleMaskStage(
-  { imageUrl, tool, brushSize, disabled, onMaskChange, onHistoryChange },
+  { imageUrl, tool, brushSize, disabled, onMaskChange, inkColor = "purple", onHistoryChange },
   ref,
 ) {
   const shellRef = useRef<HTMLDivElement>(null);
@@ -108,6 +111,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const pathRef = useRef<Point[]>([]);
   const dispScaleRef = useRef(1);
   const flashTimerRef = useRef<number | null>(null);
+  const activePointerRef = useRef<number | null>(null);
   const [ready, setReady] = useState(false);
   const [natural, setNatural] = useState<Size | null>(null);
   const [aspect, setAspect] = useState<number | null>(null);
@@ -115,6 +119,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const [nearClose, setNearClose] = useState(false);
   const [flashOrigin, setFlashOrigin] = useState<Point | null>(null);
   const [displaySize, setDisplaySize] = useState({ w: 0, h: 0 });
+  const [userZoom, setUserZoom] = useState(1);
+  const [touchRipple, setTouchRipple] = useState<{ x: number; y: number; id: number } | null>(null);
 
   const settings = (): BrushSettings => ({
     sizePx: brushSize,
@@ -122,6 +128,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     hardness: 80,
     featherPx: 2,
   });
+
+  const inkStroke = inkColor === "white" ? "#FFFFFF" : inkColor === "black" ? "#111111" : BRAND;
 
   const notify = useCallback(() => {
     const has = !!maskRef.current && maskHasPaint(maskRef.current);
@@ -152,11 +160,16 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
+    // Tint mask overlay with active ink colour (persists across tools/undo)
     ctx.save();
-    ctx.globalAlpha = 0.45;
+    ctx.globalAlpha = 0.42;
     ctx.drawImage(mask.canvas, 0, 0, w, h);
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = inkStroke;
+    ctx.fillRect(0, 0, w, h);
     ctx.restore();
-  }, []);
+  }, [inkStroke]);
 
   const layoutCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -166,9 +179,15 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     const nw = img.naturalWidth || 1;
     const nh = img.naturalHeight || 1;
     const rect = shell.getBoundingClientRect();
-    const boxW = Math.max(1, rect.width - 4);
-    const boxH = Math.max(1, rect.height - 4);
-    const { w, h, scale } = containSize(nw, nh, boxW, boxH);
+    // Full stage bounds — no inset pad so 9:16 maximizes vertical space.
+    // Add and Remove share this geometry for identical size on the same image.
+    const boxW = Math.max(1, rect.width);
+    const boxH = Math.max(1, rect.height);
+    const { w: baseW, h: baseH, scale: baseScale } = containSize(nw, nh, boxW, boxH);
+    const z = Math.min(3, Math.max(0.5, userZoom));
+    const w = Math.max(1, Math.round(baseW * z));
+    const h = Math.max(1, Math.round(baseH * z));
+    const scale = baseScale * z;
     const maxEdge = 1440;
     const resScale = Math.min(1, maxEdge / Math.max(nw, nh));
     const bufW = Math.max(1, Math.round(nw * resScale));
@@ -182,7 +201,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     dispScaleRef.current = scale;
     setDisplaySize({ w, h });
     redraw();
-  }, [redraw]);
+  }, [redraw, userZoom]);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,6 +223,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       setLivePath([]);
       setNearClose(false);
       setFlashOrigin(null);
+      setUserZoom(1);
       requestAnimationFrame(() => {
         layoutCanvas();
         notify();
@@ -219,6 +239,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   }, [imageUrl, layoutCanvas, notify]);
 
   useEffect(() => {
+    if (!ready) return;
     const shell = shellRef.current;
     if (!shell) return;
     const ro = new ResizeObserver(() => layoutCanvas());
@@ -230,90 +251,58 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     };
   }, [layoutCanvas, ready]);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      exportMask: () => {
-        const m = maskRef.current;
-        if (!m || !maskHasPaint(m)) return null;
-        return exportMaskNatural(m);
-      },
-      exportMaskStats: () => {
-        const m = maskRef.current;
-        if (!m) return null;
-        return computeMaskStats(m);
-      },
-      clear: () => {
-        const m = maskRef.current;
-        if (!m) return;
-        pushHistory();
-        clearWorkingMask(m);
-        setLivePath([]);
-        setNearClose(false);
-        setFlashOrigin(null);
-        redraw();
-        notify();
-      },
-      hasMask: () => !!maskRef.current && maskHasPaint(maskRef.current),
-      undo: () => {
-        const m = maskRef.current;
-        if (!m || historyRef.current.past.length === 0) return;
-        const cur = snapshotMask(m);
-        if (cur) historyRef.current.future.push(cur);
-        const prev = historyRef.current.past.pop();
-        if (prev) restoreSnapshot(m, prev);
-        redraw();
-        notify();
-      },
-      redo: () => {
-        const m = maskRef.current;
-        if (!m || historyRef.current.future.length === 0) return;
-        const cur = snapshotMask(m);
-        if (cur) historyRef.current.past.push(cur);
-        const next = historyRef.current.future.pop();
-        if (next) restoreSnapshot(m, next);
-        redraw();
-        notify();
-      },
-      canUndo: () => historyRef.current.past.length > 0,
-      canRedo: () => historyRef.current.future.length > 0,
-      fit: () => layoutCanvas(),
-    }),
-    [redraw, notify, pushHistory, layoutCanvas],
-  );
+  useEffect(() => {
+    redraw();
+  }, [inkStroke, redraw]);
 
   const toNatural = (e: React.PointerEvent): Point | null => {
     const canvas = canvasRef.current;
-    if (!canvas || !natural) return null;
+    const img = imgRef.current;
+    if (!canvas || !img) return null;
     const rect = canvas.getBoundingClientRect();
-    if (rect.width < 1 || rect.height < 1) return null;
-    const x = ((e.clientX - rect.left) / rect.width) * natural.width;
-    const y = ((e.clientY - rect.top) / rect.height) * natural.height;
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const x = ((e.clientX - rect.left) / rect.width) * img.naturalWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * img.naturalHeight;
     return { x, y };
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (disabled || !maskRef.current) return;
+    // Single-finger / single-pointer only — ignore additional simultaneous touches
+    if (activePointerRef.current != null && e.pointerId !== activePointerRef.current) return;
+    if (e.pointerType === "touch" && (e as unknown as { isPrimary?: boolean }).isPrimary === false) return;
+    activePointerRef.current = e.pointerId;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drawingRef.current = true;
-    pushHistory();
     const p = toNatural(e);
     if (!p) return;
-    lastPtRef.current = p;
+    drawingRef.current = true;
+    pushHistory();
     const kind = toolKind(tool);
+    // Glass ripple at touch point (display coords)
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      setTouchRipple({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        id: Date.now(),
+      });
+      window.setTimeout(() => setTouchRipple(null), 420);
+    }
     if (kind === "path") {
       pathRef.current = [p];
       setLivePath([p]);
       setNearClose(false);
-      setFlashOrigin(null);
     } else {
       stampBrush(maskRef.current, p, kind, settings(), dispScaleRef.current);
+      lastPtRef.current = p;
       redraw();
     }
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drawingRef.current || !maskRef.current) return;
+    if (activePointerRef.current != null && e.pointerId !== activePointerRef.current) return;
     const p = toNatural(e);
     if (!p) return;
     const kind = toolKind(tool);
@@ -334,9 +323,14 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     }
   };
 
-  const onPointerUp = () => {
-    if (!drawingRef.current || !maskRef.current) return;
+  const onPointerUp = (e?: React.PointerEvent) => {
+    if (e && activePointerRef.current != null && e.pointerId !== activePointerRef.current) return;
+    if (!drawingRef.current || !maskRef.current) {
+      activePointerRef.current = null;
+      return;
+    }
     drawingRef.current = false;
+    activePointerRef.current = null;
     const kind = toolKind(tool);
     if (kind === "path" && pathRef.current.length >= 3) {
       const origin = pathRef.current[0];
@@ -350,23 +344,92 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       }, 450);
     }
     pathRef.current = [];
-    lastPtRef.current = null;
     setLivePath([]);
     setNearClose(false);
+    lastPtRef.current = null;
     notify();
   };
 
-  const pathD = livePath.length > 0 ? smoothPathD(livePath) : "";
+  useImperativeHandle(
+    ref,
+    () => ({
+      exportMask: () => {
+        const m = maskRef.current;
+        const img = imgRef.current;
+        if (!m || !img) return null;
+        return exportMaskNatural(m, { width: img.naturalWidth, height: img.naturalHeight });
+      },
+      exportMaskStats: () => {
+        const m = maskRef.current;
+        if (!m) return null;
+        return computeMaskStats(m);
+      },
+      clear: () => {
+        if (!maskRef.current) return;
+        pushHistory();
+        clearWorkingMask(maskRef.current);
+        redraw();
+        notify();
+      },
+      hasMask: () => !!maskRef.current && maskHasPaint(maskRef.current),
+      undo: () => {
+        const m = maskRef.current;
+        if (!m) return;
+        const snap = historyRef.current.past.pop();
+        if (!snap) return;
+        const cur = snapshotMask(m);
+        if (cur) historyRef.current.future.push(cur);
+        restoreSnapshot(m, snap);
+        redraw();
+        notify();
+      },
+      redo: () => {
+        const m = maskRef.current;
+        if (!m) return;
+        const snap = historyRef.current.future.pop();
+        if (!snap) return;
+        const cur = snapshotMask(m);
+        if (cur) historyRef.current.past.push(cur);
+        restoreSnapshot(m, snap);
+        redraw();
+        notify();
+      },
+      canUndo: () => historyRef.current.past.length > 0,
+      canRedo: () => historyRef.current.future.length > 0,
+      fit: () => {
+        setUserZoom(1);
+        requestAnimationFrame(() => layoutCanvas());
+      },
+    }),
+    [redraw, notify, pushHistory, layoutCanvas],
+  );
+
   const termA = livePath[0];
   const termB = livePath.length > 1 ? livePath[livePath.length - 1] : null;
   const showOverlay =
     !!natural && displaySize.w > 0 && (livePath.length > 0 || flashOrigin != null);
+
+  // Overlay is in display pixels; path points are natural — scale for SVG
+  const toDisp = (p: Point): Point => {
+    const img = imgRef.current;
+    if (!img || !displaySize.w) return p;
+    return {
+      x: (p.x / img.naturalWidth) * displaySize.w,
+      y: (p.y / img.naturalHeight) * displaySize.h,
+    };
+  };
+  const dispPath = livePath.map(toDisp);
+  const dispA = termA ? toDisp(termA) : null;
+  const dispB = termB ? toDisp(termB) : null;
+  const dispFlash = flashOrigin ? toDisp(flashOrigin) : null;
+  const RING_SW = 3.25; // thicker premium ring (was ~2)
 
   return (
     <div
       ref={shellRef}
       className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
       data-circle-mask-stage="true"
+      data-circle-canvas-fill="max"
       style={aspect ? { ["--circle-img-aspect" as string]: String(aspect) } : undefined}
     >
       <div className="relative" style={{ width: displaySize.w || undefined, height: displaySize.h || undefined }}>
@@ -385,93 +448,108 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
+          onPointerUp={(e) => onPointerUp(e)}
+          onPointerCancel={(e) => onPointerUp(e)}
         />
-        {showOverlay && natural ? (
+        {/* Zoom controls */}
+        <div className="absolute bottom-2 right-2 z-20 flex flex-col gap-1.5">
+          <button
+            type="button"
+            aria-label="Zoom in"
+            onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}
+            className="grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/50 text-sm font-bold text-white backdrop-blur-md"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom out"
+            onClick={() => setUserZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}
+            className="grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/50 text-sm font-bold text-white backdrop-blur-md"
+          >
+            −
+          </button>
+        </div>
+        {/* Glass touch ripple */}
+        {touchRipple ? (
+          <span
+            key={touchRipple.id}
+            className="pointer-events-none absolute z-10 rounded-full"
+            style={{
+              left: touchRipple.x,
+              top: touchRipple.y,
+              width: 48,
+              height: 48,
+              marginLeft: -24,
+              marginTop: -24,
+              background:
+                "radial-gradient(circle, rgba(255,255,255,0.35) 0%, rgba(123,111,224,0.22) 40%, transparent 70%)",
+              border: "1px solid rgba(255,255,255,0.25)",
+              boxShadow: "0 0 20px rgba(123,111,224,0.25)",
+              animation: "c2e-glass-ripple 0.42s ease-out forwards",
+            }}
+          />
+        ) : null}
+        <style>{`@keyframes c2e-glass-ripple{0%{transform:scale(0.35);opacity:0.9}100%{transform:scale(1.35);opacity:0}}`}</style>
+        {showOverlay ? (
           <svg
             className="pointer-events-none absolute inset-0"
             width={displaySize.w}
             height={displaySize.h}
-            viewBox={`0 0 ${natural.width} ${natural.height}`}
-            preserveAspectRatio="none"
-            aria-hidden
-            data-circle-terminals="true"
+            viewBox={`0 0 ${displaySize.w} ${displaySize.h}`}
           >
             <defs>
               <linearGradient id="c2e-ab-flash" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor={BRAND} stopOpacity="0.15" />
+                <stop offset="0%" stopColor={inkStroke} stopOpacity="0.15" />
                 <stop offset="50%" stopColor="#A89BFF" stopOpacity="0.95" />
-                <stop offset="100%" stopColor={BRAND} stopOpacity="0.15" />
+                <stop offset="100%" stopColor={inkStroke} stopOpacity="0.15" />
               </linearGradient>
-              <filter id="c2e-ab-glow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="3" result="b" />
+              <filter id="c2e-ab-glow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="3.5" result="b" />
                 <feMerge>
                   <feMergeNode in="b" />
                   <feMergeNode in="SourceGraphic" />
                 </feMerge>
               </filter>
             </defs>
-            {pathD ? (
+            {dispPath.length > 1 ? (
               <path
-                d={pathD}
+                d={smoothPathD(dispPath)}
                 fill="none"
                 stroke="url(#c2e-ab-flash)"
-                strokeWidth={nearClose ? 4.5 : 3}
+                strokeWidth={RING_SW}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 filter="url(#c2e-ab-glow)"
                 opacity={nearClose ? 1 : 0.85}
               />
             ) : null}
-            {termA ? (
+            {dispA ? (
               <g>
-                <circle cx={termA.x} cy={termA.y} r={14} fill="none" stroke={BRAND} strokeWidth={2} opacity={0.9} />
-                <circle cx={termA.x} cy={termA.y} r={5} fill={BRAND} />
-                <text
-                  x={termA.x}
-                  y={termA.y - 18}
-                  textAnchor="middle"
-                  fill={BRAND}
-                  fontSize={16}
-                  fontWeight={700}
-                  style={{ fontFamily: "system-ui, sans-serif" }}
-                >
-                  A
-                </text>
+                <circle cx={dispA.x} cy={dispA.y} r={14} fill="none" stroke={inkStroke} strokeWidth={RING_SW} opacity={0.9} />
+                <circle cx={dispA.x} cy={dispA.y} r={5} fill={inkStroke} />
               </g>
             ) : null}
-            {termB ? (
+            {dispB ? (
               <g>
                 <circle
-                  cx={termB.x}
-                  cy={termB.y}
+                  cx={dispB.x}
+                  cy={dispB.y}
                   r={nearClose ? 16 : 12}
                   fill="none"
-                  stroke={nearClose ? "#A89BFF" : BRAND}
-                  strokeWidth={nearClose ? 2.5 : 2}
+                  stroke={nearClose ? "#A89BFF" : inkStroke}
+                  strokeWidth={nearClose ? RING_SW + 0.5 : RING_SW}
                   opacity={0.95}
                 >
                   {nearClose ? (
                     <animate attributeName="r" values="12;18;12" dur="0.6s" repeatCount="indefinite" />
                   ) : null}
                 </circle>
-                <circle cx={termB.x} cy={termB.y} r={5} fill={nearClose ? "#A89BFF" : BRAND} />
-                <text
-                  x={termB.x}
-                  y={termB.y - 18}
-                  textAnchor="middle"
-                  fill={nearClose ? "#A89BFF" : BRAND}
-                  fontSize={16}
-                  fontWeight={700}
-                  style={{ fontFamily: "system-ui, sans-serif" }}
-                >
-                  B
-                </text>
+                <circle cx={dispB.x} cy={dispB.y} r={5} fill={nearClose ? "#A89BFF" : inkStroke} />
               </g>
             ) : null}
-            {flashOrigin ? (
-              <circle cx={flashOrigin.x} cy={flashOrigin.y} r={8} fill="none" stroke="#A89BFF" strokeWidth={3} opacity={0.9}>
+            {dispFlash ? (
+              <circle cx={dispFlash.x} cy={dispFlash.y} r={8} fill="none" stroke="#A89BFF" strokeWidth={3} opacity={0.9}>
                 <animate attributeName="r" from="8" to="48" dur="0.4s" fill="freeze" />
                 <animate attributeName="opacity" from="0.9" to="0" dur="0.4s" fill="freeze" />
               </circle>
