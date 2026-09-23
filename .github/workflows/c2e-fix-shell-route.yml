@@ -1,0 +1,81 @@
+name: c2e-fix-shell-route
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-fix-shell-route.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          GOOD=78683d84f517e774a63244128a03402d9c510ebc
+          # Shell from good + lock icon
+          git show "$GOOD:src/components/circle-edit/CircleEditShell.tsx" > src/components/circle-edit/CircleEditShell.tsx
+          python3 -c "
+          from pathlib import Path
+          s=Path('src/components/circle-edit/CircleEditShell.tsx')
+          t=s.read_text()
+          t=t.replace('import { ArrowLeft, Info, Upload, X, Sparkles } from \"lucide-react\";','import { ArrowLeft, Info, Upload, X, Sparkles, Lock } from \"lucide-react\";')
+          t=t.replace('{id === \"remove\" ? \"Remove\" : locked ? \"Add locked\" : \"Add\"}','{id === \"remove\" ? \"Remove\" : locked ? (<span className=\"inline-flex items-center gap-1\"><Lock className=\"h-3 w-3\" aria-hidden /><span>Add</span></span>) : \"Add\"}')
+          assert 'Add locked' not in t
+          assert 'Lock' in t
+          s.write_text(t)
+          print('shell ok')
+          "
+          # Route from good + place chip
+          git show "$GOOD:src/routes/studio.image.circle-remove.tsx" > src/routes/studio.image.circle-remove.tsx
+          python3 << 'PY'
+          from pathlib import Path
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          start = rt.find('{mode === "add" && !addLocked ? (')
+          assert start > 0
+          end_marker = 'Browse objects\n            </button>\n          )}\n        </>\n      ) : null}'
+          end = rt.find(end_marker, start)
+          assert end > 0, repr(rt[start:start+200])
+          end = end + len(end_marker)
+          replacement = '''{mode === "add" && !addLocked && !addConfirmed ? (
+        <button
+          type="button"
+          onClick={() => setAddDrawerOpen(true)}
+          className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+        >
+          Browse objects
+        </button>
+      ) : null}'''
+          rt = rt[:start] + replacement + rt[end:]
+          old_stage = '''          <div className="relative flex min-h-0 flex-1 flex-col">
+            <CircleMaskStage'''
+          new_stage = '''          <div className="relative flex min-h-0 flex-1 flex-col">
+            {mode === "add" && addConfirmed && selectedAsset ? (
+              <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex justify-center px-3 pt-2" data-circle-place-chip="true">
+                <div className={cn("pointer-events-auto flex max-w-[min(100%,22rem)] items-center gap-2 rounded-full border px-2.5 py-1 shadow-md backdrop-blur-xl", isDark ? "border-[#7B6FE0]/45 bg-[rgba(18,20,28,0.82)]" : "border-[#7B6FE0]/35 bg-white/90")}>
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.22)]">
+                    <AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected />
+                  </span>
+                  <span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">Ready to place {selectedAsset.name}</span>
+                  <button type="button" aria-label="Change object" onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90">Change</button>
+                  <button type="button" aria-label="Clear selected object" onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }} className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold text-[#7B6FE0]/80">×</button>
+                </div>
+              </div>
+            ) : null}
+            <CircleMaskStage'''
+          assert old_stage in rt
+          rt = rt.replace(old_stage, new_stage, 1)
+          r.write_text(rt)
+          assert "data-circle-place-chip" in rt
+          print("route ok")
+          PY
+          git add src/components/circle-edit/CircleEditShell.tsx src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle2edit): lock icon on Add; Ready-to-place chip overlays canvas (no shrink)"
+          git pull --rebase origin main || true
+          git push
+          git rev-parse HEAD
