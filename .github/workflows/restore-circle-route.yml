@@ -1,0 +1,64 @@
+name: Restore Circle2edit route
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-circle-route.yml'
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch known-good route and apply item1 canvas fill
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://cdn.jsdelivr.net/gh/firstaimrun73/prime-artistry-engine@ea2cc70923becbc38936a64edc2638a2f94f1dcd/src/routes/studio.image.circle-remove.tsx" -o src/routes/studio.image.circle-remove.tsx
+          python3 << 'PY'
+          from pathlib import Path
+          t = Path("src/routes/studio.image.circle-remove.tsx").read_text()
+          old = '''        ) : (
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <CircleMaskStage
+              ref={maskStageRef}
+              imageUrl={preview}
+              tool={drawToolToMaskTool(drawTool)}
+              brushSize={brushSize}
+              disabled={paintLocked}
+              onMaskChange={setHasMask}
+              inkColor={inkColor}
+              onHistoryChange={onHistoryChange}
+            />
+          </div>
+        )}'''
+          new = '''        ) : (
+          <div className="relative min-h-0 w-full flex-1" data-circle-stage-fill="max">
+            <CircleMaskStage
+              ref={maskStageRef}
+              imageUrl={preview}
+              tool={drawToolToMaskTool(drawTool)}
+              brushSize={brushSize}
+              disabled={paintLocked}
+              onMaskChange={setHasMask}
+              inkColor={inkColor}
+              onHistoryChange={onHistoryChange}
+            />
+          </div>
+        )}'''
+          if old not in t:
+              raise SystemExit("pattern not found")
+          Path("src/routes/studio.image.circle-remove.tsx").write_text(t.replace(old, new))
+          print("restored", len(t))
+          PY
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/routes/studio.image.circle-remove.tsx
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "fix: restore full circle-remove route + max canvas stage fill (item 1)"
+          git push
