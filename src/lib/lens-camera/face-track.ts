@@ -187,6 +187,61 @@ export async function detectFace(
   }
 }
 
+/**
+ * Synchronous face landmarks for canvas frames (carousel lenses).
+ * Uses MediaPipe when the singleton is ready; otherwise a center-face heuristic.
+ * Kicks off ensureFaceLandmarker() from callers — this never awaits.
+ */
+export function detectFaceLandmarksSync(src: HTMLCanvasElement): FaceLandmarks | null {
+  if (!src || src.width < 2 || src.height < 2) return null;
+
+  if (landmarker) {
+    try {
+      videoTimestamp += 33;
+      // VIDEO-mode landmarker expects a video frame; pass canvas via detectForVideo
+      // by using an offscreen path when the API accepts HTMLCanvasElement.
+      const anyFl = landmarker as FaceLandmarkerInstance & {
+        detectForVideo?: (input: HTMLCanvasElement | HTMLVideoElement, ts: number) => {
+          faceLandmarks?: Array<Array<{ x: number; y: number; z?: number }>>;
+          facialTransformationMatrixes?: Array<{ data?: Float32Array | number[] }>;
+        };
+        detect?: (input: HTMLCanvasElement) => {
+          faceLandmarks?: Array<Array<{ x: number; y: number; z?: number }>>;
+          facialTransformationMatrixes?: Array<{ data?: Float32Array | number[] }>;
+        };
+      };
+      const result =
+        typeof anyFl.detectForVideo === "function"
+          ? anyFl.detectForVideo(src, videoTimestamp)
+          : typeof anyFl.detect === "function"
+            ? anyFl.detect(src)
+            : null;
+      const landmarks = result?.faceLandmarks?.[0];
+      if (landmarks && landmarks.length > 0) {
+        const matrix = result?.facialTransformationMatrixes?.[0];
+        return landmarksFromMediaPipe(landmarks, matrix);
+      }
+    } catch (err) {
+      console.warn("[face-track] detectFaceLandmarksSync error", err);
+    }
+  }
+
+  // Heuristic center-face estimate (same proportions as video fallback)
+  const cx = 0.5;
+  const cy = 0.42;
+  return {
+    headTop: { x: cx, y: cy - 0.22 },
+    leftEye: { x: cx - 0.08, y: cy - 0.05 },
+    rightEye: { x: cx + 0.08, y: cy - 0.05 },
+    nose: { x: cx, y: cy + 0.02 },
+    mouth: { x: cx, y: cy + 0.12 },
+    chin: { x: cx, y: cy + 0.28 },
+    roll: 0,
+    scale: 1,
+    confidence: landmarker ? 0.25 : 0.2,
+  };
+}
+
 /** Pre-warm the landmarker (call early, e.g. on camera start) */
 export function warmFaceLandmarker(): void {
   void ensureFaceLandmarker();
