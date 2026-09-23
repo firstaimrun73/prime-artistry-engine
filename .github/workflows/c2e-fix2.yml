@@ -1,0 +1,49 @@
+name: c2e-fix2
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-fix2.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          GOOD=78683d84f517e774a63244128a03402d9c510ebc
+          git show "$GOOD:src/components/circle-edit/CircleMaskStage.tsx" > src/components/circle-edit/CircleMaskStage.tsx
+          python3 -c "
+          from pathlib import Path
+          p=Path('src/components/circle-edit/CircleMaskStage.tsx')
+          t=p.read_text()
+          a='''    ctx.save();\n    ctx.globalAlpha = 0.42;\n    ctx.drawImage(mask.canvas, 0, 0, w, h);\n    ctx.globalCompositeOperation = \"source-atop\";\n    ctx.globalAlpha = 0.55;\n    ctx.fillStyle = inkStroke;\n    ctx.fillRect(0, 0, w, h);\n    ctx.restore();'''
+          b='''    const tint = document.createElement(\"canvas\");\n    tint.width = w;\n    tint.height = h;\n    const tctx = tint.getContext(\"2d\");\n    if (tctx) {\n      tctx.fillStyle = inkStroke;\n      tctx.fillRect(0, 0, w, h);\n      tctx.globalCompositeOperation = \"destination-in\";\n      tctx.drawImage(mask.canvas, 0, 0, w, h);\n      ctx.save();\n      ctx.globalAlpha = 0.55;\n      ctx.drawImage(tint, 0, 0);\n      ctx.restore();\n    }'''
+          assert a in t, 'tint block missing'
+          t=t.replace(a,b)
+          z='''  useEffect(() => {\n    if (!ready) return;\n    layoutCanvas();\n  }, [userZoom, ready, layoutCanvas]);\n\n'''
+          a2='''  useEffect(() => {\n    redraw();\n  }, [inkStroke, redraw]);'''
+          if 'userZoom, ready, layoutCanvas' not in t:
+            assert a2 in t
+            t=t.replace(a2, z+a2)
+          oldz='''        {/* Zoom controls */}\n        <div className=\"absolute bottom-2 right-2 z-20 flex flex-col gap-1.5\">\n          <button\n            type=\"button\"\n            aria-label=\"Zoom in\"\n            onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}\n            className=\"grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/50 text-sm font-bold text-white backdrop-blur-md\"\n          >\n            +\n          </button>\n          <button\n            type=\"button\"\n            aria-label=\"Zoom out\"\n            onClick={() => setUserZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}\n            className=\"grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/50 text-sm font-bold text-white backdrop-blur-md\"\n          >\n            −\n          </button>\n        </div>\n'''
+          assert oldz in t, 'zoom missing'
+          t=t.replace(oldz,'')
+          mark='''      data-circle-canvas-fill=\"max\"\n      style={aspect ? { [\"--circle-img-aspect\" as string]: String(aspect) } : undefined}\n    >\n'''
+          zf=mark+'''      <div className=\"pointer-events-none absolute bottom-3 right-3 z-30 flex flex-col gap-1.5\" data-circle-zoom-controls=\"true\" style={{ bottom: \"max(0.75rem, env(safe-area-inset-bottom))\" }}>\n        <button type=\"button\" aria-label=\"Zoom in\" onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))} className=\"pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md\">+</button>\n        <button type=\"button\" aria-label=\"Zoom out\" onClick={() => setUserZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))} className=\"pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md\">−</button>\n      </div>\n'''
+          assert mark in t
+          t=t.replace(mark,zf,1)
+          p.write_text(t)
+          assert 'destination-in' in t
+          print('ok', len(t))
+          "
+          git add src/components/circle-edit/CircleMaskStage.tsx
+          git commit -m "fix(circle2edit): mask tint painted-only + working zoom + fixed zoom position"
+          git pull --rebase origin main || true
+          git push
+          git rev-parse HEAD
