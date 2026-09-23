@@ -1,0 +1,50 @@
+name: Fix class attr
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fix-class-attr.yml'
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fix
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("src/routes/studio.image.circle-remove.tsx")
+          t = p.read_text()
+          bad = 'className="relative flex h-full min-h-0 w-full flex-1 flex-col" p-0" data-circle-stage-fill="max"'
+          good = 'className="relative flex h-full min-h-0 w-full flex-1 flex-col p-0" data-circle-stage-fill="max"'
+          if bad in t:
+              t = t.replace(bad, good, 1)
+              print("fixed bad attr")
+          elif good in t:
+              print("already good")
+          else:
+              # any broken variant
+              import re
+              t2, n = re.subn(
+                  r'className="relative flex h-full min-h-0 w-full flex-1 flex-col"\s*p-0"\s*data-circle-stage-fill="max"',
+                  good,
+                  t,
+                  count=1,
+              )
+              if n:
+                  t = t2
+                  print("regex fixed", n)
+              else:
+                  print("no match; snippet:", [line for line in t.splitlines() if "data-circle-stage-fill" in line][:3])
+          p.write_text(t)
+          PY
+          git add src/routes/studio.image.circle-remove.tsx
+          if git diff --cached --quiet; then echo "no change"; else git commit -m "fix: repair stage wrapper className (p-0 attribute)"; git push; fi
+          grep -n "data-circle-stage-fill" src/routes/studio.image.circle-remove.tsx
