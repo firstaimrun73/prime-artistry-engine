@@ -1,0 +1,55 @@
+name: Restore Circle2edit from 752671a
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-circle-752671a.yml'
+concurrency:
+  group: restore-circle-752671a
+  cancel-in-progress: true
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore shell + route from 752671a
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          GOOD=752671aba9340271673ef178dd7cafdda4a147b4
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/${GOOD}/src/components/circle-edit/CircleEditShell.tsx" -o src/components/circle-edit/CircleEditShell.tsx
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/${GOOD}/src/routes/studio.image.circle-remove.tsx" -o src/routes/studio.image.circle-remove.tsx
+          # Keep build fix: ensure face-track still has detectFaceLandmarksSync
+          if ! grep -q 'export function detectFaceLandmarksSync' src/lib/lens-camera/face-track.ts; then
+            echo "ERROR: build fix missing from face-track"; exit 1
+          fi
+          # Sanity
+          test "$(wc -l < src/components/circle-edit/CircleEditShell.tsx)" -ge 300
+          test "$(wc -l < src/routes/studio.image.circle-remove.tsx)" -ge 800
+          grep -q CircleMaskStage src/routes/studio.image.circle-remove.tsx
+          grep -q 'data-circle-toolbar' src/components/circle-edit/CircleEditShell.tsx
+          if grep -q 'PLACEHOLDER\|SEE_FILE' src/components/circle-edit/CircleEditShell.tsx src/routes/studio.image.circle-remove.tsx; then
+            echo "ERROR: stub content"; exit 1
+          fi
+          if grep -q 'absolute inset-x-0 bottom' src/components/circle-edit/CircleEditShell.tsx; then
+            echo "ERROR: floating layout still present"; exit 1
+          fi
+          git add src/components/circle-edit/CircleEditShell.tsx src/routes/studio.image.circle-remove.tsx
+          if git diff --cached --quiet; then
+            echo "Already matches 752671a"
+          else
+            git commit -m "revert: restore Circle2edit shell + route to 752671a (original toolbar/canvas)"
+            for i in 1 2 3 4 5; do
+              git pull --rebase origin main && git push && break || sleep 3
+            done
+          fi
+          echo "=== verify ==="
+          wc -l src/components/circle-edit/CircleEditShell.tsx src/routes/studio.image.circle-remove.tsx
+          grep -n "detectFaceLandmarksSync" src/lib/lens-camera/face-track.ts | head -1
+          head -5 src/components/circle-edit/CircleEditShell.tsx
