@@ -568,49 +568,15 @@ function Circle2editPage() {
       ) : null}
       {mode === "add" && !addLocked ? (
         <>
-          {addConfirmed && selectedAsset ? (
-            <div className="flex items-center gap-2 rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.10)] px-2.5 py-1.5">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[rgba(123,111,224,0.18)]">
-                <AssetIcon asset={selectedAsset} size={20} isDark={isDark} selected />
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#7B6FE0]">
-                {selectedAsset.name}
-              </span>
-              <button
-                type="button"
-                aria-label="Clear selected object"
-                onClick={() => {
-                  setAddObjectId(null);
-                  setFactorSelection({});
-                  setAddConfirmed(false);
-                  setConfirmOpen(false);
-                  maskStageRef.current?.clear();
-                  setHasMask(false);
-                }}
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[13px] font-bold text-[#7B6FE0]/80 hover:bg-[rgba(123,111,224,0.15)]"
-              >
-                ×
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAddConfirmed(false);
-                  setConfirmOpen(true);
-                }}
-                className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-medium text-[#7B6FE0]/90"
-              >
-                Change
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAddDrawerOpen(true)}
-              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
-            >
-              Browse objects
-            </button>
-          )}
+          {!addConfirmed ? (
+  <button
+    type="button"
+    onClick={() => setAddDrawerOpen(true)}
+    className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+  >
+    Browse objects
+  </button>
+) : null}
         </>
       ) : null}
       {mode === "add" && addLocked ? (
@@ -867,7 +833,17 @@ function Circle2editPage() {
           </div>
         ) : (
           <div className="relative flex min-h-0 flex-1 flex-col">
-            <CircleMaskStage
+  {mode === "add" && addConfirmed && selectedAsset ? (
+    <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3" data-circle-place-chip="true">
+      <div className={cn("pointer-events-auto flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-full border px-2.5 py-1 shadow-lg backdrop-blur-xl", isDark ? "border-[#7B6FE0]/40 bg-[rgba(18,20,28,0.88)]" : "border-[#7B6FE0]/30 bg-white/92")}>
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]"><AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected /></span>
+        <span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">{selectedAsset.name}</span>
+        <button type="button" aria-label="Change object" onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90">Change</button>
+        <button type="button" aria-label="Clear selected object" onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }} className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold text-[#7B6FE0]/80">×</button>
+      </div>
+    </div>
+  ) : null}
+  <CircleMaskStage
               ref={maskStageRef}
               imageUrl={preview}
               tool={drawToolToMaskTool(drawTool)}
