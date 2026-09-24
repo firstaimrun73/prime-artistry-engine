@@ -1,0 +1,133 @@
+name: c2e-chip-fix-now
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-chip-fix-now.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Restore good route from last known good (before placeholder push)
+          git show 9b329534959fdd71cd5f9b518501ed5df93cd8df:src/routes/studio.image.circle-remove.tsx > src/routes/studio.image.circle-remove.tsx
+          grep -q 'CircleMaskStage' src/routes/studio.image.circle-remove.tsx
+          ! grep -q PLACEHOLDER src/routes/studio.image.circle-remove.tsx
+
+          python3 << 'PY'
+          from pathlib import Path
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          lines = r.read_text().splitlines(True)
+
+          # Remove absolute overlay chip block
+          out = []
+          i = 0
+          while i < len(lines):
+              ln = lines[i]
+              # Detect start of overlay: mode === add && addConfirmed near upcoming place-chip absolute
+              if 'mode === "add" && addConfirmed && selectedAsset' in ln:
+                  # peek ahead for absolute place-chip
+                  window = "".join(lines[i:min(len(lines), i+15)])
+                  if 'data-circle-place-chip' in window and 'absolute' in window:
+                      # skip until ) : null}
+                      while i < len(lines) and ') : null}' not in lines[i]:
+                          i += 1
+                      if i < len(lines):
+                          i += 1  # skip the ) : null} line
+                      continue
+              out.append(ln)
+              i += 1
+          rt = "".join(out)
+
+          # Insert toolbar chip if missing
+          if 'data-circle-place-chip' not in rt:
+              old = """          {!addConfirmed ? (
+  <button
+    type="button"
+    onClick={() => setAddDrawerOpen(true)}
+    className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+  >
+    Browse objects
+  </button>
+) : null}"""
+              new = """          {!addConfirmed ? (
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(true)}
+              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+            >
+              Browse objects
+            </button>
+          ) : selectedAsset ? (
+            <div
+              className={cn(
+                "flex w-full max-w-full items-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5",
+                isDark ? "border-[#7B6FE0]/35 bg-[rgba(123,111,224,0.10)]" : "border-[#7B6FE0]/25 bg-[rgba(123,111,224,0.06)]",
+              )}
+              data-circle-place-chip="true"
+            >
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]">
+                <AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#7B6FE0]">
+                Ready to place {selectedAsset.name}
+              </span>
+              <button
+                type="button"
+                aria-label="Change object"
+                onClick={() => {
+                  setAddConfirmed(false);
+                  setConfirmOpen(true);
+                }}
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                aria-label="Clear selected object"
+                onClick={() => {
+                  setAddObjectId(null);
+                  setFactorSelection({});
+                  setAddConfirmed(false);
+                  setConfirmOpen(false);
+                  maskStageRef.current?.clear();
+                  setHasMask(false);
+                }}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[13px] font-bold text-[#7B6FE0]/80"
+              >
+                ×
+              </button>
+            </div>
+          ) : null}"""
+              if old not in rt:
+                  raise SystemExit("browse block not found")
+              rt = rt.replace(old, new, 1)
+
+          # Validate
+          assert "PLACEHOLDER" not in rt
+          assert "LOADING_FROM" not in rt
+          assert rt.count("data-circle-place-chip") == 1
+          i = rt.find("data-circle-place-chip")
+          assert "absolute" not in rt[max(0, i - 220) : i]
+          assert "const controls" in rt[:i]
+          assert "CircleMaskStage" in rt
+          r.write_text(rt)
+          print("FIXED OK")
+          PY
+
+          grep -n 'data-circle-place-chip' src/routes/studio.image.circle-remove.tsx
+          ! grep -q PLACEHOLDER src/routes/studio.image.circle-remove.tsx
+
+          git add src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle-2edit): move add object control into toolbar"
+          git push origin HEAD:main
+          git rev-parse HEAD
