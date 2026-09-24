@@ -1,0 +1,176 @@
+name: c2e-chip-toolbar
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-chip-toolbar.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 << 'PY'
+          from pathlib import Path
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          assert "PLACEHOLDER" not in rt and "LOADING_FROM" not in rt
+
+          # Remove any absolute overlay place-chip (top or bottom)
+          import re
+          # Pattern: absolute positioned place-chip block before CircleMaskStage
+          pat = re.compile(
+              r"\s*\{mode === \"add\" && addConfirmed && selectedAsset \? \(\s*"
+              r"<div className=\"pointer-events-none absolute[^\"]*\" data-circle-place-chip=\"true\">.*?"
+              r"</div>\s*</div>\s*\) : null\}\s*",
+              re.S,
+          )
+          rt2, n = pat.subn("\n", rt)
+          if n == 0:
+              # try alternate without nested closing exact
+              pat2 = re.compile(
+                  r"\{mode === \"add\" && addConfirmed && selectedAsset \? \([\s\S]*?data-circle-place-chip=\"true\"[\s\S]*?\) : null\}\s*",
+                  re.S,
+              )
+              rt2, n = pat2.subn("", rt)
+          if n == 0 and "data-circle-place-chip" in rt and "absolute" in rt:
+              # manual line strip between markers
+              lines = rt.splitlines(True)
+              out = []
+              skip = False
+              for i, ln in enumerate(lines):
+                  if "data-circle-place-chip" in ln and "absolute" in "".join(lines[max(0,i-3):i+1]):
+                      # backtrack to opening {mode === "add"
+                      while out and "mode === \"add\" && addConfirmed" not in out[-1]:
+                          out.pop()
+                      if out and "mode === \"add\" && addConfirmed" in out[-1]:
+                          out.pop()
+                      skip = True
+                      continue
+                  if skip:
+                      if ") : null}" in ln or ") : null}" in ln:
+                          skip = False
+                      continue
+                  out.append(ln)
+              rt2 = "".join(out)
+              n = 1
+          rt = rt2
+
+          # If chip still only absolute was removed, insert toolbar chip
+          if 'data-circle-place-chip="true"' not in rt:
+              needle = '''          {!addConfirmed ? (
+  <button
+    type="button"
+    onClick={() => setAddDrawerOpen(true)}
+    className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+  >
+    Browse objects
+  </button>
+) : null}'''
+              alt_needle = '''          {!addConfirmed ? (
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(true)}
+              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+            >
+              Browse objects
+            </button>
+          ) : null}'''
+              insert = '''          {!addConfirmed ? (
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(true)}
+              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+            >
+              Browse objects
+            </button>
+          ) : selectedAsset ? (
+            <div
+              className={cn(
+                "flex w-full max-w-full items-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5",
+                isDark ? "border-[#7B6FE0]/35 bg-[rgba(123,111,224,0.10)]" : "border-[#7B6FE0]/25 bg-[rgba(123,111,224,0.06)]",
+              )}
+              data-circle-place-chip="true"
+            >
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]">
+                <AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#7B6FE0]">
+                Ready to place {selectedAsset.name}
+              </span>
+              <button
+                type="button"
+                aria-label="Change object"
+                onClick={() => {
+                  setAddConfirmed(false);
+                  setConfirmOpen(true);
+                }}
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                aria-label="Clear selected object"
+                onClick={() => {
+                  setAddObjectId(null);
+                  setFactorSelection({});
+                  setAddConfirmed(false);
+                  setConfirmOpen(false);
+                  maskStageRef.current?.clear();
+                  setHasMask(false);
+                }}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[13px] font-bold text-[#7B6FE0]/80"
+              >
+                ×
+              </button>
+            </div>
+          ) : null}'''
+              if needle in rt:
+                  rt = rt.replace(needle, insert)
+              elif alt_needle in rt:
+                  rt = rt.replace(alt_needle, insert)
+              else:
+                  raise SystemExit("Browse objects block not found for insert")
+
+          # Ensure no absolute overlay remains
+          if "data-circle-place-chip" in rt:
+              # find context around chip
+              i = rt.find("data-circle-place-chip")
+              ctx = rt[max(0, i - 200) : i + 50]
+              if "absolute" in ctx:
+                  raise SystemExit("chip still absolute-positioned")
+
+          assert rt.count("data-circle-place-chip") == 1
+          assert "Ready to place" in rt
+          assert "Change object" in rt
+          assert "Clear selected object" in rt
+          assert "PLACEHOLDER" not in rt
+          r.write_text(rt)
+          print("route ok")
+          PY
+          # CircleMaskStage untouched
+          git diff --exit-code src/components/circle-edit/CircleMaskStage.tsx || true
+          grep -q 'data-circle-place-chip' src/routes/studio.image.circle-remove.tsx
+          ! grep -n 'data-circle-place-chip' src/routes/studio.image.circle-remove.tsx | head -1 | grep -q absolute
+          # confirm chip is near controls not stage: line of chip should be before CircleMaskStage in file for controls definition - soft check
+          python3 -c "
+from pathlib import Path
+t=Path('src/routes/studio.image.circle-remove.tsx').read_text()
+i=t.find('data-circle-place-chip')
+assert 'absolute' not in t[max(0,i-180):i]
+assert 'const controls' in t[:i]
+print('chip under controls const, no absolute')
+"
+          git add src/routes/studio.image.circle-remove.tsx
+          if git diff --cached --quiet; then echo nothing; else
+            git commit -m "fix(circle-2edit): move add object control into toolbar"
+            git push origin HEAD:main
+          fi
+          git rev-parse HEAD
