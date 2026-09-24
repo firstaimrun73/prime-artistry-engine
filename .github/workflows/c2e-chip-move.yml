@@ -1,0 +1,154 @@
+name: c2e-chip-move
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-chip-move.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 << 'PY'
+          from pathlib import Path
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          assert "SEE_" not in rt and len(rt) > 10000
+
+          # Remove the selected-object chip from controls (keep Browse objects only when not confirmed)
+          old_block = '''      {mode === "add" && !addLocked ? (
+        <>
+          {addConfirmed && selectedAsset ? (
+            <div className="flex items-center gap-2 rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.10)] px-2.5 py-1.5">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[rgba(123,111,224,0.18)]">
+                <AssetIcon asset={selectedAsset} size={20} isDark={isDark} selected />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#7B6FE0]">
+                {selectedAsset.name}
+              </span>
+              <button
+                type="button"
+                aria-label="Clear selected object"
+                onClick={() => {
+                  setAddObjectId(null);
+                  setFactorSelection({});
+                  setAddConfirmed(false);
+                  setConfirmOpen(false);
+                  maskStageRef.current?.clear();
+                  setHasMask(false);
+                }}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[13px] font-bold text-[#7B6FE0]/80 hover:bg-[rgba(123,111,224,0.15)]"
+              >
+                ×
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddConfirmed(false);
+                  setConfirmOpen(true);
+                }}
+                className="shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-medium text-[#7B6FE0]/90"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(true)}
+              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+            >
+              Browse objects
+            </button>
+          )}
+        </>
+      ) : null}'''
+
+          new_block = '''      {mode === "add" && !addLocked && !addConfirmed ? (
+        <button
+          type="button"
+          onClick={() => setAddDrawerOpen(true)}
+          className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+        >
+          Browse objects
+        </button>
+      ) : null}'''
+
+          if old_block not in rt:
+              raise SystemExit("controls chip block not found")
+          rt = rt.replace(old_block, new_block, 1)
+
+          # Place chip as floating pill at top-center of stage (not in toolbar)
+          if 'data-circle-place-chip' not in rt:
+              old_stage = '''          <div className="relative flex min-h-0 flex-1 flex-col">
+            <CircleMaskStage'''
+              new_stage = '''          <div className="relative flex min-h-0 flex-1 flex-col">
+            {mode === "add" && addConfirmed && selectedAsset ? (
+              <div
+                className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3"
+                data-circle-place-chip="true"
+              >
+                <div
+                  className={cn(
+                    "pointer-events-auto flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-full border px-2.5 py-1 shadow-lg backdrop-blur-xl",
+                    isDark
+                      ? "border-[#7B6FE0]/40 bg-[rgba(18,20,28,0.88)]"
+                      : "border-[#7B6FE0]/30 bg-white/92",
+                  )}
+                >
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]">
+                    <AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected />
+                  </span>
+                  <span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">
+                    {selectedAsset.name}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Change object"
+                    onClick={() => {
+                      setAddConfirmed(false);
+                      setConfirmOpen(true);
+                    }}
+                    className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90 hover:bg-[rgba(123,111,224,0.15)]"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Clear selected object"
+                    onClick={() => {
+                      setAddObjectId(null);
+                      setFactorSelection({});
+                      setAddConfirmed(false);
+                      setConfirmOpen(false);
+                      maskStageRef.current?.clear();
+                      setHasMask(false);
+                    }}
+                    className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold text-[#7B6FE0]/80 hover:bg-[rgba(123,111,224,0.15)]"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            <CircleMaskStage'''
+              if old_stage not in rt:
+                  raise SystemExit("stage block not found")
+              rt = rt.replace(old_stage, new_stage, 1)
+
+          r.write_text(rt)
+          assert "data-circle-place-chip" in rt
+          print("chip move ok")
+          PY
+          git add src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle2edit): move selected-object chip to top-center stage overlay"
+          git pull --rebase origin main || true
+          git push
+          echo TIP=$(git rev-parse HEAD)
