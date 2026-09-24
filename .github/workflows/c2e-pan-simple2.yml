@@ -1,0 +1,78 @@
+name: c2e-pan-simple2
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-pan-simple2.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          FILE=src/components/circle-edit/CircleMaskStage.tsx
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/components/circle-edit/CircleMaskStage.tsx")
+          t = p.read_text()
+          t2 = t.replace(
+              'className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"',
+              'className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-auto overscroll-contain" data-circle-pan-scroll="true"',
+          )
+          if 'data-circle-pan-surface' not in t2:
+              t2 = t2.replace('data-circle-mask-stage="true"', 'data-circle-mask-stage="true" data-circle-pan-surface="true"')
+          p.write_text(t2)
+          assert "destination-in" in t2
+          print("mask", "pan-surface" in t2, "overflow-auto" in t2)
+          PY
+
+          R=src/routes/studio.image.circle-remove.tsx
+          python3 - <<'PY'
+          from pathlib import Path
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          if 'from "@/components/circle-edit/CircleHowToHelp"' not in rt:
+              rt = rt.replace(
+                  'import { AssetIcon } from "@/components/circle-edit/AssetIcon";',
+                  'import { AssetIcon } from "@/components/circle-edit/AssetIcon";\nimport { CircleHowToHelp } from "@/components/circle-edit/CircleHowToHelp";',
+              )
+          rt = rt.replace(
+              '{selectedAsset.name}</span>',
+              'Ready to place {selectedAsset.name}</span>',
+          )
+          # avoid double Ready to place
+          rt = rt.replace('Ready to place Ready to place', 'Ready to place')
+          old = 'infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}'
+          new = '''infoSlot={
+            <div className="flex items-center gap-1" data-circle-help-row="true">
+              <CircleHowToHelp />
+              <CircleCreditsInfo title="Credits" lines={creditInfoLines} />
+            </div>
+          }'''
+          if old in rt:
+              rt = rt.replace(old, new)
+          assert "data-circle-place-chip" in rt
+          r.write_text(rt)
+          print("route ok")
+          PY
+
+          grep -q data-circle-pan-surface "$FILE"
+          grep -q CircleHowToHelp "$R"
+          grep -q 'Ready to place' "$R"
+          test -f src/components/circle-edit/CircleHowToHelp.tsx
+
+          git add "$FILE" "$R"
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+          else
+            git commit -m "fix(circle2edit): scroll-pan when zoomed; Ready-to-place label; wire HowTo help"
+            git push origin HEAD:main
+          fi
+          git rev-parse HEAD
