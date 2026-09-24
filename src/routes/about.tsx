@@ -267,9 +267,9 @@ function AboutProductPage() {
             accent={IMAGE_ACCENT}
             headers={["Path", "Typical credits"]}
             rows={[
-              ["Standard", String(STANDARD_CREDITS)],
-              ["Premium", String(PREMIUM_T2I_CREDITS)],
-              ["Ultra", String(ULTRA_T2I_CREDITS)],
+              ["Standard (T2I SD/HD)", `${STANDARD_CREDITS.textToImageSd} / ${STANDARD_CREDITS.textToImageHd}`],
+              ["Premium (T2I SD/HD/2K)", `${PREMIUM_T2I_CREDITS.sd} / ${PREMIUM_T2I_CREDITS.hd} / ${PREMIUM_T2I_CREDITS["2k"]}`],
+              ["Ultra (T2I SD/HD/2K/4K)", `${ULTRA_T2I_CREDITS.sd} / ${ULTRA_T2I_CREDITS.hd} / ${ULTRA_T2I_CREDITS["2k"]} / ${ULTRA_T2I_CREDITS["4k"]}`],
               [AUTO_EDIT_PRODUCT_NAME, Object.values(AUTO_EDIT_CREDITS_BY_QUALITY).map(String).join(" / ")],
             ]}
           />
@@ -293,9 +293,7 @@ function AboutProductPage() {
             Video Studio
           </h2>
           <p className="mt-4 text-base leading-relaxed text-neutral-700">
-            Video Studio turns text or still images into short cinematic clips. Describe the scene or upload a
-            reference, pick duration and aspect, then generate. Clips are suited to social and concept
-            previews; longer timelines and advanced audio tools continue to expand with the product.
+            Video Studio turns a written idea or a still photo into a short AI-generated video clip. Text-to-Video describes a scene; Image-to-Video animates a still; Video-to-Video restyles a clip while keeping motion. Choose duration, aspect (9:16, 1:1, 4:5, or 16:9), quality, and optional sound, then preview before download.
           </p>
           <StepDiagram
             accent={VIDEO_ACCENT}
@@ -350,8 +348,7 @@ function AboutProductPage() {
             Circle 2edit
           </h2>
           <p className="mt-4 text-base leading-relaxed text-neutral-700">
-            Circle regions to remove distractions or add objects that match the scene. Remove is fast for clean-up;
-            Add places new elements with lighting and perspective matched to the photo.
+            Circle 2edit lets you remove unwanted objects from a photo or add new ones that blend naturally into the scene. Upload any photo, mark the region with Circle or Brush (use Zoom for fine detail), then Remove to rebuild the background or Add to place a library object. The Motion2Ai engine matches lighting and perspective. Add costs more because it generates new content scaled to your photo resolution.
           </p>
           <StepDiagram
             accent={CIRCLE}

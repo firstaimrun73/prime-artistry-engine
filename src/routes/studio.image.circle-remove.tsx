@@ -45,7 +45,6 @@ import { isFreePlan } from "@/lib/policy";
 import { CIRCLE_REMOVE_CREDITS, estimateCircleAddCredits } from "@/lib/circle-edit/credits";
 import { getAssetCreditCost } from "@/lib/circle-edit/add-assets-pricing";
 import { AssetIcon } from "@/components/circle-edit/AssetIcon";
-import { CircleHowToHelp } from "@/components/circle-edit/CircleHowToHelp";
 import { cn } from "@/lib/utils";
 import { navigateCircleBack } from "@/lib/circle-edit/circle-samples";
 
@@ -815,8 +814,7 @@ function Circle2editPage() {
           onClearImage={resetPhoto}
           statusText={statusForMode()}
           infoSlot={
-  <div className="flex items-center gap-1" data-circle-help-row="true">
-    <CircleHowToHelp />
+  <div className="flex items-center gap-1">
     <CircleCreditsInfo title="Credits" lines={creditInfoLines} />
   </div>
 }
@@ -840,7 +838,7 @@ function Circle2editPage() {
         ) : (
           <div className="relative flex min-h-0 flex-1 flex-col">
   {mode === "add" && addConfirmed && selectedAsset ? (
-    <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3" data-circle-place-chip="true">
+    <div className="pointer-events-none absolute inset-x-0 bottom-14 z-20 flex justify-center px-3" data-circle-place-chip="true">
       <div className={cn("pointer-events-auto flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-full border px-2.5 py-1 shadow-lg backdrop-blur-xl", isDark ? "border-[#7B6FE0]/40 bg-[rgba(18,20,28,0.88)]" : "border-[#7B6FE0]/30 bg-white/92")}>
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]"><AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected /></span>
         <span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">Ready to place {selectedAsset.name}</span>
