@@ -1,0 +1,28 @@
+name: restore-again
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/restore-again.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git show e24b5bd11f3f7f:src/routes/studio.image.circle-remove.tsx > src/routes/studio.image.circle-remove.tsx 2>/dev/null || \
+            git show e24b5bd11f3f7f6a:src/routes/studio.image.circle-remove.tsx > src/routes/studio.image.circle-remove.tsx 2>/dev/null || \
+            git show 7c604dcda2481f576230b264c3a1ddbe73b3d5f5:src/routes/studio.image.circle-remove.tsx > src/routes/studio.image.circle-remove.tsx
+          wc -c src/routes/studio.image.circle-remove.tsx
+          head -c 60 src/routes/studio.image.circle-remove.tsx
+          grep -q CircleMaskStage src/routes/studio.image.circle-remove.tsx
+          git add src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix: restore circle-remove route (undo stub)"
+          git push origin HEAD:main
+          git rev-parse HEAD
