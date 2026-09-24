@@ -1,0 +1,77 @@
+name: move-chip-v4
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/move-chip-v4.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          F=src/routes/studio.image.circle-remove.tsx
+          # Strip absolute place-chip overlay
+          perl -i -0pe 's/\{mode === "add" && addConfirmed && selectedAsset \? \(\s*<div className="pointer-events-none absolute[\s\S]*?data-circle-place-chip="true"[\s\S]*?\) : null\}\s*//g' "$F"
+          grep -q data-circle-place-chip "$F" && echo STILL_HAS_CHIP || echo CHIP_GONE
+          # Insert toolbar chip after Browse objects block ending ) : null} inside add !addLocked
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("src/routes/studio.image.circle-remove.tsx")
+          t = p.read_text()
+          assert "PLACEHOLDER" not in t
+          if 'data-circle-place-chip' not in t:
+              marker = ") : null}\n        </>\n      ) : null}\n      {mode === \"add\" && addLocked"
+              chip = '''') : selectedAsset ? (
+            <div className={cn("flex w-full max-w-full items-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5", isDark ? "border-[#7B6FE0]/35 bg-[rgba(123,111,224,0.10)]" : "border-[#7B6FE0]/25 bg-[rgba(123,111,224,0.06)]")} data-circle-place-chip="true">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]"><AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected /></span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#7B6FE0]">Ready to place {selectedAsset.name}</span>
+              <button type="button" aria-label="Change object" onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }} className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90">Change</button>
+              <button type="button" aria-label="Clear selected object" onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[13px] font-bold text-[#7B6FE0]/80">X</button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {mode === "add" && addLocked'''
+              # replace the first ) : null after Browse objects - more precise:
+              old = '''  >
+    Browse objects
+  </button>
+) : null}
+        </>
+      ) : null}
+      {mode === "add" && addLocked'''
+              new = '''  >
+    Browse objects
+  </button>
+) : selectedAsset ? (
+            <div className={cn("flex w-full max-w-full items-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5", isDark ? "border-[#7B6FE0]/35 bg-[rgba(123,111,224,0.10)]" : "border-[#7B6FE0]/25 bg-[rgba(123,111,224,0.06)]")} data-circle-place-chip="true">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]"><AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected /></span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#7B6FE0]">Ready to place {selectedAsset.name}</span>
+              <button type="button" aria-label="Change object" onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }} className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90">Change</button>
+              <button type="button" aria-label="Clear selected object" onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[13px] font-bold text-[#7B6FE0]/80">X</button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {mode === "add" && addLocked'''
+              if old not in t:
+                  raise SystemExit("insert anchor missing")
+              t = t.replace(old, new, 1)
+          assert t.count("data-circle-place-chip") == 1
+          idx = t.find("data-circle-place-chip")
+          assert "absolute" not in t[max(0,idx-200):idx]
+          p.write_text(t)
+          print("DONE")
+          PY
+          grep -n data-circle-place-chip "$F"
+          git add "$F"
+          git commit -m "fix(circle-2edit): move add object control into toolbar"
+          git push origin HEAD:main
+          git rev-parse HEAD
