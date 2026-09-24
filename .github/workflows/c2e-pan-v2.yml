@@ -1,0 +1,168 @@
+name: c2e-pan-v2
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-pan-v2.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 << 'PY'
+          from pathlib import Path
+          t = Path("src/components/circle-edit/CircleMaskStage.tsx").read_text()
+          assert "destination-in" in t
+          if "panOffset" not in t:
+              t = t.replace(
+                  "  const [userZoom, setUserZoom] = useState(1);\n  const userZoomRef = useRef(1);\n  userZoomRef.current = userZoom;",
+                  """  const [userZoom, setUserZoom] = useState(1);
+  const userZoomRef = useRef(1);
+  userZoomRef.current = userZoom;
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const panOffsetRef = useRef({ x: 0, y: 0 });
+  panOffsetRef.current = panOffset;
+  const panningRef = useRef(false);
+  const panStartRef = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const baseDisplayRef = useRef({ w: 0, h: 0 });
+  const shellSizeRef = useRef({ w: 0, h: 0 });""",
+              )
+          if "baseDisplayRef.current" not in t:
+              t = t.replace(
+                  "    dispScaleRef.current = scale;\n    setDisplaySize({ w, h });\n    redraw();",
+                  """    dispScaleRef.current = scale;
+    baseDisplayRef.current = { w: baseW, h: baseH };
+    shellSizeRef.current = { w: boxW, h: boxH };
+    if (z <= 1) {
+      if (panOffsetRef.current.x !== 0 || panOffsetRef.current.y !== 0) {
+        panOffsetRef.current = { x: 0, y: 0 };
+        setPanOffset({ x: 0, y: 0 });
+      }
+    } else {
+      const maxX = Math.max(0, (w - boxW) / 2);
+      const maxY = Math.max(0, (h - boxH) / 2);
+      const px = Math.max(-maxX, Math.min(maxX, panOffsetRef.current.x));
+      const py = Math.max(-maxY, Math.min(maxY, panOffsetRef.current.y));
+      if (px !== panOffsetRef.current.x || py !== panOffsetRef.current.y) {
+        panOffsetRef.current = { x: px, y: py };
+        setPanOffset({ x: px, y: py });
+      }
+    }
+    setDisplaySize({ w, h });
+    redraw();""",
+              )
+          if "data-circle-pan-surface" not in t:
+              t = t.replace(
+                  '<div className="relative" style={{ width: displaySize.w || undefined, height: displaySize.h || undefined }}>',
+                  '<div className="relative will-change-transform" data-circle-pan-surface="true" style={{ width: displaySize.w || undefined, height: displaySize.h || undefined, transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}>',
+              )
+          if "clampPanTo" not in t:
+              needle = "  const onPointerDown = (e: React.PointerEvent) => {\n    if (disabled || !maskRef.current) return;"
+              insert = '''  const clampPanTo = (nx: number, ny: number) => {
+    const z = userZoomRef.current;
+    if (z <= 1) return { x: 0, y: 0 };
+    const base = baseDisplayRef.current;
+    const shell = shellSizeRef.current;
+    const w = base.w * z;
+    const h = base.h * z;
+    const maxX = Math.max(0, (w - shell.w) / 2);
+    const maxY = Math.max(0, (h - shell.h) / 2);
+    return { x: Math.max(-maxX, Math.min(maxX, nx)), y: Math.max(-maxY, Math.min(maxY, ny)) };
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (e.pointerType === "touch" && activePointersRef.current.size >= 2 && userZoomRef.current > 1) {
+      drawingRef.current = false;
+      panningRef.current = true;
+      const pts = [...activePointersRef.current.values()];
+      const cx = (pts[0].x + pts[1].x) / 2;
+      const cy = (pts[0].y + pts[1].y) / 2;
+      panStartRef.current = { cx, cy, ox: panOffsetRef.current.x, oy: panOffsetRef.current.y };
+      return;
+    }
+    const wantPan = userZoomRef.current > 1 && (e.altKey || e.metaKey || e.button === 1 || e.button === 2);
+    if (wantPan) {
+      e.preventDefault();
+      panningRef.current = true;
+      panStartRef.current = { cx: e.clientX, cy: e.clientY, ox: panOffsetRef.current.x, oy: panOffsetRef.current.y };
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      return;
+    }
+    if (disabled || !maskRef.current) return;'''
+              assert needle in t
+              t = t.replace(needle, insert, 1)
+              mn = "  const onPointerMove = (e: React.PointerEvent) => {\n    if (!drawingRef.current || !maskRef.current) return;"
+              mi = '''  const onPointerMove = (e: React.PointerEvent) => {
+    if (activePointersRef.current.has(e.pointerId)) activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (panningRef.current && userZoomRef.current > 1) {
+      if (e.pointerType === "touch" && activePointersRef.current.size >= 2) {
+        const pts = [...activePointersRef.current.values()];
+        const cx = (pts[0].x + pts[1].x) / 2;
+        const cy = (pts[0].y + pts[1].y) / 2;
+        const start = panStartRef.current;
+        if (start) {
+          const next = clampPanTo(start.ox + (cx - start.cx), start.oy + (cy - start.cy));
+          panOffsetRef.current = next; setPanOffset(next);
+        }
+        return;
+      }
+      if (panStartRef.current) {
+        const start = panStartRef.current;
+        const next = clampPanTo(start.ox + (e.clientX - start.cx), start.oy + (e.clientY - start.cy));
+        panOffsetRef.current = next; setPanOffset(next);
+      }
+      return;
+    }
+    if (!drawingRef.current || !maskRef.current) return;'''
+              assert mn in t
+              t = t.replace(mn, mi, 1)
+              un = "  const onPointerUp = (e?: React.PointerEvent) => {\n    if (e && activePointerRef.current != null && e.pointerId !== activePointerRef.current) return;"
+              ui = '''  const onPointerUp = (e?: React.PointerEvent) => {
+    if (e) activePointersRef.current.delete(e.pointerId);
+    if (panningRef.current) {
+      if (!e || activePointersRef.current.size < 2) { panningRef.current = false; panStartRef.current = null; }
+      if (!drawingRef.current) { activePointerRef.current = null; return; }
+    }
+    if (e && activePointerRef.current != null && e.pointerId !== activePointerRef.current) return;'''
+              assert un in t
+              t = t.replace(un, ui, 1)
+          Path("src/components/circle-edit/CircleMaskStage.tsx").write_text(t)
+          assert "clampPanTo" in t and "data-circle-pan-surface" in t
+
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          if 'from "@/components/circle-edit/CircleHowToHelp"' not in rt:
+              rt = rt.replace(
+                  'import { AssetIcon } from "@/components/circle-edit/AssetIcon";',
+                  'import { AssetIcon } from "@/components/circle-edit/AssetIcon";\nimport { CircleHowToHelp } from "@/components/circle-edit/CircleHowToHelp";',
+              )
+          rt = rt.replace(
+              '<span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">{selectedAsset.name}</span>',
+              '<span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">Ready to place {selectedAsset.name}</span>',
+          )
+          old = 'infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}'
+          new = '''infoSlot={\n            <div className=\"flex items-center gap-1\" data-circle-help-row=\"true\">\n              <CircleHowToHelp />\n              <CircleCreditsInfo title=\"Credits\" lines={creditInfoLines} />\n            </div>\n          }'''
+          if old in rt:
+              rt = rt.replace(old, new)
+          assert "data-circle-place-chip" in rt
+          r.write_text(rt)
+          print("success")
+          PY
+          grep -q clampPanTo src/components/circle-edit/CircleMaskStage.tsx
+          grep -q data-circle-pan-surface src/components/circle-edit/CircleMaskStage.tsx
+          grep -q CircleHowToHelp src/routes/studio.image.circle-remove.tsx
+          grep -q 'Ready to place' src/routes/studio.image.circle-remove.tsx
+          test -f src/components/circle-edit/CircleHowToHelp.tsx
+          git add src/components/circle-edit/CircleMaskStage.tsx src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle2edit): zoom pan; Ready-to-place label; wire HowTo help"
+          git push origin HEAD:main
+          git rev-parse HEAD
