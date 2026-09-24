@@ -1,0 +1,107 @@
+name: c2e-chip-move3
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-chip-move3.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          FILE=src/routes/studio.image.circle-remove.tsx
+          # 1) Delete the confirmed-object chip block inside controls via python line scan
+          python3 << 'PY'
+          from pathlib import Path
+          path = Path("src/routes/studio.image.circle-remove.tsx")
+          lines = path.read_text().splitlines(keepends=True)
+          out = []
+          i = 0
+          while i < len(lines):
+              line = lines[i]
+              # Detect start of confirmed chip: addConfirmed && selectedAsset inside controls
+              if "addConfirmed && selectedAsset" in line and i > 0 and "mode === \"add\"" in "".join(lines[max(0,i-5):i+1]):
+                  # Skip until we close the ternary that has Browse objects
+                  # Actually skip from `{addConfirmed && selectedAsset ? (` through the matching `) : (` browse branch ending `)}`
+                  depth = 0
+                  started = False
+                  while i < len(lines):
+                      l = lines[i]
+                      if "addConfirmed && selectedAsset" in l:
+                          started = True
+                      if started:
+                          depth += l.count("(") - l.count(")")
+                          i += 1
+                          if depth <= 0 and started:
+                              break
+                      else:
+                          i += 1
+                  # After skipping chip ternary, we need Browse-only when not confirmed - leave outer structure
+                  continue
+              out.append(line)
+              i += 1
+          text = "".join(out)
+          # Ensure browse still works: if we broke structure, restore from git and use simpler approach
+          if "Browse objects" not in text or "CircleDrawToolbar" not in text:
+              raise SystemExit("structure broken")
+          path.write_text(text)
+          print("step1 lines", len(out))
+          PY
+          # 2) Simpler reliable approach: checkout good route then apply known-good patch from embedded script
+          git show HEAD:src/routes/studio.image.circle-remove.tsx > /tmp/route.tsx 2>/dev/null || true
+          git checkout HEAD -- src/routes/studio.image.circle-remove.tsx
+          python3 << 'PY'
+          from pathlib import Path
+          path = Path("src/routes/studio.image.circle-remove.tsx")
+          t = path.read_text()
+          # Replace confirmed chip with nothing; keep browse when !addConfirmed
+          import re
+          # Remove the addConfirmed chip div (between addConfirmed && selectedAsset and Change button closing)
+          pattern = r'\{addConfirmed && selectedAsset \? \([\s\S]*?\) : \(\s*<button[\s\S]*?Browse objects[\s\S]*?</button>\s*\)\}'
+          repl = '''{!addConfirmed ? (
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(true)}
+              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+            >
+              Browse objects
+            </button>
+          ) : null}'''
+          new_t, n = re.subn(pattern, repl, t, count=1)
+          print("replacements", n)
+          if n != 1:
+              raise SystemExit(f"pattern match failed: {n}")
+          t = new_t
+          if "data-circle-place-chip" not in t:
+              needle = '          <div className="relative flex min-h-0 flex-1 flex-col">\n            <CircleMaskStage'
+              chip = '''          <div className="relative flex min-h-0 flex-1 flex-col">
+            {mode === "add" && addConfirmed && selectedAsset ? (
+              <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3" data-circle-place-chip="true">
+                <div className={cn("pointer-events-auto flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-full border px-2.5 py-1 shadow-lg backdrop-blur-xl", isDark ? "border-[#7B6FE0]/40 bg-[rgba(18,20,28,0.88)]" : "border-[#7B6FE0]/30 bg-white/92")}>
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]"><AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected /></span>
+                  <span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">{selectedAsset.name}</span>
+                  <button type="button" aria-label="Change object" onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90">Change</button>
+                  <button type="button" aria-label="Clear selected object" onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }} className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold text-[#7B6FE0]/80">×</button>
+                </div>
+              </div>
+            ) : null}
+            <CircleMaskStage'''
+              if needle not in t:
+                  raise SystemExit("needle missing")
+              t = t.replace(needle, chip, 1)
+          path.write_text(t)
+          assert "data-circle-place-chip" in t
+          print("success", path.stat().st_size)
+          PY
+          git add src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle2edit): move selected-object chip to top-center stage overlay"
+          git pull --rebase origin main || true
+          git push
+          git rev-parse HEAD
