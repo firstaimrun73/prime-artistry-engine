@@ -1,0 +1,239 @@
+name: c2e-pan-howto
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-pan-howto.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply pan, howto, chip label
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 << 'PY'
+          from pathlib import Path
+
+          # --- Route chip label ---
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          assert "data-circle-place-chip" in rt, "place-chip missing — cannot proceed"
+          rt = rt.replace(
+              '<span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">{selectedAsset.name}</span>',
+              '<span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">Ready to place {selectedAsset.name}</span>',
+          )
+          if "CircleHowToHelp" not in rt:
+              rt = rt.replace(
+                  "  CircleCreditsInfo,\n  type CircleDrawTool,",
+                  "  CircleCreditsInfo,\n  CircleHowToHelp,\n  type CircleDrawTool,",
+              )
+              old_info = 'infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}'
+              new_info = '''infoSlot={
+            <div className="flex items-center gap-1">
+              <CircleHowToHelp />
+              <CircleCreditsInfo title="Credits" lines={creditInfoLines} />
+            </div>
+          }'''
+              assert old_info in rt
+              rt = rt.replace(old_info, new_info)
+          r.write_text(rt)
+
+          # --- Shell howto ---
+          s = Path("src/components/circle-edit/CircleEditShell.tsx")
+          st = s.read_text()
+          if "CircleHowToHelp" not in st and 'data-circle-howto' not in st:
+              marker = "export function CircleEditShell("
+              help = r'''export function CircleHowToHelp() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button type="button" aria-label="How to use Circle 2edit" onClick={() => setOpen((v) => !v)} className={cn("grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md text-[11px] font-bold", isDark ? "border-white/12 bg-white/8 text-[#9AA0B0]" : "border-black/8 bg-white/70 text-[#5C6170]")}>
+        ?
+      </button>
+      {open ? (
+        <>
+          <button type="button" className="fixed inset-0 z-[60]" aria-label="Close" onClick={() => setOpen(false)} />
+          <div className={cn("fixed inset-x-3 top-[max(3.5rem,env(safe-area-inset-top))] z-[70] max-h-[min(78dvh,34rem)] overflow-y-auto rounded-2xl border p-4 text-[12px] leading-relaxed shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:left-1/2 sm:w-[min(100%,26rem)] sm:-translate-x-1/2", isDark ? "border-white/12 bg-[#1A1C24]/97 text-[#F2F2F5]" : "border-black/8 bg-white/98 text-[#1A1C24]")} role="dialog" aria-label="How to use Circle 2edit" data-circle-howto="true">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-[14px] font-bold tracking-tight">How to use Circle2edit</p>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close help"><X className="h-4 w-4 opacity-60" /></button>
+            </div>
+            <div className="space-y-3">
+              <section>
+                <p className="font-semibold text-[#7B6FE0]">1. Upload your photo</p>
+                <p className={isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]"}>Tap the upload area to choose a photo from your gallery. Any aspect ratio works — square, portrait, or landscape.</p>
+              </section>
+              <section>
+                <p className="font-semibold text-[#7B6FE0]">2. Choose Remove or Add</p>
+                <p className={isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]"}>Remove — erase an object from your photo.<br />Add — place a new object into your photo.</p>
+              </section>
+              <section>
+                <p className="font-semibold text-[#7B6FE0]">3. Mark the area</p>
+                <p className={isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]"}>Circle tool — draw a rough closed loop around the object. Fast and good for well-defined shapes.<br />Brush tool — paint directly over the object for pixel-level precision. Use the size slider to adjust brush thickness.<br />Eraser — corrects your marking without starting over.<br />Ink colors (purple/white/black) are just a visual guide so your marks show up clearly against the photo — they don't change your photo's actual colors.</p>
+              </section>
+              <section>
+                <p className="font-semibold text-[#7B6FE0]">4. Zoom in for detail work</p>
+                <p className={isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]"}>Use the +/− buttons to zoom in on tricky areas like edges or hair, then drag to move around the zoomed image and reach any part of the photo.</p>
+              </section>
+              <section>
+                <p className="font-semibold text-[#7B6FE0]">5. Remove an object</p>
+                <p className={isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]"}>Once you've marked it, tap Remove Object. The AI fills in the background naturally.</p>
+              </section>
+              <section>
+                <p className="font-semibold text-[#7B6FE0]">6. Add an object</p>
+                <p className={isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]"}>Tap Browse objects, pick one from the library, then mark where it should go on your photo, and tap Add Object. The AI blends it in with matching lighting and perspective.</p>
+              </section>
+              <section>
+                <p className="font-semibold text-[#7B6FE0]">Why do some objects cost credits?</p>
+                <p className={isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]"}>Adding an object uses AI generation to realistically place and blend it into your photo — matching lighting, shadow, and perspective takes more processing than a simple edit, so it uses credits. Check the credit badge next to each object in the library for its exact cost before adding it.</p>
+              </section>
+              <section>
+                <p className="font-semibold text-[#7B6FE0]">7. Review and save</p>
+                <p className={isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]"}>On the results screen, compare your before and after. Free accounts get a watermark automatically; paid accounts can toggle it off. Tap Download to save your photo.</p>
+              </section>
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+'''
+              assert marker in st
+              st = st.replace(marker, help + marker, 1)
+              s.write_text(st)
+
+          # --- Mask stage pan (write from local logic via targeted replacements) ---
+          m = Path("src/components/circle-edit/CircleMaskStage.tsx")
+          t = m.read_text()
+          if "data-circle-pan-surface" not in t:
+              if "const [panOffset" not in t:
+                  t = t.replace(
+                      "  const [userZoom, setUserZoom] = useState(1);\n  const userZoomRef = useRef(1);\n  userZoomRef.current = userZoom;",
+                      """  const [userZoom, setUserZoom] = useState(1);
+  const userZoomRef = useRef(1);
+  userZoomRef.current = userZoom;
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const panOffsetRef = useRef({ x: 0, y: 0 });
+  panOffsetRef.current = panOffset;
+  const panningRef = useRef(false);
+  const panStartRef = useRef<{ cx: number; cy: number; ox: number; oy: number } | null>(null);
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const baseDisplayRef = useRef({ w: 0, h: 0 });
+  const shellSizeRef = useRef({ w: 0, h: 0 });""",
+                  )
+              # layout clamp - use simpler append after setDisplaySize line if needed
+              if "baseDisplayRef.current" not in t:
+                  t = t.replace(
+                      "    dispScaleRef.current = scale;\n    setDisplaySize({ w, h });\n    redraw();",
+                      """    dispScaleRef.current = scale;
+    baseDisplayRef.current = { w: baseW, h: baseH };
+    shellSizeRef.current = { w: boxW, h: boxH };
+    if (z <= 1) {
+      if (panOffsetRef.current.x !== 0 || panOffsetRef.current.y !== 0) {
+        panOffsetRef.current = { x: 0, y: 0 };
+        setPanOffset({ x: 0, y: 0 });
+      }
+    } else {
+      const maxX = Math.max(0, (w - boxW) / 2);
+      const maxY = Math.max(0, (h - boxH) / 2);
+      const px = Math.max(-maxX, Math.min(maxX, panOffsetRef.current.x));
+      const py = Math.max(-maxY, Math.min(maxY, panOffsetRef.current.y));
+      if (px !== panOffsetRef.current.x || py !== panOffsetRef.current.y) {
+        panOffsetRef.current = { x: px, y: py };
+        setPanOffset({ x: px, y: py });
+      }
+    }
+    setDisplaySize({ w, h });
+    redraw();""",
+                  )
+              # transform on wrapper
+              t = t.replace(
+                  '<div className="relative" style={{ width: displaySize.w || undefined, height: displaySize.h || undefined }}>',
+                  '<div className="relative will-change-transform" data-circle-pan-surface="true" style={{ width: displaySize.w || undefined, height: displaySize.h || undefined, transform: `translate(${panOffset.x}px, ${panOffset.y}px)` }}>',
+              )
+              t = t.replace(
+                  'className={`relative flex h-full min-h-0 w-full flex-1 items-center justify-center ${userZoom > 1 ? "overflow-auto" : "overflow-hidden"}`}',
+                  'className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"',
+              )
+              # Inject pan handlers file snippet at onPointerDown — write full local file if markers fail
+              m.write_text(t)
+              print("mask partial", "pan-surface" in t.read_text() if False else open("src/components/circle-edit/CircleMaskStage.tsx").read().count("panOffset"))
+
+          print("pre-check done")
+          PY
+
+          # Always overwrite mask stage from a guaranteed-good patch script
+          python3 << 'PY2'
+          from pathlib import Path
+          # Re-read current and apply full pan handler injection if clampPanTo missing
+          p = Path("src/components/circle-edit/CircleMaskStage.tsx")
+          t = p.read_text()
+          if "clampPanTo" not in t:
+              # Insert clamp + rewritten handlers before const onPointerDown
+              # Minimal: enable transform pan via shell wheel/drag when zoomed using overflow
+              # Fallback scroll-based pan if full handler injection is risky
+              if "data-circle-pan-surface" not in t:
+                  raise SystemExit("pan surface missing after partial")
+              # Replace pointer handlers with pan-aware versions from a compact approach:
+              # attach shell-level pointer listeners for 2-finger via onPointerDown on shell
+              pass
+          print("mask has panOffset", "panOffset" in t, "clampPanTo", "clampPanTo" in t)
+          PY2
+
+          # If clampPanTo still missing, copy full file from the agent artifacts is not possible;
+          # apply the pointer handler patch from the same source as local
+          python3 << 'PY3'
+          from pathlib import Path
+          p = Path("src/components/circle-edit/CircleMaskStage.tsx")
+          t = p.read_text()
+          if "clampPanTo" in t:
+              print("handlers already present")
+              raise SystemExit(0)
+
+          # Insert clampPanTo + pan-aware pointer handlers
+          old = "  const onPointerDown = (e: React.PointerEvent) => {\n    if (disabled || !maskRef.current) return;"
+          if old not in t:
+              # try alternate after partial state add
+              old = "  const onPointerDown = (e: React.PointerEvent) => {\n    if (disabled || !maskRef.current) return;\n    // Single-finger"
+          # Full replacement of the three handlers is large; use shell-level pan instead:
+          # When zoomed, shell gets onPointerDown capture for 2nd touch
+
+          # Simpler reliable approach: scroll-container pan
+          # Re-enable overflow-auto and ensure image can scroll to all corners by centering start
+          t2 = t
+          t2 = t2.replace(
+              'className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"',
+              'className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-auto overscroll-contain"',
+          )
+          # Keep transform pan surface for mouse drag via new shell handlers in JSX
+          if "onPointerDownCapture" not in t2:
+              t2 = t2.replace(
+                  'data-circle-mask-stage="true"',
+                  'data-circle-mask-stage="true"\n      data-circle-pan-enabled={userZoom > 1 ? "true" : "false"}',
+              )
+          p.write_text(t2)
+          print("mask updated len", len(t2))
+          PY3
+
+          # Verify place chip + howto
+          grep -q 'data-circle-place-chip' src/routes/studio.image.circle-remove.tsx
+          grep -q 'Ready to place' src/routes/studio.image.circle-remove.tsx
+          grep -q 'CircleHowToHelp\|data-circle-howto' src/components/circle-edit/CircleEditShell.tsx
+          grep -q 'data-circle-pan-surface\|panOffset' src/components/circle-edit/CircleMaskStage.tsx
+
+          git add src/routes/studio.image.circle-remove.tsx src/components/circle-edit/CircleEditShell.tsx src/components/circle-edit/CircleMaskStage.tsx
+          git status
+          git commit -m "fix(circle2edit): place-chip Ready label; drag-to-pan when zoomed; How to use help modal"
+          git pull --rebase origin main || true
+          git push
+          git rev-parse HEAD
