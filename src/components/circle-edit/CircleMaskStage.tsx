@@ -120,6 +120,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const [flashOrigin, setFlashOrigin] = useState<Point | null>(null);
   const [displaySize, setDisplaySize] = useState({ w: 0, h: 0 });
   const [userZoom, setUserZoom] = useState(1);
+  const userZoomRef = useRef(1);
+  userZoomRef.current = userZoom;
   const [touchRipple, setTouchRipple] = useState<{ x: number; y: number; id: number } | null>(null);
 
   const settings = (): BrushSettings => ({
@@ -190,7 +192,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     const boxW = Math.max(1, rect.width);
     const boxH = Math.max(1, rect.height);
     const { w: baseW, h: baseH, scale: baseScale } = containSize(nw, nh, boxW, boxH);
-    const z = Math.min(3, Math.max(0.5, userZoom));
+    const z = Math.min(3, Math.max(0.5, userZoomRef.current));
     const w = Math.max(1, Math.round(baseW * z));
     const h = Math.max(1, Math.round(baseH * z));
     const scale = baseScale * z;
@@ -207,7 +209,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     dispScaleRef.current = scale;
     setDisplaySize({ w, h });
     redraw();
-  }, [redraw, userZoom]);
+  }, [redraw]);
 
   useEffect(() => {
     let cancelled = false;
@@ -242,7 +244,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     return () => {
       cancelled = true;
     };
-  }, [imageUrl, layoutCanvas, notify]);
+  }, [imageUrl]); // zoom-safe: layoutCanvas/notify must not retrigger load
 
   useEffect(() => {
     if (!ready) return;
@@ -408,6 +410,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       canUndo: () => historyRef.current.past.length > 0,
       canRedo: () => historyRef.current.future.length > 0,
       fit: () => {
+        userZoomRef.current = 1;
         setUserZoom(1);
         requestAnimationFrame(() => layoutCanvas());
       },
@@ -438,14 +441,14 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   return (
     <div
       ref={shellRef}
-      className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
+      className={`relative flex h-full min-h-0 w-full flex-1 items-center justify-center ${userZoom > 1 ? "overflow-auto" : "overflow-hidden"}`}
       data-circle-mask-stage="true"
       data-circle-canvas-fill="max"
       style={aspect ? { ["--circle-img-aspect" as string]: String(aspect) } : undefined}
     >
       <div className="pointer-events-none absolute bottom-3 right-3 z-30 flex flex-col gap-1.5" data-circle-zoom-controls="true" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-        <button type="button" aria-label="Zoom in" onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">+</button>
-        <button type="button" aria-label="Zoom out" onClick={() => setUserZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">−</button>
+        <button type="button" aria-label="Zoom in" onClick={() => { setUserZoom((z) => { const n = Math.min(3, Math.round((z + 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">+</button>
+        <button type="button" aria-label="Zoom out" onClick={() => { setUserZoom((z) => { const n = Math.max(0.5, Math.round((z - 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">−</button>
       </div>
       <div className="relative" style={{ width: displaySize.w || undefined, height: displaySize.h || undefined }}>
         <canvas
@@ -453,8 +456,6 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
           className="touch-none"
           style={{
             display: "block",
-            maxWidth: "100%",
-            maxHeight: "100%",
             width: displaySize.w ? `${displaySize.w}px` : "auto",
             height: displaySize.h ? `${displaySize.h}px` : "auto",
             objectFit: "contain",
