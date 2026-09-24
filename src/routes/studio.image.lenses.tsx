@@ -53,9 +53,9 @@ function MoreLensesPage() {
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-4">
         <div className="mb-4 flex items-center gap-3">
           <Link
-            to="/"
-            className="grid h-9 w-9 place-items-center rounded-full border border-border"
-            aria-label="Back to home"
+            to="/studio/image/lens-editor"
+            className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card/80 backdrop-blur-md"
+            aria-label="Back to Lens Studio"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
