@@ -271,23 +271,25 @@ export function applyFreeLensWatermark(src: HTMLCanvasElement): HTMLCanvasElemen
   ctx.fillStyle = "rgba(12, 10, 18, 0.72)";
   ctx.fill();
   ctx.shadowColor = "transparent";
-  ctx.strokeStyle = "rgba(255, 200, 120, 0.35)";
+  ctx.strokeStyle = "rgba(255, 200, 120, 0.45)";
   ctx.lineWidth = Math.max(1, badgeW * 0.008);
   ctx.stroke();
+  // Gold / yellow lens accent (plan: not plain white only)
   const grad = ctx.createLinearGradient(x, y, x + badgeW, y + badgeH);
   grad.addColorStop(0, "rgba(255, 214, 90, 0.98)");
-  grad.addColorStop(0.5, "rgba(255, 152, 60, 0.95)");
-  grad.addColorStop(1, "rgba(180, 130, 220, 0.92)");
-  const brandFs = Math.round(badgeW * 0.16);
-  const lensFs = Math.round(badgeW * 0.12);
+  grad.addColorStop(0.5, "rgba(255, 180, 60, 0.96)");
+  grad.addColorStop(1, "rgba(230, 160, 40, 0.94)");
+  const line1Fs = Math.round(badgeW * 0.145);
+  const line2Fs = Math.round(badgeW * 0.115);
   const cx = x + badgeW / 2;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = grad;
-  ctx.font = `700 ${brandFs}px system-ui, -apple-system, sans-serif`;
-  ctx.fillText("Motio2edit", cx, y + badgeH * 0.42);
-  ctx.font = `600 ${lensFs}px system-ui, -apple-system, sans-serif`;
-  ctx.fillText("L E N S E S \u{1F4F8}", cx, y + badgeH * 0.72);
+  // Exact plan copy: L E N S E S / Motio2edit
+  ctx.font = `700 ${line1Fs}px system-ui, -apple-system, sans-serif`;
+  ctx.fillText("L E N S E S", cx, y + badgeH * 0.38);
+  ctx.font = `600 ${line2Fs}px system-ui, -apple-system, sans-serif`;
+  ctx.fillText("Motio2edit", cx, y + badgeH * 0.68);
   ctx.restore();
   return c;
 }
