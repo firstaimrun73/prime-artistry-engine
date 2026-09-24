@@ -12,11 +12,11 @@ import { STANDARD_CREDITS } from "@/lib/studio/image/standard/credits";
 import { PREMIUM_T2I_CREDITS } from "@/lib/studio/image/premium/credits";
 import { ULTRA_T2I_CREDITS } from "@/lib/studio/image/ultra/credits";
 import { AUTO_EDIT_CREDITS_BY_QUALITY, AUTO_EDIT_PRODUCT_NAME } from "@/lib/auto-edit/constants";
-import { CIRCLE_REMOVE_CREDITS, CIRCLE_ADD_BASE_BY_MP } from "@/lib/circle-edit/credits";
 import { ALL_FILTERS } from "@/lib/filter-lens/filters/filter-registry";
 import { ALL_LENSES } from "@/lib/filter-lens/lenses/lens-registry";
 import { imageQualityDimensions } from "@/lib/quality-options";
 import { cn } from "@/lib/utils";
+import { Circle2editGuideSection } from "@/components/about/Circle2editGuideSection";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -152,9 +152,6 @@ function AboutProductPage() {
     }
     return m;
   }, []);
-
-  const filterNames = useMemo(() => ALL_FILTERS.map((f) => f.name), []);
-  const lensNames = useMemo(() => ALL_LENSES.map((l) => `${l.name} (${l.specialty})`), []);
 
   const qualityRows = (["sd", "hd", "2k", "4k", "8k"] as const).map((q) => {
     const d11 = imageQualityDimensions(q, "1:1");
@@ -331,7 +328,7 @@ function AboutProductPage() {
             Maluto AI
           </h2>
           <p className="mt-4 text-base leading-relaxed text-neutral-700">
-            Maluto AI is Motio2edit's in-product assistant for creative guidance — helping refine ideas,
+            Maluto AI is Motio2edit&apos;s in-product assistant for creative guidance — helping refine ideas,
             suggest edit directions, and orient you inside the studios. Generation credits for Image, Video,
             and Music still apply when you run those tools; Maluto itself is guidance, not a separate
             generation meter on this page.
@@ -340,29 +337,7 @@ function AboutProductPage() {
 
         <Divider />
 
-        <section id="circle-2edit" aria-labelledby="circle-h" className="scroll-mt-24">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: CIRCLE }}>
-            Mark · remove · add
-          </p>
-          <h2 id="circle-h" className="mt-2 text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
-            Circle 2edit
-          </h2>
-          <p className="mt-4 text-base leading-relaxed text-neutral-700">
-            Circle 2edit lets you remove unwanted objects from a photo or add new ones that blend naturally into the scene. Upload any photo, mark the region with Circle or Brush (use Zoom for fine detail), then Remove to rebuild the background or Add to place a library object. The Motion2Ai engine matches lighting and perspective. Add costs more because it generates new content scaled to your photo resolution.
-          </p>
-          <StepDiagram
-            accent={CIRCLE}
-            steps={["Upload", "Mark region", "Remove or Add", "Generate", "Download"]}
-          />
-          <Table
-            accent={CIRCLE}
-            headers={["Action", "Credits"]}
-            rows={[
-              ["Remove", String(CIRCLE_REMOVE_CREDITS)],
-              ["Add (varies by megapixels)", CIRCLE_ADD_BASE_BY_MP.map((b) => String(b.credits)).join(" / ")],
-            ]}
-          />
-        </section>
+        <Circle2editGuideSection />
 
         <Divider />
 
@@ -402,7 +377,9 @@ function AboutProductPage() {
         <Divider />
 
         <section id="lenses" aria-labelledby="lenses-h" className="scroll-mt-24">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Tools</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2D6A4F]">
+            Specialty · paths · effects
+          </p>
           <h2 id="lenses-h" className="mt-2 text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
             Lenses
           </h2>
