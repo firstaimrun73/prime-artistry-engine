@@ -610,9 +610,7 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
                 />
               ))}
             </div>
-            <style>{`
-              ${"".join(f"@keyframes m2e-blade-{i}{{0%{{transform:translate(-50%,-100%) rotate({i*60}deg) scaleY(0.12)}}100%{{transform:translate(-50%,-100%) rotate({i*60}deg) scaleY(1)}}}}" for i in range(6))}
-            `}</style>
+            <style>{`@keyframes m2e-blade-0{0%{transform:translate(-50%,-100%) rotate(0deg) scaleY(0.12)}100%{transform:translate(-50%,-100%) rotate(0deg) scaleY(1)}}@keyframes m2e-blade-1{0%{transform:translate(-50%,-100%) rotate(60deg) scaleY(0.12)}100%{transform:translate(-50%,-100%) rotate(60deg) scaleY(1)}}@keyframes m2e-blade-2{0%{transform:translate(-50%,-100%) rotate(120deg) scaleY(0.12)}100%{transform:translate(-50%,-100%) rotate(120deg) scaleY(1)}}@keyframes m2e-blade-3{0%{transform:translate(-50%,-100%) rotate(180deg) scaleY(0.12)}100%{transform:translate(-50%,-100%) rotate(180deg) scaleY(1)}}@keyframes m2e-blade-4{0%{transform:translate(-50%,-100%) rotate(240deg) scaleY(0.12)}100%{transform:translate(-50%,-100%) rotate(240deg) scaleY(1)}}@keyframes m2e-blade-5{0%{transform:translate(-50%,-100%) rotate(300deg) scaleY(0.12)}100%{transform:translate(-50%,-100%) rotate(300deg) scaleY(1)}}`}</style>
           </div>
         )}
         {nameChip && (
