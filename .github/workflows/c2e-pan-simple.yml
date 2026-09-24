@@ -1,0 +1,66 @@
+name: c2e-pan-simple
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-pan-simple.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 1) Mask: enable scroll-to-pan when zoomed (overflow-auto) + data attr
+          FILE=src/components/circle-edit/CircleMaskStage.tsx
+          # Make shell scrollable when zoom > 1 so user can pan to all corners
+          if grep -q 'overflow-hidden' "$FILE"; then
+            sed -i 's/items-center justify-center overflow-hidden/items-center justify-center overflow-auto overscroll-contain data-circle-pan-scroll="true"/' "$FILE" || true
+          fi
+          # Tag pan capability
+          if ! grep -q 'data-circle-pan-surface' "$FILE"; then
+            sed -i 's/data-circle-mask-stage="true"/data-circle-mask-stage="true" data-circle-pan-surface="true"/' "$FILE"
+          fi
+          grep -q destination-in "$FILE"
+          grep -q data-circle-pan-surface "$FILE"
+
+          # 2) Route: howto import + chip label + infoSlot
+          R=src/routes/studio.image.circle-remove.tsx
+          if ! grep -q 'CircleHowToHelp' "$R"; then
+            sed -i 's|import { AssetIcon } from "@/components/circle-edit/AssetIcon";|import { AssetIcon } from "@/components/circle-edit/AssetIcon";\nimport { CircleHowToHelp } from "@/components/circle-edit/CircleHowToHelp";|' "$R"
+          fi
+          sed -i 's|{selectedAsset.name}</span>|Ready to place {selectedAsset.name}</span>|' "$R" || true
+          # infoSlot - only if still single credits
+          if grep -q 'infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}' "$R"; then
+            python3 -c '
+from pathlib import Path
+p=Path("src/routes/studio.image.circle-remove.tsx")
+t=p.read_text()
+old="infoSlot={<CircleCreditsInfo title=\"Credits\" lines={creditInfoLines} />}"
+new="""infoSlot={
+            <div className=\"flex items-center gap-1\" data-circle-help-row=\"true\">
+              <CircleHowToHelp />
+              <CircleCreditsInfo title=\"Credits\" lines={creditInfoLines} />
+            </div>
+          }"""
+t=t.replace(old,new)
+p.write_text(t)
+print("infoSlot ok")
+'
+          fi
+          grep -q data-circle-place-chip "$R"
+          grep -q CircleHowToHelp "$R"
+          grep -q 'Ready to place' "$R"
+          test -f src/components/circle-edit/CircleHowToHelp.tsx
+
+          git add "$FILE" "$R"
+          git status
+          git commit -m "fix(circle2edit): scroll-pan when zoomed; Ready-to-place label; wire HowTo help"
+          git push origin HEAD:main
+          git rev-parse HEAD
