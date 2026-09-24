@@ -1,0 +1,87 @@
+name: c2e-zoom-fix2
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-zoom-fix2.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Ensure we have the good mask stage (with destination-in)
+          if ! grep -q destination-in src/components/circle-edit/CircleMaskStage.tsx; then
+            git show 500ff7fe222c2c951e86d89cd849bfb333173430:src/components/circle-edit/CircleMaskStage.tsx > src/components/circle-edit/CircleMaskStage.tsx
+          fi
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("src/components/circle-edit/CircleMaskStage.tsx")
+          t = p.read_text()
+
+          # Add userZoomRef after userZoom state
+          if "userZoomRef" not in t:
+              t = t.replace(
+                  "const [userZoom, setUserZoom] = useState(1);",
+                  "const [userZoom, setUserZoom] = useState(1);\n  const userZoomRef = useRef(1);\n  userZoomRef.current = userZoom;",
+                  1,
+              )
+
+          # layoutCanvas uses ref
+          t = t.replace(
+              "const z = Math.min(3, Math.max(0.5, userZoom));",
+              "const z = Math.min(3, Math.max(0.5, userZoomRef.current));",
+          )
+          # drop userZoom from layoutCanvas deps
+          t = t.replace("}, [redraw, userZoom]);", "}, [redraw]);")
+
+          # Critical: image effect deps — only imageUrl
+          t = t.replace(
+              "}, [imageUrl, layoutCanvas, notify]);",
+              "}, [imageUrl]); // zoom-safe: layoutCanvas/notify must not retrigger load",
+          )
+
+          # Remove CSS max clamps that defeat zoom
+          t = t.replace('            maxWidth: "100%",\n', "")
+          t = t.replace('            maxHeight: "100%",\n', "")
+
+          # overflow auto when zoomed
+          t = t.replace(
+              'className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"',
+              'className={`relative flex h-full min-h-0 w-full flex-1 items-center justify-center ${userZoom > 1 ? "overflow-auto" : "overflow-hidden"}`}',
+          )
+
+          # Sync ref in zoom click handlers (both buttons)
+          t = t.replace(
+              "onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}",
+              "onClick={() => { setUserZoom((z) => { const n = Math.min(3, Math.round((z + 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }}",
+          )
+          t = t.replace(
+              "onClick={() => setUserZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}",
+              "onClick={() => { setUserZoom((z) => { const n = Math.max(0.5, Math.round((z - 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }}",
+          )
+
+          # Also sync ref when fit() resets zoom
+          t = t.replace(
+              "fit: () => {\n        setUserZoom(1);",
+              "fit: () => {\n        userZoomRef.current = 1;\n        setUserZoom(1);",
+          )
+
+          p.write_text(t)
+          assert "userZoomRef" in t
+          assert "[imageUrl, layoutCanvas, notify]" not in t
+          assert 'maxWidth: "100%"' not in t
+          print("OK", len(t))
+          PY
+          git add src/components/circle-edit/CircleMaskStage.tsx
+          git status
+          git commit -m "fix(circle2edit): zoom +/− scales canvas (image-effect no longer resets zoom)"
+          git pull --rebase origin main || true
+          git push
+          echo TIP=$(git rev-parse HEAD)
