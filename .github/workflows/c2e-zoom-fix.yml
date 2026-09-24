@@ -20,16 +20,14 @@ jobs:
           from pathlib import Path
           p = Path("src/components/circle-edit/CircleMaskStage.tsx")
           t = p.read_text()
-          assert "SEE_" not in t and "PLACEHOLDER" not in t
+          assert "SEE_" not in t and "PLACEHOLDER" not in t and "LOADING" not in t
 
-          # 1) Keep userZoom in a ref so layoutCanvas identity is stable
           if "userZoomRef" not in t:
             t = t.replace(
               "const [userZoom, setUserZoom] = useState(1);",
               "const [userZoom, setUserZoom] = useState(1);\n  const userZoomRef = useRef(1);\n  userZoomRef.current = userZoom;",
             )
 
-          # 2) layoutCanvas reads userZoomRef, not userZoom state — drop userZoom from deps
           t = t.replace(
               "const z = Math.min(3, Math.max(0.5, userZoom));",
               "const z = Math.min(3, Math.max(0.5, userZoomRef.current));",
@@ -39,114 +37,18 @@ jobs:
               "}, [redraw]);",
           )
 
-          # 3) Image-load effect must ONLY depend on imageUrl — layoutCanvas in deps
-          #    recreated the effect and reset setUserZoom(1) on every zoom click.
-          old_img = """  useEffect(() => {
-    let cancelled = false;
-    if (flashTimerRef.current != null) {
-      window.clearTimeout(flashTimerRef.current);
-      flashTimerRef.current = null;
-    }
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      if (cancelled) return;
-      imgRef.current = img;
-      const nat: Size = { width: img.naturalWidth, height: img.naturalHeight };
-      maskRef.current = createWorkingMask(nat);
-      historyRef.current = { past: [], future: [] };
-      setNatural(nat);
-      setAspect(nat.width / Math.max(1, nat.height));
-      setReady(true);
-      setLivePath([]);
-      setNearClose(false);
-      setFlashOrigin(null);
-      setUserZoom(1);
-      requestAnimationFrame(() => {
-        layoutCanvas();
-        notify();
-      });
-    };
-    img.onerror = () => {
-      if (!cancelled) setReady(false);
-    };
-    img.src = imageUrl;
-    return () => {
-      cancelled = true;
-    };
-  }, [imageUrl, layoutCanvas, notify]);"""
+          old_img_end = "  }, [imageUrl, layoutCanvas, notify]);"
+          new_img_end = "  }, [imageUrl]); // zoom-safe: do not re-run load on layoutCanvas"
+          if old_img_end in t:
+              t = t.replace(old_img_end, new_img_end)
+          elif "}, [imageUrl]);" not in t and "zoom-safe" not in t:
+              raise SystemExit("could not fix image load deps")
 
-          new_img = """  useEffect(() => {
-    let cancelled = false;
-    if (flashTimerRef.current != null) {
-      window.clearTimeout(flashTimerRef.current);
-      flashTimerRef.current = null;
-    }
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      if (cancelled) return;
-      imgRef.current = img;
-      const nat: Size = { width: img.naturalWidth, height: img.naturalHeight };
-      maskRef.current = createWorkingMask(nat);
-      historyRef.current = { past: [], future: [] };
-      setNatural(nat);
-      setAspect(nat.width / Math.max(1, nat.height));
-      setReady(true);
-      setLivePath([]);
-      setNearClose(false);
-      setFlashOrigin(null);
-      setUserZoom(1);
-      userZoomRef.current = 1;
-      requestAnimationFrame(() => {
-        layoutCanvas();
-        notify();
-      });
-    };
-    img.onerror = () => {
-      if (!cancelled) setReady(false);
-    };
-    img.src = imageUrl;
-    return () => {
-      cancelled = true;
-    };
-    // imageUrl only — do NOT depend on layoutCanvas/notify or zoom resets on every +/-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageUrl]);"""
+          # maxWidth clamp
+          t = t.replace("\n            maxWidth: \"100%\",", "")
+          t = t.replace("\n            maxHeight: \"100%\",", "")
 
-          if old_img not in t:
-              raise SystemExit("image effect block not found")
-          t = t.replace(old_img, new_img)
-
-          # 4) Remove maxWidth/maxHeight 100% which clamped zoomed CSS size back to container
-          t = t.replace(
-              """          style={{
-            display: "block",
-            maxWidth: "100%",
-            maxHeight: "100%",
-            width: displaySize.w ? `${displaySize.w}px` : "auto",
-            height: displaySize.h ? `${displaySize.h}px` : "auto",
-            objectFit: "contain",
-            imageRendering: "auto",
-            aspectRatio: aspect ? String(aspect) : undefined,
-          }}""",
-              """          style={{
-            display: "block",
-            width: displaySize.w ? `${displaySize.w}px` : "auto",
-            height: displaySize.h ? `${displaySize.h}px` : "auto",
-            objectFit: "contain",
-            imageRendering: "auto",
-            aspectRatio: aspect ? String(aspect) : undefined,
-          }}""",
-          )
-
-          # 5) Allow pan when zoomed (overflow auto) instead of hard-clip
-          t = t.replace(
-              'className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"',
-              'className={`relative flex h-full min-h-0 w-full flex-1 items-center justify-center ${userZoom > 1 ? "overflow-auto" : "overflow-hidden"}`}',
-          )
-
-          # 6) Zoom buttons: also write userZoomRef immediately for sync layout
+          # zoom buttons write ref
           t = t.replace(
               "onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}",
               "onClick={() => { setUserZoom((z) => { const n = Math.min(3, Math.round((z + 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }}",
@@ -159,11 +61,44 @@ jobs:
           p.write_text(t)
           assert "userZoomRef" in t
           assert "[imageUrl, layoutCanvas, notify]" not in t
-          assert "maxWidth: \"100%\"" not in t
-          print("zoom fix ok", len(t))
+          print("zoom ok")
+
+          # Route: remove ?, chip bottom
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+          lines = [ln for ln in rt.splitlines(True) if "CircleHowToHelp" not in ln]
+          rt = "".join(lines)
+          rt = rt.replace("inset-x-0 top-2", "inset-x-0 bottom-14")
+          rt = rt.replace("left-0 right-0 top-0 z-20 flex justify-center px-3 pt-2", "inset-x-0 bottom-14 z-20 flex justify-center px-3")
+          # fix broken help row wrappers left over
+          rt = rt.replace(' data-circle-help-row="true"', "")
+          r.write_text(rt)
+
+          # About credits + copy
+          a = Path("src/routes/about.tsx")
+          at = a.read_text()
+          at = at.replace('["Standard", String(STANDARD_CREDITS)]', '["Standard (T2I SD/HD)", `${STANDARD_CREDITS.textToImageSd} / ${STANDARD_CREDITS.textToImageHd}`]')
+          at = at.replace('["Premium", String(PREMIUM_T2I_CREDITS)]', '["Premium (T2I SD/HD/2K)", `${PREMIUM_T2I_CREDITS.sd} / ${PREMIUM_T2I_CREDITS.hd} / ${PREMIUM_T2I_CREDITS["2k"]}`]')
+          at = at.replace('["Ultra", String(ULTRA_T2I_CREDITS)]', '["Ultra (T2I SD/HD/2K/4K)", `${ULTRA_T2I_CREDITS.sd} / ${ULTRA_T2I_CREDITS.hd} / ${ULTRA_T2I_CREDITS["2k"]} / ${ULTRA_T2I_CREDITS["4k"]}`]')
+          old = "Circle regions to remove distractions or add objects that match the scene. Remove is fast for clean-up;\n            Add places new elements with lighting and perspective matched to the photo."
+          new = "Circle 2edit lets you remove unwanted objects from a photo or add new ones that blend naturally into the scene. Upload any photo, mark the region with Circle or Brush (use Zoom for fine detail), then Remove to rebuild the background or Add to place a library object. The Motion2Ai engine matches lighting and perspective. Add costs more because it generates new content scaled to your photo resolution."
+          if old in at:
+              at = at.replace(old, new)
+          oldv = "Video Studio turns text or still images into short cinematic clips. Describe the scene or upload a\n            reference, pick duration and aspect, then generate. Clips are suited to social and concept\n            previews; longer timelines and advanced audio tools continue to expand with the product."
+          newv = "Video Studio turns a written idea or a still photo into a short AI-generated video clip. Text-to-Video describes a scene; Image-to-Video animates a still; Video-to-Video restyles a clip while keeping motion. Choose duration, aspect (9:16, 1:1, 4:5, or 16:9), quality, and optional sound, then preview before download."
+          if oldv in at:
+              at = at.replace(oldv, newv)
+          a.write_text(at)
+          assert "textToImageSd" in at
+          print("all ok")
           PY
-          git add src/components/circle-edit/CircleMaskStage.tsx
-          git commit -m "fix(circle2edit): zoom +/− actually scale canvas (stop image-effect reset)"
-          git pull --rebase origin main || true
-          git push
+          grep -q userZoomRef src/components/circle-edit/CircleMaskStage.tsx
+          grep -q zoom-safe src/components/circle-edit/CircleMaskStage.tsx
+          ! grep -q CircleHowToHelp src/routes/studio.image.circle-remove.tsx || true
+          grep -q textToImageSd src/routes/about.tsx
+          git add src/components/circle-edit/CircleMaskStage.tsx src/routes/studio.image.circle-remove.tsx src/routes/about.tsx
+          if git diff --cached --quiet; then echo nothing; else
+            git commit -m "fix: zoom root-cause; remove ?; chip bottom; about credits numbers + copy"
+            git push origin HEAD:main
+          fi
           git rev-parse HEAD
