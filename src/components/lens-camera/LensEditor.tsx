@@ -502,28 +502,51 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
   return (
     <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-black text-white">
       <header className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
-        <Link
-          to="/studio/image/lenses"
-          className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/"
+            className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => void startCamera(facingMode === "user" ? "environment" : "user")}
+            className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
+            aria-label="Flip camera"
+          >
+            <SwitchCamera className="h-5 w-5" />
+          </button>
+          {torchSupported ? (
+            <button
+              type="button"
+              onClick={() => void toggleTorch()}
+              className={cn(
+                "grid h-10 w-10 place-items-center rounded-full backdrop-blur-md",
+                torchOn ? "bg-amber-400 text-black" : "bg-black/40",
+              )}
+              aria-label="Torch"
+            >
+              <Zap className="h-5 w-5" />
+            </button>
+          ) : null}
+          <Link
+            to="/studio/image/lenses"
+            className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
+            aria-label="More lenses"
+          >
+            <ImagePlus className="h-5 w-5" />
+          </Link>
+        </div>
         <div className="rounded-full bg-black/40 px-3 py-1.5 backdrop-blur-md">
           <p className="text-[11px] font-semibold tracking-[0.14em] text-white/90">MOTIO2EDIT · LENSES</p>
         </div>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="grid h-10 w-10 place-items-center rounded-full bg-black/40 backdrop-blur-md"
-          aria-label="Upload photo"
-        >
-          <ImagePlus className="h-5 w-5" />
-        </button>
+        <div className="w-10" />
       </header>
 
       <div
-        className="relative min-h-0 flex-1 overflow-hidden pb-[11.5rem] touch-pan-y"
+        className="absolute inset-0 overflow-hidden touch-pan-y"
         onTouchStart={(e) => {
           const t = e.changedTouches[0];
           if (t) onSwipeStart(t.clientX, t.clientY);
@@ -614,22 +637,13 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
           </div>
 
           {/* Shutter row */}
-          <div className="flex items-center justify-between px-6 pb-3">
-            <button
-              type="button"
-              onClick={() => void startCamera(facingMode === "user" ? "environment" : "user")}
-              className="grid h-12 w-12 place-items-center rounded-full bg-white/10"
-              aria-label="Flip camera"
-            >
-              <SwitchCamera className="h-5 w-5" />
-            </button>
-
+          <div className="flex items-center justify-center px-6 pb-3">
             {phase === "result" ? (
-              <div className="flex gap-3">
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={onRetake}
-                  className="rounded-full bg-white/15 px-5 py-2.5 text-sm font-semibold"
+                  className="rounded-full bg-white/15 px-5 py-2.5 text-sm font-semibold backdrop-blur-md"
                 >
                   Retake
                 </button>
@@ -646,11 +660,21 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
                   <button
                     type="button"
                     onClick={() => void onShare()}
-                    className="grid h-10 w-10 place-items-center rounded-full bg-white/15"
+                    className="grid h-10 w-10 place-items-center rounded-full bg-white/15 backdrop-blur-md"
                   >
                     <Share2 className="h-4 w-4" />
                   </button>
                 )}
+                <label className="flex items-center gap-2 rounded-full bg-white/15 px-3 py-2 text-xs font-medium backdrop-blur-md">
+                  <input
+                    type="checkbox"
+                    checked={wantWm}
+                    onChange={(e) => setWantWm(e.target.checked)}
+                    disabled={!isPaid}
+                    className="accent-yellow-400"
+                  />
+                  Watermark
+                </label>
               </div>
             ) : (
               <button
@@ -663,22 +687,6 @@ export function LensEditor({ initialLensId }: { initialLensId?: string }) {
               >
                 <div className="h-14 w-14 rounded-full bg-white" />
               </button>
-            )}
-
-            {torchSupported ? (
-              <button
-                type="button"
-                onClick={() => void toggleTorch()}
-                className={cn(
-                  "grid h-12 w-12 place-items-center rounded-full",
-                  torchOn ? "bg-amber-400 text-black" : "bg-white/10",
-                )}
-                aria-label="Torch"
-              >
-                <Zap className="h-5 w-5" />
-              </button>
-            ) : (
-              <div className="h-12 w-12" />
             )}
           </div>
         </div>
