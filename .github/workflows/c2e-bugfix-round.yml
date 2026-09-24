@@ -1,0 +1,261 @@
+name: c2e-bugfix-round
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/c2e-bugfix-round.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 << 'PY'
+          from pathlib import Path
+
+          # ========== 1) CircleMaskStage: zoom root cause ==========
+          m = Path("src/components/circle-edit/CircleMaskStage.tsx")
+          t = m.read_text()
+          assert "destination-in" in t
+
+          # Add userZoomRef if missing
+          if "userZoomRef" not in t:
+              t = t.replace(
+                  "  const [userZoom, setUserZoom] = useState(1);",
+                  "  const [userZoom, setUserZoom] = useState(1);\n  const userZoomRef = useRef(1);\n  userZoomRef.current = userZoom;",
+              )
+
+          # layoutCanvas must read zoom from ref, NOT close over userZoom (prevents effect churn)
+          t = t.replace(
+              "const z = Math.min(3, Math.max(0.5, userZoom));",
+              "const z = Math.min(3, Math.max(0.5, userZoomRef.current));",
+          )
+          # Fix layoutCanvas deps: only redraw, not userZoom
+          t = t.replace(
+              "  }, [redraw, userZoom]);",
+              "  }, [redraw]);",
+          )
+
+          # CRITICAL: image load effect must NOT depend on layoutCanvas/notify
+          # (layoutCanvas identity changed on every zoom → reset to 1)
+          old_load_end = "  }, [imageUrl, layoutCanvas, notify]);"
+          new_load_end = "  }, [imageUrl]); // zoom-safe: do not re-run on layoutCanvas/userZoom"
+          if old_load_end not in t:
+              # alternate already partially fixed
+              if "}, [imageUrl]);" not in t and "}, [imageUrl]); // zoom-safe" not in t:
+                  raise SystemExit("load effect deps not found")
+          else:
+              t = t.replace(old_load_end, new_load_end)
+
+          # Sync ref on setUserZoom in buttons
+          t = t.replace(
+              'onClick={() => setUserZoom((z) => Math.min(3, Math.round((z + 0.25) * 100) / 100))}',
+              'onClick={() => setUserZoom((z) => { const n = Math.min(3, Math.round((z + 0.25) * 100) / 100); userZoomRef.current = n; return n; })}',
+          )
+          t = t.replace(
+              'onClick={() => setUserZoom((z) => Math.max(0.5, Math.round((z - 0.25) * 100) / 100))}',
+              'onClick={() => setUserZoom((z) => { const n = Math.max(0.5, Math.round((z - 0.25) * 100) / 100); userZoomRef.current = n; return n; })}',
+          )
+          t = t.replace(
+              "        setUserZoom(1);\n        requestAnimationFrame(() => layoutCanvas());",
+              "        userZoomRef.current = 1;\n        setUserZoom(1);\n        requestAnimationFrame(() => layoutCanvas());",
+          )
+          t = t.replace(
+              "      setUserZoom(1);\n      requestAnimationFrame(() => {",
+              "      userZoomRef.current = 1;\n      setUserZoom(1);\n      requestAnimationFrame(() => {",
+          )
+
+          # Remove maxWidth/maxHeight 100% that clamps zoomed CSS size back to shell
+          t = t.replace(
+              """          style={{
+            display: "block",
+            maxWidth: "100%",
+            maxHeight: "100%",
+            width: displaySize.w ? `${displaySize.w}px` : "auto",
+            height: displaySize.h ? `${displaySize.h}px` : "auto",
+            objectFit: "contain",
+            imageRendering: "auto",
+            aspectRatio: aspect ? String(aspect) : undefined,
+          }}""",
+              """          style={{
+            display: "block",
+            width: displaySize.w ? `${displaySize.w}px` : "auto",
+            height: displaySize.h ? `${displaySize.h}px` : "auto",
+            objectFit: "contain",
+            imageRendering: "auto",
+          }}""",
+          )
+
+          m.write_text(t)
+          assert "userZoomRef" in t
+          assert "}, [imageUrl]);" in t or "zoom-safe" in t
+          print("mask zoom fixed")
+
+          # ========== 2) Route: remove ?, move chip to bottom ==========
+          r = Path("src/routes/studio.image.circle-remove.tsx")
+          rt = r.read_text()
+
+          # Remove HowTo import and wiring
+          rt = rt.replace('import { CircleHowToHelp } from "@/components/circle-edit/CircleHowToHelp";\n', "")
+          rt = rt.replace("  CircleHowToHelp,\n", "")
+          # Restore simple infoSlot
+          if "data-circle-help-row" in rt:
+              import re
+              rt = re.sub(
+                  r'infoSlot=\{\s*<div className="flex items-center gap-1" data-circle-help-row="true">\s*<CircleHowToHelp />\s*<CircleCreditsInfo title="Credits" lines=\{creditInfoLines\} />\s*</div>\s*\}',
+                  'infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}',
+                  rt,
+              )
+              # fallback simple
+              if "CircleHowToHelp" in rt:
+                  rt = rt.replace("<CircleHowToHelp />\n", "")
+                  rt = rt.replace('<div className="flex items-center gap-1" data-circle-help-row="true">\n', "")
+                  # may leave broken markup - do structured replace
+
+          # Structured infoSlot restore
+          if "CircleHowToHelp" in rt or "data-circle-help-row" in rt:
+              start = rt.find("infoSlot={")
+              if start >= 0:
+                  # find matching end of infoSlot prop
+                  # simpler: replace known block
+                  old_blocks = [
+                      '''infoSlot={
+            <div className="flex items-center gap-1" data-circle-help-row="true">
+              <CircleHowToHelp />
+              <CircleCreditsInfo title="Credits" lines={creditInfoLines} />
+            </div>
+          }''',
+                      'infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}',
+                  ]
+                  for ob in old_blocks:
+                      if ob in rt:
+                          rt = rt.replace(ob, 'infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}')
+                          break
+                  else:
+                      # nuke howto lines
+                      lines = []
+                      for line in rt.splitlines(True):
+                          if "CircleHowToHelp" in line or "data-circle-help-row" in line:
+                              continue
+                          lines.append(line)
+                      rt = "".join(lines)
+
+          # Move place-chip from top to bottom so it does not cover the photo
+          rt = rt.replace(
+              'className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3"',
+              'className="pointer-events-none absolute inset-x-0 bottom-14 z-20 flex justify-center px-3"',
+          )
+          rt = rt.replace(
+              'className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex justify-center px-3 pt-2"',
+              'className="pointer-events-none absolute inset-x-0 bottom-14 z-20 flex justify-center px-3"',
+          )
+
+          assert "CircleHowToHelp" not in rt
+          assert "data-circle-place-chip" in rt
+          r.write_text(rt)
+          print("route cleaned")
+
+          # ========== 3) About page: credits table + user copy ==========
+          a = Path("src/routes/about.tsx")
+          at = a.read_text()
+
+          # Fix [object Object] — STANDARD_CREDITS is an object; PREMIUM/ULTRA are records
+          old_rows = '''            rows={[
+              ["Standard", String(STANDARD_CREDITS)],
+              ["Premium", String(PREMIUM_T2I_CREDITS)],
+              ["Ultra", String(ULTRA_T2I_CREDITS)],
+              [AUTO_EDIT_PRODUCT_NAME, Object.values(AUTO_EDIT_CREDITS_BY_QUALITY).map(String).join(" / ")],
+            ]}'''
+          new_rows = '''            rows={[
+              ["Standard (text→image SD / HD)", `${STANDARD_CREDITS.textToImageSd} / ${STANDARD_CREDITS.textToImageHd}`],
+              ["Premium (text→image SD / HD / 2K)", `${PREMIUM_T2I_CREDITS.sd} / ${PREMIUM_T2I_CREDITS.hd} / ${PREMIUM_T2I_CREDITS["2k"]}`],
+              ["Ultra (text→image SD / HD / 2K / 4K)", `${ULTRA_T2I_CREDITS.sd} / ${ULTRA_T2I_CREDITS.hd} / ${ULTRA_T2I_CREDITS["2k"]} / ${ULTRA_T2I_CREDITS["4k"]}`],
+              [AUTO_EDIT_PRODUCT_NAME, Object.values(AUTO_EDIT_CREDITS_BY_QUALITY).map(String).join(" / ")],
+            ]}'''
+          if old_rows not in at:
+              raise SystemExit("about credit rows not found")
+          at = at.replace(old_rows, new_rows)
+
+          # Circle 2edit expanded description (user copy; Motion2Ai engine only)
+          old_circle_p = '''          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Circle regions to remove distractions or add objects that match the scene. Remove is fast for clean-up;
+            Add places new elements with lighting and perspective matched to the photo.
+          </p>
+          <StepDiagram
+            accent={CIRCLE}
+            steps={["Upload", "Mark region", "Remove or Add", "Generate", "Download"]}
+          />'''
+          new_circle_p = '''          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Circle 2edit lets you remove unwanted objects from a photo or add new ones that blend naturally into the scene.
+          </p>
+          <div className="mt-4 space-y-3 text-base leading-relaxed text-neutral-700">
+            <p><span className="font-semibold text-neutral-900">1. Upload</span> — choose any photo from your gallery.</p>
+            <p><span className="font-semibold text-neutral-900">2. Mark the region</span> — use the Circle tool to draw a quick loop around your subject, or the Brush for precise, pixel-level control. Adjust brush size with the slider, and use Zoom to work accurately on small details.</p>
+            <p><span className="font-semibold text-neutral-900">3. Choose Remove or Add</span> — Remove clears the marked area and rebuilds the background naturally. Add lets you browse a library of objects and place one into your marked area.</p>
+            <p><span className="font-semibold text-neutral-900">4. Generate</span> — the Motion2Ai engine processes your edit, matching lighting and perspective for a natural result.</p>
+            <p><span className="font-semibold text-neutral-900">5. Download</span> — save your finished photo, or share it directly.</p>
+            <p className="text-sm text-neutral-600">Why does Add cost more than Remove? Adding an object isn't just erasing pixels — the engine has to generate new content that matches your photo's lighting, shadow, angle, and scale, which takes more processing. Cost scales with your photo's resolution (megapixels), so a small photo costs less to edit than a large one.</p>
+          </div>
+          <StepDiagram
+            accent={CIRCLE}
+            steps={["Upload", "Mark region", "Remove or Add", "Generate", "Download"]}
+          />'''
+          if old_circle_p not in at:
+              print("WARN circle block not exact — skip circle copy")
+          else:
+              at = at.replace(old_circle_p, new_circle_p)
+
+          # Video Studio expanded description
+          old_video_p = '''          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Video Studio turns text or still images into short cinematic clips. Describe the scene or upload a
+            reference, pick duration and aspect, then generate. Clips are suited to social and concept
+            previews; longer timelines and advanced audio tools continue to expand with the product.
+          </p>
+          <StepDiagram
+            accent={VIDEO_ACCENT}
+            steps={["Text or still", "Duration & aspect", "Generate", "Preview", "Download"]}
+          />'''
+          new_video_p = '''          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Video Studio turns a written idea or a still photo into a short AI-generated video clip.
+          </p>
+          <div className="mt-4 space-y-3 text-base leading-relaxed text-neutral-700">
+            <p><span className="font-semibold text-neutral-900">Text-to-Video</span> — describe a scene in words and the engine generates original motion and cinematography from scratch.</p>
+            <p><span className="font-semibold text-neutral-900">Image-to-Video</span> — upload a still photo and bring it to life with natural camera movement and motion.</p>
+            <p><span className="font-semibold text-neutral-900">Video-to-Video</span> — restyle or transform an existing video clip while keeping its original motion and structure.</p>
+            <p>Choose your clip's duration, aspect ratio (9:16, 1:1, 4:5, or 16:9), and quality, then add style direction to guide the mood and visual tone of the result. Sound can be generated alongside your clip to match the scene. Preview before downloading.</p>
+          </div>
+          <StepDiagram
+            accent={VIDEO_ACCENT}
+            steps={["Text or still", "Duration & aspect", "Generate", "Preview", "Download"]}
+          />'''
+          if old_video_p not in at:
+              print("WARN video block not exact — skip video copy")
+          else:
+              at = at.replace(old_video_p, new_video_p)
+
+          a.write_text(at)
+          assert "textToImageSd" in at
+          print("about fixed")
+          PY
+
+          grep -q userZoomRef src/components/circle-edit/CircleMaskStage.tsx
+          grep -q 'zoom-safe\|}\, \[imageUrl\]' src/components/circle-edit/CircleMaskStage.tsx || grep -q '\[imageUrl\]' src/components/circle-edit/CircleMaskStage.tsx
+          ! grep -q CircleHowToHelp src/routes/studio.image.circle-remove.tsx
+          grep -q bottom-14 src/routes/studio.image.circle-remove.tsx
+          grep -q textToImageSd src/routes/about.tsx
+          grep -q Motion2Ai src/routes/about.tsx
+
+          git add src/components/circle-edit/CircleMaskStage.tsx src/routes/studio.image.circle-remove.tsx src/routes/about.tsx
+          if git diff --cached --quiet; then
+            echo nothing
+          else
+            git commit -m "fix: zoom root-cause (no reload on zoom); remove ? help; chip bottom; about credits+copy"
+            git push origin HEAD:main
+          fi
+          git rev-parse HEAD
