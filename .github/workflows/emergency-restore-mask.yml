@@ -1,0 +1,26 @@
+name: emergency-restore-mask
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/emergency-restore-mask.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git show 500ff7fe222c2c951e86d89cd849bfb333173430:src/components/circle-edit/CircleMaskStage.tsx > src/components/circle-edit/CircleMaskStage.tsx
+          wc -c src/components/circle-edit/CircleMaskStage.tsx
+          grep destination-in src/components/circle-edit/CircleMaskStage.tsx
+          git add src/components/circle-edit/CircleMaskStage.tsx
+          git commit -m "fix: emergency restore CircleMaskStage (destination-in + zoom)"
+          git push origin HEAD:main
+          git rev-parse HEAD
