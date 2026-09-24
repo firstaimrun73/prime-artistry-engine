@@ -1,0 +1,100 @@
+name: move-chip-v3
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/move-chip-v3.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 -c '
+from pathlib import Path
+path = Path("src/routes/studio.image.circle-remove.tsx")
+lines = path.read_text().splitlines(True)
+out = []
+i = 0
+while i < len(lines):
+    if "mode === \"add\" && addConfirmed && selectedAsset" in lines[i]:
+        window = "".join(lines[i : min(len(lines), i + 20)])
+        if "data-circle-place-chip" in window and "absolute" in window:
+            while i < len(lines) and ") : null}" not in lines[i]:
+                i += 1
+            if i < len(lines):
+                i += 1
+            continue
+    out.append(lines[i])
+    i += 1
+rt = "".join(out)
+old = """          {!addConfirmed ? (
+  <button
+    type="button"
+    onClick={() => setAddDrawerOpen(true)}
+    className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+  >
+    Browse objects
+  </button>
+) : null}"""
+new = """          {!addConfirmed ? (
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(true)}
+              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+            >
+              Browse objects
+            </button>
+          ) : selectedAsset ? (
+            <div
+              className={cn(
+                "flex w-full max-w-full items-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5",
+                isDark ? "border-[#7B6FE0]/35 bg-[rgba(123,111,224,0.10)]" : "border-[#7B6FE0]/25 bg-[rgba(123,111,224,0.06)]",
+              )}
+              data-circle-place-chip="true"
+            >
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]">
+                <AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#7B6FE0]">
+                Ready to place {selectedAsset.name}
+              </span>
+              <button
+                type="button"
+                aria-label="Change object"
+                onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }}
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                aria-label="Clear selected object"
+                onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[13px] font-bold text-[#7B6FE0]/80"
+              >
+                X
+              </button>
+            </div>
+          ) : null}"""
+if old not in rt:
+    raise SystemExit("browse missing")
+rt = rt.replace(old, new, 1)
+if rt.count("data-circle-place-chip") != 1:
+    raise SystemExit("chip count")
+if "PLACEHOLDER" in rt:
+    raise SystemExit("placeholder")
+path.write_text(rt)
+print("OK")
+'
+          grep -n data-circle-place-chip src/routes/studio.image.circle-remove.tsx
+          git add src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle-2edit): move add object control into toolbar"
+          git push origin HEAD:main
+          git rev-parse HEAD
