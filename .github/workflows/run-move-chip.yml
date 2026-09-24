@@ -1,0 +1,24 @@
+name: run-move-chip
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/run-move-chip.yml']
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 scripts/move_circle_chip_to_toolbar.py
+          grep -n data-circle-place-chip src/routes/studio.image.circle-remove.tsx
+          git add src/routes/studio.image.circle-remove.tsx
+          git commit -m "fix(circle-2edit): move add object control into toolbar"
+          git push origin HEAD:main
+          git rev-parse HEAD
