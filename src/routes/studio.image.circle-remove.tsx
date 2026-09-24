@@ -45,6 +45,7 @@ import { isFreePlan } from "@/lib/policy";
 import { CIRCLE_REMOVE_CREDITS, estimateCircleAddCredits } from "@/lib/circle-edit/credits";
 import { getAssetCreditCost } from "@/lib/circle-edit/add-assets-pricing";
 import { AssetIcon } from "@/components/circle-edit/AssetIcon";
+import { CircleHowToHelp } from "@/components/circle-edit/CircleHowToHelp";
 import { cn } from "@/lib/utils";
 import { navigateCircleBack } from "@/lib/circle-edit/circle-samples";
 
@@ -813,7 +814,12 @@ function Circle2editPage() {
           onClearMask={onClearMask}
           onClearImage={resetPhoto}
           statusText={statusForMode()}
-          infoSlot={<CircleCreditsInfo title="Credits" lines={creditInfoLines} />}
+          infoSlot={
+  <div className="flex items-center gap-1" data-circle-help-row="true">
+    <CircleHowToHelp />
+    <CircleCreditsInfo title="Credits" lines={creditInfoLines} />
+  </div>
+}
         />
       }
     >
@@ -837,7 +843,7 @@ function Circle2editPage() {
     <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center px-3" data-circle-place-chip="true">
       <div className={cn("pointer-events-auto flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-full border px-2.5 py-1 shadow-lg backdrop-blur-xl", isDark ? "border-[#7B6FE0]/40 bg-[rgba(18,20,28,0.88)]" : "border-[#7B6FE0]/30 bg-white/92")}>
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]"><AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected /></span>
-        <span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">{selectedAsset.name}</span>
+        <span className="min-w-0 truncate text-[11px] font-semibold text-[#7B6FE0]">Ready to place {selectedAsset.name}</span>
         <button type="button" aria-label="Change object" onClick={() => { setAddConfirmed(false); setConfirmOpen(true); }} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90">Change</button>
         <button type="button" aria-label="Clear selected object" onClick={() => { setAddObjectId(null); setFactorSelection({}); setAddConfirmed(false); setConfirmOpen(false); maskStageRef.current?.clear(); setHasMask(false); }} className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold text-[#7B6FE0]/80">×</button>
       </div>

@@ -438,8 +438,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   return (
     <div
       ref={shellRef}
-      className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden"
-      data-circle-mask-stage="true"
+      className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-auto overscroll-contain" data-circle-pan-scroll="true"
+      data-circle-mask-stage="true" data-circle-pan-surface="true"
       data-circle-canvas-fill="max"
       style={aspect ? { ["--circle-img-aspect" as string]: String(aspect) } : undefined}
     >
