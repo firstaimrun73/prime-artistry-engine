@@ -1,7 +1,8 @@
 /**
  * Cropmix Crop editor — upload-first, corner handles, custom ratio, taller dock.
+ * Preview is stage-fitted so tall 9:16 / large phone photos never collapse to blank.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   RotateCcw,
   RotateCw,
@@ -74,6 +75,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   const previewRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const loadGenRef = useRef(0);
   const [srcSize, setSrcSize] = useState({ w: 1, h: 1 });
   const [ready, setReady] = useState(false);
   const [box, setBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
@@ -81,6 +83,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   const [customW, setCustomW] = useState("4");
   const [customH, setCustomH] = useState("5");
   const [watermarkOn, setWatermarkOn] = useState(false);
+  const [stageTick, setStageTick] = useState(0);
   const [hist, setHist] = useState<HistoryStack<CropGeometry>>(() =>
     historyInit(initialGeometry ?? DEFAULT_CROP),
   );
@@ -98,37 +101,59 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
       sourceCanvasRef.current = null;
       return;
     }
-    let cancelled = false;
+    const gen = ++loadGenRef.current;
     let objectUrl: string | null = null;
+    setReady(false);
     (async () => {
-      const buf = await file.arrayBuffer();
-      const orientation = readExifOrientation(buf);
-      objectUrl = URL.createObjectURL(new Blob([buf]));
-      const img = new Image();
-      await new Promise<void>((res, rej) => {
-        img.onload = () => res();
-        img.onerror = () => rej(new Error("decode"));
-        img.src = objectUrl!;
-      });
-      if (cancelled) return;
-      const canvas = document.createElement("canvas");
-      const size = drawOriented(img, orientation, canvas);
-      sourceCanvasRef.current = canvas;
-      setSrcSize({ w: size.width, h: size.height });
-      const start = applyAspect(initialGeometry ?? DEFAULT_CROP, size.width, size.height);
-      setHist(historyInit(start));
-      if (start.customW) setCustomW(String(start.customW));
-      if (start.customH) setCustomH(String(start.customH));
-      setReady(true);
-      URL.revokeObjectURL(objectUrl);
-      objectUrl = null;
-    })().catch(() => setReady(false));
+      try {
+        const buf = await file.arrayBuffer();
+        if (gen !== loadGenRef.current) return;
+        const orientation = readExifOrientation(buf);
+        objectUrl = URL.createObjectURL(new Blob([buf]));
+        const img = new Image();
+        img.decoding = "async";
+        await new Promise<void>((res, rej) => {
+          img.onload = () => res();
+          img.onerror = () => rej(new Error("decode"));
+          img.src = objectUrl!;
+        });
+        if (gen !== loadGenRef.current) return;
+        if (!img.naturalWidth || !img.naturalHeight) {
+          setReady(false);
+          return;
+        }
+        const canvas = document.createElement("canvas");
+        const size = drawOriented(img, orientation, canvas);
+        if (gen !== loadGenRef.current) return;
+        if (!size.width || !size.height) {
+          setReady(false);
+          return;
+        }
+        sourceCanvasRef.current = canvas;
+        setSrcSize({ w: size.width, h: size.height });
+        const start = applyAspect(initialGeometry ?? DEFAULT_CROP, size.width, size.height);
+        setHist(historyInit(start));
+        if (start.customW) setCustomW(String(start.customW));
+        if (start.customH) setCustomH(String(start.customH));
+        setReady(true);
+      } catch {
+        if (gen === loadGenRef.current) setReady(false);
+      } finally {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      }
+    })();
     return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      sourceCanvasRef.current = null;
+      loadGenRef.current++;
     };
   }, [file, initialGeometry]);
+
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setStageTick((n) => n + 1));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ready]);
 
   const commit = useCallback((next: CropGeometry) => {
     setHist((h) => historyPush(h, clampCrop(next)));
@@ -152,22 +177,40 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     commit(applyAspect({ ...g, aspectId: "custom", customW: nw, customH: nh }, srcSize.w, srcSize.h));
   };
 
-  useEffect(() => {
-    if (!ready || !sourceCanvasRef.current || !previewRef.current) return;
+  useLayoutEffect(() => {
+    if (!ready || !sourceCanvasRef.current || !previewRef.current || !stageRef.current) return;
     const src = sourceCanvasRef.current;
     const canvas = previewRef.current;
-    const maxSide = 720;
+    const stage = stageRef.current;
+
+    const stageW = Math.max(1, stage.clientWidth - 24);
+    const stageH = Math.max(1, stage.clientHeight - 24);
+    if (stageW < 2 || stageH < 2) return;
+
     const r = ((g.rotate90 % 4) + 4) % 4;
     const baseW = src.width;
     const baseH = src.height;
+    if (!baseW || !baseH) return;
+
     const rotatedW = r === 1 || r === 3 ? baseH : baseW;
     const rotatedH = r === 1 || r === 3 ? baseW : baseH;
-    const scale = Math.min(1, maxSide / Math.max(rotatedW, rotatedH));
-    const dispW = Math.max(1, Math.round(rotatedW * scale));
-    const dispH = Math.max(1, Math.round(rotatedH * scale));
+
+    const fit = Math.min(stageW / rotatedW, stageH / rotatedH, 1);
+    const dispW = Math.max(1, Math.round(rotatedW * fit));
+    const dispH = Math.max(1, Math.round(rotatedH * fit));
+    const scale = fit;
+
     canvas.width = dispW;
     canvas.height = dispH;
-    const ctx = canvas.getContext("2d")!;
+    canvas.style.width = `${dispW}px`;
+    canvas.style.height = `${dispH}px`;
+    canvas.style.maxWidth = "100%";
+    canvas.style.maxHeight = "100%";
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     ctx.clearRect(0, 0, dispW, dispH);
 
     ctx.save();
@@ -190,12 +233,6 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     ctx.drawImage(src, 0, 0, workW, workH);
     ctx.restore();
 
-    const corners = [
-      { x: g.x, y: g.y },
-      { x: g.x + g.w, y: g.y },
-      { x: g.x + g.w, y: g.y + g.h },
-      { x: g.x, y: g.y + g.h },
-    ];
     const mapPoint = (nx: number, ny: number) => {
       let px = nx * baseW;
       let py = ny * baseH;
@@ -215,13 +252,25 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
       }
       return { x: qx * scale, y: qy * scale };
     };
+
+    const corners = [
+      { x: g.x, y: g.y },
+      { x: g.x + g.w, y: g.y },
+      { x: g.x + g.w, y: g.y + g.h },
+      { x: g.x, y: g.y + g.h },
+    ];
     const pts = corners.map((c) => mapPoint(c.x, c.y));
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
+    let minX = Math.min(...xs);
+    let maxX = Math.max(...xs);
+    let minY = Math.min(...ys);
+    let maxY = Math.max(...ys);
+
+    minX = Math.max(0, Math.min(dispW, minX));
+    maxX = Math.max(0, Math.min(dispW, maxX));
+    minY = Math.max(0, Math.min(dispH, minY));
+    maxY = Math.max(0, Math.min(dispH, maxY));
     const gx = minX;
     const gy = minY;
     const gw = Math.max(1, maxX - minX);
@@ -234,11 +283,11 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     ctx.fillRect(gx + gw, gy, dispW - gx - gw, gh);
     ctx.strokeStyle = CROPMIX_VOLT;
     ctx.lineWidth = 2;
-    ctx.strokeRect(gx, gy, gw, gh);
+    ctx.strokeRect(gx + 0.5, gy + 0.5, gw - 1, gh - 1);
 
     const canvasRect = canvas.getBoundingClientRect();
-    const stageRect = stageRef.current?.getBoundingClientRect();
-    if (stageRect && canvasRect.width > 0) {
+    const stageRect = stage.getBoundingClientRect();
+    if (canvasRect.width > 0 && canvasRect.height > 0) {
       const sx = canvasRect.width / dispW;
       const sy = canvasRect.height / dispH;
       setBox({
@@ -248,7 +297,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
         height: gh * sy,
       });
     }
-  }, [ready, g, srcSize]);
+  }, [ready, g, srcSize, stageTick]);
 
   const hitHandle = (clientX: number, clientY: number): HandleId => {
     const hit = 22;
@@ -279,6 +328,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragRef.current || !previewRef.current) return;
     const rect = previewRef.current.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
     const dx = (e.clientX - dragRef.current.startX) / rect.width;
     const dy = (e.clientY - dragRef.current.startY) / rect.height;
     const o = dragRef.current.origin;
@@ -287,22 +337,33 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
       commit(clampCrop({ ...o, x: o.x + dx, y: o.y + dy }));
       return;
     }
-    let x = o.x, y = o.y, w = o.w, h = o.h;
+    let x = o.x;
+    let y = o.y;
+    let w = o.w;
+    let h = o.h;
     if (kind === "nw") {
-      x = o.x + dx; y = o.y + dy; w = o.w - dx; h = o.h - dy;
+      x = o.x + dx;
+      y = o.y + dy;
+      w = o.w - dx;
+      h = o.h - dy;
     } else if (kind === "ne") {
-      y = o.y + dy; w = o.w + dx; h = o.h - dy;
+      y = o.y + dy;
+      w = o.w + dx;
+      h = o.h - dy;
     } else if (kind === "sw") {
-      x = o.x + dx; w = o.w - dx; h = o.h + dy;
+      x = o.x + dx;
+      w = o.w - dx;
+      h = o.h + dy;
     } else if (kind === "se") {
-      w = o.w + dx; h = o.h + dy;
+      w = o.w + dx;
+      h = o.h + dy;
     }
     if (o.aspectId !== "free" && o.aspectId !== "original") {
       const ratio =
         o.aspectId === "custom" && o.customW > 0 && o.customH > 0
           ? o.customW / o.customH
           : ASPECT_PRESETS.find((p) => p.id === o.aspectId)?.ratio;
-      if (ratio && ratio > 0) {
+      if (ratio && ratio > 0 && srcSize.w > 0 && srcSize.h > 0) {
         const imgRatio = srcSize.w / srcSize.h;
         const target = ratio / imgRatio;
         h = w / target;
@@ -362,7 +423,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
           <>
-            <canvas ref={previewRef} className="max-h-full max-w-full touch-none" />
+            <canvas ref={previewRef} className="touch-none" />
             <div className="pointer-events-none absolute" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
               {(["nw", "ne", "sw", "se"] as const).map((id) => (
                 <span key={id} className="absolute h-3.5 w-3.5 rounded-full border-2 border-black shadow-sm"

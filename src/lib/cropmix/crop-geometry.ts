@@ -1,5 +1,8 @@
 import type { AspectPresetId, CropGeometry } from "./types";
 
+/** Browser canvas soft limit — larger bitmaps often draw blank on mobile Safari/Chrome. */
+export const CROPMIX_MAX_SOURCE_SIDE = 4096;
+
 export const DEFAULT_CROP: CropGeometry = {
   x: 0, y: 0, w: 1, h: 1, straighten: 0, rotate90: 0,
   flipH: false, flipV: false, aspectId: "free", customW: 1, customH: 1,
@@ -59,31 +62,70 @@ export function readExifOrientation(buf: ArrayBuffer): number {
   return 1;
 }
 
+/**
+ * Decode with EXIF orientation applied, downscaling if needed so the bitmap
+ * stays within browser canvas limits (blank draw is common above ~4096).
+ */
 export function drawOriented(
   img: HTMLImageElement | ImageBitmap,
   orientation: number,
   canvas: HTMLCanvasElement,
+  maxSide = CROPMIX_MAX_SOURCE_SIDE,
 ): { width: number; height: number } {
   const sw = "naturalWidth" in img ? img.naturalWidth : img.width;
   const sh = "naturalHeight" in img ? img.naturalHeight : img.height;
+  if (!sw || !sh) return { width: 1, height: 1 };
+
   const swap = orientation >= 5 && orientation <= 8;
-  const dw = swap ? sh : sw;
-  const dh = swap ? sw : sh;
+  let dw = swap ? sh : sw;
+  let dh = swap ? sw : sh;
+
+  const scaleDown = Math.min(1, maxSide / Math.max(dw, dh));
+  dw = Math.max(1, Math.round(dw * scaleDown));
+  dh = Math.max(1, Math.round(dh * scaleDown));
+
+  const srcDrawW = Math.max(1, Math.round(sw * scaleDown));
+  const srcDrawH = Math.max(1, Math.round(sh * scaleDown));
+
   canvas.width = dw;
   canvas.height = dh;
   const ctx = canvas.getContext("2d");
   if (!ctx) return { width: dw, height: dh };
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.save();
   switch (orientation) {
-    case 2: ctx.translate(dw, 0); ctx.scale(-1, 1); break;
-    case 3: ctx.translate(dw, dh); ctx.rotate(Math.PI); break;
-    case 4: ctx.translate(0, dh); ctx.scale(1, -1); break;
-    case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
-    case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -sh); break;
-    case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(dw, -sh); ctx.scale(-1, 1); break;
-    case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-sw, 0); break;
+    case 2:
+      ctx.translate(dw, 0);
+      ctx.scale(-1, 1);
+      break;
+    case 3:
+      ctx.translate(dw, dh);
+      ctx.rotate(Math.PI);
+      break;
+    case 4:
+      ctx.translate(0, dh);
+      ctx.scale(1, -1);
+      break;
+    case 5:
+      ctx.rotate(0.5 * Math.PI);
+      ctx.scale(1, -1);
+      break;
+    case 6:
+      ctx.rotate(0.5 * Math.PI);
+      ctx.translate(0, -srcDrawH);
+      break;
+    case 7:
+      ctx.rotate(0.5 * Math.PI);
+      ctx.translate(dw, -srcDrawH);
+      ctx.scale(-1, 1);
+      break;
+    case 8:
+      ctx.rotate(-0.5 * Math.PI);
+      ctx.translate(-srcDrawW, 0);
+      break;
   }
-  ctx.drawImage(img as CanvasImageSource, 0, 0);
+  ctx.drawImage(img as CanvasImageSource, 0, 0, srcDrawW, srcDrawH);
   ctx.restore();
   return { width: dw, height: dh };
 }
@@ -97,8 +139,9 @@ export function clampCrop(g: CropGeometry): CropGeometry {
 }
 
 function fitRatioBox(ratio: number, srcW: number, srcH: number): { x: number; y: number; w: number; h: number } {
-  const imgRatio = srcW / srcH;
-  let w = 1, h = 1;
+  const imgRatio = srcW / Math.max(1, srcH);
+  let w = 1;
+  let h = 1;
   if (imgRatio > ratio) {
     h = 1;
     w = ratio / imgRatio;
@@ -173,6 +216,8 @@ export function renderCropToCanvas(
   out.width = outW;
   out.height = outH;
   const ctx = out.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.save();
 
   if (r === 1) {
