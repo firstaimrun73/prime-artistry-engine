@@ -173,8 +173,23 @@ export function CollageEditor({ onResult, onCancel }: Props) {
         const { generateCropmixCollage } = await import("@/lib/cropmix/cropmix.functions");
         try {
           const photoUrls = await Promise.all(photos.map((p) => toDataUrl(p.sourceUrl)));
+          const cellPayload = photos.map((p) => {
+            const c = cells.find((x) => x.photoId === p.id);
+            return {
+              fit: (c?.fit ?? "fill") as "fit" | "fill",
+              offsetX: c?.offsetX ?? 0,
+              offsetY: c?.offsetY ?? 0,
+              zoom: c?.zoom ?? 1,
+            };
+          });
           const result = await generateCropmixCollage({
-            data: { styleId, photoUrls, ratio, customize: { ...style.defaults, ...customize } },
+            data: {
+              styleId,
+              photoUrls,
+              ratio,
+              customize: { ...style.defaults, ...customize },
+              cells: cellPayload,
+            },
           });
           if (!result?.dataUrl) throw new Error(result?.error || "Generation failed.");
           onResult(result.dataUrl, result.width, result.height, result.creditsCharged ?? CROPMIX_AI_PLUS_CREDITS);
