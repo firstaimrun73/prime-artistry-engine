@@ -85,19 +85,22 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
       balance: -8,
     },
   },
+  // Green Tint — must read clearly green
   'filter-037': {
-    temperature: -8,
-    tint: 22,
-    saturation: 14,
-    contrast: 16,
-    shadows: 10,
-    vignette: 10,
+    temperature: -6,
+    tint: 38,
+    saturation: 28,
+    vibrance: 22,
+    contrast: 14,
+    shadows: 12,
+    highlights: -4,
+    vignette: 8,
     splitToning: {
-      shadowsHue: 140,
-      shadowsSaturation: 48,
-      highlightsHue: 95,
-      highlightsSaturation: 28,
-      balance: -6,
+      shadowsHue: 145,
+      shadowsSaturation: 72,
+      highlightsHue: 110,
+      highlightsSaturation: 48,
+      balance: -10,
     },
   },
   'filter-025': {
@@ -269,5 +272,6 @@ export const FILTER_NAME_OVERRIDES: Record<string, string> = {
   'filter-055': 'Red Tint',
   // Was "Cyber City" — renamed to avoid duplicate with Premium Cyberpunk
   'filter-064': 'City Night',
-  'filter-075': 'Rangoli',
+  // Premium owns "Rangoli" — this AI+ look is Jewel Pop
+  'filter-075': 'Jewel Pop',
 };
