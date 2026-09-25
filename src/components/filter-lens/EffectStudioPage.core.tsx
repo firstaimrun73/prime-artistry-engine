@@ -1,6 +1,5 @@
 /**
- * Motio2edit Filters — core UI (re-exported by body).
- * DO NOT replace with placeholders.
+ * Re-export production Filters UI.
  */
-export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.impl";
-export type { CatalogItem } from "./EffectStudioPage.impl";
+export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.body";
+export type { CatalogItem } from "./EffectStudioPage.body";
