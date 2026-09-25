@@ -1,1 +1,1 @@
-placeholder-will-fail-if-not-replaced
+PLACEHOLDER_USE_FILE
