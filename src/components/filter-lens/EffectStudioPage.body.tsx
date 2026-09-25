@@ -1,7 +1,6 @@
 /**
  * Motio2edit Filters editor — production UI.
- * Center-crop thumbs (object-cover), watermark lock for free, orange AI+ badge.
- * Points implementation lives here (not a stub).
+ * Restored from historical Pass-2 body with: center-crop thumbs, free watermark lock icon, orange AI+ badge.
  */
-export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.live";
-export type { CatalogItem } from "./EffectStudioPage.live";
+export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.safe";
+export type { CatalogItem } from "./EffectStudioPage.safe";
