@@ -1,8 +1,12 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 
 type Props = {
-  before: string;
-  after: string;
+  before?: string;
+  after?: string;
+  /** @deprecated use before */
+  beforeSrc?: string;
+  /** @deprecated use after */
+  afterSrc?: string;
   className?: string;
 };
 
@@ -11,7 +15,9 @@ type Props = {
  * Both images use identical inset geometry; only clip boundary moves.
  * Divider + handle use Filters brand orange #FF5A1F.
  */
-export function CompareSlider({ before, after, className }: Props) {
+export function CompareSlider({ before, after, beforeSrc, afterSrc, className }: Props) {
+  const beforeUrl = before || beforeSrc || "";
+  const afterUrl = after || afterSrc || "";
   const [pos, setPos] = useState(50);
   const [ratio, setRatio] = useState<number | null>(null);
   const [frameW, setFrameW] = useState(0);
@@ -21,6 +27,10 @@ export function CompareSlider({ before, after, className }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!afterUrl) {
+      setRatio(1);
+      return;
+    }
     const img = new Image();
     img.onload = () => {
       if (cancelled) return;
@@ -31,11 +41,11 @@ export function CompareSlider({ before, after, className }: Props) {
     img.onerror = () => {
       if (!cancelled) setRatio(1);
     };
-    img.src = after;
+    img.src = afterUrl;
     return () => {
       cancelled = true;
     };
-  }, [after]);
+  }, [afterUrl]);
 
   useEffect(() => {
     const outer = outerRef.current;
@@ -100,7 +110,6 @@ export function CompareSlider({ before, after, className }: Props) {
   const frameH = ratio && frameW > 0 ? Math.round(frameW / ratio) : undefined;
   const showBefore = pos > 14;
   const showAfter = pos < 86;
-  // clip from the right so left side shows BEFORE
   const clipRight = Math.max(0, Math.min(100, 100 - pos));
 
   return (
@@ -129,25 +138,23 @@ export function CompareSlider({ before, after, className }: Props) {
           update(e.touches[0].clientX);
         }}
       >
-        {/* AFTER — full frame base */}
         <img
-          src={after}
+          src={afterUrl}
           alt="After"
           draggable={false}
           className="pointer-events-none absolute inset-0 h-full w-full"
-          style={{ objectFit: "fill" }}
+          style={{ objectFit: "contain" }}
         />
-        {/* BEFORE — same full-frame geometry, clipped by slider */}
         <div
           className="pointer-events-none absolute inset-0"
           style={{ clipPath: `inset(0 ${clipRight}% 0 0)` }}
         >
           <img
-            src={before}
+            src={beforeUrl}
             alt="Before"
             draggable={false}
             className="absolute inset-0 h-full w-full"
-            style={{ objectFit: "fill" }}
+            style={{ objectFit: "contain" }}
           />
         </div>
         <div
