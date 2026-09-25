@@ -1,5 +1,6 @@
 /**
  * Cropmix Crop editor — EXIF-correct, free + presets + custom, undo/redo.
+ * Preview re-renders on every rotate/flip/straighten change.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -86,27 +87,87 @@ export function CropEditor({ file, initialGeometry, onApply, onCancel }: Props) 
     commit(applyAspect({ ...g, aspectId: id }, srcSize.w, srcSize.h));
   };
 
-  // Preview draw
+  // Preview draw — applies rotate90 / flipH / flipV so UI matches export
   useEffect(() => {
     if (!ready || !sourceCanvasRef.current || !previewRef.current) return;
     const src = sourceCanvasRef.current;
     const canvas = previewRef.current;
     const maxSide = 720;
-    const r = Math.min(1, maxSide / Math.max(src.width, src.height));
-    canvas.width = Math.round(src.width * r);
-    canvas.height = Math.round(src.height * r);
+    const r = ((g.rotate90 % 4) + 4) % 4;
+    const baseW = src.width;
+    const baseH = src.height;
+    const rotatedW = r === 1 || r === 3 ? baseH : baseW;
+    const rotatedH = r === 1 || r === 3 ? baseW : baseH;
+    const scale = Math.min(1, maxSide / Math.max(rotatedW, rotatedH));
+    const dispW = Math.max(1, Math.round(rotatedW * scale));
+    const dispH = Math.max(1, Math.round(rotatedH * scale));
+    canvas.width = dispW;
+    canvas.height = dispH;
     const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
-    const gx = g.x * canvas.width;
-    const gy = g.y * canvas.height;
-    const gw = g.w * canvas.width;
-    const gh = g.h * canvas.height;
+    ctx.clearRect(0, 0, dispW, dispH);
+
+    ctx.save();
+    if (r === 1) {
+      ctx.translate(dispW, 0);
+      ctx.rotate(0.5 * Math.PI);
+    } else if (r === 2) {
+      ctx.translate(dispW, dispH);
+      ctx.rotate(Math.PI);
+    } else if (r === 3) {
+      ctx.translate(0, dispH);
+      ctx.rotate(-0.5 * Math.PI);
+    }
+    const workW = r === 1 || r === 3 ? dispH : dispW;
+    const workH = r === 1 || r === 3 ? dispW : dispH;
+    if (g.flipH || g.flipV) {
+      ctx.translate(g.flipH ? workW : 0, g.flipV ? workH : 0);
+      ctx.scale(g.flipH ? -1 : 1, g.flipV ? -1 : 1);
+    }
+    ctx.drawImage(src, 0, 0, workW, workH);
+    ctx.restore();
+
+    const corners = [
+      { x: g.x, y: g.y },
+      { x: g.x + g.w, y: g.y },
+      { x: g.x + g.w, y: g.y + g.h },
+      { x: g.x, y: g.y + g.h },
+    ];
+    const mapPoint = (nx: number, ny: number) => {
+      let px = nx * baseW;
+      let py = ny * baseH;
+      if (g.flipH) px = baseW - px;
+      if (g.flipV) py = baseH - py;
+      let qx = px;
+      let qy = py;
+      if (r === 1) {
+        qx = baseH - py;
+        qy = px;
+      } else if (r === 2) {
+        qx = baseW - px;
+        qy = baseH - py;
+      } else if (r === 3) {
+        qx = py;
+        qy = baseW - px;
+      }
+      return { x: qx * scale, y: qy * scale };
+    };
+    const pts = corners.map((c) => mapPoint(c.x, c.y));
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const gx = minX;
+    const gy = minY;
+    const gw = Math.max(1, maxX - minX);
+    const gh = Math.max(1, maxY - minY);
+
     ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(0, 0, canvas.width, gy);
-    ctx.fillRect(0, gy + gh, canvas.width, canvas.height - gy - gh);
+    ctx.fillRect(0, 0, dispW, gy);
+    ctx.fillRect(0, gy + gh, dispW, dispH - gy - gh);
     ctx.fillRect(0, gy, gx, gh);
-    ctx.fillRect(gx + gw, gy, canvas.width - gx - gw, gh);
+    ctx.fillRect(gx + gw, gy, dispW - gx - gw, gh);
     ctx.strokeStyle = CROPMIX_VOLT;
     ctx.lineWidth = 2;
     ctx.strokeRect(gx, gy, gw, gh);
@@ -197,52 +258,22 @@ export function CropEditor({ file, initialGeometry, onApply, onCancel }: Props) 
           ))}
         </div>
         <div className="flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => setHist((h) => historyUndo(h))}
-            className="rounded-lg border border-border p-2"
-            aria-label="Undo"
-          >
+          <button type="button" onClick={() => setHist((h) => historyUndo(h))} className="rounded-lg border border-border p-2" aria-label="Undo">
             <Undo2 className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => setHist((h) => historyRedo(h))}
-            className="rounded-lg border border-border p-2"
-            aria-label="Redo"
-          >
+          <button type="button" onClick={() => setHist((h) => historyRedo(h))} className="rounded-lg border border-border p-2" aria-label="Redo">
             <Redo2 className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 3) % 4 })}
-            className="rounded-lg border border-border p-2"
-            aria-label="Rotate left"
-          >
+          <button type="button" onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 3) % 4 })} className="rounded-lg border border-border p-2" aria-label="Rotate left">
             <RotateCcw className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 1) % 4 })}
-            className="rounded-lg border border-border p-2"
-            aria-label="Rotate right"
-          >
+          <button type="button" onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 1) % 4 })} className="rounded-lg border border-border p-2" aria-label="Rotate right">
             <RotateCw className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => commit({ ...g, flipH: !g.flipH })}
-            className="rounded-lg border border-border p-2"
-            aria-label="Flip horizontal"
-          >
+          <button type="button" onClick={() => commit({ ...g, flipH: !g.flipH })} className="rounded-lg border border-border p-2" aria-label="Flip horizontal">
             <FlipHorizontal className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => commit({ ...g, flipV: !g.flipV })}
-            className="rounded-lg border border-border p-2"
-            aria-label="Flip vertical"
-          >
+          <button type="button" onClick={() => commit({ ...g, flipV: !g.flipV })} className="rounded-lg border border-border p-2" aria-label="Flip vertical">
             <FlipVertical className="h-4 w-4" />
           </button>
         </div>
