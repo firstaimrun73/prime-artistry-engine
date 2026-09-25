@@ -1,29 +1,22 @@
 /**
  * Cropmix Output — Download / Share / Edit Again / Start New.
- * Crop: never watermarked. Collage: already watermarked upstream.
+ * Crop is never watermarked; do not mention watermark state in copy.
  */
-import { Download, Share2, RotateCcw, Plus, X } from "lucide-react";
-import { CROPMIX_VOLT } from "@/lib/cropmix/types";
+import { Download, Share2, RotateCcw, Plus, X, Crop } from "lucide-react";
 
 type Props = {
-  mode: "crop" | "collage";
   dataUrl: string;
   width: number;
   height: number;
-  watermarked: boolean;
-  creditsCharged: number;
   onEditAgain: () => void;
   onStartNew: () => void;
   onClose: () => void;
 };
 
 export function CropmixOutput({
-  mode,
   dataUrl,
   width,
   height,
-  watermarked,
-  creditsCharged,
   onEditAgain,
   onStartNew,
   onClose,
@@ -31,7 +24,7 @@ export function CropmixOutput({
   const download = () => {
     const a = document.createElement("a");
     a.href = dataUrl;
-    a.download = `cropmix-${mode}-${width}x${height}.jpg`;
+    a.download = `cropmix-${width}x${height}.jpg`;
     a.click();
   };
 
@@ -39,7 +32,7 @@ export function CropmixOutput({
     try {
       const res = await fetch(dataUrl);
       const blob = await res.blob();
-      const file = new File([blob], `cropmix-${mode}.jpg`, {
+      const file = new File([blob], "cropmix.jpg", {
         type: blob.type || "image/jpeg",
       });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -57,7 +50,7 @@ export function CropmixOutput({
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
         <button
           type="button"
           onClick={onClose}
@@ -67,15 +60,15 @@ export function CropmixOutput({
           <X className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">
-            {mode === "crop" ? "Crop result" : "Collage result"}
-          </p>
+          <p className="text-sm font-semibold">Crop result</p>
           <p className="text-[11px] text-muted-foreground">
             {width}×{height}
-            {watermarked ? " · watermarked" : " · no watermark"}
-            {creditsCharged > 0 ? ` · ${creditsCharged} credits` : ""}
           </p>
         </div>
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+          <Crop className="h-3.5 w-3.5" />
+          Motio2edit
+        </span>
       </header>
 
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black/90 p-3">
@@ -86,11 +79,11 @@ export function CropmixOutput({
         />
       </div>
 
-      <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-border bg-card/80 p-3 sm:grid-cols-4">
+      <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-border bg-card/80 p-4 sm:grid-cols-4">
         <button
           type="button"
           onClick={download}
-          className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm font-medium"
+          className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-3 text-sm font-medium"
         >
           <Download className="h-4 w-4" />
           Download
@@ -98,7 +91,7 @@ export function CropmixOutput({
         <button
           type="button"
           onClick={() => void share()}
-          className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm font-medium"
+          className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-3 text-sm font-medium"
         >
           <Share2 className="h-4 w-4" />
           Share
@@ -106,7 +99,7 @@ export function CropmixOutput({
         <button
           type="button"
           onClick={onEditAgain}
-          className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm font-medium"
+          className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-3 text-sm font-medium"
         >
           <RotateCcw className="h-4 w-4" />
           Edit Again
@@ -114,8 +107,7 @@ export function CropmixOutput({
         <button
           type="button"
           onClick={onStartNew}
-          className="flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-black"
-          style={{ backgroundColor: CROPMIX_VOLT }}
+          className="flex items-center justify-center gap-2 rounded-xl border-2 border-foreground/20 bg-foreground px-3 py-3 text-sm font-semibold text-background"
         >
           <Plus className="h-4 w-4" />
           Start New

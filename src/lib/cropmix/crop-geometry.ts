@@ -19,7 +19,13 @@ export const ASPECT_PRESETS: { id: AspectPresetId; label: string; ratio: number 
   { id: "custom", label: "Custom", ratio: null },
 ];
 
-/** Read EXIF orientation from JPEG; returns 1–8 (default 1). */
+export function presetDiagramRatio(id: AspectPresetId, customW = 1, customH = 1): number | null {
+  if (id === "free" || id === "original") return null;
+  if (id === "custom") return customW > 0 && customH > 0 ? customW / customH : 1;
+  const p = ASPECT_PRESETS.find((x) => x.id === id);
+  return p?.ratio ?? null;
+}
+
 export function readExifOrientation(buf: ArrayBuffer): number {
   const view = new DataView(buf);
   if (view.byteLength < 2 || view.getUint16(0, false) !== 0xffd8) return 1;
@@ -90,14 +96,7 @@ export function clampCrop(g: CropGeometry): CropGeometry {
   return { ...g, x, y, w, h };
 }
 
-export function applyAspect(g: CropGeometry, srcW: number, srcH: number): CropGeometry {
-  const preset = ASPECT_PRESETS.find((p) => p.id === g.aspectId);
-  if (!preset || preset.ratio == null || g.aspectId === "free" || g.aspectId === "original") {
-    if (g.aspectId === "original") return { ...g, x: 0, y: 0, w: 1, h: 1 };
-    return clampCrop(g);
-  }
-  let ratio = preset.ratio;
-  if (g.aspectId === "custom" && g.customW > 0 && g.customH > 0) ratio = g.customW / g.customH;
+function fitRatioBox(ratio: number, srcW: number, srcH: number): { x: number; y: number; w: number; h: number } {
   const imgRatio = srcW / srcH;
   let w = 1, h = 1;
   if (imgRatio > ratio) {
@@ -107,9 +106,24 @@ export function applyAspect(g: CropGeometry, srcW: number, srcH: number): CropGe
     w = 1;
     h = imgRatio / ratio;
   }
-  const x = (1 - w) / 2;
-  const y = (1 - h) / 2;
-  return clampCrop({ ...g, x, y, w, h });
+  return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+}
+
+export function applyAspect(g: CropGeometry, srcW: number, srcH: number): CropGeometry {
+  if (g.aspectId === "original") return clampCrop({ ...g, x: 0, y: 0, w: 1, h: 1 });
+  if (g.aspectId === "free") return clampCrop(g);
+
+  let ratio: number | null = null;
+  if (g.aspectId === "custom") {
+    if (g.customW > 0 && g.customH > 0) ratio = g.customW / g.customH;
+  } else {
+    const preset = ASPECT_PRESETS.find((p) => p.id === g.aspectId);
+    ratio = preset?.ratio ?? null;
+  }
+  if (ratio == null || !Number.isFinite(ratio) || ratio <= 0) return clampCrop(g);
+
+  const box = fitRatioBox(ratio, srcW, srcH);
+  return clampCrop({ ...g, ...box });
 }
 
 export type HistoryStack<T> = { past: T[]; present: T; future: T[] };
@@ -141,9 +155,6 @@ export function historyRedo<T>(stack: HistoryStack<T>): HistoryStack<T> {
   };
 }
 
-/**
- * Export crop. Canvas size is set BEFORE getContext so transforms are not wiped.
- */
 export function renderCropToCanvas(
   source: HTMLCanvasElement,
   g: CropGeometry,

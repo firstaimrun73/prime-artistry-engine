@@ -1,6 +1,5 @@
 /**
- * Cropmix Crop editor — EXIF-correct, free + presets + custom, undo/redo.
- * Preview re-renders on every rotate/flip/straighten change.
+ * Cropmix Crop editor — upload-first, corner handles, custom ratio, taller dock.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -12,6 +11,8 @@ import {
   Redo2,
   Check,
   X,
+  Upload,
+  Crop,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -24,32 +25,78 @@ import {
   historyPush,
   historyRedo,
   historyUndo,
+  presetDiagramRatio,
   readExifOrientation,
   renderCropToCanvas,
   type HistoryStack,
 } from "@/lib/cropmix/crop-geometry";
-import type { CropGeometry } from "@/lib/cropmix/types";
+import type { AspectPresetId, CropGeometry } from "@/lib/cropmix/types";
 import { CROPMIX_VOLT } from "@/lib/cropmix/types";
 
 type Props = {
-  file: File;
+  file: File | null;
   initialGeometry?: CropGeometry;
+  onFile: (file: File) => void;
   onApply: (dataUrl: string, geometry: CropGeometry, width: number, height: number) => void;
   onCancel: () => void;
 };
 
-export function CropEditor({ file, initialGeometry, onApply, onCancel }: Props) {
+type HandleId = "nw" | "ne" | "sw" | "se" | "move";
+
+function RatioGlyph({ ratio, active }: { ratio: number | null; active: boolean }) {
+  const max = 14;
+  let w = 12;
+  let h = 12;
+  if (ratio == null) {
+    w = 12;
+    h = 10;
+  } else if (ratio >= 1) {
+    w = max;
+    h = Math.max(5, Math.round(max / ratio));
+  } else {
+    h = max;
+    w = Math.max(5, Math.round(max * ratio));
+  }
+  return (
+    <span
+      className={cn(
+        "inline-block shrink-0 rounded-[2px] border",
+        active ? "border-black/70 bg-black/10" : "border-current/70",
+      )}
+      style={{ width: w, height: h }}
+      aria-hidden
+    />
+  );
+}
+
+export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }: Props) {
   const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [srcSize, setSrcSize] = useState({ w: 1, h: 1 });
   const [ready, setReady] = useState(false);
+  const [box, setBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customW, setCustomW] = useState("4");
+  const [customH, setCustomH] = useState("5");
   const [hist, setHist] = useState<HistoryStack<CropGeometry>>(() =>
     historyInit(initialGeometry ?? DEFAULT_CROP),
   );
   const g = hist.present;
-  const dragRef = useRef<{ startX: number; startY: number; origin: CropGeometry } | null>(null);
+  const dragRef = useRef<{
+    kind: HandleId;
+    startX: number;
+    startY: number;
+    origin: CropGeometry;
+  } | null>(null);
 
   useEffect(() => {
+    if (!file) {
+      setReady(false);
+      sourceCanvasRef.current = null;
+      return;
+    }
     let cancelled = false;
     let objectUrl: string | null = null;
     (async () => {
@@ -67,7 +114,10 @@ export function CropEditor({ file, initialGeometry, onApply, onCancel }: Props) 
       const size = drawOriented(img, orientation, canvas);
       sourceCanvasRef.current = canvas;
       setSrcSize({ w: size.width, h: size.height });
-      setHist(historyInit(applyAspect(initialGeometry ?? DEFAULT_CROP, size.width, size.height)));
+      const start = applyAspect(initialGeometry ?? DEFAULT_CROP, size.width, size.height);
+      setHist(historyInit(start));
+      if (start.customW) setCustomW(String(start.customW));
+      if (start.customH) setCustomH(String(start.customH));
       setReady(true);
       URL.revokeObjectURL(objectUrl);
       objectUrl = null;
@@ -83,11 +133,24 @@ export function CropEditor({ file, initialGeometry, onApply, onCancel }: Props) 
     setHist((h) => historyPush(h, clampCrop(next)));
   }, []);
 
-  const setAspect = (id: (typeof ASPECT_PRESETS)[number]["id"]) => {
+  const setAspect = (id: AspectPresetId) => {
+    if (id === "custom") {
+      setCustomOpen(true);
+      const nw = Math.max(1, Number(customW) || 1);
+      const nh = Math.max(1, Number(customH) || 1);
+      commit(applyAspect({ ...g, aspectId: "custom", customW: nw, customH: nh }, srcSize.w, srcSize.h));
+      return;
+    }
+    setCustomOpen(false);
     commit(applyAspect({ ...g, aspectId: id }, srcSize.w, srcSize.h));
   };
 
-  // Preview draw — applies rotate90 / flipH / flipV so UI matches export
+  const applyCustomRatio = () => {
+    const nw = Math.max(1, Number(customW) || 1);
+    const nh = Math.max(1, Number(customH) || 1);
+    commit(applyAspect({ ...g, aspectId: "custom", customW: nw, customH: nh }, srcSize.w, srcSize.h));
+  };
+
   useEffect(() => {
     if (!ready || !sourceCanvasRef.current || !previewRef.current) return;
     const src = sourceCanvasRef.current;
@@ -171,21 +234,82 @@ export function CropEditor({ file, initialGeometry, onApply, onCancel }: Props) 
     ctx.strokeStyle = CROPMIX_VOLT;
     ctx.lineWidth = 2;
     ctx.strokeRect(gx, gy, gw, gh);
+
+    const canvasRect = canvas.getBoundingClientRect();
+    const stageRect = stageRef.current?.getBoundingClientRect();
+    if (stageRect && canvasRect.width > 0) {
+      const sx = canvasRect.width / dispW;
+      const sy = canvasRect.height / dispH;
+      setBox({
+        left: canvasRect.left - stageRect.left + gx * sx,
+        top: canvasRect.top - stageRect.top + gy * sy,
+        width: gw * sx,
+        height: gh * sy,
+      });
+    }
   }, [ready, g, srcSize]);
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startY: e.clientY, origin: g };
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  const hitHandle = (clientX: number, clientY: number): HandleId => {
+    const hit = 22;
+    const corners: { id: HandleId; x: number; y: number }[] = [
+      { id: "nw", x: box.left, y: box.top },
+      { id: "ne", x: box.left + box.width, y: box.top },
+      { id: "sw", x: box.left, y: box.top + box.height },
+      { id: "se", x: box.left + box.width, y: box.top + box.height },
+    ];
+    const stage = stageRef.current?.getBoundingClientRect();
+    if (!stage) return "move";
+    const px = clientX - stage.left;
+    const py = clientY - stage.top;
+    for (const c of corners) {
+      if (Math.abs(px - c.x) <= hit && Math.abs(py - c.y) <= hit) return c.id;
+    }
+    return "move";
   };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!ready) return;
+    e.preventDefault();
+    const kind = hitHandle(e.clientX, e.clientY);
+    dragRef.current = { kind, startX: e.clientX, startY: e.clientY, origin: g };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragRef.current || !previewRef.current) return;
     const rect = previewRef.current.getBoundingClientRect();
     const dx = (e.clientX - dragRef.current.startX) / rect.width;
     const dy = (e.clientY - dragRef.current.startY) / rect.height;
     const o = dragRef.current.origin;
-    commit(clampCrop({ ...o, x: o.x + dx, y: o.y + dy }));
+    const kind = dragRef.current.kind;
+    if (kind === "move") {
+      commit(clampCrop({ ...o, x: o.x + dx, y: o.y + dy }));
+      return;
+    }
+    let x = o.x, y = o.y, w = o.w, h = o.h;
+    if (kind === "nw") {
+      x = o.x + dx; y = o.y + dy; w = o.w - dx; h = o.h - dy;
+    } else if (kind === "ne") {
+      y = o.y + dy; w = o.w + dx; h = o.h - dy;
+    } else if (kind === "sw") {
+      x = o.x + dx; w = o.w - dx; h = o.h + dy;
+    } else if (kind === "se") {
+      w = o.w + dx; h = o.h + dy;
+    }
+    if (o.aspectId !== "free" && o.aspectId !== "original") {
+      const ratio =
+        o.aspectId === "custom" && o.customW > 0 && o.customH > 0
+          ? o.customW / o.customH
+          : ASPECT_PRESETS.find((p) => p.id === o.aspectId)?.ratio;
+      if (ratio && ratio > 0) {
+        const imgRatio = srcSize.w / srcSize.h;
+        const target = ratio / imgRatio;
+        h = w / target;
+      }
+    }
+    commit(clampCrop({ ...o, x, y, w, h }));
   };
+
   const onPointerUp = () => {
     dragRef.current = null;
   };
@@ -196,88 +320,116 @@ export function CropEditor({ file, initialGeometry, onApply, onCancel }: Props) 
     onApply(canvas.toDataURL("image/jpeg", 0.95), g, width, height);
   };
 
-  if (!ready) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        Loading…
-      </div>
-    );
-  }
+  const toolsDisabled = !ready;
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="grid h-9 w-9 place-items-center rounded-full border border-border"
-          aria-label="Cancel"
-        >
+      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2.5">
+        <button type="button" onClick={onCancel} className="grid h-9 w-9 place-items-center rounded-full border border-border" aria-label="Back">
           <X className="h-4 w-4" />
         </button>
-        <span className="flex-1 text-sm font-semibold">Crop</span>
-        <button
-          type="button"
-          onClick={handleApply}
-          className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-black"
-          style={{ backgroundColor: CROPMIX_VOLT }}
-        >
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Motio<span className="text-[#FF5A1F]">2</span>edit
+          </p>
+          <h1 className="truncate text-sm font-bold tracking-tight">Cropmix</h1>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground">
+          <Crop className="h-3 w-3" />
+          Motio2edit
+        </span>
+        <button type="button" disabled={toolsDisabled} onClick={handleApply}
+          className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-40"
+          style={{ backgroundColor: CROPMIX_VOLT }}>
           <Check className="h-4 w-4" />
           Apply
         </button>
       </header>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black/90 p-2">
-        <canvas
-          ref={previewRef}
-          className="max-h-full max-w-full touch-none"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        />
+      <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black/90 p-3"
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+        {!file ? (
+          <button type="button" onClick={() => fileRef.current?.click()}
+            className="flex w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/70 px-6 py-14 text-center">
+            <span className="grid h-14 w-14 place-items-center rounded-2xl border border-border bg-background">
+              <Upload className="h-6 w-6 text-muted-foreground" />
+            </span>
+            <span className="text-sm font-semibold">Upload an image to begin</span>
+            <span className="text-xs text-muted-foreground">JPG, PNG, or WEBP · crop tools unlock after upload</span>
+          </button>
+        ) : !ready ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : (
+          <>
+            <canvas ref={previewRef} className="max-h-full max-w-full touch-none" />
+            <div className="pointer-events-none absolute" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
+              {(["nw", "ne", "sw", "se"] as const).map((id) => (
+                <span key={id} className="absolute h-3.5 w-3.5 rounded-full border-2 border-black shadow-sm"
+                  style={{
+                    backgroundColor: CROPMIX_VOLT,
+                    left: id === "nw" || id === "sw" ? -7 : undefined,
+                    right: id === "ne" || id === "se" ? -7 : undefined,
+                    top: id === "nw" || id === "ne" ? -7 : undefined,
+                    bottom: id === "sw" || id === "se" ? -7 : undefined,
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="shrink-0 space-y-3 border-t border-border bg-card/80 px-3 py-3 backdrop-blur">
+      <div className="shrink-0 space-y-3 border-t border-border bg-card/90 px-3 py-4 backdrop-blur">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {ASPECT_PRESETS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setAspect(p.id)}
-              className={cn(
-                "shrink-0 rounded-full border px-3 py-1 text-xs font-medium",
-                g.aspectId === p.id
-                  ? "border-transparent text-black"
-                  : "border-border text-muted-foreground",
-              )}
-              style={g.aspectId === p.id ? { backgroundColor: CROPMIX_VOLT } : undefined}
-            >
-              {p.label}
-            </button>
-          ))}
+          {ASPECT_PRESETS.map((p) => {
+            const active = g.aspectId === p.id;
+            const ratio = presetDiagramRatio(p.id, Number(customW) || 1, Number(customH) || 1);
+            return (
+              <button key={p.id} type="button" disabled={toolsDisabled} onClick={() => setAspect(p.id)}
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium disabled:opacity-40",
+                  active ? "border-transparent text-black" : "border-border text-muted-foreground",
+                )}
+                style={active ? { backgroundColor: CROPMIX_VOLT } : undefined}>
+                <RatioGlyph ratio={ratio} active={active} />
+                {p.label}
+              </button>
+            );
+          })}
         </div>
-        <div className="flex items-center justify-center gap-3">
-          <button type="button" onClick={() => setHist((h) => historyUndo(h))} className="rounded-lg border border-border p-2" aria-label="Undo">
-            <Undo2 className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => setHist((h) => historyRedo(h))} className="rounded-lg border border-border p-2" aria-label="Redo">
-            <Redo2 className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 3) % 4 })} className="rounded-lg border border-border p-2" aria-label="Rotate left">
-            <RotateCcw className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 1) % 4 })} className="rounded-lg border border-border p-2" aria-label="Rotate right">
-            <RotateCw className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => commit({ ...g, flipH: !g.flipH })} className="rounded-lg border border-border p-2" aria-label="Flip horizontal">
-            <FlipHorizontal className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => commit({ ...g, flipV: !g.flipV })} className="rounded-lg border border-border p-2" aria-label="Flip vertical">
-            <FlipVertical className="h-4 w-4" />
-          </button>
+
+        {customOpen && !toolsDisabled && (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+            <span className="text-[11px] font-medium text-muted-foreground">Custom</span>
+            <input type="number" min={1} value={customW} onChange={(e) => setCustomW(e.target.value)}
+              className="h-9 w-16 rounded-lg border border-border bg-card px-2 text-sm" aria-label="Custom width" />
+            <span className="text-muted-foreground">:</span>
+            <input type="number" min={1} value={customH} onChange={(e) => setCustomH(e.target.value)}
+              className="h-9 w-16 rounded-lg border border-border bg-card px-2 text-sm" aria-label="Custom height" />
+            <button type="button" onClick={applyCustomRatio}
+              className="ml-auto rounded-full px-3 py-1.5 text-xs font-semibold text-black"
+              style={{ backgroundColor: CROPMIX_VOLT }}>
+              Apply ratio
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center justify-center gap-3 py-1">
+          <button type="button" disabled={toolsDisabled} onClick={() => setHist((h) => historyUndo(h))} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Undo"><Undo2 className="h-5 w-5" /></button>
+          <button type="button" disabled={toolsDisabled} onClick={() => setHist((h) => historyRedo(h))} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Redo"><Redo2 className="h-5 w-5" /></button>
+          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 3) % 4 })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Rotate left"><RotateCcw className="h-5 w-5" /></button>
+          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 1) % 4 })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Rotate right"><RotateCw className="h-5 w-5" /></button>
+          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, flipH: !g.flipH })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Flip horizontal"><FlipHorizontal className="h-5 w-5" /></button>
+          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, flipV: !g.flipV })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Flip vertical"><FlipVertical className="h-5 w-5" /></button>
         </div>
       </div>
+
+      <input ref={fileRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFile(f);
+          e.target.value = "";
+        }} />
     </div>
   );
 }
