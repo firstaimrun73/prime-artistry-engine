@@ -1,0 +1,186 @@
+import type { AspectPresetId, CropGeometry } from "./types";
+
+export const DEFAULT_CROP: CropGeometry = {
+  x: 0, y: 0, w: 1, h: 1, straighten: 0, rotate90: 0,
+  flipH: false, flipV: false, aspectId: "free", customW: 1, customH: 1,
+};
+
+export const ASPECT_PRESETS: { id: AspectPresetId; label: string; ratio: number | null }[] = [
+  { id: "free", label: "Free", ratio: null },
+  { id: "original", label: "Original", ratio: null },
+  { id: "1:1", label: "1:1", ratio: 1 },
+  { id: "4:3", label: "4:3", ratio: 4 / 3 },
+  { id: "3:4", label: "3:4", ratio: 3 / 4 },
+  { id: "16:9", label: "16:9", ratio: 16 / 9 },
+  { id: "9:16", label: "9:16", ratio: 9 / 16 },
+  { id: "4:5", label: "4:5", ratio: 4 / 5 },
+  { id: "3:2", label: "3:2", ratio: 3 / 2 },
+  { id: "2:3", label: "2:3", ratio: 2 / 3 },
+  { id: "custom", label: "Custom", ratio: null },
+];
+
+/** Read EXIF orientation from JPEG; returns 1–8 (default 1). */
+export function readExifOrientation(buf: ArrayBuffer): number {
+  const view = new DataView(buf);
+  if (view.byteLength < 2 || view.getUint16(0, false) !== 0xffd8) return 1;
+  let offset = 2;
+  while (offset + 4 < view.byteLength) {
+    const marker = view.getUint16(offset, false);
+    offset += 2;
+    if (marker === 0xffe1) {
+      const size = view.getUint16(offset, false);
+      if (offset + size > view.byteLength) break;
+      if (view.getUint32(offset + 2, false) === 0x45786966 && view.getUint16(offset + 6, false) === 0) {
+        const tiff = offset + 8;
+        const little = view.getUint16(tiff, false) === 0x4949;
+        const ifd0 = tiff + view.getUint32(tiff + 4, little);
+        if (ifd0 + 2 > view.byteLength) break;
+        const entries = view.getUint16(ifd0, little);
+        for (let i = 0; i < entries; i++) {
+          const e = ifd0 + 2 + i * 12;
+          if (e + 12 > view.byteLength) break;
+          if (view.getUint16(e, little) === 0x0112) return view.getUint16(e + 8, little) || 1;
+        }
+      }
+      offset += size;
+    } else if ((marker & 0xff00) !== 0xff00) break;
+    else if (marker === 0xffda || marker === 0xffd9) break;
+    else {
+      const size = view.getUint16(offset, false);
+      offset += size;
+    }
+  }
+  return 1;
+}
+
+export function drawOriented(
+  img: HTMLImageElement | ImageBitmap,
+  orientation: number,
+  canvas: HTMLCanvasElement,
+): { width: number; height: number } {
+  const sw = "naturalWidth" in img ? img.naturalWidth : img.width;
+  const sh = "naturalHeight" in img ? img.naturalHeight : img.height;
+  const swap = orientation >= 5 && orientation <= 8;
+  const dw = swap ? sh : sw;
+  const dh = swap ? sw : sh;
+  canvas.width = dw;
+  canvas.height = dh;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return { width: dw, height: dh };
+  ctx.save();
+  switch (orientation) {
+    case 2: ctx.translate(dw, 0); ctx.scale(-1, 1); break;
+    case 3: ctx.translate(dw, dh); ctx.rotate(Math.PI); break;
+    case 4: ctx.translate(0, dh); ctx.scale(1, -1); break;
+    case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
+    case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -sh); break;
+    case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(dw, -sh); ctx.scale(-1, 1); break;
+    case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-sw, 0); break;
+  }
+  ctx.drawImage(img as CanvasImageSource, 0, 0);
+  ctx.restore();
+  return { width: dw, height: dh };
+}
+
+export function clampCrop(g: CropGeometry): CropGeometry {
+  const x = Math.max(0, Math.min(1, g.x));
+  const y = Math.max(0, Math.min(1, g.y));
+  const w = Math.max(0.02, Math.min(1 - x, g.w));
+  const h = Math.max(0.02, Math.min(1 - y, g.h));
+  return { ...g, x, y, w, h };
+}
+
+export function applyAspect(g: CropGeometry, srcW: number, srcH: number): CropGeometry {
+  const preset = ASPECT_PRESETS.find((p) => p.id === g.aspectId);
+  if (!preset || preset.ratio == null || g.aspectId === "free" || g.aspectId === "original") {
+    if (g.aspectId === "original") return { ...g, x: 0, y: 0, w: 1, h: 1 };
+    return clampCrop(g);
+  }
+  let ratio = preset.ratio;
+  if (g.aspectId === "custom" && g.customW > 0 && g.customH > 0) ratio = g.customW / g.customH;
+  const imgRatio = srcW / srcH;
+  let w = 1, h = 1;
+  if (imgRatio > ratio) {
+    h = 1;
+    w = ratio / imgRatio;
+  } else {
+    w = 1;
+    h = imgRatio / ratio;
+  }
+  const x = (1 - w) / 2;
+  const y = (1 - h) / 2;
+  return clampCrop({ ...g, x, y, w, h });
+}
+
+export type HistoryStack<T> = { past: T[]; present: T; future: T[] };
+
+export function historyInit<T>(present: T): HistoryStack<T> {
+  return { past: [], present, future: [] };
+}
+
+export function historyPush<T>(stack: HistoryStack<T>, next: T, max = 40): HistoryStack<T> {
+  const past = [...stack.past, stack.present].slice(-max);
+  return { past, present: next, future: [] };
+}
+
+export function historyUndo<T>(stack: HistoryStack<T>): HistoryStack<T> {
+  if (!stack.past.length) return stack;
+  return {
+    past: stack.past.slice(0, -1),
+    present: stack.past[stack.past.length - 1],
+    future: [stack.present, ...stack.future],
+  };
+}
+
+export function historyRedo<T>(stack: HistoryStack<T>): HistoryStack<T> {
+  if (!stack.future.length) return stack;
+  return {
+    past: [...stack.past, stack.present],
+    present: stack.future[0],
+    future: stack.future.slice(1),
+  };
+}
+
+/**
+ * Export crop. Canvas size is set BEFORE getContext so transforms are not wiped.
+ */
+export function renderCropToCanvas(
+  source: HTMLCanvasElement,
+  g: CropGeometry,
+): { canvas: HTMLCanvasElement; width: number; height: number } {
+  const sw = source.width;
+  const sh = source.height;
+  const sx = Math.round(g.x * sw);
+  const sy = Math.round(g.y * sh);
+  const cw = Math.max(1, Math.round(g.w * sw));
+  const ch = Math.max(1, Math.round(g.h * sh));
+  const r = ((g.rotate90 % 4) + 4) % 4;
+  const outW = r === 1 || r === 3 ? ch : cw;
+  const outH = r === 1 || r === 3 ? cw : ch;
+
+  const out = document.createElement("canvas");
+  out.width = outW;
+  out.height = outH;
+  const ctx = out.getContext("2d")!;
+  ctx.save();
+
+  if (r === 1) {
+    ctx.translate(outW, 0);
+    ctx.rotate(0.5 * Math.PI);
+  } else if (r === 2) {
+    ctx.translate(outW, outH);
+    ctx.rotate(Math.PI);
+  } else if (r === 3) {
+    ctx.translate(0, outH);
+    ctx.rotate(-0.5 * Math.PI);
+  }
+
+  if (g.flipH || g.flipV) {
+    ctx.translate(g.flipH ? cw : 0, g.flipV ? ch : 0);
+    ctx.scale(g.flipH ? -1 : 1, g.flipV ? -1 : 1);
+  }
+
+  ctx.drawImage(source, sx, sy, cw, ch, 0, 0, cw, ch);
+  ctx.restore();
+  return { canvas: out, width: outW, height: outH };
+}
