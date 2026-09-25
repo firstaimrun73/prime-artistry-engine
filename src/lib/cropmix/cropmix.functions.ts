@@ -1,7 +1,7 @@
 /**
  * Cropmix AI+ collage — one server endpoint.
  * Price fixed at CROPMIX_AI_PLUS_CREDITS; charge only on success.
- * Reuses deduct_credits RPC (same pattern as frames.functions / music.functions).
+ * Uses per-cell fit/fill/offset/zoom to match client preview.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -14,6 +14,13 @@ import {
 } from "@/lib/cropmix/types";
 import { getStyleById, isValidStyleId } from "@/lib/cropmix/styles";
 import { canvasSizeForRatio } from "@/lib/cropmix/collage-layout";
+
+const cellSchema = z.object({
+  fit: z.enum(["fit", "fill"]).default("fill"),
+  offsetX: z.number().min(-1).max(1).default(0),
+  offsetY: z.number().min(-1).max(1).default(0),
+  zoom: z.number().min(0.25).max(4).default(1),
+});
 
 const generateSchema = z.object({
   styleId: z.string().min(1).max(40),
@@ -30,7 +37,54 @@ const generateSchema = z.object({
       safeZones: z.boolean().optional(),
     })
     .optional(),
+  cells: z.array(cellSchema).optional(),
 });
+
+async function extractCell(
+  sharp: typeof import("sharp"),
+  buf: Buffer,
+  rw: number,
+  rh: number,
+  fit: "fit" | "fill",
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+): Promise<Buffer> {
+  const meta = await sharp(buf).metadata();
+  const iw = meta.width || 1;
+  const ih = meta.height || 1;
+  const z = Math.max(0.25, Math.min(4, zoom || 1));
+  const scale =
+    fit === "fit"
+      ? Math.min(rw / iw, rh / ih) * z
+      : Math.max(rw / iw, rh / ih) * z;
+  const dw = iw * scale;
+  const dh = ih * scale;
+  const ox = (rw - dw) / 2 + offsetX * rw;
+  const oy = (rh - dh) / 2 + offsetY * rh;
+
+  const resized = await sharp(buf)
+    .resize(Math.max(1, Math.round(dw)), Math.max(1, Math.round(dh)), {
+      fit: "fill",
+    })
+    .png()
+    .toBuffer();
+
+  const left = Math.round(ox);
+  const top = Math.round(oy);
+
+  return sharp({
+    create: {
+      width: Math.max(1, rw),
+      height: Math.max(1, rh),
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: resized, left, top }])
+    .png()
+    .toBuffer();
+}
 
 export const generateCropmixCollage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -167,11 +221,23 @@ export const generateCropmixCollage = createServerFn({ method: "POST" })
         const rh = Math.max(1, Math.round(rect.h * ch));
         const rx = Math.round(rect.x * cw);
         const ry = Math.round(rect.y * ch);
-        const resized = await sharp(buf)
-          .resize(rw, rh, { fit: "cover", position: "centre" })
-          .png()
-          .toBuffer();
-        composites.push({ input: resized, left: rx, top: ry });
+        const cell = data.cells?.[i] ?? {
+          fit: "fill" as const,
+          offsetX: 0,
+          offsetY: 0,
+          zoom: 1,
+        };
+        const fitted = await extractCell(
+          sharp,
+          buf,
+          rw,
+          rh,
+          cell.fit,
+          cell.offsetX,
+          cell.offsetY,
+          cell.zoom,
+        );
+        composites.push({ input: fitted, left: rx, top: ry });
       }
 
       const wmSvg = buildCropmixWatermarkSvg(cw, ch);
