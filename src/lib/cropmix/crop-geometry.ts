@@ -1,7 +1,7 @@
 import type { AspectPresetId, CropGeometry } from "./types";
 
-/** Browser canvas soft limit — larger bitmaps often draw blank on mobile Safari/Chrome. */
-export const CROPMIX_MAX_SOURCE_SIDE = 4096;
+/** Browser canvas soft limit — larger bitmaps often draw blank on mobile Safari/Chrome. 2048 is safer on mid/low-end phones. */
+export const CROPMIX_MAX_SOURCE_SIDE = 2048;
 
 export const DEFAULT_CROP: CropGeometry = {
   x: 0, y: 0, w: 1, h: 1, straighten: 0, rotate90: 0,
@@ -153,18 +153,13 @@ function fitRatioBox(ratio: number, srcW: number, srcH: number): { x: number; y:
 }
 
 export function applyAspect(g: CropGeometry, srcW: number, srcH: number): CropGeometry {
-  if (g.aspectId === "original") return clampCrop({ ...g, x: 0, y: 0, w: 1, h: 1 });
-  if (g.aspectId === "free") return clampCrop(g);
-
-  let ratio: number | null = null;
-  if (g.aspectId === "custom") {
-    if (g.customW > 0 && g.customH > 0) ratio = g.customW / g.customH;
-  } else {
-    const preset = ASPECT_PRESETS.find((p) => p.id === g.aspectId);
-    ratio = preset?.ratio ?? null;
+  const ratio = presetDiagramRatio(g.aspectId, g.customW, g.customH);
+  if (ratio == null) {
+    if (g.aspectId === "original") {
+      return clampCrop({ ...g, x: 0, y: 0, w: 1, h: 1 });
+    }
+    return clampCrop(g);
   }
-  if (ratio == null || !Number.isFinite(ratio) || ratio <= 0) return clampCrop(g);
-
   const box = fitRatioBox(ratio, srcW, srcH);
   return clampCrop({ ...g, ...box });
 }
@@ -175,27 +170,20 @@ export function historyInit<T>(present: T): HistoryStack<T> {
   return { past: [], present, future: [] };
 }
 
-export function historyPush<T>(stack: HistoryStack<T>, next: T, max = 40): HistoryStack<T> {
-  const past = [...stack.past, stack.present].slice(-max);
-  return { past, present: next, future: [] };
+export function historyPush<T>(h: HistoryStack<T>, next: T): HistoryStack<T> {
+  return { past: [...h.past, h.present].slice(-40), present: next, future: [] };
 }
 
-export function historyUndo<T>(stack: HistoryStack<T>): HistoryStack<T> {
-  if (!stack.past.length) return stack;
-  return {
-    past: stack.past.slice(0, -1),
-    present: stack.past[stack.past.length - 1],
-    future: [stack.present, ...stack.future],
-  };
+export function historyUndo<T>(h: HistoryStack<T>): HistoryStack<T> {
+  if (!h.past.length) return h;
+  const present = h.past[h.past.length - 1];
+  return { past: h.past.slice(0, -1), present, future: [h.present, ...h.future] };
 }
 
-export function historyRedo<T>(stack: HistoryStack<T>): HistoryStack<T> {
-  if (!stack.future.length) return stack;
-  return {
-    past: [...stack.past, stack.present],
-    present: stack.future[0],
-    future: stack.future.slice(1),
-  };
+export function historyRedo<T>(h: HistoryStack<T>): HistoryStack<T> {
+  if (!h.future.length) return h;
+  const present = h.future[0];
+  return { past: [...h.past, h.present], present, future: h.future.slice(1) };
 }
 
 export function renderCropToCanvas(
@@ -208,18 +196,20 @@ export function renderCropToCanvas(
   const sy = Math.round(g.y * sh);
   const cw = Math.max(1, Math.round(g.w * sw));
   const ch = Math.max(1, Math.round(g.h * sh));
+
   const r = ((g.rotate90 % 4) + 4) % 4;
   const outW = r === 1 || r === 3 ? ch : cw;
   const outH = r === 1 || r === 3 ? cw : ch;
 
-  const out = document.createElement("canvas");
-  out.width = outW;
-  out.height = outH;
-  const ctx = out.getContext("2d")!;
+  const canvas = document.createElement("canvas");
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return { canvas, width: outW, height: outH };
+
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.save();
-
   if (r === 1) {
     ctx.translate(outW, 0);
     ctx.rotate(0.5 * Math.PI);
@@ -230,13 +220,13 @@ export function renderCropToCanvas(
     ctx.translate(0, outH);
     ctx.rotate(-0.5 * Math.PI);
   }
-
+  const workW = r === 1 || r === 3 ? outH : outW;
+  const workH = r === 1 || r === 3 ? outW : outH;
   if (g.flipH || g.flipV) {
-    ctx.translate(g.flipH ? cw : 0, g.flipV ? ch : 0);
+    ctx.translate(g.flipH ? workW : 0, g.flipV ? workH : 0);
     ctx.scale(g.flipH ? -1 : 1, g.flipV ? -1 : 1);
   }
-
-  ctx.drawImage(source, sx, sy, cw, ch, 0, 0, cw, ch);
+  ctx.drawImage(source, sx, sy, cw, ch, 0, 0, workW, workH);
   ctx.restore();
-  return { canvas: out, width: outW, height: outH };
+  return { canvas, width: outW, height: outH };
 }
