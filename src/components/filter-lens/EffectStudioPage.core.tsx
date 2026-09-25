@@ -1,5 +1,6 @@
 /**
- * Re-export production Filters UI.
+ * Motio2edit Filters — core entry.
+ * Re-exports the full implementation (no circular reexport).
  */
-export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.body";
-export type { CatalogItem } from "./EffectStudioPage.body";
+export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.impl";
+export type { CatalogItem } from "./EffectStudioPage.impl";

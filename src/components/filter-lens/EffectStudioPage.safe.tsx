@@ -1,5 +1,5 @@
 /**
- * Motio2edit Filters — safe entry points to production body.
+ * Motio2edit Filters — safe entry.
  */
-export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.body";
-export type { CatalogItem } from "./EffectStudioPage.body";
+export { EffectStudioPage, filterToCatalogItem } from "./EffectStudioPage.impl";
+export type { CatalogItem } from "./EffectStudioPage.impl";
