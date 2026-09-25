@@ -1,15 +1,14 @@
 /**
- * Cropmix Output — Download / Share / Edit Again / Start New.
- * Crop is never watermarked; do not mention watermark state in copy.
+ * Cropmix Output — Download / Share / Edit Again.
+ * Watermark, if any, is already baked into dataUrl.
  */
-import { Download, Share2, RotateCcw, Plus, X, Crop } from "lucide-react";
+import { Download, Share2, RotateCcw, X } from "lucide-react";
 
 type Props = {
   dataUrl: string;
   width: number;
   height: number;
   onEditAgain: () => void;
-  onStartNew: () => void;
   onClose: () => void;
 };
 
@@ -18,7 +17,6 @@ export function CropmixOutput({
   width,
   height,
   onEditAgain,
-  onStartNew,
   onClose,
 }: Props) {
   const download = () => {
@@ -65,10 +63,6 @@ export function CropmixOutput({
             {width}×{height}
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-          <Crop className="h-3.5 w-3.5" />
-          Motio2edit
-        </span>
       </header>
 
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black/90 p-3">
@@ -79,7 +73,7 @@ export function CropmixOutput({
         />
       </div>
 
-      <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-border bg-card/80 p-4 sm:grid-cols-4">
+      <div className="grid shrink-0 grid-cols-3 gap-2 border-t border-border bg-card/80 p-4">
         <button
           type="button"
           onClick={download}
@@ -103,14 +97,6 @@ export function CropmixOutput({
         >
           <RotateCcw className="h-4 w-4" />
           Edit Again
-        </button>
-        <button
-          type="button"
-          onClick={onStartNew}
-          className="flex items-center justify-center gap-2 rounded-xl border-2 border-foreground/20 bg-foreground px-3 py-3 text-sm font-semibold text-background"
-        >
-          <Plus className="h-4 w-4" />
-          Start New
         </button>
       </div>
     </div>
