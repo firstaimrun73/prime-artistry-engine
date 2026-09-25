@@ -147,12 +147,32 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     };
   }, [file, initialGeometry]);
 
+  // Observe stage size + force a few ticks after ready so first paint is never skipped
+  // when flex layout still reports 0×0 on the initial layout pass.
   useEffect(() => {
+    if (!ready) return;
     const el = stageRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => setStageTick((n) => n + 1));
-    ro.observe(el);
-    return () => ro.disconnect();
+    if (!el) return;
+    const bump = () => setStageTick((n) => n + 1);
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(bump);
+      ro.observe(el);
+    }
+    const raf1 = requestAnimationFrame(() => {
+      bump();
+      requestAnimationFrame(bump);
+    });
+    const t1 = window.setTimeout(bump, 50);
+    const t2 = window.setTimeout(bump, 200);
+    const t3 = window.setTimeout(bump, 500);
+    return () => {
+      ro?.disconnect();
+      cancelAnimationFrame(raf1);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
   }, [ready]);
 
   const commit = useCallback((next: CropGeometry) => {
@@ -185,7 +205,11 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
 
     const stageW = Math.max(1, stage.clientWidth - 24);
     const stageH = Math.max(1, stage.clientHeight - 24);
-    if (stageW < 2 || stageH < 2) return;
+    // Stage not laid out yet (flex min-h-0) — retry on next frame; never leave blank.
+    if (stageW < 2 || stageH < 2) {
+      const id = requestAnimationFrame(() => setStageTick((n) => n + 1));
+      return () => cancelAnimationFrame(id);
+    }
 
     const r = ((g.rotate90 % 4) + 4) % 4;
     const baseW = src.width;
@@ -408,7 +432,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
         </button>
       </header>
 
-      <div ref={stageRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black/90 p-3"
+      <div ref={stageRef} className="relative flex min-h-[40vh] flex-1 items-center justify-center overflow-hidden bg-black/90 p-3"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
         {!file ? (
           <button type="button" onClick={() => fileRef.current?.click()}
