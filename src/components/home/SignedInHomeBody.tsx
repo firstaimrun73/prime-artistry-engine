@@ -9,6 +9,7 @@ import {
   Circle,
   Aperture,
   Filter,
+  Crop,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -27,6 +28,7 @@ import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
 const QUICK_CREATE = [
+  { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
   { to: "/studio/video" as const, label: "Video", icon: Video },
   { to: "/studio/music" as const, label: "Music", icon: Music },
@@ -85,6 +87,7 @@ export function SignedInHomeBody() {
                 to={
                   (locked ? "/pricing" : q.to) as
                     | "/pricing"
+                    | "/studio/cropmix"
                     | "/editor"
                     | "/studio/video"
                     | "/studio/music"
@@ -98,7 +101,14 @@ export function SignedInHomeBody() {
                   : {})}
                 className="flex min-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
-                <span className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <span
+                  className={
+                    q.label === "Cropmix"
+                      ? "relative flex h-12 w-12 items-center justify-center rounded-xl text-black"
+                      : "relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
+                  }
+                  style={q.label === "Cropmix" ? { backgroundColor: "#C6FF3D" } : undefined}
+                >
                   <Icon className="h-5 w-5" />
                   {locked && (
                     <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
