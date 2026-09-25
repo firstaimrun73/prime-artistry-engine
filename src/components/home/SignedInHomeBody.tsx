@@ -3,7 +3,6 @@ import {
   Music,
   Image as ImageIcon,
   Video,
-  ArrowRight,
   Sparkles,
   Lock,
   Circle,
@@ -101,14 +100,7 @@ export function SignedInHomeBody() {
                   : {})}
                 className="flex min-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
-                <span
-                  className={
-                    q.label === "Cropmix"
-                      ? "relative flex h-12 w-12 items-center justify-center rounded-xl text-black"
-                      : "relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary"
-                  }
-                  style={q.label === "Cropmix" ? { backgroundColor: "#C6FF3D" } : undefined}
-                >
+                <span className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
                   {locked && (
                     <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
