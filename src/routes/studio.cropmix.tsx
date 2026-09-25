@@ -62,12 +62,6 @@ function CropmixPage() {
     setView("output");
   };
 
-  const resetAll = () => {
-    setCropSession(null);
-    setOutput(null);
-    setView("edit");
-  };
-
   if (loading || !user) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
@@ -84,7 +78,6 @@ function CropmixPage() {
           width={output.width}
           height={output.height}
           onEditAgain={() => setView("edit")}
-          onStartNew={resetAll}
           onClose={() => navigate({ to: "/" })}
         />
       </div>
