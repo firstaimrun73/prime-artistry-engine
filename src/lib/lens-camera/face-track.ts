@@ -201,6 +201,18 @@ export function detectFaceLandmarksSync(src: HTMLCanvasElement): FaceLandmarks |
   return null;
 }
 
+/** Face-dependent carousel lenses — MediaPipe only; never synthetic. */
+export const FACE_DEPENDENT_LENS_IDS = new Set([
+  "lens_crown",
+  "lens_butterfly",
+  "lens_hair_shades",
+  "lens_thunder_eyes",
+]);
+
+export function lensRequiresFace(lensId: string): boolean {
+  return FACE_DEPENDENT_LENS_IDS.has(lensId);
+}
+
 /** Pre-warm the landmarker (call early, e.g. on camera start) */
 export function warmFaceLandmarker(): void {
   void ensureFaceLandmarker();
