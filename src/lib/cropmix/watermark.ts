@@ -1,6 +1,6 @@
 import { CROPMIX_INK, CROPMIX_VOLT, CROPMIX_VOLT_END } from "./types";
 
-export const CROPMIX_WATERMARK_LABEL = "● Motio2edit" as const;
+export const CROPMIX_WATERMARK_LABEL = "\u25CF Motio2edit" as const;
 
 function escapeXml(s: string): string {
   return s
