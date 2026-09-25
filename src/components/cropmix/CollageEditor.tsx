@@ -2,7 +2,7 @@
  * Cropmix Collage — up to 10 photos, 10 styles, common local / AI+ server.
  * Imports match branch exports from collage-layout, collage-render, styles, types, watermark.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -19,7 +19,6 @@ import { isAdminEmail } from "@/lib/admin-config";
 import {
   COLLAG_STYLES,
   getStyleById,
-  recommendStyles,
 } from "@/lib/cropmix/styles";
 import { renderCollageClient } from "@/lib/cropmix/collage-render";
 import { drawCropmixWatermark } from "@/lib/cropmix/watermark";
@@ -55,6 +54,18 @@ const RATIOS: { id: CollageCanvasRatio; label: string }[] = [
 
 function uid() {
   return `p_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function toDataUrl(src: string): Promise<string> {
+  if (src.startsWith("data:")) return src;
+  const res = await fetch(src);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function CollageEditor({ onResult, onCancel }: Props) {
@@ -174,17 +185,18 @@ export function CollageEditor({ onResult, onCancel }: Props) {
         const { generateCropmixCollage } = await import(
           "@/lib/cropmix/cropmix.functions"
         );
-        const timer = setTimeout(() => {}, CROPMIX_TIMEOUT_MS);
         try {
+          const photoUrls = await Promise.all(
+            photos.map((p) => toDataUrl(p.sourceUrl)),
+          );
           const result = await generateCropmixCollage({
             data: {
               styleId,
-              photoUrls: photos.map((p) => p.sourceUrl),
+              photoUrls,
               ratio,
               customize: { ...style.defaults, ...customize },
             },
           });
-          clearTimeout(timer);
           if (!result?.dataUrl) {
             throw new Error(result?.error || "Generation failed.");
           }
@@ -195,7 +207,6 @@ export function CollageEditor({ onResult, onCancel }: Props) {
             result.creditsCharged ?? CROPMIX_AI_PLUS_CREDITS,
           );
         } catch (e) {
-          clearTimeout(timer);
           const msg =
             e instanceof Error
               ? e.message
@@ -258,7 +269,7 @@ export function CollageEditor({ onResult, onCancel }: Props) {
           type="button"
           disabled={busy || !photos.length}
           onClick={handleExport}
-          className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-50"
           style={{ backgroundColor: CROPMIX_VOLT }}
         >
           {busy ? (
