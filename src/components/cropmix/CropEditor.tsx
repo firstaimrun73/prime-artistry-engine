@@ -12,7 +12,6 @@ import {
   Check,
   X,
   Upload,
-  Crop,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -32,6 +31,7 @@ import {
 } from "@/lib/cropmix/crop-geometry";
 import type { AspectPresetId, CropGeometry } from "@/lib/cropmix/types";
 import { CROPMIX_VOLT } from "@/lib/cropmix/types";
+import { drawCropmixWatermark } from "@/lib/cropmix/watermark";
 
 type Props = {
   file: File | null;
@@ -80,6 +80,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   const [customOpen, setCustomOpen] = useState(false);
   const [customW, setCustomW] = useState("4");
   const [customH, setCustomH] = useState("5");
+  const [watermarkOn, setWatermarkOn] = useState(false);
   const [hist, setHist] = useState<HistoryStack<CropGeometry>>(() =>
     historyInit(initialGeometry ?? DEFAULT_CROP),
   );
@@ -317,6 +318,10 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   const handleApply = () => {
     if (!sourceCanvasRef.current) return;
     const { canvas, width, height } = renderCropToCanvas(sourceCanvasRef.current, g);
+    if (watermarkOn) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) drawCropmixWatermark(ctx, width, height);
+    }
     onApply(canvas.toDataURL("image/jpeg", 0.95), g, width, height);
   };
 
@@ -334,10 +339,6 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
           </p>
           <h1 className="truncate text-sm font-bold tracking-tight">Cropmix</h1>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 text-[10px] font-medium text-muted-foreground">
-          <Crop className="h-3 w-3" />
-          Motio2edit
-        </span>
         <button type="button" disabled={toolsDisabled} onClick={handleApply}
           className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-40"
           style={{ backgroundColor: CROPMIX_VOLT }}>
@@ -422,6 +423,22 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
           <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, flipH: !g.flipH })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Flip horizontal"><FlipHorizontal className="h-5 w-5" /></button>
           <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, flipV: !g.flipV })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Flip vertical"><FlipVertical className="h-5 w-5" /></button>
         </div>
+
+        <label
+          className={cn(
+            "flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-xs font-medium",
+            toolsDisabled ? "opacity-40" : "bg-background",
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={watermarkOn}
+            disabled={toolsDisabled}
+            onChange={(e) => setWatermarkOn(e.target.checked)}
+            className="h-4 w-4 accent-[#C6FF3D]"
+          />
+          Add Motio2edit watermark
+        </label>
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" className="hidden"
