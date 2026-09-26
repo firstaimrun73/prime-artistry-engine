@@ -57,15 +57,16 @@ const DEMO_STAGE_URLS = {
     "https://assets.motio2edit.com/samples/circle-2edit/file_000000004e6481faa6caad771de9c84c.png",
 } as const;
 
+/** Slightly larger dabs so the paint stroke is clearly visible */
 const PAINT_PATH: { x: number; y: number; r: number }[] = [
-  { x: 22, y: 78, r: 11 },
-  { x: 30, y: 74, r: 12 },
-  { x: 38, y: 80, r: 13 },
-  { x: 46, y: 72, r: 12 },
-  { x: 54, y: 76, r: 13 },
-  { x: 62, y: 70, r: 11 },
-  { x: 70, y: 78, r: 12 },
-  { x: 78, y: 74, r: 11 },
+  { x: 22, y: 78, r: 13 },
+  { x: 30, y: 74, r: 14 },
+  { x: 38, y: 80, r: 15 },
+  { x: 46, y: 72, r: 14 },
+  { x: 54, y: 76, r: 15 },
+  { x: 62, y: 70, r: 13 },
+  { x: 70, y: 78, r: 14 },
+  { x: 78, y: 74, r: 13 },
 ];
 
 function ToolIcon({
@@ -80,39 +81,39 @@ function ToolIcon({
   return (
     <span
       className={cn(
-        "grid h-9 w-9 place-items-center rounded-full border shadow-md backdrop-blur-md transition-all duration-300",
+        "grid h-10 w-10 place-items-center rounded-full border shadow-md backdrop-blur-md transition-all duration-300",
         active
-          ? "scale-110 border-[#7B6FE0] bg-[#7B6FE0] text-white shadow-[0_0_16px_rgba(123,111,224,0.55)]"
+          ? "scale-110 border-[#7B6FE0] bg-[#7B6FE0] text-white shadow-[0_0_22px_rgba(123,111,224,0.75)]"
           : "border-white/40 bg-black/35 text-white",
         pulse && "animate-pulse",
       )}
       aria-hidden
     >
       {kind === "circle" && (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="2" />
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="2.2" />
         </svg>
       )}
       {kind === "brush" && (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path
             d="M4 20c2-1 3.5-2.2 5-4.5 3.5 2 6.5 2.2 9.5-1.2L15 10.5 8.5 17C7 18.8 5.5 19.5 4 20Z"
             fill="currentColor"
-            opacity="0.9"
+            opacity="0.95"
           />
-          <path d="M14.2 6.2l3.6 3.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M12.5 8l3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
+          <path d="M14.2 6.2l3.6 3.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M12.5 8l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.8" />
         </svg>
       )}
       {kind === "eraser" && (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path
             d="M7 15.5L14.5 8l3.5 3.5-5.2 5.2H9.2L7 15.5Z"
             stroke="currentColor"
-            strokeWidth="1.7"
+            strokeWidth="1.9"
             strokeLinejoin="round"
           />
-          <path d="M9 17.5h7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M9 17.5h7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       )}
     </span>
@@ -243,7 +244,10 @@ function LocalizedMaskReveal({
               transform: "translate(-50%, -50%)",
               opacity: on ? 1 : 0,
               transition: justOn ? "opacity 0.18s ease-out" : "opacity 0.12s linear",
-              boxShadow: on ? "0 0 10px rgba(123,111,224,0.35)" : undefined,
+              // Stronger glow so the paint stroke is obvious
+              boxShadow: on
+                ? "0 0 14px rgba(123,111,224,0.55), 0 0 4px rgba(255,255,255,0.35)"
+                : undefined,
             }}
           >
             <img
@@ -433,7 +437,7 @@ export function CircleRemoveHeroDemo() {
 
       {phase === "paint" && (
         <div
-          className="pointer-events-none absolute z-20 h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/90 bg-[rgba(180,160,230,0.28)] shadow-[0_0_12px_rgba(123,111,224,0.4)]"
+          className="pointer-events-none absolute z-20 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/95 bg-[rgba(180,160,230,0.38)] shadow-[0_0_16px_rgba(123,111,224,0.55)]"
           style={{ left: handPos.left, top: handPos.top }}
         />
       )}
