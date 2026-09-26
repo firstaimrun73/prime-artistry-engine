@@ -211,7 +211,6 @@ function LocalizedMaskReveal({
   paintT: number;
   fullyVisible: boolean;
 }) {
-  // Card is aspect-[4/5]; scale height by aspect so dabs stay circular.
   const CARD_ASPECT = 4 / 5;
   const activeCount = fullyVisible
     ? PAINT_PATH.length
@@ -471,8 +470,8 @@ export function CircleRemoveHeroDemo() {
       )}
 
       {showResult && (
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/55 to-transparent px-4 pb-3 pt-10">
-          <p className="text-[13px] font-semibold text-white">People removed</p>
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/45 to-transparent px-3 pb-2 pt-5">
+          <p className="text-[12px] font-semibold text-white">People removed</p>
         </div>
       )}
     </div>
