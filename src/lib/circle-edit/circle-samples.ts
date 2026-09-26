@@ -1,6 +1,7 @@
 /**
  * Circle 2edit sample registry — independent stage media + metadata.
  * Media: prefer local GitHub assets (1:1) so info pages never show blank stages.
+ * Deer sample uses production CIRCLE_ADD_DEER URLs so the (i) panel shows the real deer.
  */
 
 import sampleRemovalBefore from "@/assets/sample-removal-before.jpg";
@@ -9,6 +10,7 @@ import sampleObjectBefore from "@/assets/sample-object-before.jpg";
 import sampleObjectAfter from "@/assets/sample-object-after.jpg";
 import sampleRestoreBefore from "@/assets/sample-restore-before.jpg";
 import sampleRestoreAfter from "@/assets/sample-restore-after.jpg";
+import { CIRCLE_ADD_DEER } from "@/lib/r2-catalog";
 
 export type CircleSampleMode = "add" | "remove";
 
@@ -95,16 +97,17 @@ export const CIRCLE_SAMPLES: CircleSample[] = [
     id: "add-deer",
     title: "Add a deer",
     description:
-      "Before and After: open scene becomes a placed deer matched to scale and light. Animal placement with natural proportions — 1:1 frames.",
+      "Before and After: open scene becomes a placed deer matched to scale and light. Animal placement with natural proportions.",
     mode: "add",
     assetId: "animal_deer",
     category: "animals",
     objectLabel: "Deer",
-    beforeUrl: LOCAL_RESTORE_BEFORE,
-    afterUrl: LOCAL_RESTORE_AFTER,
+    // Real deer sample (not restoration) so the (i) panel demonstrates Circle 2edit Add
+    beforeUrl: CIRCLE_ADD_DEER.before,
+    afterUrl: CIRCLE_ADD_DEER.after,
     beforeR2Key: `${ADD}/deer-before.jpg`,
     afterR2Key: `${ADD}/deer-after.jpg`,
-    aspectRatio: "1:1",
+    aspectRatio: CIRCLE_ADD_DEER.aspectRatio || "2:3",
     quality: "High",
     generationMode: "Circle Add · Flux",
     buildDuration: "~12–25s",
