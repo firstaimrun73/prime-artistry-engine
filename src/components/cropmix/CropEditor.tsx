@@ -1,6 +1,6 @@
 /**
  * Cropmix — upload-first. Real <img> preview (never blank). Canvas only for Apply.
- * Aspect chips use ratio-frame icons; crop handles are L-brackets (not dots).
+ * Aspect chips use solid ratio-frame icons; crop handles are L-brackets (not dots).
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -25,34 +25,31 @@ type Props = {
 };
 type HandleId = "nw" | "ne" | "sw" | "se" | "move";
 
-/** Visible aspect-ratio frame icon (not a dot). */
+/** Solid aspect-ratio frame icon (clear shape, not a thin/dot glyph). */
 function RatioGlyph({ ratio, active }: { ratio: number | null; active: boolean }) {
-  const box = 18;
-  let w = 14;
-  let h = 14;
+  const box = 22;
+  let w = 16;
+  let h = 16;
   if (ratio == null) {
-    w = 14;
-    h = 12;
+    w = 16;
+    h = 14;
   } else if (ratio >= 1) {
     w = box;
-    h = Math.max(6, Math.round(box / ratio));
+    h = Math.max(8, Math.round(box / ratio));
   } else {
     h = box;
-    w = Math.max(6, Math.round(box * ratio));
+    w = Math.max(8, Math.round(box * ratio));
   }
   return (
     <span
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center",
-        active ? "text-black" : "text-current",
-      )}
-      style={{ width: box, height: box }}
+      className="inline-flex shrink-0 items-center justify-center"
+      style={{ width: box + 2, height: box + 2 }}
       aria-hidden
     >
       <span
         className={cn(
-          "block rounded-[2px] border-2",
-          active ? "border-black/80 bg-black/10" : "border-current",
+          "block rounded-[3px] border-[2.5px]",
+          active ? "border-black bg-black/15" : "border-current/90 bg-current/10",
         )}
         style={{ width: w, height: h }}
       />
@@ -166,7 +163,6 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
         let ow = swap ? img.naturalHeight : img.naturalWidth;
         let oh = swap ? img.naturalWidth : img.naturalHeight;
 
-        // Unlock UI as soon as we know dimensions — do not wait on canvas
         setSrcSize({ w: ow, h: oh });
         const start = applyAspect(initialGeometry ?? DEFAULT_CROP, ow, oh);
         setHist(historyInit(start));
@@ -174,7 +170,6 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
         if (start.customH) setCustomH(String(start.customH));
         setReady(true);
 
-        // Export canvas in background (best-effort)
         try {
           const canvas = document.createElement("canvas");
           const size = drawOriented(img, orientation, canvas);
@@ -366,7 +361,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     } else if (kind === "ne") {
       y = o.y + mdy;
       w = o.w + mdx;
-      h = o.h - mdy;
+      h = o.h + mdy;
     } else if (kind === "sw") {
       x = o.x + mdx;
       w = o.w - mdx;
