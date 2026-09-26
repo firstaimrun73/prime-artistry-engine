@@ -38,6 +38,9 @@ class DemoErrorBoundary extends Component<
   }
 }
 
+/** 4:5 media area — taller than square so deer body + ground stay visible */
+const MEDIA_ASPECT = "relative z-0 aspect-[4/5] w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent";
+
 function RemoveCard() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -49,7 +52,7 @@ function RemoveCard() {
         isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
       )}
     >
-      <div className="relative z-0 aspect-square w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
+      <div className={MEDIA_ASPECT}>
         <DemoErrorBoundary>
           <CircleRemoveHeroDemo />
         </DemoErrorBoundary>
@@ -115,7 +118,7 @@ function AddCard() {
         isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
       )}
     >
-      <div className="relative z-0 aspect-square w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent">
+      <div className={MEDIA_ASPECT}>
         <DemoErrorBoundary>
           <CircleAddHeroDemo />
         </DemoErrorBoundary>
