@@ -52,16 +52,16 @@ const DEMO_STAGE_URLS = {
     "https://assets.motio2edit.com/samples/circle-2edit/file_000000004e6481faa6caad771de9c84c.png",
 } as const;
 
-/** Larger dabs so the paint stroke is clearly visible */
+/** Positions clamped so dabs stay fully inside the 4:5 media box (incl. radius). */
 const PAINT_PATH: { x: number; y: number; r: number }[] = [
-  { x: 22, y: 78, r: 14 },
-  { x: 30, y: 74, r: 15 },
-  { x: 38, y: 80, r: 16 },
-  { x: 46, y: 72, r: 15 },
-  { x: 54, y: 76, r: 16 },
-  { x: 62, y: 70, r: 14 },
-  { x: 70, y: 78, r: 15 },
-  { x: 78, y: 74, r: 14 },
+  { x: 24, y: 72, r: 12 },
+  { x: 32, y: 68, r: 13 },
+  { x: 40, y: 74, r: 13 },
+  { x: 48, y: 66, r: 12 },
+  { x: 56, y: 70, r: 13 },
+  { x: 64, y: 64, r: 12 },
+  { x: 72, y: 70, r: 12 },
+  { x: 78, y: 66, r: 11 },
 ];
 
 function ToolIcon({
@@ -238,7 +238,7 @@ function LocalizedMaskReveal({
               opacity: on ? 1 : 0,
               transition: justOn ? "opacity 0.18s ease-out" : "opacity 0.12s linear",
               boxShadow: on
-                ? "0 0 16px rgba(123,111,224,0.7), 0 0 0 2px rgba(255,255,255,0.85)"
+                ? "0 0 10px rgba(123,111,224,0.55), inset 0 0 0 2px rgba(255,255,255,0.85)"
                 : undefined,
             }}
           >
@@ -255,7 +255,6 @@ function LocalizedMaskReveal({
                 top: `${-dab.y * (100 / diamH) + 50}%`,
               }}
             />
-            {/* Solid purple tint so the paint stroke is obvious */}
             <div
               className="absolute inset-0 rounded-full"
               style={{
@@ -411,7 +410,7 @@ export function CircleRemoveHeroDemo() {
         src={urls.stage1}
         alt="Original scene"
         className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity duration-700",
+          "absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700",
           showResult ? "opacity-0" : "opacity-100",
         )}
         draggable={false}
@@ -426,7 +425,7 @@ export function CircleRemoveHeroDemo() {
         src={urls.stage3}
         alt="People removed"
         className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity duration-700",
+          "absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700",
           showResult ? "opacity-100" : "opacity-0",
         )}
         draggable={false}
@@ -435,7 +434,7 @@ export function CircleRemoveHeroDemo() {
 
       {phase === "paint" && (
         <div
-          className="pointer-events-none absolute z-20 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[rgba(123,111,224,0.45)] shadow-[0_0_20px_rgba(123,111,224,0.7)]"
+          className="pointer-events-none absolute z-20 h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[rgba(123,111,224,0.45)] shadow-[0_0_12px_rgba(123,111,224,0.55)]"
           style={{ left: handPos.left, top: handPos.top }}
         />
       )}
