@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frames — Motio2edit</title>
+<style>body{font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f6f7fc;color:#1c2030}
+.l{font-size:14px;opacity:.7}</style>
+</head>
+<body>
+<p class="l" id="s">Loading Frame Studio…</p>
+<script>
+(async function () {
+  try {
+    var parts = ['frame-studio-v7.html.b64.part0', 'frame-studio-v7.html.b64.part1', 'frame-studio-v7.html.b64.part2'];
+    var b64 = "";
+    for (var i = 0; i < parts.length; i++) {
+      var res = await fetch(parts[i], { cache: "no-store" });
+      if (!res.ok) throw new Error("part " + i + " " + res.status);
+      b64 += await res.text();
+    }
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+    var html = new TextDecoder("utf-8").decode(bytes);
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (e) {
+    document.getElementById("s").textContent = "Could not load Frame Studio. " + (e && e.message ? e.message : e);
+  }
+})();
+</script>
+</body>
+</html>
