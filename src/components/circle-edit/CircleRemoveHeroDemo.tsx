@@ -43,11 +43,6 @@ const ORDER: DemoPhase[] = [
   "result",
 ];
 
-/**
- * Homepage Circle 2edit Remove hero card media (public assets.motio2edit.com).
- * Sequence: original → marked selection → clean result → continuous loop.
- * These absolute URLs are the source of truth for the card animation.
- */
 const DEMO_STAGE_URLS = {
   stage1:
     "https://assets.motio2edit.com/samples/circle-2edit/file_0000000091d081f585ff54de9335198f.png",
@@ -57,16 +52,16 @@ const DEMO_STAGE_URLS = {
     "https://assets.motio2edit.com/samples/circle-2edit/file_000000004e6481faa6caad771de9c84c.png",
 } as const;
 
-/** Slightly larger dabs so the paint stroke is clearly visible */
+/** Larger dabs so the paint stroke is clearly visible */
 const PAINT_PATH: { x: number; y: number; r: number }[] = [
-  { x: 22, y: 78, r: 13 },
-  { x: 30, y: 74, r: 14 },
-  { x: 38, y: 80, r: 15 },
-  { x: 46, y: 72, r: 14 },
-  { x: 54, y: 76, r: 15 },
-  { x: 62, y: 70, r: 13 },
-  { x: 70, y: 78, r: 14 },
-  { x: 78, y: 74, r: 13 },
+  { x: 22, y: 78, r: 14 },
+  { x: 30, y: 74, r: 15 },
+  { x: 38, y: 80, r: 16 },
+  { x: 46, y: 72, r: 15 },
+  { x: 54, y: 76, r: 16 },
+  { x: 62, y: 70, r: 14 },
+  { x: 70, y: 78, r: 15 },
+  { x: 78, y: 74, r: 14 },
 ];
 
 function ToolIcon({
@@ -216,10 +211,8 @@ function LocalizedMaskReveal({
   paintT: number;
   fullyVisible: boolean;
 }) {
-  // Approved visual: circular windows into stage2 with exact crop positioning.
-  // Memory: only mount active dabs (inactive were opacity 0 — same visual, fewer nodes).
-  // Card is aspect-[4/5]; equal width%/height% would make ellipses, so scale height by aspect.
-  const CARD_ASPECT = 4 / 5; // width / height of the hero image area
+  // Card is aspect-[4/5]; scale height by aspect so dabs stay circular.
+  const CARD_ASPECT = 4 / 5;
   const activeCount = fullyVisible
     ? PAINT_PATH.length
     : Math.min(PAINT_PATH.length, Math.floor(paintT * PAINT_PATH.length + 0.35));
@@ -230,8 +223,8 @@ function LocalizedMaskReveal({
         const on = i < activeCount;
         const justOn = i === activeCount - 1 && !fullyVisible;
         if (!on && !justOn) return null;
-        const diamW = dab.r * 2; // % of parent width
-        const diamH = dab.r * 2 * CARD_ASPECT; // % of parent height → true circle in px
+        const diamW = dab.r * 2;
+        const diamH = dab.r * 2 * CARD_ASPECT;
         return (
           <div
             key={i}
@@ -244,9 +237,8 @@ function LocalizedMaskReveal({
               transform: "translate(-50%, -50%)",
               opacity: on ? 1 : 0,
               transition: justOn ? "opacity 0.18s ease-out" : "opacity 0.12s linear",
-              // Stronger glow so the paint stroke is obvious
               boxShadow: on
-                ? "0 0 14px rgba(123,111,224,0.55), 0 0 4px rgba(255,255,255,0.35)"
+                ? "0 0 16px rgba(123,111,224,0.7), 0 0 0 2px rgba(255,255,255,0.85)"
                 : undefined,
             }}
           >
@@ -261,6 +253,14 @@ function LocalizedMaskReveal({
                 height: `${10000 / diamH}%`,
                 left: `${-dab.x * (100 / diamW) + 50}%`,
                 top: `${-dab.y * (100 / diamH) + 50}%`,
+              }}
+            />
+            {/* Solid purple tint so the paint stroke is obvious */}
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: "rgba(123, 111, 224, 0.42)",
+                mixBlendMode: "multiply",
               }}
             />
           </div>
@@ -285,7 +285,6 @@ export function CircleRemoveHeroDemo() {
     [],
   );
 
-  // Preload stage images so the card never sits blank; shimmer until ready.
   useEffect(() => {
     let cancelled = false;
     let loaded = 0;
@@ -315,7 +314,6 @@ export function CircleRemoveHeroDemo() {
   }, [urls.stage1, urls.stage2, urls.stage3]);
 
   useEffect(() => {
-    // Continuous loop: Image 1 → paint/reveal → Image 2 → process → Image 3 → repeat.
     const ms = PHASE_MS[phase];
     const t = window.setTimeout(() => {
       const i = ORDER.indexOf(phase);
@@ -437,7 +435,7 @@ export function CircleRemoveHeroDemo() {
 
       {phase === "paint" && (
         <div
-          className="pointer-events-none absolute z-20 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/95 bg-[rgba(180,160,230,0.38)] shadow-[0_0_16px_rgba(123,111,224,0.55)]"
+          className="pointer-events-none absolute z-20 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[rgba(123,111,224,0.45)] shadow-[0_0_20px_rgba(123,111,224,0.7)]"
           style={{ left: handPos.left, top: handPos.top }}
         />
       )}
