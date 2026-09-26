@@ -38,8 +38,13 @@ class DemoErrorBoundary extends Component<
   }
 }
 
-/** 4:5 media area — taller than square so deer body + ground stay visible */
-const MEDIA_ASPECT = "relative z-0 aspect-[4/5] w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent";
+/** Pyramid / Giza source is 1:1 — do not force a taller box (was causing empty vertical space). */
+const REMOVE_MEDIA =
+  "relative z-0 aspect-square w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent";
+
+/** Deer source is 2:3 — match natural ratio so body + ground stay visible without letterboxing. */
+const ADD_MEDIA =
+  "relative z-0 aspect-[2/3] w-full isolate overflow-hidden bg-gradient-to-br from-[#7B6FE0]/12 to-transparent";
 
 function RemoveCard() {
   const { theme } = useTheme();
@@ -48,11 +53,11 @@ function RemoveCard() {
   return (
     <article
       className={cn(
-        "group relative isolate flex w-full max-w-[380px] flex-col overflow-hidden rounded-2xl border shadow-md",
+        "group relative isolate flex h-fit w-full max-w-[380px] flex-col self-start overflow-hidden rounded-2xl border shadow-md",
         isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
       )}
     >
-      <div className={MEDIA_ASPECT}>
+      <div className={REMOVE_MEDIA}>
         <DemoErrorBoundary>
           <CircleRemoveHeroDemo />
         </DemoErrorBoundary>
@@ -82,7 +87,7 @@ function RemoveCard() {
         </Link>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-3.5 sm:p-4">
+      <div className="flex flex-col gap-2 p-3.5 sm:p-4">
         <div className="min-w-0">
           <h3 className="text-[15px] font-bold leading-tight tracking-tight">Circle to Remove</h3>
           <p
@@ -114,11 +119,11 @@ function AddCard() {
   return (
     <article
       className={cn(
-        "group relative isolate flex w-full max-w-[380px] flex-col overflow-hidden rounded-2xl border shadow-md",
+        "group relative isolate flex h-fit w-full max-w-[380px] flex-col self-start overflow-hidden rounded-2xl border shadow-md",
         isDark ? "border-white/10 bg-[#181A22]" : "border-black/8 bg-white",
       )}
     >
-      <div className={MEDIA_ASPECT}>
+      <div className={ADD_MEDIA}>
         <DemoErrorBoundary>
           <CircleAddHeroDemo />
         </DemoErrorBoundary>
@@ -148,7 +153,7 @@ function AddCard() {
         </Link>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-3.5 sm:p-4">
+      <div className="flex flex-col gap-2 p-3.5 sm:p-4">
         <div className="min-w-0">
           <h3 className="text-[15px] font-bold leading-tight tracking-tight">Circle to Add</h3>
           <p
@@ -185,7 +190,7 @@ export function CircleSampleGallery() {
           Mark a region. Remove or add objects with lighting-matched AI.
         </p>
       </div>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="mt-4 grid items-start gap-4 sm:grid-cols-2">
         <RemoveCard />
         <AddCard />
       </div>
