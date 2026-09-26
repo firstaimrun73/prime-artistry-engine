@@ -16,20 +16,20 @@ function escapeXml(s: string): string {
     .replace(/'/g, apos);
 }
 
-/** SVG overlay for server sharp composite. Bottom-right, ~3% inset. */
+/** SVG overlay for server sharp composite. Bottom-right. Larger chip for readability. */
 export function buildCropmixWatermarkSvg(w: number, h: number): string {
   const minDim = Math.min(w, h);
-  const fontSize = Math.max(11, Math.min(36, Math.round(minDim * 0.022)));
-  const padX = Math.max(8, Math.round(fontSize * 0.55));
-  const padY = Math.max(5, Math.round(fontSize * 0.38));
-  const margin = Math.max(8, Math.round(minDim * 0.03));
+  const fontSize = Math.max(16, Math.min(52, Math.round(minDim * 0.04)));
+  const padX = Math.max(12, Math.round(fontSize * 0.6));
+  const padY = Math.max(8, Math.round(fontSize * 0.42));
+  const margin = Math.max(12, Math.round(minDim * 0.035));
   const label = CROPMIX_WATERMARK_LABEL;
   const textW = label.length * fontSize * 0.52;
   const rectH = fontSize + padY * 2;
   const rectW = textW + padX * 2;
   const rectX = Math.max(margin, w - rectW - margin);
   const rectY = Math.max(margin, h - rectH - margin);
-  const radius = Math.max(4, Math.round(fontSize * 0.35));
+  const radius = Math.max(6, Math.round(fontSize * 0.35));
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" width="' +
     w +
@@ -69,17 +69,17 @@ export function buildCropmixWatermarkSvg(w: number, h: number): string {
   );
 }
 
-/** Client canvas draw of Volt chip. */
+/** Client canvas draw of Volt chip — larger for phone readability. */
 export function drawCropmixWatermark(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
 ): void {
   const minDim = Math.min(w, h);
-  const fontSize = Math.max(11, Math.min(36, Math.round(minDim * 0.022)));
-  const padX = Math.max(8, Math.round(fontSize * 0.55));
-  const padY = Math.max(5, Math.round(fontSize * 0.38));
-  const margin = Math.max(8, Math.round(minDim * 0.03));
+  const fontSize = Math.max(16, Math.min(52, Math.round(minDim * 0.04)));
+  const padX = Math.max(12, Math.round(fontSize * 0.6));
+  const padY = Math.max(8, Math.round(fontSize * 0.42));
+  const margin = Math.max(12, Math.round(minDim * 0.035));
   const label = CROPMIX_WATERMARK_LABEL;
   ctx.save();
   ctx.font = "700 " + fontSize + "px Inter, Arial, Helvetica, sans-serif";
@@ -88,7 +88,7 @@ export function drawCropmixWatermark(
   const rectW = textW + padX * 2;
   const rectX = Math.max(margin, w - rectW - margin);
   const rectY = Math.max(margin, h - rectH - margin);
-  const radius = Math.max(4, Math.round(fontSize * 0.35));
+  const radius = Math.max(6, Math.round(fontSize * 0.35));
   const grad = ctx.createLinearGradient(rectX, rectY, rectX + rectW, rectY + rectH);
   grad.addColorStop(0, CROPMIX_VOLT);
   grad.addColorStop(1, CROPMIX_VOLT_END);
