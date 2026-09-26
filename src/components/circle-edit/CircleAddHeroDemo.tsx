@@ -145,10 +145,9 @@ export function CircleAddHeroDemo() {
   const showGenLabel = phase === "generate";
   const showProcess = phase === "processing";
 
-  // Source is ~2:3 (taller). Square card + object-cover would crop top/bottom.
-  // object-position keeps the deer body (including lower portion) and environment visible.
+  // Parent card is aspect-[4/5]. Bias slightly lower so deer body + grass stay in frame.
   const imageFitClass =
-    "absolute inset-0 h-full w-full object-cover object-[center_38%] transition-opacity duration-700";
+    "absolute inset-0 h-full w-full object-cover object-[center_52%] transition-opacity duration-700";
 
   return (
     <div className="absolute inset-0 z-0 overflow-hidden" data-circle-add-demo="deer">
@@ -190,9 +189,8 @@ export function CircleAddHeroDemo() {
         decoding="async"
       />
 
-      {/* Tiny object icon */}
       {showIcon && (
-        <div className="pointer-events-none absolute left-1/2 top-[42%] z-20 -translate-x-1/2 -translate-y-1/2">
+        <div className="pointer-events-none absolute left-1/2 top-[48%] z-20 -translate-x-1/2 -translate-y-1/2">
           <div
             className={cn(
               "grid h-12 w-12 place-items-center rounded-2xl border-2 border-white/90 bg-black/45 text-white shadow-lg backdrop-blur-sm",
@@ -205,9 +203,8 @@ export function CircleAddHeroDemo() {
         </div>
       )}
 
-      {/* Brush / selection ring */}
       {showBrush && (
-        <div className="pointer-events-none absolute left-1/2 top-[42%] z-20 -translate-x-1/2 -translate-y-1/2">
+        <div className="pointer-events-none absolute left-1/2 top-[48%] z-20 -translate-x-1/2 -translate-y-1/2">
           <div className="relative h-24 w-24">
             <span
               className="absolute inset-0 rounded-full border-[3px] border-[#7B6FE0]/80"
@@ -221,7 +218,6 @@ export function CircleAddHeroDemo() {
         </div>
       )}
 
-      {/* Generate label */}
       {showGenLabel && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/25 backdrop-blur-[1px]">
           <span className="rounded-full bg-[#7B6FE0] px-4 py-2 text-[13px] font-bold tracking-wide text-white shadow-lg">
@@ -230,7 +226,6 @@ export function CircleAddHeroDemo() {
         </div>
       )}
 
-      {/* Processing: black + lavender dots */}
       {showProcess && (
         <div className="pointer-events-none absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/55 backdrop-blur-[2px]">
           <MovingDots />
@@ -240,12 +235,11 @@ export function CircleAddHeroDemo() {
       )}
 
       {showResult && (
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/55 to-transparent px-4 pb-3 pt-10">
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/45 to-transparent px-4 pb-2.5 pt-8">
           <p className="text-[13px] font-semibold text-white">Deer added</p>
         </div>
       )}
 
-      {/* Accent label */}
       <span className="pointer-events-none absolute left-2.5 top-2.5 z-30 rounded-full bg-[#7B6FE0] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
         Circle to Add
       </span>
