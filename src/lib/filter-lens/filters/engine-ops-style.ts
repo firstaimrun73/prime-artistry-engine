@@ -53,15 +53,6 @@ function scaleMask(mask: Float32Array, factor: number): Float32Array {
   return out;
 }
 
-function toBuf(image: RGBAImage): ImgBuf {
-  return { data: image.data, width: image.width, height: image.height };
-}
-
-function writeBack(image: RGBAImage, buf: ImgBuf): void {
-  if (image.data === buf.data) return;
-  image.data.set(buf.data);
-}
-
 function applySketch(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
@@ -76,13 +67,13 @@ function applySketch(img: ImgBuf, intensity: number): ImgBuf {
     paper[i + 3] = data[i + 3];
   }
   let out: ImgBuf = { data: paper, width, height };
-  const inkStrength = 1.05 + t * 1.55;
-  const threshold = 8 + stats.edgeDensity * 18;
+  const inkStrength = 1.35 + t * 1.85;
+  const threshold = 6 + stats.edgeDensity * 16;
   const inkMask = sobelInkMask(img, inkStrength, threshold);
-  out = compositeInk(out, inkMask, [18, 16, 22]);
-  const fineMask = sobelInkMask(img, 0.55 + t * 0.7, 22);
-  out = compositeInk(out, scaleMask(fineMask, 0.55), [35, 32, 38]);
-  if (t > 0.15) out = crossHatch(out, Math.min(1, (t - 0.15) / 0.5 + 0.35));
+  out = compositeInk(out, inkMask, [12, 10, 16]);
+  const fineMask = sobelInkMask(img, 0.75 + t * 0.9, 18);
+  out = compositeInk(out, scaleMask(fineMask, 0.7), [28, 26, 32]);
+  if (t > 0.1) out = crossHatch(out, Math.min(1, (t - 0.1) / 0.45 + 0.45));
   return out;
 }
 
@@ -139,21 +130,21 @@ function applyCyberpunk(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
   const cellSize = stats.edgeDensity > 0.12 ? 3 : 4;
-  let out = colorCells(img, cellSize, 0.55 + t * 0.22);
-  out = cyberpunkPaletteBlend(out, 0.48 + t * 0.4);
-  out = midtoneDarken(out, 0.12 + t * 0.18);
-  out = halftoneShadows(out, 4, 85, 0.28 + t * 0.32);
-  const inkMask = sobelInkMask(img, 0.7 + t * 0.9, 22);
-  out = compositeInk(out, inkMask, [0, 40, 70]);
-  out = neonRim(out, 0.5 + t * 0.55);
+  let out = colorCells(img, cellSize, 0.62 + t * 0.28);
+  out = cyberpunkPaletteBlend(out, 0.62 + t * 0.48);
+  out = midtoneDarken(out, 0.18 + t * 0.28);
+  out = halftoneShadows(out, 4, 85, 0.34 + t * 0.38);
+  const inkMask = sobelInkMask(img, 0.85 + t * 1.1, 22);
+  out = compositeInk(out, inkMask, [0, 55, 95]);
+  out = neonRim(out, 0.72 + t * 0.7);
   const { width, height, data } = out;
   const d = new Uint8ClampedArray(data);
   for (let i = 0; i < d.length; i += 4) {
     const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
     const w = Math.sin(Math.PI * Math.min(1, l / 255));
-    d[i] = Math.min(255, d[i] + 22 * t * w);
-    d[i + 1] = Math.min(255, d[i + 1] + 6 * t * w);
-    d[i + 2] = Math.min(255, d[i + 2] + 28 * t * w);
+    d[i] = Math.min(255, d[i] + 32 * t * w);
+    d[i + 1] = Math.min(255, d[i + 1] + 8 * t * w);
+    d[i + 2] = Math.min(255, d[i + 2] + 42 * t * w);
   }
   out = { data: d, width, height };
   return out;
@@ -161,9 +152,17 @@ function applyCyberpunk(img: ImgBuf, intensity: number): ImgBuf {
 
 function applyNeon(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
-  let out = midtoneDarken(img, 0.25 + t * 0.35);
-  out = neonRim(out, 0.5 + t * 0.9);
-  return out;
+  let out = midtoneDarken(img, 0.32 + t * 0.42);
+  out = neonRim(out, 0.72 + t * 1.05);
+  const { width, height, data } = out;
+  const d = new Uint8ClampedArray(data);
+  for (let i = 0; i < d.length; i += 4) {
+    const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const w = Math.sin(Math.PI * Math.min(1, l / 255));
+    d[i] = Math.min(255, d[i] + 18 * t * w);
+    d[i + 2] = Math.min(255, d[i + 2] + 28 * t * w);
+  }
+  return { data: d, width, height };
 }
 
 function applyGhibli(img: ImgBuf, intensity: number): ImgBuf {
@@ -174,7 +173,7 @@ function applyGhibli(img: ImgBuf, intensity: number): ImgBuf {
   let out = blend(img, painterly, 0.82 + t * 0.14);
   out = bilateralApprox(out, 3, 22);
   out = softQuantize(out, 14, 0.22);
-  out = warmGreenLift(out, 0.72 + t * 0.38);
+  out = warmGreenLift(out, 0.92 + t * 0.48);
   const { width, height, data } = out;
   const graded = new Uint8ClampedArray(data.length);
   const warm = 0.14 + t * 0.16;
@@ -185,33 +184,13 @@ function applyGhibli(img: ImgBuf, intensity: number): ImgBuf {
     b = Math.min(255, b + (236 - b) * warm * 0.18 + 4 * warm);
     const l = 0.299 * r + 0.587 * g + 0.114 * b;
     const mid = Math.sin(Math.PI * Math.min(1, l / 255));
-    g = Math.min(255, g + 12 * t * mid);
-    r = Math.min(255, r + 4 * t * mid);
+    g = Math.min(255, g + 22 * t * mid);
+    r = Math.min(255, r + 6 * t * mid);
     graded[i] = r; graded[i + 1] = g; graded[i + 2] = b; graded[i + 3] = data[i + 3];
   }
   out = { data: graded, width, height };
-  const edgeMask = adaptiveEdgeMask(img, 1.6, 12);
-  out = compositeInk(out, scaleMask(edgeMask, 0.12 + t * 0.14), [48, 58, 42]);
-  return out;
-}
-
-function applyRetro3d(img: ImgBuf, intensity: number): ImgBuf {
-  const t = norm(intensity);
-  const stats = computeImageStats(img);
-  let out = bilateralApprox(img, 2, 35);
-  out = softQuantize(out, stats.lowContrast ? 9 : 7, 0.35);
-  out = colorCells(out, 3, 0.35 + t * 0.25);
-  const inkMask = sobelInkMask(img, 0.4 + t * 0.45, 24);
-  out = compositeInk(out, inkMask, [20, 20, 25]);
-  return out;
-}
-
-function applyAnime(img: ImgBuf, intensity: number): ImgBuf {
-  const t = norm(intensity);
-  let out = bilateralApprox(img, 2, 40);
-  out = softQuantize(out, 9, 0.25);
-  const inkMask = sobelInkMask(img, 0.4 + t * 0.45, 26);
-  out = compositeInk(out, inkMask, [15, 12, 18]);
+  const edgeMask = adaptiveEdgeMask(img, 2, 10);
+  out = compositeInk(out, scaleMask(edgeMask, 0.12 + t * 0.12), [40, 55, 35]);
   return out;
 }
 
@@ -281,60 +260,36 @@ function applyStyleBuf(img: ImgBuf, style: string, intensity: number): ImgBuf {
     case 'cyberpunk': return applyCyberpunk(img, intensity);
     case 'neon': return applyNeon(img, intensity);
     case 'ghibli': return applyGhibli(img, intensity);
-    case 'retro3d': return applyRetro3d(img, intensity);
-    case 'anime': return applyAnime(img, intensity);
     case 'rangoli': return applyRangoli(img, intensity);
     case 'glassy': return applyGlassy(img, intensity);
     case 'origami': return applyOrigami(img, intensity);
-    case 'flatvector': return applyCartoon(img, intensity);
+    case 'anime': return applyCartoon(img, intensity);
+    case 'flatvector': return applyOrigami(img, intensity);
+    case 'retro3d': return applyNeon(img, intensity);
     default: return img;
   }
 }
 
-export function applyStyle(image: RGBAImage, style: string | undefined, intensity: number): void {
-  if (!style || style === 'none') return;
-  const buf = toBuf(image);
-  const result = applyStyleBuf(buf, style, intensity);
-  writeBack(image, result);
+export function applyStyle(img: ImgBuf, style: StyleKey | string, intensity: number): ImgBuf {
+  if (!style || style === 'none') return img;
+  return applyStyleBuf(img, style, intensity);
 }
 
-export function scaleProfile(profile: ProcessingProfile, intensity: number): ProcessingProfile {
-  const t = Math.max(0, Math.min(100, intensity)) / 100;
-  const s = (v?: number) => (v == null ? undefined : v * t);
+export function applyStyleFromProfile(
+  img: ImgBuf,
+  profile: ProcessingProfile,
+  intensity: number,
+): ImgBuf {
+  if (!profile.style || profile.style === 'none') return img;
+  return applyStyle(img, profile.style, intensity);
+}
+
+export function styleProfileExtras(profile: ProcessingProfile): ProcessingProfile {
   return {
-    exposure: s(profile.exposure),
-    brightness: s(profile.brightness),
-    contrast: s(profile.contrast),
-    highlights: s(profile.highlights),
-    shadows: s(profile.shadows),
-    temperature: s(profile.temperature),
-    tint: s(profile.tint),
-    saturation: s(profile.saturation),
-    vibrance: s(profile.vibrance),
-    gamma: profile.gamma,
-    monochrome: profile.monochrome,
-    sepia: s(profile.sepia),
-    fade: s(profile.fade),
-    grain: s(profile.grain),
-    vignette: s(profile.vignette),
-    vignetteFeather: profile.vignetteFeather,
-    sharpening: s(profile.sharpening),
-    clarity: s(profile.clarity),
-    bloom: s(profile.bloom),
-    blur: s(profile.blur),
-    denoise: s(profile.denoise),
-    microcontrast: s(profile.microcontrast),
-    dynamicRange: s(profile.dynamicRange),
-    starSeparation: s(profile.starSeparation),
-    atmosphere: s(profile.atmosphere),
-    splitToning: profile.splitToning,
-    toneCurve: profile.toneCurve,
-    channelAdjustments: profile.channelAdjustments,
-    posterizeLevels: profile.posterizeLevels,
-    edgeAmount: s(profile.edgeAmount),
-    pixelSize: profile.pixelSize,
-    softBlur: s(profile.softBlur),
-    duotone: profile.duotone,
+    contrast: profile.contrast,
+    saturation: profile.saturation,
+    temperature: profile.temperature,
+    tint: profile.tint,
     style: profile.style,
   };
 }
