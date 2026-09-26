@@ -1,6 +1,7 @@
 /**
  * Cropmix Crop editor — upload-first, corner handles, custom ratio, taller dock.
- * Preview is stage-fitted so tall 9:16 / large phone photos never collapse to blank.
+ * Preview uses a real <img> (object-fit contain) so tall 9:16 / large phone photos
+ * never show blank. Canvas is only used for EXIF-corrected source + export.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -72,13 +73,16 @@ function RatioGlyph({ ratio, active }: { ratio: number | null; active: boolean }
 
 export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }: Props) {
   const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const previewRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const imgWrapRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const loadGenRef = useRef(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [srcSize, setSrcSize] = useState({ w: 1, h: 1 });
   const [ready, setReady] = useState(false);
   const [box, setBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
+  const [imgBox, setImgBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const [customOpen, setCustomOpen] = useState(false);
   const [customW, setCustomW] = useState("4");
   const [customH, setCustomH] = useState("5");
@@ -99,6 +103,10 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     if (!file) {
       setReady(false);
       sourceCanvasRef.current = null;
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       return;
     }
     const gen = ++loadGenRef.current;
@@ -109,7 +117,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
         const buf = await file.arrayBuffer();
         if (gen !== loadGenRef.current) return;
         const orientation = readExifOrientation(buf);
-        objectUrl = URL.createObjectURL(new Blob([buf]));
+        objectUrl = URL.createObjectURL(new Blob([buf], { type: file.type || "image/jpeg" }));
         const img = new Image();
         img.decoding = "async";
         await new Promise<void>((res, rej) => {
@@ -135,10 +143,14 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
         setHist(historyInit(start));
         if (start.customW) setCustomW(String(start.customW));
         if (start.customH) setCustomH(String(start.customH));
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return objectUrl;
+        });
+        objectUrl = null;
         setReady(true);
       } catch {
         if (gen === loadGenRef.current) setReady(false);
-      } finally {
         if (objectUrl) URL.revokeObjectURL(objectUrl);
       }
     })();
@@ -147,8 +159,6 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     };
   }, [file, initialGeometry]);
 
-  // Observe stage size + force a few ticks after ready so first paint is never skipped
-  // when flex layout still reports 0×0 on the initial layout pass.
   useEffect(() => {
     if (!ready) return;
     const el = stageRef.current;
@@ -158,6 +168,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     if (typeof ResizeObserver !== "undefined") {
       ro = new ResizeObserver(bump);
       ro.observe(el);
+      if (imgWrapRef.current) ro.observe(imgWrapRef.current);
     }
     const raf1 = requestAnimationFrame(() => {
       bump();
@@ -198,83 +209,46 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   };
 
   useLayoutEffect(() => {
-    if (!ready || !sourceCanvasRef.current || !previewRef.current || !stageRef.current) return;
-    const src = sourceCanvasRef.current;
-    const canvas = previewRef.current;
+    if (!ready || !stageRef.current || !imgRef.current) return;
     const stage = stageRef.current;
+    const img = imgRef.current;
+    const stageRect = stage.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
 
-    const stageW = Math.max(1, stage.clientWidth - 24);
-    const stageH = Math.max(1, stage.clientHeight - 24);
-    // Stage not laid out yet (flex min-h-0) — retry on next frame; never leave blank.
-    if (stageW < 2 || stageH < 2) {
+    if (stageRect.width < 2 || stageRect.height < 2 || imgRect.width < 1 || imgRect.height < 1) {
       const id = requestAnimationFrame(() => setStageTick((n) => n + 1));
       return () => cancelAnimationFrame(id);
     }
 
+    const left = imgRect.left - stageRect.left;
+    const top = imgRect.top - stageRect.top;
+    const width = imgRect.width;
+    const height = imgRect.height;
+    setImgBox({ left, top, width, height });
+
     const r = ((g.rotate90 % 4) + 4) % 4;
-    const baseW = src.width;
-    const baseH = src.height;
+    const baseW = srcSize.w;
+    const baseH = srcSize.h;
     if (!baseW || !baseH) return;
 
-    const rotatedW = r === 1 || r === 3 ? baseH : baseW;
-    const rotatedH = r === 1 || r === 3 ? baseW : baseH;
-
-    const fit = Math.min(stageW / rotatedW, stageH / rotatedH, 1);
-    const dispW = Math.max(1, Math.round(rotatedW * fit));
-    const dispH = Math.max(1, Math.round(rotatedH * fit));
-    const scale = fit;
-
-    canvas.width = dispW;
-    canvas.height = dispH;
-    canvas.style.width = `${dispW}px`;
-    canvas.style.height = `${dispH}px`;
-    canvas.style.maxWidth = "100%";
-    canvas.style.maxHeight = "100%";
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.clearRect(0, 0, dispW, dispH);
-
-    ctx.save();
-    if (r === 1) {
-      ctx.translate(dispW, 0);
-      ctx.rotate(0.5 * Math.PI);
-    } else if (r === 2) {
-      ctx.translate(dispW, dispH);
-      ctx.rotate(Math.PI);
-    } else if (r === 3) {
-      ctx.translate(0, dispH);
-      ctx.rotate(-0.5 * Math.PI);
-    }
-    const workW = r === 1 || r === 3 ? dispH : dispW;
-    const workH = r === 1 || r === 3 ? dispW : dispH;
-    if (g.flipH || g.flipV) {
-      ctx.translate(g.flipH ? workW : 0, g.flipV ? workH : 0);
-      ctx.scale(g.flipH ? -1 : 1, g.flipV ? -1 : 1);
-    }
-    ctx.drawImage(src, 0, 0, workW, workH);
-    ctx.restore();
-
     const mapPoint = (nx: number, ny: number) => {
-      let px = nx * baseW;
-      let py = ny * baseH;
-      if (g.flipH) px = baseW - px;
-      if (g.flipV) py = baseH - py;
+      let px = nx;
+      let py = ny;
+      if (g.flipH) px = 1 - px;
+      if (g.flipV) py = 1 - py;
       let qx = px;
       let qy = py;
       if (r === 1) {
-        qx = baseH - py;
+        qx = 1 - py;
         qy = px;
       } else if (r === 2) {
-        qx = baseW - px;
-        qy = baseH - py;
+        qx = 1 - px;
+        qy = 1 - py;
       } else if (r === 3) {
         qx = py;
-        qy = baseW - px;
+        qy = 1 - px;
       }
-      return { x: qx * scale, y: qy * scale };
+      return { x: left + qx * width, y: top + qy * height };
     };
 
     const corners = [
@@ -291,37 +265,18 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     let minY = Math.min(...ys);
     let maxY = Math.max(...ys);
 
-    minX = Math.max(0, Math.min(dispW, minX));
-    maxX = Math.max(0, Math.min(dispW, maxX));
-    minY = Math.max(0, Math.min(dispH, minY));
-    maxY = Math.max(0, Math.min(dispH, maxY));
-    const gx = minX;
-    const gy = minY;
-    const gw = Math.max(1, maxX - minX);
-    const gh = Math.max(1, maxY - minY);
+    minX = Math.max(left, Math.min(left + width, minX));
+    maxX = Math.max(left, Math.min(left + width, maxX));
+    minY = Math.max(top, Math.min(top + height, minY));
+    maxY = Math.max(top, Math.min(top + height, maxY));
 
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(0, 0, dispW, gy);
-    ctx.fillRect(0, gy + gh, dispW, dispH - gy - gh);
-    ctx.fillRect(0, gy, gx, gh);
-    ctx.fillRect(gx + gw, gy, dispW - gx - gw, gh);
-    ctx.strokeStyle = CROPMIX_VOLT;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(gx + 0.5, gy + 0.5, gw - 1, gh - 1);
-
-    const canvasRect = canvas.getBoundingClientRect();
-    const stageRect = stage.getBoundingClientRect();
-    if (canvasRect.width > 0 && canvasRect.height > 0) {
-      const sx = canvasRect.width / dispW;
-      const sy = canvasRect.height / dispH;
-      setBox({
-        left: canvasRect.left - stageRect.left + gx * sx,
-        top: canvasRect.top - stageRect.top + gy * sy,
-        width: gw * sx,
-        height: gh * sy,
-      });
-    }
-  }, [ready, g, srcSize, stageTick]);
+    setBox({
+      left: minX,
+      top: minY,
+      width: Math.max(1, maxX - minX),
+      height: Math.max(1, maxY - minY),
+    });
+  }, [ready, g, srcSize, stageTick, previewUrl]);
 
   const hitHandle = (clientX: number, clientY: number): HandleId => {
     const hit = 22;
@@ -350,15 +305,32 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragRef.current || !previewRef.current) return;
-    const rect = previewRef.current.getBoundingClientRect();
-    if (rect.width < 1 || rect.height < 1) return;
-    const dx = (e.clientX - dragRef.current.startX) / rect.width;
-    const dy = (e.clientY - dragRef.current.startY) / rect.height;
+    if (!dragRef.current) return;
+    const iw = imgBox.width;
+    const ih = imgBox.height;
+    if (iw < 1 || ih < 1) return;
+    const dx = (e.clientX - dragRef.current.startX) / iw;
+    const dy = (e.clientY - dragRef.current.startY) / ih;
     const o = dragRef.current.origin;
     const kind = dragRef.current.kind;
+    const r = ((o.rotate90 % 4) + 4) % 4;
+    let mdx = dx;
+    let mdy = dy;
+    if (r === 1) {
+      mdx = dy;
+      mdy = -dx;
+    } else if (r === 2) {
+      mdx = -dx;
+      mdy = -dy;
+    } else if (r === 3) {
+      mdx = -dy;
+      mdy = dx;
+    }
+    if (o.flipH) mdx = -mdx;
+    if (o.flipV) mdy = -mdy;
+
     if (kind === "move") {
-      commit(clampCrop({ ...o, x: o.x + dx, y: o.y + dy }));
+      commit(clampCrop({ ...o, x: o.x + mdx, y: o.y + mdy }));
       return;
     }
     let x = o.x;
@@ -366,21 +338,21 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     let w = o.w;
     let h = o.h;
     if (kind === "nw") {
-      x = o.x + dx;
-      y = o.y + dy;
-      w = o.w - dx;
-      h = o.h - dy;
+      x = o.x + mdx;
+      y = o.y + mdy;
+      w = o.w - mdx;
+      h = o.h - mdy;
     } else if (kind === "ne") {
-      y = o.y + dy;
-      w = o.w + dx;
-      h = o.h - dy;
+      y = o.y + mdy;
+      w = o.w + mdx;
+      h = o.h - mdy;
     } else if (kind === "sw") {
-      x = o.x + dx;
-      w = o.w - dx;
-      h = o.h + dy;
+      x = o.x + mdx;
+      w = o.w - mdx;
+      h = o.h + mdy;
     } else if (kind === "se") {
-      w = o.w + dx;
-      h = o.h + dy;
+      w = o.w + mdx;
+      h = o.h + mdy;
     }
     if (o.aspectId !== "free" && o.aspectId !== "original") {
       const ratio =
@@ -411,6 +383,14 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   };
 
   const toolsDisabled = !ready;
+  const r = ((g.rotate90 % 4) + 4) % 4;
+  const transformParts: string[] = [];
+  if (r === 1) transformParts.push("rotate(90deg)");
+  else if (r === 2) transformParts.push("rotate(180deg)");
+  else if (r === 3) transformParts.push("rotate(-90deg)");
+  if (g.flipH) transformParts.push("scaleX(-1)");
+  if (g.flipV) transformParts.push("scaleY(-1)");
+  const imgTransform = transformParts.join(" ") || undefined;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -432,8 +412,14 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
         </button>
       </header>
 
-      <div ref={stageRef} className="relative flex min-h-[40vh] flex-1 items-center justify-center overflow-hidden bg-black/90 p-3"
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+      <div
+        ref={stageRef}
+        className="relative flex min-h-[40vh] flex-1 items-center justify-center overflow-hidden bg-black/90 p-3"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         {!file ? (
           <button type="button" onClick={() => fileRef.current?.click()}
             className="flex w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/70 px-6 py-14 text-center">
@@ -443,14 +429,80 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
             <span className="text-sm font-semibold">Upload an image to begin</span>
             <span className="text-xs text-muted-foreground">JPG, PNG, or WEBP · crop tools unlock after upload</span>
           </button>
-        ) : !ready ? (
+        ) : !ready || !previewUrl ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
           <>
-            <canvas ref={previewRef} className="touch-none" />
-            <div className="pointer-events-none absolute" style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
+            <div
+              ref={imgWrapRef}
+              className="relative flex max-h-full max-w-full items-center justify-center"
+              style={{ width: "100%", height: "100%" }}
+            >
+              <img
+                ref={imgRef}
+                src={previewUrl}
+                alt="Crop preview"
+                draggable={false}
+                className="touch-none select-none"
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  width: "auto",
+                  height: "auto",
+                  objectFit: "contain",
+                  transform: imgTransform,
+                  transformOrigin: "center center",
+                }}
+                onLoad={() => setStageTick((n) => n + 1)}
+              />
+            </div>
+            <div className="pointer-events-none absolute inset-0" aria-hidden>
+              <div
+                className="absolute bg-black/55"
+                style={{ left: 0, top: 0, right: 0, height: Math.max(0, box.top) }}
+              />
+              <div
+                className="absolute bg-black/55"
+                style={{
+                  left: 0,
+                  top: box.top + box.height,
+                  right: 0,
+                  bottom: 0,
+                }}
+              />
+              <div
+                className="absolute bg-black/55"
+                style={{
+                  left: 0,
+                  top: box.top,
+                  width: Math.max(0, box.left),
+                  height: box.height,
+                }}
+              />
+              <div
+                className="absolute bg-black/55"
+                style={{
+                  left: box.left + box.width,
+                  top: box.top,
+                  right: 0,
+                  height: box.height,
+                }}
+              />
+            </div>
+            <div
+              className="pointer-events-none absolute border-2"
+              style={{
+                left: box.left,
+                top: box.top,
+                width: box.width,
+                height: box.height,
+                borderColor: CROPMIX_VOLT,
+              }}
+            >
               {(["nw", "ne", "sw", "se"] as const).map((id) => (
-                <span key={id} className="absolute h-3.5 w-3.5 rounded-full border-2 border-black shadow-sm"
+                <span
+                  key={id}
+                  className="absolute h-3.5 w-3.5 rounded-full border-2 border-black shadow-sm"
                   style={{
                     backgroundColor: CROPMIX_VOLT,
                     left: id === "nw" || id === "sw" ? -7 : undefined,
