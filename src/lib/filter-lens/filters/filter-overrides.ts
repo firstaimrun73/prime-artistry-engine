@@ -31,8 +31,8 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     splitToning: { shadowsHue: 215, shadowsSaturation: 55, highlightsHue: 200, highlightsSaturation: 28, balance: -8 },
   },
   'filter-037': {
-    temperature: -6, tint: 38, saturation: 28, vibrance: 22, contrast: 14, shadows: 12, highlights: -4, vignette: 8,
-    splitToning: { shadowsHue: 145, shadowsSaturation: 72, highlightsHue: 110, highlightsSaturation: 48, balance: -10 },
+    temperature: -28, tint: 62, saturation: 36, vibrance: 30, contrast: 16, shadows: 14, highlights: -8, vignette: 10,
+    splitToning: { shadowsHue: 140, shadowsSaturation: 88, highlightsHue: 105, highlightsSaturation: 62, balance: -18 },
   },
   'filter-025': {
     temperature: 22, tint: 12, saturation: -4, contrast: 14, fade: 10, grain: 8, vignette: 14,
@@ -50,9 +50,9 @@ export const FILTER_PROFILE_OVERRIDES: Record<string, ProcessingProfile> = {
     temperature: 26, tint: -16, saturation: 16, contrast: 14, fade: 4, vignette: 8,
     splitToning: { shadowsHue: 48, shadowsSaturation: 36, highlightsHue: 55, highlightsSaturation: 30, balance: 2 },
   },
-  'filter-050': { style: 'neon', contrast: 18, saturation: 14, temperature: -10, shadows: -8 },
-  'filter-051': { style: 'neon', contrast: 16, saturation: 12, temperature: -14 },
-  'filter-052': { style: 'neon', contrast: 18, saturation: 16, temperature: 8 },
+  'filter-050': { style: 'neon', contrast: 28, saturation: 24, temperature: -16, shadows: -14, bloom: 12 },
+  'filter-051': { style: 'neon', contrast: 26, saturation: 22, temperature: -20, shadows: -10, bloom: 10 },
+  'filter-052': { style: 'neon', contrast: 28, saturation: 26, temperature: 6, shadows: -12, bloom: 14 },
   'filter-064': {
     contrast: 28, saturation: 14, vibrance: 12, temperature: -8, vignette: 16, shadows: 6, bloom: 12,
     splitToning: { shadowsHue: 220, shadowsSaturation: 28, highlightsHue: 40, highlightsSaturation: 22, balance: 0 },
