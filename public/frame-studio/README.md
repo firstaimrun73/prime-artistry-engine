@@ -1,10 +1,17 @@
-# Frame Studio (v5)
+# Frame Studio (Motio2edit)
 
-Standalone Motio2edit Frame Studio UI.
+Standalone photo-frame UI served from this folder.
 
-- Open `/frame-studio/frame-studio-v5.html` in the deployed app.
-- Logo: warm brown frame-corner mark (`logo.svg`).
-- Apply calls `POST /api/frame-studio/apply` with the signed-in user's Bearer token.
-- Catalog, textures, and credit amounts are final — do not regenerate.
+## Live URLs
+- `/frame-studio/` → `index.html` (Frame Studio v7)
+- `/frame-studio/frame-studio-v7.html` → same build
 
-See `DEPLOY.md` for backend + env notes.
+## Apply credits
+Client POSTs to `/api/frame-studio/apply` with:
+```json
+{ "frameId": "…", "tier": "common|aiplus|premium", "cost": 5 }
+```
+Header: `Authorization: Bearer <supabase access token>`
+
+## Demo plan switcher
+Off in production (`CONFIG.showPlanSwitcher: false`). Plan/credits come from Motio account via the API.

@@ -1,20 +1,15 @@
-# Frame Studio — logo + backend deploy notes
+# Frame Studio — deploy notes
 
 ## Assets
-- `public/frame-studio/logo.svg` — warm brown frame-corner mark
-- `public/frame-studio/favicon-32.png`, `favicon-180.png` (generate from logo.svg if needed)
-- `public/frame-studio/frame-studio-v5.html` — UI (catalog/textures/costs unchanged)
+- `public/frame-studio/index.html` — Frame Studio v7 (primary)
+- `public/frame-studio/frame-studio-v7.html` — same build
+- `public/frame-studio/logo.svg` — brand mark
 
 ## Backend
-- `src/lib/frame-studio/credits.ts` — cost table
-- `src/lib/frame-studio/charge.server.ts` — `chargeFrameStudioApply` server fn
-- `src/routes/api/frame-studio.apply.ts` — HTTP `POST /api/frame-studio/apply`
+- `src/lib/frame-studio/credits.ts` — cost table (common 5 / aiplus 15 / premium 25)
+- `src/lib/frame-studio/charge.server.ts` — `chargeFrameStudioApply`
+- `src/routes/api/frame-studio.apply.ts` — `POST /api/frame-studio/apply`
 - Migration: `supabase/migrations/20260926120000_frame_studio_ledger.sql`
-
-## Env vars (already used by Motio2edit)
-- `SUPABASE_URL`
-- `SUPABASE_PUBLISHABLE_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (via supabaseAdmin)
 
 ## Client contract
 POST `/api/frame-studio/apply`
