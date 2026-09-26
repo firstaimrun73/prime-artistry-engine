@@ -53,6 +53,14 @@ function scaleMask(mask: Float32Array, factor: number): Float32Array {
   return out;
 }
 
+function toBuf(image: RGBAImage): ImgBuf {
+  return { data: image.data, width: image.width, height: image.height };
+}
+
+function writeBack(image: RGBAImage, buf: ImgBuf): void {
+  image.data.set(buf.data);
+}
+
 function applySketch(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   const stats = computeImageStats(img);
@@ -194,6 +202,20 @@ function applyGhibli(img: ImgBuf, intensity: number): ImgBuf {
   return out;
 }
 
+function applyRetro3d(img: ImgBuf, intensity: number): ImgBuf {
+  const t = norm(intensity);
+  let out = softQuantize(img, 8, 0.35);
+  out = colorCells(out, 4, 0.4 + t * 0.25);
+  out = midtoneDarken(out, 0.1 + t * 0.15);
+  const inkMask = sobelInkMask(img, 0.6 + t * 0.7, 18);
+  out = compositeInk(out, inkMask, [20, 18, 30]);
+  return out;
+}
+
+function applyAnime(img: ImgBuf, intensity: number): ImgBuf {
+  return applyCartoon(img, intensity);
+}
+
 function applyRangoli(img: ImgBuf, intensity: number): ImgBuf {
   const t = norm(intensity);
   let out = bilateralApprox(img, 2, 28);
@@ -260,36 +282,60 @@ function applyStyleBuf(img: ImgBuf, style: string, intensity: number): ImgBuf {
     case 'cyberpunk': return applyCyberpunk(img, intensity);
     case 'neon': return applyNeon(img, intensity);
     case 'ghibli': return applyGhibli(img, intensity);
+    case 'retro3d': return applyRetro3d(img, intensity);
+    case 'anime': return applyAnime(img, intensity);
     case 'rangoli': return applyRangoli(img, intensity);
     case 'glassy': return applyGlassy(img, intensity);
     case 'origami': return applyOrigami(img, intensity);
-    case 'anime': return applyCartoon(img, intensity);
-    case 'flatvector': return applyOrigami(img, intensity);
-    case 'retro3d': return applyNeon(img, intensity);
+    case 'flatvector': return applyCartoon(img, intensity);
     default: return img;
   }
 }
 
-export function applyStyle(img: ImgBuf, style: StyleKey | string, intensity: number): ImgBuf {
-  if (!style || style === 'none') return img;
-  return applyStyleBuf(img, style, intensity);
+export function applyStyle(image: RGBAImage, style: string | undefined, intensity: number): void {
+  if (!style || style === 'none') return;
+  const buf = toBuf(image);
+  const result = applyStyleBuf(buf, style, intensity);
+  writeBack(image, result);
 }
 
-export function applyStyleFromProfile(
-  img: ImgBuf,
-  profile: ProcessingProfile,
-  intensity: number,
-): ImgBuf {
-  if (!profile.style || profile.style === 'none') return img;
-  return applyStyle(img, profile.style, intensity);
-}
-
-export function styleProfileExtras(profile: ProcessingProfile): ProcessingProfile {
+export function scaleProfile(profile: ProcessingProfile, intensity: number): ProcessingProfile {
+  const t = Math.max(0, Math.min(100, intensity)) / 100;
+  const s = (v?: number) => (v == null ? undefined : v * t);
   return {
-    contrast: profile.contrast,
-    saturation: profile.saturation,
-    temperature: profile.temperature,
-    tint: profile.tint,
+    exposure: s(profile.exposure),
+    brightness: s(profile.brightness),
+    contrast: s(profile.contrast),
+    highlights: s(profile.highlights),
+    shadows: s(profile.shadows),
+    temperature: s(profile.temperature),
+    tint: s(profile.tint),
+    saturation: s(profile.saturation),
+    vibrance: s(profile.vibrance),
+    gamma: profile.gamma,
+    monochrome: profile.monochrome,
+    sepia: s(profile.sepia),
+    fade: s(profile.fade),
+    grain: s(profile.grain),
+    vignette: s(profile.vignette),
+    vignetteFeather: profile.vignetteFeather,
+    sharpening: s(profile.sharpening),
+    clarity: s(profile.clarity),
+    bloom: s(profile.bloom),
+    blur: s(profile.blur),
+    denoise: s(profile.denoise),
+    microcontrast: s(profile.microcontrast),
+    dynamicRange: s(profile.dynamicRange),
+    starSeparation: s(profile.starSeparation),
+    atmosphere: s(profile.atmosphere),
+    splitToning: profile.splitToning,
+    toneCurve: profile.toneCurve,
+    channelAdjustments: profile.channelAdjustments,
+    posterizeLevels: profile.posterizeLevels,
+    edgeAmount: s(profile.edgeAmount),
+    pixelSize: profile.pixelSize,
+    softBlur: s(profile.softBlur),
+    duotone: profile.duotone,
     style: profile.style,
   };
 }
