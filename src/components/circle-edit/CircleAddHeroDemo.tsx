@@ -145,6 +145,11 @@ export function CircleAddHeroDemo() {
   const showGenLabel = phase === "generate";
   const showProcess = phase === "processing";
 
+  // Source is ~2:3 (taller). Square card + object-cover would crop top/bottom.
+  // object-position keeps the deer body (including lower portion) and environment visible.
+  const imageFitClass =
+    "absolute inset-0 h-full w-full object-cover object-[center_38%] transition-opacity duration-700";
+
   return (
     <div className="absolute inset-0 z-0 overflow-hidden" data-circle-add-demo="deer">
       <style>{`
@@ -172,10 +177,7 @@ export function CircleAddHeroDemo() {
       <img
         src={urls.before}
         alt="Before — forest clearing"
-        className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity duration-700",
-          showResult ? "opacity-0" : "opacity-100",
-        )}
+        className={cn(imageFitClass, showResult ? "opacity-0" : "opacity-100")}
         draggable={false}
         decoding="async"
       />
@@ -183,10 +185,7 @@ export function CircleAddHeroDemo() {
       <img
         src={urls.after}
         alt="After — deer added"
-        className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity duration-700",
-          showResult ? "opacity-100" : "opacity-0",
-        )}
+        className={cn(imageFitClass, showResult ? "opacity-100" : "opacity-0")}
         draggable={false}
         decoding="async"
       />
