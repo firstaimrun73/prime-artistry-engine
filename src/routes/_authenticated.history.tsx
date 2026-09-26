@@ -384,18 +384,18 @@ function HistoryPage() {
                   styles.border,
                 )}
               >
-                <div className={cn("relative aspect-square w-full overflow-hidden", styles.mediaBg)}>
+                <div className={cn("relative w-full overflow-hidden", styles.mediaBg)}>
                   {g.output_url ? (
                     g.type === "video" ? (
                       <video
                         src={g.output_url}
-                        className="absolute inset-0 h-full w-full object-cover"
+                        className="aspect-video w-full object-cover"
                         muted
                         playsInline
                         preload="metadata"
                       />
                     ) : g.type === "music" ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/25 to-purple-500/5">
+                      <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/25 to-purple-500/5">
                         <Music className="h-8 w-8 text-primary" />
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                           Audio
@@ -406,7 +406,7 @@ function HistoryPage() {
                         src={g.output_url}
                         alt={safeText(g.prompt, "Generated")}
                         loading="lazy"
-                        className="absolute inset-0 h-full w-full object-cover"
+                        className="block h-auto w-full"
                         onError={(e) => {
                           const el = e.target as HTMLImageElement;
                           el.style.display = "none";
@@ -415,7 +415,7 @@ function HistoryPage() {
                             const fallback = document.createElement("div");
                             fallback.dataset.fallback = "1";
                             fallback.className =
-                              "absolute inset-0 flex items-center justify-center bg-muted/40";
+                              "flex aspect-square w-full items-center justify-center bg-muted/40";
                             fallback.innerHTML =
                               '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
                             parent.appendChild(fallback);
@@ -424,7 +424,7 @@ function HistoryPage() {
                       />
                     )
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex aspect-square w-full items-center justify-center">
                       <ImageIcon className="h-6 w-6 text-muted-foreground" />
                     </div>
                   )}
