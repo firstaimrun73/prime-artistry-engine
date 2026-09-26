@@ -391,12 +391,12 @@ export function EffectStudioPage({
           </div>
         </header>
         <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-10 min-h-0">
-          <p className="mb-5 max-w-sm text-center text-sm text-[#6F6862] dark:text-[#A8A29A]">AI-powered filters · live preview on your photo</p>
+          <p className="mb-5 max-w-sm text-center text-sm text-[#6F6862] dark:text-[#C4BDB6]">AI-powered filters · live preview on your photo</p>
           <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
-            className="flex w-full flex-col items-center gap-4 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/45 bg-[#FFF1E6] px-6 py-16 transition hover:border-[#FF5A1F] hover:bg-[#FFE6DA]">
+            className="flex w-full flex-col items-center gap-4 rounded-[1.75rem] border-2 border-dashed border-[#FF5A1F]/45 bg-[#FFF1E6] px-6 py-16 transition hover:border-[#FF5A1F] hover:bg-[#FFE6DA] dark:border-[#FF5A1F]/35 dark:bg-[#241C18] dark:hover:bg-[#2E241F]">
             <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[#FF5A1F]/15 text-[#FF5A1F]">{busy ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}</span>
-            <span className="text-base font-semibold">Drop image or tap to upload</span>
-            <span className="max-w-xs text-center text-sm text-[#6F6862] dark:text-[#A8A29A]">Looks unlock after you upload</span>
+            <span className="text-base font-semibold text-[#161412] dark:text-[#F5F0EB]">Drop image or tap to upload</span>
+            <span className="max-w-xs text-center text-sm text-[#6F6862] dark:text-[#C4BDB6]">Looks unlock after you upload</span>
           </button>
           <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => void onPick(e.target.files?.[0] ?? null)} />
         </main>
@@ -492,12 +492,12 @@ export function EffectStudioPage({
             {editorTab === "filter" ? (
               <div className="space-y-3 px-3">
                 <div className="flex gap-2 overflow-x-auto px-1 scrollbar-none">
-                  <button type="button" onClick={() => setCategory("all")} className={cn("shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium", category === "all" ? "border-[#FF5A1F] bg-[#FF5A1F] text-white" : "border-[#E8E0D8] dark:border-[#2A2724] bg-white dark:bg-[#1A1816] text-[#161412]")}>All</button>
+                  <button type="button" onClick={() => setCategory("all")} className={cn("shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium", category === "all" ? "border-[#FF5A1F] bg-[#FF5A1F] text-white" : "border-[#E8E0D8] dark:border-[#3A3530] bg-white dark:bg-[#252220] text-[#161412] dark:text-[#EDE8E2]")}>All</button>
                   {sortedCategories.map((c) => (
-                    <button key={c} type="button" onClick={() => setCategory(c)} className={cn("shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium", category === c ? "border-[#FF5A1F] bg-[#FF5A1F] text-white" : "border-[#E8E0D8] dark:border-[#2A2724] bg-white dark:bg-[#1A1816] text-[#161412]")}>{c}</button>
+                    <button key={c} type="button" onClick={() => setCategory(c)} className={cn("shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-medium", category === c ? "border-[#FF5A1F] bg-[#FF5A1F] text-white" : "border-[#E8E0D8] dark:border-[#3A3530] bg-white dark:bg-[#252220] text-[#161412] dark:text-[#EDE8E2]")}>{c}</button>
                   ))}
                 </div>
-                <p className="px-1 text-xs text-[#6F6862] dark:text-[#A8A29A]">{filtered.length} looks · live preview of this photo{thumbsBusy ? " · building thumbs…" : ""}</p>
+                <p className="px-1 text-xs text-[#6F6862] dark:text-[#C4BDB6]">{filtered.length} looks · live preview of this photo{thumbsBusy ? " · building thumbs…" : ""}</p>
                 <div className="flex gap-2.5 overflow-x-auto px-1 pb-1 scrollbar-none">
                   {filtered.map((item) => {
                     const thumb = thumbMap[item.id];
