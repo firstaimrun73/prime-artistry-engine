@@ -1,4 +1,4 @@
-/** Frame catalog + canvas compose (no React). */
+/** Frame catalog + canvas compose helpers (no React UI). */
 export type FrameId =
   | "minimal-line"
   | "polaroid-classic"
@@ -193,3 +193,5 @@ export function drawWm(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.fillText("Motio2edit", w - pad - 6, h - pad);
   ctx.restore();
 }
+
+export { composeFrame } from "./compose-frame";
