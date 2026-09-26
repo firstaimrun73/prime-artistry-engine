@@ -1,10 +1,10 @@
 /**
- * Cropmix — upload-first. Preview = real <img> (never blank / never stuck Loading).
- * Canvas only for Apply/export.
+ * Cropmix — upload-first. Real <img> preview (never blank). Canvas only for Apply.
+ * Aspect chips use ratio-frame icons; crop handles are L-brackets (not dots).
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  RotateCcw, RotateCw, FlipHorizontal, FlipVertical, Undo2, Redo2, Check, X, Upload,
+  RotateCcw, RotateCw, FlipHorizontal, FlipVertical, Undo2, Redo2, Check, X, Upload, Crop,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -25,15 +25,80 @@ type Props = {
 };
 type HandleId = "nw" | "ne" | "sw" | "se" | "move";
 
+/** Visible aspect-ratio frame icon (not a dot). */
 function RatioGlyph({ ratio, active }: { ratio: number | null; active: boolean }) {
-  const max = 14;
-  let w = 12, h = 12;
-  if (ratio == null) { w = 12; h = 10; }
-  else if (ratio >= 1) { w = max; h = Math.max(5, Math.round(max / ratio)); }
-  else { h = max; w = Math.max(5, Math.round(max * ratio)); }
+  const box = 18;
+  let w = 14;
+  let h = 14;
+  if (ratio == null) {
+    w = 14;
+    h = 12;
+  } else if (ratio >= 1) {
+    w = box;
+    h = Math.max(6, Math.round(box / ratio));
+  } else {
+    h = box;
+    w = Math.max(6, Math.round(box * ratio));
+  }
   return (
-    <span className={cn("inline-block shrink-0 rounded-[2px] border", active ? "border-black/70 bg-black/10" : "border-current/70")}
-      style={{ width: w, height: h }} aria-hidden />
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center",
+        active ? "text-black" : "text-current",
+      )}
+      style={{ width: box, height: box }}
+      aria-hidden
+    >
+      <span
+        className={cn(
+          "block rounded-[2px] border-2",
+          active ? "border-black/80 bg-black/10" : "border-current",
+        )}
+        style={{ width: w, height: h }}
+      />
+    </span>
+  );
+}
+
+/** L-bracket crop handle (not a filled circle). */
+function CornerHandle({ id }: { id: "nw" | "ne" | "sw" | "se" }) {
+  const s = 14;
+  const t = 3;
+  const common: React.CSSProperties = {
+    position: "absolute",
+    width: s,
+    height: s,
+    pointerEvents: "none",
+  };
+  if (id === "nw") {
+    return (
+      <span style={{ ...common, left: -2, top: -2 }}>
+        <span style={{ position: "absolute", left: 0, top: 0, width: s, height: t, background: CROPMIX_VOLT }} />
+        <span style={{ position: "absolute", left: 0, top: 0, width: t, height: s, background: CROPMIX_VOLT }} />
+      </span>
+    );
+  }
+  if (id === "ne") {
+    return (
+      <span style={{ ...common, right: -2, top: -2 }}>
+        <span style={{ position: "absolute", right: 0, top: 0, width: s, height: t, background: CROPMIX_VOLT }} />
+        <span style={{ position: "absolute", right: 0, top: 0, width: t, height: s, background: CROPMIX_VOLT }} />
+      </span>
+    );
+  }
+  if (id === "sw") {
+    return (
+      <span style={{ ...common, left: -2, bottom: -2 }}>
+        <span style={{ position: "absolute", left: 0, bottom: 0, width: s, height: t, background: CROPMIX_VOLT }} />
+        <span style={{ position: "absolute", left: 0, bottom: 0, width: t, height: s, background: CROPMIX_VOLT }} />
+      </span>
+    );
+  }
+  return (
+    <span style={{ ...common, right: -2, bottom: -2 }}>
+      <span style={{ position: "absolute", right: 0, bottom: 0, width: s, height: t, background: CROPMIX_VOLT }} />
+      <span style={{ position: "absolute", right: 0, bottom: 0, width: t, height: s, background: CROPMIX_VOLT }} />
+    </span>
   );
 }
 
@@ -61,12 +126,18 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     if (!file) {
       setReady(false);
       sourceCanvasRef.current = null;
-      setPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       return;
     }
     const gen = ++loadGenRef.current;
     const url = URL.createObjectURL(file);
-    setPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
     setReady(false);
 
     (async () => {
@@ -79,42 +150,49 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
           img.src = url;
         });
         if (gen !== loadGenRef.current) return;
-        if (!img.naturalWidth || !img.naturalHeight) { setReady(false); return; }
+        if (!img.naturalWidth || !img.naturalHeight) {
+          setReady(false);
+          return;
+        }
 
         let orientation = 1;
         try {
           orientation = readExifOrientation(await file.arrayBuffer());
-        } catch { /* keep 1 */ }
+        } catch {
+          /* keep 1 */
+        }
 
         const swap = orientation >= 5 && orientation <= 8;
         let ow = swap ? img.naturalHeight : img.naturalWidth;
         let oh = swap ? img.naturalWidth : img.naturalHeight;
 
-        try {
-          const canvas = document.createElement("canvas");
-          const size = drawOriented(img, orientation, canvas);
-          if (size.width && size.height) {
-            sourceCanvasRef.current = canvas;
-            ow = size.width;
-            oh = size.height;
-          }
-        } catch {
-          sourceCanvasRef.current = null;
-        }
-
-        if (gen !== loadGenRef.current) return;
+        // Unlock UI as soon as we know dimensions — do not wait on canvas
         setSrcSize({ w: ow, h: oh });
         const start = applyAspect(initialGeometry ?? DEFAULT_CROP, ow, oh);
         setHist(historyInit(start));
         if (start.customW) setCustomW(String(start.customW));
         if (start.customH) setCustomH(String(start.customH));
         setReady(true);
+
+        // Export canvas in background (best-effort)
+        try {
+          const canvas = document.createElement("canvas");
+          const size = drawOriented(img, orientation, canvas);
+          if (gen === loadGenRef.current && size.width && size.height) {
+            sourceCanvasRef.current = canvas;
+            setSrcSize({ w: size.width, h: size.height });
+          }
+        } catch {
+          sourceCanvasRef.current = null;
+        }
       } catch {
         if (gen === loadGenRef.current) setReady(false);
       }
     })();
 
-    return () => { loadGenRef.current++; };
+    return () => {
+      loadGenRef.current++;
+    };
   }, [file, initialGeometry]);
 
   useEffect(() => {
@@ -127,10 +205,18 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
       ro = new ResizeObserver(bump);
       ro.observe(el);
     }
-    const id = requestAnimationFrame(() => { bump(); requestAnimationFrame(bump); });
+    const id = requestAnimationFrame(() => {
+      bump();
+      requestAnimationFrame(bump);
+    });
     const t1 = window.setTimeout(bump, 50);
     const t2 = window.setTimeout(bump, 250);
-    return () => { ro?.disconnect(); cancelAnimationFrame(id); window.clearTimeout(t1); window.clearTimeout(t2); };
+    return () => {
+      ro?.disconnect();
+      cancelAnimationFrame(id);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
   }, [previewUrl, ready]);
 
   const commit = useCallback((next: CropGeometry) => {
@@ -173,18 +259,29 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
 
     const r = ((g.rotate90 % 4) + 4) % 4;
     const mapPoint = (nx: number, ny: number) => {
-      let px = nx, py = ny;
+      let px = nx;
+      let py = ny;
       if (g.flipH) px = 1 - px;
       if (g.flipV) py = 1 - py;
-      let qx = px, qy = py;
-      if (r === 1) { qx = 1 - py; qy = px; }
-      else if (r === 2) { qx = 1 - px; qy = 1 - py; }
-      else if (r === 3) { qx = py; qy = 1 - px; }
+      let qx = px;
+      let qy = py;
+      if (r === 1) {
+        qx = 1 - py;
+        qy = px;
+      } else if (r === 2) {
+        qx = 1 - px;
+        qy = 1 - py;
+      } else if (r === 3) {
+        qx = py;
+        qy = 1 - px;
+      }
       return { x: left + qx * width, y: top + qy * height };
     };
     const corners = [
-      { x: g.x, y: g.y }, { x: g.x + g.w, y: g.y },
-      { x: g.x + g.w, y: g.y + g.h }, { x: g.x, y: g.y + g.h },
+      { x: g.x, y: g.y },
+      { x: g.x + g.w, y: g.y },
+      { x: g.x + g.w, y: g.y + g.h },
+      { x: g.x, y: g.y + g.h },
     ];
     const pts = corners.map((c) => mapPoint(c.x, c.y));
     let minX = Math.min(...pts.map((p) => p.x));
@@ -195,17 +292,25 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     maxX = Math.max(left, Math.min(left + width, maxX));
     minY = Math.max(top, Math.min(top + height, minY));
     maxY = Math.max(top, Math.min(top + height, maxY));
-    setBox({ left: minX, top: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) });
+    setBox({
+      left: minX,
+      top: minY,
+      width: Math.max(1, maxX - minX),
+      height: Math.max(1, maxY - minY),
+    });
   }, [previewUrl, ready, g, srcSize, stageTick]);
 
   const hitHandle = (clientX: number, clientY: number): HandleId => {
-    const hit = 22;
+    const hit = 24;
     const stage = stageRef.current?.getBoundingClientRect();
     if (!stage) return "move";
-    const px = clientX - stage.left, py = clientY - stage.top;
+    const px = clientX - stage.left;
+    const py = clientY - stage.top;
     for (const [id, x, y] of [
-      ["nw", box.left, box.top], ["ne", box.left + box.width, box.top],
-      ["sw", box.left, box.top + box.height], ["se", box.left + box.width, box.top + box.height],
+      ["nw", box.left, box.top],
+      ["ne", box.left + box.width, box.top],
+      ["sw", box.left, box.top + box.height],
+      ["se", box.left + box.width, box.top + box.height],
     ] as const) {
       if (Math.abs(px - x) <= hit && Math.abs(py - y) <= hit) return id;
     }
@@ -215,7 +320,12 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   const onPointerDown = (e: React.PointerEvent) => {
     if (!ready) return;
     e.preventDefault();
-    dragRef.current = { kind: hitHandle(e.clientX, e.clientY), startX: e.clientX, startY: e.clientY, origin: g };
+    dragRef.current = {
+      kind: hitHandle(e.clientX, e.clientY),
+      startX: e.clientX,
+      startY: e.clientY,
+      origin: g,
+    };
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
@@ -226,25 +336,50 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     const o = dragRef.current.origin;
     const kind = dragRef.current.kind;
     const r = ((o.rotate90 % 4) + 4) % 4;
-    let mdx = dx, mdy = dy;
-    if (r === 1) { mdx = dy; mdy = -dx; }
-    else if (r === 2) { mdx = -dx; mdy = -dy; }
-    else if (r === 3) { mdx = -dy; mdy = dx; }
+    let mdx = dx;
+    let mdy = dy;
+    if (r === 1) {
+      mdx = dy;
+      mdy = -dx;
+    } else if (r === 2) {
+      mdx = -dx;
+      mdy = -dy;
+    } else if (r === 3) {
+      mdx = -dy;
+      mdy = dx;
+    }
     if (o.flipH) mdx = -mdx;
     if (o.flipV) mdy = -mdy;
     if (kind === "move") {
       commit(clampCrop({ ...o, x: o.x + mdx, y: o.y + mdy }));
       return;
     }
-    let x = o.x, y = o.y, w = o.w, h = o.h;
-    if (kind === "nw") { x = o.x + mdx; y = o.y + mdy; w = o.w - mdx; h = o.h - mdy; }
-    else if (kind === "ne") { y = o.y + mdy; w = o.w + mdx; h = o.h - mdy; }
-    else if (kind === "sw") { x = o.x + mdx; w = o.w - mdx; h = o.h + mdy; }
-    else if (kind === "se") { w = o.w + mdx; h = o.h + mdy; }
+    let x = o.x;
+    let y = o.y;
+    let w = o.w;
+    let h = o.h;
+    if (kind === "nw") {
+      x = o.x + mdx;
+      y = o.y + mdy;
+      w = o.w - mdx;
+      h = o.h - mdy;
+    } else if (kind === "ne") {
+      y = o.y + mdy;
+      w = o.w + mdx;
+      h = o.h - mdy;
+    } else if (kind === "sw") {
+      x = o.x + mdx;
+      w = o.w - mdx;
+      h = o.h + mdy;
+    } else if (kind === "se") {
+      w = o.w + mdx;
+      h = o.h + mdy;
+    }
     if (o.aspectId !== "free" && o.aspectId !== "original") {
-      const ratio = o.aspectId === "custom" && o.customW > 0 && o.customH > 0
-        ? o.customW / o.customH
-        : ASPECT_PRESETS.find((p) => p.id === o.aspectId)?.ratio;
+      const ratio =
+        o.aspectId === "custom" && o.customW > 0 && o.customH > 0
+          ? o.customW / o.customH
+          : ASPECT_PRESETS.find((p) => p.id === o.aspectId)?.ratio;
       if (ratio && ratio > 0 && srcSize.w > 0) {
         h = w / (ratio / (srcSize.w / srcSize.h));
       }
@@ -252,7 +387,9 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
     commit(clampCrop({ ...o, x, y, w, h }));
   };
 
-  const onPointerUp = () => { dragRef.current = null; };
+  const onPointerUp = () => {
+    dragRef.current = null;
+  };
 
   const handleApply = async () => {
     let src = sourceCanvasRef.current;
@@ -271,7 +408,9 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
           src = canvas;
           sourceCanvasRef.current = canvas;
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     if (!src) return;
     const { canvas, width, height } = renderCropToCanvas(src, g);
@@ -291,6 +430,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
   if (g.flipH) parts.push("scaleX(-1)");
   if (g.flipV) parts.push("scaleY(-1)");
   const imgTransform = parts.join(" ") || undefined;
+  const showOverlay = box.width > 8 && box.height > 8;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -304,52 +444,89 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
           </p>
           <h1 className="truncate text-sm font-bold tracking-tight">Cropmix</h1>
         </div>
-        <button type="button" disabled={toolsDisabled} onClick={() => void handleApply()}
+        <button
+          type="button"
+          disabled={toolsDisabled}
+          onClick={() => void handleApply()}
           className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-black disabled:opacity-40"
-          style={{ backgroundColor: CROPMIX_VOLT }}>
+          style={{ backgroundColor: CROPMIX_VOLT }}
+        >
           <Check className="h-4 w-4" /> Apply
         </button>
       </header>
 
-      <div ref={stageRef}
-        className="relative flex min-h-[40vh] flex-1 items-center justify-center overflow-hidden bg-black/90 p-3"
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+      <div
+        ref={stageRef}
+        className="relative min-h-[50vh] flex-1 overflow-hidden bg-black/90"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         {!file ? (
-          <button type="button" onClick={() => fileRef.current?.click()}
-            className="flex w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/70 px-6 py-14 text-center">
-            <span className="grid h-14 w-14 place-items-center rounded-2xl border border-border bg-background">
-              <Upload className="h-6 w-6 text-muted-foreground" />
-            </span>
-            <span className="text-sm font-semibold">Upload an image to begin</span>
-            <span className="text-xs text-muted-foreground">JPG, PNG, or WEBP · crop tools unlock after upload</span>
-          </button>
+          <div className="flex h-full min-h-[50vh] items-center justify-center p-3">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="flex w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/70 px-6 py-14 text-center"
+            >
+              <span className="grid h-14 w-14 place-items-center rounded-2xl border border-border bg-background">
+                <Upload className="h-6 w-6 text-muted-foreground" />
+              </span>
+              <span className="text-sm font-semibold">Upload an image to begin</span>
+              <span className="text-xs text-muted-foreground">JPG, PNG, or WEBP · crop tools unlock after upload</span>
+            </button>
+          </div>
         ) : !previewUrl ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <div className="flex h-full min-h-[50vh] items-center justify-center">
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          </div>
         ) : (
           <>
-            <img ref={imgRef} src={previewUrl} alt="Crop preview" draggable={false}
-              className="touch-none select-none"
-              style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", objectFit: "contain", transform: imgTransform, transformOrigin: "center center" }}
-              onLoad={() => setStageTick((n) => n + 1)} />
-            <div className="pointer-events-none absolute inset-0" aria-hidden>
-              <div className="absolute bg-black/55" style={{ left: 0, top: 0, right: 0, height: Math.max(0, box.top) }} />
-              <div className="absolute bg-black/55" style={{ left: 0, top: box.top + box.height, right: 0, bottom: 0 }} />
-              <div className="absolute bg-black/55" style={{ left: 0, top: box.top, width: Math.max(0, box.left), height: box.height }} />
-              <div className="absolute bg-black/55" style={{ left: box.left + box.width, top: box.top, right: 0, height: box.height }} />
+            <div className="absolute inset-0 flex items-center justify-center p-3">
+              <img
+                ref={imgRef}
+                src={previewUrl}
+                alt="Crop preview"
+                draggable={false}
+                className="touch-none select-none"
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  width: "auto",
+                  height: "auto",
+                  objectFit: "contain",
+                  transform: imgTransform,
+                  transformOrigin: "center center",
+                }}
+                onLoad={() => setStageTick((n) => n + 1)}
+              />
             </div>
-            <div className="pointer-events-none absolute border-2"
-              style={{ left: box.left, top: box.top, width: box.width, height: box.height, borderColor: CROPMIX_VOLT }}>
-              {(["nw", "ne", "sw", "se"] as const).map((id) => (
-                <span key={id} className="absolute h-3.5 w-3.5 rounded-full border-2 border-black shadow-sm"
+            {showOverlay && (
+              <>
+                <div className="pointer-events-none absolute inset-0" aria-hidden>
+                  <div className="absolute bg-black/50" style={{ left: 0, top: 0, right: 0, height: Math.max(0, box.top) }} />
+                  <div className="absolute bg-black/50" style={{ left: 0, top: box.top + box.height, right: 0, bottom: 0 }} />
+                  <div className="absolute bg-black/50" style={{ left: 0, top: box.top, width: Math.max(0, box.left), height: box.height }} />
+                  <div className="absolute bg-black/50" style={{ left: box.left + box.width, top: box.top, right: 0, height: box.height }} />
+                </div>
+                <div
+                  className="pointer-events-none absolute border-2"
                   style={{
-                    backgroundColor: CROPMIX_VOLT,
-                    left: id === "nw" || id === "sw" ? -7 : undefined,
-                    right: id === "ne" || id === "se" ? -7 : undefined,
-                    top: id === "nw" || id === "ne" ? -7 : undefined,
-                    bottom: id === "sw" || id === "se" ? -7 : undefined,
-                  }} />
-              ))}
-            </div>
+                    left: box.left,
+                    top: box.top,
+                    width: box.width,
+                    height: box.height,
+                    borderColor: CROPMIX_VOLT,
+                  }}
+                >
+                  <CornerHandle id="nw" />
+                  <CornerHandle id="ne" />
+                  <CornerHandle id="sw" />
+                  <CornerHandle id="se" />
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
@@ -360,11 +537,23 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
             const active = g.aspectId === p.id;
             const ratio = presetDiagramRatio(p.id, Number(customW) || 1, Number(customH) || 1);
             return (
-              <button key={p.id} type="button" disabled={toolsDisabled} onClick={() => setAspect(p.id)}
-                className={cn("flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium disabled:opacity-40",
-                  active ? "border-transparent text-black" : "border-border text-muted-foreground")}
-                style={active ? { backgroundColor: CROPMIX_VOLT } : undefined}>
-                <RatioGlyph ratio={ratio} active={active} />{p.label}
+              <button
+                key={p.id}
+                type="button"
+                disabled={toolsDisabled}
+                onClick={() => setAspect(p.id)}
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-medium disabled:opacity-40",
+                  active ? "border-transparent text-black" : "border-border text-muted-foreground",
+                )}
+                style={active ? { backgroundColor: CROPMIX_VOLT } : undefined}
+              >
+                {p.id === "free" || p.id === "original" ? (
+                  <Crop className="h-4 w-4 shrink-0" strokeWidth={2.2} />
+                ) : (
+                  <RatioGlyph ratio={ratio} active={active} />
+                )}
+                {p.label}
               </button>
             );
           })}
@@ -372,31 +561,80 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
         {customOpen && !toolsDisabled && (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
             <span className="text-[11px] font-medium text-muted-foreground">Custom</span>
-            <input type="number" min={1} value={customW} onChange={(e) => setCustomW(e.target.value)}
-              className="h-9 w-16 rounded-lg border border-border bg-card px-2 text-sm" aria-label="Custom width" />
+            <input
+              type="number"
+              min={1}
+              value={customW}
+              onChange={(e) => setCustomW(e.target.value)}
+              className="h-9 w-16 rounded-lg border border-border bg-card px-2 text-sm"
+              aria-label="Custom width"
+            />
             <span className="text-muted-foreground">:</span>
-            <input type="number" min={1} value={customH} onChange={(e) => setCustomH(e.target.value)}
-              className="h-9 w-16 rounded-lg border border-border bg-card px-2 text-sm" aria-label="Custom height" />
-            <button type="button" onClick={applyCustomRatio}
+            <input
+              type="number"
+              min={1}
+              value={customH}
+              onChange={(e) => setCustomH(e.target.value)}
+              className="h-9 w-16 rounded-lg border border-border bg-card px-2 text-sm"
+              aria-label="Custom height"
+            />
+            <button
+              type="button"
+              onClick={applyCustomRatio}
               className="ml-auto rounded-full px-3 py-1.5 text-xs font-semibold text-black"
-              style={{ backgroundColor: CROPMIX_VOLT }}>Apply ratio</button>
+              style={{ backgroundColor: CROPMIX_VOLT }}
+            >
+              Apply ratio
+            </button>
           </div>
         )}
         <div className="flex items-center justify-center gap-3 py-1">
-          <button type="button" disabled={toolsDisabled} onClick={() => setHist((h) => historyUndo(h))} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Undo"><Undo2 className="h-5 w-5" /></button>
-          <button type="button" disabled={toolsDisabled} onClick={() => setHist((h) => historyRedo(h))} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Redo"><Redo2 className="h-5 w-5" /></button>
-          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 3) % 4 })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Rotate left"><RotateCcw className="h-5 w-5" /></button>
-          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 1) % 4 })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Rotate right"><RotateCw className="h-5 w-5" /></button>
-          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, flipH: !g.flipH })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Flip horizontal"><FlipHorizontal className="h-5 w-5" /></button>
-          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, flipV: !g.flipV })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Flip vertical"><FlipVertical className="h-5 w-5" /></button>
+          <button type="button" disabled={toolsDisabled} onClick={() => setHist((h) => historyUndo(h))} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Undo">
+            <Undo2 className="h-5 w-5" />
+          </button>
+          <button type="button" disabled={toolsDisabled} onClick={() => setHist((h) => historyRedo(h))} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Redo">
+            <Redo2 className="h-5 w-5" />
+          </button>
+          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 3) % 4 })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Rotate left">
+            <RotateCcw className="h-5 w-5" />
+          </button>
+          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, rotate90: ((g.rotate90 % 4) + 1) % 4 })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Rotate right">
+            <RotateCw className="h-5 w-5" />
+          </button>
+          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, flipH: !g.flipH })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Flip horizontal">
+            <FlipHorizontal className="h-5 w-5" />
+          </button>
+          <button type="button" disabled={toolsDisabled} onClick={() => commit({ ...g, flipV: !g.flipV })} className="rounded-xl border border-border p-2.5 disabled:opacity-40" aria-label="Flip vertical">
+            <FlipVertical className="h-5 w-5" />
+          </button>
         </div>
-        <label className={cn("flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-xs font-medium", toolsDisabled ? "opacity-40" : "bg-background")}>
-          <input type="checkbox" checked={watermarkOn} disabled={toolsDisabled} onChange={(e) => setWatermarkOn(e.target.checked)} className="h-4 w-4 accent-[#C6FF3D]" />
+        <label
+          className={cn(
+            "flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-xs font-medium",
+            toolsDisabled ? "opacity-40" : "bg-background",
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={watermarkOn}
+            disabled={toolsDisabled}
+            onChange={(e) => setWatermarkOn(e.target.checked)}
+            className="h-4 w-4 accent-[#C6FF3D]"
+          />
           Add Motio2edit watermark
         </label>
       </div>
-      <input ref={fileRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFile(f);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }
