@@ -12,7 +12,7 @@
 <script>
 (async function () {
   try {
-    var parts = ['frame-studio-v7.html.b64.part0', 'frame-studio-v7.html.b64.part1', 'frame-studio-v7.html.b64.part2'];
+    var parts = ["frame-studio-v7.z.b64.part0","frame-studio-v7.z.b64.part1","frame-studio-v7.z.b64.part2"];
     var b64 = "";
     for (var i = 0; i < parts.length; i++) {
       var res = await fetch(parts[i], { cache: "no-store" });
@@ -22,7 +22,10 @@
     var bin = atob(b64);
     var bytes = new Uint8Array(bin.length);
     for (var j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
-    var html = new TextDecoder("utf-8").decode(bytes);
+    var ds = new DecompressionStream("deflate");
+    var stream = new Blob([bytes]).stream().pipeThrough(ds);
+    var buf = await new Response(stream).arrayBuffer();
+    var html = new TextDecoder("utf-8").decode(buf);
     document.open();
     document.write(html);
     document.close();
