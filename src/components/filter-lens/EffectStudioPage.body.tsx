@@ -4,6 +4,7 @@
  * (category chips, thumb previews, watermark, result phase).
  * Uses filter-editor-core for Adjust pipeline + output-only watermark.
  * Header locked. No implementation disclosure. No filter credits.
+ * Deploy marker: 2026-09-26-force-live
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
