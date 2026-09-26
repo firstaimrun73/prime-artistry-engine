@@ -7,7 +7,7 @@ import { getPlan } from "@/lib/plans";
 import { getTier } from "@/lib/plan-tier";
 import { CrownBadge } from "@/components/CrownBadge";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
-import { Lock } from "lucide-react";
+import { Lock, Eye, EyeOff } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
 import { useI18n } from "@/lib/i18n";
 
@@ -24,6 +24,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 });
 
 const NOTIF_KEY = "motio2edit-notifications";
+const HISTORY_KEY = "motio2edit-history-prefs";
 
 type NotifPrefs = {
   product: boolean;
@@ -31,7 +32,13 @@ type NotifPrefs = {
   security: boolean;
 };
 
+type HistoryPrefs = {
+  history_enabled: boolean;
+  sensitive_mode: boolean;
+};
+
 const DEFAULT_NOTIFS: NotifPrefs = { product: true, marketing: false, security: true };
+const DEFAULT_HISTORY: HistoryPrefs = { history_enabled: true, sensitive_mode: false };
 
 function SettingsPage() {
   const { profile, user, refreshProfile, signOut } = useAuth();
@@ -44,6 +51,8 @@ function SettingsPage() {
   const [pwSaving, setPwSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [notifs, setNotifs] = useState<NotifPrefs>(DEFAULT_NOTIFS);
+  const [historyPrefs, setHistoryPrefs] = useState<HistoryPrefs>(DEFAULT_HISTORY);
+  const [historySaving, setHistorySaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -53,7 +62,36 @@ function SettingsPage() {
     } catch {
       // ignore
     }
+    try {
+      const h = localStorage.getItem(HISTORY_KEY);
+      if (h) setHistoryPrefs({ ...DEFAULT_HISTORY, ...JSON.parse(h) });
+    } catch {
+      // ignore
+    }
   }, []);
+
+  // Prefer backend user_settings when available (Claude will add columns)
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("user_settings")
+        .select("history_enabled, sensitive_mode")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setHistoryPrefs((prev) => ({
+        history_enabled:
+          typeof data.history_enabled === "boolean" ? data.history_enabled : prev.history_enabled,
+        sensitive_mode:
+          typeof data.sensitive_mode === "boolean" ? data.sensitive_mode : prev.sensitive_mode,
+      }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
@@ -145,6 +183,35 @@ function SettingsPage() {
       localStorage.setItem(NOTIF_KEY, JSON.stringify(next));
     } catch {
       // ignore
+    }
+  };
+
+  const toggleHistoryPref = async (key: keyof HistoryPrefs, value: boolean) => {
+    const next = { ...historyPrefs, [key]: value };
+    setHistoryPrefs(next);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+    // Backend is source of truth when user_settings columns exist
+    if (!user?.id) return;
+    setHistorySaving(true);
+    const { error } = await supabase.from("user_settings").upsert(
+      {
+        user_id: user.id,
+        history_enabled: next.history_enabled,
+        sensitive_mode: next.sensitive_mode,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+    setHistorySaving(false);
+    if (error) {
+      // Column may not exist yet — local preference still applied
+      console.warn("[settings] history prefs backend write:", error.message);
+    } else {
+      toast.success("History preference saved.");
     }
   };
 
@@ -258,6 +325,51 @@ function SettingsPage() {
             >
               <Moon className="mr-1.5 h-4 w-4" /> {t("settings.dark")}
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* History & Privacy — consumes history_enabled / sensitive_mode */}
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">History & Privacy</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Control whether generated media is kept in your private History drive.
+        </p>
+        <div className="mt-4 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Keep History</p>
+              <p className="text-xs text-muted-foreground">
+                When off, new generations are not saved to History.
+              </p>
+            </div>
+            <Switch
+              checked={historyPrefs.history_enabled}
+              disabled={historySaving}
+              onCheckedChange={(v) => toggleHistoryPref("history_enabled", v)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 text-muted-foreground">
+                {historyPrefs.sensitive_mode ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </span>
+              <div>
+                <p className="text-sm font-medium">Sensitive mode</p>
+                <p className="text-xs text-muted-foreground">
+                  When on, your request is not saved to History (privacy eye).
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={historyPrefs.sensitive_mode}
+              disabled={historySaving}
+              onCheckedChange={(v) => toggleHistoryPref("sensitive_mode", v)}
+            />
           </div>
         </div>
       </section>
