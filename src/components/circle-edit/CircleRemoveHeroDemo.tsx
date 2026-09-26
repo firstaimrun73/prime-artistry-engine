@@ -52,7 +52,7 @@ const DEMO_STAGE_URLS = {
     "https://assets.motio2edit.com/samples/circle-2edit/file_000000004e6481faa6caad771de9c84c.png",
 } as const;
 
-/** Positions clamped so dabs stay fully inside the 4:5 media box (incl. radius). */
+/** Positions clamped so dabs stay fully inside the square media box (incl. radius). */
 const PAINT_PATH: { x: number; y: number; r: number }[] = [
   { x: 24, y: 72, r: 12 },
   { x: 32, y: 68, r: 13 },
@@ -211,7 +211,8 @@ function LocalizedMaskReveal({
   paintT: number;
   fullyVisible: boolean;
 }) {
-  const CARD_ASPECT = 4 / 5;
+  // Media box is aspect-square (matches 1:1 Giza source)
+  const CARD_ASPECT = 1;
   const activeCount = fullyVisible
     ? PAINT_PATH.length
     : Math.min(PAINT_PATH.length, Math.floor(paintT * PAINT_PATH.length + 0.35));
