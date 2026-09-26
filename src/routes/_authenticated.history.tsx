@@ -123,49 +123,49 @@ const CATEGORY_STYLES: Record<
 > = {
   image: {
     border: "border-orange-300/60 hover:border-primary dark:border-orange-500/35",
-    mediaBg: "bg-orange-500/10",
+    mediaBg: "bg-muted/30",
     badge: "bg-primary/90 text-primary-foreground",
     footer: "bg-orange-500/5",
     label: "Image",
   },
   video: {
     border: "border-rose-300/70 hover:border-rose-500 dark:border-rose-500/40",
-    mediaBg: "bg-rose-500/10",
+    mediaBg: "bg-muted/30",
     badge: "bg-rose-600/90 text-white",
     footer: "bg-rose-500/5",
     label: "Video",
   },
   auto: {
     border: "border-violet-300/70 hover:border-violet-500 dark:border-violet-500/40",
-    mediaBg: "bg-violet-500/10",
+    mediaBg: "bg-muted/30",
     badge: "bg-gradient-to-r from-violet-600 to-cyan-500 text-white",
     footer: "bg-violet-500/5",
     label: "Auto Edit",
   },
   circle: {
     border: "border-[#7B6FE0]/50 hover:border-[#7B6FE0] dark:border-[#7B6FE0]/40",
-    mediaBg: "bg-[#7B6FE0]/10",
+    mediaBg: "bg-muted/30",
     badge: "bg-[#7B6FE0] text-white",
     footer: "bg-[#7B6FE0]/5",
     label: "Circle 2edit",
   },
   lenses: {
     border: "border-cyan-300/60 hover:border-cyan-500 dark:border-cyan-500/40",
-    mediaBg: "bg-cyan-500/10",
+    mediaBg: "bg-muted/30",
     badge: "bg-cyan-600/90 text-white",
     footer: "bg-cyan-500/5",
     label: "AI+ Lenses",
   },
   music: {
     border: "border-purple-300/60 hover:border-purple-500 dark:border-purple-500/40",
-    mediaBg: "bg-purple-500/10",
+    mediaBg: "bg-muted/30",
     badge: "bg-purple-600/90 text-white",
     footer: "bg-purple-500/5",
     label: "Music",
   },
   other: {
     border: "border-border hover:border-primary",
-    mediaBg: "bg-secondary",
+    mediaBg: "bg-muted/30",
     badge: "bg-background/80",
     footer: "",
     label: "Media",
@@ -387,9 +387,15 @@ function HistoryPage() {
                 <div className={cn("relative aspect-square w-full overflow-hidden", styles.mediaBg)}>
                   {g.output_url ? (
                     g.type === "video" ? (
-                      <video src={g.output_url} className="h-full w-full object-cover" muted playsInline />
+                      <video
+                        src={g.output_url}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
                     ) : g.type === "music" ? (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/25 to-purple-500/5">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/25 to-purple-500/5">
                         <Music className="h-8 w-8 text-primary" />
                         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                           Audio
@@ -400,7 +406,7 @@ function HistoryPage() {
                         src={g.output_url}
                         alt={safeText(g.prompt, "Generated")}
                         loading="lazy"
-                        className="h-full w-full object-cover"
+                        className="absolute inset-0 h-full w-full object-cover"
                         onError={(e) => {
                           const el = e.target as HTMLImageElement;
                           el.style.display = "none";
@@ -418,13 +424,13 @@ function HistoryPage() {
                       />
                     )
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center">
                       <ImageIcon className="h-6 w-6 text-muted-foreground" />
                     </div>
                   )}
                   <span
                     className={cn(
-                      "absolute left-2 top-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize backdrop-blur",
+                      "absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize backdrop-blur",
                       styles.badge,
                     )}
                   >
