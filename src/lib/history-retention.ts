@@ -1,14 +1,14 @@
 /**
  * Shared History retention preference helpers.
  *
- * Backend source of truth (when columns exist):
- *   public.user_settings.history_enabled  boolean  (default true)
- *   public.user_settings.sensitive_mode   boolean  (default false)
+ * Live contract (Claude SQL applied):
+ *   should_retain_as_history(p_user_id, p_is_private)
+ *   history_user_delete(p_generation_id)
+ *   music_history_user_delete(p_track_id)
+ *   generations.retained_as_history, deleted_at, storage_provider, …
  *
- * Until those columns are applied in Supabase, client falls back to
- * localStorage key "motio2edit-history-prefs" so the UI remains usable.
- * Server-side generation pipelines must call shouldRetainAsHistoryServer
- * only after the SQL migration is live — do not invent columns.
+ * Prefs UI still reads/writes user_settings.history_enabled when present;
+ * localStorage is a non-authoritative cache only.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -98,54 +98,86 @@ export async function saveHistoryPrefs(
   }
 }
 
-/** Whether a generations row should appear in History UI. */
-export function isVisibleInHistory(metadata: unknown): boolean {
-  if (!metadata || typeof metadata !== "object") return true;
-  const m = metadata as Record<string, unknown>;
-  if (m.history_hidden === true) return false;
-  if (m.retained_as_history === false) return false;
+/**
+ * Whether a generations row should appear in History UI.
+ * Live: retained_as_history === true && deleted_at IS NULL.
+ * Legacy rows (no new columns): treat as visible if not soft-hidden in metadata.
+ */
+export function isVisibleInHistory(row: {
+  retained_as_history?: boolean | null;
+  deleted_at?: string | null;
+  metadata?: unknown;
+}): boolean {
+  if (row.deleted_at) return false;
+  if (typeof row.retained_as_history === "boolean") {
+    return row.retained_as_history === true;
+  }
+  // Legacy fallback until all rows have the column populated
+  if (row.metadata && typeof row.metadata === "object") {
+    const m = row.metadata as Record<string, unknown>;
+    if (m.history_hidden === true) return false;
+    if (m.retained_as_history === false) return false;
+  }
   return true;
 }
 
 /**
- * Soft-hide a generation from History without deleting the job row.
- * Uses existing jsonb `metadata` only (no invented columns).
+ * History delete via RPC — queues media deletion; does not hard-delete from browser.
  */
-export async function softHideFromHistory(
+export async function historyUserDelete(
   generationId: string,
-  existingMetadata: unknown,
 ): Promise<{ ok: boolean; message?: string }> {
-  const base =
-    existingMetadata && typeof existingMetadata === "object"
-      ? { ...(existingMetadata as Record<string, unknown>) }
-      : {};
-  const next = { ...base, history_hidden: true, history_hidden_at: new Date().toISOString() };
-  const { error } = await supabase
-    .from("generations")
-    .update({ metadata: next })
-    .eq("id", generationId);
+  const { error } = await supabase.rpc("history_user_delete", {
+    p_generation_id: generationId,
+  });
+  if (error) return { ok: false, message: error.message };
+  return { ok: true };
+}
+
+export async function musicHistoryUserDelete(
+  trackId: string,
+): Promise<{ ok: boolean; message?: string }> {
+  const { error } = await supabase.rpc("music_history_user_delete", {
+    p_track_id: trackId,
+  });
   if (error) return { ok: false, message: error.message };
   return { ok: true };
 }
 
 /**
- * Server-side decision helper (call from generation pipelines after SQL is live).
- * Returns false when History Save is OFF or sensitive_mode is ON.
- * When columns are missing, defaults to retain (true) so job tracking is not broken.
+ * @deprecated Use historyUserDelete. Kept as alias for any residual callers.
+ */
+export async function softHideFromHistory(
+  generationId: string,
+  _existingMetadata?: unknown,
+): Promise<{ ok: boolean; message?: string }> {
+  return historyUserDelete(generationId);
+}
+
+/**
+ * Server-side decision — prefer RPC when available.
  */
 export async function shouldRetainAsHistoryServer(args: {
-  supabaseAdmin: { from: (t: string) => any };
+  supabaseAdmin: { rpc: (fn: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> };
   userId: string;
+  isPrivate?: boolean;
 }): Promise<boolean> {
   try {
-    const { data, error } = await args.supabaseAdmin
-      .from("user_settings")
-      .select("history_enabled, sensitive_mode")
-      .eq("user_id", args.userId)
-      .maybeSingle();
-    if (error || !data) return true;
-    if (data.sensitive_mode === true) return false;
-    if (data.history_enabled === false) return false;
+    const { data, error } = await args.supabaseAdmin.rpc("should_retain_as_history", {
+      p_user_id: args.userId,
+      p_is_private: args.isPrivate !== false,
+    });
+    if (error) {
+      console.warn("[history-retention] should_retain_as_history:", error.message);
+      return true;
+    }
+    if (data === false) return false;
+    if (data === true) return true;
+    if (data && typeof data === "object") {
+      const o = data as Record<string, unknown>;
+      if (o.retain === false || o.should_retain === false) return false;
+      return true;
+    }
     return true;
   } catch {
     return true;
