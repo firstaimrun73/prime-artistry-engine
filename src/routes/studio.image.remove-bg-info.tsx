@@ -1,15 +1,22 @@
 /**
- * Remove BG info page — /studio/image/remove-bg-info
- * Like Circle info: explain product, rose carousel, then Try Now → editor.
+ * Remove BG info — /studio/image/remove-bg-info
+ * Header → Before & After (animated) → How it works → Details → one Try Now
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, ImagePlus, Sparkles, Download } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { REMOVE_BG_CREDITS } from "@/lib/remove-bg/constants";
-import { REMOVE_BG_INFO_CAROUSEL } from "@/lib/remove-bg/samples";
+import {
+  REMOVE_BG_ROSE_AFTER,
+  REMOVE_BG_ROSE_BEFORE,
+  REMOVE_BG_GALLERY,
+} from "@/lib/remove-bg/samples";
+import { CompareSlider } from "@/components/CompareSlider";
+
+const ROSE_ACCENT = "#f43f5e";
 
 export const Route = createFileRoute("/studio/image/remove-bg-info")({
   ssr: false,
@@ -25,13 +32,123 @@ export const Route = createFileRoute("/studio/image/remove-bg-info")({
   }),
 });
 
+const CHECKER = {
+  backgroundImage:
+    "linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%)",
+  backgroundSize: "14px 14px",
+  backgroundPosition: "0 0,0 7px,7px -7px,-7px 0",
+  backgroundColor: "#f8fafc",
+} as const;
+
+/** Auto-looping before → scan → after with progressive clip reveal */
+function AnimatedBeforeAfter() {
+  const [phase, setPhase] = useState<"before" | "scanning" | "after">("before");
+  const [reveal, setReveal] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    let raf = 0;
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const wait = (ms: number) =>
+      new Promise<void>((r) => {
+        window.setTimeout(r, reduced ? Math.min(ms, 400) : ms);
+      });
+
+    const animateReveal = (from: number, to: number, duration: number) =>
+      new Promise<void>((resolve) => {
+        if (reduced) {
+          setReveal(to);
+          resolve();
+          return;
+        }
+        const start = performance.now();
+        const tick = (now: number) => {
+          if (cancelled) return;
+          const t = Math.min(1, (now - start) / duration);
+          const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          setReveal(from + (to - from) * eased);
+          if (t < 1) raf = requestAnimationFrame(tick);
+          else resolve();
+        };
+        raf = requestAnimationFrame(tick);
+      });
+
+    const loop = async () => {
+      while (!cancelled) {
+        setPhase("before");
+        setReveal(0);
+        await wait(2400);
+        if (cancelled) break;
+        setPhase("scanning");
+        await animateReveal(0, 1, 1800);
+        if (cancelled) break;
+        setPhase("after");
+        await wait(2800);
+        if (cancelled) break;
+        setPhase("before");
+        await animateReveal(1, 0, 1000);
+      }
+    };
+    void loop();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const clipPct = Math.max(0, Math.min(100, (1 - reveal) * 100));
+
+  return (
+    <div className="relative aspect-square w-full overflow-hidden">
+      <style>{`
+        @keyframes rbg-info-scan {
+          0% { opacity: 0.35; }
+          50% { opacity: 1; }
+          100% { opacity: 0.35; }
+        }
+      `}</style>
+      <div className="absolute inset-0" style={CHECKER} />
+      <img
+        src={REMOVE_BG_ROSE_AFTER}
+        alt="Transparent cutout"
+        className="absolute inset-0 h-full w-full object-contain"
+        draggable={false}
+      />
+      <div
+        className="absolute inset-0"
+        style={{ clipPath: `inset(0 ${clipPct}% 0 0)` }}
+      >
+        <img
+          src={REMOVE_BG_ROSE_BEFORE}
+          alt="Original with background"
+          className="absolute inset-0 h-full w-full object-contain"
+          draggable={false}
+        />
+      </div>
+      {phase === "scanning" && (
+        <div
+          className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.7)]"
+          style={{
+            left: `${reveal * 100}%`,
+            animation: "rbg-info-scan 0.8s ease-in-out infinite",
+          }}
+        />
+      )}
+      <span className="absolute left-3 top-3 z-10 rounded-full bg-black/55 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-md">
+        {phase === "before" ? "Before" : phase === "scanning" ? "Removing…" : "After"}
+      </span>
+    </div>
+  );
+}
+
 function RemoveBgInfoPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [slide, setSlide] = useState(0);
-  const current = REMOVE_BG_INFO_CAROUSEL[slide] ?? REMOVE_BG_INFO_CAROUSEL[0];
 
   const start = () => {
     if (user) {
@@ -43,6 +160,9 @@ function RemoveBgInfoPage() {
       });
     }
   };
+
+  const squareItems = REMOVE_BG_GALLERY.filter((g) => g.aspect === "1:1");
+  const wideItems = REMOVE_BG_GALLERY.filter((g) => g.aspect === "16:9");
 
   return (
     <div
@@ -77,27 +197,7 @@ function RemoveBgInfoPage() {
       </header>
 
       <div className="mx-auto max-w-2xl space-y-10 px-4 py-8">
-        <section className="relative overflow-hidden rounded-3xl border border-rose-500/35 bg-gradient-to-br from-rose-500/18 via-transparent to-transparent p-6 sm:p-8">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-rose-500">Remove BG</p>
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
-            One-click background removal
-          </h1>
-          <p className={cn("mt-2 max-w-md text-[14px] leading-relaxed", isDark ? "text-[#C5C7D0]" : "text-[#3A3E4C]")}>
-            Upload any photo. AI removes the background and returns a clean transparent PNG — ready for
-            product shots, social posts, and design work.
-          </p>
-          <button
-            type="button"
-            onClick={start}
-            className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 text-[14px] font-semibold text-white shadow-lg shadow-rose-500/35 transition active:scale-[0.98] hover:bg-rose-600"
-          >
-            <Sparkles className="h-4 w-4" />
-            {user ? "Try Now" : "Start Now"}
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </section>
-
-        {/* Before / After carousel — user rose pair, keep natural aspect */}
+        {/* Animated Before & After — primary visual */}
         <section className="space-y-3">
           <h2 className="text-[15px] font-bold tracking-tight">Before & after</h2>
           <div
@@ -106,67 +206,67 @@ function RemoveBgInfoPage() {
               isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white",
             )}
           >
-            <div
-              className="relative aspect-square w-full"
-              style={{
-                backgroundImage:
-                  current.label === "After"
-                    ? "linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%)"
-                    : undefined,
-                backgroundSize: current.label === "After" ? "14px 14px" : undefined,
-                backgroundPosition: current.label === "After" ? "0 0,0 7px,7px -7px,-7px 0" : undefined,
-                backgroundColor: current.label === "After" ? "#f8fafc" : undefined,
-              }}
+            <AnimatedBeforeAfter />
+            <p
+              className={cn(
+                "px-4 py-3 text-[12px]",
+                isDark ? "text-[#9AA0B0]" : "text-[#5C6170]",
+              )}
             >
-              <img
-                src={current.src}
-                alt={current.caption}
-                className="h-full w-full object-contain"
-                draggable={false}
-              />
-              <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-md">
-                {current.label}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-2 px-4 py-3">
-              <p className={cn("text-[12px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
-                {current.caption}
-              </p>
-              <div className="flex gap-1.5">
-                {REMOVE_BG_INFO_CAROUSEL.map((item, i) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSlide(i)}
-                    className={cn(
-                      "h-2 w-2 rounded-full transition",
-                      i === slide ? "bg-rose-500" : isDark ? "bg-white/25" : "bg-black/20",
-                    )}
-                    aria-label={item.label}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="flex border-t border-border/60">
-              {REMOVE_BG_INFO_CAROUSEL.map((item, i) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSlide(i)}
-                  className={cn(
-                    "flex-1 py-2.5 text-[12px] font-semibold transition",
-                    i === slide
-                      ? "bg-rose-500/10 text-rose-600"
-                      : isDark
-                        ? "text-[#9AA0B0] hover:bg-white/5"
-                        : "text-[#5C6170] hover:bg-black/5",
-                  )}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+              Original photo → AI removes the background → transparent PNG cutout
+            </p>
           </div>
+        </section>
+
+        {/* Real examples — 1:1 two-up, 16:9 full width */}
+        <section className="space-y-3">
+          <h2 className="text-[15px] font-bold tracking-tight">Examples</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {squareItems.map((item) => (
+              <div
+                key={item.id}
+                className={cn(
+                  "overflow-hidden rounded-2xl border",
+                  isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white",
+                )}
+              >
+                <div className="relative aspect-square w-full">
+                  <CompareSlider
+                    before={item.before}
+                    after={item.after}
+                    accentColor={ROSE_ACCENT}
+                    transparentAfter
+                    className="h-full w-full"
+                  />
+                </div>
+                <p className="px-2.5 py-1.5 text-center text-[11px] font-semibold text-muted-foreground">
+                  {item.title}
+                </p>
+              </div>
+            ))}
+          </div>
+          {wideItems.map((item) => (
+            <div
+              key={item.id}
+              className={cn(
+                "overflow-hidden rounded-2xl border",
+                isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white",
+              )}
+            >
+              <div className="relative aspect-video w-full">
+                <CompareSlider
+                  before={item.before}
+                  after={item.after}
+                  accentColor={ROSE_ACCENT}
+                  transparentAfter
+                  className="h-full w-full"
+                />
+              </div>
+              <p className="px-2.5 py-1.5 text-center text-[11px] font-semibold text-muted-foreground">
+                {item.title}
+              </p>
+            </div>
+          ))}
         </section>
 
         <section className="space-y-3">
@@ -221,6 +321,7 @@ function RemoveBgInfoPage() {
           </dl>
         </section>
 
+        {/* Single Try Now CTA */}
         <Link
           to="/studio/image/remove-bg"
           search={{ from: "info" }}
