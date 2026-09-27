@@ -26,7 +26,6 @@ export const Route = createFileRoute("/studio/image")({
 /**
  * Child product routes under /studio/image/* — must render via Outlet.
  * NEVER redirect these to /editor (Image Studio).
- * Lens Studio routes removed from product.
  */
 const CHILD_PRODUCT_PREFIXES = [
   "/studio/image/auto-edit",
@@ -37,6 +36,7 @@ const CHILD_PRODUCT_PREFIXES = [
   "/studio/image/filters",
   "/studio/image/filter-editor",
   "/studio/image/age",
+  "/studio/image/remove-bg",
 ] as const;
 
 function isChildProductRoute(pathname: string): boolean {

@@ -8,6 +8,7 @@ import {
   Circle,
   Filter,
   Crop,
+  Eraser,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -17,6 +18,7 @@ import { canAccessMusic, canAccessVideo } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
+import { RemoveBgHomeCard } from "@/components/remove-bg/RemoveBgHomeCard";
 import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery";
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
@@ -30,6 +32,7 @@ const QUICK_CREATE = [
   { to: "/studio/video" as const, label: "Video", icon: Video },
   { to: "/studio/music" as const, label: "Music", icon: Music },
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
+  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
   { to: "/studio/image/auto-edit" as const, label: "Auto Edit", icon: Sparkles },
   { to: "/studio/image/filters" as const, label: "Filters", icon: Filter },
 ] as const;
@@ -88,12 +91,15 @@ export function SignedInHomeBody() {
                     | "/studio/video"
                     | "/studio/music"
                     | "/studio/image/circle-remove"
+                    | "/studio/image/remove-bg"
                     | "/studio/image/auto-edit"
                     | "/studio/image/filters"
                 }
                 {...(!locked && q.label === "Circle"
                   ? { search: { mode: "remove" as const, from: "home" as const } }
-                  : {})}
+                  : !locked && q.label === "Remove BG"
+                    ? { search: { from: "home" as const } }
+                    : {})}
                 className="flex min-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
                 <span className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -110,6 +116,8 @@ export function SignedInHomeBody() {
       </section>
 
       <CircleSampleGallery />
+
+      <RemoveBgHomeCard />
 
       <div className="mt-12">
         <VisualDiscoveryGallery />

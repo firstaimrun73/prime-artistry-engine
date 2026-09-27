@@ -10,6 +10,7 @@ export function hideBottomNav(pathname: string): boolean {
   if (pathname.startsWith("/studio/image/circle-info")) return true;
   if (pathname.startsWith("/studio/image/circle-add-discover")) return true;
   if (pathname.startsWith("/studio/image/auto-edit")) return true;
+  if (pathname.startsWith("/studio/image/remove-bg")) return true;
   // Dedicated filter editor surfaces — never cover intensity/Apply controls
   if (pathname.startsWith("/studio/image/filters")) return true;
   if (pathname.startsWith("/studio/image/filter-editor")) return true;
