@@ -1,19 +1,17 @@
 /**
  * About Product — single canonical editorial page (/about)
- * Sections: Image Studio → Video → Music → Maluto AI → Circle 2edit → Filters → Lenses
+ * Sections: Image Studio → Video → Music → Maluto AI → Circle 2edit → Filters
  */
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEMANTIC_TAG_REGISTRY, MAX_SEMANTIC_TAGS } from "@/lib/studio/image/tag-semantic-registry";
-import { IMAGE_EXPERIENCE_BASE_CREDITS, ULTRA_8K_EXTRA_CREDITS } from "@/lib/studio/image/image-experience-credits";
 import { STANDARD_CREDITS } from "@/lib/studio/image/standard/credits";
 import { PREMIUM_T2I_CREDITS } from "@/lib/studio/image/premium/credits";
 import { ULTRA_T2I_CREDITS } from "@/lib/studio/image/ultra/credits";
 import { AUTO_EDIT_CREDITS_BY_QUALITY, AUTO_EDIT_PRODUCT_NAME } from "@/lib/auto-edit/constants";
 import { ALL_FILTERS } from "@/lib/filter-lens/filters/filter-registry";
-import { ALL_LENSES } from "@/lib/filter-lens/lenses/lens-registry";
 import { imageQualityDimensions } from "@/lib/quality-options";
 import { cn } from "@/lib/utils";
 import { Circle2editGuideSection } from "@/components/about/Circle2editGuideSection";
@@ -25,7 +23,7 @@ export const Route = createFileRoute("/about")({
       {
         name: "description",
         content:
-          "Motio2edit About Product: Image Studio, Video Studio, Music Studio, Maluto AI, Circle 2edit, Filters, and Lenses — how generation, tags, quality, credits, and editing tools work.",
+          "Motio2edit About Product: Image Studio, Video Studio, Music Studio, Maluto AI, Circle 2edit, and Filters — how generation, tags, quality, credits, and editing tools work.",
       },
       { property: "og:title", content: "About Product — Motio2edit" },
     ],
@@ -46,7 +44,6 @@ const SECTIONS = [
   { id: "maluto-ai", label: "Maluto AI" },
   { id: "circle-2edit", label: "Circle 2edit" },
   { id: "filters", label: "Filters" },
-  { id: "lenses", label: "Lenses" },
 ] as const;
 
 function Divider() {
@@ -141,7 +138,6 @@ function AboutProductPage() {
 
   const tagCount = SEMANTIC_TAG_REGISTRY.length;
   const filterCount = ALL_FILTERS.length;
-  const lensCount = ALL_LENSES.length;
 
   const tagsByCategory = useMemo(() => {
     const m = new Map<string, (typeof SEMANTIC_TAG_REGISTRY)[number][]>();
@@ -238,7 +234,7 @@ function AboutProductPage() {
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-neutral-700 sm:text-lg">
             This page documents how Motio2edit works today across Image Studio, Video Studio, Music Studio,
-            Maluto AI, Circle 2edit, Filters, and Lenses — modes, quality, credits, and practical workflows.
+            Maluto AI, Circle 2edit, and Filters — modes, quality, credits, and practical workflows.
           </p>
         </section>
 
@@ -371,21 +367,6 @@ function AboutProductPage() {
             Premium filters are the highest-level visual collection. They focus on sophisticated cinematic
             grades, large-format-inspired looks, dramatic color treatments, editorial styles, ultra-detailed
             aesthetics, and polished professional finishes.
-          </p>
-        </section>
-
-        <Divider />
-
-        <section id="lenses" aria-labelledby="lenses-h" className="scroll-mt-24">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2D6A4F]">
-            Specialty · paths · effects
-          </p>
-          <h2 id="lenses-h" className="mt-2 text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
-            Lenses
-          </h2>
-          <p className="mt-4 text-base leading-relaxed text-neutral-700">
-            Lenses are specialty edit paths. Motio2edit ships <strong>{lensCount}</strong> lenses from the product
-            registry.
           </p>
         </section>
 

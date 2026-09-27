@@ -206,7 +206,7 @@ export function DiscoveryFeed({ isSignedIn, compact, forceSearchOpen }: Props) {
           ))}
           {DISCOVER_CATALOG.filter((i) => !i.available).length > 0 && (
             <p className="mt-8 text-center text-[11px] text-muted-foreground">
-              Filters and Lenses will appear here when those studios ship.
+              More experiences will appear here as they ship.
             </p>
           )}
         </>
