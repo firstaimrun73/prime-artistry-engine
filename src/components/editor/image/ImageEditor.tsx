@@ -1,1 +1,1 @@
-PLACEHOLDER_LOAD_FROM_FILE
+SEE_ARTIFACT_/home/workdir/artifacts/ImageEditor.FINAL_GLASS.tsx
