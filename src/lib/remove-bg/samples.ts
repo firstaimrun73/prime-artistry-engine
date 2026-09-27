@@ -15,11 +15,12 @@ export const REMOVE_BG_CAR_BEFORE =
 export const REMOVE_BG_CAR_AFTER =
   "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0000.jpg";
 
+// Fixed mapping: Before = original, After = bg-removed
 export const REMOVE_BG_PORTRAIT_BEFORE =
-  "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0002.jpg";
+  "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0001.jpg";
 
 export const REMOVE_BG_PORTRAIT_AFTER =
-  "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0001.jpg";
+  "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0002.jpg";
 
 export type RemoveBgGalleryItem = {
   id: string;
@@ -32,7 +33,7 @@ export type RemoveBgGalleryItem = {
 
 /**
  * Gallery — interactive CompareSlider cards.
- * Rose + Portrait (1:1) share a row on desktop; Car (wide) spans full width.
+ * Rose + Portrait (1:1) share a row on desktop; Car (wide) spans full width at correct 16:9.
  */
 export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
   {
