@@ -1,9 +1,7 @@
 /**
  * Premium Circle Remove visual demo — Giza people-removal sequence.
- * CSS/React only (no canvas). Used inside RemoveHeroCard image area.
- *
- * Media: absolute public URLs on assets.motio2edit.com (circle-2edit sample set).
- * Wired directly into the homepage Remove hero card animation.
+ * Hand draws an IRREGULAR organic selection (not a perfect circle),
+ * lavender fill grows inside as the path closes, then removal result.
  */
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
@@ -12,31 +10,31 @@ type DemoPhase =
   | "intro"
   | "tools"
   | "selectBrush"
-  | "paint"
-  | "selectErase"
+  | "draw"
+  | "pulse"
   | "analysing"
   | "removing"
   | "generating"
   | "result";
 
 const PHASE_MS: Record<DemoPhase, number> = {
-  intro: 1400,
-  tools: 800,
-  selectBrush: 1000,
-  paint: 3600,
-  selectErase: 900,
-  analysing: 1500,
-  removing: 1500,
-  generating: 1500,
-  result: 4000,
+  intro: 1200,
+  tools: 700,
+  selectBrush: 900,
+  draw: 4200,
+  pulse: 700,
+  analysing: 1400,
+  removing: 1400,
+  generating: 1400,
+  result: 3800,
 };
 
 const ORDER: DemoPhase[] = [
   "intro",
   "tools",
   "selectBrush",
-  "paint",
-  "selectErase",
+  "draw",
+  "pulse",
   "analysing",
   "removing",
   "generating",
@@ -52,17 +50,22 @@ const DEMO_STAGE_URLS = {
     "https://assets.motio2edit.com/samples/circle-2edit/file_000000004e6481faa6caad771de9c84c.png",
 } as const;
 
-/** Positions clamped so dabs stay fully inside the square media box (incl. radius). */
-const PAINT_PATH: { x: number; y: number; r: number }[] = [
-  { x: 24, y: 72, r: 12 },
-  { x: 32, y: 68, r: 13 },
-  { x: 40, y: 74, r: 13 },
-  { x: 48, y: 66, r: 12 },
-  { x: 56, y: 70, r: 13 },
-  { x: 64, y: 64, r: 12 },
-  { x: 72, y: 70, r: 12 },
-  { x: 78, y: 66, r: 11 },
-];
+/**
+ * Irregular hand-drawn path around subject (viewBox 0–100).
+ * Starts at A (bottom-left-ish), wanders organically, closes at B ≈ A.
+ * NOT a perfect circle — slight wobbles like a finger/stylus mark.
+ */
+const HAND_PATH =
+  "M 22 68 " +
+  "C 18 55, 20 40, 28 28 " +
+  "C 36 16, 48 12, 58 14 " +
+  "C 70 16, 80 24, 84 36 " +
+  "C 88 48, 86 60, 80 70 " +
+  "C 74 80, 62 86, 50 84 " +
+  "C 38 82, 28 78, 22 68 Z";
+
+/** Approximate path length for stroke-dasharray (viewBox units). */
+const PATH_LEN = 280;
 
 function ToolIcon({
   kind,
@@ -202,78 +205,51 @@ function ProcessCenter({
   );
 }
 
-function LocalizedMaskReveal({
-  stage2Src,
-  paintT,
-  fullyVisible,
-}: {
-  stage2Src: string;
-  paintT: number;
-  fullyVisible: boolean;
-}) {
-  // Media box is aspect-square (matches 1:1 Giza source)
-  const CARD_ASPECT = 1;
-  const activeCount = fullyVisible
-    ? PAINT_PATH.length
-    : Math.min(PAINT_PATH.length, Math.floor(paintT * PAINT_PATH.length + 0.35));
+/**
+ * Sample points along the irregular path for hand position.
+ * Approximate bezier sampling (percent coords matching viewBox 0–100).
+ */
+const HAND_SAMPLES: { x: number; y: number }[] = [
+  { x: 22, y: 68 },
+  { x: 19, y: 58 },
+  { x: 20, y: 46 },
+  { x: 24, y: 34 },
+  { x: 32, y: 24 },
+  { x: 42, y: 16 },
+  { x: 52, y: 13 },
+  { x: 62, y: 15 },
+  { x: 72, y: 20 },
+  { x: 80, y: 28 },
+  { x: 84, y: 38 },
+  { x: 86, y: 50 },
+  { x: 84, y: 60 },
+  { x: 78, y: 70 },
+  { x: 68, y: 80 },
+  { x: 56, y: 84 },
+  { x: 44, y: 82 },
+  { x: 32, y: 76 },
+  { x: 24, y: 70 },
+  { x: 22, y: 68 },
+];
 
-  return (
-    <>
-      {PAINT_PATH.map((dab, i) => {
-        const on = i < activeCount;
-        const justOn = i === activeCount - 1 && !fullyVisible;
-        if (!on && !justOn) return null;
-        const diamW = dab.r * 2;
-        const diamH = dab.r * 2 * CARD_ASPECT;
-        return (
-          <div
-            key={i}
-            className="pointer-events-none absolute overflow-hidden rounded-full"
-            style={{
-              left: `${dab.x}%`,
-              top: `${dab.y}%`,
-              width: `${diamW}%`,
-              height: `${diamH}%`,
-              transform: "translate(-50%, -50%)",
-              opacity: on ? 1 : 0,
-              transition: justOn ? "opacity 0.18s ease-out" : "opacity 0.12s linear",
-              boxShadow: on
-                ? "0 0 10px rgba(123,111,224,0.55), inset 0 0 0 2px rgba(255,255,255,0.85)"
-                : undefined,
-            }}
-          >
-            <img
-              src={stage2Src}
-              alt=""
-              draggable={false}
-              decoding="async"
-              className="absolute max-w-none object-cover"
-              style={{
-                width: `${10000 / diamW}%`,
-                height: `${10000 / diamH}%`,
-                left: `${-dab.x * (100 / diamW) + 50}%`,
-                top: `${-dab.y * (100 / diamH) + 50}%`,
-              }}
-            />
-            <div
-              className="absolute inset-0 rounded-full"
-              style={{
-                background: "rgba(123, 111, 224, 0.42)",
-                mixBlendMode: "multiply",
-              }}
-            />
-          </div>
-        );
-      })}
-    </>
-  );
+function sampleHand(t: number): { x: number; y: number } {
+  const n = HAND_SAMPLES.length - 1;
+  const i = Math.min(n - 1, Math.max(0, Math.floor(t * n)));
+  const local = t * n - i;
+  const a = HAND_SAMPLES[i]!;
+  const b = HAND_SAMPLES[i + 1]!;
+  return {
+    x: a.x + (b.x - a.x) * local,
+    y: a.y + (b.y - a.y) * local,
+  };
 }
 
 export function CircleRemoveHeroDemo() {
   const [phase, setPhase] = useState<DemoPhase>("intro");
   const [pct, setPct] = useState(0);
-  const [paintT, setPaintT] = useState(0);
+  const [drawT, setDrawT] = useState(0);
   const [ready, setReady] = useState(false);
+  const [reduced, setReduced] = useState(false);
 
   const urls = useMemo(
     () => ({
@@ -283,6 +259,11 @@ export function CircleRemoveHeroDemo() {
     }),
     [],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -313,13 +294,13 @@ export function CircleRemoveHeroDemo() {
   }, [urls.stage1, urls.stage2, urls.stage3]);
 
   useEffect(() => {
-    const ms = PHASE_MS[phase];
+    const ms = reduced ? Math.min(PHASE_MS[phase], 600) : PHASE_MS[phase];
     const t = window.setTimeout(() => {
       const i = ORDER.indexOf(phase);
-      setPhase(ORDER[(i + 1) % ORDER.length]);
+      setPhase(ORDER[(i + 1) % ORDER.length]!);
     }, ms);
     return () => window.clearTimeout(t);
-  }, [phase]);
+  }, [phase, reduced]);
 
   useEffect(() => {
     if (phase !== "analysing" && phase !== "removing" && phase !== "generating") {
@@ -328,68 +309,71 @@ export function CircleRemoveHeroDemo() {
     }
     setPct(0);
     const start = performance.now();
-    const dur = PHASE_MS[phase] - 120;
+    const dur = (reduced ? 400 : PHASE_MS[phase]) - 80;
     let raf = 0;
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / dur);
-      const eased = 1 - Math.pow(1 - p, 2.2);
-      setPct(eased * 100);
+      setPct((1 - Math.pow(1 - p, 2.2)) * 100);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phase]);
+  }, [phase, reduced]);
 
   useEffect(() => {
-    if (phase !== "paint") {
-      setPaintT(0);
+    if (phase !== "draw") {
+      if (phase === "intro" || phase === "tools" || phase === "selectBrush") setDrawT(0);
+      else if (phase === "pulse" || phase === "analysing" || phase === "removing" || phase === "generating")
+        setDrawT(1);
+      return;
+    }
+    if (reduced) {
+      setDrawT(1);
       return;
     }
     const start = performance.now();
-    const dur = PHASE_MS.paint - 200;
+    const dur = PHASE_MS.draw - 200;
     let raf = 0;
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / dur);
-      setPaintT(p);
+      // slight ease-in-out so stroke feels hand-paced
+      const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      setDrawT(eased);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phase]);
+  }, [phase, reduced]);
 
-  const showTools = phase === "tools" || phase === "selectBrush" || phase === "paint" || phase === "selectErase";
-  const brushActive = phase === "selectBrush" || phase === "paint";
-  const eraseActive = phase === "selectErase";
-  const showHand = phase === "selectBrush" || phase === "paint" || phase === "selectErase";
+  const showTools =
+    phase === "tools" || phase === "selectBrush" || phase === "draw" || phase === "pulse";
+  const brushActive = phase === "selectBrush" || phase === "draw" || phase === "pulse";
+  const showHand = phase === "selectBrush" || phase === "draw";
   const showProcess = phase === "analysing" || phase === "removing" || phase === "generating";
   const showResult = phase === "result";
-  const showPaint =
-    phase === "paint" || phase === "selectErase" || phase === "analysing" || phase === "removing" || phase === "generating";
-  const paintFull = phase !== "paint" && showPaint;
+  const showSelection =
+    phase === "draw" ||
+    phase === "pulse" ||
+    phase === "analysing" ||
+    phase === "removing" ||
+    phase === "generating";
 
-  const pathIndex = Math.min(
-    Math.max(0, PAINT_PATH.length - 1),
-    Math.max(0, Math.floor(paintT * (PAINT_PATH.length - 0.01))),
-  );
-  const pathPt = PAINT_PATH[pathIndex] ?? PAINT_PATH[0];
-  const nextPt = PAINT_PATH[Math.min(PAINT_PATH.length - 1, pathIndex + 1)] ?? pathPt;
-  const segT = paintT * Math.max(1, PAINT_PATH.length - 1) - pathIndex;
-  const handX = (pathPt?.x ?? 50) + ((nextPt?.x ?? 50) - (pathPt?.x ?? 50)) * segT;
-  const handY = (pathPt?.y ?? 50) + ((nextPt?.y ?? 50) - (pathPt?.y ?? 50)) * segT;
-
+  const handPt = sampleHand(drawT);
   const handPos =
     phase === "selectBrush"
       ? { left: "72%", top: "18%" }
-      : phase === "paint"
-        ? { left: `${handX}%`, top: `${handY}%` }
-        : phase === "selectErase"
-          ? { left: "86%", top: "18%" }
-          : { left: "50%", top: "50%" };
+      : phase === "draw"
+        ? { left: `${handPt.x}%`, top: `${handPt.y}%` }
+        : { left: "50%", top: "50%" };
 
   const processKind =
     phase === "analysing" ? "analysing" : phase === "removing" ? "removing" : "generating";
   const processLabel =
     phase === "analysing" ? "ANALYSING" : phase === "removing" ? "REMOVING" : "GENERATING";
+
+  const dashOffset = PATH_LEN * (1 - drawT);
+  const fillOpacity = drawT > 0.85 ? Math.min(1, (drawT - 0.85) / 0.15) * 0.42 : 0;
+  const strokeComplete = drawT >= 0.98 || phase === "pulse";
 
   return (
     <div className="absolute inset-0 z-0 overflow-hidden" data-circle-remove-demo="giza">
@@ -397,6 +381,10 @@ export function CircleRemoveHeroDemo() {
         @keyframes c2d-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes c2d-pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
         @keyframes c2d-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+        @keyframes c2d-sel-pulse {
+          0%,100% { filter: drop-shadow(0 0 4px rgba(123,111,224,0.4)); }
+          50% { filter: drop-shadow(0 0 12px rgba(123,111,224,0.85)); }
+        }
       `}</style>
 
       {!ready && (
@@ -417,9 +405,76 @@ export function CircleRemoveHeroDemo() {
         decoding="async"
       />
 
-      {showPaint && !showResult ? (
-        <LocalizedMaskReveal stage2Src={urls.stage2} paintT={paintT} fullyVisible={paintFull} />
-      ) : null}
+      {/* Hand-drawn irregular selection overlay */}
+      {showSelection && !showResult && (
+        <svg
+          className="pointer-events-none absolute inset-0 z-15 h-full w-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          aria-hidden
+          style={{
+            animation: phase === "pulse" ? "c2d-sel-pulse 0.7s ease-in-out" : undefined,
+          }}
+        >
+          {/* Lavender translucent fill — grows as path closes */}
+          <path
+            d={HAND_PATH}
+            fill="rgba(123, 111, 224, 0.38)"
+            stroke="none"
+            style={{
+              opacity: phase === "pulse" || phase === "analysing" || phase === "removing" || phase === "generating"
+                ? 0.42
+                : fillOpacity,
+              transition: reduced ? "none" : "opacity 0.15s linear",
+            }}
+          />
+          {/* Progressive stroke following hand */}
+          <path
+            d={HAND_PATH}
+            fill="none"
+            stroke="#7B6FE0"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={PATH_LEN}
+            strokeDashoffset={strokeComplete ? 0 : dashOffset}
+            vectorEffect="non-scaling-stroke"
+            style={{
+              filter: "drop-shadow(0 0 3px rgba(255,255,255,0.9))",
+            }}
+          />
+          {/* Soft white outer edge for contrast */}
+          <path
+            d={HAND_PATH}
+            fill="none"
+            stroke="rgba(255,255,255,0.7)"
+            strokeWidth="0.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={PATH_LEN}
+            strokeDashoffset={strokeComplete ? 0 : dashOffset}
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      )}
+
+      {/* Masked stage2 peek inside selection once drawn (optional depth) */}
+      {showSelection && !showResult && drawT > 0.5 && (
+        <div
+          className="pointer-events-none absolute inset-0 z-[14] opacity-40"
+          style={{
+            clipPath: `path('${HAND_PATH}')`,
+            WebkitClipPath: `path(evenodd, '${HAND_PATH}')`,
+          }}
+        >
+          <img
+            src={urls.stage2}
+            alt=""
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+        </div>
+      )}
 
       <img
         src={urls.stage3}
@@ -432,13 +487,6 @@ export function CircleRemoveHeroDemo() {
         decoding="async"
       />
 
-      {phase === "paint" && (
-        <div
-          className="pointer-events-none absolute z-20 h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[rgba(123,111,224,0.45)] shadow-[0_0_12px_rgba(123,111,224,0.55)]"
-          style={{ left: handPos.left, top: handPos.top }}
-        />
-      )}
-
       {showTools && (
         <div className="pointer-events-none absolute right-2 top-12 z-20 flex flex-col gap-2 sm:right-3 sm:top-14">
           <div style={{ animation: "c2d-float 2.4s ease-in-out infinite" }}>
@@ -448,14 +496,14 @@ export function CircleRemoveHeroDemo() {
             <ToolIcon kind="brush" active={brushActive} pulse={phase === "selectBrush"} />
           </div>
           <div style={{ animation: "c2d-float 2.4s ease-in-out 0.3s infinite" }}>
-            <ToolIcon kind="eraser" active={eraseActive} pulse={phase === "selectErase"} />
+            <ToolIcon kind="eraser" />
           </div>
         </div>
       )}
 
       {showHand && (
         <HandCursor
-          className="transition-all duration-200 ease-out"
+          className="transition-[left,top] duration-75 ease-linear"
           style={{
             left: handPos.left,
             top: handPos.top,
