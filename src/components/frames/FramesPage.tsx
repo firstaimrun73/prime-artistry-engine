@@ -26,7 +26,7 @@ import {
   FRAME_CREDIT_COST,
   DEFAULT_CONTROLS,
   composeFrame,
-  type FrameId,
+  framesForAspect,
   type FrameDef,
   type Controls,
 } from "@/lib/frame-studio/frames-compose";
@@ -177,7 +177,7 @@ export function FramesPage() {
   const paid = admin || isPaidPlan(profile?.plan);
 
   const [phase, setPhase] = useState<Phase>("idle");
-  const [frameId, setFrameId] = useState<FrameId>("polaroid-classic");
+  const [frameId, setFrameId] = useState("polaroid");
   const [source, setSource] = useState<HTMLImageElement | null>(null);
   const [sourceKey, setSourceKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -192,8 +192,21 @@ export function FramesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const applyLock = useRef(false);
 
-  const frame = FRAMES.find((f) => f.id === frameId) ?? FRAMES[0]!;
+  const imageAspect = source
+    ? (source.naturalWidth || source.width) / Math.max(1, source.naturalHeight || source.height)
+    : 1;
+  const compatibleFrames = useMemo(
+    () => (source ? framesForAspect(imageAspect) : FRAMES),
+    [source, imageAspect],
+  );
+  const frame = compatibleFrames.find((f) => f.id === frameId) ?? compatibleFrames[0] ?? FRAMES[0]!;
   const cost = FRAME_CREDIT_COST[frame.tier];
+
+  useEffect(() => {
+    if (!compatibleFrames.some((f) => f.id === frameId)) {
+      setFrameId(compatibleFrames[0]?.id ?? "polaroid");
+    }
+  }, [source, compatibleFrames, frameId]);
 
   useEffect(() => {
     if (!source || phase !== "edit") {
@@ -219,7 +232,10 @@ export function FramesPage() {
     let cancelled = false;
     const cache: Record<string, string> = {};
     const run = async () => {
-      for (const f of FRAMES) {
+      const list = framesForAspect(
+        (source.naturalWidth || source.width) / Math.max(1, source.naturalHeight || source.height),
+      );
+      for (const f of list) {
         if (cancelled) return;
         try {
           const c = composeFrame(source, f, DEFAULT_CONTROLS, 120, false);
@@ -279,9 +295,22 @@ export function FramesPage() {
     applyLock.current = true;
     setApplying(true);
     try {
-      const res = await chargeApply({
-        data: { frameId: frame.id, tier: frame.tier },
-      });
+      // Compose first — never charge for a failed composition
+      let composed: HTMLCanvasElement;
+      try {
+        const edgePre = Math.min(2048, Math.max(source.naturalWidth, source.naturalHeight, 1200));
+        composed = composeFrame(source, frame, controls, edgePre, !paid || wantWm);
+        if (!composed || composed.width < 8 || composed.height < 8) {
+          toast.error("Composition failed");
+          return;
+        }
+      } catch (ce) {
+        console.error(ce);
+        toast.error("Composition failed");
+        return;
+      }
+
+      const res = await chargeApply({ data: { frameId: frame.id } });
 
       if (!res || typeof res !== "object") {
         toast.error("Could not verify credits");
@@ -318,10 +347,7 @@ export function FramesPage() {
         /* ignore */
       }
 
-      const edge = Math.min(2048, Math.max(source.naturalWidth, source.naturalHeight, 1200));
-      const stampWm = !paid || wantWm;
-      const c = composeFrame(source, frame, controls, edge, stampWm);
-      const url = c.toDataURL("image/jpeg", 0.94);
+      const url = composed.toDataURL("image/jpeg", 0.94);
       setResultUrl(url);
       setPhase("result");
       setAdjustOpen(false);
@@ -530,7 +556,7 @@ export function FramesPage() {
           }}
         >
           <div className="mb-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {FRAMES.map((f) => (
+            {compatibleFrames.map((f) => (
               <FrameThumb
                 key={f.id}
                 frame={f}
@@ -553,59 +579,49 @@ export function FramesPage() {
               <SliderRow label="Padding" value={controls.padding} min={0} max={48} step={1} onChange={(padding) => setControls((c) => ({ ...c, padding }))} />
               <SliderRow label="Round" value={controls.round} min={0} max={32} step={1} onChange={(round) => setControls((c) => ({ ...c, round }))} />
               <SliderRow label="Texture" value={controls.texture} min={0} max={100} step={1} onChange={(texture) => setControls((c) => ({ ...c, texture }))} />
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--frames-muted)]">Shadow</span>
-                <button
-                  type="button"
-                  onClick={() => setControls((c) => ({ ...c, shadowOn: !c.shadowOn }))}
-                  className={cn(
-                    "h-8 rounded-full px-4 text-xs font-bold",
-                    controls.shadowOn ? "bg-[#FF5A1F] text-white" : "border text-[var(--frames-muted)]",
-                  )}
-                  style={!controls.shadowOn ? { borderColor: "var(--frames-border)" } : undefined}
-                >
-                  {controls.shadowOn ? "On" : "Off"}
-                </button>
-              </div>
+              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--frames-muted)]">
+                <input
+                  type="checkbox"
+                  checked={controls.shadowOn}
+                  onChange={(e) => setControls((c) => ({ ...c, shadowOn: e.target.checked }))}
+                  className="accent-[#FF5A1F]"
+                />
+                Shadow
+              </label>
             </div>
           )}
 
-          <div className="mb-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setAdjustOpen((v) => !v)}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-2.5 text-xs font-semibold",
-                adjustOpen && "bg-[#FF5A1F]/15",
-              )}
-              style={{ borderColor: "var(--frames-border)", color: "var(--frames-text)" }}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Adjust
-            </button>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border py-2.5 text-xs font-semibold"
-              style={{ borderColor: "var(--frames-border)", color: "var(--frames-text)" }}
+              className="rounded-full border px-3 py-2 text-xs font-semibold"
+              style={{ borderColor: "var(--frames-border)" }}
             >
-              <Upload className="h-3.5 w-3.5" />
               Change Photo
             </button>
+            <button
+              type="button"
+              onClick={() => setAdjustOpen((o) => !o)}
+              className="grid h-10 w-10 place-items-center rounded-full border"
+              style={{ borderColor: "var(--frames-border)" }}
+              aria-label="Adjust"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              disabled={applying}
+              onClick={() => void onApply()}
+              className="ml-auto flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white shadow-md shadow-[#FF5A1F]/20 disabled:opacity-40"
+            >
+              {applying ? "Applying…" : `Apply · ${cost} credits`}
+            </button>
           </div>
-
-          <button
-            type="button"
-            disabled={applying}
-            onClick={() => void onApply()}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF5A1F] py-3 text-sm font-bold text-white disabled:opacity-50"
-          >
-            {applying ? "Applying…" : `Apply · ${cost} credits`}
-          </button>
         </footer>
       )}
 
-      {phase === "result" && (
+      {phase === "result" && resultUrl && (
         <footer
           className="z-20 shrink-0 border-t px-3 pt-3"
           style={{
@@ -615,14 +631,14 @@ export function FramesPage() {
             paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
           }}
         >
-          <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
+          <div className="mb-3 flex items-center justify-center gap-2">
             <button
               type="button"
               onClick={() => {
                 setPhase("edit");
                 setResultUrl(null);
               }}
-              className="rounded-full border px-4 py-2 text-xs font-semibold"
+              className="rounded-full border px-4 py-2.5 text-sm font-semibold"
               style={{ borderColor: "var(--frames-border)" }}
             >
               Edit again
