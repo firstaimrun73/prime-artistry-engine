@@ -49,6 +49,55 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
+    title: "Image Studio",
+    items: [
+      {
+        q: "What is Image Studio?",
+        a: "Image Studio is Motio2edit’s dedicated workspace for uploading photos, writing prompts, choosing quality and aspect ratio, and generating edited or new images. Flow: Upload → Prompt → Generate.",
+      },
+      {
+        q: "What are Standard, Premium, and Ultra AI?",
+        a: "Three experiences in Image Studio. Standard is the everyday path (SD/HD). Premium unlocks higher quality (up to 2K) and more reference images. Ultra AI is the top tier (up to 8K) for maximum fidelity. Your plan controls which experiences you can use.",
+      },
+      {
+        q: "How many reference images can I use?",
+        a: "Free plans are limited to 1 image. Paid plans can add references up to the experience and plan limit (Standard up to 5, Premium/Ultra up to 10, subject to your plan). The first selected image is primary; additional selected images are references.",
+      },
+      {
+        q: "Why can’t Free users use multiple references?",
+        a: "Free accounts are limited to a single image so multi-reference generation stays a paid capability. Upgrade to unlock multiple references and higher limits.",
+      },
+      {
+        q: "How are Image Studio credits calculated?",
+        a: "Cost depends on experience, whether you have a source image, how many references you send, and quality. The quote shown before Generate matches the images actually selected. Failed generations do not charge credits.",
+      },
+      {
+        q: "What image quality options are available?",
+        a: "Standard: SD and HD. Premium: SD, HD, and 2K. Ultra AI: SD, HD, 2K, 4K, and 8K. Only options the backend can process are shown for each experience.",
+      },
+      {
+        q: "Which aspect ratios are supported?",
+        a: "Core ratios: 1:1, 4:3, 16:9, 9:16, and 3:4. IMAX is not offered in the UI until the full 8K Max pipeline is supported end-to-end.",
+      },
+      {
+        q: "How does the watermark work?",
+        a: "Free outputs show a Motio2edit mark. Paid users can turn the preview watermark off; server-side download policy still applies. The preview mark is UI-only and does not change backend enforcement.",
+      },
+      {
+        q: "How do tags affect generation?",
+        a: "Tags add structured context to your prompt (style, mood, subject). Selected tags are included in the generation request without duplicating the written prompt.",
+      },
+      {
+        q: "Can I preview an uploaded image full-size?",
+        a: "Yes. Tap a selected thumbnail to open a full-size preview. Active selection still controls which image is primary for generation.",
+      },
+      {
+        q: "What happens if generation fails?",
+        a: "An error is shown and you can retry. Credits are not charged for failed jobs under the existing backend refund policy.",
+      },
+    ],
+  },
+  {
     title: "Image Editing",
     items: [
       {
