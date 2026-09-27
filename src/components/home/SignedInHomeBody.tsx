@@ -24,6 +24,7 @@ import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
+import { FramesStudioGallery } from "@/components/home/FramesStudioGallery";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
 /** Order: Cropmix → Remove BG → rest */
@@ -125,6 +126,8 @@ export function SignedInHomeBody() {
       </div>
 
       <MusicStudioGallery />
+
+      <FramesStudioGallery />
 
       <FilterLensHomeSection />
 
