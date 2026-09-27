@@ -95,7 +95,10 @@ export function EditorGallery({
             className="relative flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 text-primary transition hover:border-primary/60 disabled:opacity-50 sm:h-[72px] sm:w-[72px]"
             aria-label={lockAdd || maxImages <= 1 ? "Upgrade for more images" : "Image limit reached"}
           >
-            <Lock className="h-4 w-4" />
+            <span className="relative inline-flex">
+              <Plus className="h-4 w-4 opacity-50" />
+              <Lock className="absolute -right-1.5 -top-1.5 h-3 w-3" />
+            </span>
             <span className="text-[9px] font-semibold leading-none sm:text-[10px]">
               {lockAdd || maxImages <= 1 ? "1 max" : "Limit"}
             </span>
