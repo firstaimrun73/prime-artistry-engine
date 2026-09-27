@@ -169,7 +169,7 @@ function ProcessCenter({
             <path
               d="M16 24h16"
               stroke="currentColor"
-atura              strokeWidth="2.5"
+              strokeWidth="2.5"
               strokeLinecap="round"
               style={{ animation: "c2d-pulse 1s ease-in-out infinite" }}
             />
