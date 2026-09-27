@@ -1,5 +1,6 @@
 /**
  * Frame Studio helpers + catalog re-exports.
+ * Textures are procedural per material — not a single hue-shifted pattern.
  */
 export {
   FRAMES,
@@ -49,50 +50,336 @@ export function roundRect(
   ctx.closePath();
 }
 
-const TEX_COLORS: Record<string, [string, string]> = {
-  paper: ["#f7f3ef", "#e8e0d6"], kraft: ["#c4a574", "#a8885a"], linen: ["#f5f0e8", "#e0d8cc"],
-  concrete: ["#9a9a98", "#7a7a78"], cork: ["#c9a66b", "#a8844a"], denim: ["#3b5f8a", "#2a4568"],
-  watercolor: ["#e8d4e8", "#c8b0d8"], filmgrain: ["#2a2a28", "#1a1a18"], frostgrain: ["#e8eef5", "#d0dce8"],
-  walnut: ["#5c3d1e", "#3d2814"], oak: ["#c4a574", "#a8885a"], ebony: ["#1a1410", "#0d0a08"],
-  leatherB: ["#4a3020", "#2e1c12"], leatherT: ["#8b6914", "#6b5010"], silver: ["#c8c8d0", "#a8a8b0"],
-  rosegold: ["#e8b4a0", "#c89480"], goldfoil: ["#d4af37", "#b8941f"], marbleW: ["#f0ece8", "#d8d0c8"],
-  marbleB: ["#2a2a30", "#1a1a20"], carbon: ["#1c1c1e", "#0c0c0e"], holo: ["#e0d0f0", "#c0b0e0"],
-  brass: ["#c9a86a", "#a8884a"], copper: ["#b87333", "#986028"], rust: ["#8b4513", "#6b3410"],
-  slate: ["#4a5560", "#3a4550"], driftwood: ["#a09080", "#807060"], bamboo: ["#d4c090", "#b4a070"],
-  velvet: ["#4a2040", "#301028"], galaxy: ["#1a1030", "#0a0820"], emerald: ["#0a4a3a", "#063028"],
-  sapphire: ["#1a2a6a", "#0a1a4a"], champagne: ["#f0e6c8", "#d8c8a8"], terracotta: ["#c07050", "#a05030"],
-  blush: ["#f0d0d0", "#d0b0b0"], mint: ["#d0f0e0", "#b0d0c0"], bone: ["#f0e8d8", "#d8d0c0"],
-  ancientStone: ["#8a8070", "#6a6050"], museumGold: ["#c9a86a", "#8b7355"], vhsTape: ["#2a2040", "#1a1028"],
+/** Deterministic noise 0..1 */
+function n2(x: number, y: number, seed = 1): number {
+  const s = Math.sin(x * 12.9898 + y * 78.233 + seed * 43.758) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+const BASE: Record<string, [string, string, string]> = {
+  paper: ["#f7f3ef", "#ebe4dc", "#d9d0c6"],
+  kraft: ["#c9a66b", "#b08a52", "#8f6d3c"],
+  linen: ["#f4efe6", "#e8e0d4", "#d4cabb"],
+  concrete: ["#a3a3a0", "#8a8a87", "#6e6e6b"],
+  cork: ["#d2ad70", "#b89050", "#95743c"],
+  denim: ["#3d628c", "#2f4d70", "#1f3550"],
+  watercolor: ["#ead6ea", "#d0b8d8", "#b898c0"],
+  filmgrain: ["#2c2c2a", "#1e1e1c", "#121210"],
+  frostgrain: ["#eef3f8", "#d8e2ec", "#c0cedc"],
+  walnut: ["#6a4524", "#4a2e16", "#2e1a0c"],
+  oak: ["#d0b07a", "#b8945c", "#947240"],
+  ebony: ["#1c1612", "#0f0c0a", "#080604"],
+  leatherB: ["#523624", "#3a2416", "#24160c"],
+  leatherT: ["#9a7420", "#7a5a18", "#5a4010"],
+  silver: ["#d0d0d8", "#b0b0b8", "#909098"],
+  rosegold: ["#ecc0ac", "#d09c88", "#b07c68"],
+  goldfoil: ["#e0bc40", "#c49a28", "#a07a18"],
+  marbleW: ["#f4f0ec", "#e4dcd4", "#d0c8c0"],
+  marbleB: ["#2e2e34", "#1c1c22", "#101016"],
+  carbon: ["#222226", "#121216", "#08080a"],
+  holo: ["#e8d8f8", "#c8b8e8", "#a898d0"],
+  brass: ["#d4b474", "#b89450", "#947438"],
+  copper: ["#c88040", "#a86830", "#885020"],
+  rust: ["#9a5020", "#7a3c14", "#5a2c10"],
+  slate: ["#556070", "#3e4854", "#2a323c"],
+  driftwood: ["#b0a090", "#8e7e6e", "#6e5e50"],
+  bamboo: ["#dcc898", "#c0a878", "#a08858"],
+  velvet: ["#582848", "#3c1830", "#240f1c"],
+  galaxy: ["#201838", "#100c24", "#080614"],
+  emerald: ["#0c5844", "#083c2e", "#04241c"],
+  sapphire: ["#1e3278", "#122050", "#0a1430"],
+  champagne: ["#f4ecd0", "#e0d4b0", "#c8bc98"],
+  terracotta: ["#c87854", "#a85838", "#884028"],
+  blush: ["#f4d8d8", "#e0bcbc", "#c8a0a0"],
+  mint: ["#d8f4e8", "#b8dcc8", "#98c0b0"],
+  bone: ["#f4ecdc", "#e0d8c8", "#c8c0b0"],
+  ancientStone: ["#948870", "#746858", "#544838"],
+  museumGold: ["#d4b474", "#a88850", "#7a6438"],
+  vhsTape: ["#322848", "#1e1830", "#100c1c"],
 };
+
+function woodGrain(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string, intensity: number, seed: number,
+) {
+  const g = ctx.createLinearGradient(x, y, x + w, y);
+  g.addColorStop(0, c0); g.addColorStop(0.5, c1); g.addColorStop(1, c2);
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  const lines = Math.max(8, Math.round(h / 6 + intensity * 0.4));
+  for (let i = 0; i < lines; i++) {
+    const yy = y + (i / lines) * h + (n2(i, seed) - 0.5) * 3;
+    const amp = 2 + n2(i, seed + 2) * 6;
+    ctx.beginPath();
+    ctx.moveTo(x, yy);
+    for (let xx = 0; xx <= w; xx += 6) {
+      const dy = Math.sin(xx * 0.04 + i * 0.7 + seed) * amp + (n2(xx, i + seed) - 0.5) * 2;
+      ctx.lineTo(x + xx, yy + dy);
+    }
+    ctx.strokeStyle = `rgba(0,0,0,${0.06 + intensity * 0.0015})`;
+    ctx.lineWidth = 1 + n2(i, seed + 1);
+    ctx.stroke();
+  }
+}
+
+function marbleVeins(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string, intensity: number, dark: boolean,
+) {
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, c0); g.addColorStop(1, c1);
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  const veins = 5 + Math.round(intensity / 20);
+  for (let i = 0; i < veins; i++) {
+    ctx.beginPath();
+    const sx = x + n2(i, 1) * w;
+    const sy = y + n2(i, 2) * h;
+    ctx.moveTo(sx, sy);
+    for (let t = 0; t < 8; t++) {
+      ctx.lineTo(
+        sx + (n2(i, t + 3) - 0.4) * w * 0.5,
+        sy + (n2(i, t + 9) - 0.3) * h * 0.5,
+      );
+    }
+    ctx.strokeStyle = dark
+      ? `rgba(220,220,230,${0.12 + intensity * 0.002})`
+      : `rgba(80,70,60,${0.1 + intensity * 0.002})`;
+    ctx.lineWidth = 1 + n2(i, 4) * 2.5;
+    ctx.stroke();
+  }
+  ctx.fillStyle = dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)";
+  for (let i = 0; i < 40; i++) {
+    ctx.fillRect(x + n2(i, 11) * w, y + n2(i, 12) * h, 2, 2);
+  }
+}
+
+function leatherGrain(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string, intensity: number,
+) {
+  const g = ctx.createRadialGradient(x + w * 0.3, y + h * 0.3, 0, x + w * 0.5, y + h * 0.5, Math.max(w, h));
+  g.addColorStop(0, c0); g.addColorStop(0.6, c1); g.addColorStop(1, c2);
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  const step = Math.max(3, Math.round(6 - intensity * 0.03));
+  for (let yy = 0; yy < h; yy += step) {
+    for (let xx = 0; xx < w; xx += step) {
+      const v = n2(xx, yy, 7);
+      if (v > 0.55) {
+        ctx.fillStyle = `rgba(0,0,0,${0.04 + v * 0.08})`;
+        ctx.beginPath();
+        ctx.ellipse(x + xx, y + yy, 1.2, 0.8, v * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function denimWeave(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string, intensity: number,
+) {
+  ctx.fillStyle = c1; ctx.fillRect(x, y, w, h);
+  const step = 3;
+  for (let yy = 0; yy < h; yy += step) {
+    for (let xx = 0; xx < w; xx += step) {
+      const on = ((xx / step) + (yy / step)) % 2 === 0;
+      ctx.fillStyle = on ? c0 : c2;
+      ctx.globalAlpha = 0.35 + intensity * 0.003;
+      ctx.fillRect(x + xx, y + yy, step, step);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < w; i += 8) {
+    ctx.beginPath(); ctx.moveTo(x + i, y); ctx.lineTo(x + i + 4, y + h); ctx.stroke();
+  }
+}
+
+function metalPlate(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string, intensity: number,
+) {
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, c0); g.addColorStop(0.35, c1); g.addColorStop(0.55, c0);
+  g.addColorStop(0.75, c2); g.addColorStop(1, c1);
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  const sg = ctx.createLinearGradient(x, y, x, y + h * 0.35);
+  sg.addColorStop(0, `rgba(255,255,255,${0.18 + intensity * 0.002})`);
+  sg.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sg; ctx.fillRect(x, y, w, h * 0.35);
+  for (let i = 0; i < 30; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${0.02 + n2(i, 3) * 0.04})`;
+    ctx.fillRect(x + n2(i, 1) * w, y + n2(i, 2) * h, 1 + n2(i, 4) * 8, 1);
+  }
+}
+
+function paperFiber(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string, intensity: number,
+) {
+  const g = ctx.createLinearGradient(x, y, x, y + h);
+  g.addColorStop(0, c0); g.addColorStop(1, c1);
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  for (let i = 0; i < 120 + intensity; i++) {
+    ctx.fillStyle = `rgba(0,0,0,${0.015 + n2(i, 5) * 0.03})`;
+    ctx.fillRect(x + n2(i, 1) * w, y + n2(i, 2) * h, 1 + n2(i, 3) * 3, 1);
+  }
+  ctx.strokeStyle = `rgba(0,0,0,${0.04 + intensity * 0.0004})`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 12; i++) {
+    ctx.beginPath();
+    ctx.moveTo(x + n2(i, 6) * w, y);
+    ctx.lineTo(x + n2(i, 7) * w, y + h);
+    ctx.stroke();
+  }
+}
+
+function carbonFiber(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string,
+) {
+  ctx.fillStyle = c1; ctx.fillRect(x, y, w, h);
+  const step = 4;
+  for (let yy = 0; yy < h; yy += step) {
+    for (let xx = 0; xx < w; xx += step) {
+      const diag = ((xx + yy) / step) % 4;
+      ctx.fillStyle = diag < 2 ? c0 : c2;
+      ctx.fillRect(x + xx, y + yy, step, step);
+    }
+  }
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, "rgba(255,255,255,0.08)"); g.addColorStop(1, "rgba(0,0,0,0.15)");
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+}
+
+function galaxyField(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string,
+) {
+  const g = ctx.createRadialGradient(x + w * 0.5, y + h * 0.4, 0, x + w * 0.5, y + h * 0.5, Math.max(w, h));
+  g.addColorStop(0, c0); g.addColorStop(0.5, c1); g.addColorStop(1, c2);
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  for (let i = 0; i < 80; i++) {
+    const bright = n2(i, 9);
+    ctx.fillStyle = `rgba(255,255,255,${0.15 + bright * 0.7})`;
+    ctx.beginPath();
+    ctx.arc(x + n2(i, 1) * w, y + n2(i, 2) * h, 0.4 + bright * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function holoSheen(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string,
+) {
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, "#ff9ad5"); g.addColorStop(0.25, c0);
+  g.addColorStop(0.5, "#9ad5ff"); g.addColorStop(0.75, c1);
+  g.addColorStop(1, "#d5ff9a");
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(x, y, w, h * 0.2);
+}
+
+function genericNoise(
+  ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
+  c0: string, c1: string, c2: string, intensity: number,
+) {
+  const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  g.addColorStop(0, c0); g.addColorStop(0.5, c1); g.addColorStop(1, c2);
+  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+  for (let i = 0; i < 60 + intensity; i++) {
+    ctx.fillStyle = `rgba(0,0,0,${0.02 + n2(i, 8) * 0.05})`;
+    ctx.fillRect(x + n2(i, 1) * w, y + n2(i, 2) * h, 1 + n2(i, 3) * 4, 1 + n2(i, 4) * 3);
+  }
+}
 
 export function fillTexture(
   ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
   textureId: string, intensity: number,
 ) {
-  const [c1, c2] = TEX_COLORS[textureId] ?? ["#ccc", "#999"];
-  const g = ctx.createLinearGradient(x, y, x + w, y + h);
-  g.addColorStop(0, c1); g.addColorStop(1, c2);
-  ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
-  const a = 0.03 + intensity * 0.0005;
-  ctx.strokeStyle = `rgba(0,0,0,${a})`; ctx.lineWidth = 1;
-  for (let i = 0; i < w; i += 4) {
-    ctx.beginPath(); ctx.moveTo(x + i, y); ctx.lineTo(x + i + (i % 5) - 2, y + h); ctx.stroke();
+  const cols = BASE[textureId] ?? ["#ccc", "#aaa", "#888"];
+  const [c0, c1, c2] = cols;
+  const id = textureId;
+
+  if (id === "walnut" || id === "oak" || id === "ebony" || id === "driftwood" || id === "bamboo") {
+    woodGrain(ctx, x, y, w, h, c0, c1, c2, intensity, id === "oak" ? 2 : id === "ebony" ? 3 : id === "bamboo" ? 4 : 1);
+  } else if (id === "marbleW" || id === "marbleB" || id === "ancientStone") {
+    marbleVeins(ctx, x, y, w, h, c0, c1, c2, intensity, id === "marbleB");
+  } else if (id === "leatherB" || id === "leatherT") {
+    leatherGrain(ctx, x, y, w, h, c0, c1, c2, intensity);
+  } else if (id === "denim") {
+    denimWeave(ctx, x, y, w, h, c0, c1, c2, intensity);
+  } else if (id === "silver" || id === "rosegold" || id === "goldfoil" || id === "brass" || id === "copper" || id === "rust" || id === "museumGold") {
+    metalPlate(ctx, x, y, w, h, c0, c1, c2, intensity);
+  } else if (id === "paper" || id === "kraft" || id === "linen" || id === "bone") {
+    paperFiber(ctx, x, y, w, h, c0, c1, c2, intensity);
+  } else if (id === "carbon") {
+    carbonFiber(ctx, x, y, w, h, c0, c1, c2);
+  } else if (id === "galaxy") {
+    galaxyField(ctx, x, y, w, h, c0, c1, c2);
+  } else if (id === "holo") {
+    holoSheen(ctx, x, y, w, h, c0, c1, c2);
+  } else if (id === "concrete" || id === "cork" || id === "slate") {
+    genericNoise(ctx, x, y, w, h, c0, c1, c2, intensity + 20);
+    // pebble / pore dots
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${0.04 + n2(i, 15) * 0.08})`;
+      ctx.beginPath();
+      ctx.arc(x + n2(i, 1) * w, y + n2(i, 2) * h, 0.8 + n2(i, 3) * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (id === "velvet" || id === "emerald" || id === "sapphire") {
+    const g = ctx.createRadialGradient(x + w * 0.4, y + h * 0.3, 0, x + w * 0.5, y + h * 0.5, Math.max(w, h));
+    g.addColorStop(0, c0); g.addColorStop(1, c2);
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+    const sg = ctx.createLinearGradient(x, y, x + w * 0.4, y + h * 0.3);
+    sg.addColorStop(0, "rgba(255,255,255,0.12)"); sg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sg; ctx.fillRect(x, y, w * 0.5, h * 0.4);
+  } else {
+    genericNoise(ctx, x, y, w, h, c0, c1, c2, intensity);
   }
 }
 
+/**
+ * Professional Frames watermark — not a black banner.
+ * 🖼️ F R A M E S
+ * Motio2edit
+ */
 export function drawWm(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.save();
-  const fs = Math.max(12, Math.round(w * 0.022));
-  const pad = Math.max(10, Math.round(w * 0.02));
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  roundRect(ctx, w - Math.round(w * 0.28) - pad, h - fs * 2.4 - pad, Math.round(w * 0.28), fs * 2.4 + pad * 0.5, 8);
+  const fs = Math.max(11, Math.round(w * 0.018));
+  const pad = Math.max(12, Math.round(w * 0.022));
+  const boxW = Math.round(w * 0.26);
+  const boxH = fs * 2.6;
+  const bx = w - boxW - pad;
+  const by = h - boxH - pad;
+
+  // soft glass plate
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  roundRect(ctx, bx, by, boxW, boxH, 10);
   ctx.fill();
-  ctx.fillStyle = "#F5C542"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
-  ctx.font = `600 ${fs}px system-ui,sans-serif`;
-  ctx.fillText("Frame", w - pad - 6, h - fs * 1.5 - pad);
-  ctx.fillStyle = "#FFE08A";
-  ctx.font = `500 ${Math.round(fs * 0.85)}px system-ui,sans-serif`;
-  ctx.fillText("Motio2edit", w - pad - 6, h - pad);
+  ctx.strokeStyle = "rgba(255,255,255,0.28)";
+  ctx.lineWidth = 1;
+  roundRect(ctx, bx, by, boxW, boxH, 10);
+  ctx.stroke();
+
+  // top sheen
+  const sheen = ctx.createLinearGradient(bx, by, bx, by + boxH * 0.45);
+  sheen.addColorStop(0, "rgba(255,255,255,0.22)");
+  sheen.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sheen;
+  roundRect(ctx, bx, by, boxW, boxH * 0.45, 10);
+  ctx.fill();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
+  ctx.fillText("🖼️  F R A M E S", bx + boxW / 2, by + boxH * 0.38);
+  ctx.fillStyle = "rgba(255,255,255,0.72)";
+  ctx.font = `500 ${Math.round(fs * 0.82)}px system-ui, -apple-system, sans-serif`;
+  ctx.fillText("Motio2edit", bx + boxW / 2, by + boxH * 0.72);
   ctx.restore();
 }
 
