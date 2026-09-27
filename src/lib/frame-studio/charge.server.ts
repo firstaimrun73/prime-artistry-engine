@@ -1,5 +1,6 @@
 /**
  * Frame Studio — server entitlement. Client tier/cost are NEVER authority.
+ * Ledger is best-effort: credit charge is authoritative; ledger failure must not block Apply.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -45,7 +46,7 @@ export const chargeFrameStudioApply = createServerFn({ method: "POST" })
     const { data: profile, error: pErr } = await supabase
       .from("profiles").select("id, plan, credits, email").eq("id", userId).maybeSingle();
     if (pErr || !profile) {
-      return { ok: false, reason: "error", message: "Could not load account" };
+      return { ok: false, reason: "error", message: "Frame is not applied. Something went wrong on the server. Please try again." };
     }
 
     const admin = isAdminClaims({ email: profile.email ?? undefined });
@@ -57,10 +58,25 @@ export const chargeFrameStudioApply = createServerFn({ method: "POST" })
     const needRank = PLAN_RANK[TIER_NEED[tier]] ?? 0;
     const haveRank = PLAN_RANK[framePlan] ?? 0;
     if (haveRank < needRank) {
-      return { ok: false, reason: "plan", message: `Requires ${TIER_NEED[tier]} plan`, plan: framePlan, credits: profile.credits ?? 0 };
+      return {
+        ok: false,
+        reason: "plan",
+        message:
+          tier === "aiplus"
+            ? "Upgrade to AI+ to apply this frame"
+            : "Upgrade to Premium to apply this frame",
+        plan: framePlan,
+        credits: profile.credits ?? 0,
+      };
     }
     if ((profile.credits ?? 0) < expectedCost) {
-      return { ok: false, reason: "credits", message: `Need ${expectedCost} credits`, plan: framePlan, credits: profile.credits ?? 0 };
+      return {
+        ok: false,
+        reason: "credits",
+        message: `Need ${expectedCost} credits to apply this frame`,
+        plan: framePlan,
+        credits: profile.credits ?? 0,
+      };
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -73,19 +89,37 @@ export const chargeFrameStudioApply = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (uErr || !updated) {
-      return { ok: false, reason: "credits", message: "Insufficient credits", plan: framePlan, credits: profile.credits ?? 0 };
+      return {
+        ok: false,
+        reason: "credits",
+        message: "Not enough credits to apply this frame",
+        plan: framePlan,
+        credits: profile.credits ?? 0,
+      };
     }
 
-    const { error: ledErr } = await supabaseAdmin.from("frame_studio_ledger").insert({
-      user_id: userId, frame_id: frame.id, tier, cost: expectedCost,
-    });
-    if (ledErr) {
-      console.error("[frame-studio] ledger failed — refunding", ledErr);
-      await supabaseAdmin.from("profiles")
-        .update({ credits: (updated.credits as number) + expectedCost })
-        .eq("id", userId);
-      return { ok: false, reason: "error", message: "Could not record transaction", plan: framePlan, credits: (updated.credits as number) + expectedCost };
+    // Ledger is audit-only. Never block Apply or refund if the table is missing / RLS fails.
+    try {
+      const { error: ledErr } = await supabaseAdmin.from("frame_studio_ledger").insert({
+        user_id: userId,
+        frame_id: frame.id,
+        tier,
+        cost: expectedCost,
+      });
+      if (ledErr) {
+        console.error("[frame-studio] ledger insert failed (non-blocking):", ledErr.message || ledErr);
+      }
+    } catch (e) {
+      console.error("[frame-studio] ledger exception (non-blocking):", e);
     }
 
-    return { ok: true, admin: false, credits: updated.credits as number, plan: framePlan, charged: expectedCost, tier, frameId: frame.id };
+    return {
+      ok: true,
+      admin: false,
+      credits: updated.credits as number,
+      plan: framePlan,
+      charged: expectedCost,
+      tier,
+      frameId: frame.id,
+    };
   });
