@@ -26,7 +26,7 @@ import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
-/** Same card width for every icon — Cropmix → Remove BG → rest */
+/** Same fixed width for every quick-create icon — Cropmix → Remove BG → rest */
 const QUICK_CREATE = [
   { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
   { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
@@ -101,9 +101,9 @@ export function SignedInHomeBody() {
                   : !locked && q.label === "Remove BG"
                     ? { search: { from: "home" as const } }
                     : {})}
-                className="flex w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-2 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
+                className="flex h-auto w-[72px] min-w-[72px] max-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-1.5 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
-                <span className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
                   {locked && (
                     <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
