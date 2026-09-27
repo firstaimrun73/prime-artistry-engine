@@ -8,14 +8,39 @@ type Props = {
   /** @deprecated use after */
   afterSrc?: string;
   className?: string;
+  /**
+   * Slider handle + divider color.
+   * Default: Filters orange #FF5A1F.
+   * Remove BG: pass rose e.g. #f43f5e.
+   */
+  accentColor?: string;
+  /** Show checkerboard behind after image (for transparent PNGs). */
+  transparentAfter?: boolean;
 };
+
+const DEFAULT_ACCENT = "#FF5A1F";
+
+const CHECKER = {
+  backgroundImage:
+    "linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%)",
+  backgroundSize: "14px 14px",
+  backgroundPosition: "0 0,0 7px,7px -7px,-7px 0",
+  backgroundColor: "#f8fafc",
+} as const;
 
 /**
  * BEFORE ← slider → AFTER in ONE shared frame.
  * Both images use identical inset geometry; only clip boundary moves.
- * Divider + handle use Filters brand orange #FF5A1F.
  */
-export function CompareSlider({ before, after, beforeSrc, afterSrc, className }: Props) {
+export function CompareSlider({
+  before,
+  after,
+  beforeSrc,
+  afterSrc,
+  className,
+  accentColor = DEFAULT_ACCENT,
+  transparentAfter = false,
+}: Props) {
   const beforeUrl = before || beforeSrc || "";
   const afterUrl = after || afterSrc || "";
   const [pos, setPos] = useState(50);
@@ -127,6 +152,7 @@ export function CompareSlider({ before, after, beforeSrc, afterSrc, className }:
           maxWidth: "100%",
           maxHeight: "100%",
           aspectRatio: ratio ? String(ratio) : undefined,
+          ...(transparentAfter ? CHECKER : {}),
         }}
         onMouseDown={(e) => {
           dragging.current = true;
@@ -158,10 +184,13 @@ export function CompareSlider({ before, after, beforeSrc, afterSrc, className }:
           />
         </div>
         <div
-          className="pointer-events-none absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-[#FF5A1F]"
-          style={{ left: `${pos}%` }}
+          className="pointer-events-none absolute inset-y-0 z-10 w-0.5 -translate-x-1/2"
+          style={{ left: `${pos}%`, backgroundColor: accentColor }}
         >
-          <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-[#FF5A1F] shadow-md">
+          <div
+            className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white shadow-md"
+            style={{ backgroundColor: accentColor }}
+          >
             <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden className="text-white">
               <path d="M6 1L1 6l5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M10 1l5 5-5 5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
