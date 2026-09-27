@@ -3,7 +3,7 @@
  * Browser is never the source of truth for plan or credits.
  *
  * Costs (must match client CREDIT_COST):
- *   common: 5 | aiplus: 10 | premium: 25
+ *   common: 5 | aiplus: 15 | premium: 25
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -71,6 +71,7 @@ export const chargeFrameStudioApply = createServerFn({ method: "POST" })
     }
 
     const tier = data.tier as FrameTier;
+    // Server is sole authority for cost — ignore any client-supplied cost
     const expectedCost = FRAME_CREDIT_COST[tier];
 
     const { data: profile, error: pErr } = await supabase
