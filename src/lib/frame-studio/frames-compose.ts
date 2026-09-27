@@ -375,16 +375,17 @@ export function drawWm(
   const bx = photoX + photoW - boxW - pad;
   const by = photoY + photoH - boxH - pad;
 
-  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  // Semi-opaque pill ON the photo (bottom-right) so it never sits under the mat/border
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
   roundRect(ctx, bx, by, boxW, boxH, 8);
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 1.25;
   roundRect(ctx, bx, by, boxW, boxH, 8);
   ctx.stroke();
 
   const sheen = ctx.createLinearGradient(bx, by, bx, by + boxH * 0.5);
-  sheen.addColorStop(0, "rgba(255,255,255,0.2)");
+  sheen.addColorStop(0, "rgba(255,255,255,0.28)");
   sheen.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = sheen;
   roundRect(ctx, bx, by, boxW, boxH * 0.5, 8);
@@ -392,11 +393,11 @@ export function drawWm(
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.font = `600 ${fs}px system-ui, -apple-system, "Segoe UI Emoji", sans-serif`;
+  ctx.fillStyle = "rgba(255,255,255,1)";
+  ctx.font = `700 ${fs}px system-ui, -apple-system, "Segoe UI Emoji", sans-serif`;
   ctx.fillText("Frames", bx + boxW / 2, by + boxH * 0.36);
-  ctx.fillStyle = "rgba(255,255,255,0.78)";
-  ctx.font = `500 ${Math.round(fs * 0.78)}px system-ui, -apple-system, sans-serif`;
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.font = `600 ${Math.round(fs * 0.78)}px system-ui, -apple-system, sans-serif`;
   ctx.fillText("Motio2edit", bx + boxW / 2, by + boxH * 0.72);
   ctx.restore();
 }
