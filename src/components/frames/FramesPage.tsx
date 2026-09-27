@@ -1,13 +1,13 @@
 /**
  * Motio2edit Frames Studio — production compose → charge → result.
  * Free: preview any frame; Apply only for Common (server still authoritative).
+ * No info (i) buttons on thumbs.
  */
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Download,
-  Info,
   Lock,
   Share2,
   SlidersHorizontal,
@@ -33,7 +33,6 @@ import {
   type Controls,
   type FrameTier,
 } from "@/lib/frame-studio/frames-compose";
-import { getFrameInfo } from "@/lib/frame-studio/frame-info";
 
 type Phase = "idle" | "edit" | "processing" | "result";
 
@@ -78,11 +77,8 @@ export function FramesPage() {
   const [thumbCache, setThumbCache] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [controls, setControls] = useState<Controls>({
-    ...DEFAULT_CONTROLS,
-  });
+  const [controls, setControls] = useState<Controls>({ ...DEFAULT_CONTROLS });
   const [adjustOpen, setAdjustOpen] = useState(false);
-  const [infoFrame, setInfoFrame] = useState<FrameDef | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreQuery, setMoreQuery] = useState("");
   const [wantWm, setWantWm] = useState(() => readKeepWatermarkPref());
@@ -191,7 +187,6 @@ export function FramesPage() {
     img.src = url;
   }, []);
 
-  /** Free users can preview any frame; Apply is gated. */
   const selectFrame = (f: FrameDef) => {
     setFrameId(f.id);
   };
@@ -319,9 +314,6 @@ export function FramesPage() {
                     <TierBadge tier={f.tier} />
                     {locked && <span className="pointer-events-none absolute bottom-0.5 right-0.5 z-10 grid h-4 w-4 place-items-center rounded-full bg-black/55"><Lock className="h-2.5 w-2.5 text-white" /></span>}
                   </button>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); setInfoFrame(f); }} className="absolute -right-0.5 -top-0.5 z-20 grid h-5 w-5 place-items-center rounded-full border bg-[var(--frames-surface)]" style={{ borderColor: "var(--frames-border)" }} aria-label="Info">
-                    <Info className="h-3 w-3" />
-                  </button>
                 </div>
               );
             })}
@@ -411,37 +403,6 @@ export function FramesPage() {
                 );
               })}
             </div>
-          </div>
-        </div>
-      )}
-
-      {infoFrame && (
-        <div className="absolute inset-0 z-50 grid place-items-end bg-black/40" onClick={() => setInfoFrame(null)}>
-          <div className="max-h-[70dvh] w-full overflow-y-auto rounded-t-2xl border-t p-4" style={{ background: "var(--frames-surface)", borderColor: "var(--frames-border)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-start justify-between">
-              <div>
-                <p className="text-base font-bold">{infoFrame.name}</p>
-                <p className="text-[11px] font-semibold uppercase text-[var(--frames-muted)]">{infoFrame.tier} · {infoFrame.kind}</p>
-              </div>
-              <button type="button" onClick={() => setInfoFrame(null)} className="grid h-8 w-8 place-items-center rounded-full border" style={{ borderColor: "var(--frames-border)" }}><X className="h-4 w-4" /></button>
-            </div>
-            <dl className="space-y-2 text-xs text-[var(--frames-muted)]">
-              <div><dt className="font-semibold text-[var(--frames-text)]">Material</dt><dd>{infoFrame.texture || infoFrame.color || infoFrame.kind}</dd></div>
-              <div><dt className="font-semibold text-[var(--frames-text)]">Credits</dt><dd>{FRAME_CREDIT_COST[infoFrame.tier]}</dd></div>
-              {(() => {
-                try {
-                  const info = getFrameInfo(infoFrame);
-                  return (
-                    <>
-                      <div><dt className="font-semibold text-[var(--frames-text)]">Description</dt><dd>{info.description}</dd></div>
-                      <div><dt className="font-semibold text-[var(--frames-text)]">Visual</dt><dd>{info.visual}</dd></div>
-                    </>
-                  );
-                } catch {
-                  return null;
-                }
-              })()}
-            </dl>
           </div>
         </div>
       )}
