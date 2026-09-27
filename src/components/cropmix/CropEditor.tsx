@@ -556,13 +556,14 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
                   <div className="absolute bg-black/50" style={{ left: box.left + box.width, top: box.top, right: 0, height: box.height }} />
                 </div>
                 <div
-                  className="pointer-events-none absolute border-2"
+                  className="absolute border-2"
                   style={{
                     left: box.left,
                     top: box.top,
                     width: box.width,
                     height: box.height,
                     borderColor: CROPMIX_VOLT,
+                    boxShadow: "0 0 0 1px rgba(0,0,0,0.35)",
                   }}
                 >
                   <CornerHandle id="nw" />
@@ -577,7 +578,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
       </div>
 
       <div className="shrink-0 space-y-2 border-t border-border bg-card/40 px-3 py-3">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-nowrap gap-1.5 overflow-x-auto overscroll-x-contain pb-1 -mx-1 px-1 [scrollbar-width:thin]">
           {ASPECT_PRESETS.map((p) => (
             <button
               key={p.id}
@@ -585,7 +586,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
               disabled={toolsDisabled}
               onClick={() => setAspect(p.id)}
               className={cn(
-                "flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium disabled:opacity-40",
+                "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-2.5 py-1.5 text-xs font-medium disabled:opacity-40",
                 g.aspectId === p.id
                   ? "border-transparent text-black"
                   : "border-border bg-background",
@@ -622,7 +623,7 @@ export function CropEditor({ file, initialGeometry, onFile, onApply, onCancel }:
               className="rounded-lg px-3 py-1.5 text-xs font-semibold text-black"
               style={{ backgroundColor: CROPMIX_VOLT }}
             >
-              Apply ratio
+              Set
             </button>
           </div>
         )}
