@@ -29,6 +29,64 @@ const CHECKER = {
 } as const;
 
 /**
+ * If after is JPEG with solid black bg (no alpha), convert near-black to transparent
+ * so checkerboard shows — matches Rose PNG behaviour for Portrait/Car demos.
+ */
+function useTransparentAfterUrl(afterUrl: string, enabled: boolean) {
+  const [url, setUrl] = useState(afterUrl);
+
+  useEffect(() => {
+    if (!enabled || !afterUrl) {
+      setUrl(afterUrl);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const w = img.naturalWidth || 1;
+        const h = img.naturalHeight || 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          setUrl(afterUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, w, h);
+        const d = data.data;
+        // Key out near-black pixels (demo assets with solid black bg)
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i]!;
+          const g = d[i + 1]!;
+          const b = d[i + 2]!;
+          if (r < 18 && g < 18 && b < 18) {
+            d[i + 3] = 0;
+          }
+        }
+        ctx.putImageData(data, 0, 0);
+        setUrl(canvas.toDataURL("image/png"));
+      } catch {
+        setUrl(afterUrl);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) setUrl(afterUrl);
+    };
+    img.src = afterUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [afterUrl, enabled]);
+
+  return url;
+}
+
+/**
  * BEFORE ← slider → AFTER in ONE shared frame.
  * Both images use identical inset geometry; only clip boundary moves.
  */
@@ -42,7 +100,8 @@ export function CompareSlider({
   transparentAfter = false,
 }: Props) {
   const beforeUrl = before || beforeSrc || "";
-  const afterUrl = after || afterSrc || "";
+  const rawAfter = after || afterSrc || "";
+  const afterUrl = useTransparentAfterUrl(rawAfter, transparentAfter);
   const [pos, setPos] = useState(50);
   const [ratio, setRatio] = useState<number | null>(null);
   const [frameW, setFrameW] = useState(0);
@@ -52,7 +111,7 @@ export function CompareSlider({
 
   useEffect(() => {
     let cancelled = false;
-    if (!afterUrl) {
+    if (!rawAfter) {
       setRatio(1);
       return;
     }
@@ -66,11 +125,11 @@ export function CompareSlider({
     img.onerror = () => {
       if (!cancelled) setRatio(1);
     };
-    img.src = afterUrl;
+    img.src = rawAfter;
     return () => {
       cancelled = true;
     };
-  }, [afterUrl]);
+  }, [rawAfter]);
 
   useEffect(() => {
     const outer = outerRef.current;
