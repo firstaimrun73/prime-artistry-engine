@@ -3,6 +3,7 @@
  * Free: preview any frame; Apply only for Common (server still authoritative).
  * No info (i) buttons on thumbs.
  * Result screen includes Watermark toggle: locked for free, unlocked for paid.
+ * Watermark is drawn on the PHOTO area (not under the mat) and re-composited on toggle.
  */
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,22 +31,13 @@ import {
   DEFAULT_CONTROLS,
   composeFrame,
   framesForAspect,
+  CURATED_FRAME_IDS,
   type FrameDef,
   type Controls,
   type FrameTier,
 } from "@/lib/frame-studio/frames-compose";
 
 type Phase = "idle" | "edit" | "processing" | "result";
-
-const CURATED_IDS = [
-  "paper", "kraft", "walnut", "oak", "polaroid", "galleryDouble",
-  "c-charcoal", "g-clear", "watercolor", "corners", "linen", "film",
-  "filmreel2", "videoReel", "camera2", "g-frost", "g-aurora", "driftwood",
-  "denimSt", "rosegold", "marbleW", "museumGold", "treasure1", "leatherSt",
-  "ebony", "marbleB", "camera1", "filmreel1", "g-sheen", "ancientRelic",
-  "brass", "velvet", "goldfoil", "silver", "bamboo",
-  "baroqueGold", "velvetHibiscus", "lotusPolaroid", "filmVintage",
-];
 
 function TierBadge({ tier }: { tier: FrameTier }) {
   if (tier === "common") return null;
@@ -59,6 +51,18 @@ function TierBadge({ tier }: { tier: FrameTier }) {
       {tier === "aiplus" ? "AI+" : "Premium"}
     </span>
   );
+}
+
+/** Unique frames by id (preserves order). */
+function uniqueFrames(list: FrameDef[]): FrameDef[] {
+  const seen = new Set<string>();
+  const out: FrameDef[] = [];
+  for (const f of list) {
+    if (seen.has(f.id)) continue;
+    seen.add(f.id);
+    out.push(f);
+  }
+  return out;
 }
 
 export function FramesPage() {
@@ -82,21 +86,26 @@ export function FramesPage() {
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [moreQuery, setMoreQuery] = useState("");
-  const [wantWm, setWantWm] = useState(() => readKeepWatermarkPref());
+  // Free is always watermarked; paid starts from preference
+  const [wantWm, setWantWm] = useState(() => (typeof window !== "undefined" ? readKeepWatermarkPref() : true));
   const fileRef = useRef<HTMLInputElement>(null);
   const applyLock = useRef(false);
   const sourceOnly = useRef<HTMLImageElement | null>(null);
+  const appliedFrameRef = useRef<FrameDef | null>(null);
+  const appliedControlsRef = useRef<Controls>({ ...DEFAULT_CONTROLS });
 
   const imageAspect = source
     ? (source.naturalWidth || source.width) / Math.max(1, source.naturalHeight || source.height)
     : 1;
   const compatibleFrames = useMemo(
-    () => (source ? framesForAspect(imageAspect) : FRAMES),
+    () => uniqueFrames(source ? framesForAspect(imageAspect) : FRAMES),
     [source, imageAspect],
   );
   const railFrames = useMemo(() => {
     const map = new Map(compatibleFrames.map((f) => [f.id, f]));
-    const curated = CURATED_IDS.map((id) => map.get(id)).filter(Boolean) as FrameDef[];
+    const curated = uniqueFrames(
+      CURATED_FRAME_IDS.map((id) => map.get(id)).filter(Boolean) as FrameDef[],
+    );
     return curated.length >= 8 ? curated : compatibleFrames.slice(0, 35);
   }, [compatibleFrames]);
   const frame =
@@ -116,6 +125,7 @@ export function FramesPage() {
     }
   }, [source, compatibleFrames, frameId]);
 
+  // Live preview (no watermark — clean preview)
   useEffect(() => {
     if (!source || phase !== "edit") {
       if (!source) setPreviewUrl(null);
@@ -132,6 +142,7 @@ export function FramesPage() {
     return () => window.clearTimeout(t);
   }, [source, frame, controls, phase]);
 
+  // Thumbnail cache — unique frames only
   useEffect(() => {
     if (!source || phase === "idle") {
       setThumbCache({});
@@ -160,9 +171,42 @@ export function FramesPage() {
     };
   }, [source, sourceKey, phase, compatibleFrames]);
 
+  // Free users: force watermark on; paid: keep preference
   useEffect(() => {
     if (!paid) setWantWm(true);
   }, [paid]);
+
+  /** Re-compose result when paid user toggles watermark (or after apply). */
+  const rebuildResult = useCallback(
+    (withWm: boolean) => {
+      const srcImg = sourceOnly.current ?? source;
+      const f = appliedFrameRef.current ?? frame;
+      const c = appliedControlsRef.current ?? controls;
+      if (!srcImg || !f) return;
+      try {
+        const edgePre = Math.min(
+          2048,
+          Math.max(srcImg.naturalWidth, srcImg.naturalHeight, 1200),
+        );
+        // Free always gets watermark; paid follows toggle
+        const stamp = !paid || withWm;
+        const composed = composeFrame(srcImg, f, c, edgePre, stamp);
+        if (composed && composed.width >= 8) {
+          setResultUrl(composed.toDataURL("image/jpeg", 0.94));
+        }
+      } catch (e) {
+        console.error("[Frames] rebuildResult", e);
+      }
+    },
+    [source, frame, controls, paid],
+  );
+
+  // When paid user toggles watermark on result screen, recompose immediately
+  useEffect(() => {
+    if (phase !== "result") return;
+    if (!paid) return;
+    rebuildResult(wantWm);
+  }, [wantWm, phase, paid, rebuildResult]);
 
   const onPick = useCallback((file?: File) => {
     if (!file) return;
@@ -212,7 +256,9 @@ export function FramesPage() {
         2048,
         Math.max(srcImg.naturalWidth, srcImg.naturalHeight, 1200),
       );
-      const composed = composeFrame(srcImg, frame, controls, edgePre, !paid || wantWm);
+      // Free always watermarked; paid uses current toggle preference
+      const stamp = !paid || wantWm;
+      const composed = composeFrame(srcImg, frame, controls, edgePre, stamp);
       if (!composed || composed.width < 8) {
         toast.error("Composition failed");
         setPhase("edit");
@@ -231,6 +277,8 @@ export function FramesPage() {
       } catch {
         /* ignore */
       }
+      appliedFrameRef.current = frame;
+      appliedControlsRef.current = { ...controls };
       setResultUrl(composed.toDataURL("image/jpeg", 0.94));
       setPhase("result");
       setAdjustOpen(false);
@@ -255,6 +303,19 @@ export function FramesPage() {
     } finally {
       setExporting(false);
     }
+  };
+
+  const toggleWatermark = () => {
+    if (!paid) return;
+    setWantWm((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem("motio2edit-watermark-pref", next ? "on" : "off");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
   };
 
   const isLight = theme === "light";
@@ -360,12 +421,16 @@ export function FramesPage() {
 
       {phase === "result" && resultUrl && (
         <footer className="z-20 shrink-0 space-y-2 border-t px-3 pt-3" style={{ borderColor: "var(--frames-border)", background: "var(--frames-glass)", paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-          {/* Watermark toggle — locked for free, unlocked for paid */}
+          {/* Watermark toggle — locked for free, unlocked for paid; recomposes result on toggle */}
           <div className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2" style={{ borderColor: "var(--frames-border)" }}>
             <div className="min-w-0">
               <p className="text-[12px] font-semibold">Watermark</p>
               <p className="text-[10px] text-[var(--frames-muted)]">
-                {paid ? "Toggle to keep or remove Motio2edit mark" : "Always on for free plan"}
+                {paid
+                  ? wantWm
+                    ? "Motio2edit mark on photo (bottom-right)"
+                    : "Watermark removed — toggle to restore"
+                  : "Always on for free plan"}
               </p>
             </div>
             {paid ? (
@@ -373,11 +438,7 @@ export function FramesPage() {
                 type="button"
                 role="switch"
                 aria-checked={wantWm}
-                onClick={() => setWantWm((v) => {
-                  const next = !v;
-                  try { localStorage.setItem("motio2edit-watermark-pref", next ? "on" : "off"); } catch {}
-                  return next;
-                })}
+                onClick={toggleWatermark}
                 className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${wantWm ? "bg-[#FF5A1F]" : "bg-zinc-400"}`}
               >
                 <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${wantWm ? "left-5" : "left-0.5"}`} />
@@ -425,7 +486,7 @@ export function FramesPage() {
                 const locked = !paid && f.tier !== "common";
                 return (
                   <button key={f.id} type="button" onClick={() => { selectFrame(f); setMoreOpen(false); }} className={cn("relative aspect-square overflow-hidden rounded-xl border", f.id === frame.id ? "border-[#FF5A1F]" : "border-[var(--frames-border)]")}>
-                    {thumbCache[f.id] ? <img src={thumbCache[f.id]} alt="" className="h-full w-full object-cover" /> : null}
+                    {thumbCache[f.id] ? <img src={thumbCache[f.id]} alt={f.name} className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-[9px] text-[var(--frames-muted)]">…</span>}
                     <TierBadge tier={f.tier} />
                     {locked && <span className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-black/55"><Lock className="h-3 w-3 text-white" /></span>}
                   </button>
