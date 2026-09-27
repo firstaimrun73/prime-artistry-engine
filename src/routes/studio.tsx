@@ -46,7 +46,6 @@ function StudioHub() {
           <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a studio</h1>
         </div>
 
-        {/* Order: Image | Circle2edit , Video | Frames , Music full-width */}
         <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[1.1fr_1fr_0.85fr] gap-2.5 sm:gap-3">
           <StudioTile
             to="/editor"
@@ -174,11 +173,11 @@ function StudioTile({
   );
 }
 
-/** Meta-style concentric ring mark in Circle 2edit purple — matches internal header. */
+/** Polished Circle 2edit mark — dual-ring draw + soft pulse (matches header). */
 function CircleMetaRing() {
   return (
     <span
-      className="relative grid h-12 w-12 place-items-center rounded-2xl border border-[#7B6FE0]/45 bg-white/80 shadow-lg dark:bg-[#22252F] sm:h-14 sm:w-14"
+      className="relative grid h-12 w-12 place-items-center rounded-2xl border border-[#7B6FE0]/45 bg-white/90 shadow-lg dark:bg-[#22252F] sm:h-14 sm:w-14"
       aria-hidden
     >
       <svg viewBox="0 0 40 40" className="h-9 w-9 overflow-visible sm:h-10 sm:w-10">
@@ -192,16 +191,39 @@ function CircleMetaRing() {
         <circle
           cx="20"
           cy="20"
-          r="14"
+          r="15"
           fill="none"
           stroke="url(#studioMetaRing)"
-          strokeWidth="2.4"
+          strokeWidth="2.2"
           strokeLinecap="round"
-          className="origin-center motion-safe:animate-[spin_8s_linear_infinite]"
+          strokeDasharray="28 60"
+          className="origin-center motion-safe:animate-[spin_5.5s_linear_infinite]"
         />
-        <circle cx="20" cy="20" r="8.5" fill="none" stroke="#7B6FE0" strokeWidth="1.6" opacity="0.85" />
-        <circle cx="20" cy="20" r="3.2" fill="#7B6FE0" opacity="0.9" />
+        <circle
+          cx="20"
+          cy="20"
+          r="10"
+          fill="none"
+          stroke="#7B6FE0"
+          strokeWidth="1.5"
+          opacity="0.75"
+          strokeDasharray="18 40"
+          className="origin-center motion-safe:animate-[spin_9s_linear_infinite_reverse]"
+        />
+        <circle
+          cx="20"
+          cy="20"
+          r="3.4"
+          fill="#7B6FE0"
+          className="motion-safe:animate-[c2ePulse_2.4s_ease-in-out_infinite]"
+        />
       </svg>
+      <style>{`
+        @keyframes c2ePulse {
+          0%, 100% { opacity: 0.85; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.15); }
+        }
+      `}</style>
     </span>
   );
 }
