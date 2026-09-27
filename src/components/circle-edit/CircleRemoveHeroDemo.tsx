@@ -44,8 +44,6 @@ const ORDER: DemoPhase[] = [
 const DEMO_STAGE_URLS = {
   stage1:
     "https://assets.motio2edit.com/samples/circle-2edit/file_0000000091d081f585ff54de9335198f.png",
-  stage2:
-    "https://assets.motio2edit.com/samples/circle-2edit/file_00000000ab9082089ae984430379abed.png",
   stage3:
     "https://assets.motio2edit.com/samples/circle-2edit/file_000000004e6481faa6caad771de9c84c.png",
 } as const;
@@ -171,7 +169,7 @@ function ProcessCenter({
             <path
               d="M16 24h16"
               stroke="currentColor"
-              strokeWidth="2.5"
+atura              strokeWidth="2.5"
               strokeLinecap="round"
               style={{ animation: "c2d-pulse 1s ease-in-out infinite" }}
             />
@@ -205,10 +203,6 @@ function ProcessCenter({
   );
 }
 
-/**
- * Sample points along the irregular path for hand position.
- * Approximate bezier sampling (percent coords matching viewBox 0–100).
- */
 const HAND_SAMPLES: { x: number; y: number }[] = [
   { x: 22, y: 68 },
   { x: 19, y: 58 },
@@ -254,7 +248,6 @@ export function CircleRemoveHeroDemo() {
   const urls = useMemo(
     () => ({
       stage1: DEMO_STAGE_URLS.stage1,
-      stage2: DEMO_STAGE_URLS.stage2,
       stage3: DEMO_STAGE_URLS.stage3,
     }),
     [],
@@ -270,9 +263,9 @@ export function CircleRemoveHeroDemo() {
     let loaded = 0;
     const mark = () => {
       loaded += 1;
-      if (!cancelled && loaded >= 3) setReady(true);
+      if (!cancelled && loaded >= 2) setReady(true);
     };
-    const imgs = [urls.stage1, urls.stage2, urls.stage3].map((src) => {
+    const imgs = [urls.stage1, urls.stage3].map((src) => {
       const im = new Image();
       im.decoding = "async";
       im.onload = mark;
@@ -291,7 +284,7 @@ export function CircleRemoveHeroDemo() {
         im.onerror = null;
       });
     };
-  }, [urls.stage1, urls.stage2, urls.stage3]);
+  }, [urls.stage1, urls.stage3]);
 
   useEffect(() => {
     const ms = reduced ? Math.min(PHASE_MS[phase], 600) : PHASE_MS[phase];
@@ -336,7 +329,6 @@ export function CircleRemoveHeroDemo() {
     let raf = 0;
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / dur);
-      // slight ease-in-out so stroke feels hand-paced
       const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
       setDrawT(eased);
       if (p < 1) raf = requestAnimationFrame(tick);
@@ -405,10 +397,9 @@ export function CircleRemoveHeroDemo() {
         decoding="async"
       />
 
-      {/* Hand-drawn irregular selection overlay */}
       {showSelection && !showResult && (
         <svg
-          className="pointer-events-none absolute inset-0 z-15 h-full w-full"
+          className="pointer-events-none absolute inset-0 z-[15] h-full w-full"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           aria-hidden
@@ -416,19 +407,21 @@ export function CircleRemoveHeroDemo() {
             animation: phase === "pulse" ? "c2d-sel-pulse 0.7s ease-in-out" : undefined,
           }}
         >
-          {/* Lavender translucent fill — grows as path closes */}
           <path
             d={HAND_PATH}
             fill="rgba(123, 111, 224, 0.38)"
             stroke="none"
             style={{
-              opacity: phase === "pulse" || phase === "analysing" || phase === "removing" || phase === "generating"
-                ? 0.42
-                : fillOpacity,
+              opacity:
+                phase === "pulse" ||
+                phase === "analysing" ||
+                phase === "removing" ||
+                phase === "generating"
+                  ? 0.42
+                  : fillOpacity,
               transition: reduced ? "none" : "opacity 0.15s linear",
             }}
           />
-          {/* Progressive stroke following hand */}
           <path
             d={HAND_PATH}
             fill="none"
@@ -443,7 +436,6 @@ export function CircleRemoveHeroDemo() {
               filter: "drop-shadow(0 0 3px rgba(255,255,255,0.9))",
             }}
           />
-          {/* Soft white outer edge for contrast */}
           <path
             d={HAND_PATH}
             fill="none"
@@ -456,24 +448,6 @@ export function CircleRemoveHeroDemo() {
             vectorEffect="non-scaling-stroke"
           />
         </svg>
-      )}
-
-      {/* Masked stage2 peek inside selection once drawn (optional depth) */}
-      {showSelection && !showResult && drawT > 0.5 && (
-        <div
-          className="pointer-events-none absolute inset-0 z-[14] opacity-40"
-          style={{
-            clipPath: `path('${HAND_PATH}')`,
-            WebkitClipPath: `path(evenodd, '${HAND_PATH}')`,
-          }}
-        >
-          <img
-            src={urls.stage2}
-            alt=""
-            className="h-full w-full object-cover"
-            draggable={false}
-          />
-        </div>
       )}
 
       <img
