@@ -1,5 +1,6 @@
 /**
  * Homepage card for Remove BG — same pattern as Circle Sample cards.
+ * (i) → info page · Try Now → editor
  */
 import { Link } from "@tanstack/react-router";
 import { Info, Sparkles } from "lucide-react";
@@ -7,7 +8,6 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { RemoveBgHeroDemo } from "@/components/remove-bg/RemoveBgHeroDemo";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { REMOVE_BG_CREDITS } from "@/lib/remove-bg/constants";
 
 class DemoErrorBoundary extends Component<
   { children: ReactNode; fallback?: ReactNode },
@@ -48,7 +48,7 @@ export function RemoveBgHomeCard() {
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#F9A8D4]">What's New</p>
         <h2 className="mt-1.5 text-[18px] font-extrabold tracking-tight sm:text-[20px]">Remove BG</h2>
         <p className="mt-1 max-w-md text-[13px] leading-snug text-white/65">
-          One photo. One click. Transparent background — {REMOVE_BG_CREDITS} credits.
+          One photo. One click. Transparent background.
         </p>
       </div>
 
@@ -74,15 +74,14 @@ export function RemoveBgHomeCard() {
             </span>
 
             <Link
-              to="/studio/image/remove-bg"
-              search={{ from: "home" }}
+              to="/studio/image/remove-bg-info"
               className={cn(
                 "absolute right-2.5 top-2.5 z-50 grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md transition active:scale-95",
                 isDark
                   ? "border-white/15 bg-black/40 text-white hover:bg-black/55"
                   : "border-black/10 bg-white/80 text-[#1A1C24] hover:bg-white",
               )}
-              aria-label="Open Remove BG"
+              aria-label="About Remove BG"
               onClick={(e) => e.stopPropagation()}
             >
               <Info className="h-4 w-4" strokeWidth={2.25} />

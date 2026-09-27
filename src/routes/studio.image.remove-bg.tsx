@@ -1,7 +1,7 @@
 /**
  * Remove BG — /studio/image/remove-bg
- * Standalone product (not Image Studio editor).
- * Upload → one click → transparent PNG. 20 credits. SD free / HD paid. No watermark.
+ * Standalone product. Upload → one click → transparent PNG.
+ * Credits + quality enforced server-side (20 credits; free→SD, paid→HD).
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,11 +11,11 @@ import {
   ArrowLeft,
   Download,
   ImagePlus,
+  Info,
   Loader2,
   Share2,
   Sparkles,
   Trash2,
-  Lock,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -26,17 +26,19 @@ import {
   REMOVE_BG_CREDITS,
   type RemoveBgQuality,
 } from "@/lib/remove-bg/constants";
-import { REMOVE_BG_SAMPLES } from "@/lib/remove-bg/samples";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-type Search = { from?: "home" | "studio" };
+type Search = { from?: "home" | "studio" | "info" };
 
 export const Route = createFileRoute("/studio/image/remove-bg")({
   ssr: false,
   validateSearch: (raw: Record<string, unknown>): Search => ({
-    from: raw.from === "home" || raw.from === "studio" ? raw.from : undefined,
+    from:
+      raw.from === "home" || raw.from === "studio" || raw.from === "info"
+        ? raw.from
+        : undefined,
   }),
   component: RemoveBgPage,
   head: () => ({
@@ -44,7 +46,7 @@ export const Route = createFileRoute("/studio/image/remove-bg")({
       { title: "Remove BG — Motio2edit" },
       {
         name: "description",
-        content: "Remove image background in one click. Transparent PNG cutout — 20 credits.",
+        content: "Remove image background in one click. Transparent PNG cutout.",
       },
     ],
   }),
@@ -78,10 +80,7 @@ function RemoveBgPage() {
 
   useEffect(() => {
     if (free) setQuality("sd");
-    else if (paid && quality === "sd") {
-      /* allow paid to stay on sd if they chose it */
-    }
-  }, [free, paid, quality]);
+  }, [free]);
 
   useEffect(() => {
     if (phase !== "processing") return;
@@ -98,6 +97,10 @@ function RemoveBgPage() {
   const goBack = () => {
     if (search.from === "studio") {
       void navigate({ to: "/studio" });
+      return;
+    }
+    if (search.from === "info") {
+      void navigate({ to: "/studio/image/remove-bg-info" });
       return;
     }
     void navigate({ to: "/" });
@@ -147,9 +150,10 @@ function RemoveBgPage() {
       return;
     }
     if (!isAdmin && (profile?.credits ?? 0) < REMOVE_BG_CREDITS) {
-      toast.error(`Need ${REMOVE_BG_CREDITS} credits for Remove BG`);
+      toast.error(`Need ${REMOVE_BG_CREDITS} credits`);
       return;
     }
+    // Server enforces free→sd / paid→hd; client only sends preferred quality for paid users.
     const q: RemoveBgQuality = free ? "sd" : quality;
     setPhase("uploading");
     try {
@@ -162,11 +166,7 @@ function RemoveBgPage() {
       setOutput(res.outputUrl);
       setPhase("result");
       await refreshProfile();
-      toast.success(
-        res.quality === "sd"
-          ? "Background removed (SD)"
-          : "Background removed (HD)",
-      );
+      toast.success("Background removed");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Remove BG failed");
       setPhase("idle");
@@ -180,7 +180,6 @@ function RemoveBgPage() {
       await triggerBrowserDownload(output, `motio2edit-remove-bg-${Date.now()}.png`);
       toast.success("Download started");
     } catch {
-      // fallback open
       window.open(output, "_blank", "noopener,noreferrer");
     }
   };
@@ -219,7 +218,7 @@ function RemoveBgPage() {
     );
   }
 
-  const creditsLabel = isAdmin ? "Admin" : `${profile?.credits ?? 0} credits`;
+  const creditsLabel = isAdmin ? "Admin" : `${profile?.credits ?? 0}`;
   const busy = phase === "uploading" || phase === "processing";
 
   return (
@@ -236,8 +235,15 @@ function RemoveBgPage() {
           </button>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-500">Remove BG</p>
-            <p className="truncate text-sm font-semibold">One-click background removal</p>
+            <p className="truncate text-sm font-semibold">Motio2edit</p>
           </div>
+          <Link
+            to="/studio/image/remove-bg-info"
+            className="grid h-9 w-9 place-items-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+            aria-label="About Remove BG"
+          >
+            <Info className="h-4 w-4" />
+          </Link>
           <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
             {creditsLabel}
           </span>
@@ -245,6 +251,16 @@ function RemoveBgPage() {
       </header>
 
       <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+        {/* Canvas title — clear on the stage, not only in the header */}
+        <div className="mb-3 text-center">
+          <h1 className="text-lg font-extrabold tracking-tight sm:text-xl">
+            One-click background removal
+          </h1>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Upload a photo · get a transparent cutout
+          </p>
+        </div>
+
         {/* Stage */}
         <div
           className={cn(
@@ -263,9 +279,7 @@ function RemoveBgPage() {
               </span>
               <div>
                 <p className="text-sm font-semibold">Upload a photo</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Any aspect · {REMOVE_BG_CREDITS} credits · no watermark
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">JPG, PNG, WebP · any aspect</p>
               </div>
             </button>
           ) : (
@@ -314,7 +328,7 @@ function RemoveBgPage() {
           />
         </div>
 
-        {/* Quality */}
+        {/* Quality — labels only; plan rules enforced on server */}
         {preview && (
           <div className="mt-4 flex items-center gap-2">
             <p className="text-xs font-semibold text-muted-foreground">Quality</p>
@@ -330,35 +344,40 @@ function RemoveBgPage() {
                     : "border-border text-muted-foreground hover:border-rose-300",
                 )}
               >
-                SD · free plan
+                SD
               </button>
               <button
                 type="button"
                 disabled={busy || free}
                 onClick={() => {
-                  if (free) {
-                    toast.message("HD is on paid plans");
-                    return;
-                  }
+                  if (free) return;
                   setQuality("hd");
                 }}
                 className={cn(
-                  "flex flex-1 items-center justify-center gap-1 rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                  "flex-1 rounded-xl border px-3 py-2 text-xs font-semibold transition",
                   quality === "hd"
                     ? "border-rose-500 bg-rose-500/10 text-rose-600"
                     : "border-border text-muted-foreground hover:border-rose-300",
-                  free && "opacity-70",
+                  free && "cursor-not-allowed opacity-50",
                 )}
               >
-                {free && <Lock className="h-3 w-3" />}
-                HD · paid
+                HD
               </button>
             </div>
           </div>
         )}
 
+        {/* Credits line — separate from primary CTA */}
+        {preview && phase !== "result" && (
+          <p className="mt-3 text-center text-[12px] text-muted-foreground">
+            <span className="font-semibold text-foreground">{REMOVE_BG_CREDITS} credits</span>
+            {" "}
+            per photo
+          </p>
+        )}
+
         {/* Actions */}
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 space-y-2">
           {phase !== "result" ? (
             <Button
               size="lg"
@@ -374,7 +393,7 @@ function RemoveBgPage() {
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Remove background · {REMOVE_BG_CREDITS} credits
+                  Remove background
                 </>
               )}
             </Button>
@@ -388,7 +407,12 @@ function RemoveBgPage() {
                 <Download className="mr-1.5 h-4 w-4" />
                 Download
               </Button>
-              <Button size="lg" variant="outline" className="h-12 rounded-2xl font-semibold" onClick={() => void onShare()}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-12 rounded-2xl font-semibold"
+                onClick={() => void onShare()}
+              >
                 <Share2 className="mr-1.5 h-4 w-4" />
                 Share
               </Button>
@@ -421,51 +445,6 @@ function RemoveBgPage() {
             </div>
           )}
         </div>
-
-        {/* Sample ideas carousel */}
-        <section className="mt-10">
-          <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Try with</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Products, flowers, plants — not only portraits.
-          </p>
-          <div className="mt-3 flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-            {REMOVE_BG_SAMPLES.map((s) => (
-              <div
-                key={s.id}
-                className={cn(
-                  "min-w-[140px] shrink-0 overflow-hidden rounded-2xl border border-border bg-card",
-                )}
-              >
-                <div
-                  className={cn(
-                    "flex aspect-square items-center justify-center bg-gradient-to-br text-4xl",
-                    s.gradient,
-                  )}
-                >
-                  {s.emoji}
-                </div>
-                <div className="p-2.5">
-                  <p className="text-[12px] font-semibold leading-tight">{s.title}</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">{s.subtitle}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <p className="mt-8 text-center text-[11px] text-muted-foreground">
-          Results are transparent PNG cutouts. No watermark on Remove BG.{" "}
-          {free ? (
-            <>
-              Free plan uses SD.{" "}
-              <Link to="/pricing" className="font-semibold text-rose-500">
-                Upgrade for HD
-              </Link>
-            </>
-          ) : (
-            "Paid plans can use HD."
-          )}
-        </p>
       </main>
     </div>
   );

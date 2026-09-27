@@ -26,13 +26,14 @@ import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
+/** Order: Cropmix → Remove BG → rest */
 const QUICK_CREATE = [
   { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
+  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
   { to: "/studio/video" as const, label: "Video", icon: Video },
   { to: "/studio/music" as const, label: "Music", icon: Music },
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
-  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
   { to: "/studio/image/auto-edit" as const, label: "Auto Edit", icon: Sparkles },
   { to: "/studio/image/filters" as const, label: "Filters", icon: Filter },
 ] as const;

@@ -37,6 +37,7 @@ const CHILD_PRODUCT_PREFIXES = [
   "/studio/image/filter-editor",
   "/studio/image/age",
   "/studio/image/remove-bg",
+  "/studio/image/remove-bg-info",
 ] as const;
 
 function isChildProductRoute(pathname: string): boolean {
