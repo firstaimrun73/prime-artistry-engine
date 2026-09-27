@@ -3,17 +3,15 @@
  * Wraps chargeFrameStudioApply for the standalone Frame Studio HTML client.
  */
 import { createAPIFileRoute } from "@tanstack/react-start/api";
-import { FRAME_CREDIT_COST } from "@/lib/frame-studio/credits";
 
 export const APIRoute = createAPIFileRoute("/api/frame-studio/apply")({
   POST: async ({ request }) => {
     try {
       const body = await request.json().catch(() => ({}));
       const frameId = String(body.frameId || "").slice(0, 80);
-      const tier = body.tier as "common" | "aiplus" | "premium";
-      if (!frameId || !["common", "aiplus", "premium"].includes(tier)) {
+      if (!frameId) {
         return Response.json(
-          { ok: false, reason: "error", message: "Invalid frameId or tier" },
+          { ok: false, reason: "error", message: "Invalid frameId" },
           { status: 400 },
         );
       }
@@ -30,7 +28,7 @@ export const APIRoute = createAPIFileRoute("/api/frame-studio/apply")({
         "@/lib/frame-studio/charge.server"
       );
       const result = await chargeFrameStudioApply({
-        data: { frameId, tier, cost: FRAME_CREDIT_COST[tier] },
+        data: { frameId },
       });
 
       if (!result.ok) {
