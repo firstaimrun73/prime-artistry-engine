@@ -32,6 +32,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CompareSlider } from "@/components/CompareSlider";
 
+const ROSE_ACCENT = "#f43f5e";
+
 type Search = { from?: "home" | "studio" | "info" };
 
 export const Route = createFileRoute("/studio/image/remove-bg")({
@@ -221,10 +223,11 @@ function RemoveBgPage() {
 
   const creditsLabel = isAdmin ? "Admin" : `${profile?.credits ?? 0}`;
   const busy = phase === "uploading" || phase === "processing";
+  const squareItems = REMOVE_BG_GALLERY.filter((g) => g.aspect === "1:1");
+  const wideItems = REMOVE_BG_GALLERY.filter((g) => g.aspect === "16:9");
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
-      {/* Header — Motio2edit + Remove BG icon, no Info button */}
       <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center gap-2 px-3 py-2.5">
           <button
@@ -237,7 +240,7 @@ function RemoveBgPage() {
           </button>
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-rose-500/15 text-rose-500">
-              <Eraser className="h-4.5 w-4.5 h-[18px] w-[18px]" strokeWidth={2.25} />
+              <Eraser className="h-[18px] w-[18px]" strokeWidth={2.25} />
             </span>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-500">Remove BG</p>
@@ -260,7 +263,6 @@ function RemoveBgPage() {
           </p>
         </div>
 
-        {/* Stage */}
         <div
           className={cn(
             "relative overflow-hidden rounded-2xl border border-border bg-card",
@@ -327,7 +329,6 @@ function RemoveBgPage() {
           />
         </div>
 
-        {/* Quality */}
         {preview && (
           <div className="mt-4 flex items-center gap-2">
             <p className="text-xs font-semibold text-muted-foreground">Quality</p>
@@ -374,7 +375,6 @@ function RemoveBgPage() {
           </p>
         )}
 
-        {/* Secondary actions when photo loaded */}
         {preview && (
           <div className="mt-2 flex gap-2">
             <Button
@@ -401,7 +401,6 @@ function RemoveBgPage() {
           </div>
         )}
 
-        {/* Result actions */}
         {phase === "result" && (
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Button
@@ -424,7 +423,7 @@ function RemoveBgPage() {
           </div>
         )}
 
-        {/* Samples — fill empty space, interactive sliders only */}
+        {/* Examples: 1:1 two-up, 16:9 full width; rose slider + checkerboard */}
         {!preview && (
           <section className="mt-8 space-y-3">
             <div className="flex items-baseline justify-between">
@@ -432,18 +431,19 @@ function RemoveBgPage() {
               <p className="text-[11px] text-muted-foreground">Drag to compare</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {REMOVE_BG_GALLERY.map((item) => (
+              {squareItems.map((item) => (
                 <div
                   key={item.id}
                   className="overflow-hidden rounded-2xl border border-border bg-card"
                 >
-                  <div
-                    className={cn(
-                      "relative w-full",
-                      item.aspect === "3:4" ? "aspect-[3/4]" : "aspect-square",
-                    )}
-                  >
-                    <CompareSlider before={item.before} after={item.after} className="h-full w-full" />
+                  <div className="relative aspect-square w-full">
+                    <CompareSlider
+                      before={item.before}
+                      after={item.after}
+                      accentColor={ROSE_ACCENT}
+                      transparentAfter
+                      className="h-full w-full"
+                    />
                   </div>
                   <p className="px-2.5 py-1.5 text-center text-[11px] font-semibold text-muted-foreground">
                     {item.title}
@@ -451,13 +451,30 @@ function RemoveBgPage() {
                 </div>
               ))}
             </div>
+            {wideItems.map((item) => (
+              <div
+                key={item.id}
+                className="overflow-hidden rounded-2xl border border-border bg-card"
+              >
+                <div className="relative aspect-video w-full">
+                  <CompareSlider
+                    before={item.before}
+                    after={item.after}
+                    accentColor={ROSE_ACCENT}
+                    transparentAfter
+                    className="h-full w-full"
+                  />
+                </div>
+                <p className="px-2.5 py-1.5 text-center text-[11px] font-semibold text-muted-foreground">
+                  {item.title}
+                </p>
+              </div>
+            ))}
           </section>
         )}
 
-        {/* Spacer so CTA sits at end of content */}
         <div className="mt-auto pt-6" />
 
-        {/* Primary CTA — end of scroll / bottom of page */}
         {phase !== "result" && (
           <div className="sticky bottom-0 z-20 -mx-3 border-t border-border/60 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/90">
             <Button
