@@ -71,35 +71,55 @@ export async function executeStandaloneAutoEdit(
 
   if (analysis.no_change || !analysis.final_edit_prompt.trim()) {
     // Still record History so the job is visible (0 credits, no edit applied).
-    const noChangeRow = {
-      user_id: args.userId,
-      type: "image" as const,
-      prompt: "Maluto AI Auto Edit",
-      input_url: validated.imageUrl.startsWith("https://") ? validated.imageUrl : null,
-      output_url: validated.imageUrl,
-      status: "success" as const,
-      metadata: {
-        experience: "auto-edit",
-        source: "standalone_auto",
-        operation: "auto_edit_no_change",
-        quality,
-        credits_charged: 0,
-        credits_used: 0,
-        no_change: true,
-      },
-    };
-    let histErr = (await args.supabaseAdmin.from("generations").insert(noChangeRow)).error;
-    if (histErr && /metadata|column|schema/i.test(histErr.message + (histErr.details ?? ""))) {
-      const { metadata: _m, ...base } = noChangeRow;
-      histErr = (await args.supabaseAdmin.from("generations").insert(base)).error;
-    }
-    if (histErr) {
-      console.error("[AutoEdit] NO_CHANGE history insert failed:", histErr.message, histErr.code);
+    let outputUrl = validated.imageUrl;
+    try {
+      const { persistGenerationHistory } = await import("@/lib/history-persist.server");
+      let outputBytes: Buffer | null = null;
+      let outputContentType = "image/jpeg";
+      try {
+        if (validated.imageUrl.startsWith("http")) {
+          const res = await fetch(validated.imageUrl);
+          if (res.ok) {
+            outputBytes = Buffer.from(await res.arrayBuffer());
+            outputContentType = res.headers.get("content-type") || outputContentType;
+          }
+        }
+      } catch {
+        /* keep source URL only */
+      }
+      const persist = await persistGenerationHistory({
+        supabaseAdmin: args.supabaseAdmin,
+        userId: args.userId,
+        type: "image",
+        prompt: "Maluto AI Auto Edit",
+        input_url: validated.imageUrl.startsWith("https://") ? validated.imageUrl : null,
+        output_url: validated.imageUrl,
+        status: "success",
+        is_private: true,
+        outputBytes,
+        outputContentType,
+        outputExt: "jpg",
+        metadata: {
+          experience: "auto-edit",
+          source: "standalone_auto",
+          operation: "auto_edit_no_change",
+          quality,
+          credits_charged: 0,
+          credits_used: 0,
+          no_change: true,
+        },
+      });
+      if (persist.error) {
+        console.error("[AutoEdit] NO_CHANGE history persist failed:", persist.error);
+      }
+      if (persist.output_url) outputUrl = persist.output_url;
+    } catch (e) {
+      console.error("[AutoEdit] NO_CHANGE history persist exception:", e);
     }
 
     return {
       success: true,
-      outputUrl: validated.imageUrl,
+      outputUrl,
       changed: false,
       status: "NO_CHANGE",
       creditsCharged: 0,
