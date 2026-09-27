@@ -7,7 +7,7 @@ import { getPlan } from "@/lib/plans";
 import { getTier } from "@/lib/plan-tier";
 import { CrownBadge } from "@/components/CrownBadge";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
-import { Lock, Eye, EyeOff } from "lucide-react";
+import { Lock } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
 import { useI18n } from "@/lib/i18n";
 
@@ -64,7 +64,6 @@ function SettingsPage() {
     }
   }, []);
 
-  // Same source as Profile History Save (shared helper)
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -299,47 +298,24 @@ function SettingsPage() {
         </div>
       </section>
 
+      {/* History only — sensitive-eye removed completely */}
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">History & Privacy</h2>
+        <h2 className="font-semibold">History</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Control whether generated media is kept in your private History drive.
+          Controls whether your present generations are saved to History.
         </p>
-        <div className="mt-4 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">History Save</p>
-              <p className="text-xs text-muted-foreground">
-                Keep successful creations in your private History. When off, new generations are not retained as History.
-              </p>
-            </div>
-            <Switch
-              checked={historyPrefs.history_enabled}
-              disabled={historySaving}
-              onCheckedChange={(v) => toggleHistoryPref("history_enabled", v)}
-            />
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">Save my history</p>
+            <p className="text-xs text-muted-foreground">
+              When on, new generations are saved here. When off, no more present generations are stored.
+            </p>
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-2">
-              <span className="mt-0.5 text-muted-foreground">
-                {historyPrefs.sensitive_mode ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </span>
-              <div>
-                <p className="text-sm font-medium">Sensitive mode</p>
-                <p className="text-xs text-muted-foreground">
-                  When on, your request is not saved to History (privacy eye).
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={historyPrefs.sensitive_mode}
-              disabled={historySaving}
-              onCheckedChange={(v) => toggleHistoryPref("sensitive_mode", v)}
-            />
-          </div>
+          <Switch
+            checked={historyPrefs.history_enabled}
+            disabled={historySaving}
+            onCheckedChange={(v) => toggleHistoryPref("history_enabled", v)}
+          />
         </div>
       </section>
 
