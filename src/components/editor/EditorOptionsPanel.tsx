@@ -1,4 +1,4 @@
-import { Lock, Coins, Info } from "lucide-react";
+import { Lock, Info } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ASPECT_RATIOS, type AspectRatio } from "@/lib/prompt-suggestions";
@@ -8,8 +8,6 @@ import {
   type ImageQuality,
   type VideoResolution,
 } from "@/lib/quality-options";
-import { Slider } from "@/components/ui/slider";
-import { MultiImageInput } from "@/components/MultiImageInput";
 import {
   VIDEO_DURATIONS,
   VIDEO_ASPECT_RATIOS,
@@ -214,38 +212,16 @@ export function EditorOptionsPanel({
       )}
 
       {mediaType === "image" && inputDataUrl && (
-        <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-muted-foreground">Strength</span>
-            <span className="text-[11px] font-semibold tabular-nums">{strength.toFixed(2)}</span>
-          </div>
-          <Slider
-            value={[strength]}
-            min={0}
-            max={1}
-            step={0.05}
-            onValueChange={(v) => setStrength(v[0])}
-            disabled={loading}
-          />
-          <p className="text-[11px] text-muted-foreground">
-            Higher = more visible changes. Lower preserves the original more.
-          </p>
+        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
+          <span className="text-[11px] font-medium text-muted-foreground">Strength</span>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#FF5A1F]/80" aria-hidden />
+            Recommended
+          </span>
         </div>
       )}
 
-      {mediaType === "image" && canAddRefImages && (
-        <div className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-3">
-          <p className="text-[11px] font-medium text-muted-foreground">
-            References
-          </p>
-          <MultiImageInput
-            userPlan={userPlan}
-            images={refImages}
-            onChange={setRefImages}
-            disabled={loading}
-          />
-        </div>
-      )}
+      {/* Multi-reference selection is handled by the gallery + slot only — no separate lock tile. */}
 
       {mediaType === "video" && (
         <div className="space-y-3 rounded-lg border border-border bg-card p-3">
@@ -342,10 +318,10 @@ export function EditorOptionsPanel({
                 <button
                   type="button"
                   className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/40 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+                  aria-label="Generation cost info"
                 >
-                  <Coins className="h-3.5 w-3.5" />
-                  <span className="tabular-nums">{cost} credits</span>
-                  <Info className="h-3 w-3 opacity-60" />
+                  <Info className="h-3.5 w-3.5" />
+                  <span>Info</span>
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-64 space-y-2 text-xs" align="start">
@@ -365,7 +341,7 @@ export function EditorOptionsPanel({
                   </div>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Balance: {isAdmin ? "∞" : credits} · After: {isAdmin ? "∞" : Math.max(0, credits - cost)}
+                  Cost is deducted only on successful generation.
                 </p>
               </PopoverContent>
             </Popover>
