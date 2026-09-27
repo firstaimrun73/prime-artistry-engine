@@ -23,6 +23,15 @@ interface EditorPreviewProps {
   studioTier?: StudioTier;
 }
 
+/** Subtle glassy Motio2edit mark — UI preview only; server policy unchanged. */
+function WatermarkMark() {
+  return (
+    <span className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/45 px-2 py-1 text-[11px] font-bold tracking-wide text-white/90 backdrop-blur-[2px]">
+      Motio<span className="text-[#FF5A1F]">2</span>edit
+    </span>
+  );
+}
+
 /**
  * Preview / result surface.
  * Generation UI branches by Experience:
@@ -57,6 +66,7 @@ export function EditorPreview({
 
   const vip = studioTier === "premium";
   const premiumExp = studioTier === "pro";
+  const showWm = !isAdmin && (isFree || keepWatermark);
 
   if (state === "analyzing") {
     return (
@@ -145,7 +155,6 @@ export function EditorPreview({
             {loadingMessage}
           </p>
 
-          {/* Standard: progress bar */}
           {studioTier === "standard" && (
             <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-secondary">
               <div
@@ -155,7 +164,6 @@ export function EditorPreview({
             </div>
           )}
 
-          {/* Premium: soft energy bar */}
           {premiumExp && (
             <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-orange-950/50">
               <div
@@ -165,7 +173,6 @@ export function EditorPreview({
             </div>
           )}
 
-          {/* Ultra AI: gold progress with subtle cyan tip */}
           {vip && (
             <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-[#111B2E]">
               <div
@@ -234,8 +241,9 @@ export function EditorPreview({
 
   if (!outputIsVideo && mediaType === "image" && inputPreview) {
     return (
-      <div className="animate-scale-in overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-md">
+      <div className="relative animate-scale-in overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-md">
         <CompareSlider before={inputPreview} after={output} />
+        {showWm && <WatermarkMark />}
       </div>
     );
   }
@@ -243,7 +251,7 @@ export function EditorPreview({
   return (
     <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/70 p-3 shadow-sm backdrop-blur-md animate-scale-in">
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
-      <div className="flex min-h-[200px] items-center justify-center overflow-hidden rounded-xl bg-background/40">
+      <div className="relative flex min-h-[200px] items-center justify-center overflow-hidden rounded-xl bg-background/40">
         {outputIsVideo ? (
           <div className="relative h-full w-full min-h-[200px]">
             <video
@@ -254,21 +262,20 @@ export function EditorPreview({
               loop
               muted
             />
-            {!isAdmin && (isFree || keepWatermark) && (
-              <span className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/55 px-2 py-1 text-[11px] font-bold tracking-wide text-white/95">
-                Motio2edit
-              </span>
-            )}
+            {showWm && <WatermarkMark />}
           </div>
         ) : (
-          <img
-            src={output}
-            alt="output"
-            className="max-h-[480px] w-full object-contain select-none"
-            draggable={false}
-            onContextMenu={(e) => e.preventDefault()}
-            style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
-          />
+          <>
+            <img
+              src={output}
+              alt="output"
+              className="max-h-[480px] w-full object-contain select-none"
+              draggable={false}
+              onContextMenu={(e) => e.preventDefault()}
+              style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+            />
+            {showWm && <WatermarkMark />}
+          </>
         )}
       </div>
     </div>
