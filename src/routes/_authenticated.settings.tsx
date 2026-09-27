@@ -23,8 +23,14 @@ export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
+import {
+  loadHistoryPrefs,
+  saveHistoryPrefs,
+  type HistoryPrefs,
+  DEFAULT_HISTORY_PREFS,
+} from "@/lib/history-retention";
+
 const NOTIF_KEY = "motio2edit-notifications";
-const HISTORY_KEY = "motio2edit-history-prefs";
 
 type NotifPrefs = {
   product: boolean;
@@ -32,13 +38,7 @@ type NotifPrefs = {
   security: boolean;
 };
 
-type HistoryPrefs = {
-  history_enabled: boolean;
-  sensitive_mode: boolean;
-};
-
 const DEFAULT_NOTIFS: NotifPrefs = { product: true, marketing: false, security: true };
-const DEFAULT_HISTORY: HistoryPrefs = { history_enabled: true, sensitive_mode: false };
 
 function SettingsPage() {
   const { profile, user, refreshProfile, signOut } = useAuth();
@@ -51,7 +51,7 @@ function SettingsPage() {
   const [pwSaving, setPwSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [notifs, setNotifs] = useState<NotifPrefs>(DEFAULT_NOTIFS);
-  const [historyPrefs, setHistoryPrefs] = useState<HistoryPrefs>(DEFAULT_HISTORY);
+  const [historyPrefs, setHistoryPrefs] = useState<HistoryPrefs>(DEFAULT_HISTORY_PREFS);
   const [historySaving, setHistorySaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -62,32 +62,15 @@ function SettingsPage() {
     } catch {
       // ignore
     }
-    try {
-      const h = localStorage.getItem(HISTORY_KEY);
-      if (h) setHistoryPrefs({ ...DEFAULT_HISTORY, ...JSON.parse(h) });
-    } catch {
-      // ignore
-    }
   }, []);
 
-  // Prefer backend user_settings when available (Claude will add columns)
+  // Same source as Profile History Save (shared helper)
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from("user_settings")
-        .select("history_enabled, sensitive_mode")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (cancelled || !data) return;
-      setHistoryPrefs((prev) => ({
-        history_enabled:
-          typeof data.history_enabled === "boolean" ? data.history_enabled : prev.history_enabled,
-        sensitive_mode:
-          typeof data.sensitive_mode === "boolean" ? data.sensitive_mode : prev.sensitive_mode,
-      }));
-    })();
+    loadHistoryPrefs(user.id).then((prefs) => {
+      if (!cancelled) setHistoryPrefs(prefs);
+    });
     return () => {
       cancelled = true;
     };
@@ -189,29 +172,16 @@ function SettingsPage() {
   const toggleHistoryPref = async (key: keyof HistoryPrefs, value: boolean) => {
     const next = { ...historyPrefs, [key]: value };
     setHistoryPrefs(next);
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-    } catch {
-      // ignore
-    }
-    // Backend is source of truth when user_settings columns exist
     if (!user?.id) return;
     setHistorySaving(true);
-    const { error } = await supabase.from("user_settings").upsert(
-      {
-        user_id: user.id,
-        history_enabled: next.history_enabled,
-        sensitive_mode: next.sensitive_mode,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
+    const res = await saveHistoryPrefs(user.id, next);
     setHistorySaving(false);
-    if (error) {
-      // Column may not exist yet — local preference still applied
-      console.warn("[settings] history prefs backend write:", error.message);
-    } else {
-      toast.success("History preference saved.");
+    if (res.backend) toast.success("History preference saved.");
+    else {
+      console.warn("[settings] history prefs backend write:", res.message);
+      toast.message("Preference saved on this device.", {
+        description: "Backend history_enabled columns not applied yet.",
+      });
     }
   };
 
@@ -329,7 +299,6 @@ function SettingsPage() {
         </div>
       </section>
 
-      {/* History & Privacy — consumes history_enabled / sensitive_mode */}
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">History & Privacy</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -338,9 +307,9 @@ function SettingsPage() {
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Keep History</p>
+              <p className="text-sm font-medium">History Save</p>
               <p className="text-xs text-muted-foreground">
-                When off, new generations are not saved to History.
+                Keep successful creations in your private History. When off, new generations are not retained as History.
               </p>
             </div>
             <Switch
