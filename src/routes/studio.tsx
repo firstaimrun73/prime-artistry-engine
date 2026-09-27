@@ -13,7 +13,7 @@ export const Route = createFileRoute("/studio")({
       { title: "Studio — Motio2edit by Motion2AI" },
       {
         name: "description",
-        content: "Image, Circle 2edit, Frames, Video, and Music studios in one hub.",
+        content: "Image, Circle 2edit, Video, Frames, and Music studios in one hub.",
       },
       { property: "og:title", content: "Studio — Motio2edit by Motion2AI" },
     ],
@@ -46,16 +46,16 @@ function StudioHub() {
           <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a studio</h1>
         </div>
 
-        {/* 3 rows: Image|Circle, Frames full-width, Video|Music — fits without scroll */}
-        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[1fr_0.72fr_1fr] gap-2 sm:gap-3">
+        {/* Order: Image | Circle2edit , Video | Frames , Music full-width */}
+        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[1.1fr_1fr_0.85fr] gap-2.5 sm:gap-3">
           <StudioTile
             to="/editor"
             title="Image"
             subtitle="Generate · enhance"
             gradient="from-primary/35 via-primary/10 to-transparent"
             icon={
-              <span className="inline-flex rounded-2xl bg-primary p-2.5 text-primary-foreground shadow-lg sm:p-3">
-                <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg sm:p-3.5">
+                <ImageIcon className="h-6 w-6 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3s_ease-in-out_infinite]" />
               </span>
             }
           />
@@ -76,27 +76,26 @@ function StudioHub() {
           />
 
           <StudioTile
-            to="/studio/frames"
-            title="Frames"
-            subtitle="Frame · Glass"
-            gradient="from-slate-400/30 via-zinc-200/10 to-transparent"
-            className="col-span-2"
-            icon={
-              <span className="inline-flex rounded-2xl border border-slate-400/40 bg-background/80 p-2.5 sm:p-3">
-                <Frame className="h-5 w-5 text-slate-600 dark:text-slate-300 sm:h-6 sm:w-6" />
-              </span>
-            }
-          />
-
-          <StudioTile
             to={videoOk ? "/studio/video" : "/pricing"}
             title="Video"
             subtitle={videoOk ? "Cinematic motion" : "Upgrade to unlock"}
             gradient="from-rose-500/30 via-transparent to-transparent"
             locked={!videoOk}
             icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-2.5 sm:p-3">
-                <Video className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
+              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
+                <Video className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.2s_ease-in-out_infinite]" />
+              </span>
+            }
+          />
+
+          <StudioTile
+            to="/studio/frames"
+            title="Frames"
+            subtitle="Frame · Glass"
+            gradient="from-slate-400/30 via-zinc-200/10 to-transparent"
+            icon={
+              <span className="inline-flex rounded-2xl border border-slate-400/40 bg-background/80 p-3 sm:p-3.5">
+                <Frame className="h-6 w-6 text-slate-600 dark:text-slate-300 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_2.8s_ease-in-out_infinite]" />
               </span>
             }
           />
@@ -107,13 +106,21 @@ function StudioHub() {
             subtitle={musicOk ? "Prompt-to-music" : "Upgrade to unlock"}
             gradient="from-fuchsia-500/30 via-transparent to-transparent"
             locked={!musicOk}
+            className="col-span-2"
             icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-2.5 sm:p-3">
-                <Music className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
+              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
+                <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.4s_ease-in-out_infinite]" />
               </span>
             }
           />
         </div>
+
+        <style>{`
+          @keyframes iconFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+          }
+        `}</style>
       </main>
     </div>
   );
@@ -145,7 +152,7 @@ function StudioTile({
       to={to}
       search={search as never}
       className={cn(
-        "group relative flex min-h-0 flex-col justify-between overflow-hidden rounded-2xl border bg-card/80 p-3 shadow-sm backdrop-blur-md transition-transform active:scale-[0.98] sm:rounded-3xl sm:p-4",
+        "group relative flex min-h-0 flex-col justify-between overflow-hidden rounded-2xl border bg-card/80 p-3.5 shadow-sm backdrop-blur-md transition-transform active:scale-[0.98] sm:rounded-3xl sm:p-4",
         "border-border/80",
         borderClass,
         className,
@@ -167,14 +174,14 @@ function StudioTile({
   );
 }
 
-/** Meta-style concentric ring mark in Circle 2edit purple. */
+/** Meta-style concentric ring mark in Circle 2edit purple — matches internal header. */
 function CircleMetaRing() {
   return (
     <span
-      className="relative grid h-11 w-11 place-items-center rounded-2xl border border-[#7B6FE0]/45 bg-white/80 shadow-lg dark:bg-[#22252F] sm:h-12 sm:w-12"
+      className="relative grid h-12 w-12 place-items-center rounded-2xl border border-[#7B6FE0]/45 bg-white/80 shadow-lg dark:bg-[#22252F] sm:h-14 sm:w-14"
       aria-hidden
     >
-      <svg viewBox="0 0 40 40" className="h-8 w-8 overflow-visible sm:h-9 sm:w-9">
+      <svg viewBox="0 0 40 40" className="h-9 w-9 overflow-visible sm:h-10 sm:w-10">
         <defs>
           <linearGradient id="studioMetaRing" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#A8A0F0" />
@@ -190,7 +197,7 @@ function CircleMetaRing() {
           stroke="url(#studioMetaRing)"
           strokeWidth="2.4"
           strokeLinecap="round"
-          className="origin-center motion-safe:animate-[spin_10s_linear_infinite]"
+          className="origin-center motion-safe:animate-[spin_8s_linear_infinite]"
         />
         <circle cx="20" cy="20" r="8.5" fill="none" stroke="#7B6FE0" strokeWidth="1.6" opacity="0.85" />
         <circle cx="20" cy="20" r="3.2" fill="#7B6FE0" opacity="0.9" />
