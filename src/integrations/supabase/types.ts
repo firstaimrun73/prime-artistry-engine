@@ -7,453 +7,106 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      admin_access_log: {
-        Row: {
-          allowed: boolean
-          created_at: string
-          email: string | null
-          id: string
-          path: string | null
-          user_id: string | null
-        }
-        Insert: {
-          allowed?: boolean
-          created_at?: string
-          email?: string | null
-          id?: string
-          path?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          allowed?: boolean
-          created_at?: string
-          email?: string | null
-          id?: string
-          path?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      admin_popups: {
-        Row: {
-          button_text: string
-          created_at: string
-          enabled: boolean
-          id: string
-          message: string
-          target: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          button_text?: string
-          created_at?: string
-          enabled?: boolean
-          id?: string
-          message?: string
-          target?: string
-          title?: string
-          updated_at?: string
-        }
-        Update: {
-          button_text?: string
-          created_at?: string
-          enabled?: boolean
-          id?: string
-          message?: string
-          target?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      app_settings: {
-        Row: {
-          ad_settings: Json
-          created_at: string
-          id: number
-          plan_visibility: Json
-          updated_at: string
-        }
-        Insert: {
-          ad_settings?: Json
-          created_at?: string
-          id?: number
-          plan_visibility?: Json
-          updated_at?: string
-        }
-        Update: {
-          ad_settings?: Json
-          created_at?: string
-          id?: number
-          plan_visibility?: Json
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      billing_audit_log: {
-        Row: {
-          action: string
-          actor: string | null
-          created_at: string
-          id: string
-          metadata: Json | null
-          target_id: string | null
-          user_id: string | null
-        }
-        Insert: {
-          action: string
-          actor?: string | null
-          created_at?: string
-          id?: string
-          metadata?: Json | null
-          target_id?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          action?: string
-          actor?: string | null
-          created_at?: string
-          id?: string
-          metadata?: Json | null
-          target_id?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      broadcasts: {
-        Row: {
-          active: boolean
-          created_at: string
-          id: string
-          kind: string
-          message: string
-          target: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          kind?: string
-          message: string
-          target?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          created_at?: string
-          id?: string
-          kind?: string
-          message?: string
-          target?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      credit_audit_log: {
-        Row: {
-          amount_paid: number | null
-          created_at: string
-          credits_added: number
-          currency: string | null
-          id: string
-          payment_method: string | null
-          reason: string
-          transaction_id: string
-          user_id: string
-        }
-        Insert: {
-          amount_paid?: number | null
-          created_at?: string
-          credits_added: number
-          currency?: string | null
-          id?: string
-          payment_method?: string | null
-          reason?: string
-          transaction_id: string
-          user_id: string
-        }
-        Update: {
-          amount_paid?: number | null
-          created_at?: string
-          credits_added?: number
-          currency?: string | null
-          id?: string
-          payment_method?: string | null
-          reason?: string
-          transaction_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      credit_ledger: {
-        Row: {
-          created_at: string
-          credits_added: number
-          id: string
-          reason: string
-          transaction_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          credits_added: number
-          id?: string
-          reason?: string
-          transaction_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          credits_added?: number
-          id?: string
-          reason?: string
-          transaction_id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      credit_transactions: {
-        Row: {
-          amount: number
-          balance_after: number
-          created_at: string
-          generation_type: string | null
-          id: string
-          kind: string
-          refunded: boolean
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          balance_after: number
-          created_at?: string
-          generation_type?: string | null
-          id?: string
-          kind: string
-          refunded?: boolean
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          balance_after?: number
-          created_at?: string
-          generation_type?: string | null
-          id?: string
-          kind?: string
-          refunded?: boolean
-          user_id?: string
-        }
-        Relationships: []
-      }
-      email_send_log: {
-        Row: {
-          created_at: string
-          error_message: string | null
-          id: string
-          message_id: string | null
-          metadata: Json | null
-          recipient_email: string
-          status: string
-          template_name: string
-        }
-        Insert: {
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          message_id?: string | null
-          metadata?: Json | null
-          recipient_email: string
-          status: string
-          template_name: string
-        }
-        Update: {
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          message_id?: string | null
-          metadata?: Json | null
-          recipient_email?: string
-          status?: string
-          template_name?: string
-        }
-        Relationships: []
-      }
-      email_send_state: {
-        Row: {
-          auth_email_ttl_minutes: number
-          batch_size: number
-          id: number
-          retry_after_until: string | null
-          send_delay_ms: number
-          transactional_email_ttl_minutes: number
-          updated_at: string
-        }
-        Insert: {
-          auth_email_ttl_minutes?: number
-          batch_size?: number
-          id?: number
-          retry_after_until?: string | null
-          send_delay_ms?: number
-          transactional_email_ttl_minutes?: number
-          updated_at?: string
-        }
-        Update: {
-          auth_email_ttl_minutes?: number
-          batch_size?: number
-          id?: number
-          retry_after_until?: string | null
-          send_delay_ms?: number
-          transactional_email_ttl_minutes?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      email_unsubscribe_tokens: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          token: string
-          used_at: string | null
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          token: string
-          used_at?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          token?: string
-          used_at?: string | null
-        }
-        Relationships: []
-      }
-      feedback: {
-        Row: {
-          category: string | null
-          created_at: string
-          id: string
-          message: string
-          page_url: string | null
-          rating: number | null
-          screenshot_url: string | null
-          status: string
-          user_email: string | null
-          user_id: string | null
-          user_name: string | null
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string
-          id?: string
-          message: string
-          page_url?: string | null
-          rating?: number | null
-          screenshot_url?: string | null
-          status?: string
-          user_email?: string | null
-          user_id?: string | null
-          user_name?: string | null
-        }
-        Update: {
-          category?: string | null
-          created_at?: string
-          id?: string
-          message?: string
-          page_url?: string | null
-          rating?: number | null
-          screenshot_url?: string | null
-          status?: string
-          user_email?: string | null
-          user_id?: string | null
-          user_name?: string | null
-        }
-        Relationships: []
-      }
-      generation_history: {
-        Row: {
-          created_at: string
-          id: string
-          input_path: string | null
-          output_path: string | null
-          prompt: string | null
-          status: string
-          type: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          input_path?: string | null
-          output_path?: string | null
-          prompt?: string | null
-          status?: string
-          type: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          input_path?: string | null
-          output_path?: string | null
-          prompt?: string | null
-          status?: string
-          type?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       generations: {
         Row: {
           created_at: string
+          deleted_at: string | null
           id: string
           input_url: string | null
+          is_private: boolean | null
           metadata: Json | null
           output_url: string | null
           prompt: string | null
+          r2_object_key: string | null
+          retained_as_history: boolean | null
           status: Database["public"]["Enums"]["gen_status"]
+          storage_provider: string | null
+          thumbnail_key: string | null
           title: string | null
           type: Database["public"]["Enums"]["gen_type"]
           user_id: string
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           id?: string
           input_url?: string | null
+          is_private?: boolean | null
           metadata?: Json | null
           output_url?: string | null
           prompt?: string | null
+          r2_object_key?: string | null
+          retained_as_history?: boolean | null
           status?: Database["public"]["Enums"]["gen_status"]
+          storage_provider?: string | null
+          thumbnail_key?: string | null
           title?: string | null
           type: Database["public"]["Enums"]["gen_type"]
           user_id: string
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           id?: string
           input_url?: string | null
+          is_private?: boolean | null
           metadata?: Json | null
           output_url?: string | null
           prompt?: string | null
+          r2_object_key?: string | null
+          retained_as_history?: boolean | null
           status?: Database["public"]["Enums"]["gen_status"]
+          storage_provider?: string | null
+          thumbnail_key?: string | null
           title?: string | null
           type?: Database["public"]["Enums"]["gen_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      history_media_deletion_queue: {
+        Row: {
+          attempt_count: number | null
+          created_at: string
+          id: string
+          last_error: string | null
+          object_key: string | null
+          processed_at: string | null
+          source_id: string
+          source_table: string
+          status: string
+          storage_provider: string | null
+          user_id: string
+        }
+        Insert: {
+          attempt_count?: number | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          object_key?: string | null
+          processed_at?: string | null
+          source_id: string
+          source_table: string
+          status?: string
+          storage_provider?: string | null
+          user_id: string
+        }
+        Update: {
+          attempt_count?: number | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          object_key?: string | null
+          processed_at?: string | null
+          source_id?: string
+          source_table?: string
+          status?: string
+          storage_provider?: string | null
           user_id?: string
         }
         Relationships: []
@@ -500,123 +153,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_attempts: {
-        Row: {
-          created_at: string
-          id: string
-          payment_method: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          payment_method: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          payment_method?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      payment_transactions: {
-        Row: {
-          amount: number
-          created_at: string
-          credits_purchased: number
-          currency: string
-          gateway_order_id: string | null
-          gateway_response: Json | null
-          id: string
-          payment_method: string
-          payment_status: string
-          paypal_capture_id: string | null
-          paypal_refund_id: string | null
-          refunded_amount: number | null
-          refunded_at: string | null
-          transaction_id: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          credits_purchased?: number
-          currency: string
-          gateway_order_id?: string | null
-          gateway_response?: Json | null
-          id?: string
-          payment_method: string
-          payment_status?: string
-          paypal_capture_id?: string | null
-          paypal_refund_id?: string | null
-          refunded_amount?: number | null
-          refunded_at?: string | null
-          transaction_id?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          credits_purchased?: number
-          currency?: string
-          gateway_order_id?: string | null
-          gateway_response?: Json | null
-          id?: string
-          payment_method?: string
-          payment_status?: string
-          paypal_capture_id?: string | null
-          paypal_refund_id?: string | null
-          refunded_amount?: number | null
-          refunded_at?: string | null
-          transaction_id?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      payments: {
-        Row: {
-          amount: number
-          created_at: string
-          currency: string
-          description: string | null
-          id: string
-          provider: string | null
-          provider_payment_id: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string
-          description?: string | null
-          id?: string
-          provider?: string | null
-          provider_payment_id?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string
-          description?: string | null
-          id?: string
-          provider?: string | null
-          provider_payment_id?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -656,295 +192,32 @@ export type Database = {
         }
         Relationships: []
       }
-      refund_requests: {
-        Row: {
-          admin_note: string | null
-          created_at: string
-          currency: string | null
-          details: string | null
-          id: string
-          payment_transaction_id: string | null
-          paypal_refund_id: string | null
-          reason: string
-          refund_amount: number | null
-          refunded_at: string | null
-          requested_at: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          admin_note?: string | null
-          created_at?: string
-          currency?: string | null
-          details?: string | null
-          id?: string
-          payment_transaction_id?: string | null
-          paypal_refund_id?: string | null
-          reason: string
-          refund_amount?: number | null
-          refunded_at?: string | null
-          requested_at?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          admin_note?: string | null
-          created_at?: string
-          currency?: string | null
-          details?: string | null
-          id?: string
-          payment_transaction_id?: string | null
-          paypal_refund_id?: string | null
-          reason?: string
-          refund_amount?: number | null
-          refunded_at?: string | null
-          requested_at?: string
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "refund_requests_payment_transaction_id_fkey"
-            columns: ["payment_transaction_id"]
-            isOneToOne: false
-            referencedRelation: "payment_transactions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscriptions: {
-        Row: {
-          auto_renew: boolean
-          cancel_reason: string | null
-          cancelled_at: string | null
-          created_at: string
-          current_period_end: string | null
-          current_period_start: string | null
-          id: string
-          plan: string
-          provider: string | null
-          provider_subscription_id: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          auto_renew?: boolean
-          cancel_reason?: string | null
-          cancelled_at?: string | null
-          created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          plan?: string
-          provider?: string | null
-          provider_subscription_id?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          auto_renew?: boolean
-          cancel_reason?: string | null
-          cancelled_at?: string | null
-          created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          plan?: string
-          provider?: string | null
-          provider_subscription_id?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Relationships: []
-      }
-      support_tickets: {
-        Row: {
-          attachment_url: string | null
-          category: Database["public"]["Enums"]["ticket_category"]
-          created_at: string
-          id: string
-          message: string
-          priority: string
-          status: Database["public"]["Enums"]["ticket_status"]
-          subject: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          attachment_url?: string | null
-          category: Database["public"]["Enums"]["ticket_category"]
-          created_at?: string
-          id?: string
-          message: string
-          priority?: string
-          status?: Database["public"]["Enums"]["ticket_status"]
-          subject: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          attachment_url?: string | null
-          category?: Database["public"]["Enums"]["ticket_category"]
-          created_at?: string
-          id?: string
-          message?: string
-          priority?: string
-          status?: Database["public"]["Enums"]["ticket_status"]
-          subject?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      suppressed_emails: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          metadata: Json | null
-          reason: string
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          metadata?: Json | null
-          reason: string
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          metadata?: Json | null
-          reason?: string
-        }
-        Relationships: []
-      }
-      usage_tracking: {
-        Row: {
-          action: string
-          created_at: string
-          credits_used: number
-          id: string
-          metadata: Json | null
-          user_id: string
-        }
-        Insert: {
-          action: string
-          created_at?: string
-          credits_used?: number
-          id?: string
-          metadata?: Json | null
-          user_id: string
-        }
-        Update: {
-          action?: string
-          created_at?: string
-          credits_used?: number
-          id?: string
-          metadata?: Json | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_credits: {
-        Row: {
-          created_at: string
-          credits: number
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          credits?: number
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          credits?: number
-          id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       user_settings: {
         Row: {
-          created_at: string
-          email_notifications: boolean
-          id: string
-          preferred_currency: string
-          theme: string
-          updated_at: string
+          history_enabled: boolean | null
+          sensitive_mode: boolean | null
+          updated_at: string | null
           user_id: string
         }
         Insert: {
-          created_at?: string
-          email_notifications?: boolean
-          id?: string
-          preferred_currency?: string
-          theme?: string
-          updated_at?: string
+          history_enabled?: boolean | null
+          sensitive_mode?: boolean | null
+          updated_at?: string | null
           user_id: string
         }
         Update: {
-          created_at?: string
-          email_notifications?: boolean
-          id?: string
-          preferred_currency?: string
-          theme?: string
-          updated_at?: string
+          history_enabled?: boolean | null
+          sensitive_mode?: boolean | null
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
       }
-      webhook_events: {
-        Row: {
-          created_at: string
-          event_id: string
-          event_type: string
-          gateway: string
-          id: string
-          payload: Json
-          processed: boolean
-          processed_at: string | null
-        }
-        Insert: {
-          created_at?: string
-          event_id: string
-          event_type: string
-          gateway: string
-          id?: string
-          payload: Json
-          processed?: boolean
-          processed_at?: string | null
-        }
-        Update: {
-          created_at?: string
-          event_id?: string
-          event_type?: string
-          gateway?: string
-          id?: string
-          payload?: Json
-          processed?: boolean
-          processed_at?: string | null
-        }
-        Relationships: []
+      [key: string]: {
+        Row: Record<string, unknown>
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+        Relationships: unknown[]
       }
     }
     Views: {
@@ -964,35 +237,21 @@ export type Database = {
         Args: { _amount: number; _gen_type: string; _user_id: string }
         Returns: Json
       }
-      delete_email: {
-        Args: { message_id: number; queue_name: string }
-        Returns: boolean
+      history_user_delete: {
+        Args: { p_generation_id: string }
+        Returns: undefined
       }
-      email_queue_dispatch: { Args: never; Returns: undefined }
-      enqueue_email: {
-        Args: { payload: Json; queue_name: string }
-        Returns: number
+      music_history_user_delete: {
+        Args: { p_track_id: string }
+        Returns: undefined
       }
-      move_to_dlq: {
-        Args: {
-          dlq_name: string
-          message_id: number
-          payload: Json
-          source_queue: string
-        }
-        Returns: number
-      }
-      read_email_batch: {
-        Args: { batch_size: number; queue_name: string; vt: number }
-        Returns: {
-          message: Json
-          msg_id: number
-          read_ct: number
-        }[]
-      }
-      refund_credits: {
-        Args: { _transaction_id: string; _user_id: string }
+      should_retain_as_history: {
+        Args: { p_is_private: boolean; p_user_id: string }
         Returns: Json
+      }
+      [key: string]: {
+        Args: Record<string, unknown>
+        Returns: unknown
       }
     }
     Enums: {
@@ -1120,47 +379,3 @@ export type Enums<
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      gen_status: ["pending", "processing", "success", "failed"],
-      gen_type: ["image", "video", "music"],
-      plan_type: ["free", "lite", "plus", "pro", "studio", "business"],
-      ticket_category: [
-        "payment",
-        "credits",
-        "generation",
-        "account",
-        "technical",
-        "feature_request",
-        "bug_report",
-        "other",
-      ],
-      ticket_status: [
-        "open",
-        "in_progress",
-        "resolved",
-        "waiting_user",
-        "closed",
-      ],
-    },
-  },
-} as const

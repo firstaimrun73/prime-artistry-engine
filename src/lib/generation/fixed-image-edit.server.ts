@@ -8,6 +8,7 @@
  * - Credits deducted only after a deliverable URL exists (stamp-then-deduct)
  * - creditCost may be overridden (Auto Edit uses a fixed job cost)
  * - Internal prompt never leaves this module toward the client
+ * - History insert uses should_retain_as_history + private Blob/R2 when retained
  */
 
 import { imageQualityCost, imageUpscaleFactor } from "@/lib/quality-options";
@@ -20,6 +21,7 @@ import {
   type FalStep,
 } from "@/lib/fal-request";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { persistGenerationHistory } from "@/lib/history-persist.server";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -130,7 +132,7 @@ export type FixedImageEditArgs = {
   imageUrl: string;
   imageQuality: ImageQuality;
   keepWatermark?: boolean;
-  /** Override credit charge (Auto Edit uses fixed AUTO_EDIT_CREDIT_COST). */
+  /** Override credit price (Auto Edit uses fixed AUTO_EDIT_CREDIT_COST). */
   creditCost?: number;
 };
 
@@ -237,20 +239,23 @@ export async function runFixedImageEdit(
     console.log("[fixed-edit] charged", cost, "credits → remaining", newCredits);
   }
 
-  const { error: histErr } = await args.supabase.from("generations").insert({
-    user_id: args.userId,
+  const persist = await persistGenerationHistory({
+    supabaseAdmin: args.supabaseAdmin,
+    userId: args.userId,
     type: "image",
     prompt: "[motio2edit-auto]",
     input_url: "uploaded",
     output_url: outputUrl,
     status: "success",
+    is_private: true,
     metadata: {
       source: "standalone_auto",
       primary_model: IMAGE_EDIT_MODEL,
       credits_charged: creditsCharged,
     },
   });
-  if (histErr) console.error("[fixed-edit] history insert failed:", histErr.message);
+  if (persist.error) console.error("[fixed-edit] history insert failed:", persist.error);
+  if (persist.output_url) outputUrl = persist.output_url;
 
   return {
     outputUrl,

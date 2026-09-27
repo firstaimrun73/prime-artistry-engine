@@ -25,6 +25,15 @@ import {
   ArrowRight,
   BookOpen,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  loadHistoryPrefs,
+  saveHistoryPrefs,
+  isVisibleInHistory,
+  type HistoryPrefs,
+  DEFAULT_HISTORY_PREFS,
+} from "@/lib/history-retention";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -37,6 +46,7 @@ type Generation = {
   output_url: string | null;
   status: string;
   created_at: string;
+  metadata?: unknown;
 };
 
 export function Dashboard() {
@@ -44,19 +54,40 @@ export function Dashboard() {
   const { t } = useI18n();
   const [gens, setGens] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [historyPrefs, setHistoryPrefs] = useState<HistoryPrefs>(DEFAULT_HISTORY_PREFS);
+  const [historySaving, setHistorySaving] = useState(false);
 
   useEffect(() => {
     if (!user) return;
+    loadHistoryPrefs(user.id).then(setHistoryPrefs);
     supabase
       .from("generations")
-      .select("id, type, prompt, output_url, status, created_at")
+      .select("id, type, prompt, output_url, status, created_at, metadata")
       .order("created_at", { ascending: false })
-      .limit(8)
+      .limit(24)
       .then(({ data }) => {
-        if (data) setGens(data as Generation[]);
+        if (data) {
+          const rows = (data as Generation[]).filter((g) => isVisibleInHistory(g.metadata));
+          setGens(rows.slice(0, 8));
+        }
         setLoading(false);
       });
   }, [user]);
+
+  const toggleHistorySave = async (value: boolean) => {
+    if (!user) return;
+    const next = { ...historyPrefs, history_enabled: value };
+    setHistoryPrefs(next);
+    setHistorySaving(true);
+    const res = await saveHistoryPrefs(user.id, next);
+    setHistorySaving(false);
+    if (res.backend) toast.success(value ? "History Save on." : "History Save off.");
+    else toast.message(value ? "History Save on (device)." : "History Save off (device).", {
+      description: res.message
+        ? "Backend preference columns not applied yet — preference saved locally."
+        : undefined,
+    });
+  };
 
   if (!profile) return null;
   const plan = getPlan(profile.plan);
@@ -167,6 +198,26 @@ export function Dashboard() {
               <Link to={s.to}>{s.label}</Link>
             </Button>
           ))}
+        </div>
+      </section>
+
+      <section className="mt-8 rounded-xl border border-border bg-card p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">History Save</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Keep successful creations in your private History.
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Turn this off when you don&apos;t want new creations retained in History.
+            </p>
+          </div>
+          <Switch
+            checked={historyPrefs.history_enabled}
+            disabled={historySaving}
+            onCheckedChange={toggleHistorySave}
+            aria-label="History Save"
+          />
         </div>
       </section>
 
