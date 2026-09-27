@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Download,
+  Frame,
   Lock,
   Share2,
   SlidersHorizontal,
@@ -267,7 +268,15 @@ export function FramesPage() {
       const res = await chargeApply({ data: { frameId: frame.id } });
       if (!res || typeof res !== "object" || !("ok" in res) || !res.ok) {
         const r = res as { reason?: string; message?: string };
-        toast.error(r?.message || "Could not apply frame");
+        const msg =
+          r?.reason === "auth"
+            ? "Sign in to apply frames"
+            : r?.reason === "plan"
+              ? r?.message || "Upgrade to apply this frame"
+              : r?.reason === "credits"
+                ? r?.message || "Not enough credits"
+                : "Frame is not applied. Something went wrong on the server. Please try again.";
+        toast.error(msg);
         if (r?.reason === "plan" || r?.reason === "credits") void navigate({ to: "/pricing" });
         setPhase("edit");
         return;
@@ -284,7 +293,7 @@ export function FramesPage() {
       setAdjustOpen(false);
     } catch (e) {
       console.error(e);
-      toast.error("Could not apply frame");
+      toast.error("Frame is not applied. Something went wrong on the server. Please try again.");
       setPhase("edit");
     } finally {
       setApplying(false);
@@ -340,7 +349,10 @@ export function FramesPage() {
         <button type="button" onClick={() => void navigate({ to: "/studio" })} className="grid h-10 w-10 place-items-center rounded-full border" style={{ borderColor: "var(--frames-border)" }} aria-label="Back">
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <h1 className="text-lg font-bold tracking-tight">Frames</h1>
+        <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+          <Frame className="h-5 w-5 text-[#FF5A1F]" aria-hidden />
+          Frames
+        </h1>
         <div className="h-10 w-10" />
       </header>
 
