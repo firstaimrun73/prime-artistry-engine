@@ -6,7 +6,6 @@ import {
   Sparkles,
   Lock,
   Circle,
-  Aperture,
   Filter,
   Crop,
 } from "lucide-react";
@@ -20,7 +19,6 @@ import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
 import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery";
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
-import { ExploreLensesSection } from "@/components/home/ExploreLensesSection";
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
@@ -34,7 +32,6 @@ const QUICK_CREATE = [
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
   { to: "/studio/image/auto-edit" as const, label: "Auto Edit", icon: Sparkles },
   { to: "/studio/image/filters" as const, label: "Filters", icon: Filter },
-  { to: "/studio/image/lens-editor" as const, label: "Lenses", icon: Aperture },
 ] as const;
 
 export function SignedInHomeBody() {
@@ -93,7 +90,6 @@ export function SignedInHomeBody() {
                     | "/studio/image/circle-remove"
                     | "/studio/image/auto-edit"
                     | "/studio/image/filters"
-                    | "/studio/image/lens-editor"
                 }
                 {...(!locked && q.label === "Circle"
                   ? { search: { mode: "remove" as const, from: "home" as const } }
@@ -122,8 +118,6 @@ export function SignedInHomeBody() {
       <MusicStudioGallery />
 
       <FilterLensHomeSection />
-
-      <ExploreLensesSection />
 
       <ObserveBuildProtect />
 

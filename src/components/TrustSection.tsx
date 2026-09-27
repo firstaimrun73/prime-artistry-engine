@@ -14,7 +14,7 @@ const ITEMS = [
   {
     icon: Sparkles,
     title: "One workspace",
-    body: "Studios, Circle 2edit, Filters, Lenses, and Auto Edit in one Motio2edit account.",
+    body: "Studios, Circle 2edit, Filters, and Auto Edit in one Motio2edit account.",
   },
 ] as const;
 
