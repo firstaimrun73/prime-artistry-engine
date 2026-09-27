@@ -1,5 +1,5 @@
 import type { Controls, FrameDef } from "./frames-compose";
-import { scaleBorder, fillWood, fillLinen, roundRect, drawWm } from "./frames-compose";
+import { fillTexture, roundRect, drawWm } from "./frames-compose";
 
 export function composeFrame(
   img: HTMLImageElement,
@@ -11,236 +11,119 @@ export function composeFrame(
   const iw = img.naturalWidth || img.width;
   const ih = img.naturalHeight || img.height;
   const aspect = iw / Math.max(1, ih);
+  let contentW: number, contentH: number;
+  if (aspect >= 1) { contentW = maxEdge; contentH = Math.round(maxEdge / aspect); }
+  else { contentH = maxEdge; contentW = Math.round(maxEdge * aspect); }
+  contentW = Math.max(64, contentW); contentH = Math.max(64, contentH);
 
-  let contentW: number;
-  let contentH: number;
-  if (aspect >= 1) {
-    contentW = maxEdge;
-    contentH = Math.round(maxEdge / aspect);
-  } else {
-    contentH = maxEdge;
-    contentW = Math.round(maxEdge * aspect);
-  }
-  contentW = Math.max(64, contentW);
-  contentH = Math.max(64, contentH);
-
-  const border = scaleBorder(frame.baseBorder, controls.borderWidth);
-  const pad = Math.round(controls.padding * (maxEdge / 1000));
-  const bottomExtra = frame.bottomExtra
-    ? Math.round(Math.min(contentW, contentH) * frame.bottomExtra)
-    : 0;
-  const radius = Math.round(
-    Math.max(frame.radius, controls.round) * (maxEdge / 1000) * 8,
-  );
-
+  const padScale = 0.5 + (controls.padding / 48) * 1.2;
+  const borderScale = 0.5 + ((controls.borderWidth - 4) / 56) * 1.2;
+  const basePad = Math.round((frame.pad / 100) * Math.min(contentW, contentH) * padScale);
+  const border = Math.max(2, Math.round(basePad * borderScale * (frame.wide ? 1.3 : 1)));
+  const pad = Math.max(0, basePad);
+  const bottomExtra = frame.polaroid ? Math.round(Math.min(contentW, contentH) * 0.12) : 0;
+  const baseRadius = (frame.radius / 100) * Math.min(contentW, contentH);
+  const radius = Math.round(Math.max(baseRadius, controls.round * (maxEdge / 1000) * 8));
   const outerW = contentW + (border + pad) * 2;
   const outerH = contentH + (border + pad) * 2 + bottomExtra;
-
   const canvas = document.createElement("canvas");
   const shadowPad = controls.shadowOn ? Math.round(40 * (controls.texture / 100 + 0.3)) : 8;
   canvas.width = outerW + shadowPad * 2;
   canvas.height = outerH + shadowPad * 2;
   const ctx = canvas.getContext("2d")!;
-  const ox = shadowPad;
-  const oy = shadowPad;
+  const ox = shadowPad, oy = shadowPad;
+  const fillColor = frame.color ?? "#ffffff";
 
-  if (controls.shadowOn && frame.kind !== "float") {
+  if (controls.shadowOn) {
     ctx.save();
     ctx.shadowColor = `rgba(0,0,0,${0.12 + controls.texture * 0.003})`;
     ctx.shadowBlur = 12 + controls.texture * 0.4;
     ctx.shadowOffsetY = 6 + controls.texture * 0.08;
-    ctx.fillStyle = frame.outer === "transparent" ? "#fff" : frame.outer;
-    roundRect(ctx, ox, oy, outerW, outerH, radius);
-    ctx.fill();
+    ctx.fillStyle = fillColor;
+    roundRect(ctx, ox, oy, outerW, outerH, radius); ctx.fill();
     ctx.restore();
   }
-
-  if (frame.kind === "float") {
-    ctx.save();
-    ctx.shadowColor = `rgba(0,0,0,${0.2 + controls.texture * 0.004})`;
-    ctx.shadowBlur = 24 + controls.texture * 0.5;
-    ctx.shadowOffsetY = 16;
-    ctx.fillStyle = "#fff";
-    roundRect(ctx, ox + 4, oy + 4, outerW - 8, outerH - 8, 4);
-    ctx.fill();
-    ctx.restore();
-    ctx.drawImage(img, ox + 4, oy + 4, outerW - 8, outerH - 8);
-    if (watermark) drawWm(ctx, canvas.width, canvas.height);
-    return canvas;
-  }
-
-  if (frame.kind === "wood") {
-    fillWood(ctx, ox, oy, outerW, outerH, frame.outer, frame.id === "dark-walnut");
-  } else if (frame.kind === "linen") {
-    fillLinen(ctx, ox, oy, outerW, outerH, frame.outer, controls.texture);
-  } else if (frame.outer !== "transparent") {
-    ctx.fillStyle = frame.outer;
-    roundRect(ctx, ox, oy, outerW, outerH, radius);
-    ctx.fill();
-  }
-
-  if (frame.kind === "ornate" && frame.accent) {
-    const inset = Math.max(3, Math.round(border * 0.35));
-    ctx.strokeStyle = frame.accent;
-    ctx.lineWidth = Math.max(1, Math.round(border * 0.08));
-    ctx.strokeRect(ox + inset, oy + inset, outerW - inset * 2, outerH - inset * 2 - bottomExtra);
-  }
-
-  if (frame.kind === "brass" && frame.accent) {
-    const inset = Math.max(2, Math.round(border * 0.45));
-    ctx.strokeStyle = frame.accent;
-    ctx.lineWidth = Math.max(2, Math.round(border * 0.15));
-    ctx.strokeRect(ox + inset, oy + inset, outerW - inset * 2, outerH - inset * 2);
-  }
-
-  if (frame.kind === "double") {
-    const gap = Math.max(4, Math.round(pad * 0.6));
-    ctx.strokeStyle = frame.outer;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(ox + border + gap, oy + border + gap, outerW - (border + gap) * 2, outerH - (border + gap) * 2);
-  }
-
-  if (frame.kind === "triple") {
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(ox + 2, oy + 2, outerW - 4, outerH - 4);
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(ox + 6, oy + 6, outerW - 12, outerH - 12);
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(ox + 12, oy + 12, outerW - 24, outerH - 24);
-  }
-
-  if (frame.kind === "stack") {
-    ctx.fillStyle = "#1E1E1E";
-    ctx.fillRect(ox, oy, outerW, outerH);
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(ox + 10, oy + 10, outerW - 20, outerH - 20);
-    ctx.fillStyle = "#1E1E1E";
-    ctx.fillRect(ox + 12, oy + 12, outerW - 24, outerH - 24);
-  }
-
-  if (frame.kind === "film") {
-    const holeR = Math.max(3, Math.round(border * 0.18));
-    const step = holeR * 3;
-    ctx.fillStyle = frame.accent ?? "#333";
-    for (let y = oy + border * 0.4; y < oy + outerH - border * 0.4; y += step) {
-      ctx.beginPath();
-      ctx.arc(ox + border * 0.45, y, holeR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(ox + outerW - border * 0.45, y, holeR, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  const mx = ox + border;
-  const my = oy + border;
-  const mw = outerW - border * 2;
-  const mh = outerH - border * 2 - bottomExtra;
-  if (frame.mat !== "transparent" && frame.kind !== "stack") {
-    ctx.fillStyle = frame.mat;
-    ctx.fillRect(mx, my, mw, mh);
-  }
-  if (frame.accent && (frame.kind === "solid" || frame.kind === "polaroid") && frame.id !== "minimal-line") {
-    ctx.strokeStyle = frame.accent;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
-  }
-
-  const ix = mx + pad;
-  const iy = my + pad;
-  const iw2 = Math.max(1, mw - pad * 2);
-  const ih2 = Math.max(1, mh - pad * 2);
 
   ctx.save();
-  if (radius > 0) {
-    roundRect(ctx, ix, iy, iw2, ih2, Math.min(radius, Math.min(iw2, ih2) / 4));
-    ctx.clip();
-  }
-
-  const boxA = iw2 / ih2;
-  const imgA = iw / ih;
-  let dw = iw2;
-  let dh = ih2;
-  let dx = ix;
-  let dy = iy;
-  if (imgA > boxA) {
-    dw = iw2;
-    dh = iw2 / imgA;
-    dy = iy + (ih2 - dh) / 2;
-  } else {
-    dh = ih2;
-    dw = ih2 * imgA;
-    dx = ix + (iw2 - dw) / 2;
-  }
-  ctx.drawImage(img, dx, dy, dw, dh);
-
-  if (frame.kind === "vignette") {
-    const g = ctx.createRadialGradient(
-      ix + iw2 / 2,
-      iy + ih2 / 2,
-      Math.min(iw2, ih2) * 0.35,
-      ix + iw2 / 2,
-      iy + ih2 / 2,
-      Math.min(iw2, ih2) * 0.75,
-    );
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, `rgba(0,0,0,${0.35 + controls.texture * 0.004})`);
-    ctx.fillStyle = g;
-    ctx.fillRect(ix, iy, iw2, ih2);
-  }
-
-  if (frame.kind === "blur") {
-    const edge = Math.max(8, Math.round(16 * (maxEdge / 1000)));
-    const grd = ctx.createLinearGradient(ix, iy, ix, iy + edge);
-    grd.addColorStop(0, "rgba(255,255,255,0.55)");
-    grd.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = grd;
-    ctx.fillRect(ix, iy, iw2, edge);
-  }
-
+  roundRect(ctx, ox, oy, outerW, outerH, radius); ctx.clip();
+  if (frame.texture) fillTexture(ctx, ox, oy, outerW, outerH, frame.texture, controls.texture);
+  else { ctx.fillStyle = fillColor; ctx.fillRect(ox, oy, outerW, outerH); }
+  const g = ctx.createLinearGradient(ox, oy, ox, oy + outerH);
+  g.addColorStop(0, "rgba(255,255,255,0.12)"); g.addColorStop(1, "rgba(0,0,0,0.08)");
+  ctx.fillStyle = g; ctx.fillRect(ox, oy, outerW, outerH);
   ctx.restore();
 
-  if (frame.kind === "tape" && frame.accent) {
+  if (frame.kind === "glass" && (frame.tint ?? 0) > 0) {
     ctx.save();
-    ctx.fillStyle = frame.accent;
-    ctx.globalAlpha = 0.65;
-    ctx.translate(ox + outerW * 0.12, oy + 8);
-    ctx.rotate((-8 * Math.PI) / 180);
-    ctx.fillRect(-20, 0, 50, 14);
-    ctx.restore();
-    ctx.save();
-    ctx.fillStyle = frame.accent;
-    ctx.globalAlpha = 0.65;
-    ctx.translate(ox + outerW * 0.88, oy + 10);
-    ctx.rotate((7 * Math.PI) / 180);
-    ctx.fillRect(-20, 0, 50, 14);
+    roundRect(ctx, ox, oy, outerW, outerH, radius); ctx.clip();
+    const tc = frame.tintColor ?? "255,255,255";
+    if (frame.aurora) {
+      const ag = ctx.createLinearGradient(ox, oy, ox + outerW, oy + outerH);
+      ag.addColorStop(0, "rgba(255,120,200,0.25)"); ag.addColorStop(1, "rgba(120,200,255,0.2)");
+      ctx.fillStyle = ag;
+    } else ctx.fillStyle = `rgba(${tc},${frame.tint})`;
+    ctx.fillRect(ox, oy, outerW, outerH);
     ctx.restore();
   }
 
-  if (frame.kind === "deckled") {
-    ctx.strokeStyle = "rgba(0,0,0,0.12)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    const steps = 40;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const px = ox + t * outerW;
-      const py = oy + Math.sin(t * 28) * 2.5 + Math.sin(t * 11) * 1.2;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+  if (frame.perf || frame.filmreel) {
+    const holeR = Math.max(3, Math.round(border * 0.18));
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    for (let y = oy + border * 0.4; y < oy + outerH - border * 0.4; y += holeR * 3) {
+      ctx.beginPath(); ctx.arc(ox + border * 0.45, y, holeR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ox + outerW - border * 0.45, y, holeR, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.stroke();
+  }
+  if (frame.browser) {
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
+    ctx.fillRect(ox + border, oy + border, outerW - border * 2, Math.max(10, border * 0.8));
+  }
+  if (frame.stitched) {
+    ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    ctx.strokeRect(ox + border * 0.4, oy + border * 0.4, outerW - border * 0.8, outerH - border * 0.8);
+    ctx.setLineDash([]);
+  }
+  if (frame.brackets) {
+    const b = Math.max(12, border);
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 2;
+    for (const [cx, cy] of [[ox+pad,oy+pad],[ox+outerW-pad,oy+pad],[ox+pad,oy+outerH-pad-bottomExtra],[ox+outerW-pad,oy+outerH-pad-bottomExtra]] as const) {
+      ctx.beginPath(); ctx.moveTo(cx - b*0.3, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + b*0.3); ctx.stroke();
+    }
   }
 
-  if (border > 4 && frame.kind !== "float" && frame.kind !== "vignette") {
+  const mx = ox + border, my = oy + border;
+  const mw = outerW - border * 2, mh = outerH - border * 2 - bottomExtra;
+  const ix = mx + pad, iy = my + pad;
+  const iw2 = Math.max(1, mw - pad * 2), ih2 = Math.max(1, mh - pad * 2);
+
+  ctx.save();
+  const photoR = Math.min(radius * 0.6, Math.min(iw2, ih2) / 4);
+  if (photoR > 0 || frame.story || frame.notch) {
+    roundRect(ctx, ix, iy, iw2, ih2, frame.story || frame.notch ? Math.min(iw2, ih2) * 0.12 : photoR);
+    ctx.clip();
+  }
+  const boxA = iw2 / ih2, imgA = iw / ih;
+  let dw = iw2, dh = ih2, dx = ix, dy = iy;
+  if (imgA > boxA) { dw = iw2; dh = iw2 / imgA; dy = iy + (ih2 - dh) / 2; }
+  else { dh = ih2; dw = ih2 * imgA; dx = ix + (iw2 - dw) / 2; }
+  ctx.drawImage(img, dx, dy, dw, dh);
+  if (frame.kind === "glass" && (frame.sheen ?? 0) > 0) {
+    const sg = ctx.createLinearGradient(ix, iy, ix + iw2 * 0.5, iy + ih2 * 0.4);
+    sg.addColorStop(0, `rgba(255,255,255,${frame.sheen! * 0.35})`); sg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = sg; ctx.fillRect(ix, iy, iw2 * 0.55, ih2 * 0.4);
+  }
+  ctx.restore();
+
+  if (frame.notch) {
+    ctx.fillStyle = fillColor;
+    const nw = iw2 * 0.35, nh = Math.max(6, border * 0.5);
+    roundRect(ctx, ix + (iw2 - nw) / 2, iy - 1, nw, nh, nh / 2); ctx.fill();
+  }
+  if (border > 4 && frame.kind !== "glass") {
     ctx.strokeStyle = `rgba(255,255,255,${0.08 + controls.texture * 0.001})`;
     ctx.lineWidth = 1;
     ctx.strokeRect(ox + border + 0.5, oy + border + 0.5, outerW - border * 2 - 1, outerH - border * 2 - bottomExtra - 1);
   }
-
   if (watermark) drawWm(ctx, canvas.width, canvas.height);
   return canvas;
 }

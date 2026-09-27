@@ -1,32 +1,12 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Frames — Motio2edit</title>
-<style>body{font-family:system-ui;display:grid;place-items:center;min-height:100vh;margin:0;background:#f6f7fc;color:#1c2030;padding:24px;text-align:center}
-.box{max-width:420px}.l{font-size:14px;opacity:.7;margin-top:8px}code{font-size:12px;background:#eee;padding:2px 6px;border-radius:4px}</style>
+  <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="0;url=/studio/frames" />
+  <title>Frames Studio</title>
+  <script>location.replace("/studio/frames");</script>
 </head>
 <body>
-<div class="box">
-<h1 style="font-size:18px;margin:0 0 8px">Frame Studio v7</h1>
-<p class="l">Full HTML is ready locally. Upload <code>frame-studio-v7.html</code> into <code>public/frame-studio/</code> on GitHub (drag &amp; drop, 79 KB), then this page will load it automatically.</p>
-<p class="l" id="s">Checking…</p>
-</div>
-<script>
-(async function () {
-  try {
-    var res = await fetch("frame-studio-v7.html", { cache: "no-store" });
-    if (!res.ok) throw new Error("not found yet");
-    var html = await res.text();
-    if (html.length < 5000 || html.indexOf("Frame Studio") < 0) throw new Error("stub only");
-    document.open();
-    document.write(html);
-    document.close();
-  } catch (e) {
-    document.getElementById("s").textContent = "Waiting for full frame-studio-v7.html upload (" + (e && e.message ? e.message : e) + ").";
-  }
-})();
-</script>
+  <p><a href="/studio/frames">Continue to Frames Studio</a></p>
 </body>
 </html>
