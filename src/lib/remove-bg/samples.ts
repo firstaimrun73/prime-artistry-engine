@@ -1,8 +1,7 @@
 /**
  * Remove BG sample media (R2) + gallery cards.
- * Rose pair = user-provided (hero + info carousel).
+ * Rose pair = user-provided (hero + info carousel + first gallery card).
  * Gallery = interactive before/after only (no info buttons).
- * Extra pairs use free Unsplash (before) + transparent cutout demos (after).
  */
 
 export const REMOVE_BG_ROSE_BEFORE =
@@ -21,16 +20,24 @@ export type RemoveBgGalleryItem = {
 
 /**
  * Editor bottom gallery — interactive CompareSlider cards.
- * Free stock (Unsplash / public cutouts). No info buttons.
+ * First card uses real transparent cutout (rose). Others: free Unsplash demos
+ * (swap after URLs when more licensed cutouts are available).
  */
 export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
+  {
+    id: "rose",
+    title: "Rose",
+    before: REMOVE_BG_ROSE_BEFORE,
+    after: REMOVE_BG_ROSE_AFTER,
+    aspect: "1:1",
+  },
   {
     id: "product-bottle",
     title: "Product",
     before:
       "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&q=80&auto=format",
     after:
-      "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&q=80&auto=format&sat=-100&bri=10",
+      "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&q=80&auto=format",
     aspect: "1:1",
   },
   {
@@ -39,7 +46,7 @@ export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
     before:
       "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=80&auto=format",
     after:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=80&auto=format&sat=-80",
+      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=80&auto=format",
     aspect: "3:4",
   },
   {
@@ -48,7 +55,7 @@ export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
     before:
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80&auto=format",
     after:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80&auto=format&bri=15",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80&auto=format",
     aspect: "1:1",
   },
   {
@@ -57,7 +64,7 @@ export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
     before:
       "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=800&q=80&auto=format",
     after:
-      "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=800&q=80&auto=format&sat=-50",
+      "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=800&q=80&auto=format",
     aspect: "3:4",
   },
   {
@@ -66,17 +73,8 @@ export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
     before:
       "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80&auto=format",
     after:
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80&auto=format&bri=12",
+      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80&auto=format",
     aspect: "1:1",
-  },
-  {
-    id: "chair",
-    title: "Chair",
-    before:
-      "https://images.unsplash.com/photo-1592078615290-033ee584e267?w=800&q=80&auto=format",
-    after:
-      "https://images.unsplash.com/photo-1592078615290-033ee584e267?w=800&q=80&auto=format&sat=-40",
-    aspect: "3:4",
   },
 ];
 
