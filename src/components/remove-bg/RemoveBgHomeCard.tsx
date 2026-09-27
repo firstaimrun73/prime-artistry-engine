@@ -1,5 +1,5 @@
 /**
- * Homepage card for Remove BG — same pattern as Circle Sample cards.
+ * Homepage card for Remove BG.
  * (i) → info page · Try Now → editor
  */
 import { Link } from "@tanstack/react-router";
@@ -24,10 +24,7 @@ class DemoErrorBoundary extends Component<
     if (this.state.failed) {
       return (
         this.props.fallback ?? (
-          <div
-            className="h-full w-full animate-pulse bg-gradient-to-br from-rose-100 via-pink-50 to-amber-50"
-            aria-label="Loading preview"
-          />
+          <div className="h-full w-full animate-pulse bg-gradient-to-br from-rose-100 via-pink-50 to-amber-50" />
         )
       );
     }

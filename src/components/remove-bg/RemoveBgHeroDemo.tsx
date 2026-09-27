@@ -1,26 +1,26 @@
 /**
- * Animated Remove BG hero — flower on noisy bg → clean cutout.
- * No people (product direction).
+ * Animated Remove BG hero — real rose before/after from R2.
  */
 import { useEffect, useState } from "react";
+import { REMOVE_BG_ROSE_AFTER, REMOVE_BG_ROSE_BEFORE } from "@/lib/remove-bg/samples";
 
-type Phase = "messy" | "scanning" | "clean";
+type Phase = "before" | "scanning" | "after";
 
 export function RemoveBgHeroDemo() {
-  const [phase, setPhase] = useState<Phase>("messy");
+  const [phase, setPhase] = useState<Phase>("before");
 
   useEffect(() => {
     let cancelled = false;
     const loop = async () => {
       while (!cancelled) {
-        setPhase("messy");
-        await wait(1800);
+        setPhase("before");
+        await wait(2000);
         if (cancelled) break;
         setPhase("scanning");
-        await wait(1600);
+        await wait(1400);
         if (cancelled) break;
-        setPhase("clean");
-        await wait(2200);
+        setPhase("after");
+        await wait(2400);
       }
     };
     void loop();
@@ -29,78 +29,49 @@ export function RemoveBgHeroDemo() {
     };
   }, []);
 
+  const src = phase === "after" ? REMOVE_BG_ROSE_AFTER : REMOVE_BG_ROSE_BEFORE;
+
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden" data-remove-bg-demo="flower">
+    <div className="absolute inset-0 z-0 overflow-hidden" data-remove-bg-demo="rose">
       <style>{`
         @keyframes rbg-scan {
-          0% { transform: translateY(-10%); opacity: 0.4; }
+          0% { transform: translateY(-8%); opacity: 0.35; }
           50% { opacity: 1; }
-          100% { transform: translateY(110%); opacity: 0.4; }
-        }
-        @keyframes rbg-pulse {
-          0%, 100% { opacity: 0.7; }
-          50% { opacity: 1; }
+          100% { transform: translateY(108%); opacity: 0.35; }
         }
       `}</style>
 
-      {/* Messy / noise background */}
-      <div
-        className="absolute inset-0 transition-opacity duration-500"
-        style={{
-          opacity: phase === "clean" ? 0 : 1,
-          background:
-            "radial-gradient(circle at 20% 30%, #fbcfe8 0%, transparent 40%), radial-gradient(circle at 80% 70%, #a5f3fc 0%, transparent 35%), radial-gradient(circle at 50% 50%, #fef3c7 0%, #e2e8f0 70%), repeating-linear-gradient(45deg, rgba(0,0,0,0.04) 0 4px, transparent 4px 10px)",
-        }}
-      />
-
-      {/* Checkerboard for clean phase */}
-      <div
-        className="absolute inset-0 transition-opacity duration-500"
-        style={{
-          opacity: phase === "clean" ? 1 : 0,
-          backgroundImage:
-            "linear-gradient(45deg, #e5e7eb 25%, transparent 25%), linear-gradient(-45deg, #e5e7eb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e7eb 75%), linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)",
-          backgroundSize: "16px 16px",
-          backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
-          backgroundColor: "#f8fafc",
-        }}
-      />
-
-      {/* Flower subject */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      {phase === "after" && (
         <div
-          className="relative flex h-[58%] w-[58%] items-center justify-center rounded-full transition-all duration-500"
+          className="absolute inset-0"
           style={{
-            background:
-              phase === "clean"
-                ? "radial-gradient(circle at 40% 35%, #fda4af, #f43f5e 45%, #be123c)"
-                : "radial-gradient(circle at 40% 35%, #fda4af, #f43f5e 45%, #9f1239)",
-            boxShadow:
-              phase === "clean"
-                ? "0 12px 28px rgba(244,63,94,0.35)"
-                : "0 8px 20px rgba(0,0,0,0.15)",
-            transform: phase === "scanning" ? "scale(1.04)" : "scale(1)",
+            backgroundImage:
+              "linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%)",
+            backgroundSize: "14px 14px",
+            backgroundPosition: "0 0,0 7px,7px -7px,-7px 0",
+            backgroundColor: "#f8fafc",
           }}
-        >
-          <span className="text-4xl sm:text-5xl select-none" aria-hidden>
-            🌸
-          </span>
-        </div>
-      </div>
+        />
+      )}
+
+      <img
+        src={src}
+        alt={phase === "after" ? "Background removed" : "Original with background"}
+        className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
+        style={{ opacity: phase === "scanning" ? 0.85 : 1 }}
+        draggable={false}
+      />
 
       {phase === "scanning" && (
         <div
-          className="pointer-events-none absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#7B6FE0] to-transparent"
-          style={{ animation: "rbg-scan 1.4s ease-in-out infinite" }}
+          className="pointer-events-none absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-rose-400 to-transparent"
+          style={{ animation: "rbg-scan 1.2s ease-in-out infinite" }}
         />
       )}
 
       <div className="absolute bottom-2 left-0 right-0 flex justify-center">
-        <span
-          className="rounded-full bg-black/45 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur-md"
-          style={{ animation: phase === "scanning" ? "rbg-pulse 0.9s ease-in-out infinite" : undefined }}
-        >
-          {phase === "messy" ? "Original" : phase === "scanning" ? "Removing…" : "Background gone"}
+        <span className="rounded-full bg-black/50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur-md">
+          {phase === "before" ? "Before" : phase === "scanning" ? "Removing…" : "After"}
         </span>
       </div>
     </div>

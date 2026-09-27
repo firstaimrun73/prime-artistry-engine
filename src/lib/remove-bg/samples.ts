@@ -1,44 +1,36 @@
 /**
- * Remove BG homepage sample cards.
- * Prefer non-person subjects (flowers, products, pets) per product direction.
+ * Remove BG sample media (R2) + gallery cards.
+ * User-provided rose pair; gallery uses before/after only (no info buttons).
  */
 
-export type RemoveBgSample = {
+export const REMOVE_BG_ROSE_BEFORE =
+  "https://assets.motio2edit.com/samples/circle-2edit/file_000000001b80821091ce891b23fc036f.png";
+
+export const REMOVE_BG_ROSE_AFTER =
+  "https://assets.motio2edit.com/samples/circle-2edit/file_000000008dc481f4b1f73107c3caa1c1.png";
+
+export type RemoveBgGalleryItem = {
   id: string;
   title: string;
-  subtitle: string;
-  /** CSS gradient fallback when no remote asset */
-  gradient: string;
-  emoji: string;
+  before: string;
+  after: string;
+  aspect: "1:1" | "4:5" | "3:4";
 };
 
-export const REMOVE_BG_SAMPLES: RemoveBgSample[] = [
+/** Before/after pairs for the editor bottom gallery (interactive sliders). */
+export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
   {
-    id: "flower-noise",
-    title: "Flower · clean cut",
-    subtitle: "Busy background → transparent",
-    gradient: "from-rose-200 via-pink-100 to-amber-50",
-    emoji: "🌸",
+    id: "rose",
+    title: "Rose",
+    before: REMOVE_BG_ROSE_BEFORE,
+    after: REMOVE_BG_ROSE_AFTER,
+    aspect: "1:1",
   },
   {
-    id: "product-shelf",
-    title: "Product shot",
-    subtitle: "Shelf clutter → pure subject",
-    gradient: "from-sky-200 via-cyan-50 to-white",
-    emoji: "📦",
-  },
-  {
-    id: "plant-desk",
-    title: "Plant on desk",
-    subtitle: "Messy desk → cutout",
-    gradient: "from-emerald-200 via-lime-50 to-white",
-    emoji: "🌿",
-  },
-  {
-    id: "mug-cafe",
-    title: "Mug · café",
-    subtitle: "Busy café → subject only",
-    gradient: "from-orange-200 via-amber-50 to-white",
-    emoji: "☕",
+    id: "rose-2",
+    title: "Rose cutout",
+    before: REMOVE_BG_ROSE_BEFORE,
+    after: REMOVE_BG_ROSE_AFTER,
+    aspect: "1:1",
   },
 ];

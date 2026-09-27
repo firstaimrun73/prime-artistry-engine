@@ -24,10 +24,9 @@ import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
-import { FramesStudioGallery } from "@/components/home/FramesStudioGallery";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
-/** Order: Cropmix → Remove BG → rest */
+/** Same card width for every icon — Cropmix → Remove BG → rest */
 const QUICK_CREATE = [
   { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
   { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
@@ -102,7 +101,7 @@ export function SignedInHomeBody() {
                   : !locked && q.label === "Remove BG"
                     ? { search: { from: "home" as const } }
                     : {})}
-                className="flex min-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
+                className="flex w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-2 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
                 <span className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
@@ -110,7 +109,7 @@ export function SignedInHomeBody() {
                     <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
                   )}
                 </span>
-                <span className="text-[11px] font-semibold">{q.label}</span>
+                <span className="w-full truncate text-[11px] font-semibold leading-tight">{q.label}</span>
               </Link>
             );
           })}
@@ -126,8 +125,6 @@ export function SignedInHomeBody() {
       </div>
 
       <MusicStudioGallery />
-
-      <FramesStudioGallery />
 
       <FilterLensHomeSection />
 
