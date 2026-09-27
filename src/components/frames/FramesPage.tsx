@@ -2,6 +2,7 @@
  * Motio2edit Frames Studio — production compose → charge → result.
  * Free: preview any frame; Apply only for Common (server still authoritative).
  * No info (i) buttons on thumbs.
+ * Result screen includes Watermark toggle: locked for free, unlocked for paid.
  */
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -359,6 +360,34 @@ export function FramesPage() {
 
       {phase === "result" && resultUrl && (
         <footer className="z-20 shrink-0 space-y-2 border-t px-3 pt-3" style={{ borderColor: "var(--frames-border)", background: "var(--frames-glass)", paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+          {/* Watermark toggle — locked for free, unlocked for paid */}
+          <div className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2" style={{ borderColor: "var(--frames-border)" }}>
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold">Watermark</p>
+              <p className="text-[10px] text-[var(--frames-muted)]">
+                {paid ? "Toggle to keep or remove Motio2edit mark" : "Always on for free plan"}
+              </p>
+            </div>
+            {paid ? (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={wantWm}
+                onClick={() => setWantWm((v) => {
+                  const next = !v;
+                  try { localStorage.setItem("motio2edit-watermark-pref", next ? "on" : "off"); } catch {}
+                  return next;
+                })}
+                className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${wantWm ? "bg-[#FF5A1F]" : "bg-zinc-400"}`}
+              >
+                <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${wantWm ? "left-5" : "left-0.5"}`} />
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold text-[var(--frames-muted)]" style={{ borderColor: "var(--frames-border)" }}>
+                <Lock className="h-3.5 w-3.5" /> On
+              </span>
+            )}
+          </div>
           <div className="flex items-center justify-center gap-2">
             <button type="button" onClick={() => { setPhase("edit"); setResultUrl(null); }} className="rounded-full border px-4 py-2.5 text-sm font-semibold" style={{ borderColor: "var(--frames-border)" }}>Edit again</button>
             <button type="button" disabled={exporting} onClick={() => void onExport()} className="flex items-center gap-2 rounded-full bg-[#FF5A1F] px-5 py-2.5 text-sm font-bold text-white">
@@ -398,7 +427,7 @@ export function FramesPage() {
                   <button key={f.id} type="button" onClick={() => { selectFrame(f); setMoreOpen(false); }} className={cn("relative aspect-square overflow-hidden rounded-xl border", f.id === frame.id ? "border-[#FF5A1F]" : "border-[var(--frames-border)]")}>
                     {thumbCache[f.id] ? <img src={thumbCache[f.id]} alt="" className="h-full w-full object-cover" /> : null}
                     <TierBadge tier={f.tier} />
-                    {locked && <span className="pointer-events-none absolute bottom-1 right-1 grid h-4 w-4 place-items-center rounded-full bg-black/55"><Lock className="h-2.5 w-2.5 text-white" /></span>}
+                    {locked && <span className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-black/55"><Lock className="h-3 w-3 text-white" /></span>}
                   </button>
                 );
               })}
