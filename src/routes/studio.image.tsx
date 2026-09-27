@@ -26,7 +26,7 @@ export const Route = createFileRoute("/studio/image")({
 /**
  * Child product routes under /studio/image/* — must render via Outlet.
  * NEVER redirect these to /editor (Image Studio).
- * circle-info was missing → (i) buttons opened Image Editor. Fixed.
+ * Lens Studio routes removed from product.
  */
 const CHILD_PRODUCT_PREFIXES = [
   "/studio/image/auto-edit",
@@ -35,9 +35,7 @@ const CHILD_PRODUCT_PREFIXES = [
   "/studio/image/circle-add-discover",
   "/studio/image/multi",
   "/studio/image/filters",
-  "/studio/image/lenses",
   "/studio/image/filter-editor",
-  "/studio/image/lens-editor",
   "/studio/image/age",
 ] as const;
 
@@ -60,7 +58,6 @@ function ImageStudio() {
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
 
-  // Still under /studio/image tree (exact hub or child product)
   const underImageStudio =
     pathname === "/studio/image" || pathname.startsWith("/studio/image/");
 
@@ -74,9 +71,6 @@ function ImageStudio() {
     navigate({ to: user ? "/editor" : "/auth", search: user ? undefined : { redirect: "/editor" } });
   };
 
-  // Exact /studio/image only: signed-in users go into the Image Editor.
-  // Never redirect child product routes (Circle, Lens, Filter, Auto Edit, …).
-  // Never run this redirect while leaving the image tree (e.g. Filters → homepage).
   useEffect(() => {
     if (isChild) return;
     if (!underImageStudio) return;
@@ -99,7 +93,6 @@ function ImageStudio() {
     return <Outlet />;
   }
 
-  // Leaving Filters/etc. toward homepage: do not flash "Opening Image Studio"
   if (!underImageStudio) {
     return null;
   }

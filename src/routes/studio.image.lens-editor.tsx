@@ -1,27 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { LensEditor } from "@/components/lens-camera/LensEditor";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-type Search = { lens?: string };
-
+/** Lens Studio removed from the product — legacy URLs go home. */
 export const Route = createFileRoute("/studio/image/lens-editor")({
   ssr: false,
-  validateSearch: (search: Record<string, unknown>): Search => ({
-    lens: typeof search.lens === "string" ? search.lens : undefined,
-  }),
-  head: () => ({
-    meta: [
-      { title: "Lens — Motio2edit" },
-      {
-        name: "description",
-        content:
-          "Motio2edit Lens — apply optical treatments to your photos. Free on-device lenses.",
-      },
-    ],
-  }),
-  component: LensEditorRoute,
+  beforeLoad: () => {
+    throw redirect({ to: "/" });
+  },
+  component: () => null,
 });
-
-function LensEditorRoute() {
-  const { lens } = Route.useSearch();
-  return <LensEditor initialLensId={lens ?? null} />;
-}
