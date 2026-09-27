@@ -7,6 +7,7 @@ export {
   FRAME_BY_ID,
   FRAME_CREDIT_COST,
   CATALOG_COUNT,
+  CURATED_FRAME_IDS,
   getFrameById,
   framesForAspect,
   type FrameDef,
@@ -25,12 +26,13 @@ export type Controls = {
   glassPanel: boolean;
 };
 
+/** Shadow off by default — uniform dark outer shadow made every frame look the same. */
 export const DEFAULT_CONTROLS: Controls = {
   borderWidth: 16,
   padding: 12,
   round: 0,
   texture: 35,
-  shadowOn: true,
+  shadowOn: false,
   glassPanel: false,
 };
 
@@ -99,6 +101,11 @@ const BASE: Record<string, [string, string, string]> = {
   ancientStone: ["#948870", "#746858", "#544838"],
   museumGold: ["#d4b474", "#a88850", "#7a6438"],
   vhsTape: ["#322848", "#1e1830", "#100c1c"],
+  pastelPink: ["#ffd6e8", "#ffb8d6", "#f090b8"],
+  pastelSky: ["#d6f0ff", "#b8e0ff", "#90c8f0"],
+  pastelMint: ["#d8ffe8", "#b8f0d0", "#90d8b0"],
+  cartoonYellow: ["#ffe566", "#ffd033", "#e8b800"],
+  sketchGray: ["#f5f5f5", "#e8e8e8", "#d0d0d0"],
 };
 
 function woodGrain(
@@ -315,7 +322,7 @@ export function fillTexture(
     denimWeave(ctx, x, y, w, h, c0, c1, c2, intensity);
   } else if (id === "silver" || id === "rosegold" || id === "goldfoil" || id === "brass" || id === "copper" || id === "rust" || id === "museumGold") {
     metalPlate(ctx, x, y, w, h, c0, c1, c2, intensity);
-  } else if (id === "paper" || id === "kraft" || id === "linen" || id === "bone") {
+  } else if (id === "paper" || id === "kraft" || id === "linen" || id === "bone" || id === "pastelPink" || id === "pastelSky" || id === "pastelMint" || id === "sketchGray") {
     paperFiber(ctx, x, y, w, h, c0, c1, c2, intensity);
   } else if (id === "carbon") {
     carbonFiber(ctx, x, y, w, h, c0, c1, c2);
@@ -338,6 +345,13 @@ export function fillTexture(
     const sg = ctx.createLinearGradient(x, y, x + w * 0.4, y + h * 0.3);
     sg.addColorStop(0, "rgba(255,255,255,0.12)"); sg.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = sg; ctx.fillRect(x, y, w * 0.5, h * 0.4);
+  } else if (id === "cartoonYellow") {
+    ctx.fillStyle = c0; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+      ctx.strokeRect(x + 4 + i * 2, y + 4 + i * 2, w - 8 - i * 4, h - 8 - i * 4);
+    }
   } else {
     genericNoise(ctx, x, y, w, h, c0, c1, c2, intensity);
   }
@@ -345,7 +359,6 @@ export function fillTexture(
 
 /**
  * Watermark ON THE PHOTO area only (not on the outer frame).
- * Soft glass chip + emoji icon + Motio2edit.
  */
 export function drawWm(
   ctx: CanvasRenderingContext2D,
@@ -362,7 +375,7 @@ export function drawWm(
   const bx = photoX + photoW - boxW - pad;
   const by = photoY + photoH - boxH - pad;
 
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
   roundRect(ctx, bx, by, boxW, boxH, 8);
   ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.35)";
@@ -381,38 +394,34 @@ export function drawWm(
   ctx.textBaseline = "middle";
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.font = `600 ${fs}px system-ui, -apple-system, "Segoe UI Emoji", sans-serif`;
-  ctx.fillText("🖼️  Frames", bx + boxW / 2, by + boxH * 0.36);
+  ctx.fillText("Frames", bx + boxW / 2, by + boxH * 0.36);
   ctx.fillStyle = "rgba(255,255,255,0.78)";
   ctx.font = `500 ${Math.round(fs * 0.78)}px system-ui, -apple-system, sans-serif`;
   ctx.fillText("Motio2edit", bx + boxW / 2, by + boxH * 0.72);
   ctx.restore();
 }
 
-/** Glass panel overlay — only on the photo rectangle. */
+/** Glass panel — softer, less digital. */
 export function drawGlassPanel(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
 ) {
   ctx.save();
-  // subtle cool tint
-  ctx.fillStyle = "rgba(220,230,245,0.12)";
+  ctx.fillStyle = "rgba(245,248,252,0.06)";
   ctx.fillRect(x, y, w, h);
-  // primary reflection streak
-  const sg = ctx.createLinearGradient(x, y, x + w * 0.55, y + h * 0.4);
-  sg.addColorStop(0, "rgba(255,255,255,0.38)");
-  sg.addColorStop(0.45, "rgba(255,255,255,0.08)");
+  const sg = ctx.createLinearGradient(x, y, x + w * 0.5, y + h * 0.35);
+  sg.addColorStop(0, "rgba(255,255,255,0.22)");
+  sg.addColorStop(0.4, "rgba(255,255,255,0.05)");
   sg.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = sg;
-  ctx.fillRect(x, y, w * 0.65, h * 0.45);
-  // secondary edge catch
-  const eg = ctx.createLinearGradient(x + w * 0.7, y, x + w, y + h * 0.25);
+  ctx.fillRect(x, y, w * 0.55, h * 0.38);
+  const eg = ctx.createLinearGradient(x + w * 0.75, y, x + w, y + h * 0.2);
   eg.addColorStop(0, "rgba(255,255,255,0)");
-  eg.addColorStop(1, "rgba(255,255,255,0.18)");
+  eg.addColorStop(1, "rgba(255,255,255,0.12)");
   ctx.fillStyle = eg;
-  ctx.fillRect(x + w * 0.65, y, w * 0.35, h * 0.3);
-  // thin edge highlight
-  ctx.strokeStyle = "rgba(255,255,255,0.4)";
-  ctx.lineWidth = 1;
+  ctx.fillRect(x + w * 0.7, y, w * 0.3, h * 0.25);
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.lineWidth = 0.75;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
   ctx.restore();
 }
