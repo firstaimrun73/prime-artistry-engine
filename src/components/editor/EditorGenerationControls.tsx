@@ -23,7 +23,7 @@ interface EditorGenerationControlsProps {
    * Default false so any other consumer keeps the previous Stop button.
    */
   hideStop?: boolean;
-  /** Optional single credit-cost label shown on the Generate button (e.g. "25 cr"). */
+  /** Optional cost label on Generate. Image Studio must NOT pass this — cost lives in Info only. */
   costLabel?: string;
 }
 
