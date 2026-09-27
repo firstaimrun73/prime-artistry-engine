@@ -21,6 +21,8 @@ export type Controls = {
   round: number;
   texture: number;
   shadowOn: boolean;
+  /** When true: glass reflection overlay on the photo only (real framed-under-glass look). */
+  glassPanel: boolean;
 };
 
 export const DEFAULT_CONTROLS: Controls = {
@@ -29,6 +31,7 @@ export const DEFAULT_CONTROLS: Controls = {
   round: 0,
   texture: 35,
   shadowOn: true,
+  glassPanel: false,
 };
 
 export function scaleBorder(base: number, slider: number): number {
@@ -322,7 +325,6 @@ export function fillTexture(
     holoSheen(ctx, x, y, w, h, c0, c1, c2);
   } else if (id === "concrete" || id === "cork" || id === "slate") {
     genericNoise(ctx, x, y, w, h, c0, c1, c2, intensity + 20);
-    // pebble / pore dots
     for (let i = 0; i < 40; i++) {
       ctx.fillStyle = `rgba(0,0,0,${0.04 + n2(i, 15) * 0.08})`;
       ctx.beginPath();
@@ -342,44 +344,76 @@ export function fillTexture(
 }
 
 /**
- * Professional Frames watermark — not a black banner.
- * 🖼️ F R A M E S
- * Motio2edit
+ * Watermark ON THE PHOTO area only (not on the outer frame).
+ * Soft glass chip + emoji icon + Motio2edit.
  */
-export function drawWm(ctx: CanvasRenderingContext2D, w: number, h: number) {
+export function drawWm(
+  ctx: CanvasRenderingContext2D,
+  photoX: number,
+  photoY: number,
+  photoW: number,
+  photoH: number,
+) {
   ctx.save();
-  const fs = Math.max(11, Math.round(w * 0.018));
-  const pad = Math.max(12, Math.round(w * 0.022));
-  const boxW = Math.round(w * 0.26);
-  const boxH = fs * 2.6;
-  const bx = w - boxW - pad;
-  const by = h - boxH - pad;
+  const fs = Math.max(10, Math.round(Math.min(photoW, photoH) * 0.035));
+  const pad = Math.max(8, Math.round(Math.min(photoW, photoH) * 0.03));
+  const boxW = Math.min(photoW * 0.42, Math.max(90, fs * 9));
+  const boxH = fs * 2.5;
+  const bx = photoX + photoW - boxW - pad;
+  const by = photoY + photoH - boxH - pad;
 
-  // soft glass plate
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
-  roundRect(ctx, bx, by, boxW, boxH, 10);
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  roundRect(ctx, bx, by, boxW, boxH, 8);
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.28)";
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
   ctx.lineWidth = 1;
-  roundRect(ctx, bx, by, boxW, boxH, 10);
+  roundRect(ctx, bx, by, boxW, boxH, 8);
   ctx.stroke();
 
-  // top sheen
-  const sheen = ctx.createLinearGradient(bx, by, bx, by + boxH * 0.45);
-  sheen.addColorStop(0, "rgba(255,255,255,0.22)");
+  const sheen = ctx.createLinearGradient(bx, by, bx, by + boxH * 0.5);
+  sheen.addColorStop(0, "rgba(255,255,255,0.2)");
   sheen.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = sheen;
-  roundRect(ctx, bx, by, boxW, boxH * 0.45, 10);
+  roundRect(ctx, bx, by, boxW, boxH * 0.5, 8);
   ctx.fill();
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.font = `600 ${fs}px system-ui, -apple-system, sans-serif`;
-  ctx.fillText("🖼️  F R A M E S", bx + boxW / 2, by + boxH * 0.38);
-  ctx.fillStyle = "rgba(255,255,255,0.72)";
-  ctx.font = `500 ${Math.round(fs * 0.82)}px system-ui, -apple-system, sans-serif`;
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = `600 ${fs}px system-ui, -apple-system, "Segoe UI Emoji", sans-serif`;
+  ctx.fillText("🖼️  Frames", bx + boxW / 2, by + boxH * 0.36);
+  ctx.fillStyle = "rgba(255,255,255,0.78)";
+  ctx.font = `500 ${Math.round(fs * 0.78)}px system-ui, -apple-system, sans-serif`;
   ctx.fillText("Motio2edit", bx + boxW / 2, by + boxH * 0.72);
+  ctx.restore();
+}
+
+/** Glass panel overlay — only on the photo rectangle. */
+export function drawGlassPanel(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+) {
+  ctx.save();
+  // subtle cool tint
+  ctx.fillStyle = "rgba(220,230,245,0.12)";
+  ctx.fillRect(x, y, w, h);
+  // primary reflection streak
+  const sg = ctx.createLinearGradient(x, y, x + w * 0.55, y + h * 0.4);
+  sg.addColorStop(0, "rgba(255,255,255,0.38)");
+  sg.addColorStop(0.45, "rgba(255,255,255,0.08)");
+  sg.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = sg;
+  ctx.fillRect(x, y, w * 0.65, h * 0.45);
+  // secondary edge catch
+  const eg = ctx.createLinearGradient(x + w * 0.7, y, x + w, y + h * 0.25);
+  eg.addColorStop(0, "rgba(255,255,255,0)");
+  eg.addColorStop(1, "rgba(255,255,255,0.18)");
+  ctx.fillStyle = eg;
+  ctx.fillRect(x + w * 0.65, y, w * 0.35, h * 0.3);
+  // thin edge highlight
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
   ctx.restore();
 }
 
