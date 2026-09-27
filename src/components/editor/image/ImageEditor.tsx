@@ -1,1 +1,4 @@
-PLACEHOLDER_WILL_FAIL_IF_USED
+/**
+ * Image Editor workspace — independent of Video Editor.
+ * UPLOAD → WRITE & SELECT → GENERATE → OUTPUT (compact glass UI)
+ */
