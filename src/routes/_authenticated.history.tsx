@@ -18,7 +18,7 @@ import {
   Video, History as HistoryIcon, FolderOpen, Music, Sparkles, Circle, Aperture,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isVisibleInHistory, softHideFromHistory } from "@/lib/history-retention";
+import { isVisibleInHistory, historyUserDelete } from "@/lib/history-retention";
 
 export const Route = createFileRoute("/_authenticated/history")({
   component: HistoryPage,
@@ -31,6 +31,8 @@ type GenerationMeta = {
 type Generation = {
   id: string; type: string; prompt: string | null; output_url: string | null;
   status: string; created_at: string; metadata?: GenerationMeta | null;
+  retained_as_history?: boolean | null; deleted_at?: string | null;
+  storage_provider?: string | null;
 };
 type HistoryCategory = "image" | "video" | "auto" | "circle" | "lenses" | "music" | "other";
 
@@ -113,17 +115,20 @@ function HistoryPage() {
   const load = () => {
     if (!user) { setLoading(false); setGens([]); setLoadError(null); return; }
     setLoading(true); setLoadError(null);
-    supabase.from("generations").select("id, type, prompt, output_url, status, created_at, metadata")
-      .eq("user_id", user.id).order("created_at", { ascending: false }).limit(100)
+    supabase.from("generations").select("id, type, prompt, output_url, status, created_at, metadata, retained_as_history, deleted_at, storage_provider")
+      .eq("user_id", user.id)
+      .or("retained_as_history.eq.true,retained_as_history.is.null")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }).limit(100)
       .then(async ({ data, error }) => {
         if (error) {
           console.error("[history] load failed:", error.message);
-          const fb = await supabase.from("generations").select("id, type, prompt, output_url, status, created_at")
+          const fb = await supabase.from("generations").select("id, type, prompt, output_url, status, created_at, metadata")
             .eq("user_id", user.id).order("created_at", { ascending: false }).limit(100);
           if (fb.error) { setGens([]); setLoadError(fb.error.message); toast.error("Could not load history."); }
-          else { setGens(((fb.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g.metadata))); setLoadError(null); }
+          else { setGens(((fb.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g))); setLoadError(null); }
         } else {
-          setGens(((data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g.metadata)));
+          setGens(((data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g)));
           setLoadError(null);
         }
         setLoading(false);
@@ -168,7 +173,7 @@ function HistoryPage() {
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     setDeleting(true);
-    const result = await softHideFromHistory(pendingDelete.id, pendingDelete.metadata);
+    const result = await historyUserDelete(pendingDelete.id);
     setDeleting(false);
     if (!result.ok) { toast.error(result.message || "Could not remove this item from History."); return; }
     setGens((prev) => prev.filter((x) => x.id !== pendingDelete.id));
