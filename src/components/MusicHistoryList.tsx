@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { VinylDisc } from "@/components/VinylDisc";
 import { toast } from "sonner";
 import { Download, Trash2, Play, Pause, Music } from "lucide-react";
+import { historyUserDelete, musicHistoryUserDelete } from "@/lib/history-retention";
 
 type Track = {
   id: string;
@@ -48,10 +49,11 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
 
       const { data: gens, error: gErr } = await supabase
         .from("generations")
-        .select("id, title, prompt, output_url, metadata, created_at")
+        .select("id, title, prompt, output_url, metadata, created_at, retained_as_history, deleted_at")
         .eq("user_id", userId)
         .eq("type", "music")
         .eq("status", "success")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(50);
 
@@ -60,7 +62,7 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
 
       setTracks(
         (gens ?? [])
-          .filter((g) => g.output_url)
+          .filter((g) => g.output_url && (g as { retained_as_history?: boolean | null }).retained_as_history !== false)
           .map((g) => {
             const meta = (g.metadata ?? {}) as Record<string, unknown>;
             return {
@@ -116,25 +118,20 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
   };
 
   const remove = async (t: Track) => {
-    if (t.source === "music_history") {
-      const { error } = await supabase.from("music_history").delete().eq("id", t.id);
-      if (error) {
-        toast.error("Could not delete this track.");
-        return;
-      }
-    } else {
-      const { error } = await supabase.from("generations").delete().eq("id", t.id);
-      if (error) {
-        toast.error("Could not delete this track.");
-        return;
-      }
+    const result =
+      t.source === "music_history"
+        ? await musicHistoryUserDelete(t.id)
+        : await historyUserDelete(t.id);
+    if (!result.ok) {
+      toast.error(result.message || "Could not delete this track.");
+      return;
     }
     if (playingId === t.id) {
       audioRef.current?.pause();
       setPlayingId(null);
     }
     setTracks((prev) => prev.filter((x) => x.id !== t.id));
-    toast.success("Track deleted.");
+    toast.success("Track removed from History.");
   };
 
   if (loading) return <p className="mt-8 text-sm text-muted-foreground">Loading tracks…</p>;
