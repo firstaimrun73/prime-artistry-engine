@@ -69,10 +69,19 @@ export function composeFrame(
     return canvas;
   }
 
+  // Outer frame body — always respect Round (radius) for solid / wood / linen
   if (frame.kind === "wood") {
+    ctx.save();
+    roundRect(ctx, ox, oy, outerW, outerH, radius);
+    ctx.clip();
     fillWood(ctx, ox, oy, outerW, outerH, frame.outer, frame.id === "dark-walnut");
+    ctx.restore();
   } else if (frame.kind === "linen") {
+    ctx.save();
+    roundRect(ctx, ox, oy, outerW, outerH, radius);
+    ctx.clip();
     fillLinen(ctx, ox, oy, outerW, outerH, frame.outer, controls.texture);
+    ctx.restore();
   } else if (frame.outer !== "transparent") {
     ctx.fillStyle = frame.outer;
     roundRect(ctx, ox, oy, outerW, outerH, radius);
