@@ -23,6 +23,8 @@ interface EditorGenerationControlsProps {
    * Default false so any other consumer keeps the previous Stop button.
    */
   hideStop?: boolean;
+  /** Optional single credit-cost label shown on the Generate button (e.g. "25 cr"). */
+  costLabel?: string;
 }
 
 export function EditorGenerationControls({
@@ -36,6 +38,7 @@ export function EditorGenerationControls({
   showAutoToggle = true,
   generateClassName,
   hideStop = false,
+  costLabel,
 }: EditorGenerationControlsProps) {
   return (
     <section className="space-y-3 pt-1">
@@ -99,6 +102,11 @@ export function EditorGenerationControls({
         >
           <Sparkles className="mr-1.5 h-4 w-4" />
           {autoMode ? "Generate with Auto" : "Generate"}
+          {costLabel ? (
+            <span className="ml-2 rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold tabular-nums">
+              {costLabel}
+            </span>
+          ) : null}
         </Button>
       )}
 
