@@ -3,15 +3,15 @@
  * Standalone product. Upload → one click → transparent PNG.
  * Credits + quality enforced server-side (20 credits; free→SD, paid→HD).
  */
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   ArrowLeft,
   Download,
+  Eraser,
   ImagePlus,
-  Info,
   Loader2,
   Share2,
   Sparkles,
@@ -26,9 +26,11 @@ import {
   REMOVE_BG_CREDITS,
   type RemoveBgQuality,
 } from "@/lib/remove-bg/constants";
+import { REMOVE_BG_GALLERY } from "@/lib/remove-bg/samples";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { CompareSlider } from "@/components/CompareSlider";
 
 type Search = { from?: "home" | "studio" | "info" };
 
@@ -153,7 +155,6 @@ function RemoveBgPage() {
       toast.error(`Need ${REMOVE_BG_CREDITS} credits`);
       return;
     }
-    // Server enforces free→sd / paid→hd; client only sends preferred quality for paid users.
     const q: RemoveBgQuality = free ? "sd" : quality;
     setPhase("uploading");
     try {
@@ -222,7 +223,8 @@ function RemoveBgPage() {
   const busy = phase === "uploading" || phase === "processing";
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-[100dvh] flex-col bg-background">
+      {/* Header — Motio2edit + Remove BG icon, no Info button */}
       <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center gap-2 px-3 py-2.5">
           <button
@@ -233,25 +235,22 @@ function RemoveBgPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-500">Remove BG</p>
-            <p className="truncate text-sm font-semibold">Motio2edit</p>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-rose-500/15 text-rose-500">
+              <Eraser className="h-4.5 w-4.5 h-[18px] w-[18px]" strokeWidth={2.25} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-500">Remove BG</p>
+              <p className="truncate text-sm font-semibold">Motio2edit</p>
+            </div>
           </div>
-          <Link
-            to="/studio/image/remove-bg-info"
-            className="grid h-9 w-9 place-items-center rounded-full border border-border text-muted-foreground hover:bg-muted"
-            aria-label="About Remove BG"
-          >
-            <Info className="h-4 w-4" />
-          </Link>
           <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
             {creditsLabel}
           </span>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
-        {/* Canvas title — clear on the stage, not only in the header */}
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-3 pb-4 pt-4">
         <div className="mb-3 text-center">
           <h1 className="text-lg font-extrabold tracking-tight sm:text-xl">
             One-click background removal
@@ -265,14 +264,14 @@ function RemoveBgPage() {
         <div
           className={cn(
             "relative overflow-hidden rounded-2xl border border-border bg-card",
-            !preview && "min-h-[280px]",
+            !preview && "min-h-[240px]",
           )}
         >
           {!preview ? (
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="flex w-full flex-col items-center justify-center gap-3 px-6 py-16 text-center transition hover:bg-muted/40"
+              className="flex w-full flex-col items-center justify-center gap-3 px-6 py-14 text-center transition hover:bg-muted/40"
             >
               <span className="grid h-14 w-14 place-items-center rounded-2xl bg-rose-500/15 text-rose-500">
                 <ImagePlus className="h-7 w-7" />
@@ -328,7 +327,7 @@ function RemoveBgPage() {
           />
         </div>
 
-        {/* Quality — labels only; plan rules enforced on server */}
+        {/* Quality */}
         {preview && (
           <div className="mt-4 flex items-center gap-2">
             <p className="text-xs font-semibold text-muted-foreground">Quality</p>
@@ -367,7 +366,6 @@ function RemoveBgPage() {
           </div>
         )}
 
-        {/* Credits line — separate from primary CTA */}
         {preview && phase !== "result" && (
           <p className="mt-3 text-center text-[12px] text-muted-foreground">
             <span className="font-semibold text-foreground">{REMOVE_BG_CREDITS} credits</span>
@@ -376,9 +374,92 @@ function RemoveBgPage() {
           </p>
         )}
 
-        {/* Actions */}
-        <div className="mt-3 space-y-2">
-          {phase !== "result" ? (
+        {/* Secondary actions when photo loaded */}
+        {preview && (
+          <div className="mt-2 flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="flex-1 text-muted-foreground"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              Change photo
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              disabled={busy}
+              onClick={reset}
+            >
+              <Trash2 className="mr-1 h-3.5 w-3.5" />
+              Clear
+            </Button>
+          </div>
+        )}
+
+        {/* Result actions */}
+        {phase === "result" && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button
+              size="lg"
+              className="h-12 rounded-2xl bg-rose-500 font-semibold hover:bg-rose-600"
+              onClick={() => void onDownload()}
+            >
+              <Download className="mr-1.5 h-4 w-4" />
+              Download
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-12 rounded-2xl font-semibold"
+              onClick={() => void onShare()}
+            >
+              <Share2 className="mr-1.5 h-4 w-4" />
+              Share
+            </Button>
+          </div>
+        )}
+
+        {/* Samples — fill empty space, interactive sliders only */}
+        {!preview && (
+          <section className="mt-8 space-y-3">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-sm font-bold tracking-tight">Examples</h2>
+              <p className="text-[11px] text-muted-foreground">Drag to compare</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {REMOVE_BG_GALLERY.map((item) => (
+                <div
+                  key={item.id}
+                  className="overflow-hidden rounded-2xl border border-border bg-card"
+                >
+                  <div
+                    className={cn(
+                      "relative w-full",
+                      item.aspect === "3:4" ? "aspect-[3/4]" : "aspect-square",
+                    )}
+                  >
+                    <CompareSlider before={item.before} after={item.after} className="h-full w-full" />
+                  </div>
+                  <p className="px-2.5 py-1.5 text-center text-[11px] font-semibold text-muted-foreground">
+                    {item.title}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Spacer so CTA sits at end of content */}
+        <div className="mt-auto pt-6" />
+
+        {/* Primary CTA — end of scroll / bottom of page */}
+        {phase !== "result" && (
+          <div className="sticky bottom-0 z-20 -mx-3 border-t border-border/60 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/90">
             <Button
               size="lg"
               className="h-12 w-full rounded-2xl bg-rose-500 text-base font-semibold hover:bg-rose-600"
@@ -397,54 +478,8 @@ function RemoveBgPage() {
                 </>
               )}
             </Button>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                size="lg"
-                className="h-12 rounded-2xl bg-rose-500 font-semibold hover:bg-rose-600"
-                onClick={() => void onDownload()}
-              >
-                <Download className="mr-1.5 h-4 w-4" />
-                Download
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-12 rounded-2xl font-semibold"
-                onClick={() => void onShare()}
-              >
-                <Share2 className="mr-1.5 h-4 w-4" />
-                Share
-              </Button>
-            </div>
-          )}
-
-          {preview && (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="flex-1 text-muted-foreground"
-                disabled={busy}
-                onClick={() => fileRef.current?.click()}
-              >
-                Change photo
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                disabled={busy}
-                onClick={reset}
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                Clear
-              </Button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
     </div>
   );
