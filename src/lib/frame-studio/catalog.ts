@@ -1,6 +1,9 @@
 /**
  * Authoritative Frame Studio catalog.
- * Premium sceneBg only on selected showcase frames — not every Premium.
+ * Styles informed by popular Pinterest / market trends:
+ * natural wood, thin metal, floating, gallery mat, polaroid, vintage/ornate (sparingly),
+ * black+gold lip, champagne, distressed, shadow box, film, velvet scene.
+ * Premium sceneBg only on selected showcase frames.
  */
 export type FrameTier = "common" | "aiplus" | "premium";
 export type FrameKind = "mat" | "glass" | "specialty";
@@ -55,14 +58,15 @@ export const CURATED_FRAME_IDS: string[] = [
   "paper", "kraft", "walnut", "polaroid", "galleryDouble", "c-charcoal",
   "g-clear", "watercolor", "corners", "c-ivory",
   "linen", "oak", "film", "g-frost", "rosegold", "silver", "driftwood",
-  "museumGold", "leatherSt", "marbleW", "brass",
-  "baroqueGold", "galleryGoldBead", "velvetHibiscus", "lotusPolaroid",
-  "filmVintage", "baroquePortrait", "rococoGold",
-  "museumShadow", "mahoganyLuxury", "blackGoldInlay",
-  "instantLuxury", "palaceGold", "polaroid70s",
+  "museumGold", "leatherSt", "marbleW", "thinBlackMetal",
+  "baroqueGold", "floatingBlack", "velvetHibiscus", "lotusPolaroid",
+  "filmVintage", "champagneLip", "blackGoldLip",
+  "museumShadow", "mahoganyLuxury", "distressedOak",
+  "instantLuxury", "naturalMaple", "polaroid70s",
 ];
 
 export const FRAMES: FrameDef[] = [
+  // ——— Common (Free) ———
   { id: "paper", name: "Paper Soft", tier: "common", kind: "mat", texture: "paper", pad: 5.6, radius: 1.2, tags: ["paper"], materialLabel: "Paper", ratios: { all: true } },
   { id: "kraft", name: "Kraft Natural", tier: "common", kind: "mat", texture: "kraft", pad: 5.6, radius: 1.2, tags: ["kraft"], materialLabel: "Kraft", ratios: { all: true } },
   { id: "walnut", name: "Walnut Grain", tier: "common", kind: "mat", texture: "walnut", pad: 5.6, radius: 1.2, tags: ["wood"], materialLabel: "Walnut", ratios: { all: true } },
@@ -77,6 +81,7 @@ export const FRAMES: FrameDef[] = [
   { id: "sketchSoft", name: "Soft Sketch Border", tier: "common", kind: "mat", texture: "sketchGray", pad: 4, radius: 0, brackets: true, tags: ["sketch","outline"], materialLabel: "Sketch", ratios: { all: true } },
   { id: "cutiePink", name: "Cutie Pastel Pink", tier: "common", kind: "mat", texture: "pastelPink", pad: 6, radius: 4, tags: ["cutie","sticker","pastel"], materialLabel: "Pastel pink", ratios: { all: true } },
 
+  // ——— AI+ ———
   { id: "linen", name: "Linen Texture", tier: "aiplus", kind: "mat", texture: "linen", pad: 5.6, radius: 1.2, tags: ["fabric"], materialLabel: "Linen", ratios: { all: true } },
   { id: "oak", name: "Oak Warm Grain", tier: "aiplus", kind: "mat", texture: "oak", pad: 5.6, radius: 1.2, tags: ["wood"], materialLabel: "Oak", ratios: { all: true } },
   { id: "film", name: "Film Strip Reel", tier: "aiplus", kind: "specialty", color: "#14161e", pad: 8.6, radius: 3, perf: true, filmreel: true, tags: ["film"], materialLabel: "Film strip", ratios: { min: 1.15 } },
@@ -102,24 +107,34 @@ export const FRAMES: FrameDef[] = [
   { id: "cutieMint", name: "Cutie Mint Sticker", tier: "aiplus", kind: "mat", texture: "pastelMint", pad: 6, radius: 5, tags: ["cutie","sticker"], materialLabel: "Pastel mint", ratios: { all: true } },
   { id: "sketchInk", name: "Ink Sketch Frame", tier: "aiplus", kind: "mat", texture: "sketchGray", pad: 4, radius: 0, brackets: true, tags: ["sketch","outline"], materialLabel: "Ink sketch", ratios: { all: true } },
   { id: "gullyNeon", name: "Gully Neon Edge", tier: "aiplus", kind: "mat", color: "#1a1a2e", pad: 5, radius: 2, tags: ["gully","neon","street"], materialLabel: "Neon edge", ratios: { all: true } },
+  // New AI+ from trends: thin metal, natural maple, floating feel, bamboo
+  { id: "thinBlackMetal", name: "Thin Black Metal", tier: "aiplus", kind: "mat", color: "#1a1a1a", pad: 3.2, radius: 0, keyline: 1, tags: ["metal","minimal","modern"], materialLabel: "Matte black metal", ratios: { all: true } },
+  { id: "thinBrassMetal", name: "Thin Brass Metal", tier: "aiplus", kind: "mat", texture: "brass", pad: 3.2, radius: 0, tags: ["metal","brass","modern"], materialLabel: "Brushed brass", ratios: { all: true } },
+  { id: "naturalMaple", name: "Natural Maple", tier: "aiplus", kind: "mat", texture: "oak", pad: 4.5, radius: 1, tags: ["wood","maple","scandi"], materialLabel: "Light maple", ratios: { all: true } },
+  { id: "bambooSoft", name: "Bamboo Soft", tier: "aiplus", kind: "mat", texture: "bamboo", pad: 5, radius: 2, tags: ["bamboo","eco","natural"], materialLabel: "Bamboo", ratios: { all: true } },
+  { id: "slateMat", name: "Slate Stone Mat", tier: "aiplus", kind: "mat", texture: "slate", pad: 6, radius: 1, tags: ["stone","slate"], materialLabel: "Slate", ratios: { all: true } },
+  { id: "champagneMat", name: "Champagne Mat", tier: "aiplus", kind: "mat", texture: "champagne", pad: 6, radius: 1.5, tags: ["metal","champagne","warm"], materialLabel: "Champagne", ratios: { all: true } },
 
-  // Premium — sceneBg only on a few showcase pieces
+  // ——— Premium (unique looks — not five similar golds) ———
   { id: "baroqueGold", name: "Baroque Ornate Gold", tier: "premium", kind: "specialty", texture: "museumGold", pad: 14, radius: 2, baroque: true, ornamental: true, tags: ["royal","gold","baroque"], materialLabel: "Carved gold leaf", ratios: { all: true } },
-  { id: "baroquePortrait", name: "Rococo Portrait Gold", tier: "premium", kind: "specialty", texture: "museumGold", pad: 16, radius: 3, baroque: true, ornamental: true, tags: ["royal","gold","rococo"], materialLabel: "Rococo gold", ratios: { all: true } },
-  { id: "rococoGold", name: "Palace Rococo Gold", tier: "premium", kind: "specialty", texture: "goldfoil", pad: 15, radius: 2.5, baroque: true, ornamental: true, tags: ["palace","gold"], materialLabel: "Palace gold", ratios: { all: true } },
-  { id: "galleryGoldBead", name: "Gallery Gold Beaded", tier: "premium", kind: "specialty", texture: "museumGold", pad: 12, radius: 1, ornamental: true, keyline: 2, tags: ["gallery","gold"], materialLabel: "Beaded gold", ratios: { all: true } },
-  { id: "palaceGold", name: "Palace Gold Moulding", tier: "premium", kind: "specialty", texture: "brass", pad: 13, radius: 1.5, baroque: true, ornamental: true, tags: ["palace","gold"], materialLabel: "Palace moulding", ratios: { all: true } },
+  { id: "floatingBlack", name: "Floating Black", tier: "premium", kind: "specialty", color: "#0e0e10", pad: 18, radius: 0, keyline: 1, tags: ["floating","modern","gallery"], materialLabel: "Floating black", ratios: { all: true } },
+  { id: "blackGoldLip", name: "Black Gold Lip", tier: "premium", kind: "specialty", color: "#121214", pad: 10, radius: 1, ornamental: true, treasure: true, tags: ["black","gold","lip","modern"], materialLabel: "Black with gold lip", ratios: { all: true } },
+  { id: "champagneLip", name: "Champagne Gold Lip", tier: "premium", kind: "specialty", texture: "champagne", pad: 11, radius: 1.5, ornamental: true, tags: ["champagne","gold","warm"], materialLabel: "Champagne lip", ratios: { all: true } },
+  { id: "distressedOak", name: "Distressed Oak Vintage", tier: "premium", kind: "specialty", texture: "oak", pad: 12, radius: 2, ornamental: true, tags: ["vintage","wood","distressed"], materialLabel: "Distressed oak", ratios: { all: true } },
   { id: "velvetHibiscus", name: "Velvet Hibiscus Scene", tier: "premium", kind: "specialty", color: "#4a0e18", texture: "velvet", pad: 10, radius: 1.5, sceneBg: "velvetHibiscus", keyline: 1, tags: ["velvet","floral","scene"], materialLabel: "Burgundy velvet + scene", ratios: { all: true } },
   { id: "lotusPolaroid", name: "Lotus Garden Polaroid", tier: "premium", kind: "specialty", color: "#f5f0e6", pad: 8, radius: 3, polaroid: true, floralPolaroid: true, sceneBg: "lotusGarden", tags: ["floral","polaroid","scene"], materialLabel: "Floral polaroid", ratios: { all: true } },
   { id: "filmVintage", name: "Vintage Film Strip", tier: "premium", kind: "specialty", color: "#1a1814", pad: 11, radius: 0, filmVintage: true, perf: true, filmreel: true, tags: ["film","vintage"], materialLabel: "Aged film strip", ratios: { all: true } },
   { id: "cinemaStrip", name: "Cinema Aged Strip", tier: "premium", kind: "specialty", color: "#12100e", pad: 12, radius: 0, filmVintage: true, perf: true, filmreel: true, tags: ["film","cinema"], materialLabel: "Cinema strip", ratios: { all: true } },
-  { id: "museumShadow", name: "Museum Shadow Box", tier: "premium", kind: "mat", color: "#1c1c1e", pad: 16, radius: 0, keyline: 4, tags: ["museum","gallery"], materialLabel: "Deep museum box", ratios: { all: true } },
+  { id: "museumShadow", name: "Museum Shadow Box", tier: "premium", kind: "mat", color: "#1c1c1e", pad: 16, radius: 0, keyline: 4, tags: ["museum","gallery","shadow"], materialLabel: "Deep museum box", ratios: { all: true } },
   { id: "mahoganyLuxury", name: "Mahogany Carved Luxury", tier: "premium", kind: "specialty", texture: "walnut", color: "#3d1a0c", pad: 13, radius: 2, ornamental: true, baroque: true, tags: ["wood","mahogany"], materialLabel: "Carved mahogany", ratios: { all: true } },
   { id: "blackGoldInlay", name: "Black Gold Inlay", tier: "premium", kind: "specialty", color: "#0e0e10", pad: 12, radius: 1.5, ornamental: true, treasure: true, tags: ["luxury","gold"], materialLabel: "Black gold inlay", ratios: { all: true } },
   { id: "instantLuxury", name: "Luxury Instant Card", tier: "premium", kind: "specialty", color: "#faf6f0", pad: 9, radius: 4, polaroid: true, tags: ["instant","luxury"], materialLabel: "Luxury instant", ratios: { all: true } },
   { id: "polaroid70s", name: "1970s Instant Print", tier: "premium", kind: "specialty", color: "#f5f0e8", pad: 10, radius: 3, polaroid: true, tags: ["instant","1970s","retro","camera"], materialLabel: "70s instant print", ratios: { all: true } },
   { id: "velvetDeep", name: "Deep Burgundy Velvet", tier: "premium", kind: "specialty", color: "#3d0a12", texture: "velvet", pad: 11, radius: 1.2, keyline: 1, tags: ["velvet","luxury"], materialLabel: "Deep velvet", ratios: { all: true } },
   { id: "emeraldVelvet", name: "Emerald Velvet Luxe", tier: "premium", kind: "specialty", color: "#0c3d2e", texture: "velvet", pad: 10, radius: 1.5, keyline: 1, tags: ["velvet","emerald"], materialLabel: "Emerald velvet", ratios: { all: true } },
+  { id: "wideGalleryWhite", name: "Wide Gallery White", tier: "premium", kind: "mat", color: "#f8f6f2", pad: 20, radius: 0, keyline: 1, tags: ["gallery","wide","mat"], materialLabel: "Oversized white mat", ratios: { all: true } },
+  { id: "linenStudioScene", name: "Linen Studio Scene", tier: "premium", kind: "specialty", texture: "linen", pad: 10, radius: 1, sceneBg: "linenStudio", tags: ["linen","studio","scene"], materialLabel: "Linen studio", ratios: { all: true } },
+  { id: "antiqueSilver", name: "Antique Silver Ornate", tier: "premium", kind: "specialty", texture: "silver", pad: 13, radius: 2, ornamental: true, baroque: true, tags: ["silver","antique","ornate"], materialLabel: "Antique silver", ratios: { all: true } },
 ];
 
 export const FRAME_BY_ID: Record<string, FrameDef> = Object.fromEntries(
