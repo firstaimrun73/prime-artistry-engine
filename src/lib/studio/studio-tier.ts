@@ -137,6 +137,7 @@ export function experienceWatermarkLine(tier: StudioTier, planDisplayName: strin
  * Standard: SD, HD only.
  * Premium (pro): SD, HD, 2K (matches PremiumQuality backend).
  * Ultra AI (premium): SD, HD, 2K, 4K, 8K.
+ * Note: backend IMAX requires 8k_max quality which is not yet a user-facing chip.
  */
 export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
   switch (tier) {
@@ -152,14 +153,15 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
 /**
  * Aspect ratios for text-to-image per experience.
  * Standard + Premium: five core ratios.
- * Ultra AI: same five + IMAX (21:9).
+ * Ultra AI: same five core ratios.
+ * IMAX is intentionally omitted until the UI exposes 8K Max (8k_max), which the
+ * Ultra validator requires for IMAX. Do not present a selectable IMAX path that
+ * cannot satisfy the backend.
  */
 export function aspectRatiosForStudioTier(
   tier: StudioTier,
 ): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "imax"> {
-  if (tier === "premium") {
-    return ["1:1", "4:3", "16:9", "9:16", "3:4", "imax"];
-  }
+  void tier;
   return ["1:1", "4:3", "16:9", "9:16", "3:4"];
 }
 
