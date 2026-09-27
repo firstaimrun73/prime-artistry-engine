@@ -1,10 +1,10 @@
 /**
  * About Product — single canonical editorial page (/about)
- * Sections: Image Studio → Video → Music → Maluto AI → Circle 2edit → Filters
+ * Sections: Image Studio → Video → Music → Maluto AI → Circle 2edit → Remove BG → Filters
  */
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft, ChevronDown, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEMANTIC_TAG_REGISTRY, MAX_SEMANTIC_TAGS } from "@/lib/studio/image/tag-semantic-registry";
 import { STANDARD_CREDITS } from "@/lib/studio/image/standard/credits";
@@ -13,6 +13,7 @@ import { ULTRA_T2I_CREDITS } from "@/lib/studio/image/ultra/credits";
 import { AUTO_EDIT_CREDITS_BY_QUALITY, AUTO_EDIT_PRODUCT_NAME } from "@/lib/auto-edit/constants";
 import { ALL_FILTERS } from "@/lib/filter-lens/filters/filter-registry";
 import { imageQualityDimensions } from "@/lib/quality-options";
+import { REMOVE_BG_CREDITS } from "@/lib/remove-bg/constants";
 import { cn } from "@/lib/utils";
 import { Circle2editGuideSection } from "@/components/about/Circle2editGuideSection";
 
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/about")({
       {
         name: "description",
         content:
-          "Motio2edit About Product: Image Studio, Video Studio, Music Studio, Maluto AI, Circle 2edit, and Filters — how generation, tags, quality, credits, and editing tools work.",
+          "Motio2edit About Product: Image Studio, Video Studio, Music Studio, Maluto AI, Circle 2edit, Remove BG, and Filters — how generation, tags, quality, credits, and editing tools work.",
       },
       { property: "og:title", content: "About Product — Motio2edit" },
     ],
@@ -36,6 +37,7 @@ const IMAGE_ACCENT = "oklch(0.70 0.19 45)";
 const VIDEO_ACCENT = "oklch(0.55 0.22 25)";
 const MUSIC_ACCENT = "oklch(0.58 0.22 310)";
 const MALUTO_ACCENT = "oklch(0.55 0.12 250)";
+const REMOVE_BG_ACCENT = "#f43f5e"; /* rose-500 */
 
 const SECTIONS = [
   { id: "image-studio", label: "Image Studio" },
@@ -43,6 +45,7 @@ const SECTIONS = [
   { id: "music-studio", label: "Music Studio" },
   { id: "maluto-ai", label: "Maluto AI" },
   { id: "circle-2edit", label: "Circle 2edit" },
+  { id: "remove-bg", label: "Remove BG" },
   { id: "filters", label: "Filters" },
 ] as const;
 
@@ -234,7 +237,7 @@ function AboutProductPage() {
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-neutral-700 sm:text-lg">
             This page documents how Motio2edit works today across Image Studio, Video Studio, Music Studio,
-            Maluto AI, Circle 2edit, and Filters — modes, quality, credits, and practical workflows.
+            Maluto AI, Circle 2edit, Remove BG, and Filters — modes, quality, credits, and practical workflows.
           </p>
         </section>
 
@@ -324,7 +327,7 @@ function AboutProductPage() {
             Maluto AI
           </h2>
           <p className="mt-4 text-base leading-relaxed text-neutral-700">
-            Maluto AI is Motio2edit&apos;s in-product assistant for creative guidance — helping refine ideas,
+            Maluto AI is Motio2edit's in-product assistant for creative guidance — helping refine ideas,
             suggest edit directions, and orient you inside the studios. Generation credits for Image, Video,
             and Music still apply when you run those tools; Maluto itself is guidance, not a separate
             generation meter on this page.
@@ -334,6 +337,61 @@ function AboutProductPage() {
         <Divider />
 
         <Circle2editGuideSection />
+
+        <Divider />
+
+        {/* Remove BG — standalone product */}
+        <section id="remove-bg" aria-labelledby="remove-bg-h" className="scroll-mt-24">
+          <div className="flex items-center gap-3">
+            <span
+              className="grid h-10 w-10 place-items-center rounded-xl text-white"
+              style={{ backgroundColor: REMOVE_BG_ACCENT }}
+              aria-hidden
+            >
+              <Eraser className="h-5 w-5" strokeWidth={2.25} />
+            </span>
+            <div>
+              <p
+                className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: REMOVE_BG_ACCENT }}
+              >
+                Cutout · transparent · one click
+              </p>
+              <h2 id="remove-bg-h" className="text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
+                Remove BG
+              </h2>
+            </div>
+          </div>
+          <p className="mt-4 text-base leading-relaxed text-neutral-700">
+            Remove BG is a focused tool for turning any photo into a clean cutout. Upload an image, tap
+            once, and download a transparent PNG — ideal for product shots, social creatives, stickers, and
+            design layouts. You keep the subject; the background is cleared automatically.
+          </p>
+          <p className="mt-3 text-base leading-relaxed text-neutral-700">
+            Quality follows your plan: standard definition on free, high definition when you are on a paid
+            plan. Each photo costs <strong>{REMOVE_BG_CREDITS} credits</strong>. Aspect ratio is preserved so
+            portraits, products, and landscapes stay true to the original frame.
+          </p>
+          <StepDiagram
+            accent={REMOVE_BG_ACCENT}
+            steps={["Upload photo", "Remove background", "Download PNG"]}
+          />
+          <Table
+            accent={REMOVE_BG_ACCENT}
+            headers={["Item", "Detail"]}
+            rows={[
+              ["Credits", `${REMOVE_BG_CREDITS} per photo`],
+              ["Output", "Transparent PNG"],
+              ["Aspect", "Any (kept from original)"],
+              ["Quality", "SD (free) · HD (paid)"],
+            ]}
+          />
+          <div className="mt-6">
+            <Button asChild size="sm" className="rounded-full" style={{ backgroundColor: REMOVE_BG_ACCENT }}>
+              <Link to="/studio/image/remove-bg">Try Remove BG</Link>
+            </Button>
+          </div>
+        </section>
 
         <Divider />
 
