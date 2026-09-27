@@ -173,7 +173,7 @@ function RemoveBgInfoPage() {
     >
       <header
         className={cn(
-          "sticky top-0 z-10 flex items-center gap-3 border-b px-4 py-3 backdrop-blur-xl",
+          "sticky top-0 z-40 flex items-center gap-3 border-b px-4 py-3.5 backdrop-blur-xl shadow-sm",
           isDark ? "border-white/8 bg-[#181A22]/90" : "border-black/6 bg-white/85",
         )}
       >
@@ -196,8 +196,7 @@ function RemoveBgInfoPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl space-y-10 px-4 py-8">
-        {/* Animated Before & After — primary visual */}
+      <div className="mx-auto max-w-2xl space-y-10 px-4 pb-8 pt-6">
         <section className="space-y-3">
           <h2 className="text-[15px] font-bold tracking-tight">Before & after</h2>
           <div
@@ -218,7 +217,6 @@ function RemoveBgInfoPage() {
           </div>
         </section>
 
-        {/* Real examples — 1:1 two-up, 16:9 full width */}
         <section className="space-y-3">
           <h2 className="text-[15px] font-bold tracking-tight">Examples</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -230,7 +228,7 @@ function RemoveBgInfoPage() {
                   isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white",
                 )}
               >
-                <div className="relative aspect-square w-full">
+                <div className="relative aspect-square w-full overflow-hidden">
                   <CompareSlider
                     before={item.before}
                     after={item.after}
@@ -253,7 +251,7 @@ function RemoveBgInfoPage() {
                 isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white",
               )}
             >
-              <div className="relative aspect-video w-full">
+              <div className="relative aspect-video w-full overflow-hidden">
                 <CompareSlider
                   before={item.before}
                   after={item.after}
@@ -321,7 +319,6 @@ function RemoveBgInfoPage() {
           </dl>
         </section>
 
-        {/* Single Try Now CTA */}
         <Link
           to="/studio/image/remove-bg"
           search={{ from: "info" }}
