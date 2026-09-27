@@ -1,13 +1,15 @@
 /**
  * Remove BG info page — /studio/image/remove-bg-info
- * Like Circle info: explain product, then Try Now → editor.
+ * Like Circle info: explain product, rose carousel, then Try Now → editor.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { ArrowLeft, ArrowRight, ImagePlus, Sparkles, Download } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { REMOVE_BG_CREDITS } from "@/lib/remove-bg/constants";
+import { REMOVE_BG_INFO_CAROUSEL } from "@/lib/remove-bg/samples";
 
 export const Route = createFileRoute("/studio/image/remove-bg-info")({
   ssr: false,
@@ -28,6 +30,8 @@ function RemoveBgInfoPage() {
   const isDark = theme === "dark";
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [slide, setSlide] = useState(0);
+  const current = REMOVE_BG_INFO_CAROUSEL[slide] ?? REMOVE_BG_INFO_CAROUSEL[0];
 
   const start = () => {
     if (user) {
@@ -91,6 +95,78 @@ function RemoveBgInfoPage() {
             {user ? "Try Now" : "Start Now"}
             <ArrowRight className="h-4 w-4" />
           </button>
+        </section>
+
+        {/* Before / After carousel — user rose pair, keep natural aspect */}
+        <section className="space-y-3">
+          <h2 className="text-[15px] font-bold tracking-tight">Before & after</h2>
+          <div
+            className={cn(
+              "overflow-hidden rounded-2xl border",
+              isDark ? "border-white/10 bg-white/5" : "border-black/6 bg-white",
+            )}
+          >
+            <div
+              className="relative aspect-square w-full"
+              style={{
+                backgroundImage:
+                  current.label === "After"
+                    ? "linear-gradient(45deg,#e5e7eb 25%,transparent 25%),linear-gradient(-45deg,#e5e7eb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e5e7eb 75%),linear-gradient(-45deg,transparent 75%,#e5e7eb 75%)"
+                    : undefined,
+                backgroundSize: current.label === "After" ? "14px 14px" : undefined,
+                backgroundPosition: current.label === "After" ? "0 0,0 7px,7px -7px,-7px 0" : undefined,
+                backgroundColor: current.label === "After" ? "#f8fafc" : undefined,
+              }}
+            >
+              <img
+                src={current.src}
+                alt={current.caption}
+                className="h-full w-full object-contain"
+                draggable={false}
+              />
+              <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-md">
+                {current.label}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 px-4 py-3">
+              <p className={cn("text-[12px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+                {current.caption}
+              </p>
+              <div className="flex gap-1.5">
+                {REMOVE_BG_INFO_CAROUSEL.map((item, i) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSlide(i)}
+                    className={cn(
+                      "h-2 w-2 rounded-full transition",
+                      i === slide ? "bg-rose-500" : isDark ? "bg-white/25" : "bg-black/20",
+                    )}
+                    aria-label={item.label}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex border-t border-border/60">
+              {REMOVE_BG_INFO_CAROUSEL.map((item, i) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSlide(i)}
+                  className={cn(
+                    "flex-1 py-2.5 text-[12px] font-semibold transition",
+                    i === slide
+                      ? "bg-rose-500/10 text-rose-600"
+                      : isDark
+                        ? "text-[#9AA0B0] hover:bg-white/5"
+                        : "text-[#5C6170] hover:bg-black/5",
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="space-y-3">
