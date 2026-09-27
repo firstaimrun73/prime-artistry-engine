@@ -1,1 +1,294 @@
-PLACEHOLDER_WILL_REPLACE2
+/**
+ * Lens Apply entitlements + AI+ Image Edit.
+ * Common lenses: free for everyone — no credits, no FAL, no AI+ usage.
+ * AI+: paid-plan only. Successful AI+ generation costs LENS_AI_CREDITS (20).
+ * Failed/empty/invalid/provider-error generations cost 0 credits.
+ * Idempotent on generationId — duplicate success does not double-charge.
+ */
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isAdminClaims } from "@/lib/admin-guard.server";
+import {
+  getCameraLensById,
+  isAiLens,
+  LENS_AI_CREDITS,
+  LENS_AI_PLUS_ATTEMPT_LIMIT,
+} from "@/lib/lens-camera/roster";
+import { isPaidPlan } from "@/lib/policy";
+import { buildImageEdit, type FalStep } from "@/lib/fal-request";
+
+const FAL_QUEUE = "https://queue.fal.run/";
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function runFalStep(step: FalStep, falKey: string): Promise<string> {
+  const headers = { Authorization: `Key ${falKey}`, "Content-Type": "application/json" };
+  const submit = await fetch(`${FAL_QUEUE}${step.model}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(step.body),
+  });
+  if (!submit.ok) {
+    const txt = await submit.text();
+    throw new Error(`AI edit failed (${submit.status}): ${txt.slice(0, 200)}`);
+  }
+  const { status_url, response_url } = (await submit.json()) as {
+    status_url: string;
+    response_url: string;
+  };
+  const deadline = Date.now() + 120_000;
+  let delay = 1500;
+  let lastStatus = "";
+  while (Date.now() < deadline) {
+    await sleep(delay);
+    const st = await fetch(status_url, { headers });
+    if (!st.ok) throw new Error(`AI status failed (${st.status})`);
+    const body = (await st.json()) as { status?: string };
+    lastStatus = body.status ?? "";
+    if (lastStatus === "COMPLETED") break;
+    if (lastStatus === "FAILED" || lastStatus === "ERROR") {
+      throw new Error("AI enhancement failed.");
+    }
+    delay = Math.min(delay + 500, 5000);
+  }
+  if (lastStatus !== "COMPLETED") throw new Error("AI enhancement timed out.");
+  const res = await fetch(response_url, { headers });
+  if (!res.ok) throw new Error(`AI result failed (${res.status})`);
+  const result = (await res.json()) as {
+    images?: { url?: string }[];
+    image?: { url?: string };
+  };
+  const url = result.images?.[0]?.url ?? result.image?.url ?? null;
+  if (!url) throw new Error("AI enhancement returned no image.");
+  return url;
+}
+
+const chargeSchema = z.object({
+  lensId: z.string().min(1).max(64),
+  generationId: z.string().min(8).max(80),
+});
+
+const aiPlusRunSchema = z.object({
+  lensId: z.string().min(1).max(64),
+  imageDataUrl: z.string().min(32).max(12_000_000),
+  generationId: z.string().min(8).max(80),
+});
+
+function startOfLocalDayIso(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+const AI_PROMPTS: Record<string, string> = {
+  lens_hd_4k:
+    "Enhance this photograph for higher perceived clarity and fine detail. Sharpen fine textures, reduce noise, preserve exact composition, lighting, and subject identity. Photorealistic 4K clarity upgrade.",
+  lens_farreach:
+    "This is a digitally zoomed photograph of a distant subject. Recover fine detail, reduce compression noise, gently sharpen, and enhance clarity while preserving composition and identity.",
+  lens_microreveal:
+    "Enhance this image as macro photography: extreme subject detail, crisp textures, natural shallow depth of field feel, preserve identity and composition.",
+  lens_origami:
+    "Transform this photograph into origami paper-fold art. Geometric folded paper aesthetic, clean creases, stylized origami sculpture of the main subject, keep recognizable composition.",
+};
+
+export const chargeLensGeneration = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => chargeSchema.parse(data))
+  .handler(async ({ data }) => {
+    // Common lenses are free. Compatibility endpoint — never charges for local optical Apply.
+    const lens = getCameraLensById(data.lensId);
+    return {
+      ok: true as const,
+      credits: 0,
+      charged: 0,
+      generationId: data.generationId,
+      lensName: lens?.name ?? data.lensId,
+      cost: 0,
+    };
+  });
+
+export const runLensAiPlusGeneration = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => aiPlusRunSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const lens = getCameraLensById(data.lensId);
+    if (!lens) throw new Error("Unknown lens.");
+    if (!isAiLens(lens)) throw new Error("This lens is not AI+.");
+    const { data: profile, error: pErr } = await supabase
+      .from("profiles")
+      .select("plan, email")
+      .eq("id", userId)
+      .single();
+    if (pErr || !profile) throw new Error("Could not load your account.");
+    const isAdmin = isAdminClaims({ email: profile.email ?? undefined });
+    const paid = isAdmin || isPaidPlan(profile.plan);
+    if (!paid) {
+      throw new Error("AI+ lenses require a paid plan. Upgrade to unlock.");
+    }
+    // Idempotent replay: same generationId must not create a second provider call or charge
+    {
+      const { data: prior } = await supabaseAdmin
+        .from("generation_history")
+        .select("output_path, status")
+        .eq("user_id", userId)
+        .eq("type", "lens_ai_plus")
+        .eq("prompt", `${lens.id}:${data.generationId}`)
+        .eq("status", "success")
+        .maybeSingle();
+      if (prior?.output_path) {
+        const dayStartReplay = startOfLocalDayIso();
+        const { count: usedReplay } = await supabaseAdmin
+          .from("generation_history")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("type", "lens_ai_plus")
+          .eq("status", "success")
+          .gte("created_at", dayStartReplay);
+        return {
+          ok: true as const,
+          outputUrl: prior.output_path as string,
+          lensName: lens.name,
+          generationId: data.generationId,
+          charged: 0,
+          credits: 0,
+          used: usedReplay ?? 0,
+          limit: isAdmin ? null : LENS_AI_PLUS_ATTEMPT_LIMIT,
+          remaining: isAdmin
+            ? null
+            : Math.max(0, LENS_AI_PLUS_ATTEMPT_LIMIT - (usedReplay ?? 0)),
+          replayed: true as const,
+        };
+      }
+    }
+    const dayStart = startOfLocalDayIso();
+    if (!isAdmin) {
+      const { count, error: cErr } = await supabaseAdmin
+        .from("generation_history")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("type", "lens_ai_plus")
+        .eq("status", "success")
+        .gte("created_at", dayStart);
+      if (cErr) throw new Error("Could not verify AI+ allowance.");
+      if ((count ?? 0) >= LENS_AI_PLUS_ATTEMPT_LIMIT) {
+        throw new Error("AI+ daily limit reached. Try again tomorrow.");
+      }
+    }
+    const prompt =
+      AI_PROMPTS[lens.id] ??
+      "Enhance this photograph with high detail while preserving composition and identity.";
+    const falKey = process.env.FAL_KEY || process.env.FAL_API_KEY;
+    if (!falKey) throw new Error("AI service is not configured.");
+    let outputUrl: string;
+    try {
+      const step = buildImageEdit({
+        prompt,
+        imageUrl: data.imageDataUrl,
+        strength: 0.55,
+      });
+      outputUrl = await runFalStep(step, falKey);
+    } catch (e) {
+      // Failed generation: 0 credits
+      throw new Error(
+        e instanceof Error ? e.message : "AI enhancement failed. Try again.",
+      );
+    }
+    if (!outputUrl) throw new Error("AI enhancement returned no image.");
+
+    // Post-success credit charge only (failed generations cost 0)
+    let chargedCredits = 0;
+    if (!isAdmin) {
+      const cost = LENS_AI_CREDITS;
+      const { data: deductOk, error: deductErr } = await supabaseAdmin.rpc("deduct_credits", {
+        p_user_id: userId,
+        p_amount: cost,
+      });
+      if (deductErr) {
+        throw new Error("Could not charge credits for AI+ generation.");
+      }
+      if (deductOk === false || deductOk === null) {
+        throw new Error("Insufficient credits for AI+ generation.");
+      }
+      chargedCredits = cost;
+    }
+
+    await supabaseAdmin.from("generation_history").insert({
+      user_id: userId,
+      type: "lens_ai_plus",
+      status: "success",
+      prompt: `${lens.id}:${data.generationId}`,
+      output_path: outputUrl.slice(0, 500),
+      credits_used: chargedCredits,
+    });
+    const { count: usedNow } = await supabaseAdmin
+      .from("generation_history")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("type", "lens_ai_plus")
+      .eq("status", "success")
+      .gte("created_at", dayStart);
+    return {
+      ok: true as const,
+      outputUrl,
+      lensName: lens.name,
+      generationId: data.generationId,
+      charged: chargedCredits,
+      credits: chargedCredits,
+      used: usedNow ?? 1,
+      limit: isAdmin ? null : LENS_AI_PLUS_ATTEMPT_LIMIT,
+      remaining: isAdmin
+        ? null
+        : Math.max(0, LENS_AI_PLUS_ATTEMPT_LIMIT - (usedNow ?? 1)),
+    };
+  });
+
+export const consumeAiPlusAttempt = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        lensId: z.string().min(1).max(64),
+        generationId: z.string().min(8).max(80),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const lens = getCameraLensById(data.lensId);
+    if (!lens || !isAiLens(lens)) throw new Error("This lens is not AI+.");
+    return { ok: true as const, generationId: data.generationId };
+  });
+
+export const getAiPlusStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("plan, email")
+      .eq("id", userId)
+      .single();
+    const isAdmin = isAdminClaims({ email: profile?.email ?? undefined });
+    const paid = isAdmin || isPaidPlan(profile?.plan);
+    if (!paid) {
+      return { paid: false, used: 0, limit: LENS_AI_PLUS_ATTEMPT_LIMIT, remaining: 0 };
+    }
+    const dayStart = startOfLocalDayIso();
+    const { count: used } = await supabaseAdmin
+      .from("generation_history")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("type", "lens_ai_plus")
+      .eq("status", "success")
+      .gte("created_at", dayStart);
+    return {
+      paid: true,
+      used: used ?? 0,
+      limit: isAdmin ? null : LENS_AI_PLUS_ATTEMPT_LIMIT,
+      remaining: isAdmin ? null : Math.max(0, LENS_AI_PLUS_ATTEMPT_LIMIT - (used ?? 0)),
+    };
+  });
