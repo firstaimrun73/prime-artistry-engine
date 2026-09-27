@@ -51,11 +51,8 @@ export function EditorUpload({
         className="hidden"
       />
 
-      {/* 1. UPLOAD — compact on mobile; full drop zone when empty */}
+      {/* Upload control — parent Image/Video section supplies the stage heading */}
       <section className="min-w-0 space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          1. Upload
-        </p>
         {gallery.length === 0 ? (
           <button
             onClick={() => fileRef.current?.click()}
