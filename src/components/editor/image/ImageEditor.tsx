@@ -1,6 +1,6 @@
 /**
  * Image Editor workspace — independent of Video Editor.
- * UPLOAD → PROMPT → SELECT → GENERATE → OUTPUT
+ * UPLOAD → WRITE & SELECT → GENERATE → OUTPUT (compact glass UI)
  */
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -94,7 +94,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [refImages, setRefImages] = useState<string[]>([]);
   const [output, setOutput] = useState<string | null>(null);
   const [state, setState] = useState<GenState>("idle");
-  const [strength, setStrength] = useState(0.7);
+  /** Recommended strength — backend fal defaults cluster ~0.55–0.85; use mid for general edits. */
+  const [strength] = useState(0.75);
   const [keepWatermark, setKeepWatermark] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
@@ -486,7 +487,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       }
 
       let referenceImageUrls: string[] | undefined;
-      // Prefer gallery extras as references so visible selection matches the request.
       const extras = gallery.filter((_, i) => i !== activeImage);
       if (!maskImageUrl && effectiveMaxImages > 1 && extras.length > 0) {
         const sources = extras.map((g) => g.dataUrl).slice(0, Math.max(0, effectiveMaxImages - 1));
@@ -544,11 +544,15 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
       if (runId !== runIdRef.current) return;
 
-      if (!result?.url) throw new Error("Generation returned no image.");
-      await preloadImage(result.url);
+      // generateMedia returns { outputUrl, credits } — not { url }
+      const outUrl =
+        (result as { outputUrl?: string; url?: string } | null)?.outputUrl ||
+        (result as { url?: string } | null)?.url;
+      if (!outUrl) throw new Error("Generation returned no image.");
+      await preloadImage(outUrl);
       if (runId !== runIdRef.current) return;
 
-      setOutput(result.url);
+      setOutput(outUrl);
       setState("success");
       setProgress(100);
       endGeneration();
@@ -831,9 +835,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
-              <span className="rounded-full border border-border/50 bg-card/60 px-2.5 py-1.5 text-xs font-semibold backdrop-blur-md sm:px-3">
-                {isAdmin ? "∞ credits" : `${profile.credits} credits`}
-              </span>
               <Button size="sm" variant="ghost" onClick={handleClear} className="min-h-[36px]">
                 <RotateCcw className="mr-1.5 h-4 w-4" /> New
               </Button>
@@ -841,13 +842,38 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           </div>
 
           <style>{`
-            @keyframes studio-icon-pulse {
-              0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(255,90,31,0.0); }
-              50% { opacity: 0.95; transform: scale(1.05); box-shadow: 0 0 14px -2px rgba(255,90,31,0.4); }
+            @keyframes studio-spark-burst {
+              0%, 100% { transform: scale(1); opacity: 1; }
+              35% { transform: scale(1.12); opacity: 1; }
+              55% { transform: scale(0.96); opacity: 0.92; }
+              75% { transform: scale(1.04); opacity: 1; }
             }
-            .studio-image-icon { animation: studio-icon-pulse 3.2s ease-in-out infinite; }
+            @keyframes studio-spark-ray {
+              0%, 100% { transform: scale(0.4); opacity: 0; }
+              30% { transform: scale(1); opacity: 0.7; }
+              60% { transform: scale(1.35); opacity: 0; }
+              100% { transform: scale(0.4); opacity: 0; }
+            }
+            .studio-image-icon { position: relative; animation: studio-spark-burst 2.8s ease-in-out infinite; }
+            .studio-image-icon::before,
+            .studio-image-icon::after {
+              content: "";
+              position: absolute;
+              inset: -3px;
+              border-radius: 9999px;
+              border: 1.5px solid rgba(255, 90, 31, 0.35);
+              animation: studio-spark-ray 2.8s ease-out infinite;
+              pointer-events: none;
+            }
+            .studio-image-icon::after {
+              inset: -6px;
+              border-color: rgba(255, 90, 31, 0.18);
+              animation-delay: 0.15s;
+            }
             @media (prefers-reduced-motion: reduce) {
-              .studio-image-icon { animation: none; }
+              .studio-image-icon,
+              .studio-image-icon::before,
+              .studio-image-icon::after { animation: none; }
             }
           `}</style>
 
@@ -855,24 +881,18 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
           </div>
 
-          <nav
+          <p
             aria-label="Workflow stages"
-            className="mt-3 flex items-center gap-1 overflow-x-auto text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]"
+            className="mt-2 text-[10px] text-muted-foreground sm:text-[11px]"
           >
-            {[
-              { n: "①", label: "Upload", on: gallery.length > 0 || !!inputDataUrl },
-              { n: "②", label: "Write & Select", on: prompt.trim().length > 0 },
-              { n: "③", label: "Generate", on: loading },
-              { n: "④", label: "Output", on: !!output && state === "success" },
-            ].map((s, i) => (
-              <span key={s.label} className="flex items-center gap-1 shrink-0">
-                {i > 0 && <span className="mx-0.5 text-border">·</span>}
-                <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5", s.on && "bg-[#FF5A1F]/10 text-[#FF5A1F]")}>
-                  <span aria-hidden>{s.n}</span> {s.label}
-                </span>
-              </span>
-            ))}
-          </nav>
+            <span className={cn((gallery.length > 0 || !!inputDataUrl) && "text-[#FF5A1F] font-medium")}>① Upload</span>
+            <span className="mx-1.5 text-border">·</span>
+            <span className={cn(prompt.trim().length > 0 && "text-[#FF5A1F] font-medium")}>② Write & Select</span>
+            <span className="mx-1.5 text-border">·</span>
+            <span className={cn(loading && "text-[#FF5A1F] font-medium")}>③ Generate</span>
+            <span className="mx-1.5 text-border">·</span>
+            <span className={cn(!!output && state === "success" && "text-[#FF5A1F] font-medium")}>④ Output</span>
+          </p>
 
           <div className="mt-3 grid min-w-0 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[1fr_minmax(280px,360px)] lg:gap-5">
             <div className="order-1 min-w-0 space-y-3 sm:space-y-3.5">
@@ -944,7 +964,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                     setImageQuality(q);
                   }}
                   strength={strength}
-                  setStrength={setStrength}
+                  setStrength={() => {}}
                   canAddRefImages={canAddRefImages}
                   refImages={refImages}
                   setRefImages={setRefImages}
@@ -971,14 +991,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   studioCardClass(studioTier),
                 )}
               >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                    <span className="text-[#FF5A1F]">③</span> Generate
-                  </p>
-                  <span className="rounded-full border border-border/50 bg-background/50 px-2 py-0.5 text-[11px] font-semibold tabular-nums backdrop-blur-sm">
-                    {cost} cr
-                  </span>
-                </div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
+                  <span className="text-[#FF5A1F]">③</span> Generate
+                </p>
                 <EditorGenerationControls
                   loading={loading}
                   onGenerate={runGenerate}
@@ -987,6 +1002,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   noCredits={noCredits}
                   generateClassName={studioGenerateClass(studioTier)}
                   showAutoToggle={false}
+                  costLabel={`${cost} cr`}
                 />
               </section>
             </div>
