@@ -1,7 +1,6 @@
 /**
  * Remove BG sample media (R2) + gallery cards.
- * Rose pair = user-provided (hero + info carousel + first gallery card).
- * Gallery = interactive before/after only (no info buttons).
+ * Real before/after pairs only — no placeholder duplicates.
  */
 
 export const REMOVE_BG_ROSE_BEFORE =
@@ -10,18 +9,30 @@ export const REMOVE_BG_ROSE_BEFORE =
 export const REMOVE_BG_ROSE_AFTER =
   "https://assets.motio2edit.com/samples/circle-2edit/file_000000008dc481f4b1f73107c3caa1c1.png";
 
+export const REMOVE_BG_CAR_BEFORE =
+  "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0003.jpg";
+
+export const REMOVE_BG_CAR_AFTER =
+  "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0000.jpg";
+
+export const REMOVE_BG_PORTRAIT_BEFORE =
+  "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0002.jpg";
+
+export const REMOVE_BG_PORTRAIT_AFTER =
+  "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0001.jpg";
+
 export type RemoveBgGalleryItem = {
   id: string;
   title: string;
   before: string;
   after: string;
-  aspect: "1:1" | "4:5" | "3:4" | "3:2";
+  /** Layout hint: square cards share a row; wide uses full width */
+  aspect: "1:1" | "16:9" | "3:4" | "4:5";
 };
 
 /**
- * Editor bottom gallery — interactive CompareSlider cards.
- * First card uses real transparent cutout (rose). Others: free Unsplash demos
- * (swap after URLs when more licensed cutouts are available).
+ * Gallery — interactive CompareSlider cards.
+ * Rose + Portrait (1:1) share a row on desktop; Car (wide) spans full width.
  */
 export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
   {
@@ -32,53 +43,22 @@ export const REMOVE_BG_GALLERY: RemoveBgGalleryItem[] = [
     aspect: "1:1",
   },
   {
-    id: "product-bottle",
-    title: "Product",
-    before:
-      "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&q=80&auto=format",
-    after:
-      "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&q=80&auto=format",
-    aspect: "1:1",
-  },
-  {
     id: "portrait",
     title: "Portrait",
-    before:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=80&auto=format",
-    after:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=80&auto=format",
-    aspect: "3:4",
-  },
-  {
-    id: "sneaker",
-    title: "Sneaker",
-    before:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80&auto=format",
-    after:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80&auto=format",
+    before: REMOVE_BG_PORTRAIT_BEFORE,
+    after: REMOVE_BG_PORTRAIT_AFTER,
     aspect: "1:1",
   },
   {
-    id: "plant",
-    title: "Plant",
-    before:
-      "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=800&q=80&auto=format",
-    after:
-      "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=800&q=80&auto=format",
-    aspect: "3:4",
-  },
-  {
-    id: "watch",
-    title: "Watch",
-    before:
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80&auto=format",
-    after:
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80&auto=format",
-    aspect: "1:1",
+    id: "car",
+    title: "Car",
+    before: REMOVE_BG_CAR_BEFORE,
+    after: REMOVE_BG_CAR_AFTER,
+    aspect: "16:9",
   },
 ];
 
-/** Info page carousel — user rose pair only */
+/** Info page — animated before→after using real rose pair */
 export const REMOVE_BG_INFO_CAROUSEL = [
   {
     id: "rose-before",
