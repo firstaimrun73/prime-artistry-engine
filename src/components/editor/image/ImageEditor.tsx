@@ -1,4 +1,4 @@
-/**
+  /**
  * Image Editor workspace — independent of Video Editor.
  * UPLOAD → PROMPT → SELECT → GENERATE → OUTPUT
  */
@@ -247,8 +247,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       if (hasSource) {
         return quoteStandardCredits({
           mode: "image_to_image",
-          imageQuality: imageQuality === "hd" ? "hd" : "sd",
-        }).credits;
+          imageQuality: imageQuality === "hd" ? "hd" : "sd",        }).credits;
       }
       return quoteStandardCredits({
         mode: "text_to_image",
@@ -486,258 +485,459 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           });
           uploaded.push(await uploadToStorage(refFile));
         }
-        referenceImageUrls = uploaded;
+        const valid = uploaded.filter((u) => u.startsWith("https://"));
+        if (valid.length !== wanted.length) {
+          toast.error("Some reference images could not be uploaded and were skipped.");
+        }
+        referenceImageUrls = valid.length > 0 ? valid : undefined;
       }
+      if (runId !== runIdRef.current) return;
 
-      const result = await generate({
+      const res = await generate({
         data: {
           prompt: opts.jobPrompt,
-          mediaUrl,
-          mediaType: inputKind === "image" ? "image" : undefined,
-          strength,
-          aspectRatio,
+          type: "image",          imageUrl: mediaUrl,
+          sourceKind: mediaUrl ? "image" : undefined,
+          strength: mediaUrl ? strength : undefined,
+          maskImageUrl,
+          referenceImageUrls,
+          keepWatermark,
+          aspectRatio: !mediaUrl ? aspectRatio : undefined,
           imageQuality,
           studioTier,
-          referenceImageUrls,
-          maskImageUrl,
-          contextTags: contextTags.length > 0 ? contextTags : undefined,
-          keepWatermark,
+          contextTags: contextTags.length > 0 ? contextTags.slice(0, 10) : undefined,
         },
       });
 
       if (runId !== runIdRef.current) return;
+      const url = res.outputUrl;
+      setProgress(100);
+      setStage(stages.length);
 
-      const url = result?.url ?? result?.imageUrl ?? null;
-      if (!url) throw new Error("No image returned. Please try again.");
-
-      await preloadImage(url);
-      if (runId !== runIdRef.current) return;
+      if (isStandardExp) {
+        setStandardCompleteHold(true);
+        setStandardGenError(null);
+        await preloadImage(url);
+        if (runId !== runIdRef.current) return;
+      }
 
       setOutput(url);
       setState("success");
-      setProgress(100);
+      setPremiumGenError(null);
+      setUltraGenError(null);
+      setStandardGenError(null);
+      setRemoveMaskDataUrl(null);
+      await refreshProfile();
       toast.success("Image ready");
-      void refreshProfile();
-    } catch (err: unknown) {
+      endGeneration();
+
+      if (isStandardExp) {
+        window.setTimeout(() => setStandardCompleteHold(false), 600);
+      }
+    } catch (err) {
       if (runId !== runIdRef.current) return;
-      const msg = err instanceof Error ? err.message : "Generation failed";
-      setState("error");
-      if (isPremiumExp) setPremiumGenError(msg);
-      if (isUltraExp) setUltraGenError(msg);
-      if (isStandardExp) setStandardGenError(msg);
+      const msg = err instanceof Error ? err.message : "Failed. Credits not charged.";
+      endGeneration();
+      if (isPremiumExp) {
+        setPremiumGenError(msg);
+        setState("idle");
+      } else if (isUltraExp) {
+        setUltraGenError(msg);
+        setState("idle");
+      } else {
+        setStandardGenError(msg);
+        setState("idle");
+      }
       toast.error(msg);
     } finally {
       progressTimers.forEach(clearTimeout);
-      endGeneration();
     }
   };
 
-  const onGenerate = () => {
-    if (!prompt.trim() && !inputDataUrl) {
-      return toast.error("Add a prompt or upload an image.");
-    }
-    void runImageJob({ jobPrompt: prompt.trim() || "Enhance this image" });
+  const runGenerate = async () => {
+    if (!prompt.trim()) return toast.error("Enter a prompt first.");
+    await runImageJob({ jobPrompt: prompt.trim() });
   };
 
-  const onSmartRemove = (masked: string) => {
-    setRemoveMaskDataUrl(masked);
+  const runSmartRemove = async (maskDataUrl: string) => {
+    setRemoveMaskDataUrl(maskDataUrl);
     setSmartRemoveOpen(false);
-    void runImageJob({
+    await runImageJob({
       jobPrompt: SMART_REMOVE_PROMPT,
-      maskDataUrl: masked,
+      maskDataUrl,
       toastStart: "Removing selected area…",
     });
   };
 
-  const onDownload = async () => {
-    if (!output) return;
-    try {
-      const res = await secureDl({ data: { url: output, keepWatermark } });
-      if (res?.downloadUrl) {
-        triggerBrowserDownload(res.downloadUrl, `prime-artistry-${Date.now()}.png`);
-        setDownloaded(true);
-        try {
-          localStorage.setItem(WATERMARK_PREF_KEY, keepWatermark ? "on" : "off");
-        } catch {
-          /* ignore */
-        }
-      }
-    } catch (e) {
-      toast.error("Download failed. Please try again.");
-    }
+  /* Phase 2: Stop / Cancel removed — job runs to completion or fails with refund. */
+
+  const handleDismissPremiumError = () => {
+    setPremiumGenError(null);
+    setPremiumCompleteHold(false);
+    setState("idle");
   };
 
-  const onReset = () => {
-    if (loading) return;
+  const handleDismissUltraError = () => {
+    setUltraGenError(null);
+    setUltraCompleteHold(false);
+    setState("idle");
+  };
+
+  const handleDismissStandardError = () => {
+    setStandardGenError(null);
+    setStandardCompleteHold(false);
+    setState("idle");
+  };
+
+  const handleClear = () => {
+    runIdRef.current++;
     setPrompt("");
     setInputPreview(null);
     setInputDataUrl(null);
     setInputFile(null);
     setInputKind(null);
     setRefImages([]);
+    setRemoveMaskDataUrl(null);
     setOutput(null);
     setState("idle");
+    setDownloaded(false);
+    setProgress(0);
+    setStage(0);
+    setPremiumCompleteHold(false);
+    setPremiumGenError(null);
+    setUltraCompleteHold(false);
+    setUltraGenError(null);
+    setStandardCompleteHold(false);
+    setStandardGenError(null);
     setGallery([]);
     setActiveImage(0);
-    setRemoveMaskDataUrl(null);
-    setDownloaded(false);
     setContextTags([]);
+    if (fileRef.current) fileRef.current.value = "";
   };
 
-  const onTierChange = (tier: StudioTier) => {
-    setStudioTier(tier);
-    if (!qualityTouchedRef.current) {
-      const qs = imageQualitiesForStudioTier(tier);
-      if (qs.length > 0) setImageQuality(qs[0] as ImageQuality);
+  const handleUseResultAsInput = () => {
+    if (!output) return;
+    setInputPreview(output);
+    setInputDataUrl(output);
+    setInputKind("image");
+    setOutput(null);
+    setState("idle");
+    setDownloaded(false);
+    toast.success("Result moved to input — keep editing.");
+  };
+
+  const handleDownload = async () => {
+    if (!output) return;
+    try {
+      const res = await secureDl({
+        data: {
+          imageUrl: output,
+          keepWatermark: keepWatermark === true,
+          studioTier,
+        },
+      });
+      await triggerBrowserDownload(res.downloadUrl, `motio2edit-${Date.now()}.jpg`);
+      setDownloaded(true);
+      toast.success(res.watermarked ? "Download started (branded)" : "Download started");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Download failed. Please try again.");
     }
   };
 
+  const handleShare = async () => {
+    if (!output) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Made with Motio2edit", url: output });
+      } else {
+        await navigator.clipboard.writeText(output);
+        toast.success("Link copied to clipboard.");
+      }
+    } catch {
+      /* user cancelled */
+    }
+  };
+
+  const handleSelectTool = (tool: { prompt: string; id?: string }) => {
+    if (tool.prompt === "__CIRCLE_REMOVE__") {
+      try {
+        if (inputDataUrl) sessionStorage.setItem("circle2edit-preview", inputDataUrl);
+        else sessionStorage.removeItem("circle2edit-preview");
+      } catch {
+        /* ignore */
+      }
+      void navigate({ to: "/studio/image/circle-remove" });
+      return;
+    }
+    if (tool.prompt.startsWith("__") && tool.prompt.endsWith("__")) return;
+  };
+
+  const noopVideoDuration = 5 as const;
+  const noopSetVideoDuration = () => {};
+  const noopVideoAspect = "16:9" as const;
+  const noopSetVideoAspect = () => {};
+  const noopVideoRes = "1080p" as const;
+  const noopSetVideoRes = () => {};
+
+  const expLabel = studioExperienceLabel(studioTier);
+
+  const standardPhase =
+    standardGenError
+      ? "error"
+      : state === "analyzing"
+        ? "analyzing"
+        : state === "loading"
+          ? "loading"
+          : standardCompleteHold
+            ? "success"
+            : "loading";
+
+  const premiumPhase =
+    premiumGenError
+      ? "error"
+      : state === "analyzing"
+        ? "analyzing"
+        : state === "loading"
+          ? "loading"
+          : premiumCompleteHold
+            ? "success"
+            : "loading";
+
+  const ultraPhase =
+    ultraGenError
+      ? "error"
+      : state === "analyzing"
+        ? "analyzing"
+        : state === "loading"
+          ? "loading"
+          : ultraCompleteHold
+            ? "success"
+            : "loading";
+
   return (
-    <div className={cn(studioShellClass, "space-y-4")}>
-      <StudioBackLink />
-      <CreditWarningBanner />
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Image Studio</h1>
-          <p className="text-sm text-muted-foreground">Upload · Select · Prompt · Generate</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <StudioTierSelector value={studioTier} onChange={onTierChange} />
-        </div>
-      </div>
-
-      {!hideFormDuringGen && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-4">
-            <EditorUpload
-              fileRef={fileRef}
-              onFile={onFile}
-              gallery={gallery}
-              activeImage={activeImage}
-              onSwitch={switchImage}
-              onRemove={removeImage}
-              effectiveMaxImages={effectiveMaxImages}
-              isFree={isFree}
-              loading={loading}
-              inputPreview={inputPreview}
-              canAddRefImages={canAddRefImages}
-              refImages={refImages}
-              setRefImages={setRefImages}
-            />
-            <EditorPromptPanel
-              prompt={prompt}
-              setPrompt={setPrompt}
-              taRef={taRef}
-              suggestions={suggestions}
-              contextTags={contextTags}
-              setContextTags={setContextTags}
-              loading={loading}
-            />
-            <EditorOptionsPanel
-              studioTier={studioTier}
-              imageQuality={imageQuality}
-              setImageQuality={(q) => {
-                qualityTouchedRef.current = true;
-                setImageQuality(q);
-              }}
-              aspectRatio={aspectRatio}
-              setAspectRatio={setAspectRatio}
-              strength={strength}
-              setStrength={setStrength}
-              keepWatermark={keepWatermark}
-              setKeepWatermark={setKeepWatermark}
-              loading={loading}
-              hasSource={!!inputDataUrl}
-            />
-            <EditorGenerationControls
-              onGenerate={onGenerate}
-              cost={cost}
-              noCredits={noCredits}
-              loading={loading}
-              onReset={onReset}
-              credits={profile.credits}
-            />
-          </div>
-          <div className="space-y-4">
-            <EditorPreview
-              inputPreview={inputPreview}
-              output={output}
-              state={state}
-              progress={progress}
-              msgIdx={msgIdx}
-              stage={stage}
-              stages={stages}
-              showInlinePreview={showInlinePreview}
-              onSmartRemoveOpen={() => setSmartRemoveOpen(true)}
-              hasSource={!!inputDataUrl}
-            />
-            {showInlinePreview && (
-              <EditorResult
-                output={output!}
-                onDownload={onDownload}
-                downloaded={downloaded}
-                keepWatermark={keepWatermark}
-              />
-            )}
-          </div>
-        </div>
-      )}
-
+    <div className={cn("min-h-[100dvh] overflow-x-hidden pb-8", studioShellClass(studioTier))}>
       {showStandardOverlay && (
         <StandardImageGenerationOverlay
-          progress={progress}
-          message={LOADING_MESSAGES[msgIdx]}
-          stage={stage}
-          stages={stages}
-          completeHold={standardCompleteHold}
+          phase={standardPhase}
           error={standardGenError}
-          onDismissError={() => {
-            setStandardGenError(null);
-            setState("idle");
-          }}
+          onRetry={runGenerate}
+          onDismiss={handleDismissStandardError}
         />
       )}
       {showPremiumOverlay && (
         <PremiumImageGenerationOverlay
+          phase={premiumPhase}
           progress={progress}
-          message={LOADING_MESSAGES[msgIdx]}
-          stage={stage}
-          stages={stages}
-          completeHold={premiumCompleteHold}
           error={premiumGenError}
-          onDismissError={() => {
-            setPremiumGenError(null);
-            setState("idle");
-          }}
+          onRetry={runGenerate}
+          onDismiss={handleDismissPremiumError}
         />
       )}
       {showUltraOverlay && (
         <UltraAIImageGenerationOverlay
+          phase={ultraPhase}
           progress={progress}
-          message={LOADING_MESSAGES[msgIdx]}
-          stage={stage}
-          stages={stages}
-          completeHold={ultraCompleteHold}
           error={ultraGenError}
-          onDismissError={() => {
-            setUltraGenError(null);
-            setState("idle");
-          }}
+          onRetry={runGenerate}
+          onDismiss={handleDismissUltraError}
         />
       )}
 
-      <EditorDisclaimer />
-
-      {smartRemoveOpen && inputPreview && (
-        <div className="fixed inset-0 z-50">
-          <SmartRemoveModal
-            imageUrl={inputPreview}
-            onClose={() => setSmartRemoveOpen(false)}
-            onConfirm={(masked) => {
-              onSmartRemove(masked);
-            }}
-          />
+      {!hideFormDuringGen && (
+      <div className="mx-auto min-w-0 max-w-6xl overflow-x-hidden px-3 py-4 sm:px-4 sm:py-10">        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 animate-fade-in sm:gap-3">
+          <div className="min-w-0 space-y-1.5 sm:space-y-2">
+            <StudioBackLink />
+            <h1 className="text-lg font-extrabold tracking-tight leading-tight sm:text-2xl">
+              <span className="text-foreground">Image</span>{" "}
+              <span className="text-orange-500">Studio</span>
+              <span className="mx-1.5 text-muted-foreground/50 font-normal">·</span>
+              <span
+                className={cn(
+                  "align-middle text-sm font-semibold tracking-normal sm:text-base",
+                  studioTier === "premium" && "text-[#E8C547]",
+                  studioTier === "pro" && "text-orange-600 dark:text-orange-400",
+                  studioTier === "standard" && "text-primary",
+                )}
+              >
+                {expLabel}
+              </span>
+            </h1>
+            <p className="text-[11px] text-muted-foreground sm:text-xs">
+              Upload · Prompt · Experience · Generate
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border/60 bg-card/80 px-2.5 py-1.5 text-xs font-semibold backdrop-blur-sm sm:px-3">
+              {isAdmin ? "∞ credits" : `${profile.credits} credits`}
+            </span>
+            <Button size="sm" variant="ghost" onClick={handleClear} className="min-h-[36px]">
+              <RotateCcw className="mr-1.5 h-4 w-4" /> New
+            </Button>
+          </div>
         </div>
+
+        <div className="mt-3 sm:mt-4">
+          <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
+        </div>
+
+        <div className="mt-4 grid min-w-0 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2 lg:gap-8">
+          <div className="order-1 min-w-0 space-y-4 sm:space-y-5">
+            <div className={cn("min-w-0 space-y-3 p-3 sm:p-5", studioCardClass(studioTier))}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Image</p>
+              <EditorUpload
+                fileRef={fileRef}
+                mediaType="image"
+                videoLocked={false}
+                loading={loading}
+                inputPreview={inputPreview}
+                inputKind={inputKind}
+                maxImageMb={MAX_IMAGE_MB}
+                maxVideoMb={200}
+                onFile={onFile}
+                gallery={gallery}
+                activeImage={activeImage}
+                maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, effectiveMaxImages)}
+                onSwitchImage={switchImage}
+                onRemoveImage={removeImage}
+              />
+            </div>
+
+            <div className={cn("min-w-0 space-y-3 p-3 sm:p-5", studioCardClass(studioTier))}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
+              <EditorPromptPanel
+                mediaType="image"
+                loading={loading}
+                inputDataUrl={inputDataUrl}
+                inputPreview={inputPreview}
+                prompt={prompt}
+                setPrompt={setPrompt}
+                taRef={taRef}
+                suggestions={suggestions}
+                onSelectTool={handleSelectTool}
+                studioTier={studioTier}
+                referenceCount={refImages.length}
+                maxChars={studioTier === "premium" ? 10000 : studioTier === "pro" ? 4000 : 2000}
+                contextTags={contextTags}
+                onToggleTag={(id) => {
+                  setContextTags((prev) =>
+                    prev.includes(id) ? prev.filter((t) => t !== id) : prev.length >= 10 ? prev : [...prev, id],
+                  );
+                }}
+              />
+            </div>
+
+            <div className={cn("min-w-0 space-y-4 p-3 sm:p-5", studioCardClass(studioTier))}>
+              <StudioTierSelector
+                value={studioTier}
+                visibleTiers={visibleImageExperiences(profile.plan, isAdmin)}
+                onChange={(t) => {
+                  setStudioTier(t);
+                  const allowed = imageQualitiesForStudioTier(t);
+                  const preferred = studioTierToImageQuality(t);
+                  if (!qualityTouchedRef.current) setImageQuality(preferred);
+                  else if (!allowed.includes(imageQuality)) setImageQuality(preferred);
+                }}
+              />
+              <div className="border-t border-border/50 pt-4">
+                <EditorOptionsPanel
+                  mediaType="image"
+                  loading={loading}
+                  inputDataUrl={inputDataUrl}
+                  aspectRatio={aspectRatio}
+                  setAspectRatio={setAspectRatio}
+                  imageQuality={imageQuality}
+                  setImageQuality={(q) => {
+                    qualityTouchedRef.current = true;
+                    setImageQuality(q);
+                  }}
+                  strength={strength}
+                  setStrength={setStrength}
+                  canAddRefImages={canAddRefImages}
+                  refImages={refImages}
+                  setRefImages={setRefImages}
+                  userPlan={profile.plan}
+                  videoDuration={noopVideoDuration}
+                  setVideoDuration={noopSetVideoDuration as never}
+                  videoAspect={noopVideoAspect}
+                  setVideoAspect={noopSetVideoAspect as never}
+                  videoResolution={noopVideoRes}
+                  setVideoResolution={noopSetVideoRes as never}
+                  cost={cost}
+                  isAdmin={isAdmin}
+                  credits={profile.credits}
+                  keepWatermark={keepWatermark}
+                  setKeepWatermark={setKeepWatermark}
+                  isFree={isFree}
+                  studioTier={studioTier}
+                />
+              </div>
+            </div>
+
+            <div className={cn("min-w-0 space-y-3 p-3 ring-1 ring-primary/15 sm:p-5", studioCardClass(studioTier))}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Generate</p>
+              <EditorGenerationControls
+                loading={loading}
+                onGenerate={runGenerate}
+                hideStop
+                videoLocked={false}
+                noCredits={noCredits}
+                generateClassName={studioGenerateClass(studioTier)}
+              />
+            </div>
+          </div>
+
+          <div className="order-2 min-w-0 space-y-4 lg:sticky lg:top-4 lg:self-start">
+            {showInlinePreview && output && (
+              <div className={cn("min-w-0 p-3 sm:p-4", studioCardClass(studioTier))}>
+                <EditorPreview
+                  state={state}
+                  loadingMessage={LOADING_MESSAGES[msgIdx]}
+                  progress={progress}
+                  stage={stage}
+                  stages={stages}
+                  output={output}
+                  outputIsVideo={false}
+                  mediaType="image"
+                  inputPreview={inputPreview}
+                  inputKind={inputKind}
+                  isAdmin={isAdmin}
+                  isFree={isFree}
+                  keepWatermark={keepWatermark}
+                  studioTier={studioTier}
+                />
+              </div>
+            )}
+
+            <EditorResult
+              output={output}
+              loading={loading || standardCompleteHold || premiumCompleteHold || ultraCompleteHold}
+              onDownload={handleDownload}
+              onRegenerate={runGenerate}
+              onEditAgain={handleUseResultAsInput}
+              onShare={handleShare}
+              onClear={handleClear}
+              isFree={isFree}
+              downloaded={downloaded}
+            />
+
+            {!loading && !output && !standardCompleteHold && !standardGenError && !premiumCompleteHold && !premiumGenError && !ultraCompleteHold && !ultraGenError && (
+              <div className="flex min-h-[100px] items-center justify-center rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+                Result appears here after Generate.
+              </div>
+            )}
+          </div>
+          <EditorDisclaimer />
+        </div>
+
+        <SmartRemoveModal
+          open={smartRemoveOpen}
+          imageUrl={inputPreview}
+          onCancel={() => setSmartRemoveOpen(false)}
+          onApply={(masked) => {
+            void runSmartRemove(masked);
+          }}
+        />
+      </div>
       )}
     </div>
   );
