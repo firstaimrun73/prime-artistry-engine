@@ -1,0 +1,33 @@
+name: Harden Image Studio UI
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/harden-image-studio-ui.py"
+      - ".github/workflows/harden-image-studio-ui.yml"
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply surgical polish
+        run: |
+          set -euo pipefail
+          python3 scripts/harden-image-studio-ui.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/components/editor/image/ImageEditor.tsx \
+            src/components/editor/EditorResult.tsx \
+            src/components/editor/image/ImageStudioWeeklyCarousel.tsx \
+            src/lib/studio/image/image-model-registry.ts
+          git diff --cached --quiet && echo "no changes" && exit 0
+          # Safety: refuse if generate.functions was staged
+          if git diff --cached --name-only | grep -q 'generate.functions'; then
+            echo "REFUSING: generate.functions must not change in this job"
+            exit 1
+          fi
+          git commit -m "polish(image-studio): watermark control, Output actions, Weekly Top 10 title"
+          git push
