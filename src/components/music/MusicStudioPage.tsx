@@ -6,6 +6,7 @@ import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { MusicAccessGate } from "@/components/MusicAccessGate";
 import { MusicModeCards } from "@/components/music/MusicModeCards";
 import { MusicScrollChips } from "@/components/music/MusicScrollChips";
+import { MusicInstrumentCards } from "@/components/music/MusicInstrumentCards";
 import { MusicResultCard } from "@/components/music/MusicResultCard";
 import { MusicVoiceLibrary } from "@/components/music/MusicVoiceLibrary";
 import {
@@ -17,11 +18,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  generateMusic, estimateMusicCost, MUSIC_GENRES, MUSIC_MOODS, MUSIC_INSTRUMENTS, type MusicMode,
+  generateMusic, estimateMusicCost, MUSIC_GENRES, MUSIC_MOODS, type MusicMode,
 } from "@/lib/music.functions";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { toast } from "sonner";
-import { Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, ChevronDown } from "lucide-react";
+import { Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, Music2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 async function uploadFile(file: File, userId: string, folder: string) {
@@ -37,7 +38,7 @@ async function uploadFile(file: File, userId: string, folder: string) {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground">{children}</p>;
+  return <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground">{children}</p>;
 }
 
 export function MusicStudioPage() {
@@ -64,12 +65,9 @@ function MusicStudio() {
   const [mood, setMood] = useState("");
   const [instrument, setInstrument] = useState("");
   const [duration, setDuration] = useState(30);
-  /** Canonical xAI TTS voice id — only used when mode === voiceover */
   const [voice, setVoice] = useState<VoiceId>("eve");
   const [qualityTier, setQualityTier] = useState<"standard" | "premium">("standard");
   const [sfxCategory, setSfxCategory] = useState("");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [tempo, setTempo] = useState<"auto" | "slow" | "medium" | "fast">("auto");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(search.videoUrl ?? null);
@@ -165,7 +163,7 @@ function MusicStudio() {
     if (mode === "sfx" && !prompt.trim() && !videoUrl) return toast.error("Describe the sound or upload a video.");
     if ((mode === "song" || mode === "instrumental") && !prompt.trim() && !imageUrl && !videoUrl)
       return toast.error("Add a description, image, or video.");
-    const need = estCredits ?? 35;
+    const need = estCredits ?? 50;
     if (profile && typeof profile.credits === "number" && profile.credits < need)
       return toast.error(`Not enough credits. Need ${need}.`);
 
@@ -178,9 +176,8 @@ function MusicStudio() {
           lyrics: mode === "song" ? lyrics.trim() || undefined : undefined,
           genre: genre && (MUSIC_GENRES as readonly string[]).includes(genre) ? (genre as (typeof MUSIC_GENRES)[number]) : undefined,
           mood: mood && (MUSIC_MOODS as readonly string[]).includes(mood) ? (mood as (typeof MUSIC_MOODS)[number]) : undefined,
-          instrument: instrument && (MUSIC_INSTRUMENTS as readonly string[]).includes(instrument) ? (instrument as (typeof MUSIC_INSTRUMENTS)[number]) : undefined,
+          instrument: instrument || undefined,
           durationSeconds: duration, imageUrl: imageUrl || undefined, videoUrl: videoUrl || undefined,
-          // selectedVoiceId → xAI TTS (only for voiceover)
           voice: mode === "voiceover" ? voice : undefined,
           instrumental: mode === "instrumental",
           qualityTier: mode === "song" || mode === "instrumental" ? qualityTier : "standard",
@@ -199,60 +196,96 @@ function MusicStudio() {
   }
 
   const canAfford = estCredits == null || (profile?.credits ?? 0) >= estCredits;
-  const promptLabel = mode === "voiceover" ? "Script" : mode === "sfx" ? "Sound description" : mode === "song" ? "Describe the music you want…" : "Describe the instrumental…";
+  const promptLabel =
+    mode === "voiceover" ? "Script" :
+    mode === "sfx" ? "Sound description" :
+    mode === "song" ? "Describe the music…" :
+    "Describe the instrumental…";
 
   return (
     <div className="flex min-h-screen w-full min-w-0 flex-col overflow-x-clip bg-background">
-      <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-5 pb-24 sm:px-6 md:pb-8 lg:max-w-7xl lg:px-8">
-        <div className="mb-6 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Music{" "}
-              <span className="bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 bg-clip-text text-transparent">Studio</span>
-            </h1>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              Turn ideas into sound — songs, instrumentals, voiceovers, and cinematic effects.
-            </p>
-          </div>
-          <div className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-sm shadow-sm">
-            <Coins className="h-4 w-4 text-orange-500" />
-            <span className="tabular-nums font-semibold">{profile?.credits != null ? profile.credits.toLocaleString() : "—"}</span>
-            <span className="text-muted-foreground">credits</span>
-          </div>
-        </div>
-
-        <section className="mb-6 w-full min-w-0"><MusicModeCards mode={mode} onChange={setMode} /></section>
-
-        <section className="mb-6 w-full min-w-0">
-          <Label>Try an example</Label>
-          <div className="w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain pb-1">
-            <div className="flex w-max gap-2">
-              {EXAMPLES.map((ex) => (
-                <button key={ex.title} type="button" onClick={() => applyExample(ex)}
-                  className="min-w-[150px] shrink-0 rounded-2xl border border-border/70 bg-card p-3 text-left shadow-sm transition hover:border-orange-500/40">
-                  <p className="text-xs font-bold text-orange-600 dark:text-orange-400">{ex.title}</p>
-                  <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{ex.prompt}</p>
-                </button>
-              ))}
+      <main className="mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 py-5 pb-24 sm:px-6 md:pb-8">
+        {/* Header with icon + divider line */}
+        <header className="mb-5">
+          <div className="flex w-full min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-purple-600 text-white shadow-sm">
+                <Music2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+                  Music{" "}
+                  <span className="bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 bg-clip-text text-transparent">
+                    Studio
+                  </span>
+                </h1>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  Songs · Instrumentals · AI Voice · Sound
+                </p>
+              </div>
             </div>
+            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-card px-2.5 py-1 text-sm shadow-sm">
+              <Coins className="h-3.5 w-3.5 text-orange-500" />
+              <span className="tabular-nums font-semibold">
+                {profile?.credits != null ? profile.credits.toLocaleString() : "—"}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 h-px w-full bg-gradient-to-r from-orange-500/40 via-rose-500/30 to-purple-600/40" />
+        </header>
+
+        {/* Mode cards — compact */}
+        <section className="mb-5">
+          <MusicModeCards mode={mode} onChange={setMode} />
+        </section>
+
+        {/* Examples — single row, less visual weight */}
+        <section className="mb-5">
+          <Label>Quick start</Label>
+          <div className="flex flex-wrap gap-2">
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex.title}
+                type="button"
+                onClick={() => applyExample(ex)}
+                className="rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-orange-500/40 hover:text-foreground"
+              >
+                {ex.title}
+              </button>
+            ))}
           </div>
         </section>
 
-        <div className="grid w-full min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
-          <div className="min-w-0 space-y-5">
+        <div className="grid w-full min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]">
+          <div className="min-w-0 space-y-4">
+            {/* Prompt */}
             <section>
               <Label>{promptLabel}</Label>
-              <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={mode === "voiceover" ? 6 : 3}
-                placeholder={mode === "voiceover" ? "Write the script…" : mode === "sfx" ? "e.g. soft rain, distant thunder" : "e.g. nostalgic piano for a family photo"}
-                className="min-h-[88px] w-full resize-y rounded-2xl border-border/70 bg-card shadow-sm" />
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={mode === "voiceover" ? 5 : 3}
+                placeholder={
+                  mode === "voiceover"
+                    ? "Write the script…"
+                    : mode === "sfx"
+                      ? "e.g. soft rain, distant thunder"
+                      : "e.g. nostalgic piano for a family photo"
+                }
+                className="min-h-[80px] w-full resize-y rounded-xl border-border/60 bg-card shadow-sm"
+              />
             </section>
 
             {mode === "song" && (
               <section>
                 <Label>Lyrics (optional)</Label>
-                <Textarea value={lyrics} onChange={(e) => setLyrics(e.target.value)} rows={3}
+                <Textarea
+                  value={lyrics}
+                  onChange={(e) => setLyrics(e.target.value)}
+                  rows={2}
                   placeholder={"[Verse]\n…\n[Chorus]\n…"}
-                  className="w-full resize-y rounded-2xl border-border/70 bg-card font-mono text-sm shadow-sm" />
+                  className="w-full resize-y rounded-xl border-border/60 bg-card font-mono text-sm shadow-sm"
+                />
               </section>
             )}
 
@@ -262,37 +295,59 @@ function MusicStudio() {
 
             {(mode === "song" || mode === "instrumental") && (
               <>
-                <section className="min-w-0"><Label>Genre</Label><MusicScrollChips items={MUSIC_GENRES} value={genre} onChange={setGenre} /></section>
-                <section className="min-w-0"><Label>Mood</Label>
-                  <MusicScrollChips items={MUSIC_MOODS} value={mood} onChange={setMood}
-                    activeClass="border-transparent bg-gradient-to-r from-violet-500 to-purple-700 text-white shadow-sm" />
+                <section className="min-w-0">
+                  <Label>Genre</Label>
+                  <MusicScrollChips items={MUSIC_GENRES} value={genre} onChange={setGenre} />
+                </section>
+                <section className="min-w-0">
+                  <Label>Mood</Label>
+                  <MusicScrollChips
+                    items={MUSIC_MOODS}
+                    value={mood}
+                    onChange={setMood}
+                    activeClass="border-transparent bg-gradient-to-r from-violet-500 to-purple-700 text-white shadow-sm"
+                  />
                 </section>
               </>
             )}
 
             {mode === "instrumental" && (
-              <section className="min-w-0"><Label>Instrument</Label>
-                <MusicScrollChips items={MUSIC_INSTRUMENTS} value={instrument} onChange={setInstrument}
-                  activeClass="border-transparent bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-sm" />
+              <section className="min-w-0">
+                <Label>Instrument</Label>
+                <MusicInstrumentCards value={instrument} onChange={setInstrument} />
               </section>
             )}
 
             {mode === "sfx" && (
-              <section className="min-w-0"><Label>Category</Label>
-                <MusicScrollChips items={SFX_CATEGORIES} value={sfxCategory} onChange={(v) => {
-                  setSfxCategory(v); if (v && !prompt.trim()) setPrompt(`${v} sound effect`);
-                }} />
+              <section className="min-w-0">
+                <Label>Category</Label>
+                <MusicScrollChips
+                  items={SFX_CATEGORIES}
+                  value={sfxCategory}
+                  onChange={(v) => {
+                    setSfxCategory(v);
+                    if (v && !prompt.trim()) setPrompt(`${v} sound effect`);
+                  }}
+                />
               </section>
             )}
 
             {mode !== "voiceover" && (
               <section>
-                <Label>Duration{(mode === "song" || mode === "instrumental") && !videoUrl ? " (style preference)" : ""}</Label>
+                <Label>Duration</Label>
                 <div className="flex flex-wrap gap-2">
                   {DURATIONS.filter((d) => mode !== "sfx" || d.s <= 30).map((d) => (
-                    <button key={d.s} type="button" onClick={() => setDuration(d.s)}
-                      className={cn("rounded-full border px-3.5 py-2 text-xs font-semibold",
-                        duration === d.s ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white" : "border-border/70 bg-card")}>
+                    <button
+                      key={d.s}
+                      type="button"
+                      onClick={() => setDuration(d.s)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-1.5 text-xs font-semibold",
+                        duration === d.s
+                          ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white"
+                          : "border-border/60 bg-card",
+                      )}
+                    >
                       {d.label}
                     </button>
                   ))}
@@ -304,111 +359,190 @@ function MusicStudio() {
               <section>
                 <Label>Quality</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setQualityTier("standard")}
-                    className={cn("rounded-2xl border p-3 text-left", qualityTier === "standard" ? "ring-2 ring-orange-500/40 border-transparent bg-orange-500/10" : "border-border/70 bg-card")}>
+                  <button
+                    type="button"
+                    onClick={() => setQualityTier("standard")}
+                    className={cn(
+                      "rounded-xl border p-2.5 text-left",
+                      qualityTier === "standard"
+                        ? "ring-2 ring-orange-500/40 border-transparent bg-orange-500/10"
+                        : "border-border/60 bg-card",
+                    )}
+                  >
                     <p className="text-sm font-bold">Standard</p>
-                    <p className="text-[11px] text-muted-foreground">Fast · 35 credits</p>
+                    <p className="text-[11px] text-muted-foreground">Fast · ~50 credits</p>
                   </button>
-                  <button type="button" onClick={() => setQualityTier("premium")}
-                    className={cn("rounded-2xl border p-3 text-left", qualityTier === "premium" ? "ring-2 ring-purple-500/50 border-transparent bg-purple-500/10" : "border-border/70 bg-card")}>
+                  <button
+                    type="button"
+                    onClick={() => setQualityTier("premium")}
+                    className={cn(
+                      "rounded-xl border p-2.5 text-left",
+                      qualityTier === "premium"
+                        ? "ring-2 ring-purple-500/50 border-transparent bg-purple-500/10"
+                        : "border-border/60 bg-card",
+                    )}
+                  >
                     <p className="text-sm font-bold">Premium</p>
-                    <p className="text-[11px] text-muted-foreground">Higher quality · 75 credits</p>
+                    <p className="text-[11px] text-muted-foreground">Higher quality · ~100 credits</p>
                   </button>
                 </div>
               </section>
             )}
 
-            {(mode === "song" || mode === "instrumental") && (
-              <section className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4">
-                <div className="mb-2 flex items-center gap-2"><ImagePlus className="h-4 w-4 text-orange-500" /><p className="text-sm font-semibold">Image → atmosphere</p></div>
-                <p className="mb-3 text-[11px] text-muted-foreground">Vision analysis shapes mood and direction.</p>
-                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onImageFile(f); }} />
-                {imagePreview ? (
-                  <div className="relative overflow-hidden rounded-xl border">
-                    <img src={imagePreview} alt="" className="max-h-36 w-full object-cover" />
-                    <button type="button" onClick={() => { setImageUrl(null); setImagePreview(null); }} className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white"><X className="h-4 w-4" /></button>
-                  </div>
-                ) : (
-                  <button type="button" disabled={uploading} onClick={() => imageInputRef.current?.click()}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border bg-card py-6 text-sm text-muted-foreground">
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />} Upload photo
-                  </button>
-                )}
-              </section>
-            )}
-
-            {(mode === "sfx" || mode === "song" || mode === "instrumental") && (
-              <section className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4">
-                <div className="mb-2 flex items-center gap-2"><Video className="h-4 w-4 text-purple-500" /><p className="text-sm font-semibold">Video → soundtrack</p></div>
-                <p className="mb-3 text-[11px] text-muted-foreground">Creates <strong>audio only</strong> — not video-to-video.</p>
-                <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void onVideoFile(f); }} />
-                {videoUrl ? (
-                  <div className="flex min-w-0 items-center justify-between rounded-xl border bg-card px-3 py-2.5 text-sm">
-                    <span className="truncate font-medium">{videoName || "Video attached"}</span>
-                    <button type="button" className="shrink-0" onClick={() => { setVideoUrl(null); setVideoName(null); }}><X className="h-4 w-4" /></button>
-                  </div>
-                ) : (
-                  <button type="button" disabled={uploading} onClick={() => videoInputRef.current?.click()}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border bg-card py-6 text-sm text-muted-foreground">
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />} Upload video
-                  </button>
-                )}
-              </section>
-            )}
-
-            {(mode === "song" || mode === "instrumental") && (
-              <section>
-                <button type="button" onClick={() => setAdvancedOpen((o) => !o)} className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-                  Advanced <ChevronDown className={cn("h-3.5 w-3.5 transition", advancedOpen && "rotate-180")} />
-                </button>
-                {advancedOpen && (
-                  <div className="mt-3 space-y-2 rounded-2xl border bg-card p-3">
-                    <Label>Tempo feel</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {(["auto", "slow", "medium", "fast"] as const).map((t) => (
-                        <button key={t} type="button" onClick={() => setTempo(t)}
-                          className={cn("rounded-full border px-3 py-1.5 text-xs capitalize", tempo === t ? "bg-orange-500 text-white border-transparent" : "border-border")}>
-                          {t}
+            {/* Simplified file inputs — one compact row */}
+            {(mode === "song" || mode === "instrumental" || mode === "sfx") && (
+              <section className="rounded-xl border border-dashed border-border/70 bg-muted/15 p-3">
+                <Label>Optional files</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(mode === "song" || mode === "instrumental") && (
+                    <>
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void onImageFile(f);
+                        }}
+                      />
+                      {imagePreview ? (
+                        <div className="relative h-16 w-16 overflow-hidden rounded-lg border">
+                          <img src={imagePreview} alt="" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImageUrl(null);
+                              setImagePreview(null);
+                            }}
+                            className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={uploading}
+                          onClick={() => imageInputRef.current?.click()}
+                          className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground hover:border-orange-500/40"
+                        >
+                          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
+                          Photo
                         </button>
-                      ))}
+                      )}
+                    </>
+                  )}
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void onVideoFile(f);
+                    }}
+                  />
+                  {videoUrl ? (
+                    <div className="inline-flex max-w-[200px] items-center gap-1.5 rounded-lg border bg-card px-2.5 py-2 text-xs">
+                      <Video className="h-3.5 w-3.5 shrink-0 text-purple-500" />
+                      <span className="truncate font-medium">{videoName || "Video"}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVideoUrl(null);
+                          setVideoName(null);
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">Embedded in the brief — MiniMax has no separate BPM API.</p>
-                  </div>
-                )}
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={uploading}
+                      onClick={() => videoInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground hover:border-purple-500/40"
+                    >
+                      {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
+                      Video → audio
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1.5 text-[10px] text-muted-foreground">
+                  Photo sets mood. Video creates soundtrack only (not video-to-video).
+                </p>
               </section>
             )}
 
-            <section className="sticky bottom-20 z-10 rounded-2xl border border-border/70 bg-card/95 p-4 shadow-lg backdrop-blur-md md:static md:shadow-sm">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+            {/* Generate bar */}
+            <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-2 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Estimated </span>
-                  {estLoading ? "…" : estCredits != null ? <span className="font-bold tabular-nums">{estCredits} credits</span> : "—"}
+                  <span className="text-muted-foreground">Cost </span>
+                  {estLoading ? (
+                    "…"
+                  ) : estCredits != null ? (
+                    <span className="font-bold tabular-nums">{estCredits} credits</span>
+                  ) : (
+                    "—"
+                  )}
                 </div>
-                {!canAfford && <Link to="/pricing" className="text-xs font-semibold text-orange-600 underline-offset-2 hover:underline">Get credits</Link>}
+                {!canAfford && (
+                  <Link to="/pricing" className="text-xs font-semibold text-orange-600 underline-offset-2 hover:underline">
+                    Get credits
+                  </Link>
+                )}
               </div>
-              <Button type="button" disabled={loading || uploading || !canAfford} onClick={() => void onGenerate()}
-                className="h-12 w-full rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 text-base font-semibold text-white shadow-md hover:opacity-95">
-                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{LOADING[loadingStep]}</>
-                  : !canAfford ? "Not enough credits"
-                  : <><Sparkles className="mr-2 h-4 w-4" />Generate{estCredits != null ? ` · ${estCredits} credits` : ""}</>}
+              <Button
+                type="button"
+                disabled={loading || uploading || !canAfford}
+                onClick={() => void onGenerate()}
+                className="h-11 w-full rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 text-base font-semibold text-white shadow-md hover:opacity-95"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {LOADING[loadingStep]}
+                  </>
+                ) : !canAfford ? (
+                  "Not enough credits"
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate{estCredits != null ? ` · ${estCredits} cr` : ""}
+                  </>
+                )}
               </Button>
             </section>
           </div>
 
+          {/* Result column */}
           <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
             {loading && (
-              <div className="flex flex-col items-center gap-3 rounded-2xl border bg-card p-10 text-center shadow-sm">
+              <div className="flex flex-col items-center gap-3 rounded-xl border bg-card p-8 text-center shadow-sm">
                 <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
                 <p className="text-sm font-semibold">{LOADING[loadingStep]}</p>
               </div>
             )}
             {!loading && audioUrl && (
-              <MusicResultCard audioUrl={audioUrl} trackTitle={trackTitle || "Generated track"} mode={mode}
-                genre={genre} mood={mood} charged={charged} model={resultModel} videoUrl={videoUrl}
-                onAgain={() => { setAudioUrl(null); setTrackTitle(null); }} />
+              <MusicResultCard
+                audioUrl={audioUrl}
+                trackTitle={trackTitle || "Generated track"}
+                mode={mode}
+                genre={genre}
+                mood={mood}
+                charged={charged}
+                model={resultModel}
+                videoUrl={videoUrl}
+                onAgain={() => {
+                  setAudioUrl(null);
+                  setTrackTitle(null);
+                }}
+              />
             )}
             {!loading && !audioUrl && (
-              <div className="hidden rounded-2xl border border-dashed border-border/50 p-8 text-center lg:block">
+              <div className="hidden rounded-xl border border-dashed border-border/50 p-8 text-center lg:block">
                 <Mic2 className="mx-auto h-8 w-8 text-muted-foreground/40" />
                 <p className="mt-3 text-xs text-muted-foreground">Your track appears here after generation.</p>
               </div>
@@ -417,7 +551,10 @@ function MusicStudio() {
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          Need video? <Link to="/studio/video" className="text-primary underline-offset-2 hover:underline">Video Studio</Link>
+          Need video?{" "}
+          <Link to="/studio/video" className="text-primary underline-offset-2 hover:underline">
+            Video Studio
+          </Link>
         </p>
         <EditorDisclaimer className="mt-4" />
       </main>
