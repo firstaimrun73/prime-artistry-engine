@@ -181,7 +181,7 @@ export const PLANS: Plan[] = [
     video: true,
     priority: true,
     bestQuality: true,
-    price: { USD: 49.99, EUR: 45.99, INR: 4199 },
+    price: { USD: 55, EUR: 50.99, INR: 4599 },
     features: [
       "5,000 credits / month",
       "Standard + Premium + Ultra AI",
@@ -201,9 +201,9 @@ export const PLANS: Plan[] = [
     video: true,
     priority: true,
     bestQuality: true,
-    price: { USD: 99, EUR: 89.99, INR: 8299 },
+    price: { USD: 110, EUR: 99.99, INR: 9199 },
     features: [
-      "10,000 monthly credits",
+      "10,000 credits / month",
       "Standard + Premium + Ultra AI",
       "Prompt: Unlimited*",
       "IMAX, 8K Max, Custom aspects",
@@ -309,11 +309,11 @@ export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, string>> = {
     AUD: "A$44.99", CAD: "C$39.99", JPY: "¥4,499", SGD: "S$39.99",
   },
   studio: {
-    USD: "$49.99", INR: "₹4,199", GBP: "£39.99", EUR: "€45.99", AED: "183 AED",
-    AUD: "A$74.99", CAD: "C$64.99", JPY: "¥7,499", SGD: "S$64.99",
+    USD: "$55", INR: "₹4,599", GBP: "£44.99", EUR: "€50.99", AED: "201 AED",
+    AUD: "A$82.99", CAD: "C$74.99", JPY: "¥8,299", SGD: "S$74.99",
   },
   business: {
-    USD: "$99", INR: "₹8,299", GBP: "£79.99", EUR: "€89.99", AED: "363 AED",
-    AUD: "A$149.99", CAD: "C$129.99", JPY: "¥14,999", SGD: "S$129.99",
+    USD: "$110", INR: "₹9,199", GBP: "£89.99", EUR: "€99.99", AED: "403 AED",
+    AUD: "A$164.99", CAD: "C$149.99", JPY: "¥16,499", SGD: "S$144.99",
   },
 };
