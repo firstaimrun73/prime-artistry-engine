@@ -73,7 +73,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   },
   business: {
     maxImages: 10,
-    maxPromptChars: 7000,
+    maxPromptChars: 7000, // backend safety ceiling only — UI uses isPromptEffectivelyUnlimited
     videoEnabled: true,
     hd: true,
     premiumUnlocked: true,
@@ -94,7 +94,8 @@ export function isMultiImageLocked(plan: string | undefined | null, isAdmin = fa
 
 /** Max concurrent gallery / reference images for this plan. */
 export function maxImagesForPlan(plan: string | undefined | null, isAdmin = false): number {
-  if (isAdmin) return 10;
+  // Admin may bypass free 1-image lock, but never exceeds plan matrix (and experience caps elsewhere).
+  if (isAdmin) return Math.max(getPlanLimits(plan ?? "free").maxImages, 1);
   return getPlanLimits(plan ?? "free").maxImages;
 }
 
@@ -104,9 +105,13 @@ export function maxPromptCharsForPlan(plan: string | undefined | null, _isAdmin 
   return getPlanLimits(plan ?? "free").maxPromptChars;
 }
 
-/** True when UI should hide a numeric character limit (Master Studio). */
+/**
+ * True when UI should hide a numeric character limit (Master Studio).
+ * Backend may still enforce ~7000 safety ceiling — that must not be shown as the UI limit.
+ */
 export function isPromptEffectivelyUnlimited(plan: string | undefined | null): boolean {
-  return getPlanLimits(plan ?? "free").maxPromptChars >= 7000;
+  const id = (plan ?? "free").toLowerCase();
+  return id === "business" || getPlanLimits(plan ?? "free").ultraFullUnlocked;
 }
 
 export const MULTI_IMAGE_UPGRADE_MESSAGE =
