@@ -17,7 +17,6 @@ import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
 import { FooterAd } from "@/components/ads";
 import { ConstructionNotice } from "@/components/home/ConstructionNotice";
-import { Motion2AiDailyStrip } from "@/components/home/Motion2AiDailyStrip";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -71,7 +70,6 @@ function SignedOutHome() {
       <Header />
       <HomeHero />
       <BeforeAfterShowcase />
-      <Motion2AiDailyStrip />
 
       <WatchDemoSection variant="prominent" />
 
