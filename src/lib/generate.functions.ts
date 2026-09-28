@@ -251,6 +251,23 @@ export const generateMedia = createServerFn({ method: "POST" })
           );
         }
       }
+
+      // Experience image-count ceilings (server authoritative — do not trust client).
+      {
+        const tier = (data.studioTier ?? "standard") as string;
+        const primary = typeof data.imageUrl === "string" && data.imageUrl.startsWith("https://") ? 1 : 0;
+        const refs = (data.referenceImageUrls ?? []).filter(
+          (u) => typeof u === "string" && u.startsWith("https://"),
+        );
+        const total = primary + refs.length;
+        if (tier === "standard" && total > 5) {
+          throw new Error("Standard supports up to 5 images total (base + references).");
+        }
+        if ((tier === "pro" || tier === "premium") && total > 10) {
+          throw new Error("This experience supports up to 10 images total (base + references).");
+        }
+      }
+
     }
 
     let modelPrompt: string;

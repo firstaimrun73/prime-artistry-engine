@@ -140,6 +140,15 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       ? 1
       : Math.min(getPlanLimits(profile?.plan ?? "free").maxImages, experienceMax);
 
+  // Keep gallery within the active experience + plan ceiling (prevents Standard 5-cap overflow crash).
+  useEffect(() => {
+    if (gallery.length <= effectiveMaxImages) return;
+    setGallery((prev) => prev.slice(0, effectiveMaxImages));
+    setActiveImage((idx) => Math.min(idx, Math.max(0, effectiveMaxImages - 1)));
+    toast.message(`Showing up to ${effectiveMaxImages} images for this experience.`);
+  }, [effectiveMaxImages]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
   // Keep refImages synchronized with gallery selection (primary = active; extras = references).
   useEffect(() => {
     if (gallery.length <= 1) {
@@ -395,7 +404,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     }
     if (accepted.length === 0) return;
 
-    const items: GalleryItem[] = await Promise.all(
+        let items: GalleryItem[] = [];
+    try {
+    items = await Promise.all(
       accepted.map(async (f) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         preview: URL.createObjectURL(f),
@@ -403,6 +414,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         file: f,
       })),
     );
+    } catch {
+      toast.error("Could not read one or more images. Try fewer or smaller files.");
+      return;
+    }
+
 
     const next = [...gallery, ...items];
     setGallery(next);

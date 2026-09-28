@@ -77,7 +77,7 @@ function LoopTrack({ set, onOpen }: { set: DailySet; onOpen: (url: string) => vo
   const loop = [...set.images, ...set.images];
 
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-hidden leading-none">
       <div ref={trackRef} className="flex w-max gap-3 will-change-transform sm:gap-4">
         {loop.map((img, i) => (
           <Card
@@ -100,7 +100,7 @@ export function ImageStudioWeeklyCarousel() {
   if (!active || active.images.length === 0) return null;
 
   return (
-    <section className="mt-5 border-t border-border/40 pt-4 pb-1 sm:mt-6 sm:pt-5">
+    <section className="mt-5 border-t border-border/40 pt-4 pb-0 sm:mt-6 sm:pt-5">
       <h2 className="mb-2 text-center text-sm font-semibold tracking-wide text-muted-foreground sm:text-base">
         Try Something New
       </h2>
