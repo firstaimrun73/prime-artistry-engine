@@ -1,0 +1,135 @@
+name: Image Studio Locks Apply
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/image-studio-locks-apply.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          st = Path("src/lib/studio/studio-tier.ts")
+          s = st.read_text()
+          if "aspectRatiosForPlanAndTier" not in s:
+              helper = '''
+/** Aspect ratios for plan+experience. IMAX/Custom require Master ultraFullUnlocked. */
+export function aspectRatiosForPlanAndTier(
+  tier: StudioTier,
+  ultraFullUnlocked: boolean,
+): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax" | "custom"> {
+  const base = aspectRatiosForStudioTier(tier);
+  if (!ultraFullUnlocked) {
+    return base.filter((a) => a !== "imax" && a !== "custom") as typeof base;
+  }
+  return base;
+}
+'''
+              m = re.search(r"export function aspectRatiosForStudioTier[\s\S]*?\n\}", s)
+              assert m, "aspectRatiosForStudioTier missing"
+              s = s[: m.end()] + "\n" + helper + s[m.end() :]
+          if '"8k_max"' not in s and "8k_max" not in s.split("imageQualitiesForStudioTier")[-1][:400]:
+              s = s.replace(
+                  'case "premium":\n      return ["sd", "hd", "2k", "4k", "8k"];',
+                  'case "premium":\n      return ["sd", "hd", "2k", "4k", "8k", "8k_max"];',
+                  1,
+              )
+          st.write_text(s)
+
+          q = Path("src/lib/quality-options.ts")
+          qt = q.read_text()
+          if "8k_max" not in qt:
+              qt = qt.replace(
+                  'export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k";',
+                  'export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k" | "8k_max";',
+                  1,
+              )
+              qt = qt.replace('  "8k": 4320,\n};', '  "8k": 4320,\n  "8k_max": 4320,\n};', 1)
+              idx = qt.find('id: "8k"')
+              end = qt.find("},", idx)
+              qt = qt[: end + 1] + ''',\n  {\n    id: "8k_max",\n    label: "8K Max",\n    title: "8K Max",\n    credits: 0,\n    upscaleFactor: 8,\n    hint: "8K Max · IMAX-capable · Master Ultra",\n  }''' + qt[end + 1 :]
+              q.write_text(qt)
+
+          eop = Path("src/components/editor/EditorOptionsPanel.tsx")
+          e = eop.read_text()
+          if "aspectRatiosForPlanAndTier" not in e:
+              e = e.replace("aspectRatiosForStudioTier,", "aspectRatiosForStudioTier,\n  aspectRatiosForPlanAndTier,", 1)
+          if 'from "@/utils/planLimits"' not in e:
+              e = e.replace(
+                  'from "@/lib/studio/studio-tier";',
+                  'from "@/lib/studio/studio-tier";\nimport { getPlanLimits } from "@/utils/planLimits";',
+                  1,
+              )
+          if "const ultraFull =" not in e:
+              e = e.replace(
+                  "const expLabel = studioExperienceLabel(studioTier);",
+                  'const expLabel = studioExperienceLabel(studioTier);\n  const ultraFull = isAdmin || getPlanLimits(userPlan ?? "free").ultraFullUnlocked;',
+                  1,
+              )
+          e = e.replace(
+              "aspectRatiosForStudioTier(studioTier).includes(a.id as never)",
+              "aspectRatiosForPlanAndTier(studioTier, ultraFull).includes(a.id as never)",
+          )
+          if 'id !== "8k_max"' not in e:
+              e = e.replace(
+                  "imageQualitiesForStudioTier(studioTier).includes",
+                  'imageQualitiesForStudioTier(studioTier).filter((id) => id !== "8k_max" || ultraFull).includes',
+              )
+          eop.write_text(e)
+
+          genp = Path("src/lib/generate.functions.ts")
+          gen = genp.read_text()
+          before = len(gen)
+          assert before > 20000
+          if "Master-only Ultra features" not in gen:
+              aidx = gen.find("Plan prompt character ceiling")
+              insert_pos = None
+              if aidx >= 0:
+                  m = re.search(r"Plan prompt character ceiling[\s\S]{0,900}?\n      \}", gen[aidx:])
+                  if m:
+                      insert_pos = aidx + m.end()
+              block = """
+      // Master-only Ultra features: IMAX, Custom aspect, 8k_max.
+      {
+        const planId = (profile.plan ?? "free") as string;
+        const tier = (data.studioTier ?? "standard") as string;
+        const full = isAdmin || planId === "business";
+        const ar = String(data.aspectRatio ?? "").toLowerCase();
+        const q = String(data.imageQuality ?? "").toLowerCase();
+        if (!full && tier === "premium") {
+          if (ar === "imax" || q === "8k_max") {
+            throw new Error("IMAX and 8K Max require Master Studio.");
+          }
+          if (ar === "custom") {
+            throw new Error("Custom aspect ratio requires Master Studio.");
+          }
+        }
+      }
+"""
+              if insert_pos is not None:
+                  gen = gen[:insert_pos] + block + gen[insert_pos:]
+                  assert len(gen) > before
+                  genp.write_text(gen)
+
+          gen2 = genp.read_text()
+          assert "executeUltraImage" in gen2 and "Fail closed" in gen2
+          assert len(gen2) >= before
+          print("locks OK", len(gen2))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/studio/studio-tier.ts src/lib/quality-options.ts \
+            src/components/editor/EditorOptionsPanel.tsx src/lib/generate.functions.ts
+          git diff --cached --quiet && echo no-changes && exit 0
+          sz=$(wc -c < src/lib/generate.functions.ts)
+          [ "$sz" -ge 20000 ] || exit 1
+          git commit -m "feat(image-studio): gate IMAX/Custom/8K Max to Master Studio"
+          git push
