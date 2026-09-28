@@ -1,0 +1,49 @@
+name: Image Studio Second Pass
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/image-studio-second-pass.py"
+      - ".github/workflows/image-studio-second-pass.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply
+        run: |
+          set -euo pipefail
+          BEFORE=$(wc -c < src/lib/generate.functions.ts)
+          python3 scripts/image-studio-second-pass.py
+          AFTER=$(wc -c < src/lib/generate.functions.ts)
+          echo "generate.functions $BEFORE -> $AFTER"
+          if [ "$AFTER" -lt 20000 ] || [ "$AFTER" -lt "$BEFORE" ]; then
+            echo "REFUSE generate.functions size"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/components/editor/image/ImageEditor.tsx \
+            src/utils/planLimits.ts \
+            src/components/editor/EditorPromptPanel.tsx \
+            src/lib/generate.functions.ts \
+            src/lib/plans.ts
+          git diff --cached --quiet && echo "no changes" && exit 0
+          for f in $(git diff --cached --name-only); do
+            sz=$(wc -c < "$f")
+            echo "staged $f $sz"
+            case "$f" in
+              *generate.functions.ts) [ "$sz" -ge 20000 ] || exit 1 ;;
+              *ImageEditor.tsx) [ "$sz" -ge 15000 ] || exit 1 ;;
+            esac
+          done
+          # Refuse admin→7000 still in ImageEditor
+          if git show :src/components/editor/image/ImageEditor.tsx | grep -q 'isAdmin ? 7000'; then
+            echo "REFUSE still has isAdmin ? 7000"
+            exit 1
+          fi
+          git commit -m "fix(image-studio): plan prompt limits, Standard 5-cap (no page crash)"
+          git push
