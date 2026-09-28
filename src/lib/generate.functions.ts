@@ -622,7 +622,8 @@ export const generateMedia = createServerFn({ method: "POST" })
           plan: profile.plan,
           email: profile.email,
           isAdmin,
-          keepWatermark: data.keepWatermark,
+          // Free is always forced on server policy; still pass true so intent is explicit.
+          keepWatermark: !isAdmin && profile.plan === "free" ? true : data.keepWatermark,
           userId,
           studioTier: data.studioTier,
         });
@@ -630,8 +631,15 @@ export const generateMedia = createServerFn({ method: "POST" })
           outputUrl = fin.finalUrl;
         }
       } catch (wmErr) {
-        console.error("[generate] watermark finalize failed (returning clean URL):", wmErr);
-        // Fail open: do not block generation if stamp pipeline errors
+        // Fail closed when a stamp was required (free plan, or paid keepWatermark=true).
+        // finalizeMediaAsset only throws when stamp/store fails; paid opt-out returns clean without throw.
+        // Never leak the clean provider URL for Free or paid-with-watermark-on.
+        console.error("[generate] watermark finalize failed:", wmErr);
+        throw new Error(
+          wmErr instanceof Error && wmErr.message
+            ? wmErr.message
+            : "Could not finalize image. Please try again.",
+        );
       }
     }
 
