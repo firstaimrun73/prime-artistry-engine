@@ -1,7 +1,7 @@
 // Client-safe output-quality tiers for the Image and Video editors.
 // Quality selects output resolution / upscale factor — NOT user price.
 
-export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k";
+export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k" | "8k_max";
 export type VideoResolution = "720p" | "1080p" | "4k";
 
 /** Long-side targets used for UI labels (aligned with Ultra delivery map). */
@@ -11,6 +11,7 @@ export const IMAGE_QUALITY_LONG_SIDE: Record<ImageQuality, number> = {
   "2k": 1440,
   "4k": 2160,
   "8k": 4320,
+  "8k_max": 4320,
 };
 
 /**
@@ -96,6 +97,14 @@ export const IMAGE_QUALITY_OPTIONS: {
     credits: 0,
     upscaleFactor: 8,
     hint: "8K · up to 4320px long side",
+  },
+  {
+    id: "8k_max",
+    label: "8K Max",
+    title: "8K Max",
+    credits: 0,
+    upscaleFactor: 8,
+    hint: "8K Max · IMAX-capable · Master Ultra",
   },
 ];
 
