@@ -1,0 +1,25 @@
+name: Image Studio Header MaxChars
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/image-studio-header-maxchars.py"
+      - ".github/workflows/image-studio-header-maxchars.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euo pipefail
+          python3 scripts/image-studio-header-maxchars.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx
+          git diff --cached --quiet && exit 0
+          sz=$(wc -c < src/components/editor/image/ImageEditor.tsx)
+          if [ "$sz" -lt 15000 ]; then echo "REFUSE tiny"; exit 1; fi
+          git commit -m "fix(image-studio): header divider + plan-based prompt maxChars"
+          git push
