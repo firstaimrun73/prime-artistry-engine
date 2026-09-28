@@ -102,7 +102,7 @@ export function ImageStudioWeeklyCarousel() {
   return (
     <section className="mt-6 border-t border-border/40 pt-5 sm:mt-8 sm:pt-6">
       <h2 className="mb-3 text-center text-sm font-semibold tracking-wide text-muted-foreground sm:text-base">
-        Motion2Ai · This Week&apos;s Creative Generations
+        Weekly Top 10
       </h2>
       <LoopTrack set={active} onOpen={setLightbox} />
       {lightbox && (
