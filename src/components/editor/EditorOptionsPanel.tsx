@@ -70,6 +70,7 @@ function AspectShape({ id }: { id: string }) {
     "16:9": { w: 26, h: 14 },
     "9:16": { w: 14, h: 26 },
     "3:4": { w: 16, h: 22 },
+    "21:9": { w: 28, h: 12 },
     imax: { w: 22, h: 15 },
   };
   const d = dims[id] ?? { w: 18, h: 18 };
