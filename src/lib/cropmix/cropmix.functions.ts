@@ -315,12 +315,25 @@ export const generateCropmixCollage = createServerFn({ method: "POST" })
       const { supabaseAdmin } = await import(
         "@/integrations/supabase/client.server"
       );
-      await supabaseAdmin.from("generations").insert({
-        user_id: userId,
+      const { persistGenerationHistory } = await import(
+        "@/lib/history-persist.server"
+      );
+      let outputBytes: Buffer | null = null;
+      if (dataUrl?.startsWith("data:")) {
+        const b64 = dataUrl.split(",")[1] ?? "";
+        if (b64) outputBytes = Buffer.from(b64, "base64");
+      }
+      const persist = await persistGenerationHistory({
+        supabaseAdmin,
+        userId,
         type: "image",
         prompt: `Cropmix · ${style.name}`,
-        output_url: null,
-        credits_used: creditsCharged,
+        output_url: dataUrl,
+        status: "success",
+        is_private: true,
+        outputBytes,
+        outputContentType: "image/jpeg",
+        outputExt: "jpg",
         metadata: {
           source: "cropmix",
           experience: "cropmix-collage",
@@ -330,6 +343,7 @@ export const generateCropmixCollage = createServerFn({ method: "POST" })
           credits_charged: creditsCharged,
         },
       });
+      if (persist.error) console.error("[cropmix] history persist failed", persist.error);
     } catch (e) {
       console.error("[cropmix] history insert failed", e);
     }

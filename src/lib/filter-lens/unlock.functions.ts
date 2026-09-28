@@ -72,13 +72,16 @@ export const unlockFilterOrLens = createServerFn({ method: "POST" })
     }
 
     try {
-      await supabase.from("generations").insert({
-        user_id: userId,
+      const { persistGenerationHistory } = await import("@/lib/history-persist.server");
+      // Unlock is a purchase ledger row, not generated media — no private bytes.
+      await persistGenerationHistory({
+        supabaseAdmin,
+        userId,
         type: "image",
         prompt: `Unlock ${data.kind}: ${name}`,
-        input_url: null,
-        output_url: null,
+        output_url: "",
         status: "success",
+        is_private: true,
         metadata: {
           operation: data.kind === "filter" ? "filter_unlock" : "lens_unlock",
           item_id: data.itemId,

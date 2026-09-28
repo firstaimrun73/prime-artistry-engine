@@ -91,14 +91,18 @@ export const finalizeFramesExport = createServerFn({ method: "POST" })
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { persistGenerationHistory } = await import("@/lib/history-persist.server");
       const frame = getFrameById(data.frameId);
       const glass = getGlassById(data.glassId);
-      await supabaseAdmin.from("generations").insert({
-        user_id: userId,
+      // Client-side composition — no output bytes on server; persist job row only.
+      const persist = await persistGenerationHistory({
+        supabaseAdmin,
+        userId,
         type: "image",
         prompt: `Frames · ${frame?.name ?? data.frameId} · ${glass?.name ?? data.glassId} · ${data.ratioId}`,
-        output_url: null,
-        credits_used: isAdmin ? 0 : quote.credits,
+        output_url: "",
+        status: "success",
+        is_private: true,
         metadata: {
           source: "frames",
           experience: "frames",
@@ -110,6 +114,7 @@ export const finalizeFramesExport = createServerFn({ method: "POST" })
           credits_charged: isAdmin ? 0 : quote.credits,
         },
       });
+      if (persist.error) console.error("[frames] history persist failed", persist.error);
     } catch (e) {
       console.error("[frames] history insert failed", e);
     }
