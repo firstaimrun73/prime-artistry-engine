@@ -154,17 +154,21 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
  * Aspect ratios for text-to-image per experience.
  * Standard: five core ratios.
  * Premium + Ultra AI: five core + 21:9 (normal ultra-wide).
- * IMAX is intentionally omitted until the UI exposes 8K Max (8k_max), which the
- * Ultra validator requires for IMAX. Do not present a selectable IMAX path that
- * cannot satisfy the backend. 21:9 is never IMAX.
+ * IMAX (true 1.43:1) is Ultra-only and requires imageQuality 8k_max at generate time.
+ * 21:9 is normal ultra-wide and is never treated as IMAX.
  */
 export function aspectRatiosForStudioTier(
   tier: StudioTier,
-): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax"> {
+): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax" | "custom"> {
   if (tier === "standard") {
     return ["1:1", "4:3", "16:9", "9:16", "3:4"];
   }
-  return ["1:1", "4:3", "16:9", "9:16", "3:4", "21:9"];
+  if (tier === "pro") {
+    // Premium experience — 21:9 ultra-wide; no IMAX (Ultra-only).
+    return ["1:1", "4:3", "16:9", "9:16", "3:4", "21:9", "custom"];
+  }
+  // Ultra AI — 21:9 + true IMAX 1.43:1 (requires 8k_max on generate) + Custom.
+  return ["1:1", "4:3", "16:9", "9:16", "3:4", "21:9", "imax", "custom"];
 }
 
 /**

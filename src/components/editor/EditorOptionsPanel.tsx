@@ -72,6 +72,7 @@ function AspectShape({ id }: { id: string }) {
     "3:4": { w: 16, h: 22 },
     "21:9": { w: 28, h: 12 },
     imax: { w: 22, h: 15 },
+    custom: { w: 20, h: 16 },
   };
   const d = dims[id] ?? { w: 18, h: 18 };
   return (
@@ -139,8 +140,8 @@ export function EditorOptionsPanel({
                   onClick={() => setAspectRatio(a.id)}
                   className={`flex min-h-[44px] min-w-[52px] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-1.5 text-[10px] font-semibold transition-all ${
                     active
-                      ? "border-primary bg-primary/15 text-primary ring-1 ring-primary/30"
-                      : "border-border/70 bg-card/50 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-[#FF5A1F] ring-1 ring-[#FF5A1F]/35 shadow-[0_0_12px_-4px_rgba(255,90,31,0.45)]"
+                      : "border-border/70 bg-card/50 text-muted-foreground hover:border-[#FF5A1F]/40 hover:text-foreground"
                   }`}
                   aria-pressed={active}
                   aria-label={`Aspect ${a.label}`}
@@ -169,8 +170,8 @@ export function EditorOptionsPanel({
                   onClick={() => setAspectRatio(a.id)}
                   className={`flex min-h-[44px] min-w-[52px] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-1.5 text-[10px] font-semibold transition-all ${
                     active
-                      ? "border-primary bg-primary/15 text-primary ring-1 ring-primary/30"
-                      : "border-border/70 bg-card/50 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-[#FF5A1F] ring-1 ring-[#FF5A1F]/35 shadow-[0_0_12px_-4px_rgba(255,90,31,0.45)]"
+                      : "border-border/70 bg-card/50 text-muted-foreground hover:border-[#FF5A1F]/40 hover:text-foreground"
                   }`}
                   aria-pressed={active}
                   aria-label={`Aspect ${a.label}`}

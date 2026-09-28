@@ -3,7 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { Sparkles, Wand2, X } from "lucide-react";
-import { EXAMPLE_PROMPTS } from "@/lib/prompt-suggestions";
+import { EXAMPLE_PROMPTS, getRotatedImageIdeas } from "@/lib/prompt-suggestions";
 import { VIDEO_QUICK_STYLES } from "@/lib/editor/editor.constants";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -302,7 +302,7 @@ export function EditorPromptPanel({
         {!loading && !prompt.trim() && !activeToolLabel && mediaType === "image" && (
           <div className="-mx-0.5 flex items-center gap-1.5 overflow-x-auto px-0.5 pb-0.5 scrollbar-none">
             <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground"><Sparkles className="h-3 w-3 text-primary" /> Try:</span>
-            {IMAGE_IDEAS.map((s) => (
+            {getRotatedImageIdeas(4).map((s) => (
               <button key={s.label} type="button" onClick={() => setPrompt(s.prompt)} className="min-h-[30px] shrink-0 rounded-full border border-border/80 bg-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground">{s.label}</button>
             ))}
           </div>

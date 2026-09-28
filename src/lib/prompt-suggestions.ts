@@ -46,6 +46,112 @@ export const EXAMPLE_PROMPTS: Suggestion[] = [
   { label: "Product photo", prompt: "Professional e-commerce product photo of this item on a clean white studio background with soft even lighting, subtle shadow and sharp focus." },
   { label: "Thumbnail", prompt: "Design an eye-catching YouTube thumbnail based on this scene with bold contrast, dramatic lighting, clear focal subject and space for large title text." },
   { label: "Social post", prompt: "Design a polished square social media post based on this scene with balanced composition, vibrant color grading and clean space for a short headline." },
+
+  // --- expanded catalogue (rotation pool ≥100) ---
+  { label: "Cinematic portrait", prompt: "Create a cinematic portrait with dramatic side lighting, shallow depth of field, rich color grading and a filmic look." },
+  { label: "Family portrait", prompt: "Create a warm natural family portrait with soft window light, genuine expressions and a clean uncluttered background." },
+  { label: "Travel photo", prompt: "Enhance this travel photo with vibrant natural colors, balanced exposure and a sense of place while keeping the scene realistic." },
+  { label: "Fashion editorial", prompt: "Transform into a high-fashion editorial image with bold styling, crisp detail, premium lighting and magazine-cover polish." },
+  { label: "Product hero", prompt: "Create a premium product hero shot on a clean minimal surface with soft studio lighting, subtle reflection and sharp focus." },
+  { label: "Food photography", prompt: "Style as appetizing food photography with natural light, rich textures, shallow depth of field and fresh vibrant colors." },
+  { label: "Nature landscape", prompt: "Create a sweeping nature landscape with dramatic sky, balanced exposure, vivid yet natural colors and strong depth." },
+  { label: "Architecture", prompt: "Photograph architecture with clean lines, balanced perspective, crisp detail and sophisticated contrast." },
+  { label: "Wedding moment", prompt: "Create a romantic wedding photograph with soft golden light, elegant composition and timeless color grading." },
+  { label: "Lifestyle", prompt: "Create a natural lifestyle image with candid energy, soft daylight and authentic everyday atmosphere." },
+  { label: "Profile photo", prompt: "Create a professional profile portrait with flattering light, clean background and natural skin texture." },
+  { label: "Fantasy scene", prompt: "Create a refined fantasy scene with magical atmosphere, cinematic lighting and detailed environment without clutter." },
+  { label: "Futuristic city", prompt: "Create a futuristic city vista with neon accents, atmospheric haze, sharp architecture and cinematic color grade." },
+  { label: "Vintage film", prompt: "Apply a vintage film look with gentle grain, warm tones, soft contrast and nostalgic character." },
+  { label: "Luxury brand", prompt: "Create a luxury brand visual with refined composition, premium materials, elegant lighting and minimal distraction." },
+  { label: "Studio portrait", prompt: "Create a clean studio portrait with controlled lighting, soft background falloff and natural skin detail." },
+  { label: "Pet portrait", prompt: "Create a sharp pet portrait with catchlights in the eyes, soft background blur and natural fur texture." },
+  { label: "Car showcase", prompt: "Create a premium automotive showcase with dramatic reflections, crisp body lines and cinematic lighting." },
+  { label: "Interior design", prompt: "Photograph an interior space with balanced ambient light, true-to-life colors and inviting composition." },
+  { label: "Seasonal autumn", prompt: "Create an autumn scene with warm golden foliage, soft directional light and cozy atmosphere." },
+  { label: "Seasonal winter", prompt: "Create a winter scene with cool clean light, soft snow texture and calm atmospheric depth." },
+  { label: "Object remove", prompt: "Remove the distracting object cleanly and reconstruct the background so the edit is invisible." },
+  { label: "People remove", prompt: "Remove all people from the scene and reconstruct the background naturally with matching light and texture." },
+  { label: "Background swap", prompt: "Replace the background with a clean professional environment while matching subject lighting and edge detail." },
+  { label: "Relight soft", prompt: "Relight the subject with soft diffused key light, gentle fill and natural shadow transitions." },
+  { label: "Relight dramatic", prompt: "Relight with dramatic cinematic contrast, controlled highlights and deep but detailed shadows." },
+  { label: "Color grade teal", prompt: "Apply a cinematic teal-and-orange color grade while preserving natural skin tones and highlight detail." },
+  { label: "Color grade warm", prompt: "Warm the color grade with golden tones, soft contrast and a welcoming lifestyle feel." },
+  { label: "Restore photo", prompt: "Restore this damaged photo: repair scratches, recover faded detail, balance tones and keep identity faithful." },
+  { label: "Enhance detail", prompt: "Enhance fine detail and micro-contrast while keeping skin and textures natural, no harsh oversharpening." },
+  { label: "Poster design", prompt: "Create a bold poster composition with strong focal hierarchy, dramatic lighting and space for title text." },
+  { label: "Ad creative", prompt: "Create a polished advertising visual with premium product presence, clean negative space and persuasive lighting." },
+  { label: "Social story", prompt: "Compose a vertical social story frame with clear subject focus, balanced margins and vibrant grading." },
+  { label: "Flat lay", prompt: "Create an organized flat-lay product arrangement with even overhead light, tidy composition and soft shadows." },
+  { label: "Macro detail", prompt: "Create a macro detail shot with razor focus on texture, soft bokeh and tactile realism." },
+  { label: "Night city", prompt: "Create a night city scene with controlled highlights, glowing lights, deep blues and cinematic atmosphere." },
+  { label: "Beach golden hour", prompt: "Create a golden-hour beach scene with warm sunlight, soft reflections and relaxed lifestyle mood." },
+  { label: "Mountain vista", prompt: "Create a mountain vista with layered depth, crisp peaks, atmospheric haze and balanced exposure." },
+  { label: "Street style", prompt: "Create a street-style fashion frame with authentic urban backdrop, natural light and confident pose energy." },
+  { label: "Beauty close-up", prompt: "Create a beauty close-up with flawless yet natural skin texture, precise eyes and soft glam lighting." },
+  { label: "Black and white", prompt: "Convert to refined black and white with rich tonal range, deep blacks and luminous highlights." },
+  { label: "Matte finish", prompt: "Apply a modern matte finish with soft contrast, muted highlights and contemporary color polish." },
+  { label: "High key", prompt: "Create a high-key bright image with airy whites, soft shadows and clean minimal aesthetic." },
+  { label: "Low key", prompt: "Create a low-key image with deep shadows, selective highlights and dramatic mood." },
+  { label: "Reflection water", prompt: "Add natural water reflections that match perspective, light direction and scene color." },
+  { label: "Fog atmosphere", prompt: "Add soft atmospheric fog that enhances depth without washing out the subject." },
+  { label: "Rain mood", prompt: "Add subtle rain atmosphere with wet surfaces, soft specular highlights and moody depth." },
+  { label: "Studio product", prompt: "Place the product in a premium studio setup with seamless backdrop, softboxes and crisp brand-ready detail." },
+  { label: "Before after clean", prompt: "Clean and modernize the image: fix exposure, color, and clutter while keeping the original composition." },
+  { label: "Identity preserve", prompt: "Edit carefully while strictly preserving the person identity, facial structure and natural expression." },
+  { label: "Outfit change", prompt: "Change the outfit to a stylish alternative that fits body shape, pose and scene lighting." },
+  { label: "Hair restyle", prompt: "Restyle the hair naturally with realistic strands, volume and lighting consistent with the scene." },
+  { label: "Eye color", prompt: "Adjust eye color subtly while keeping catchlights, moisture and realism intact." },
+  { label: "Smile refine", prompt: "Refine the expression toward a natural confident smile without changing identity." },
+  { label: "Skin natural", prompt: "Retouch skin softly: even tone, keep pores and texture, avoid plastic look." },
+  { label: "Teeth natural", prompt: "Brighten teeth slightly in a natural way without over-whitening or changing shape." },
+  { label: "Sky drama", prompt: "Replace the sky with a dramatic but believable sky and match ground lighting and reflections." },
+  { label: "Clean background", prompt: "Simplify the background, reduce clutter and keep subject separation clear and natural." },
+  { label: "Add bokeh", prompt: "Increase background bokeh smoothly while keeping the subject tack sharp." },
+  { label: "Perspective fix", prompt: "Correct perspective distortion on architecture while preserving realism and proportions." },
+  { label: "Crop reframe", prompt: "Reframe the composition for a stronger focal point and balanced negative space." },
+  { label: "Text space", prompt: "Recompose with clean negative space suitable for a short headline overlay." },
+  { label: "Brand color", prompt: "Grade the image toward a cohesive brand palette while keeping subjects natural." },
+  { label: "Metallic shine", prompt: "Enhance metallic surfaces with realistic specular highlights and controlled reflections." },
+  { label: "Glass refraction", prompt: "Render glass with believable refraction, reflections and edge highlights." },
+  { label: "Fabric detail", prompt: "Enhance fabric weave and soft folds with natural shading and tactile realism." },
+  { label: "Wood texture", prompt: "Bring out natural wood grain and warm material depth without oversharpening." },
+  { label: "Jewelry sparkle", prompt: "Enhance jewelry sparkle with precise highlights while avoiding blown-out glare." },
+  { label: "Watch macro", prompt: "Create a luxury watch macro with crisp dial detail, controlled reflections and premium lighting." },
+  { label: "Sneaker product", prompt: "Create a clean sneaker product shot with dynamic angle, crisp materials and soft studio light." },
+  { label: "Cosmetic flat", prompt: "Create a cosmetic flat-lay with elegant arrangement, soft shadows and refined color harmony." },
+  { label: "Book cover", prompt: "Design a striking book-cover image with strong mood, clear focal subject and space for title typography." },
+  { label: "Album art", prompt: "Create album-art imagery with bold concept, emotional lighting and memorable composition." },
+  { label: "Game key art", prompt: "Create cinematic game key art with heroic subject, dynamic light and high production polish." },
+  { label: "Sci-fi portrait", prompt: "Create a sci-fi character portrait with advanced wardrobe, subtle tech details and cinematic grade." },
+  { label: "Historical look", prompt: "Restyle the scene with a believable historical period look: wardrobe, palette and atmosphere." },
+  { label: "Minimal product", prompt: "Create a minimal product composition with abundant negative space, soft light and quiet luxury." },
+  { label: "Action freeze", prompt: "Capture a frozen action moment with sharp subject motion clarity and dynamic energy." },
+  { label: "Soft romance", prompt: "Create a soft romantic image with gentle light bloom, warm tones and intimate framing." },
+  { label: "Corporate headshot", prompt: "Create a corporate headshot with even professional lighting, clean backdrop and confident expression." },
+  { label: "Creator thumbnail", prompt: "Create a high-contrast creator thumbnail with expressive subject, vivid grade and clear focal hierarchy." },
+  { label: "Real estate", prompt: "Enhance a real-estate interior: bright balanced light, true colors, tidy space and inviting depth." },
+  { label: "Menu food", prompt: "Style food for a restaurant menu: appetizing color, crisp texture and clean presentation." },
+  { label: "Event highlight", prompt: "Create an event highlight frame with energetic atmosphere, flattering light and clear subjects." },
+  { label: "Sports energy", prompt: "Create a sports image with dynamic energy, sharp athlete focus and powerful contrast." },
+  { label: "Yoga calm", prompt: "Create a calm wellness image with soft natural light, serene palette and balanced composition." },
+  { label: "Coffee lifestyle", prompt: "Create a cozy coffee lifestyle scene with warm tones, soft morning light and inviting detail." },
+  { label: "Desk setup", prompt: "Create a clean desk setup flat-lay with organized tech, soft overhead light and modern minimal style." },
+  { label: "Plant green", prompt: "Enhance indoor plants with fresh greens, soft daylight and natural leaf texture." },
+  { label: "Sunset silhouette", prompt: "Create a sunset silhouette with rich sky gradient, clean subject outline and atmospheric depth." },
+  { label: "Blue hour", prompt: "Create a blue-hour city mood with cool ambient light, gentle artificial glow and quiet atmosphere." },
+  { label: "Mist forest", prompt: "Create a misty forest scene with layered trees, soft volumetric light and peaceful depth." },
+  { label: "Desert heat", prompt: "Create a desert landscape with heat haze, golden light, textured sand and vast scale." },
+  { label: "Ocean clarity", prompt: "Create clear ocean water with turquoise depth, soft waves and bright natural daylight." },
+  { label: "Snow portrait", prompt: "Create a winter portrait with soft snow bokeh, cool clean light and warm skin tones." },
+  { label: "Rainy street", prompt: "Create a rainy street scene with reflective pavement, soft neon glow and cinematic mood." },
+  { label: "Market color", prompt: "Create a vibrant market scene with rich color, layered depth and lively but orderly composition." },
+  { label: "Library quiet", prompt: "Create a quiet library interior with warm practical lights, soft contrast and cozy intellectual mood." },
+  { label: "Museum light", prompt: "Create a museum gallery scene with controlled exhibit lighting, clean architecture and refined atmosphere." },
+  { label: "Workshop craft", prompt: "Create a craft workshop scene with tactile materials, practical light and authentic maker details." },
+  { label: "Garden bloom", prompt: "Create a blooming garden scene with natural color variety, soft daylight and gentle depth of field." },
+  { label: "Rooftop view", prompt: "Create a rooftop city view with expansive skyline, balanced exposure and late-day atmosphere." },
+  { label: "Bridge long", prompt: "Create a long-exposure bridge scene with smooth water, crisp structure and tranquil night mood." },
+  { label: "Custom ratio hint", prompt: "Create a wide cinematic frame approximately 2.35:1 with balanced composition and filmic color." },
 ];
 
 const SMART_RULES: { match: RegExp; suggestions: Suggestion[] }[] = [
@@ -151,7 +257,7 @@ export function getSmartSuggestions(input: string): Suggestion[] {
 
 // Aspect ratio (text-to-image). Ultra also supports IMAX at 1.43:1.
 // 21:9 is normal ultra-wide — never treated as IMAX.
-export type AspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax";
+export type AspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax" | "custom";
 
 export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
   { id: "1:1", label: "1:1" },
@@ -160,7 +266,8 @@ export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
   { id: "9:16", label: "9:16" },
   { id: "3:4", label: "3:4" },
   { id: "21:9", label: "21:9" },
-  { id: "imax", label: "IMAX" },
+  { id: "imax", label: "IMAX 1.43:1" },
+  { id: "custom", label: "Custom" },
 ];
 
 export function aspectToImageSize(aspect: AspectRatio | undefined): string {
@@ -183,4 +290,27 @@ export function aspectToImageSize(aspect: AspectRatio | undefined): string {
     default:
       return "square_hd";
   }
+}
+
+/** Session-stable rotated subset for Image Studio "Try" chips. No network. */
+export function getRotatedImageIdeas(count = 4): Suggestion[] {
+  const pool = EXAMPLE_PROMPTS;
+  if (pool.length === 0) return [];
+  const n = Math.min(count, pool.length);
+  // Day + session entropy for variety without server state.
+  let seed = Date.now() % 100000;
+  try {
+    const k = "m2e_try_seed";
+    const existing = sessionStorage.getItem(k);
+    if (existing) seed = Number(existing) || seed;
+    else sessionStorage.setItem(k, String(seed));
+  } catch {
+    /* ignore */
+  }
+  const start = seed % pool.length;
+  const out: Suggestion[] = [];
+  for (let i = 0; i < n; i++) {
+    out.push(pool[(start + i * 7) % pool.length]!);
+  }
+  return out;
 }

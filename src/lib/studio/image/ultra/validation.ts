@@ -57,6 +57,26 @@ export function normalizeUltraAspect(
   ) {
     return { aspect: a as UltraAspectRatio };
   }
+  // Custom: client may send "custom" — treat as 16:9 master; prompt should carry ratio intent.
+  // True free-form W:H custom dims are applied when aspect is a numeric ratio like "2.35:1".
+  if (a === "custom") {
+    return { aspect: "16:9" };
+  }
+  const ratioMatch = a.match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+  if (ratioMatch) {
+    const w = Number(ratioMatch[1]);
+    const h = Number(ratioMatch[2]);
+    if (w > 0 && h > 0) {
+      const r = w / h;
+      // Map free ratio to nearest supported Ultra aspect for master generation.
+      if (r > 2.1) return { aspect: "21:9" };
+      if (r > 1.5) return { aspect: "16:9" };
+      if (r > 1.2) return { aspect: "4:3" };
+      if (r > 0.9) return { aspect: "1:1" };
+      if (r > 0.7) return { aspect: "3:4" };
+      return { aspect: "9:16" };
+    }
+  }
   return { aspect: "1:1" };
 }
 

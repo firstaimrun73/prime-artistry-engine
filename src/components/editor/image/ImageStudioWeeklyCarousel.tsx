@@ -100,9 +100,9 @@ export function ImageStudioWeeklyCarousel() {
   if (!active || active.images.length === 0) return null;
 
   return (
-    <section className="mt-6 border-t border-border/40 pt-5 sm:mt-8 sm:pt-6">
-      <h2 className="mb-3 text-center text-sm font-semibold tracking-wide text-muted-foreground sm:text-base">
-        Weekly Top 10
+    <section className="mt-5 border-t border-border/40 pt-4 pb-1 sm:mt-6 sm:pt-5">
+      <h2 className="mb-2 text-center text-sm font-semibold tracking-wide text-muted-foreground sm:text-base">
+        Try Something New
       </h2>
       <LoopTrack set={active} onOpen={setLightbox} />
       {lightbox && (

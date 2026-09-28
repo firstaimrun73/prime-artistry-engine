@@ -529,7 +529,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           imageUrl: mediaUrl,
           strength,
           aspectRatio,
-          imageQuality,
+          // IMAX requires Ultra 8k_max on the server validator — never send plain 8k for imax.
+          imageQuality: aspectRatio === "imax" ? "8k_max" : imageQuality,
           studioTier,
           maskImageUrl,
           referenceImageUrls,
