@@ -152,17 +152,19 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
 
 /**
  * Aspect ratios for text-to-image per experience.
- * Standard + Premium: five core ratios.
- * Ultra AI: same five core ratios.
+ * Standard: five core ratios.
+ * Premium + Ultra AI: five core + 21:9 (normal ultra-wide).
  * IMAX is intentionally omitted until the UI exposes 8K Max (8k_max), which the
  * Ultra validator requires for IMAX. Do not present a selectable IMAX path that
- * cannot satisfy the backend.
+ * cannot satisfy the backend. 21:9 is never IMAX.
  */
 export function aspectRatiosForStudioTier(
   tier: StudioTier,
-): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "imax"> {
-  void tier;
-  return ["1:1", "4:3", "16:9", "9:16", "3:4"];
+): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax"> {
+  if (tier === "standard") {
+    return ["1:1", "4:3", "16:9", "9:16", "3:4"];
+  }
+  return ["1:1", "4:3", "16:9", "9:16", "3:4", "21:9"];
 }
 
 /**
