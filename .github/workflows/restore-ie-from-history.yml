@@ -10,68 +10,49 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Restore ImageEditor from a0dd852 and apply final fixes
+      - name: Restore ImageEditor from a0dd852
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git show a0dd852:src/components/editor/image/ImageEditor.tsx > /tmp/ie.tsx
-          SIZE=$(wc -c < /tmp/ie.tsx)
+          git show a0dd852:src/components/editor/image/ImageEditor.tsx > src/components/editor/image/ImageEditor.tsx
+          SIZE=$(wc -c < src/components/editor/image/ImageEditor.tsx)
           echo "restored size=$SIZE"
           test "$SIZE" -gt 30000
 
           python3 << 'PY'
           from pathlib import Path
-          text = Path("/tmp/ie.tsx").read_text()
-
-          old = """                  showAutoToggle={false}
-                  costLabel={`${cost} cr`}
-                />"""
-          new = """                  showAutoToggle={false}
-                />"""
-          if old in text:
-              text = text.replace(old, new, 1)
-              print("removed costLabel")
-
-          old_h = """            <div className=\"min-w-0 space-y-1\">
-              <StudioBackLink />
-              <div className=\"flex min-w-0 items-center gap-2\">
-                <span
-                  className=\"studio-image-icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#FF5A1F]/25 bg-[#FF5A1F]/10 text-[#FF5A1F] shadow-[0_0_12px_-4px_rgba(255,90,31,0.45)] backdrop-blur-sm sm:h-9 sm:w-9\"
-                  aria-hidden
-                >
-                  <ImageIcon className=\"h-4 w-4 sm:h-[18px] sm:w-[18px]\" strokeWidth={2.25} />
-                </span>
-                <h1 className=\"min-w-0 text-lg font-extrabold tracking-tight leading-tight sm:text-xl\">"""
-          new_h = """            <div className=\"min-w-0 flex flex-wrap items-center gap-2 sm:gap-3\">
-              <StudioBackLink className=\"shrink-0\" />
-              <div className=\"flex min-w-0 items-center gap-2\">
-                <span
-                  className=\"studio-image-icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#FF5A1F]/25 bg-[#FF5A1F]/10 text-[#FF5A1F] shadow-[0_0_10px_-4px_rgba(255,90,31,0.4)] backdrop-blur-sm sm:h-8 sm:w-8\"
-                  aria-hidden
-                >
-                  <span className=\"spark-dot\" />
-                  <span className=\"spark-dot\" />
-                  <span className=\"spark-dot\" />
-                  <span className=\"spark-dot\" />
-                  <ImageIcon className=\"relative h-3.5 w-3.5 sm:h-4 sm:w-4\" strokeWidth={2.25} />
-                </span>
-                <h1 className=\"min-w-0 text-base font-extrabold tracking-tight leading-none sm:text-lg\">"""
-          if old_h in text:
-              text = text.replace(old_h, new_h, 1)
-              print("header compact")
-
+          import re
+          p = Path("src/components/editor/image/ImageEditor.tsx")
+          text = p.read_text()
           assert "PLACEHOLDER" not in text
           assert "export function ImageEditor" in text
           assert "outputUrl" in text
-          assert "costLabel={" not in text
 
-          Path("src/components/editor/image/ImageEditor.tsx").write_text(text)
+          # Remove costLabel prop from Generate controls (any spacing)
+          text2, n = re.subn(
+              r"\n\s*costLabel=\{`\$\{cost\} cr`\}\s*",
+              "\n",
+              text,
+              count=1,
+          )
+          print("costLabel removals", n)
+          text = text2
+
+          if "costLabel={" in text:
+              print("WARN: costLabel still present after replace")
+          else:
+              print("costLabel cleared from ImageEditor")
+
+          p.write_text(text)
           print("written", len(text))
           PY
 
+          ! grep -q PLACEHOLDER src/components/editor/image/ImageEditor.tsx
+          test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 30000
+
           git add src/components/editor/image/ImageEditor.tsx
           git status
-          git commit -m "fix(Image Studio): EMERGENCY restore full ImageEditor from a0dd852 + final UI fixes" || echo "nothing to commit"
+          git commit -m "fix(Image Studio): EMERGENCY restore full ImageEditor from a0dd852 (outputUrl, no stub)"
           git push
