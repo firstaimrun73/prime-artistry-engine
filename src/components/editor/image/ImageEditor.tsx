@@ -19,7 +19,7 @@ import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveM
 import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
-import { getPlanLimits, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
+import { getPlanLimits, maxPromptCharsForPlan, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
 import { toast } from "sonner";
@@ -775,7 +775,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
       {!hideFormDuringGen && (
         <div className="mx-auto min-w-0 max-w-5xl overflow-x-hidden px-3 py-3 sm:px-4 sm:py-6">
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 animate-fade-in">
+          <div className="mb-1 flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3 animate-fade-in">
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <StudioBackLink className="shrink-0" />
               <span className="hidden h-5 w-px shrink-0 bg-border/60 sm:block" aria-hidden />
@@ -958,7 +958,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   onSelectTool={handleSelectTool}
                   studioTier={studioTier}
                   referenceCount={refImages.length}
-                  maxChars={studioTier === "premium" ? 10000 : studioTier === "pro" ? 4000 : 2000}
+                  maxChars={isAdmin ? 7000 : maxPromptCharsForPlan(profile?.plan ?? "free")}
                   contextTags={contextTags}
                   onToggleTag={(id) => {
                     setContextTags((prev) =>
