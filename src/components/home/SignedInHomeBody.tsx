@@ -25,7 +25,6 @@ import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
-import { Motion2AiDailyStrip } from "@/components/home/Motion2AiDailyStrip";
 
 /** Same fixed width for every quick-create icon — Cropmix → Remove BG → rest */
 const QUICK_CREATE = [
@@ -116,8 +115,6 @@ export function SignedInHomeBody() {
           })}
         </div>
       </section>
-
-      <Motion2AiDailyStrip />
 
       <CircleSampleGallery />
 
