@@ -12,6 +12,8 @@ interface EditorResultProps {
   onClear: () => void;
   isFree: boolean;
   downloaded: boolean;
+  /** When true (I2I / multi-ref), show Edit Again. When false (T2I), show Regenerate. Never both. */
+  hasSourceImage?: boolean;
 }
 
 export function EditorResult({
@@ -24,21 +26,25 @@ export function EditorResult({
   onClear,
   isFree,
   downloaded,
+  hasSourceImage = false,
 }: EditorResultProps) {
   return (
     <>
       {output && !loading && (
         <div className="space-y-2 animate-fade-in">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Button variant="default" className="min-h-[44px]" onClick={onDownload}>
               <Download className="mr-1.5 h-4 w-4" /> Download
             </Button>
-            <Button variant="outline" className="min-h-[44px]" onClick={onRegenerate}>
-              <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerate
-            </Button>
-            <Button variant="outline" className="min-h-[44px]" onClick={onEditAgain}>
-              <Recycle className="mr-1.5 h-4 w-4" /> Edit Again
-            </Button>
+            {hasSourceImage ? (
+              <Button variant="outline" className="min-h-[44px]" onClick={onEditAgain}>
+                <Recycle className="mr-1.5 h-4 w-4" /> Edit Again
+              </Button>
+            ) : (
+              <Button variant="outline" className="min-h-[44px]" onClick={onRegenerate}>
+                <RefreshCw className="mr-1.5 h-4 w-4" /> Regenerate
+              </Button>
+            )}
             <Button variant="outline" className="min-h-[44px]" onClick={onShare}>
               <Share2 className="mr-1.5 h-4 w-4" /> Share
             </Button>
