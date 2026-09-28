@@ -12,47 +12,29 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Decode and write files
+      - name: Decode generate.functions watermark fail-closed
         run: |
           set -euo pipefail
           python3 << 'PY'
           import base64, zlib
           from pathlib import Path
-
-          def decode_halves(prefix, out_path):
-              h0 = Path(f".restore/completion/{prefix}.half0.txt").read_text().strip()
-              h1 = Path(f".restore/completion/{prefix}.half1.txt").read_text().strip()
-              data = zlib.decompress(base64.b64decode(h0 + h1))
-              Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-              Path(out_path).write_bytes(data)
-              print(out_path, len(data))
-              return data
-
-          def decode_parts(prefix, n, out_path):
-              b64 = "".join(
-                  Path(f".restore/completion/{prefix}.part{i}.txt").read_text().strip()
-                  for i in range(n)
-              )
-              data = zlib.decompress(base64.b64decode(b64))
-              Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-              Path(out_path).write_bytes(data)
-              print(out_path, len(data))
-              return data
-
-          gen = decode_halves("gen_zlib", "src/lib/generate.functions.ts")
-          assert b"Fail closed" in gen
-          assert b"executeUltraImage" in gen
-          assert b"PLACEHOLDER" not in gen or len(gen) > 1000
-
-          ie = decode_parts("ie_zlib", 4, "src/components/editor/image/ImageEditor.tsx")
-          assert b"ImageStudioWeeklyCarousel" in ie
-          assert b"StudioBackLink className" in ie
-          assert b"readKeepWatermarkPref" in ie or b"useState(true)" in ie
+          h0 = Path(".restore/completion/gen_zlib.half0.txt").read_text().strip()
+          h1 = Path(".restore/completion/gen_zlib.half1.txt").read_text().strip()
+          data = zlib.decompress(base64.b64decode(h0 + h1))
+          Path("src/lib/generate.functions.ts").write_bytes(data)
+          print("generate.functions.ts", len(data))
+          assert b"Fail closed" in data
+          assert b"executeUltraImage" in data
+          assert b"executePremiumImage" in data
+          assert b"executeStandardImage" in data
+          assert b"persistGenerationHistory" in data
+          assert b"Multiple reference images require a paid plan" in data
+          assert b"returning clean URL" not in data
           print("OK")
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/generate.functions.ts src/components/editor/image/ImageEditor.tsx
+          git add src/lib/generate.functions.ts
           git diff --cached --quiet && echo "no changes" && exit 0
-          git commit -m "fix(image-studio): watermark fail-closed; Home header; weekly Top-10; keepWatermark default ON"
+          git commit -m "fix(watermark): fail closed on stamp failure — never leak clean Free/provider URL"
           git push
