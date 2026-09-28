@@ -43,6 +43,8 @@ export function ultraMasterImageSize(
     switch (aspect) {
       case "16:9":
         return "landscape_4_3";
+      case "21:9":
+        return { width: 896, height: 384 };
       case "9:16":
         return "portrait_4_3";
       case "4:3":
@@ -57,6 +59,8 @@ export function ultraMasterImageSize(
   switch (aspect) {
     case "16:9":
       return "landscape_16_9";
+    case "21:9":
+      return { width: 2048, height: 878 };
     case "9:16":
       return "portrait_16_9";
     case "4:3":
@@ -117,6 +121,7 @@ export function ultraDeliveryDimensions(
     "3:4": [Math.round((long * 3) / 4), long],
     "16:9": [long, Math.round((long * 9) / 16)],
     "9:16": [Math.round((long * 9) / 16), long],
+    "21:9": [long, Math.round((long * 9) / 21)],
   };
   const [w, h] = map[ar] ?? map["1:1"];
   return { width: w, height: h };
