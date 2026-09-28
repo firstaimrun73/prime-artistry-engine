@@ -40,7 +40,6 @@ jobs:
               *ImageEditor.tsx) [ "$sz" -ge 15000 ] || exit 1 ;;
             esac
           done
-          # Refuse admin→7000 still in ImageEditor
           if git show :src/components/editor/image/ImageEditor.tsx | grep -q 'isAdmin ? 7000'; then
             echo "REFUSE still has isAdmin ? 7000"
             exit 1
