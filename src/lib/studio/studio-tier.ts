@@ -136,8 +136,7 @@ export function experienceWatermarkLine(tier: StudioTier, planDisplayName: strin
  * Quality chips exposed per experience (labels only — no credit numbers).
  * Standard: SD, HD only.
  * Premium (pro): SD, HD, 2K (matches PremiumQuality backend).
- * Ultra AI (premium): SD, HD, 2K, 4K, 8K.
- * Note: backend IMAX requires 8k_max quality which is not yet a user-facing chip.
+ * Ultra AI (premium): SD, HD, 2K, 4K, 8K, 8K Max (Master).
  */
 export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
   switch (tier) {
@@ -146,7 +145,7 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
     case "pro":
       return ["sd", "hd", "2k"];
     case "premium":
-      return ["sd", "hd", "2k", "4k", "8k"];
+      return ["sd", "hd", "2k", "4k", "8k", "8k_max"];
   }
 }
 
@@ -169,6 +168,18 @@ export function aspectRatiosForStudioTier(
   }
   // Ultra AI — 21:9 + true IMAX 1.43:1 (requires 8k_max on generate) + Custom.
   return ["1:1", "4:3", "16:9", "9:16", "3:4", "21:9", "imax", "custom"];
+}
+
+/** Aspect ratios for plan+experience. IMAX/Custom require Master ultraFullUnlocked. */
+export function aspectRatiosForPlanAndTier(
+  tier: StudioTier,
+  ultraFullUnlocked: boolean,
+): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax" | "custom"> {
+  const base = aspectRatiosForStudioTier(tier);
+  if (!ultraFullUnlocked) {
+    return base.filter((a) => a !== "imax" && a !== "custom") as typeof base;
+  }
+  return base;
 }
 
 /**
