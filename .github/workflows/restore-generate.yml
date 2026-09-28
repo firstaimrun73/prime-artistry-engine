@@ -1,0 +1,41 @@
+name: Restore generate.functions
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".restore/genfix.*"
+      - ".restore/manifest.json"
+      - ".github/workflows/restore-generate.yml"
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reassemble generate.functions.ts
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import base64, json
+          from pathlib import Path
+          m = json.loads(Path(".restore/manifest.json").read_text())
+          item = m["items"][0]
+          b64 = "".join(Path(f".restore/{item['prefix']}.part{i}.b64").read_text().strip() for i in range(item["parts"]))
+          data = base64.b64decode(b64)
+          Path("src/lib/generate.functions.ts").write_bytes(data)
+          print("wrote", len(data))
+          assert len(data) > 20000
+          text = data.decode()
+          assert "PLACEHOLDER" not in text
+          assert "executePremiumImage" in text
+          assert "executeUltraImage" in text
+          assert "persistGenerationHistory" in text
+          assert "finalizeMediaAsset" in text
+          assert "Multiple reference images require" in text
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          git commit -m "EMERGENCY RESTORE: full generate.functions.ts (routing + free multi lock + gen watermark)"
+          git push

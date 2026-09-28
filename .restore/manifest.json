@@ -2,58 +2,8 @@
   "items": [
     {
       "path": "src/lib/generate.functions.ts",
-      "prefix": "src_lib_generate_functions_ts",
-      "parts": 5
-    },
-    {
-      "path": "src/components/editor/image/ImageEditor.tsx",
-      "prefix": "src_components_editor_image_ImageEditor_tsx",
-      "parts": 8
-    },
-    {
-      "path": "src/components/editor/image/ImageStudioWeeklyCarousel.tsx",
-      "prefix": "src_components_editor_image_ImageStudioWeeklyCarousel_tsx",
-      "parts": 1
-    },
-    {
-      "path": "src/lib/studio/studio-tier.ts",
-      "prefix": "src_lib_studio_studio_tier_ts",
-      "parts": 1
-    },
-    {
-      "path": "src/lib/studio/image/ultra/model.ts",
-      "prefix": "src_lib_studio_image_ultra_model_ts",
-      "parts": 1
-    },
-    {
-      "path": "src/lib/studio/image/ultra/validation.ts",
-      "prefix": "src_lib_studio_image_ultra_validation_ts",
-      "parts": 1
-    },
-    {
-      "path": "src/lib/prompt-suggestions.ts",
-      "prefix": "src_lib_prompt_suggestions_ts",
-      "parts": 3
-    },
-    {
-      "path": "src/lib/watermark-config.ts",
-      "prefix": "src_lib_watermark_config_ts",
-      "parts": 1
-    },
-    {
-      "path": "src/data/motion2ai-daily.ts",
-      "prefix": "src_data_motion2ai_daily_ts",
-      "parts": 1
-    },
-    {
-      "path": "src/lib/studio/image/premium/validation.ts",
-      "prefix": "src_lib_studio_image_premium_validation_ts",
-      "parts": 1
-    },
-    {
-      "path": "src/lib/studio/image/premium/models.ts",
-      "prefix": "src_lib_studio_image_premium_models_ts",
-      "parts": 1
+      "prefix": "genfix",
+      "parts": 7
     }
   ]
 }
