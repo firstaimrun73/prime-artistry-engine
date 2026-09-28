@@ -78,7 +78,8 @@ export function validatePremiumImageRequest(
     raw.aspectRatio === "4:3" ||
     raw.aspectRatio === "16:9" ||
     raw.aspectRatio === "9:16" ||
-    raw.aspectRatio === "3:4"
+    raw.aspectRatio === "3:4" ||
+    raw.aspectRatio === "21:9"
       ? raw.aspectRatio
       : undefined;
 
