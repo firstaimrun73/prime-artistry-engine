@@ -33,11 +33,14 @@ export type UltraQuality = "sd" | "hd" | "2k" | "4k" | "8k" | "8k_max";
 export function ultraMasterImageSize(
   quality: UltraQuality,
   aspect: string,
-): string {
-  // Prefer documented presets; Seedream default auto_2K for HD+ masters.
-  const ar = aspect === "imax" ? "16:9" : aspect;
+): string | { width: number; height: number } {
+  // IMAX = exact 1.43:1 custom dimensions (never 16:9 or 21:9).
+  if (aspect === "imax") {
+    // ~2K-class master for enhancement; delivery upscale uses ultraDeliveryDimensions.
+    return { width: 2048, height: 1432 };
+  }
   if (quality === "sd") {
-    switch (ar) {
+    switch (aspect) {
       case "16:9":
         return "landscape_4_3";
       case "9:16":
@@ -51,7 +54,7 @@ export function ultraMasterImageSize(
     }
   }
   // HD / 2K / 4K / 8K / 8K Max master ≈ 2K-class
-  switch (ar) {
+  switch (aspect) {
     case "16:9":
       return "landscape_16_9";
     case "9:16":
@@ -93,7 +96,7 @@ export function ultraDeliveryDimensions(
   quality: UltraQuality,
   aspect: string,
 ): { width: number; height: number } {
-  const ar = aspect === "imax" ? "21:9" : aspect;
+  const ar = aspect;
   const targets: Record<UltraQuality, number> = {
     sd: 512,
     hd: 1024,
@@ -103,13 +106,17 @@ export function ultraDeliveryDimensions(
     "8k_max": 4320,
   };
   const long = targets[quality];
+  // IMAX cinema aspect is exactly 1.43:1 (NOT 21:9 / 16:9).
+  if (ar === "imax") {
+    const height = Math.round(long / 1.43);
+    return { width: long, height };
+  }
   const map: Record<string, [number, number]> = {
     "1:1": [long, long],
     "4:3": [long, Math.round((long * 3) / 4)],
     "3:4": [Math.round((long * 3) / 4), long],
     "16:9": [long, Math.round((long * 9) / 16)],
     "9:16": [Math.round((long * 9) / 16), long],
-    "21:9": [long, Math.round((long * 9) / 21)],
   };
   const [w, h] = map[ar] ?? map["1:1"];
   return { width: w, height: h };
