@@ -25,6 +25,8 @@ import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWa
 import { toast } from "sonner";
 import { RotateCcw, Image as ImageIcon, ChevronDown } from "lucide-react";
 import { StudioBackLink } from "@/components/StudioBackLink";
+import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
+import { readKeepWatermarkPref } from "@/lib/watermark-pref";
 import type { GenState, GalleryItem } from "@/lib/editor/editor.types";
 import {
   MAX_GALLERY_IMAGES,
@@ -96,7 +98,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [state, setState] = useState<GenState>("idle");
   /** Recommended strength — backend fal defaults cluster ~0.55–0.85; use mid for general edits. */
   const [strength] = useState(0.75);
-  const [keepWatermark, setKeepWatermark] = useState(false);
+  const [keepWatermark, setKeepWatermark] = useState(true); // default ON; hydrated from pref
   const [downloaded, setDownloaded] = useState(false);
   const [smartRemoveOpen, setSmartRemoveOpen] = useState(false);
   const [pendingSmartRemove, setPendingSmartRemove] = useState(
@@ -154,13 +156,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   }, [gallery, activeImage, refImages]);
 
   useEffect(() => {
-    try {
-      const pref = localStorage.getItem(WATERMARK_PREF_KEY);
-      if (pref === "on") setKeepWatermark(true);
-      if (pref === "off") setKeepWatermark(false);
-    } catch {
-      /* ignore */
-    }
+    setKeepWatermark(readKeepWatermarkPref());
   }, []);
 
   useEffect(() => {
@@ -763,8 +759,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       {!hideFormDuringGen && (
         <div className="mx-auto min-w-0 max-w-5xl overflow-x-hidden px-3 py-3 sm:px-4 sm:py-6">
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 animate-fade-in">
-            <div className="min-w-0 space-y-1">
-              <StudioBackLink />
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <StudioBackLink className="shrink-0" />
+              <span className="hidden h-5 w-px shrink-0 bg-border/60 sm:block" aria-hidden />
               <div className="flex min-w-0 items-center gap-2">
                 <span
                   className="studio-image-icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#FF5A1F]/25 bg-[#FF5A1F]/10 text-[#FF5A1F] shadow-[0_0_12px_-4px_rgba(255,90,31,0.45)] backdrop-blur-sm sm:h-9 sm:w-9"
@@ -1072,6 +1069,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                       onClear={handleClear}
                       isFree={isFree}
                       downloaded={downloaded}
+                      hasSourceImage={!!inputDataUrl || refImages.length > 0}
                     />
                   </>
                 ) : (
@@ -1081,6 +1079,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   </div>
                 )}
               </section>
+              <ImageStudioWeeklyCarousel />
               <EditorDisclaimer />
             </div>
           </div>
