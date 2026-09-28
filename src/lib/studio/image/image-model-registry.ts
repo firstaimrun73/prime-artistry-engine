@@ -1,6 +1,9 @@
 /**
  * IMAGE STUDIO — experience → model registry
  * Isolated from Video/Music.
+ * NOTE: Live Image Studio generation routes through generate.functions.ts →
+ * executeStandardImage / executePremiumImage / executeUltraImage.
+ * This registry is documentation / future selection only — not the runtime path.
  *
  * User-facing: Standard | Premium | Ultra AI
  * Internal ids: standard | pro | premium

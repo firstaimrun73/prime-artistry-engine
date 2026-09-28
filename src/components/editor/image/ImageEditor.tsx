@@ -1027,8 +1027,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                       studioTier={studioTier}
                     />
                     {!isFree && !isAdmin && (
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/40 px-3 py-2">
-                        <span className="text-xs font-medium text-muted-foreground">Watermark</span>
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground">Watermark</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {keepWatermark ? "On — stamped on generated output" : "Off — clean output"}
+                          </p>
+                        </div>
                         <button
                           type="button"
                           role="switch"
@@ -1045,8 +1050,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                             })
                           }
                           className={cn(
-                            "relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            keepWatermark ? "bg-[#FF5A1F]" : "bg-muted",
+                            "relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]/40",
+                            keepWatermark ? "bg-[#FF5A1F] shadow-[0_0_12px_-2px_rgba(255,90,31,0.55)]" : "bg-muted",
                           )}
                         >
                           <span
