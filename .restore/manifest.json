@@ -3,47 +3,7 @@
     {
       "path": "src/lib/generate.functions.ts",
       "prefix": "src_lib_generate_functions_ts",
-      "parts": 8
-    },
-    {
-      "path": "src/lib/studio/image/ultra/model.ts",
-      "prefix": "src_lib_studio_image_ultra_model_ts",
-      "parts": 1
-    },
-    {
-      "path": "src/lib/studio/studio-tier.ts",
-      "prefix": "src_lib_studio_studio_tier_ts",
-      "parts": 2
-    },
-    {
-      "path": "src/lib/quality-options.ts",
-      "prefix": "src_lib_quality_options_ts",
-      "parts": 2
-    },
-    {
-      "path": "src/lib/prompt-suggestions.ts",
-      "prefix": "src_lib_prompt_suggestions_ts",
-      "parts": 6
-    },
-    {
-      "path": "src/components/editor/EditorResult.tsx",
-      "prefix": "src_components_editor_EditorResult_tsx",
-      "parts": 1
-    },
-    {
-      "path": "src/components/editor/EditorOptionsPanel.tsx",
-      "prefix": "src_components_editor_EditorOptionsPanel_tsx",
-      "parts": 5
-    },
-    {
-      "path": "src/components/editor/image/ImageEditor.tsx",
-      "prefix": "src_components_editor_image_ImageEditor_tsx",
-      "parts": 12
-    },
-    {
-      "path": "src/routes/_authenticated.history.tsx",
-      "prefix": "src_routes__authenticated_history_tsx",
-      "parts": 6
+      "parts": 10
     }
   ]
 }
