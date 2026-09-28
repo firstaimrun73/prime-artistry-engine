@@ -150,7 +150,8 @@ export function getSmartSuggestions(input: string): Suggestion[] {
 }
 
 // Aspect ratio (text-to-image). Ultra also supports IMAX at 1.43:1.
-export type AspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "imax";
+// 21:9 is normal ultra-wide — never treated as IMAX.
+export type AspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax";
 
 export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
   { id: "1:1", label: "1:1" },
@@ -158,6 +159,7 @@ export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
   { id: "16:9", label: "16:9" },
   { id: "9:16", label: "9:16" },
   { id: "3:4", label: "3:4" },
+  { id: "21:9", label: "21:9" },
   { id: "imax", label: "IMAX" },
 ];
 
@@ -171,6 +173,9 @@ export function aspectToImageSize(aspect: AspectRatio | undefined): string {
       return "portrait_16_9";
     case "3:4":
       return "portrait_4_3";
+    case "21:9":
+      // Normal ultra-wide — not IMAX. Closest preset; Ultra/Premium may use custom dims.
+      return "landscape_16_9";
     case "imax":
       // IMAX 1.43:1 — closest fal landscape size; Ultra may refine server-side
       return "landscape_16_9";
