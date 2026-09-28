@@ -73,9 +73,9 @@ export function detectWatermarkRatioKey(
 }
 
 /** Relative size of primary pill vs min(image width, height). Bumped for visibility. */
-export const PRIMARY_SIZE_RATIO = 0.038;
+export const PRIMARY_SIZE_RATIO = 0.048;
 /** Relative size of secondary icon vs min(image width, height). */
-export const SECONDARY_SIZE_RATIO = 0.06;
+export const SECONDARY_SIZE_RATIO = 0.07;
 /** Safe margin from edges as fraction of min dimension. */
 export const EDGE_MARGIN_RATIO = 0.018;
 

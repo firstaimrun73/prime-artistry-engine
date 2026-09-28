@@ -33,7 +33,9 @@ export function normalizeUltraAspect(
   imaxFlag?: boolean | null,
 ): { aspect: UltraAspectRatio; error?: string } {
   const a = (raw ?? "1:1").toLowerCase();
-  const wantsImax = imaxFlag === true || a === "imax" || a === "21:9";
+  // IMAX is true 1.43:1 cinema — only via explicit imax flag/aspect + 8k_max.
+  // 21:9 is normal ultra-wide and must NOT be treated as IMAX.
+  const wantsImax = imaxFlag === true || a === "imax";
 
   if (wantsImax) {
     if (quality !== "8k_max") {
@@ -50,9 +52,10 @@ export function normalizeUltraAspect(
     a === "4:3" ||
     a === "16:9" ||
     a === "9:16" ||
-    a === "3:4"
+    a === "3:4" ||
+    a === "21:9"
   ) {
-    return { aspect: a };
+    return { aspect: a as UltraAspectRatio };
   }
   return { aspect: "1:1" };
 }
