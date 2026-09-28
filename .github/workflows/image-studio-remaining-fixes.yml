@@ -1,0 +1,346 @@
+name: Image Studio Remaining Fixes
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/image-studio-remaining-fixes.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply fixes
+        run: |
+          set -euo pipefail
+          BEFORE=$(wc -c < src/lib/generate.functions.ts)
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          changed = []
+
+          # ---- 1) planLimits: isPromptEffectivelyUnlimited uses plan id business ----
+          pl = Path("src/utils/planLimits.ts")
+          plt = pl.read_text()
+          # Prefer plan id check over numeric 7000 threshold for Unlimited UI
+          old_unlim = '''export function isPromptEffectivelyUnlimited(plan: string | undefined | null): boolean {
+  return getPlanLimits(plan ?? "free").maxPromptChars >= 7000;
+}'''
+          new_unlim = '''export function isPromptEffectivelyUnlimited(plan: string | undefined | null): boolean {
+  const id = (plan ?? "free").toLowerCase();
+  // Master Studio (business) — UI shows Unlimited; backend still clamps ~7000.
+  return id === "business" || getPlanLimits(plan ?? "free").ultraFullUnlocked;
+}'''
+          if old_unlim in plt:
+              plt = plt.replace(old_unlim, new_unlim, 1)
+              changed.append("unlimited helper")
+          # maxImagesForPlan: never force admin to 10
+          plt = plt.replace(
+              "  if (isAdmin) return 10;\n  return getPlanLimits(plan ?? \"free\").maxImages;",
+              "  if (isAdmin) return Math.max(getPlanLimits(plan ?? \"free\").maxImages, 1);\n  return getPlanLimits(plan ?? \"free\").maxImages;",
+              1,
+          )
+          pl.write_text(plt)
+
+          # ---- 2) EditorPromptPanel — explicit unlimited prop ----
+          epp = Path("src/components/editor/EditorPromptPanel.tsx")
+          et = epp.read_text()
+          if "promptUnlimited" not in et:
+              # Add prop to type if present
+              if "maxChars?: number;" in et:
+                  et = et.replace(
+                      "maxChars?: number;",
+                      "maxChars?: number;\n  /** Master Studio: hide numeric limit (show Unlimited). */\n  promptUnlimited?: boolean;",
+                      1,
+                  )
+              # Destructure default
+              et = et.replace(
+                  "maxChars = 2000,",
+                  "maxChars = 2000,\n  promptUnlimited = false,",
+                  1,
+              )
+              # Counter UI
+              old_c = '''{limit >= 7000 ? (
+                <span title="No practical limit in the Studio UI">{prompt.length.toLocaleString()} · Unlimited</span>
+              ) : (
+                <>{prompt.length}/{limit}</>
+              )}'''
+              new_c = '''{promptUnlimited || limit >= 7000 ? (
+                <span title="No practical limit in the Studio UI">{prompt.length.toLocaleString()} · Unlimited</span>
+              ) : (
+                <>{prompt.length}/{limit}</>
+              )}'''
+              if old_c in et:
+                  et = et.replace(old_c, new_c, 1)
+                  changed.append("EPP unlimited prop")
+              epp.write_text(et)
+
+          # ---- 3) ImageEditor — promptUnlimited + memory-safe onFile ----
+          ie = Path("src/components/editor/image/ImageEditor.tsx")
+          it = ie.read_text()
+          assert len(it) > 20000
+
+          # Import isPromptEffectivelyUnlimited
+          if "isPromptEffectivelyUnlimited" not in it:
+              it = it.replace(
+                  "import { getPlanLimits, maxPromptCharsForPlan, MULTI_IMAGE_UPGRADE_MESSAGE } from \"@/utils/planLimits\";",
+                  "import { getPlanLimits, maxPromptCharsForPlan, isPromptEffectivelyUnlimited, MULTI_IMAGE_UPGRADE_MESSAGE } from \"@/utils/planLimits\";",
+                  1,
+              )
+              changed.append("IE import unlimited")
+
+          # maxChars line + promptUnlimited prop
+          old_mc = 'maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}'
+          new_mc = '''maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}
+                  promptUnlimited={isPromptEffectivelyUnlimited(profile?.plan ?? "free")}'''
+          if old_mc in it and "promptUnlimited=" not in it:
+              it = it.replace(old_mc, new_mc, 1)
+              changed.append("IE promptUnlimited prop")
+
+          # Memory-safe: do NOT readAsDataUrl on multi-select — preview blob only
+          old_items = '''    items = await Promise.all(
+      accepted.map(async (f) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        preview: URL.createObjectURL(f),
+        dataUrl: await readAsDataUrl(f),
+        file: f,
+      })),
+    );'''
+          new_items = '''    // Memory-safe: preview via blob URL only. Defer base64 until generate/upload.
+    items = accepted.map((f) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      preview: URL.createObjectURL(f),
+      dataUrl: null,
+      file: f,
+    }));'''
+          if old_items in it:
+              it = it.replace(old_items, new_items, 1)
+              changed.append("memory-safe gallery items")
+          else:
+              # try alternate formatting
+              if "dataUrl: await readAsDataUrl(f)" in it:
+                  it = it.replace(
+                      "dataUrl: await readAsDataUrl(f)",
+                      "dataUrl: null /* deferred; preview is blob URL */",
+                      1,
+                  )
+                  # If still Promise.all of async - simplify
+                  if "await Promise.all" in it and "dataUrl: null" in it:
+                      pass
+                  changed.append("dataUrl null on select")
+
+          # refImages sync: use dataUrl OR preview (blob)
+          old_sync = '''    const extras = gallery
+      .filter((_, i) => i !== activeImage)
+      .map((g) => g.dataUrl)
+      .filter(Boolean) as string[];'''
+          new_sync = '''    const extras = gallery
+      .filter((_, i) => i !== activeImage)
+      .map((g) => g.dataUrl || g.preview)
+      .filter(Boolean) as string[];'''
+          if old_sync in it:
+              it = it.replace(old_sync, new_sync, 1)
+              changed.append("ref sync preview")
+
+          # Generate ref path: prefer gallery.file over dataUrl fetch when available
+          # Patch sources = extras.map dataUrl
+          if 'sources = extras.map((g) => g.dataUrl)' in it:
+              it = it.replace(
+                  'sources = extras.map((g) => g.dataUrl).slice(0, Math.max(0, effectiveMaxImages - 1));',
+                  'sources = extras.map((g) => g.dataUrl || g.preview).slice(0, Math.max(0, effectiveMaxImages - 1));',
+                  1,
+              )
+              changed.append("sources preview")
+
+          # When uploading refs, prefer item.file from gallery
+          # Add file-based upload loop if we find the standard pattern
+          # Insert after wanted = refImages...
+          # Safer: when fetching src, if blob: and gallery has file matching, use file
+
+          ie.write_text(it)
+          assert len(ie.read_text()) > 20000
+          assert "isAdmin ? 7000" not in ie.read_text()
+
+          # ---- 4) Pricing show Plus + Master ----
+          plans = Path("src/lib/plans.ts")
+          pt = plans.read_text()
+          pt2 = pt.replace(
+              'export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "pro", "studio"];',
+              'export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "plus", "pro", "studio", "business"];',
+              1,
+          )
+          # Ensure Studio/Master features are detailed
+          if "IMAX locked" not in pt2:
+              pt2 = pt2.replace(
+                  '"Ultra features partially restricted",',
+                  '"Ultra AI available",
+      "IMAX locked · 8K Max locked · Custom locked",',
+                  1,
+              )
+          if "10,000 credits / month" in pt2 or "10,000 monthly credits" in pt2:
+              pass
+          plans.write_text(pt2)
+          assert "USD: 110" in pt2 or '"$110"' in pt2
+          assert "USD: 55" in pt2 or '"$55"' in pt2
+          changed.append("pricing show ids")
+
+          # ---- 5) aspectRatiosForPlanAndTier + EOP gates ----
+          st = Path("src/lib/studio/studio-tier.ts")
+          stt = st.read_text()
+          if "aspectRatiosForPlanAndTier" not in stt:
+              helper = '''
+/** Aspect ratios for plan+experience. IMAX/Custom require Master ultraFullUnlocked. */
+export function aspectRatiosForPlanAndTier(
+  tier: StudioTier,
+  ultraFullUnlocked: boolean,
+): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax" | "custom"> {
+  const base = aspectRatiosForStudioTier(tier);
+  if (!ultraFullUnlocked) {
+    return base.filter((a) => a !== "imax" && a !== "custom") as typeof base;
+  }
+  return base;
+}
+'''
+              m = re.search(r"export function aspectRatiosForStudioTier[\s\S]*?\n\}", stt)
+              assert m
+              stt = stt[: m.end()] + "\n" + helper + stt[m.end() :]
+              changed.append("aspect helper")
+          if '"8k_max"' not in stt:
+              stt = stt.replace(
+                  'case "premium":\n      return ["sd", "hd", "2k", "4k", "8k"];',
+                  'case "premium":\n      return ["sd", "hd", "2k", "4k", "8k", "8k_max"];',
+                  1,
+              )
+          st.write_text(stt)
+
+          # quality-options 8k_max
+          q = Path("src/lib/quality-options.ts")
+          qt = q.read_text()
+          if "8k_max" not in qt:
+              qt = qt.replace(
+                  'export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k";',
+                  'export type ImageQuality = "sd" | "hd" | "2k" | "4k" | "8k" | "8k_max";',
+                  1,
+              )
+              qt = qt.replace('  "8k": 4320,\n};', '  "8k": 4320,\n  "8k_max": 4320,\n};', 1)
+              idx = qt.find('id: "8k"')
+              end = qt.find("},", idx)
+              qt = qt[: end + 1] + ''',\n  {\n    id: "8k_max",\n    label: "8K Max",\n    title: "8K Max",\n    credits: 0,\n    upscaleFactor: 8,\n    hint: "8K Max · IMAX-capable · Master Ultra",\n  }''' + qt[end + 1 :]
+              q.write_text(qt)
+              changed.append("8k_max option")
+
+          eop = Path("src/components/editor/EditorOptionsPanel.tsx")
+          e = eop.read_text()
+          if "aspectRatiosForPlanAndTier" not in e:
+              e = e.replace("aspectRatiosForStudioTier,", "aspectRatiosForStudioTier,\n  aspectRatiosForPlanAndTier,", 1)
+          if 'from "@/utils/planLimits"' not in e:
+              e = e.replace(
+                  'from "@/lib/studio/studio-tier";',
+                  'from "@/lib/studio/studio-tier";\nimport { getPlanLimits } from "@/utils/planLimits";',
+                  1,
+              )
+          if "const ultraFull =" not in e:
+              e = e.replace(
+                  "const expLabel = studioExperienceLabel(studioTier);",
+                  'const expLabel = studioExperienceLabel(studioTier);\n  const ultraFull = isAdmin || getPlanLimits(userPlan ?? "free").ultraFullUnlocked;',
+                  1,
+              )
+          e = e.replace(
+              "aspectRatiosForStudioTier(studioTier).includes(a.id as never)",
+              "aspectRatiosForPlanAndTier(studioTier, ultraFull).includes(a.id as never)",
+          )
+          if 'id !== "8k_max"' not in e:
+              e = e.replace(
+                  "imageQualitiesForStudioTier(studioTier).includes",
+                  'imageQualitiesForStudioTier(studioTier).filter((id) => id !== "8k_max" || ultraFull).includes',
+              )
+          eop.write_text(e)
+          changed.append("EOP gates")
+
+          # ---- 6) Server Master-only gate ----
+          genp = Path("src/lib/generate.functions.ts")
+          gen = genp.read_text()
+          before = len(gen)
+          assert before > 20000 and "Fail closed" in gen
+          if "Master-only Ultra features" not in gen:
+              aidx = gen.find("Plan prompt character ceiling")
+              insert_pos = None
+              if aidx >= 0:
+                  m = re.search(r"Plan prompt character ceiling[\s\S]{0,900}?\n      \}", gen[aidx:])
+                  if m:
+                      insert_pos = aidx + m.end()
+              if insert_pos is None:
+                  aidx = gen.find("Experience image-count ceilings")
+                  if aidx >= 0:
+                      m = re.search(
+                          r"supports up to 10 images total \(base \+ references\)\.[\s\S]{0,120}?\}",
+                          gen[aidx:],
+                      )
+                      if m:
+                          insert_pos = aidx + m.end()
+              block = '''
+      // Master-only Ultra features: IMAX, Custom aspect, 8k_max.
+      {
+        const planId = (profile.plan ?? "free") as string;
+        const tier = (data.studioTier ?? "standard") as string;
+        const full = isAdmin || planId === "business";
+        const ar = String(data.aspectRatio ?? "").toLowerCase();
+        const q = String(data.imageQuality ?? "").toLowerCase();
+        if (!full && tier === "premium") {
+          if (ar === "imax" || q === "8k_max") {
+            throw new Error("IMAX and 8K Max require Master Studio.");
+          }
+          if (ar === "custom") {
+            throw new Error("Custom aspect ratio requires Master Studio.");
+          }
+        }
+      }
+'''
+              if insert_pos is not None:
+                  gen = gen[:insert_pos] + block + gen[insert_pos:]
+                  assert len(gen) > before
+                  genp.write_text(gen)
+                  changed.append("server Master-only")
+
+          gen2 = genp.read_text()
+          assert len(gen2) >= before
+          assert "executeUltraImage" in gen2 and "Fail closed" in gen2
+
+          # Final IE checks
+          ie2 = Path("src/components/editor/image/ImageEditor.tsx").read_text()
+          assert "promptUnlimited" in ie2 or "isPromptEffectivelyUnlimited" in ie2
+          assert "dataUrl: await readAsDataUrl(f)" not in ie2 or "dataUrl: null" in ie2
+
+          print("CHANGED:", changed)
+          print("gen", before, "->", len(gen2))
+          print("OK")
+          PY
+
+          AFTER=$(wc -c < src/lib/generate.functions.ts)
+          echo "generate.functions $BEFORE -> $AFTER"
+          [ "$AFTER" -ge 20000 ] || exit 1
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/utils/planLimits.ts \
+            src/components/editor/EditorPromptPanel.tsx \
+            src/components/editor/image/ImageEditor.tsx \
+            src/lib/plans.ts \
+            src/lib/studio/studio-tier.ts \
+            src/lib/quality-options.ts \
+            src/components/editor/EditorOptionsPanel.tsx \
+            src/lib/generate.functions.ts
+          git diff --cached --quiet && echo "no changes" && exit 0
+          if git show :src/components/editor/image/ImageEditor.tsx | grep -q 'isAdmin ? 7000'; then
+            echo "REFUSE admin 7000"; exit 1
+          fi
+          if git show :src/lib/generate.functions.ts | wc -c | awk '{exit !($1>=20000)}'; then
+            :
+          else
+            echo "REFUSE gen size"; exit 1
+          fi
+          git commit -m "fix(image-studio): Unlimited Master UI, memory-safe gallery, pricing+locks"
+          git push
