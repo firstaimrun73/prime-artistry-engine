@@ -1,0 +1,59 @@
+name: Apply Image Studio backend fix
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.restore/**'
+      - '.github/workflows/apply-image-studio-fix.yml'
+concurrency:
+  group: apply-image-studio-fix
+  cancel-in-progress: true
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reassemble fixed files
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import base64, json
+          from pathlib import Path
+          manifest = json.loads(Path(".restore/manifest.json").read_text())
+          for item in manifest["items"]:
+              prefix = item["prefix"]
+              parts = item["parts"]
+              path = item["path"]
+              b64 = ""
+              for i in range(parts):
+                  p = Path(f".restore/{prefix}.part{i}.b64")
+                  if not p.exists():
+                      raise SystemExit(f"missing {p}")
+                  b64 += p.read_text().strip()
+              data = base64.b64decode(b64)
+              Path(path).parent.mkdir(parents=True, exist_ok=True)
+              Path(path).write_bytes(data)
+              print(path, len(data))
+          PY
+          test -f src/lib/generate.functions.ts
+          test $(wc -c < src/lib/generate.functions.ts) -gt 20000
+          grep -q executePremiumImage src/lib/generate.functions.ts
+          grep -q executeUltraImage src/lib/generate.functions.ts
+          grep -q persistGenerationHistory src/lib/generate.functions.ts
+          ! grep -q PLACEHOLDER src/components/editor/image/ImageEditor.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts \
+            src/lib/studio/image/ultra/model.ts \
+            src/lib/studio/studio-tier.ts \
+            src/lib/quality-options.ts \
+            src/lib/prompt-suggestions.ts \
+            src/components/editor/EditorResult.tsx \
+            src/components/editor/EditorOptionsPanel.tsx \
+            src/components/editor/image/ImageEditor.tsx \
+            src/routes/_authenticated.history.tsx
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "fix(Image Studio): route Premium/Ultra to real executors; multi-ref; History generations; IMAX 1.43:1"
+          git push
