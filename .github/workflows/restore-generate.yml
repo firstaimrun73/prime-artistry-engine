@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - ".restore/generate.functions.ts.zlib.b64"
+      - ".restore/gen_zlib.*"
       - ".github/workflows/restore-generate.yml"
 jobs:
   restore:
@@ -12,13 +12,18 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Decompress and restore
+      - name: Concatenate zlib chunks, decompress, restore
         run: |
           set -euo pipefail
           python3 << 'PY'
           import base64, zlib
           from pathlib import Path
-          b64 = Path(".restore/generate.functions.ts.zlib.b64").read_text().strip()
+          parts = []
+          for i in range(4):
+              p = Path(f".restore/gen_zlib.part{i}.txt")
+              assert p.exists(), f"missing {p}"
+              parts.append(p.read_text().strip())
+          b64 = "".join(parts)
           data = zlib.decompress(base64.b64decode(b64))
           Path("src/lib/generate.functions.ts").write_bytes(data)
           print("wrote", len(data))
