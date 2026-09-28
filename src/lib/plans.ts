@@ -186,7 +186,8 @@ export const PLANS: Plan[] = [
       "5,000 credits / month",
       "Standard + Premium + Ultra AI",
       "Prompt: 6,000 characters",
-      "Ultra features partially restricted",
+      "Ultra AI available",
+      "IMAX locked · 8K Max locked · Custom locked",
       "≈ 200 images or ≈ 40 videos",
       "4K video · full music studio",
       "Fastest queue · commercial license",
@@ -223,7 +224,7 @@ export const PLANS: Plan[] = [
 ];
 
 /** Plans shown on the public pricing page (backend ids preserved for subscribers). */
-export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "pro", "studio"];
+export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "plus", "pro", "studio", "business"];
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
   free: 40,
