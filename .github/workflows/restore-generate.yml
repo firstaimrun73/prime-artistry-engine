@@ -3,8 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - ".restore/genfix.*"
-      - ".restore/manifest.json"
+      - ".restore/gen_txt.*"
       - ".github/workflows/restore-generate.yml"
 jobs:
   restore:
@@ -13,27 +12,26 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Reassemble generate.functions.ts
+      - name: Concatenate and restore generate.functions.ts
         run: |
           set -euo pipefail
-          python3 << 'PY'
-          import base64, json
-          from pathlib import Path
-          m = json.loads(Path(".restore/manifest.json").read_text())
-          item = m["items"][0]
-          b64 = "".join(Path(f".restore/{item['prefix']}.part{i}.b64").read_text().strip() for i in range(item["parts"]))
-          data = base64.b64decode(b64)
-          Path("src/lib/generate.functions.ts").write_bytes(data)
-          print("wrote", len(data))
-          assert len(data) > 20000
-          text = data.decode()
-          assert "PLACEHOLDER" not in text
-          assert "executePremiumImage" in text
-          assert "executeUltraImage" in text
-          assert "persistGenerationHistory" in text
-          assert "finalizeMediaAsset" in text
-          assert "Multiple reference images require" in text
-          PY
+          N=12
+          OUT=src/lib/generate.functions.ts
+          : > "$OUT"
+          for i in $(seq 0 $((N-1))); do
+            f=".restore/gen_txt.part${i}.txt"
+            test -f "$f" || { echo "missing $f"; exit 1; }
+            cat "$f" >> "$OUT"
+          done
+          BYTES=$(wc -c < "$OUT")
+          echo "wrote $BYTES bytes"
+          test "$BYTES" -gt 20000
+          ! grep -q PLACEHOLDER "$OUT"
+          grep -q executePremiumImage "$OUT"
+          grep -q executeUltraImage "$OUT"
+          grep -q persistGenerationHistory "$OUT"
+          grep -q finalizeMediaAsset "$OUT"
+          grep -q "Multiple reference images require" "$OUT"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/generate.functions.ts
