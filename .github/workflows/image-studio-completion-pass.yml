@@ -1,0 +1,46 @@
+name: Image Studio Completion Pass
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/image-studio-completion-pass.py"
+      - ".github/workflows/image-studio-completion-pass.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply surgical completion pass
+        run: |
+          set -euo pipefail
+          python3 scripts/image-studio-completion-pass.py
+          # Safety gate
+          GEN_SIZE=$(wc -c < src/lib/generate.functions.ts)
+          if [ "$GEN_SIZE" -lt 20000 ]; then
+            echo "REFUSE: generate.functions.ts too small ($GEN_SIZE)"
+            exit 1
+          fi
+          if grep -q 'PLACEHOLDER' src/lib/generate.functions.ts && [ "$GEN_SIZE" -lt 10000 ]; then
+            echo "REFUSE: placeholder detect"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/components/editor/image/ImageStudioWeeklyCarousel.tsx \
+            src/lib/studio/studio-tier.ts \
+            src/lib/prompt-suggestions.ts \
+            src/components/editor/EditorOptionsPanel.tsx \
+            src/components/editor/image/ImageEditor.tsx \
+            src/components/editor/EditorPromptPanel.tsx \
+            src/lib/studio/image/ultra/validation.ts
+          # Never stage generate.functions
+          if git diff --cached --name-only | grep -q 'generate.functions'; then
+            echo "REFUSE: generate.functions staged"
+            exit 1
+          fi
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "feat(image-studio): IMAX+Custom aspects, Try rotation, carousel title"
+          git push
