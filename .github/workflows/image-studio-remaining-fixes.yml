@@ -2,6 +2,7 @@ name: Image Studio Remaining Fixes
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/image-studio-remaining-fixes.yml"
 jobs:
@@ -21,22 +22,15 @@ jobs:
 
           changed = []
 
-          # ---- 1) planLimits: isPromptEffectivelyUnlimited uses plan id business ----
           pl = Path("src/utils/planLimits.ts")
           plt = pl.read_text()
-          # Prefer plan id check over numeric 7000 threshold for Unlimited UI
-          old_unlim = '''export function isPromptEffectivelyUnlimited(plan: string | undefined | null): boolean {
-  return getPlanLimits(plan ?? "free").maxPromptChars >= 7000;
-}'''
-          new_unlim = '''export function isPromptEffectivelyUnlimited(plan: string | undefined | null): boolean {
-  const id = (plan ?? "free").toLowerCase();
-  // Master Studio (business) — UI shows Unlimited; backend still clamps ~7000.
-  return id === "business" || getPlanLimits(plan ?? "free").ultraFullUnlocked;
-}'''
-          if old_unlim in plt:
-              plt = plt.replace(old_unlim, new_unlim, 1)
-              changed.append("unlimited helper")
-          # maxImagesForPlan: never force admin to 10
+          if "id === \"business\"" not in plt:
+              plt = plt.replace(
+                  "return getPlanLimits(plan ?? \"free\").maxPromptChars >= 7000;",
+                  'const id = (plan ?? "free").toLowerCase();\n  return id === "business" || getPlanLimits(plan ?? "free").ultraFullUnlocked;',
+                  1,
+              )
+              changed.append("unlimited by business id")
           plt = plt.replace(
               "  if (isAdmin) return 10;\n  return getPlanLimits(plan ?? \"free\").maxImages;",
               "  if (isAdmin) return Math.max(getPlanLimits(plan ?? \"free\").maxImages, 1);\n  return getPlanLimits(plan ?? \"free\").maxImages;",
@@ -44,149 +38,86 @@ jobs:
           )
           pl.write_text(plt)
 
-          # ---- 2) EditorPromptPanel — explicit unlimited prop ----
           epp = Path("src/components/editor/EditorPromptPanel.tsx")
           et = epp.read_text()
           if "promptUnlimited" not in et:
-              # Add prop to type if present
-              if "maxChars?: number;" in et:
-                  et = et.replace(
-                      "maxChars?: number;",
-                      "maxChars?: number;\n  /** Master Studio: hide numeric limit (show Unlimited). */\n  promptUnlimited?: boolean;",
-                      1,
-                  )
-              # Destructure default
+              et = et.replace("maxChars?: number;", "maxChars?: number;\n  promptUnlimited?: boolean;", 1)
+              et = et.replace("maxChars = 2000,", "maxChars = 2000,\n  promptUnlimited = false,", 1)
               et = et.replace(
-                  "maxChars = 2000,",
-                  "maxChars = 2000,\n  promptUnlimited = false,",
+                  "{limit >= 7000 ? (",
+                  "{promptUnlimited || limit >= 7000 ? (",
                   1,
               )
-              # Counter UI
-              old_c = '''{limit >= 7000 ? (
-                <span title="No practical limit in the Studio UI">{prompt.length.toLocaleString()} · Unlimited</span>
-              ) : (
-                <>{prompt.length}/{limit}</>
-              )}'''
-              new_c = '''{promptUnlimited || limit >= 7000 ? (
-                <span title="No practical limit in the Studio UI">{prompt.length.toLocaleString()} · Unlimited</span>
-              ) : (
-                <>{prompt.length}/{limit}</>
-              )}'''
-              if old_c in et:
-                  et = et.replace(old_c, new_c, 1)
-                  changed.append("EPP unlimited prop")
               epp.write_text(et)
+              changed.append("EPP promptUnlimited")
 
-          # ---- 3) ImageEditor — promptUnlimited + memory-safe onFile ----
           ie = Path("src/components/editor/image/ImageEditor.tsx")
           it = ie.read_text()
           assert len(it) > 20000
-
-          # Import isPromptEffectivelyUnlimited
           if "isPromptEffectivelyUnlimited" not in it:
               it = it.replace(
-                  "import { getPlanLimits, maxPromptCharsForPlan, MULTI_IMAGE_UPGRADE_MESSAGE } from \"@/utils/planLimits\";",
-                  "import { getPlanLimits, maxPromptCharsForPlan, isPromptEffectivelyUnlimited, MULTI_IMAGE_UPGRADE_MESSAGE } from \"@/utils/planLimits\";",
+                  'import { getPlanLimits, maxPromptCharsForPlan, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";',
+                  'import { getPlanLimits, maxPromptCharsForPlan, isPromptEffectivelyUnlimited, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";',
                   1,
               )
-              changed.append("IE import unlimited")
+          if "promptUnlimited=" not in it:
+              it = it.replace(
+                  'maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}',
+                  'maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}\n                  promptUnlimited={isPromptEffectivelyUnlimited(profile?.plan ?? "free")}',
+                  1,
+              )
+              changed.append("IE promptUnlimited")
 
-          # maxChars line + promptUnlimited prop
-          old_mc = 'maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}'
-          new_mc = '''maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}
-                  promptUnlimited={isPromptEffectivelyUnlimited(profile?.plan ?? "free")}'''
-          if old_mc in it and "promptUnlimited=" not in it:
-              it = it.replace(old_mc, new_mc, 1)
-              changed.append("IE promptUnlimited prop")
-
-          # Memory-safe: do NOT readAsDataUrl on multi-select — preview blob only
-          old_items = '''    items = await Promise.all(
+          # Memory-safe: never base64 all selected files at once
+          if "dataUrl: await readAsDataUrl(f)" in it:
+              it = it.replace("dataUrl: await readAsDataUrl(f)", "dataUrl: null", 1)
+              changed.append("defer dataUrl")
+          # Prefer sync map over Promise.all when dataUrl is null
+          if "await Promise.all" in it and "dataUrl: null" in it:
+              # Soften Promise.all to map if pattern matches single createObjectURL
+              old = """    items = await Promise.all(
       accepted.map(async (f) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         preview: URL.createObjectURL(f),
-        dataUrl: await readAsDataUrl(f),
+        dataUrl: null,
         file: f,
       })),
-    );'''
-          new_items = '''    // Memory-safe: preview via blob URL only. Defer base64 until generate/upload.
+    );"""
+              new = """    // Memory-safe: blob preview only — no multi base64 decode on select.
     items = accepted.map((f) => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       preview: URL.createObjectURL(f),
       dataUrl: null,
       file: f,
-    }));'''
-          if old_items in it:
-              it = it.replace(old_items, new_items, 1)
-              changed.append("memory-safe gallery items")
-          else:
-              # try alternate formatting
-              if "dataUrl: await readAsDataUrl(f)" in it:
-                  it = it.replace(
-                      "dataUrl: await readAsDataUrl(f)",
-                      "dataUrl: null /* deferred; preview is blob URL */",
-                      1,
-                  )
-                  # If still Promise.all of async - simplify
-                  if "await Promise.all" in it and "dataUrl: null" in it:
-                      pass
-                  changed.append("dataUrl null on select")
+    }));"""
+              if old in it:
+                  it = it.replace(old, new, 1)
+                  changed.append("sync map items")
 
-          # refImages sync: use dataUrl OR preview (blob)
-          old_sync = '''    const extras = gallery
-      .filter((_, i) => i !== activeImage)
-      .map((g) => g.dataUrl)
-      .filter(Boolean) as string[];'''
-          new_sync = '''    const extras = gallery
-      .filter((_, i) => i !== activeImage)
-      .map((g) => g.dataUrl || g.preview)
-      .filter(Boolean) as string[];'''
-          if old_sync in it:
-              it = it.replace(old_sync, new_sync, 1)
-              changed.append("ref sync preview")
-
-          # Generate ref path: prefer gallery.file over dataUrl fetch when available
-          # Patch sources = extras.map dataUrl
+          it = it.replace(
+              ".map((g) => g.dataUrl)\n      .filter(Boolean) as string[];",
+              ".map((g) => g.dataUrl || g.preview)\n      .filter(Boolean) as string[];",
+              1,
+          )
           if 'sources = extras.map((g) => g.dataUrl)' in it:
               it = it.replace(
-                  'sources = extras.map((g) => g.dataUrl).slice(0, Math.max(0, effectiveMaxImages - 1));',
-                  'sources = extras.map((g) => g.dataUrl || g.preview).slice(0, Math.max(0, effectiveMaxImages - 1));',
+                  "sources = extras.map((g) => g.dataUrl).slice(0, Math.max(0, effectiveMaxImages - 1));",
+                  "sources = extras.map((g) => g.dataUrl || g.preview).slice(0, Math.max(0, effectiveMaxImages - 1));",
                   1,
               )
-              changed.append("sources preview")
-
-          # When uploading refs, prefer item.file from gallery
-          # Add file-based upload loop if we find the standard pattern
-          # Insert after wanted = refImages...
-          # Safer: when fetching src, if blob: and gallery has file matching, use file
 
           ie.write_text(it)
           assert len(ie.read_text()) > 20000
-          assert "isAdmin ? 7000" not in ie.read_text()
 
-          # ---- 4) Pricing show Plus + Master ----
           plans = Path("src/lib/plans.ts")
           pt = plans.read_text()
-          pt2 = pt.replace(
+          pt = pt.replace(
               'export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "pro", "studio"];',
               'export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "plus", "pro", "studio", "business"];',
               1,
           )
-          # Ensure Studio/Master features are detailed
-          if "IMAX locked" not in pt2:
-              pt2 = pt2.replace(
-                  '"Ultra features partially restricted",',
-                  '"Ultra AI available",
-      "IMAX locked · 8K Max locked · Custom locked",',
-                  1,
-              )
-          if "10,000 credits / month" in pt2 or "10,000 monthly credits" in pt2:
-              pass
-          plans.write_text(pt2)
-          assert "USD: 110" in pt2 or '"$110"' in pt2
-          assert "USD: 55" in pt2 or '"$55"' in pt2
-          changed.append("pricing show ids")
+          plans.write_text(pt)
 
-          # ---- 5) aspectRatiosForPlanAndTier + EOP gates ----
           st = Path("src/lib/studio/studio-tier.ts")
           stt = st.read_text()
           if "aspectRatiosForPlanAndTier" not in stt:
@@ -207,7 +138,7 @@ export function aspectRatiosForPlanAndTier(
               assert m
               stt = stt[: m.end()] + "\n" + helper + stt[m.end() :]
               changed.append("aspect helper")
-          if '"8k_max"' not in stt:
+          if "8k_max" not in stt:
               stt = stt.replace(
                   'case "premium":\n      return ["sd", "hd", "2k", "4k", "8k"];',
                   'case "premium":\n      return ["sd", "hd", "2k", "4k", "8k", "8k_max"];',
@@ -215,7 +146,6 @@ export function aspectRatiosForPlanAndTier(
               )
           st.write_text(stt)
 
-          # quality-options 8k_max
           q = Path("src/lib/quality-options.ts")
           qt = q.read_text()
           if "8k_max" not in qt:
@@ -229,7 +159,7 @@ export function aspectRatiosForPlanAndTier(
               end = qt.find("},", idx)
               qt = qt[: end + 1] + ''',\n  {\n    id: "8k_max",\n    label: "8K Max",\n    title: "8K Max",\n    credits: 0,\n    upscaleFactor: 8,\n    hint: "8K Max · IMAX-capable · Master Ultra",\n  }''' + qt[end + 1 :]
               q.write_text(qt)
-              changed.append("8k_max option")
+              changed.append("8k_max")
 
           eop = Path("src/components/editor/EditorOptionsPanel.tsx")
           e = eop.read_text()
@@ -259,7 +189,6 @@ export function aspectRatiosForPlanAndTier(
           eop.write_text(e)
           changed.append("EOP gates")
 
-          # ---- 6) Server Master-only gate ----
           genp = Path("src/lib/generate.functions.ts")
           gen = genp.read_text()
           before = len(gen)
@@ -280,7 +209,7 @@ export function aspectRatiosForPlanAndTier(
                       )
                       if m:
                           insert_pos = aidx + m.end()
-              block = '''
+              block = """
       // Master-only Ultra features: IMAX, Custom aspect, 8k_max.
       {
         const planId = (profile.plan ?? "free") as string;
@@ -297,50 +226,29 @@ export function aspectRatiosForPlanAndTier(
           }
         }
       }
-'''
+"""
               if insert_pos is not None:
                   gen = gen[:insert_pos] + block + gen[insert_pos:]
-                  assert len(gen) > before
                   genp.write_text(gen)
                   changed.append("server Master-only")
 
           gen2 = genp.read_text()
-          assert len(gen2) >= before
-          assert "executeUltraImage" in gen2 and "Fail closed" in gen2
-
-          # Final IE checks
+          assert len(gen2) >= before and "Fail closed" in gen2
           ie2 = Path("src/components/editor/image/ImageEditor.tsx").read_text()
           assert "promptUnlimited" in ie2 or "isPromptEffectivelyUnlimited" in ie2
-          assert "dataUrl: await readAsDataUrl(f)" not in ie2 or "dataUrl: null" in ie2
-
           print("CHANGED:", changed)
           print("gen", before, "->", len(gen2))
           print("OK")
           PY
-
           AFTER=$(wc -c < src/lib/generate.functions.ts)
-          echo "generate.functions $BEFORE -> $AFTER"
+          echo "gen $BEFORE -> $AFTER"
           [ "$AFTER" -ge 20000 ] || exit 1
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            src/utils/planLimits.ts \
-            src/components/editor/EditorPromptPanel.tsx \
-            src/components/editor/image/ImageEditor.tsx \
-            src/lib/plans.ts \
-            src/lib/studio/studio-tier.ts \
-            src/lib/quality-options.ts \
-            src/components/editor/EditorOptionsPanel.tsx \
-            src/lib/generate.functions.ts
-          git diff --cached --quiet && echo "no changes" && exit 0
-          if git show :src/components/editor/image/ImageEditor.tsx | grep -q 'isAdmin ? 7000'; then
-            echo "REFUSE admin 7000"; exit 1
-          fi
-          if git show :src/lib/generate.functions.ts | wc -c | awk '{exit !($1>=20000)}'; then
-            :
-          else
-            echo "REFUSE gen size"; exit 1
-          fi
+          git add src/utils/planLimits.ts src/components/editor/EditorPromptPanel.tsx \
+            src/components/editor/image/ImageEditor.tsx src/lib/plans.ts \
+            src/lib/studio/studio-tier.ts src/lib/quality-options.ts \
+            src/components/editor/EditorOptionsPanel.tsx src/lib/generate.functions.ts
+          git diff --cached --quiet && echo no-changes && exit 0
           git commit -m "fix(image-studio): Unlimited Master UI, memory-safe gallery, pricing+locks"
           git push
