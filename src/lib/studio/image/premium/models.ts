@@ -18,15 +18,26 @@ export type PremiumModelId = (typeof PREMIUM_MODELS)[keyof typeof PREMIUM_MODELS
 
 export type PremiumQuality = "sd" | "hd" | "2k";
 
+/** 21:9 ultra-wide custom dims by quality (NOT IMAX). */
+function premium21x9Size(quality: PremiumQuality): { width: number; height: number } {
+  // Keep long side in line with other presets; height = width * 9/21
+  if (quality === "2k") return { width: 1920, height: 823 };
+  if (quality === "hd") return { width: 1344, height: 576 };
+  return { width: 768, height: 329 };
+}
+
 /**
  * image_size for Flux 2 Pro T2I.
- * SD \~0.25 MP, HD \~1 MP, 2K \~2 MP — via documented presets only.
+ * SD ~0.25 MP, HD ~1 MP, 2K ~2 MP — via documented presets, or custom for 21:9.
  */
 export function premiumFlux2ProImageSize(
   quality: PremiumQuality,
   aspect?: string | null,
-): string {
+): string | { width: number; height: number } {
   const ar = aspect ?? "1:1";
+  if (ar === "21:9") {
+    return premium21x9Size(quality);
+  }
   if (quality === "2k") {
     switch (ar) {
       case "16:9":
