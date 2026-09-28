@@ -266,6 +266,28 @@ export const generateMedia = createServerFn({ method: "POST" })
         if ((tier === "pro" || tier === "premium") && total > 10) {
           throw new Error("This experience supports up to 10 images total (base + references).");
         }
+      // Plan prompt character ceiling (server authoritative).
+      {
+        const planId = (profile.plan ?? "free") as string;
+        const promptLen = typeof data.prompt === "string" ? data.prompt.length : 0;
+        const planCeil =
+          planId === "business"
+            ? 7000
+            : planId === "pro" || planId === "studio"
+              ? 6000
+              : planId === "plus"
+                ? 4000
+                : 2000;
+        const ceil = isAdmin ? Math.max(planCeil, 7000) : planCeil;
+        if (promptLen > ceil) {
+          throw new Error(
+            planId === "business" || isAdmin
+              ? "Prompt exceeds the safe maximum length."
+              : `Prompt is too long for your plan (max ${planCeil} characters).`,
+          );
+        }
+      }
+
       }
 
     }

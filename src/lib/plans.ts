@@ -124,6 +124,9 @@ export const PLANS: Plan[] = [
     price: { USD: 4.99, EUR: 4.49, INR: 399 },
     features: [
       "350 credits / month",
+      "Standard Image Studio",
+      "Up to 5 reference images",
+      "Prompt: 2,000 characters",
       "≈ 14 image edits or ≈ 2–3 videos",
       "720p video · music included",
       "Circle 2edit · no watermark",
@@ -140,6 +143,9 @@ export const PLANS: Plan[] = [
     price: { USD: 9.99, EUR: 8.99, INR: 849 },
     features: [
       "750 monthly credits",
+      "Standard Image Studio",
+      "Up to 10 reference images",
+      "Prompt: 4,000 characters",
       "HD AI image generation",
       "720p AI video generation",
       "Music generation included",
@@ -158,6 +164,9 @@ export const PLANS: Plan[] = [
     price: { USD: 29.99, EUR: 27.99, INR: 2499 },
     features: [
       "2,500 credits / month",
+      "Standard + Premium Image Studio",
+      "Up to 10 Premium references",
+      "Prompt: 6,000 characters",
       "≈ 100 images or ≈ 20 videos",
       "1080p video · music included",
       "Priority queue · no watermark",
@@ -175,6 +184,9 @@ export const PLANS: Plan[] = [
     price: { USD: 49.99, EUR: 45.99, INR: 4199 },
     features: [
       "5,000 credits / month",
+      "Standard + Premium + Ultra AI",
+      "Prompt: 6,000 characters",
+      "Ultra features partially restricted",
       "≈ 200 images or ≈ 40 videos",
       "4K video · full music studio",
       "Fastest queue · commercial license",
@@ -192,6 +204,9 @@ export const PLANS: Plan[] = [
     price: { USD: 99, EUR: 89.99, INR: 8299 },
     features: [
       "10,000 monthly credits",
+      "Standard + Premium + Ultra AI",
+      "Prompt: Unlimited*",
+      "IMAX, 8K Max, Custom aspects",
       "Advanced Image, Video and Music studios",
       "Latest AI features and editor improvements",
       "Upcoming AI feature updates",

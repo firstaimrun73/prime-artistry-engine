@@ -287,7 +287,13 @@ export function EditorPromptPanel({
             <span className="inline-flex min-w-0 items-center gap-1 text-primary/90">
               <Wand2 className="h-3 w-3 shrink-0" /><span className="truncate">Auto-enhanced</span>
             </span>
-            <span className="shrink-0 tabular-nums">{prompt.length}/{limit}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {limit >= 7000 ? (
+                <span title="No practical limit in the Studio UI">{prompt.length.toLocaleString()} · Unlimited</span>
+              ) : (
+                <>{prompt.length}/{limit}</>
+              )}
+            </span>
           </div>
         </div>
 

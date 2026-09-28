@@ -98,9 +98,15 @@ export function maxImagesForPlan(plan: string | undefined | null, isAdmin = fals
   return getPlanLimits(plan ?? "free").maxImages;
 }
 
-export function maxPromptCharsForPlan(plan: string | undefined | null, isAdmin = false): number {
-  if (isAdmin) return 7000;
+/** UI + client clamp. Uses effective plan — admin does not force 7000. */
+export function maxPromptCharsForPlan(plan: string | undefined | null, _isAdmin = false): number {
+  void _isAdmin;
   return getPlanLimits(plan ?? "free").maxPromptChars;
+}
+
+/** True when UI should hide a numeric character limit (Master Studio). */
+export function isPromptEffectivelyUnlimited(plan: string | undefined | null): boolean {
+  return getPlanLimits(plan ?? "free").maxPromptChars >= 7000;
 }
 
 export const MULTI_IMAGE_UPGRADE_MESSAGE =

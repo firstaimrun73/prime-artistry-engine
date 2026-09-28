@@ -134,11 +134,15 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const isUltraExp = studioTier === "premium";
 
   const experienceMax = maxImagesForStudioTier(studioTier);
-  const effectiveMaxImages = isAdmin
-    ? Math.max(experienceMax, 10)
-    : isFree
-      ? 1
-      : Math.min(getPlanLimits(profile?.plan ?? "free").maxImages, experienceMax);
+  // Experience ceiling is hard (Standard multi = 5 total). Admin may bypass plan locks
+  // but must never exceed the experience/provider contract — that caused page crashes.
+  const planMaxImages = isFree
+    ? 1
+    : getPlanLimits(profile?.plan ?? "free").maxImages;
+  const effectiveMaxImages = Math.min(
+    isAdmin ? Math.max(planMaxImages, experienceMax) : planMaxImages,
+    experienceMax,
+  );
 
   // Keep gallery within the active experience + plan ceiling (prevents Standard 5-cap overflow crash).
   useEffect(() => {
@@ -370,11 +374,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // onFile safe wrapper — never let selection errors reach the route error boundary
+    try {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     e.target.value = "";
 
-    const maxAllowed = effectiveMaxImages;
+    const maxAllowed = Math.max(1, effectiveMaxImages);
     const room = Math.min(MAX_GALLERY_IMAGES, maxAllowed) - gallery.length;
     if (room <= 0) {
       if (isFree) {
@@ -382,7 +388,14 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } },
         });
       }
-      return toast.error(`This experience allows up to ${maxAllowed} images at a time.`);
+      return toast.error(
+        maxAllowed <= 5
+          ? `Standard supports up to ${maxAllowed} images (base + references).`
+          : `This experience allows up to ${maxAllowed} images at a time.`,
+      );
+    }
+    if (files.length > room) {
+      toast.message(`Only ${room} more image${room === 1 ? "" : "s"} can be added (max ${maxAllowed}).`);
     }
     if (isFree && files.length > 1) {
       toast.message("Free plan: only 1 image. Extra files were ignored.");
@@ -425,6 +438,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     activateSlot(next, gallery.length);
     toast.success(items.length > 1 ? `${items.length} images uploaded` : "Upload complete");
   };
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not add images. Try fewer or smaller files.");
+    }
 
   const runImageJob = async (opts: {
     jobPrompt: string;
@@ -958,7 +976,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   onSelectTool={handleSelectTool}
                   studioTier={studioTier}
                   referenceCount={refImages.length}
-                  maxChars={isAdmin ? 7000 : maxPromptCharsForPlan(profile?.plan ?? "free")}
+                  maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}
                   contextTags={contextTags}
                   onToggleTag={(id) => {
                     setContextTags((prev) =>
