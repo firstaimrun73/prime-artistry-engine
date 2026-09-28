@@ -8,6 +8,8 @@
  *   - no fake duration scaling on flat-billed models
  *
  * Credit value: 1 credit ≈ $0.01143 customer value ($4 / 350).
+ *
+ * Product target: main music generations ~50–100 credits (frontend-aligned).
  */
 
 import {
@@ -44,15 +46,15 @@ export type MusicPriceResult = {
   };
 };
 
-/** Product floors so Studio does not feel arbitrarily cheap vs image (25 cr). */
+/** Floors aligned to frontend 50–100 cr band for core music. */
 const FLOOR = {
-  song_standard: 35,
-  song_premium: 75,
-  instrumental_standard: 35,
-  instrumental_premium: 75,
-  sfx: 15,
-  video_music: 20,
-  voiceover: 20,
+  song_standard: 50,
+  song_premium: 100,
+  instrumental_standard: 50,
+  instrumental_premium: 100,
+  sfx: 25,
+  video_music: 40,
+  voiceover: 30,
   image_analysis: 15,
 } as const;
 
