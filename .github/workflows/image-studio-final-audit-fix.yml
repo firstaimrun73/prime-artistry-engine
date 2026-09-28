@@ -1,0 +1,59 @@
+name: Image Studio Final Audit Fix
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/image-studio-final-audit-fix.py"
+      - ".github/workflows/image-studio-final-audit-fix.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply surgical fixes
+        run: |
+          set -euo pipefail
+          BEFORE=$(wc -c < src/lib/generate.functions.ts)
+          python3 scripts/image-studio-final-audit-fix.py
+          AFTER=$(wc -c < src/lib/generate.functions.ts)
+          echo "generate.functions: $BEFORE -> $AFTER"
+          if [ "$AFTER" -lt 20000 ]; then
+            echo "REFUSE: generate.functions too small"
+            exit 1
+          fi
+          if [ "$AFTER" -lt "$BEFORE" ]; then
+            echo "REFUSE: generate.functions shrank"
+            exit 1
+          fi
+          if grep -qE 'PLACEHOLDER|TODO generation|mock output' src/lib/generate.functions.ts; then
+            if [ "$AFTER" -lt 10000 ]; then
+              echo "REFUSE: placeholder"
+              exit 1
+            fi
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/components/StudioBackLink.tsx \
+            src/components/editor/image/ImageEditor.tsx \
+            src/utils/planLimits.ts \
+            src/lib/generate.functions.ts \
+            src/components/editor/image/ImageStudioWeeklyCarousel.tsx
+          git diff --cached --quiet && echo "no changes" && exit 0
+          # refuse if any staged file is tiny
+          for f in $(git diff --cached --name-only); do
+            sz=$(wc -c < "$f")
+            echo "staged $f $sz"
+            case "$f" in
+              *generate.functions.ts)
+                if [ "$sz" -lt 20000 ]; then echo "REFUSE tiny generate"; exit 1; fi
+                ;;
+              *ImageEditor.tsx)
+                if [ "$sz" -lt 15000 ]; then echo "REFUSE tiny ImageEditor"; exit 1; fi
+                ;;
+            esac
+          done
+          git commit -m "fix(image-studio): glass back button, ref-limit harden, plan matrix"
+          git push
