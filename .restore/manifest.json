@@ -1,7 +1,7 @@
 [
   {
     "prefix": "image_editor",
-    "parts": 8,
+    "parts": 11,
     "path": "src/components/editor/image/ImageEditor.tsx"
   }
 ]
