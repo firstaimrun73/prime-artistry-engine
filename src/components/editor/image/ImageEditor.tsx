@@ -19,7 +19,7 @@ import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveM
 import { isAdminEmail } from "@/lib/admin-config";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
-import { getPlanLimits, maxPromptCharsForPlan, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
+import { getPlanLimits, maxPromptCharsForPlan, isPromptEffectivelyUnlimited, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
 import { toast } from "sonner";
@@ -161,7 +161,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     }
     const extras = gallery
       .filter((_, i) => i !== activeImage)
-      .map((g) => g.dataUrl)
+      .map((g) => g.dataUrl || g.preview)
       .filter(Boolean) as string[];
     const same =
       extras.length === refImages.length && extras.every((u, i) => u === refImages[i]);
@@ -419,14 +419,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
         let items: GalleryItem[] = [];
     try {
-    items = await Promise.all(
-      accepted.map(async (f) => ({
+    items = (
+      accepted.map((f) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         preview: URL.createObjectURL(f),
-        dataUrl: await readAsDataUrl(f),
+        dataUrl: null,
         file: f,
-      })),
-    );
+      }));
     } catch {
       toast.error("Could not read one or more images. Try fewer or smaller files.");
       return;
@@ -519,7 +518,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       let referenceImageUrls: string[] | undefined;
       const extras = gallery.filter((_, i) => i !== activeImage);
       if (!maskImageUrl && effectiveMaxImages > 1 && extras.length > 0) {
-        const sources = extras.map((g) => g.dataUrl).slice(0, Math.max(0, effectiveMaxImages - 1));
+        const sources = extras.map((g) => g.dataUrl || g.preview).slice(0, Math.max(0, effectiveMaxImages - 1));
         toast(`Uploading ${sources.length} reference image${sources.length > 1 ? "s" : ""}…`);
         const uploaded: string[] = [];
         for (const src of sources) {
@@ -977,6 +976,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   studioTier={studioTier}
                   referenceCount={refImages.length}
                   maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}
+                  promptUnlimited={isPromptEffectivelyUnlimited(profile?.plan ?? "free")}
                   contextTags={contextTags}
                   onToggleTag={(id) => {
                     setContextTags((prev) =>

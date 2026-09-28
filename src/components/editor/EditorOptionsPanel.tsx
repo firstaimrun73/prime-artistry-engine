@@ -23,9 +23,11 @@ import {
 import {
   imageQualitiesForStudioTier,
   aspectRatiosForStudioTier,
+  aspectRatiosForPlanAndTier,
   studioExperienceLabel,
   type StudioTier,
 } from "@/lib/studio/studio-tier";
+import { getPlanLimits } from "@/utils/planLimits";
 import {
   Popover,
   PopoverContent,
@@ -114,6 +116,7 @@ export function EditorOptionsPanel({
 }: EditorOptionsPanelProps) {
   const [costOpen, setCostOpen] = useState(false);
   const expLabel = studioExperienceLabel(studioTier);
+  const ultraFull = isAdmin || getPlanLimits(userPlan ?? "free").ultraFullUnlocked;
   const qualityLabel =
     IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.label ?? imageQuality.toUpperCase();
 
@@ -130,7 +133,7 @@ export function EditorOptionsPanel({
           <p className="text-[11px] font-medium text-muted-foreground">Aspect ratio</p>
           <div className="flex flex-wrap gap-2">
             {ASPECT_RATIOS.filter((a) =>
-              aspectRatiosForStudioTier(studioTier).includes(a.id as never),
+              aspectRatiosForPlanAndTier(studioTier, ultraFull).includes(a.id as never),
             ).map((a) => {
               const active = aspectRatio === a.id;
               return (
@@ -160,7 +163,7 @@ export function EditorOptionsPanel({
           <p className="text-[11px] font-medium text-muted-foreground">Aspect ratio</p>
           <div className="flex flex-wrap gap-2">
             {ASPECT_RATIOS.filter((a) =>
-              aspectRatiosForStudioTier(studioTier).includes(a.id as never),
+              aspectRatiosForPlanAndTier(studioTier, ultraFull).includes(a.id as never),
             ).map((a) => {
               const active = aspectRatio === a.id;
               return (
@@ -190,7 +193,7 @@ export function EditorOptionsPanel({
           <p className="text-[11px] font-medium text-muted-foreground">Quality</p>
           <div className="flex flex-wrap gap-2">
             {IMAGE_QUALITY_OPTIONS.filter((q) =>
-              imageQualitiesForStudioTier(studioTier).includes(q.id),
+              imageQualitiesForStudioTier(studioTier).filter((id) => id !== "8k_max" || ultraFull).includes(q.id),
             ).map((q) => {
               const active = imageQuality === q.id;
               return (

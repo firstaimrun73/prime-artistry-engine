@@ -287,6 +287,23 @@ export const generateMedia = createServerFn({ method: "POST" })
           );
         }
       }
+      // Master-only Ultra features: IMAX, Custom aspect, 8k_max.
+      {
+        const planId = (profile.plan ?? "free") as string;
+        const tier = (data.studioTier ?? "standard") as string;
+        const full = isAdmin || planId === "business";
+        const ar = String(data.aspectRatio ?? "").toLowerCase();
+        const q = String(data.imageQuality ?? "").toLowerCase();
+        if (!full && tier === "premium") {
+          if (ar === "imax" || q === "8k_max") {
+            throw new Error("IMAX and 8K Max require Master Studio.");
+          }
+          if (ar === "custom") {
+            throw new Error("Custom aspect ratio requires Master Studio.");
+          }
+        }
+      }
+
 
       }
 

@@ -91,6 +91,7 @@ interface EditorPromptPanelProps {
   studioTier?: "standard" | "pro" | "premium";
   referenceCount?: number;
   maxChars?: number;
+  promptUnlimited?: boolean;
   contextTags?: string[];
   onToggleTag?: (tag: string) => void;
 }
@@ -127,6 +128,7 @@ export function EditorPromptPanel({
   studioTier = "standard",
   referenceCount = 0,
   maxChars = 2000,
+  promptUnlimited = false,
   contextTags = [],
   onToggleTag,
 }: EditorPromptPanelProps) {
@@ -288,7 +290,7 @@ export function EditorPromptPanel({
               <Wand2 className="h-3 w-3 shrink-0" /><span className="truncate">Auto-enhanced</span>
             </span>
             <span className="shrink-0 tabular-nums text-muted-foreground">
-              {limit >= 7000 ? (
+              {promptUnlimited || limit >= 7000 ? (
                 <span title="No practical limit in the Studio UI">{prompt.length.toLocaleString()} · Unlimited</span>
               ) : (
                 <>{prompt.length}/{limit}</>
