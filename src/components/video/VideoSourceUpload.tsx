@@ -1,5 +1,6 @@
 /**
  * Single glass upload tile for Image→Video / Video→Video.
+ * Preview uses natural media aspect — does NOT follow output aspect ratio.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Film, X, Replace, AlertCircle, Grid3x3, Plus } from "lucide-react";
@@ -15,7 +16,6 @@ export function VideoSourceUpload({
   onPick,
   onClear,
   disabled,
-  aspect = "16:9",
   showGrid = false,
   onToggleGrid,
 }: {
@@ -25,6 +25,7 @@ export function VideoSourceUpload({
   onPick: (file: File) => void;
   onClear: () => void;
   disabled?: boolean;
+  /** @deprecated ignored — preview uses natural media aspect */
   aspect?: "16:9" | "9:16" | "1:1";
   showGrid?: boolean;
   onToggleGrid?: () => void;
@@ -42,13 +43,6 @@ export function VideoSourceUpload({
   const addLabel = mode === "image" ? "Add image" : "Add video";
   const formats =
     mode === "image" ? "JPG, PNG, WebP · max 40MB" : "MP4, WebM · max 40MB";
-
-  const aspectClass =
-    aspect === "9:16"
-      ? "aspect-[9/16] max-h-[42vh] w-auto mx-auto"
-      : aspect === "1:1"
-        ? "aspect-square max-h-[42vh] w-full max-w-[min(100%,42vh)] mx-auto"
-        : "aspect-video w-full max-h-[42vh]";
 
   useEffect(() => {
     setVidDur(null);
@@ -112,14 +106,14 @@ export function VideoSourceUpload({
       />
 
       {previewUrl ? (
-        <div className={cn("relative overflow-hidden", glass, aspectClass)}>
-          <div className="relative h-full w-full">
+        <div className={cn("relative mx-auto max-h-[42vh] w-full overflow-hidden", glass)}>
+          <div className="relative flex max-h-[42vh] w-full items-center justify-center bg-black/5">
             {mode === "video" ? (
               <video
                 ref={videoRef}
                 src={previewUrl}
-                className="h-full w-full object-cover"
-                muted
+                className="max-h-[42vh] w-full object-contain"
+                controls
                 playsInline
                 onLoadedMetadata={() => {
                   const d = videoRef.current?.duration;
@@ -130,7 +124,11 @@ export function VideoSourceUpload({
                 }}
               />
             ) : (
-              <img src={previewUrl} alt="Source" className="h-full w-full object-cover" />
+              <img
+                src={previewUrl}
+                alt="Source"
+                className="max-h-[42vh] w-full object-contain"
+              />
             )}
             {GridOverlay}
             {vidDur && (
@@ -189,8 +187,7 @@ export function VideoSourceUpload({
           className={cn(
             "group relative flex w-full flex-col items-center justify-center gap-2 overflow-hidden px-4 transition",
             glass,
-            aspectClass,
-            "min-h-[140px]",
+            "min-h-[140px] aspect-video",
             "shadow-[inset_0_0_0_1px_rgba(255,122,69,0.25)]",
             dragging && "ring-2 ring-[#FF7A45]/60",
             disabled && "opacity-50",
@@ -208,7 +205,7 @@ export function VideoSourceUpload({
       )}
 
       {error && (
-        <p className="mt-1.5 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
+        <p className="mt-1.5 flex items-center gap-1 text-[11px] text-amber-600">
           <AlertCircle className="h-3 w-3 shrink-0" />
           {error}
         </p>

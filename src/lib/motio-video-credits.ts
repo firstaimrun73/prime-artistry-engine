@@ -30,7 +30,7 @@ export type MotioVideoMode = "text" | "image" | "video" | "audio";
 
 export const CREDIT_PRICING_VERSION = "2026-09-motio-spend-v1";
 /** Flat credits added on top of routed cost when tier === "premium". */
-export const PREMIUM_TIER_SURCHARGE_CREDITS = 22;
+export const PREMIUM_TIER_SURCHARGE_CREDITS = 25;
 /** Spend face value: 1 Motio2edit credit = 1.86¢ in Video Studio */
 export const CREDIT_RETAIL_USD = VIDEO_CREDIT_FACE_CENTS / 100;
 export const VIDEO_CREDIT_FACE_CENTS_PUBLIC = VIDEO_CREDIT_FACE_CENTS;
