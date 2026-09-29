@@ -16,15 +16,11 @@ async function resolvePreviewUrl(
   const cached = urlCache.get(voiceId);
   if (cached) return cached;
 
-  // Prefer static public assets when present (instant).
-  try {
-    const head = await fetch(staticSrc, { method: "HEAD", cache: "force-cache" });
-    if (head.ok) {
-      urlCache.set(voiceId, staticSrc);
-      return staticSrc;
-    }
-  } catch {
-    /* fall through to server TTS cache */
+  // Prefer known static public asset path directly (no HEAD).
+  // Playback onerror falls back to server-generated preview.
+  if (staticSrc && staticSrc.startsWith("/")) {
+    urlCache.set(voiceId, staticSrc);
+    return staticSrc;
   }
 
   const url = await fetchPreview(voiceId);
@@ -62,7 +58,6 @@ export function MusicVoiceLibrary({
 
   const play = useCallback(
     async (id: VoiceId, staticSrc: string) => {
-      // Toggle off if same voice is playing
       if (playingId === id) {
         stop();
         return;
@@ -84,13 +79,27 @@ export function MusicVoiceLibrary({
 
         audio.onended = () => setPlayingId(null);
         audio.onerror = () => {
+          urlCache.delete(id);
           setPlayingId(null);
           setLoadingId(null);
-          urlCache.delete(id);
         };
 
-        await audio.play();
-        setPlayingId(id);
+        try {
+          await audio.play();
+          setPlayingId(id);
+        } catch {
+          urlCache.delete(id);
+          const res = await getPreview({ data: { voice: id } });
+          if (res?.url) {
+            urlCache.set(id, res.url);
+            const a2 = new Audio(res.url);
+            a2.preload = "auto";
+            audioRef.current = a2;
+            a2.onended = () => setPlayingId(null);
+            await a2.play();
+            setPlayingId(id);
+          }
+        }
       } catch {
         setPlayingId(null);
       } finally {
@@ -100,16 +109,12 @@ export function MusicVoiceLibrary({
     [getPreview, playingId, stop],
   );
 
-  // Warm first voice in background for snappier first click
+  // Cache static path for first voice only (no network on mount).
   useEffect(() => {
     const first = VOICES[0];
     if (!first || urlCache.has(first.id)) return;
-    void resolvePreviewUrl(first.id, first.previewSrc, async (voiceId) => {
-      const res = await getPreview({ data: { voice: voiceId } });
-      if (!res?.url) throw new Error("No preview URL");
-      return res.url;
-    }).catch(() => undefined);
-  }, [getPreview]);
+    if (first.previewSrc.startsWith("/")) urlCache.set(first.id, first.previewSrc);
+  }, []);
 
   return (
     <section>
