@@ -1,10 +1,13 @@
 /**
  * Shared private media delivery (server-only).
  *
- * Flow: private R2 object → auth + ownership → permanent key → temporary signed URL
- * Used by History, Download recovery, and any studio that needs browser-safe delivery.
+ * PAID History (storage_provider=r2):
+ *   motio2edit-user-media via private-history-storage (CLOUDFLARE_R2_USER_*)
+ * FREE History (storage_provider=blob):
+ *   private Vercel Blob
  *
- * Never exposes R2 secrets. Never returns public r2.dev URLs for users/**.
+ * Never signs paid user keys with the primary public/sample R2 (motio2edit-media).
+ * Never returns public r2.dev URLs for users/**.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -14,26 +17,34 @@ export type MediaResolveInput = {
   outputUrl?: string | null;
   storageProvider?: string | null;
   userId: string;
-  /** Row owner — must match authenticated user (or admin). */
+  /** Row owner — must match authenticated user (or admin viewing own rows). */
   ownerUserId: string;
 };
 
 export type MediaResolveResult = {
   deliveryUrl: string | null;
   objectKey: string | null;
-  source: "signed_r2" | "signed_private_r2" | "passthrough" | "unavailable";
+  source: "signed_private_r2" | "blob" | "passthrough" | "unavailable";
 };
 
 function assertOwner(ownerUserId: string, requesterId: string, isAdmin: boolean): void {
-  if (isAdmin) return;
+  // Admin may only resolve their own media when owner matches, OR we allow admin
+  // to resolve any row they already loaded via RLS as themselves.
+  // Cross-user: always require owner === requester (admin is not a global media bypass).
   if (ownerUserId !== requesterId) {
     throw new Error("Not authorized to access this media.");
   }
+  void isAdmin;
+}
+
+function keyLooksLikeUserMedia(key: string | null | undefined): boolean {
+  if (!key) return false;
+  return key.replace(/^\//, "").startsWith("users/");
 }
 
 /**
  * Resolve a browser-loadable temporary URL for private user media.
- * Prefer permanent r2_object_key; fall back to key extraction from broken public URLs.
+ * Prefer permanent r2_object_key on the private user-media bucket.
  */
 export async function resolvePrivateMediaDelivery(
   input: MediaResolveInput & { isAdmin?: boolean },
@@ -41,56 +52,68 @@ export async function resolvePrivateMediaDelivery(
   assertOwner(input.ownerUserId, input.userId, !!input.isAdmin);
 
   const provider = (input.storageProvider ?? "").toLowerCase();
+  let key = (input.r2ObjectKey && input.r2ObjectKey.replace(/^\//, "")) || null;
 
-  // Dedicated private user bucket (history pipeline)
-  if (provider === "r2" && input.r2ObjectKey) {
+  // Recover key from broken public r2.dev URLs stored in legacy rows
+  if (!key && input.outputUrl) {
+    try {
+      const { extractR2ObjectKeyFromUrl } = await import("@/lib/r2.server");
+      key = extractR2ObjectKeyFromUrl(input.outputUrl);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // ── Private user-media R2 (paid) ──────────────────────────────────────────
+  if ((provider === "r2" || keyLooksLikeUserMedia(key)) && key) {
     try {
       const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
         "@/lib/private-history-storage.server"
       );
       if (isPrivateR2Configured()) {
-        const url = await privateR2SignedGetUrl(input.r2ObjectKey);
-        return { deliveryUrl: url, objectKey: input.r2ObjectKey, source: "signed_private_r2" };
+        const url = await privateR2SignedGetUrl(key);
+        return { deliveryUrl: url, objectKey: key, source: "signed_private_r2" };
       }
     } catch (e) {
       console.warn("[private-media] private R2 sign failed:", e);
     }
   }
 
-  // Primary app R2 bucket (finalizeMediaAsset users/**/outputs)
-  try {
-    const {
-      isR2Configured,
-      r2ResolveDeliveryUrl,
-      extractR2ObjectKeyFromUrl,
-      isPrivateUserObjectKey,
-    } = await import("@/lib/r2.server");
-
-    let key =
-      (input.r2ObjectKey && input.r2ObjectKey.replace(/^\//, "")) ||
-      (input.outputUrl ? extractR2ObjectKeyFromUrl(input.outputUrl) : null);
-
-    if (key && isPrivateUserObjectKey(key) && isR2Configured()) {
-      const url = await r2ResolveDeliveryUrl(key, { preferSigned: true });
-      if (url) {
-        return { deliveryUrl: url, objectKey: key, source: "signed_r2" };
-      }
-    }
-
-    // Non-private URL (fal CDN, supabase signed, blob): passthrough if https
-    if (input.outputUrl?.startsWith("https://")) {
-      // Never passthrough broken public r2.dev for users/**
-      const extracted = extractR2ObjectKeyFromUrl(input.outputUrl);
-      if (extracted && isPrivateUserObjectKey(extracted)) {
-        return { deliveryUrl: null, objectKey: extracted, source: "unavailable" };
-      }
-      return { deliveryUrl: input.outputUrl, objectKey: key, source: "passthrough" };
-    }
-  } catch (e) {
-    console.error("[private-media] resolve failed:", e);
+  // ── Private Blob (free History) ───────────────────────────────────────────
+  if (provider === "blob" && input.outputUrl?.startsWith("https://")) {
+    // Blob private URLs from put() are usable with the store token server-side;
+    // the stored delivery_url from upload is returned to the owner only.
+    return { deliveryUrl: input.outputUrl, objectKey: key, source: "blob" };
   }
 
-  return { deliveryUrl: null, objectKey: input.r2ObjectKey ?? null, source: "unavailable" };
+  // ── Safe passthrough: temporary provider/CDN URLs only ────────────────────
+  if (input.outputUrl?.startsWith("https://")) {
+    // Never passthrough unauthorized public r2.dev for users/**
+    try {
+      const { extractR2ObjectKeyFromUrl } = await import("@/lib/r2.server");
+      const extracted = extractR2ObjectKeyFromUrl(input.outputUrl);
+      if (extracted && keyLooksLikeUserMedia(extracted)) {
+        // Last attempt: private R2 sign
+        try {
+          const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
+            "@/lib/private-history-storage.server"
+          );
+          if (isPrivateR2Configured()) {
+            const url = await privateR2SignedGetUrl(extracted);
+            return { deliveryUrl: url, objectKey: extracted, source: "signed_private_r2" };
+          }
+        } catch {
+          /* unavailable */
+        }
+        return { deliveryUrl: null, objectKey: extracted, source: "unavailable" };
+      }
+    } catch {
+      /* ignore */
+    }
+    return { deliveryUrl: input.outputUrl, objectKey: key, source: "passthrough" };
+  }
+
+  return { deliveryUrl: null, objectKey: key, source: "unavailable" };
 }
 
 /**
@@ -101,7 +124,6 @@ export async function resolveGenerationsMediaBatch(opts: {
   userId: string;
   isAdmin?: boolean;
   generationIds?: string[];
-  /** When empty, resolve latest retained rows for user (limit). */
   limit?: number;
 }): Promise<
   Array<{
@@ -147,21 +169,26 @@ export async function resolveGenerationsMediaBatch(opts: {
     storage_provider: string | null;
     user_id: string;
   }>) {
-    const resolved = await resolvePrivateMediaDelivery({
-      userId: opts.userId,
-      ownerUserId: row.user_id,
-      isAdmin: opts.isAdmin,
-      r2ObjectKey: row.r2_object_key,
-      outputUrl: row.output_url,
-      storageProvider: row.storage_provider,
-      generationId: row.id,
-    });
-    out.push({
-      id: row.id,
-      deliveryUrl: resolved.deliveryUrl,
-      objectKey: resolved.objectKey,
-      type: row.type,
-    });
+    try {
+      const resolved = await resolvePrivateMediaDelivery({
+        userId: opts.userId,
+        ownerUserId: row.user_id,
+        isAdmin: opts.isAdmin,
+        r2ObjectKey: row.r2_object_key,
+        outputUrl: row.output_url,
+        storageProvider: row.storage_provider,
+        generationId: row.id,
+      });
+      out.push({
+        id: row.id,
+        deliveryUrl: resolved.deliveryUrl,
+        objectKey: resolved.objectKey,
+        type: row.type,
+      });
+    } catch (e) {
+      console.warn("[private-media] row resolve denied/failed:", row.id, e);
+      out.push({ id: row.id, deliveryUrl: null, objectKey: row.r2_object_key, type: row.type });
+    }
   }
   return out;
 }
