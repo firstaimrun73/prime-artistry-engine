@@ -12,11 +12,30 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Write full generate.functions.ts and music.functions.ts
+        with:
+          fetch-depth: 0
+      - name: Restore generate and music backends
         run: |
           set -euo pipefail
-          python3 << 'PY'
-          import base64, zlib
-          from pathlib import Path
-          print("placeholder - full content via second step")
-          PY
+          git show 7262a1179fdd:src/lib/generate.functions.ts > /tmp/generate.functions.ts
+          git show 77cfab6537e74e669a8daa1095c92dbdbac6c8da:src/lib/music.functions.ts > /tmp/music.functions.ts
+          python3 scripts/apply-media-r2-patches.py /tmp/generate.functions.ts /tmp/music.functions.ts
+          cp /tmp/generate.functions.ts src/lib/generate.functions.ts
+          cp /tmp/music.functions.ts src/lib/music.functions.ts
+          wc -c src/lib/generate.functions.ts src/lib/music.functions.ts
+          grep -q executeStandardImage src/lib/generate.functions.ts
+          grep -q ingestProviderMediaToUserR2 src/lib/generate.functions.ts
+          grep -q r2ObjectKey src/lib/generate.functions.ts
+          grep -q generateMusic src/lib/music.functions.ts
+          grep -q ingestProviderMediaToUserR2 src/lib/music.functions.ts
+          ! grep -q "restore incomplete" src/lib/generate.functions.ts
+          ! grep -q SEE_FILE src/lib/music.functions.ts
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts src/lib/music.functions.ts
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "EMERGENCY RESTORE: full generate.functions.ts + music private R2 ingest"
+          git push
