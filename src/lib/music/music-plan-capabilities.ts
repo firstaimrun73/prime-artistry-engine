@@ -40,8 +40,11 @@ export type MusicPlanCapabilities = {
 /** MMAudio provider hard limit — never silently exceed. */
 export const MMAUDIO_MAX_SEGMENT_SECONDS = 30;
 
-/** Abuse-protection ceiling for Master Studio "Unlimited*" prompts. */
-export const SERVER_PROMPT_ABUSE_CEILING = 12_000;
+/**
+ * Customer plan limit for Master Studio (business id).
+ * Provider-specific limits stay in music-prompt-compose.ts.
+ */
+export const MASTER_STUDIO_PROMPT_MAX_CHARS = 15_000;
 export const SERVER_LYRICS_ABUSE_CEILING = 3_500;
 
 const FREE_CAPS: MusicPlanCapabilities = {
@@ -107,9 +110,10 @@ const STUDIO_CAPS: MusicPlanCapabilities = {
   priorityQueue: true,
 };
 
+/** Internal id "business" — user-facing name Master Studio. */
 const BUSINESS_CAPS: MusicPlanCapabilities = {
   ...STUDIO_CAPS,
-  promptMaxChars: SERVER_PROMPT_ABUSE_CEILING,
+  promptMaxChars: MASTER_STUDIO_PROMPT_MAX_CHARS,
   lyricsMaxChars: SERVER_LYRICS_ABUSE_CEILING,
   maxConcurrentMusicJobs: 4,
   priorityQueue: true,
@@ -155,7 +159,7 @@ export function assertMusicQualityAllowed(
   return { ok: true };
 }
 
-/** Public capability payload for the future frontend. */
+/** Public capability payload for the frontend. */
 export function musicCapabilitiesPublicPayload(
   plan: PlanId,
   credits: number,
