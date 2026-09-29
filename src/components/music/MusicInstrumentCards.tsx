@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { cn } from "@/lib/utils";
 
 /** Compact outline instrument diagrams — stroke uses currentColor for theme. */
@@ -120,7 +121,7 @@ function IconChoir({ className }: { className?: string }) {
 const INSTRUMENTS: ReadonlyArray<{
   id: string;
   label: string;
-  Icon: (p: { className?: string }) => React.ReactElement;
+  Icon: (p: { className?: string }) => ReactElement;
 }> = [
   { id: "piano", label: "Piano", Icon: IconPiano },
   { id: "guitar", label: "Guitar", Icon: IconGuitar },
