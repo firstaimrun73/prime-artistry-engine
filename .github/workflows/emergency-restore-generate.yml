@@ -1,6 +1,9 @@
 name: Emergency restore generate.functions.ts
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/emergency-restore-generate.yml"
 jobs:
   restore:
     runs-on: ubuntu-latest
@@ -13,7 +16,9 @@ jobs:
       - name: Restore full generate.functions.ts and persist r2 key
         run: |
           set -euo pipefail
-          # Last known full production file (before 9-byte placeholder)
+          SIZE=$(wc -c < src/lib/generate.functions.ts || echo 0)
+          echo "current size=$SIZE"
+          # Last known full production file (before 9-byte / placeholder)
           git show 7262a1179fdd:src/lib/generate.functions.ts > src/lib/generate.functions.ts
           python3 << 'PY'
           from pathlib import Path
@@ -21,7 +26,9 @@ jobs:
           t = p.read_text()
           if len(t) < 10000:
               raise SystemExit(f"restore too small: {len(t)}")
-          if "r2ObjectKeyFromFinalize" not in t:
+          if "PLACEHOLDER" in t or t.strip() == "see below":
+              raise SystemExit("restore still placeholder")
+          if "r2ObjectKeyFromFinalize" not in t and "finalizedR2Key" not in t:
               t = t.replace(
                   '    if (data.type === "image" && outputUrl) {\n      try {\n        const { finalizeMediaAsset }',
                   '    let r2ObjectKeyFromFinalize: string | null = null;\n    if (data.type === "image" && outputUrl) {\n      try {\n        const { finalizeMediaAsset }',
@@ -67,7 +74,7 @@ jobs:
               )
           if "executeStandardImage" not in t or "persistGenerationHistory" not in t:
               raise SystemExit("restore incomplete")
-          if "r2ObjectKeyFromFinalize" not in t:
+          if "r2ObjectKeyFromFinalize" not in t and "finalizedR2Key" not in t:
               raise SystemExit("r2 key patch failed")
           p.write_text(t)
           print("restored bytes", len(t))
@@ -75,5 +82,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/generate.functions.ts
-          git commit -m "EMERGENCY RESTORE: full generate.functions.ts + r2_object_key persist (was 9-byte placeholder)"
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "EMERGENCY RESTORE: full generate.functions.ts + r2_object_key persist"
           git push
