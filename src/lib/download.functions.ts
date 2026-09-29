@@ -24,9 +24,20 @@ export const secureDownloadImage = createServerFn({ method: "POST" })
     const isAdmin =
       !!profile.email && profile.email.trim().toLowerCase() === "firstaimrun89@gmail.com";
     if (!data.imageUrl.startsWith("https://")) throw new Error("Invalid image URL.");
+
+    // Recover broken public r2.dev user URLs → signed GET before fetch/finalize.
+    let sourceUrl = data.imageUrl;
+    try {
+      const { r2ResolveStoredOutput } = await import("@/lib/r2.server");
+      const resolved = await r2ResolveStoredOutput({ outputUrl: data.imageUrl });
+      if (resolved) sourceUrl = resolved;
+    } catch {
+      /* keep original */
+    }
+
     const { finalizeMediaAsset } = await import("@/lib/watermark/finalize");
     const result = await finalizeMediaAsset({
-      sourceUrl: data.imageUrl,
+      sourceUrl,
       mediaKind: "image",
       plan: profile.plan,
       email: profile.email,
