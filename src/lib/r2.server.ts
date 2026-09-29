@@ -7,7 +7,7 @@
  * - Private user media under users/** MUST use signed GET URLs.
  *   Never return a public r2.dev URL for private outputs (causes 401 on private buckets).
  */
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function env(name: string): string | undefined {
@@ -136,6 +136,14 @@ export async function r2ObjectExists(key: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Delete a private user (or any) object from the primary app R2 bucket. */
+export async function r2DeleteObject(key: string): Promise<void> {
+  const client = getClient();
+  await client.send(
+    new DeleteObjectCommand({ Bucket: bucket(), Key: key.replace(/^\//, "") }),
+  );
 }
 
 /**
