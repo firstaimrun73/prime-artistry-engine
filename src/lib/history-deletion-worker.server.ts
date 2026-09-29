@@ -2,6 +2,10 @@
  * Processes history_media_deletion_queue rows.
  * Idempotent: safe to re-run. Does not invent queue rows.
  * Server-only.
+ *
+ * Paid user media lives in motio2edit-user-media (private R2).
+ * Free History lives in private Vercel Blob.
+ * Never delete against the public/sample primary R2 bucket.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -34,26 +38,7 @@ async function deleteObject(
   const key = objectKey.replace(/^\//, "");
   const p = (provider || "").toLowerCase();
 
-  // Primary app R2 bucket (users/** from finalize / user-media ingest)
-  if (key.startsWith("users/")) {
-    try {
-      const { isR2Configured, r2DeleteObject } = await import("@/lib/r2.server");
-      if (isR2Configured()) {
-        await r2DeleteObject(key);
-        return;
-      }
-    } catch (e) {
-      console.warn("[history-deletion-worker] primary R2 delete:", e);
-    }
-  }
-
-  if (p === "r2") {
-    if (!isPrivateR2Configured()) {
-      throw new Error("Private R2 not configured; cannot delete object.");
-    }
-    await privateR2DeleteObject(key);
-    return;
-  }
+  // Explicit provider wins
   if (p === "blob") {
     if (!isPrivateBlobConfigured()) {
       throw new Error("Private Blob not configured; cannot delete object.");
@@ -61,6 +46,16 @@ async function deleteObject(
     await privateBlobDeleteObject(key);
     return;
   }
+
+  if (p === "r2" || key.startsWith("users/")) {
+    // Paid/admin private user-media bucket only — never primary sample R2
+    if (!isPrivateR2Configured()) {
+      throw new Error("Private R2 not configured; cannot delete object.");
+    }
+    await privateR2DeleteObject(key);
+    return;
+  }
+
   // supabase / unknown: nothing to delete from private stores
 }
 
