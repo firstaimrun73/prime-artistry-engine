@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import sharp from "sharp";
 import type { WatermarkMode, WatermarkBrand } from "./types";
 import {
@@ -18,6 +19,49 @@ function escapeXml(s: string): string {
     .replace(/>/g, "&" + "gt;")
     .replace(/"/g, "&" + "quot;")
     .replace(/'/g, "&" + "apos;");
+}
+
+/** Linux/Vercel-safe bold sans fonts (Arial is often missing → empty tofu glyphs). */
+const FONT_CANDIDATES = [
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+  "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+  "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+  "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+  "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+  "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+  "/System/Library/Fonts/Supplemental/Arial.ttf",
+] as const;
+
+let cachedFontFaceCss: string | null | undefined;
+
+/**
+ * Embed a real TTF as @font-face data URI so librsvg/sharp can rasterize
+ * "Motio2edit" without depending on Arial being installed.
+ */
+function watermarkFontFaceCss(): string {
+  if (cachedFontFaceCss !== undefined) return cachedFontFaceCss ?? "";
+  for (const file of FONT_CANDIDATES) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const b64 = fs.readFileSync(file).toString("base64");
+      if (b64.length < 1000) continue;
+      cachedFontFaceCss =
+        `@font-face{font-family:'MotioWM';src:url('data:font/ttf;base64,${b64}') format('truetype');font-weight:700;font-style:normal;}`;
+      return cachedFontFaceCss;
+    } catch {
+      /* try next */
+    }
+  }
+  cachedFontFaceCss = null;
+  // Last-resort CSS: prefer Liberation/DejaVu local names over Arial
+  return "";
+}
+
+function fontFamilyAttr(): string {
+  // Prefer embedded MotioWM when available; never rely on Arial alone.
+  return "MotioWM,DejaVu Sans,Liberation Sans,FreeSans,Helvetica,sans-serif";
 }
 
 /**
@@ -61,6 +105,8 @@ export function buildImageOverlaySvg(
   const dotCy = rectY + rectH / 2;
   const textX = dotCx + dotR + 8;
   const textY = rectY + pad + fontSize * 0.82;
+  const ff = fontFamilyAttr();
+  const faceCss = watermarkFontFaceCss();
 
   // Secondary dense marks only when mode explicitly requests them (not Free).
   let secondary = "";
@@ -80,7 +126,7 @@ export function buildImageOverlaySvg(
         const my = cellH * (row + 1);
         if (mx < margin || my < margin || mx > w - margin || my > h - margin) continue;
         marks.push(
-          `<text x="${mx.toFixed(1)}" y="${my.toFixed(1)}" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${secFont}" fill="#ffffff" fill-opacity="0.65" text-anchor="middle">${escapeXml(WATERMARK_BRAND_TEXT)}</text>`,
+          `<text x="${mx.toFixed(1)}" y="${my.toFixed(1)}" font-family="${ff}" font-weight="700" font-size="${secFont}" fill="#ffffff" fill-opacity="0.65" text-anchor="middle">${escapeXml(WATERMARK_BRAND_TEXT)}</text>`,
         );
         n++;
       }
@@ -106,15 +152,16 @@ export function buildImageOverlaySvg(
     const motioW = "Motio".length * approxChar;
     const twoW = "2".length * approxChar;
     brandText =
-      `<text x="${textX}" y="${textY}" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml("Motio")}</text>` +
-      `<text x="${textX + motioW}" y="${textY}" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${fontSize}" fill="${WATERMARK_BRAND_ORANGE}">${escapeXml("2")}</text>` +
-      `<text x="${textX + motioW + twoW}" y="${textY}" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml("edit" + rest)}</text>`;
+      `<text x="${textX}" y="${textY}" font-family="${ff}" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml("Motio")}</text>` +
+      `<text x="${textX + motioW}" y="${textY}" font-family="${ff}" font-weight="700" font-size="${fontSize}" fill="${WATERMARK_BRAND_ORANGE}">${escapeXml("2")}</text>` +
+      `<text x="${textX + motioW + twoW}" y="${textY}" font-family="${ff}" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml("edit" + rest)}</text>`;
   } else {
-    brandText = `<text x="${textX}" y="${textY}" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml(displayText)}</text>`;
+    brandText = `<text x="${textX}" y="${textY}" font-family="${ff}" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml(displayText)}</text>`;
   }
 
+  const styleBlock = faceCss ? `<defs><style type="text/css"><![CDATA[${faceCss}]]></style></defs>` : "";
   const brandSvg = `<rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" rx="8" ry="8" fill="rgba(0,0,0,0.78)"/><circle cx="${dotCx}" cy="${dotCy}" r="${dotR}" fill="${WATERMARK_BRAND_ORANGE}"/>${brandText}`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" data-ratio="${detectWatermarkRatioKey(w, h)}">${secondary}${brandSvg}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" data-ratio="${detectWatermarkRatioKey(w, h)}">${styleBlock}${secondary}${brandSvg}</svg>`;
 }
 
 export async function renderImageWatermark(
@@ -132,6 +179,8 @@ export async function renderImageWatermark(
   const w = meta.width ?? 0;
   const h = meta.height ?? 0;
   if (w < 8 || h < 8) throw new Error("Image too small to watermark.");
+  // Ensure font face is resolved before building SVG (caches base64 TTF).
+  void watermarkFontFaceCss();
   return image
     .composite([
       {
