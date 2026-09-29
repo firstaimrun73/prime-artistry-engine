@@ -3,7 +3,7 @@
     {
       "path": "src/lib/generate.functions.ts",
       "prefix": "genfix",
-      "parts": 7
+      "parts": 6
     }
   ]
 }

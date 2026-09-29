@@ -1,0 +1,51 @@
+name: Restore generate.functions from parts
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.restore/genfix.part*.b64'
+      - '.restore/manifest.json'
+      - '.github/workflows/restore-generate-functions.yml'
+concurrency:
+  group: restore-generate-functions
+  cancel-in-progress: true
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reassemble generate.functions.ts
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import base64, json
+          from pathlib import Path
+          manifest = json.loads(Path(".restore/manifest.json").read_text())
+          for item in manifest["items"]:
+              if item["path"] != "src/lib/generate.functions.ts":
+                  continue
+              prefix = item["prefix"]
+              parts = item["parts"]
+              b64 = ""
+              for i in range(parts):
+                  p = Path(f".restore/{prefix}.part{i}.b64")
+                  if not p.exists():
+                      raise SystemExit(f"missing {p}")
+                  b64 += p.read_text().strip()
+              data = base64.b64decode(b64)
+              Path("src/lib/generate.functions.ts").write_bytes(data)
+              print("wrote", len(data))
+              text = data.decode()
+              assert "executePremiumImage" in text
+              assert "executeUltraImage" in text
+              assert "persistGenerationHistory" in text
+              assert len(data) > 20000
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "EMERGENCY RESTORE: generate.functions.ts + r2_object_key persist"
+          git push
