@@ -141,10 +141,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const planMaxImages = isFree
     ? 1
     : getPlanLimits(profile?.plan ?? "free").maxImages;
-  const effectiveMaxImages = Math.min(
-    isAdmin ? Math.max(planMaxImages, experienceMax) : planMaxImages,
-    experienceMax,
-  );
+  const effectiveMaxImages = Math.min(planMaxImages, experienceMax);
 
   // Keep gallery within the active experience + plan ceiling (prevents Standard 5-cap overflow crash).
   useEffect(() => {
@@ -852,7 +849,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                           role="listbox"
                           className="absolute left-0 top-full z-50 mt-1 min-w-[140px] overflow-hidden rounded-xl border border-border/60 bg-card/95 py-1 shadow-xl backdrop-blur-xl"
                         >
-                          {visibleImageExperiences(profile.plan, isAdmin).map((t) => (
+                          {visibleImageExperiences(profile.plan, false).map((t) => (
                             <li key={t}>
                               <button
                                 type="button"
@@ -1029,7 +1026,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   credits={profile.credits}
                   keepWatermark={keepWatermark}
                   setKeepWatermark={setKeepWatermark}
-                  isFree={isFree}
+                  isFree={isFreePlanForWm}
                   studioTier={studioTier}
                 />
               </section>

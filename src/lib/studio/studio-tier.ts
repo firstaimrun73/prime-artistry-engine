@@ -167,7 +167,7 @@ export function aspectRatiosForStudioTier(
     return ["1:1", "4:3", "16:9", "9:16", "3:4", "21:9", "custom"];
   }
   // Ultra AI — 21:9 + true IMAX 1.43:1 (requires 8k_max on generate) + Custom.
-  return ["1:1", "4:3", "16:9", "9:16", "3:4", "21:9", "imax", "custom"];
+  return ["1:1", "4:3", "3:2", "16:9", "9:16", "2:3", "3:4", "21:9", "imax", "custom"];
 }
 
 /** Aspect ratios for plan+experience. IMAX/Custom require Master ultraFullUnlocked. */

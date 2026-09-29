@@ -7,7 +7,7 @@
  *   Free / Lite / Plus → Standard only
  *   Pro               → Standard + Premium
  *   Studio / Business → Standard + Premium + Ultra AI
- *   Admin             → all three (handled by caller with isAdmin override)
+ *   Admin does NOT override product entitlement
  *
  * Single source of truth for UI locks + server enforcement.
  */
@@ -46,7 +46,8 @@ export function canAccessImageExperience(
   tier: StudioTier,
   isAdmin = false,
 ): boolean {
-  if (isAdmin) return true;
+  // Admin is operational only — product entitlement follows subscription plan.
+  void isAdmin;
   const planId = normalizePlanId(plan);
   return IMAGE_EXPERIENCE_ALLOWED_PLANS[tier].includes(planId);
 }

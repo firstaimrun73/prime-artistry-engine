@@ -116,7 +116,8 @@ export function EditorOptionsPanel({
 }: EditorOptionsPanelProps) {
   const [costOpen, setCostOpen] = useState(false);
   const expLabel = studioExperienceLabel(studioTier);
-  const ultraFull = isAdmin || getPlanLimits(userPlan ?? "free").ultraFullUnlocked;
+  const ultraFull = getPlanLimits(userPlan ?? "free").ultraFullUnlocked;
+  const planIsFree = (userPlan ?? "free").toLowerCase() === "free";
   const qualityLabel =
     IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.label ?? imageQuality.toUpperCase();
 
@@ -354,12 +355,12 @@ export function EditorOptionsPanel({
         </div>
       )}
 
-      {mediaType === "video" && (
+      {(mediaType === "video" || mediaType === "image") && (
       <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
         <span className="text-xs font-medium text-muted-foreground">Watermark</span>
-        {isFree ? (
+        {(planIsFree || isFree) ? (
           <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-            <Lock className="h-3.5 w-3.5" /> Locked · On
+            <Lock className="h-3.5 w-3.5" /> Locked · On — Motio2edit
           </span>
         ) : (
           <button

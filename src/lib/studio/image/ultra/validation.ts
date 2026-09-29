@@ -53,31 +53,53 @@ export function normalizeUltraAspect(
     a === "16:9" ||
     a === "9:16" ||
     a === "3:4" ||
-    a === "21:9"
+    a === "21:9" ||
+    a === "3:2" ||
+    a === "2:3"
   ) {
     return { aspect: a as UltraAspectRatio };
   }
-  // Custom: client may send "custom" — treat as 16:9 master; prompt should carry ratio intent.
-  // True free-form W:H custom dims are applied when aspect is a numeric ratio like "2.35:1".
+  // Custom must NEVER silently become 16:9 (or any other preset).
+  // Bare "custom" without dimensions is rejected — client should send explicit W:H.
   if (a === "custom") {
-    return { aspect: "16:9" };
+    return {
+      aspect: "1:1",
+      error:
+        "Custom aspect requires an explicit ratio (for example 2.35:1 or 3:2). It cannot default to 16:9.",
+    };
   }
+  // Explicit numeric ratios (including 3:2 / 2:3 and free-form) are preserved for provider image_size.
   const ratioMatch = a.match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
   if (ratioMatch) {
     const w = Number(ratioMatch[1]);
     const h = Number(ratioMatch[2]);
-    if (w > 0 && h > 0) {
-      const r = w / h;
-      // Map free ratio to nearest supported Ultra aspect for master generation.
-      if (r > 2.1) return { aspect: "21:9" };
-      if (r > 1.5) return { aspect: "16:9" };
-      if (r > 1.2) return { aspect: "4:3" };
-      if (r > 0.9) return { aspect: "1:1" };
-      if (r > 0.7) return { aspect: "3:4" };
-      return { aspect: "9:16" };
+    if (w > 0 && h > 0 && Number.isFinite(w) && Number.isFinite(h)) {
+      const known = [
+        "1:1",
+        "4:3",
+        "16:9",
+        "9:16",
+        "3:4",
+        "21:9",
+        "3:2",
+        "2:3",
+      ] as const;
+      const normalized = `${w}:${h}`;
+      // Prefer canonical labels when exact match (integer forms).
+      for (const k of known) {
+        const [kw, kh] = k.split(":").map(Number);
+        if (Math.abs(w / h - kw / kh) < 1e-6) {
+          return { aspect: k as UltraAspectRatio };
+        }
+      }
+      // Preserve free-form ratio as "W:H" — model maps to real pixel dimensions.
+      return { aspect: normalized as UltraAspectRatio };
     }
   }
-  return { aspect: "1:1" };
+  return {
+    aspect: "1:1",
+    error: "Unsupported aspect ratio. Choose a preset or an explicit W:H custom ratio.",
+  };
 }
 
 /**

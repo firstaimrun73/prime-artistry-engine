@@ -13,7 +13,10 @@ export type UltraAspectRatio =
   | "9:16"
   | "3:4"
   | "21:9"
-  | "imax";
+  | "3:2"
+  | "2:3"
+  | "imax"
+  | (string & {});
 
 export type UltraMode = "text_to_image" | "image_to_image" | "multi_image";
 

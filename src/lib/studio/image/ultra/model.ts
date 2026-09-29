@@ -30,6 +30,20 @@ export type UltraQuality = "sd" | "hd" | "2k" | "4k" | "8k" | "8k_max";
  * Map product quality → Seedream / Flux master image_size preset.
  * Never emit unsupported native 4K/8K — those use enhancement after.
  */
+
+/** Build width×height for a W:H ratio at a long-edge budget (Flux custom image_size). */
+function dimensionsForRatio(aspect: string, longEdge: number): { width: number; height: number } | null {
+  const match = aspect.match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/);
+  if (!match) return null;
+  const rw = Number(match[1]);
+  const rh = Number(match[2]);
+  if (!(rw > 0) || !(rh > 0)) return null;
+  if (rw >= rh) {
+    return { width: longEdge, height: Math.max(64, Math.round((longEdge * rh) / rw)) };
+  }
+  return { width: Math.max(64, Math.round((longEdge * rw) / rh)), height: longEdge };
+}
+
 export function ultraMasterImageSize(
   quality: UltraQuality,
   aspect: string,
@@ -38,6 +52,14 @@ export function ultraMasterImageSize(
   if (aspect === "imax") {
     // ~2K-class master for enhancement; delivery upscale uses ultraDeliveryDimensions.
     return { width: 2048, height: 1432 };
+  }
+  // 3:2 / 2:3 and free-form W:H — real dimensions for Flux custom image_size (never coerce to 16:9).
+  if (aspect === "3:2" || aspect === "2:3" || /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(aspect)) {
+    if (!["1:1", "4:3", "3:4", "16:9", "9:16", "21:9"].includes(aspect)) {
+      const long = quality === "sd" ? 896 : 2048;
+      const dims = dimensionsForRatio(aspect, long);
+      if (dims) return dims;
+    }
   }
   if (quality === "sd") {
     switch (aspect) {
@@ -122,7 +144,14 @@ export function ultraDeliveryDimensions(
     "16:9": [long, Math.round((long * 9) / 16)],
     "9:16": [Math.round((long * 9) / 16), long],
     "21:9": [long, Math.round((long * 9) / 21)],
+    "3:2": [long, Math.round((long * 2) / 3)],
+    "2:3": [Math.round((long * 2) / 3), long],
   };
-  const [w, h] = map[ar] ?? map["1:1"];
-  return { width: w, height: h };
+  if (map[ar]) {
+    const [w, h] = map[ar];
+    return { width: w, height: h };
+  }
+  const custom = dimensionsForRatio(ar, long);
+  if (custom) return custom;
+  return { width: long, height: long };
 }
