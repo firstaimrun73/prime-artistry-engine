@@ -149,16 +149,27 @@ export function imageQualitiesForStudioTier(tier: StudioTier): ImageQuality[] {
   }
 }
 
+export type ImageStudioAspectId =
+  | "1:1"
+  | "4:3"
+  | "3:2"
+  | "16:9"
+  | "9:16"
+  | "2:3"
+  | "3:4"
+  | "21:9"
+  | "imax"
+  | "custom";
+
 /**
  * Aspect ratios for text-to-image per experience.
  * Standard: five core ratios.
  * Premium + Ultra AI: five core + 21:9 (normal ultra-wide).
+ * Ultra: + 3:2 / 2:3 (Flux custom image_size) + IMAX + Custom.
  * IMAX (true 1.43:1) is Ultra-only and requires imageQuality 8k_max at generate time.
  * 21:9 is normal ultra-wide and is never treated as IMAX.
  */
-export function aspectRatiosForStudioTier(
-  tier: StudioTier,
-): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax" | "custom"> {
+export function aspectRatiosForStudioTier(tier: StudioTier): ImageStudioAspectId[] {
   if (tier === "standard") {
     return ["1:1", "4:3", "16:9", "9:16", "3:4"];
   }
@@ -166,7 +177,7 @@ export function aspectRatiosForStudioTier(
     // Premium experience — 21:9 ultra-wide; no IMAX (Ultra-only).
     return ["1:1", "4:3", "16:9", "9:16", "3:4", "21:9", "custom"];
   }
-  // Ultra AI — 21:9 + true IMAX 1.43:1 (requires 8k_max on generate) + Custom.
+  // Ultra AI — 3:2 / 2:3 + 21:9 + true IMAX 1.43:1 (requires 8k_max) + Custom.
   return ["1:1", "4:3", "3:2", "16:9", "9:16", "2:3", "3:4", "21:9", "imax", "custom"];
 }
 
@@ -174,10 +185,10 @@ export function aspectRatiosForStudioTier(
 export function aspectRatiosForPlanAndTier(
   tier: StudioTier,
   ultraFullUnlocked: boolean,
-): Array<"1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax" | "custom"> {
+): ImageStudioAspectId[] {
   const base = aspectRatiosForStudioTier(tier);
   if (!ultraFullUnlocked) {
-    return base.filter((a) => a !== "imax" && a !== "custom") as typeof base;
+    return base.filter((a) => a !== "imax" && a !== "custom");
   }
   return base;
 }
