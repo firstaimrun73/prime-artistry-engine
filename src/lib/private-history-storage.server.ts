@@ -1,12 +1,10 @@
 /**
  * Private History media storage — server only.
  *
- * FREE/private History → Vercel Blob store `motio2edit-user-history`
- * PAID/private History → Cloudflare R2 bucket `motio2edit-user-media`
- *   (env: CLOUDFLARE_R2_USER_* )
+ * FREE History → Vercel Blob (BLOB_READ_WRITE_TOKEN), access: private
+ * PAID/ADMIN History → Cloudflare R2 motio2edit-user-media (CLOUDFLARE_R2_USER_*)
  *
- * Public samples continue to use src/lib/r2.server.ts (motio2edit-media).
- * Never import this module from client code.
+ * Public samples: src/lib/r2.server.ts (motio2edit-media) — never use here for user media.
  */
 
 import {
@@ -35,7 +33,7 @@ export function historyObjectKey(
   return `users/${userId}/history/${generationId}/${kind}.${e}`;
 }
 
-// ── Private R2 (paid History) ──────────────────────────────────────────────
+// ── Private R2 (paid/admin History) ─────────────────────────────────────────
 
 export function isPrivateR2Configured(): boolean {
   return !!(
@@ -110,7 +108,6 @@ export async function privateR2SignedGetUrl(
 // ── Private Vercel Blob (free History) ─────────────────────────────────────
 
 export function isPrivateBlobConfigured(): boolean {
-  // Token for store motio2edit-user-history — server-only, never NEXT_PUBLIC
   return !!(env("BLOB_READ_WRITE_TOKEN") || env("VERCEL_BLOB_READ_WRITE_TOKEN"));
 }
 
@@ -121,16 +118,15 @@ function blobToken(): string {
 }
 
 /**
- * Upload to the existing private Blob store.
- * pathname is the logical key (e.g. users/{uid}/history/{gid}/output.jpg).
- * Returns the Blob URL (private store; access via token / signed patterns).
+ * Upload to private Vercel Blob.
+ * pathname is the permanent logical key (store in r2_object_key).
+ * Returns pathname + URL string (URL may be private; resolve for browser via privateBlobResolveDelivery).
  */
 export async function privateBlobPutObject(opts: {
   pathname: string;
   body: Buffer | Uint8Array;
   contentType: string;
 }): Promise<{ url: string; pathname: string }> {
-  // Dynamic import so client bundles never pull Blob SDK
   const { put } = await import("@vercel/blob");
   const pathname = opts.pathname.replace(/^\//, "");
   const result = await put(pathname, opts.body, {
@@ -139,7 +135,7 @@ export async function privateBlobPutObject(opts: {
     token: blobToken(),
     addRandomSuffix: false,
     allowOverwrite: true,
-  });
+  } as Parameters<typeof put>[2]);
   return { url: result.url, pathname };
 }
 
@@ -149,8 +145,61 @@ export async function privateBlobDeleteObject(urlOrPathname: string): Promise<vo
 }
 
 /**
+ * Resolve a browser-usable delivery reference for a private Blob object.
+ * Prefer permanent pathname (r2_object_key). Falls back to stored URL.
+ *
+ * Private Blob URLs are not world-readable; callers that need bytes should
+ * use privateBlobFetchBytes. For History UI we return the store URL only when
+ * the authenticated owner already passed ownership checks (server function).
+ */
+export async function privateBlobResolveDelivery(
+  pathnameOrUrl: string | null | undefined,
+): Promise<string | null> {
+  if (!pathnameOrUrl) return null;
+  const token = blobToken();
+  try {
+    // Prefer head/get when available to validate the object still exists
+    const blobMod = await import("@vercel/blob");
+    const head = (blobMod as { head?: (url: string, opts: { token: string }) => Promise<{ url: string }> }).head;
+    if (typeof head === "function" && pathnameOrUrl.startsWith("https://")) {
+      const meta = await head(pathnameOrUrl, { token });
+      if (meta?.url) return meta.url;
+    }
+  } catch (e) {
+    console.warn("[private-blob] head failed:", e);
+  }
+  // Return stored URL for owner-scoped server responses only (never public listing)
+  if (pathnameOrUrl.startsWith("https://")) return pathnameOrUrl;
+  return null;
+}
+
+/** Fetch private Blob bytes server-side (download / proxy). */
+export async function privateBlobFetchBytes(
+  urlOrPathname: string,
+): Promise<{ body: Buffer; contentType: string } | null> {
+  try {
+    const blobMod = await import("@vercel/blob");
+    const get = (blobMod as {
+      get?: (
+        url: string,
+        opts: { access: "private"; token: string },
+      ) => Promise<{ stream?: ReadableStream; blob?: Blob } | null>;
+    }).get;
+    if (typeof get === "function" && urlOrPathname.startsWith("https://")) {
+      const result = await get(urlOrPathname, { access: "private", token: blobToken() });
+      if (result?.stream) {
+        const ab = await new Response(result.stream).arrayBuffer();
+        return { body: Buffer.from(ab), contentType: "application/octet-stream" };
+      }
+    }
+  } catch (e) {
+    console.warn("[private-blob] get failed:", e);
+  }
+  return null;
+}
+
+/**
  * Upload generation output bytes to the correct private provider.
- * Does not touch public R2 or Supabase Storage.
  */
 export async function uploadPrivateHistoryMedia(opts: {
   provider: "blob" | "r2";
