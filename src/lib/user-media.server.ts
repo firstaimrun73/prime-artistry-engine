@@ -1,27 +1,35 @@
 /**
  * Shared user-media storage + delivery for Motio2edit.
  *
- * USER MEDIA (private): users/{userId}/...
- *   → permanent r2_object_key
- *   → ownership check
- *   → temporary signed GET for browser
+ * PAID / ADMIN → private R2 bucket motio2edit-user-media
+ *   env: CLOUDFLARE_R2_USER_ACCESS_KEY_ID, CLOUDFLARE_R2_USER_SECRET_ACCESS_KEY,
+ *        CLOUDFLARE_R2_USER_BUCKET_NAME (or CLOUDFLARE_R2_USER_BUCKET)
+ *   keys: users/{userId}/outputs|videos|music/{id}.ext
+ *   delivery: temporary signed GET only
  *
- * SAMPLES (public): samples/, frames/, assets/, image/samples/, etc.
- *   → public base URL when configured
+ * FREE → private Vercel Blob store motio2edit-user-history
+ *   keys: users/{userId}/history/{id}/output.ext
  *
- * Never persist permanent public r2.dev URLs for users/**.
- * Never expose R2 credentials to the browser.
+ * Public samples stay on primary r2.server.ts (motio2edit-media).
+ * Never persist permanent public r2.dev URLs for user media.
  */
 import {
-  isR2Configured,
-  r2PutObject,
-  r2ResolveDeliveryUrl,
-  isPrivateUserObjectKey,
-  extractR2ObjectKeyFromUrl,
-  R2_PREFIX,
-} from "@/lib/r2.server";
+  isPrivateR2Configured,
+  isPrivateBlobConfigured,
+  privateR2PutObject,
+  privateR2SignedGetUrl,
+  privateBlobPutObject,
+  historyObjectKey,
+} from "@/lib/private-history-storage.server";
 
 export type UserMediaKind = "image" | "video" | "music" | "other";
+
+export type IngestResult = {
+  objectKey: string;
+  deliveryUrl: string;
+  contentType: string;
+  storageProvider: "r2" | "blob";
+};
 
 function extFor(kind: UserMediaKind, contentType: string | null, sourceUrl: string): string {
   const ct = (contentType || "").toLowerCase();
@@ -62,31 +70,18 @@ function contentTypeFor(kind: UserMediaKind, ext: string): string {
   return map[ext] || (kind === "video" ? "video/mp4" : kind === "music" ? "audio/mpeg" : "image/jpeg");
 }
 
-/**
- * Download provider/CDN bytes and store under users/{userId}/...
- * Returns permanent object key + temporary signed delivery URL.
- */
-export async function ingestProviderMediaToUserR2(opts: {
-  userId: string;
-  sourceUrl: string;
-  kind: UserMediaKind;
-  /** Optional stable id for key path */
-  generationId?: string | null;
-}): Promise<{ objectKey: string; deliveryUrl: string; contentType: string } | null> {
-  if (!isR2Configured()) return null;
-  if (!opts.sourceUrl.startsWith("https://")) return null;
-  // Already our private user object — just re-sign
-  const existing = extractR2ObjectKeyFromUrl(opts.sourceUrl);
-  if (existing && isPrivateUserObjectKey(existing)) {
-    const deliveryUrl = await r2ResolveDeliveryUrl(existing, { preferSigned: true });
-    if (deliveryUrl) {
-      return { objectKey: existing, deliveryUrl, contentType: contentTypeFor(opts.kind, "bin") };
-    }
-  }
+function isFreePlan(plan: string | null | undefined): boolean {
+  const p = (plan ?? "free").toLowerCase();
+  return p === "free" || p === "";
+}
 
+async function fetchProviderBytes(
+  sourceUrl: string,
+): Promise<{ buf: Buffer; contentType: string } | null> {
+  if (!sourceUrl.startsWith("https://")) return null;
   let res: Response;
   try {
-    res = await fetch(opts.sourceUrl, { redirect: "follow" });
+    res = await fetch(sourceUrl, { redirect: "follow" });
   } catch (e) {
     console.error("[user-media] fetch provider failed:", e);
     return null;
@@ -95,7 +90,6 @@ export async function ingestProviderMediaToUserR2(opts: {
     console.error("[user-media] provider HTTP", res.status);
     return null;
   }
-  // Reject HTML error pages
   const ctHeader = res.headers.get("content-type") || "";
   if (ctHeader.includes("text/html")) {
     console.error("[user-media] provider returned HTML, not media");
@@ -106,22 +100,99 @@ export async function ingestProviderMediaToUserR2(opts: {
     console.error("[user-media] provider body too small");
     return null;
   }
-  const ext = extFor(opts.kind, ctHeader, opts.sourceUrl);
-  const contentType = contentTypeFor(opts.kind, ext);
-  const stamp = opts.generationId || `${Date.now()}`;
-  const folder =
-    opts.kind === "music" ? "music" : opts.kind === "video" ? "videos" : "outputs";
-  const objectKey = `users/${opts.userId}/${folder}/${stamp}.${ext}`;
-
-  try {
-    await r2PutObject({ key: objectKey, body: buf, contentType });
-    const deliveryUrl = await r2ResolveDeliveryUrl(objectKey, { preferSigned: true });
-    if (!deliveryUrl) return null;
-    return { objectKey, deliveryUrl, contentType };
-  } catch (e) {
-    console.error("[user-media] R2 put failed:", e);
-    return null;
-  }
+  return { buf, contentType: ctHeader };
 }
 
-export { R2_PREFIX };
+/**
+ * Store provider/CDN media into the correct private store for the user's plan.
+ *
+ * PAID/ADMIN → private R2 (motio2edit-user-media)
+ * FREE → private Vercel Blob (motio2edit-user-history)
+ *
+ * Returns permanent object key + temporary browser delivery URL.
+ */
+export async function ingestProviderMediaToUserR2(opts: {
+  userId: string;
+  sourceUrl: string;
+  kind: UserMediaKind;
+  generationId?: string | null;
+  /** profiles.plan — free uses Blob; paid/admin uses private R2 */
+  plan?: string | null;
+  /** When true, always prefer private R2 (admin product path) */
+  preferPrivateR2?: boolean;
+}): Promise<IngestResult | null> {
+  const useR2 =
+    opts.preferPrivateR2 === true || !isFreePlan(opts.plan)
+      ? isPrivateR2Configured()
+      : false;
+  const useBlob = !useR2 && isPrivateBlobConfigured();
+
+  // Already a private-user key path: re-sign from private R2 when possible
+  if (opts.sourceUrl.includes("/users/") || opts.sourceUrl.startsWith("users/")) {
+    try {
+      const { extractR2ObjectKeyFromUrl } = await import("@/lib/r2.server");
+      const existing =
+        extractR2ObjectKeyFromUrl(opts.sourceUrl) ||
+        (opts.sourceUrl.startsWith("users/") ? opts.sourceUrl.replace(/^\//, "") : null);
+      if (existing && existing.startsWith("users/") && isPrivateR2Configured()) {
+        const deliveryUrl = await privateR2SignedGetUrl(existing);
+        return {
+          objectKey: existing,
+          deliveryUrl,
+          contentType: contentTypeFor(opts.kind, "bin"),
+          storageProvider: "r2",
+        };
+      }
+    } catch {
+      /* fall through to re-fetch */
+    }
+  }
+
+  const fetched = await fetchProviderBytes(opts.sourceUrl);
+  if (!fetched) return null;
+  const ext = extFor(opts.kind, fetched.contentType, opts.sourceUrl);
+  const contentType = contentTypeFor(opts.kind, ext);
+  const stamp = opts.generationId || `${Date.now()}`;
+
+  if (useR2) {
+    const folder =
+      opts.kind === "music" ? "music" : opts.kind === "video" ? "videos" : "outputs";
+    const objectKey = `users/${opts.userId}/${folder}/${stamp}.${ext}`;
+    try {
+      await privateR2PutObject({ key: objectKey, body: fetched.buf, contentType });
+      const deliveryUrl = await privateR2SignedGetUrl(objectKey);
+      return { objectKey, deliveryUrl, contentType, storageProvider: "r2" };
+    } catch (e) {
+      console.error("[user-media] private R2 put failed:", e);
+      return null;
+    }
+  }
+
+  if (useBlob) {
+    const objectKey = historyObjectKey(opts.userId, stamp, "output", ext);
+    try {
+      const { url } = await privateBlobPutObject({
+        pathname: objectKey,
+        body: fetched.buf,
+        contentType,
+      });
+      return {
+        objectKey,
+        deliveryUrl: url,
+        contentType,
+        storageProvider: "blob",
+      };
+    } catch (e) {
+      console.error("[user-media] private Blob put failed:", e);
+      return null;
+    }
+  }
+
+  console.warn(
+    "[user-media] no private store configured (need CLOUDFLARE_R2_USER_* or BLOB_READ_WRITE_TOKEN)",
+  );
+  return null;
+}
+
+/** @deprecated alias — use ingestProviderMediaToUserR2 */
+export const ingestProviderMediaToPrivateStore = ingestProviderMediaToUserR2;
