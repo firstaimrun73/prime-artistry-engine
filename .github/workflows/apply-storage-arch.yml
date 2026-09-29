@@ -1,0 +1,31 @@
+name: Apply storage architecture patches
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-storage-arch.yml"
+      - "scripts/apply_storage_arch_patches.py"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patches
+        run: |
+          set -euo pipefail
+          python3 scripts/apply_storage_arch_patches.py
+          grep -q privateR2PutObject src/lib/watermark/finalize.ts
+          grep -q "core columns only" src/routes/_authenticated.history.tsx
+          grep -q "preferPrivateR2: isAdmin" src/lib/generate.functions.ts || true
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/watermark/finalize.ts src/routes/_authenticated.history.tsx src/lib/generate.functions.ts src/lib/music.functions.ts
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "fix(storage): private user-media R2 finalize + History core fallback + plan-aware ingest"
+          git push
