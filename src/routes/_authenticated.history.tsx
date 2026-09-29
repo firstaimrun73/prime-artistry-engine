@@ -126,10 +126,22 @@ function HistoryPage() {
       .then(async ({ data, error }) => {
         let rows: Generation[] = [];
         if (error) {
-          console.error("[history] load failed:", error.message);
-          const fb = await supabase.from("generations").select("id, type, prompt, output_url, status, created_at, metadata, r2_object_key, storage_provider")
-            .eq("user_id", user.id).order("created_at", { ascending: false }).limit(100);
-          if (fb.error) { setGens([]); setLoadError(fb.error.message); toast.error("Could not load history."); setLoading(false); return; }
+          // Real compatibility fallback: core columns only (pre-migration schema).
+          console.error("[history] load failed (full select):", error.message, error);
+          const fb = await supabase
+            .from("generations")
+            .select("id, type, prompt, output_url, status, created_at, metadata")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(100);
+          if (fb.error) {
+            console.error("[history] core fallback failed:", fb.error.message, fb.error);
+            setGens([]);
+            setLoadError(fb.error.message);
+            toast.error("Could not load history.");
+            setLoading(false);
+            return;
+          }
           rows = ((fb.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
         } else {
           rows = ((data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));

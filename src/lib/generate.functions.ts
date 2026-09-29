@@ -713,6 +713,8 @@ export const generateMedia = createServerFn({ method: "POST" })
           userId,
           sourceUrl: outputUrl,
           kind,
+          plan: profile.plan,
+          preferPrivateR2: isAdmin,
         });
         if (ingested) {
           finalizedR2Key = ingested.objectKey;

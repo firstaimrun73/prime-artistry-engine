@@ -572,6 +572,8 @@ export const generateMusic = createServerFn({ method: "POST" })
           userId,
           sourceUrl: outputUrl,
           kind,
+          plan: profile.plan,
+          preferPrivateR2: isAdmin,
         });
         if (ingested) {
           musicR2Key = ingested.objectKey;

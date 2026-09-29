@@ -164,12 +164,16 @@ async function storeAndSign(opts: {
   const contentType = opts.mediaKind === "video" ? "video/mp4" : "image/jpeg";
   const key = `users/${opts.userId}/outputs/${marker}${Date.now()}.${ext}`;
 
-  // Prefer R2 when configured
+  // Prefer PRIVATE user-media R2 (motio2edit-user-media) - never primary sample bucket
   try {
-    const { isR2Configured, r2PutObject, r2ResolveDeliveryUrl } = await import("@/lib/r2.server");
-    if (isR2Configured()) {
-      await r2PutObject({ key, body: opts.buffer, contentType });
-      const url = await r2ResolveDeliveryUrl(key);
+    const {
+      isPrivateR2Configured,
+      privateR2PutObject,
+      privateR2SignedGetUrl,
+    } = await import("@/lib/private-history-storage.server");
+    if (isPrivateR2Configured()) {
+      await privateR2PutObject({ key, body: opts.buffer, contentType });
+      const url = await privateR2SignedGetUrl(key);
       if (url) {
         return {
           finalUrl: url,
@@ -181,7 +185,31 @@ async function storeAndSign(opts: {
       }
     }
   } catch (e) {
-    console.warn("[WATERMARK_FINALIZE] R2 store failed, falling back to Supabase storage:", e);
+    console.warn("[WATERMARK_FINALIZE] private R2 store failed, trying Blob/Supabase:", e);
+  }
+
+  try {
+    const { isPrivateBlobConfigured, privateBlobPutObject } = await import(
+      "@/lib/private-history-storage.server"
+    );
+    if (isPrivateBlobConfigured()) {
+      const { url } = await privateBlobPutObject({
+        pathname: key,
+        body: opts.buffer,
+        contentType,
+      });
+      if (url) {
+        return {
+          finalUrl: url,
+          watermarked: opts.watermarked,
+          mode: opts.mode,
+          storagePath: key,
+          skippedAsFinalized: false,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("[WATERMARK_FINALIZE] private Blob store failed:", e);
   }
 
   // Fallback: Supabase storage (legacy)
