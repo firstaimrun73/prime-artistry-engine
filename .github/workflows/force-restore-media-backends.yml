@@ -1,0 +1,22 @@
+name: Force restore media generation backends
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/force-restore-media-backends.yml"
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write full generate.functions.ts and music.functions.ts
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import base64, zlib
+          from pathlib import Path
+          print("placeholder - full content via second step")
+          PY
