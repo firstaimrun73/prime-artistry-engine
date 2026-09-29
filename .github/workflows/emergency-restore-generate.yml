@@ -1,0 +1,79 @@
+name: Emergency restore generate.functions.ts
+on:
+  workflow_dispatch:
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore full generate.functions.ts and persist r2 key
+        run: |
+          set -euo pipefail
+          # Last known full production file (before 9-byte placeholder)
+          git show 7262a1179fdd:src/lib/generate.functions.ts > src/lib/generate.functions.ts
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("src/lib/generate.functions.ts")
+          t = p.read_text()
+          if len(t) < 10000:
+              raise SystemExit(f"restore too small: {len(t)}")
+          if "r2ObjectKeyFromFinalize" not in t:
+              t = t.replace(
+                  '    if (data.type === "image" && outputUrl) {\n      try {\n        const { finalizeMediaAsset }',
+                  '    let r2ObjectKeyFromFinalize: string | null = null;\n    if (data.type === "image" && outputUrl) {\n      try {\n        const { finalizeMediaAsset }',
+                  1,
+              )
+              t = t.replace(
+                  """        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
+          outputUrl = fin.finalUrl;
+        }
+      } catch (wmErr) {""",
+                  """        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
+          outputUrl = fin.finalUrl;
+        }
+        if (fin.storagePath) {
+          r2ObjectKeyFromFinalize = fin.storagePath;
+        }
+      } catch (wmErr) {""",
+                  1,
+              )
+              t = t.replace(
+                  """      await persistGenerationHistory({
+        supabaseAdmin,
+        userId,
+        type: data.type === "video" ? "video" : "image",
+        prompt: data.prompt,
+        input_url: data.imageUrl ?? null,
+        output_url: outputUrl,
+        status: "success",
+        metadata: meta,
+      });""",
+                  """      await persistGenerationHistory({
+        supabaseAdmin,
+        userId,
+        type: data.type === "video" ? "video" : "image",
+        prompt: data.prompt,
+        input_url: data.imageUrl ?? null,
+        output_url: outputUrl,
+        status: "success",
+        metadata: meta,
+        r2ObjectKey: r2ObjectKeyFromFinalize,
+      });""",
+                  1,
+              )
+          if "executeStandardImage" not in t or "persistGenerationHistory" not in t:
+              raise SystemExit("restore incomplete")
+          if "r2ObjectKeyFromFinalize" not in t:
+              raise SystemExit("r2 key patch failed")
+          p.write_text(t)
+          print("restored bytes", len(t))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          git commit -m "EMERGENCY RESTORE: full generate.functions.ts + r2_object_key persist (was 9-byte placeholder)"
+          git push
