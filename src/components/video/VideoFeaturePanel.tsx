@@ -6,12 +6,12 @@ import type { VideoResolution, VideoAspect } from "@/lib/video-model-registry";
 export type VideoSizeOption = "small" | "medium" | "large";
 
 const GLASS =
-  "rounded-[22px] border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:border-white/[0.12] dark:bg-white/[0.06] dark:ring-white/[0.06]";
+  "rounded-[22px] border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150 ring-1 ring-black/5";
 
 const CHIP_ON =
   "bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] text-white border-transparent shadow-[0_6px_18px_rgba(244,63,94,0.35)]";
 const CHIP_OFF =
-  "border border-slate-300/80 bg-white/50 text-slate-600 dark:border-white/20 dark:bg-white/[0.06] dark:text-zinc-300";
+  "border border-slate-300/80 bg-white/50 text-slate-600";
 
 function ChipGroup<T extends string>({
   label,
@@ -39,7 +39,7 @@ function ChipGroup<T extends string>({
     options.find((o) => o.disabled || o.locked)?.reason;
   return (
     <div>
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
       <div className="flex flex-wrap gap-2">
@@ -66,7 +66,7 @@ function ChipGroup<T extends string>({
           );
         })}
       </div>
-      {note && <p className="mt-1.5 text-[11px] text-slate-500 dark:text-zinc-400">{note}</p>}
+      {note && <p className="mt-1.5 text-[11px] text-slate-500">{note}</p>}
     </div>
   );
 }
@@ -134,7 +134,7 @@ export function VideoFeaturePanel({
 
   return (
     <div className={cn(GLASS, "space-y-4 p-4")}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         Features
       </p>
 
@@ -147,8 +147,8 @@ export function VideoFeaturePanel({
               <VolumeX className="h-4 w-4 text-slate-400" aria-hidden />
             )}
             <div>
-              <p className="text-sm font-medium text-slate-800 dark:text-white">Sound</p>
-              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+              <p className="text-sm font-medium text-slate-800">Sound</p>
+              <p className="text-[11px] text-slate-500">
                 {soundOn ? "On when supported" : "Silent (default)"}
               </p>
             </div>
@@ -164,7 +164,7 @@ export function VideoFeaturePanel({
               "relative h-7 w-[48px] shrink-0 rounded-full border transition-all duration-300",
               soundOn
                 ? "border-transparent bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]"
-                : "border-slate-300/80 bg-white/60 dark:border-white/20 dark:bg-white/10",
+                : "border-slate-300/80 bg-white/60",
               disabled && "opacity-50",
             )}
           >
@@ -179,7 +179,7 @@ export function VideoFeaturePanel({
       )}
 
       <div>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           Aspect ratio
         </p>
         <div className="flex flex-wrap gap-2">
@@ -237,7 +237,7 @@ export function VideoFeaturePanel({
       />
 
       {capabilityNote && (
-        <p className="text-[11px] text-slate-500 dark:text-zinc-400">{capabilityNote}</p>
+        <p className="text-[11px] text-slate-500">{capabilityNote}</p>
       )}
     </div>
   );

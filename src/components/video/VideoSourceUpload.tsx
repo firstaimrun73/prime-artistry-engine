@@ -82,7 +82,7 @@ export function VideoSourceUpload({
   };
 
   const glass =
-    "rounded-3xl border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:border-white/[0.12] dark:bg-white/[0.06] dark:ring-white/[0.06]";
+    "rounded-3xl border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150 ring-1 ring-black/5";
 
   const GridOverlay = showGrid ? (
     <div className="pointer-events-none absolute inset-0 z-[5] opacity-30" aria-hidden>
@@ -94,7 +94,7 @@ export function VideoSourceUpload({
   ) : null;
 
   const cornerBtn =
-    "grid h-9 w-9 place-items-center rounded-full border border-white/70 bg-white/70 text-slate-700 shadow-sm backdrop-blur-md dark:border-white/20 dark:bg-black/50 dark:text-white";
+    "grid h-9 w-9 place-items-center rounded-full border border-white/70 bg-white/70 text-slate-700 shadow-sm backdrop-blur-md";
 
   return (
     <div className="w-full">
@@ -199,10 +199,10 @@ export function VideoSourceUpload({
           <span className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-[#FF7A45] to-[#F43F5E] text-white shadow-[0_6px_18px_rgba(244,63,94,0.35)]">
             {mode === "image" ? <ImagePlus className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
           </span>
-          <span className="text-sm font-bold text-slate-800 dark:text-white">{addLabel}</span>
-          <span className="text-center text-[11px] text-slate-500 dark:text-zinc-400">{formats}</span>
+          <span className="text-sm font-bold text-slate-800">{addLabel}</span>
+          <span className="text-center text-[11px] text-slate-500">{formats}</span>
           {mode === "video" && (
-            <Film className="pointer-events-none absolute bottom-3 right-3 h-5 w-5 text-slate-300 dark:text-zinc-600" aria-hidden />
+            <Film className="pointer-events-none absolute bottom-3 right-3 h-5 w-5 text-slate-300" aria-hidden />
           )}
         </button>
       )}
