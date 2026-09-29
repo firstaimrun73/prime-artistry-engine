@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Download, Pause, Play, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { musicModeBadge } from "@/components/music/musicStudioData";
 
 function artworkGradient(mode: string, genre?: string | null, mood?: string | null) {
   const key = `${mode}-${genre || ""}-${mood || ""}`.toLowerCase();
@@ -20,6 +21,8 @@ export function MusicResultCard({
   mood,
   charged,
   model,
+  quality,
+  durationSeconds,
   videoUrl,
   onAgain,
 }: {
@@ -30,6 +33,8 @@ export function MusicResultCard({
   mood?: string | null;
   charged?: number | null;
   model?: string | null;
+  quality?: string | null;
+  durationSeconds?: number | null;
   videoUrl?: string | null;
   onAgain: () => void;
 }) {
@@ -37,6 +42,7 @@ export function MusicResultCard({
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const badge = musicModeBadge(mode);
 
   useEffect(() => {
     setPlaying(false);
@@ -84,11 +90,26 @@ export function MusicResultCard({
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         <div className="relative z-10 min-w-0">
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
+            <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+              {badge.emoji} {badge.label}
+            </span>
+            {quality && (
+              <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium capitalize text-white backdrop-blur-sm">
+                {quality}
+              </span>
+            )}
+            {(durationSeconds != null || duration > 0) && (
+              <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                {durationSeconds ?? Math.round(duration)}s
+              </span>
+            )}
+          </div>
           <p className="truncate text-base font-bold text-white drop-shadow">{trackTitle}</p>
           <p className="mt-0.5 text-xs text-white/85 capitalize">
-            {mode}
-            {genre ? ` · ${genre}` : ""}
-            {mood ? ` · ${mood}` : ""}
+            {genre ? `${genre}` : ""}
+            {genre && mood ? " · " : ""}
+            {mood ? `${mood}` : ""}
             {charged != null ? ` · ${charged} credits` : ""}
           </p>
         </div>
@@ -128,9 +149,7 @@ export function MusicResultCard({
           </div>
         </div>
 
-        {model && (
-          <p className="truncate text-[10px] text-muted-foreground">{model}</p>
-        )}
+        {model && <p className="truncate text-[10px] text-muted-foreground">{model}</p>}
 
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" variant="outline" asChild>
