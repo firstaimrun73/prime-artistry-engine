@@ -11,18 +11,19 @@ import { MusicResultCard } from "@/components/music/MusicResultCard";
 import { MusicVoiceLibrary } from "@/components/music/MusicVoiceLibrary";
 import {
   DURATIONS, SFX_CATEGORIES, MUSIC_EXAMPLES as EXAMPLES, LOADING_STEPS as LOADING,
+  MOOD_CHIPS,
   type VoiceId,
 } from "@/components/music/musicStudioData";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  generateMusic, estimateMusicCost, MUSIC_GENRES, MUSIC_MOODS, type MusicMode,
+  generateMusic, estimateMusicCost, getMusicCapabilities, MUSIC_GENRES, MUSIC_MOODS, type MusicMode,
 } from "@/lib/music.functions";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { toast } from "sonner";
 import { StudioBackLink } from "@/components/StudioBackLink";
-import { Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, Music2, Info } from "lucide-react";
+import { Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, Music2, Info, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 async function uploadFile(file: File, userId: string, folder: string) {
@@ -98,6 +99,7 @@ function MusicStudio() {
   const search = useSearch({ from: "/_authenticated/music" }) as { mode?: string; videoUrl?: string };
   const generate = useServerFn(generateMusic);
   const estimate = useServerFn(estimateMusicCost);
+  const getCaps = useServerFn(getMusicCapabilities);
 
   const initialMode: MusicMode =
     search.mode === "video-music" ? "sfx" : ((search.mode as MusicMode) || "song");
@@ -129,6 +131,11 @@ function MusicStudio() {
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const estSeqRef = useRef(0);
   const [showCostInfo, setShowCostInfo] = useState(false);
+  const [musicCaps, setMusicCaps] = useState<{
+    qualityTiers: ("standard" | "premium")[];
+    promptMaxChars: number;
+    lyricsMaxChars: number;
+  } | null>(null);
 
   useEffect(() => {
     if (search.videoUrl) {
@@ -137,6 +144,34 @@ function MusicStudio() {
       setMode("sfx");
     }
   }, [search.videoUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await getCaps();
+        if (cancelled || !res) return;
+        setMusicCaps({
+          qualityTiers: (res.qualityTiers as ("standard" | "premium")[]) ?? ["standard"],
+          promptMaxChars: typeof res.promptMaxChars === "number" ? res.promptMaxChars : 0,
+          lyricsMaxChars: typeof res.lyricsMaxChars === "number" ? res.lyricsMaxChars : 0,
+        });
+      } catch {
+        /* capability fetch is best-effort; server still enforces */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getCaps]);
+
+  const premiumAllowed = !musicCaps || musicCaps.qualityTiers.includes("premium");
+  const promptMax = musicCaps?.promptMaxChars && musicCaps.promptMaxChars > 0 ? musicCaps.promptMaxChars : null;
+  const lyricsMax = musicCaps?.lyricsMaxChars && musicCaps.lyricsMaxChars > 0 ? musicCaps.lyricsMaxChars : null;
+
+  useEffect(() => {
+    if (!premiumAllowed && qualityTier === "premium") setQualityTier("standard");
+  }, [premiumAllowed, qualityTier]);
 
   const refreshEstimate = useCallback(async () => {
     const seq = ++estSeqRef.current;
@@ -313,7 +348,19 @@ function MusicStudio() {
           <div className="min-w-0 space-y-4">
             {/* Prompt */}
             <section>
-              <Label>{promptLabel}</Label>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">{promptLabel}</p>
+                {promptMax != null && (
+                  <span
+                    className={cn(
+                      "text-[10px] tabular-nums text-muted-foreground",
+                      prompt.length > promptMax && "text-destructive",
+                    )}
+                  >
+                    {prompt.length.toLocaleString()}/{promptMax.toLocaleString()}
+                  </span>
+                )}
+              </div>
               <AutoGrowTextarea
                 value={prompt}
                 onChange={setPrompt}
@@ -331,7 +378,19 @@ function MusicStudio() {
 
             {mode === "song" && (
               <section>
-                <Label>Lyrics (optional)</Label>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">Lyrics (optional)</p>
+                  {lyricsMax != null && (
+                    <span
+                      className={cn(
+                        "text-[10px] tabular-nums text-muted-foreground",
+                        lyrics.length > lyricsMax && "text-destructive",
+                      )}
+                    >
+                      {lyrics.length.toLocaleString()}/{lyricsMax.toLocaleString()}
+                    </span>
+                  )}
+                </div>
                 <AutoGrowTextarea
                   value={lyrics}
                   onChange={setLyrics}
@@ -356,7 +415,7 @@ function MusicStudio() {
                 <section className="min-w-0">
                   <Label>Mood</Label>
                   <MusicScrollChips
-                    items={MUSIC_MOODS}
+                    items={MOOD_CHIPS}
                     value={mood}
                     onChange={setMood}
                     activeClass="border-transparent bg-gradient-to-r from-violet-500 to-purple-700 text-white shadow-sm"
@@ -428,16 +487,26 @@ function MusicStudio() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setQualityTier("premium")}
+                    disabled={!premiumAllowed}
+                    onClick={() => {
+                      if (!premiumAllowed) return;
+                      setQualityTier("premium");
+                    }}
                     className={cn(
                       "rounded-xl border p-2.5 text-left",
-                      qualityTier === "premium"
+                      !premiumAllowed && "cursor-not-allowed opacity-60",
+                      qualityTier === "premium" && premiumAllowed
                         ? "ring-2 ring-purple-500/50 border-transparent bg-purple-500/10"
                         : "border-border/60 bg-card",
                     )}
                   >
-                    <p className="text-sm font-bold">Premium</p>
-                    <p className="text-[11px] text-muted-foreground">Higher fidelity</p>
+                    <p className="flex items-center gap-1.5 text-sm font-bold">
+                      Premium
+                      {!premiumAllowed && <Lock className="h-3 w-3 text-muted-foreground" aria-hidden />}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {premiumAllowed ? "Higher fidelity" : "Pro or higher"}
+                    </p>
                   </button>
                 </div>
               </section>
