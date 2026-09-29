@@ -1,0 +1,25 @@
+name: Run Fix Standard Crash
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/run-fix-standard-crash.yml"
+      - "scripts/fix_standard_crash.py"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply fix
+        run: |
+          set -euo pipefail
+          python3 scripts/fix_standard_crash.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx
+          git diff --cached --stat
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "fix(image-studio): Standard multi-image crash — clean onFile, blob previews, source detection"
+          git push origin HEAD:main
