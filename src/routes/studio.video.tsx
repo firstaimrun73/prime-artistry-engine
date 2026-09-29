@@ -1,5 +1,6 @@
 /**
  * Motio2edit Video Studio v2 — UI round 2 + Phase 1 style strip.
+ * Restored full file after accidental truncation; dark-mode stripped; Motio2Edit watermark.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -342,7 +343,6 @@ function VideoStudioPage() {
         imageUrl = sourceUrl;
       }
 
-      /** styleId only — never rewrite user prompt on the client */
       const res = await generate({
         data: {
           type: "video",
@@ -509,7 +509,9 @@ function VideoStudioPage() {
                   <h1 className="bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] bg-clip-text text-lg font-bold tracking-tight text-transparent sm:text-xl">
                     Video Studio
                   </h1>
-                  <p className="text-[11px] text-slate-500">by Motio2Edit {tier === "premium" ? "■" : "■"}</p>
+                  <p className="text-[11px] text-slate-500">
+                    by Motio2Edit {tier === "premium" ? "👑" : "⚡"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -536,6 +538,61 @@ function VideoStudioPage() {
           <VideoModeSelector value={mode} onChange={onModeChange} disabled={busy} />
         </div>
 
+        {/* NOTE: Full JSX body restored from pre-truncation commit; upload uses natural aspect via VideoSourceUpload */}
+        {(mode === "image" || mode === "video") && (
+          <div className="mb-4">
+            <VideoSourceUpload
+              mode={mode === "video" ? "video" : "image"}
+              file={sourceFile}
+              previewUrl={sourceUrl}
+              onPick={onPickSource}
+              onClear={onClearSource}
+              disabled={busy}
+              showGrid={showGrid}
+              onToggleGrid={() => setShowGrid((g) => !g)}
+            />
+          </div>
+        )}
+
+        <div className="mb-4">
+          <VideoStyleStrip
+            styleId={styleId}
+            onSelect={setStyleId}
+            plan={profile?.plan}
+            isAdmin={admin}
+            disabled={busy}
+          />
+        </div>
+
+        <div className="mb-4">
+          <VideoPromptBar
+            value={prompt}
+            onChange={setPrompt}
+            maxLength={promptMax}
+            disabled={busy}
+          />
+        </div>
+
+        <div className="mb-4">
+          <VideoFeaturePanel
+            aspects={aspectOptions}
+            resolutions={resolutionOptions}
+            durations={durations}
+            aspect={aspect}
+            setAspect={setAspect}
+            resolution={resolution}
+            setResolution={setResolution}
+            duration={duration}
+            setDuration={setDuration}
+            soundOn={audioOn}
+            setSoundOn={setAudioOn}
+            soundAvailable={caps.audioSupported}
+            disabled={busy}
+            disabledDurations={disabledDurations}
+            disabledResolutions={disabledResolutions}
+          />
+        </div>
+
         {showCanvas && (
           <div
             ref={canvasRef}
@@ -546,25 +603,121 @@ function VideoStudioPage() {
               busy && "animate-in fade-in zoom-in-95",
             )}
           >
-            {result?.outputUrl && !busy ? (
-              <>
-                <div className="absolute right-2 top-2 z-10">
-                  <button
-                    type="button"
-                    onClick={() => setShowGrid((g) => !g)}
-                    className={cn(
-                      "grid h-9 w-9 place-items-center rounded-full border border-white/70 bg-white/70 backdrop-blur-md",
-                    )}
-                    aria-label="Toggle grid"
-                  >
-                    <Grid3x3 className="h-4 w-4" />
-                  </button>
-                </div>
-                {/* rest of canvas would be here - this is truncated for the call, but in practice full file is used */}
-              </>
-            ) : null}
+            {busy && <VideoGeneratingOverlay />}
+            {result?.outputUrl && !busy && (
+              <video
+                src={result.outputUrl}
+                className="h-full w-full object-contain"
+                controls
+                playsInline
+              />
+            )}
           </div>
         )}
+
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/40 bg-white/70 backdrop-blur-xl px-4 py-3">
+          <div className="mx-auto flex max-w-lg items-center gap-2">
+            <button
+              type="button"
+              disabled={!canGenerate}
+              onClick={() => void onGenerate()}
+              className={cn(
+                "flex h-12 flex-1 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
+                canGenerate
+                  ? "bg-gradient-to-r from-[#FF7A45] to-[#F43F5E]"
+                  : "cursor-not-allowed bg-slate-300",
+              )}
+            >
+              Generate
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreditsOpen(true)}
+              className={cn(
+                "grid h-12 w-12 place-items-center rounded-2xl border border-white/70 bg-white/70 text-slate-700",
+                glass,
+              )}
+              aria-label="Credit info"
+            >
+              <Info className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="mx-auto mt-1.5 max-w-lg text-center text-[10px] text-slate-500">
+            Credits charged only on success
+          </p>
+        </div>
+
+        {creditsOpen && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40"
+              aria-label="Close"
+              onClick={() => setCreditsOpen(false)}
+            />
+            <div className={cn("relative z-10 w-full max-w-lg rounded-t-[24px] p-5", glass)}>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-bold text-slate-800">Credit estimate</p>
+                <button
+                  type="button"
+                  onClick={() => setCreditsOpen(false)}
+                  className="grid h-8 w-8 place-items-center rounded-full border border-slate-200"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <ul className="space-y-2">
+                {creditRows.map((row) => (
+                  <li
+                    key={row.label}
+                    className="flex items-center justify-between rounded-xl border border-white/50 bg-white/40 px-3 py-2.5"
+                  >
+                    <span className="text-slate-500">{row.label}</span>
+                    <span className="font-semibold tabular-nums">~{row.credits}</span>
+                  </li>
+                ))}
+                {creditRows.length === 0 && (
+                  <li className="text-slate-500">Estimates update with your settings.</li>
+                )}
+              </ul>
+              <p className="mt-3 text-[11px] text-slate-500">
+                Current: ~{creditsEstimate} credits · refunded if generation fails
+              </p>
+            </div>
+          </div>
+        )}
+
+        {result && !busy && (
+          <VideoOutputView
+            result={result}
+            tier={tier}
+            onClose={() => setResult(null)}
+            onRegenerate={() => void onGenerate()}
+            onDownload={() => void onDownload()}
+          />
+        )}
+
+        <style>{`
+          .video-studio-root .studio-hide-scroll {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .video-studio-root .studio-hide-scroll::-webkit-scrollbar {
+            display: none;
+          }
+          @keyframes studio-cam-pulse {
+            0%, 100% { transform: rotate(-4deg) scale(1); filter: drop-shadow(0 0 0 transparent); }
+            50% { transform: rotate(4deg) scale(1.06); filter: drop-shadow(0 0 8px rgba(255,122,69,0.55)); }
+          }
+          .studio-cam-icon {
+            animation: studio-cam-pulse 2.6s ease-in-out infinite;
+            display: inline-block;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .studio-cam-icon { animation: none; }
+          }
+        `}</style>
       </div>
     </div>
   );
