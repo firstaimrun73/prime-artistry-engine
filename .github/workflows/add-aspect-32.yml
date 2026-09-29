@@ -1,0 +1,81 @@
+name: Add 3:2 2:3 Aspects
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/add-aspect-32.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/lib/prompt-suggestions.ts")
+          t = p.read_text()
+          if '"3:2"' in t and 'AspectRatio' in t:
+              # may already be partially there
+              pass
+          old_type = 'export type AspectRatio = "1:1" | "4:3" | "16:9" | "9:16" | "3:4" | "21:9" | "imax" | "custom";'
+          new_type = 'export type AspectRatio = "1:1" | "4:3" | "3:2" | "16:9" | "9:16" | "2:3" | "3:4" | "21:9" | "imax" | "custom";'
+          if old_type in t:
+              t = t.replace(old_type, new_type, 1)
+          old_list = '''export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
+  { id: "1:1", label: "1:1" },
+  { id: "4:3", label: "4:3" },
+  { id: "16:9", label: "16:9" },
+  { id: "9:16", label: "9:16" },
+  { id: "3:4", label: "3:4" },
+  { id: "21:9", label: "21:9" },
+  { id: "imax", label: "IMAX" },
+  { id: "custom", label: "Custom" },
+];'''
+          new_list = '''export const ASPECT_RATIOS: { id: AspectRatio; label: string }[] = [
+  { id: "1:1", label: "1:1" },
+  { id: "4:3", label: "4:3" },
+  { id: "3:2", label: "3:2" },
+  { id: "16:9", label: "16:9" },
+  { id: "9:16", label: "9:16" },
+  { id: "2:3", label: "2:3" },
+  { id: "3:4", label: "3:4" },
+  { id: "21:9", label: "21:9" },
+  { id: "imax", label: "IMAX" },
+  { id: "custom", label: "Custom" },
+];'''
+          if old_list in t:
+              t = t.replace(old_list, new_list, 1)
+              print("list replaced")
+          elif '"3:2"' in t:
+              print("already has 3:2")
+          else:
+              raise SystemExit("ASPECT_RATIOS pattern not found")
+          p.write_text(t)
+          # AspectShape dims in EditorOptionsPanel
+          eop = Path("src/components/editor/EditorOptionsPanel.tsx")
+          et = eop.read_text()
+          if '"3:2"' not in et:
+              et = et.replace(
+                  '"4:3": { w: 22, h: 16 },',
+                  '"4:3": { w: 22, h: 16 },\n    "3:2": { w: 24, h: 16 },',
+                  1,
+              )
+              et = et.replace(
+                  '"9:16": { w: 14, h: 26 },',
+                  '"9:16": { w: 14, h: 26 },\n    "2:3": { w: 16, h: 24 },',
+                  1,
+              )
+              eop.write_text(et)
+              print("eop shapes ok")
+          print("done")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/prompt-suggestions.ts src/components/editor/EditorOptionsPanel.tsx
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "fix(image-studio): expose 3:2 and 2:3 aspect chips for Ultra"
+          git push origin HEAD:main
