@@ -34,7 +34,7 @@ export const Route = createFileRoute("/pricing")({
       {
         name: "description",
         content:
-          "Simple Motio2edit plans: Free, Lite, Pro and Studio. Credit-based AI image, video and music generation.",
+          "Motio2edit plans: Free, Lite, Plus, Pro, Studio and Master Studio. Credit-based AI image, video and music.",
       },
       { property: "og:title", content: "Pricing — Motio2edit" },
       {
@@ -52,6 +52,7 @@ const LABELS: Partial<Record<PlanId, { text: string; cls: string }>> = {
   lite: { text: "Best Starter", cls: "bg-amber-500 text-white" },
   pro: { text: "Most Popular", cls: "bg-primary text-primary-foreground" },
   studio: { text: "Pro Creators", cls: "bg-violet-600 text-white" },
+  business: { text: "Master Studio", cls: "bg-gradient-to-r from-amber-500 to-orange-600 text-white" },
 };
 
 function Pricing() {
@@ -229,10 +230,28 @@ function Pricing() {
           })}
         </div>
 
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          Secure checkout via Razorpay, PayPal or crypto. Credits are granted only after server-side
-          payment verification.
-        </p>
+        <div className="mx-auto mt-10 max-w-2xl space-y-4 text-center">
+          <p className="text-[11px] text-muted-foreground">
+            *Unlimited prompt length is a product-facing label for Master Studio. Server-side safety
+            limits still apply to protect generation quality and system stability.
+          </p>
+          <div className="rounded-2xl border border-border bg-card p-4 text-left sm:p-5">
+            <p className="text-sm font-semibold text-foreground">Commercial use</p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              Commercial-use access is included with eligible paid plans as described above. Your
+              ability to use generated content commercially may also depend on the applicable AI
+              provider's terms, the content you create, and local law.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              Motio2edit does not guarantee copyright protection, exclusivity, or ownership of every
+              AI-generated result.
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Secure checkout via Razorpay, PayPal or crypto. Credits are granted only after server-side
+            payment verification.
+          </p>
+        </div>
       </div>
       <FooterAd placement="pricing" />
       <Footer />
