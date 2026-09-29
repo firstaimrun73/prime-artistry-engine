@@ -132,6 +132,7 @@ export const PLANS: Plan[] = [
       "Circle 2edit · no watermark",
       "Private History — plan retention applies",
       "Standard queue · email support",
+      "Watermark-free downloads",
     ],
   },
   {
@@ -152,7 +153,8 @@ export const PLANS: Plan[] = [
       "Faster processing",
       "Private History — plan retention applies",
       "JPG and PNG downloads",
-      "Basic commercial use",
+      "Commercial-use access (see note below)",
+      "Watermark-free downloads",
     ],
   },
   {
@@ -172,6 +174,7 @@ export const PLANS: Plan[] = [
       "Priority queue · no watermark",
       "Private History — plan retention applies",
       "Priority support",
+      "Watermark-free downloads",
     ],
   },
   {
@@ -190,9 +193,10 @@ export const PLANS: Plan[] = [
       "IMAX locked · 8K Max locked · Custom locked",
       "≈ 200 images or ≈ 40 videos",
       "4K video · full music studio",
-      "Fastest queue · commercial license",
+      "Fastest queue · commercial-use access",
       "Private History — plan retention applies",
       "Premium support",
+      "Watermark-free downloads",
     ],
   },
   {
@@ -215,10 +219,11 @@ export const PLANS: Plan[] = [
       "4K Ultra image and video generation",
       "No ads",
       "No watermark",
-      "Commercial license",
+      "Commercial-use access (see note below)",
       "VIP Master Studio badge and priority support",
       "Private History — plan retention applies",
       "Server-side credit protection still applies",
+      "Watermark-free downloads",
     ],
   },
 ];
