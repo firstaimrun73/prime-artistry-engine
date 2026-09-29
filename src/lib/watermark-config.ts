@@ -5,13 +5,14 @@
  * The AI provider is never instructed to draw Motio2edit branding.
  *
  * Brand text (primary): exactly "Motio2edit" (only the digit 2 is brand-highlighted).
- * Secondary: dense text marks + corner icon — free/non-premium protection.
+ * Free users: primary only (no secondary). Paid: primary when opted in.
  */
 
 export const WATERMARK_BRAND_TEXT = "Motio2edit" as const;
 /** Exact label for Video Studio burned-in watermark (spec §21) */
 export const VIDEO_WATERMARK_LABEL = "Motio2edit Video Studio" as const;
-export const WATERMARK_BRAND_ORANGE = "#f97316";
+/** Brand orange for the digit "2" — matches Image Studio accent. */
+export const WATERMARK_BRAND_ORANGE = "#FF5A1F";
 
 /** Supported aspect-ratio keys for asset selection (final output dimensions). */
 export type WatermarkRatioKey =
@@ -72,8 +73,10 @@ export function detectWatermarkRatioKey(
   return best;
 }
 
-/** Relative size of primary pill vs min(image width, height). Bumped for visibility. */
+/** Relative size of primary pill vs min(image width, height) — paid / default. */
 export const PRIMARY_SIZE_RATIO = 0.048;
+/** Free-plan primary is somewhat larger so Motio2edit stays clearly visible. */
+export const FREE_PRIMARY_SIZE_RATIO = 0.068;
 /** Relative size of secondary icon vs min(image width, height). */
 export const SECONDARY_SIZE_RATIO = 0.07;
 /** Safe margin from edges as fraction of min dimension. */
