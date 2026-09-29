@@ -1,13 +1,14 @@
 /**
  * Shared private media delivery (server-only).
  *
- * PAID History (storage_provider=r2):
+ * PAID/ADMIN (storage_provider=r2):
  *   motio2edit-user-media via private-history-storage (CLOUDFLARE_R2_USER_*)
- * FREE History (storage_provider=blob):
- *   private Vercel Blob
+ * FREE (storage_provider=blob):
+ *   private Vercel Blob (BLOB_READ_WRITE_TOKEN)
  *
  * Never signs paid user keys with the primary public/sample R2 (motio2edit-media).
  * Never returns public r2.dev URLs for users/**.
+ * Admin is NOT a cross-user media bypass.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -17,7 +18,7 @@ export type MediaResolveInput = {
   outputUrl?: string | null;
   storageProvider?: string | null;
   userId: string;
-  /** Row owner — must match authenticated user (or admin viewing own rows). */
+  /** Row owner — must match authenticated user. */
   ownerUserId: string;
 };
 
@@ -28,9 +29,6 @@ export type MediaResolveResult = {
 };
 
 function assertOwner(ownerUserId: string, requesterId: string, isAdmin: boolean): void {
-  // Admin may only resolve their own media when owner matches, OR we allow admin
-  // to resolve any row they already loaded via RLS as themselves.
-  // Cross-user: always require owner === requester (admin is not a global media bypass).
   if (ownerUserId !== requesterId) {
     throw new Error("Not authorized to access this media.");
   }
@@ -44,7 +42,6 @@ function keyLooksLikeUserMedia(key: string | null | undefined): boolean {
 
 /**
  * Resolve a browser-loadable temporary URL for private user media.
- * Prefer permanent r2_object_key on the private user-media bucket.
  */
 export async function resolvePrivateMediaDelivery(
   input: MediaResolveInput & { isAdmin?: boolean },
@@ -54,7 +51,6 @@ export async function resolvePrivateMediaDelivery(
   const provider = (input.storageProvider ?? "").toLowerCase();
   let key = (input.r2ObjectKey && input.r2ObjectKey.replace(/^\//, "")) || null;
 
-  // Recover key from broken public r2.dev URLs stored in legacy rows
   if (!key && input.outputUrl) {
     try {
       const { extractR2ObjectKeyFromUrl } = await import("@/lib/r2.server");
@@ -64,8 +60,8 @@ export async function resolvePrivateMediaDelivery(
     }
   }
 
-  // ── Private user-media R2 (paid) ──────────────────────────────────────────
-  if ((provider === "r2" || keyLooksLikeUserMedia(key)) && key) {
+  // ── Private user-media R2 (paid/admin) ────────────────────────────────────
+  if ((provider === "r2" || keyLooksLikeUserMedia(key)) && key && provider !== "blob") {
     try {
       const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
         "@/lib/private-history-storage.server"
@@ -80,20 +76,32 @@ export async function resolvePrivateMediaDelivery(
   }
 
   // ── Private Blob (free History) ───────────────────────────────────────────
-  if (provider === "blob" && input.outputUrl?.startsWith("https://")) {
-    // Blob private URLs from put() are usable with the store token server-side;
-    // the stored delivery_url from upload is returned to the owner only.
-    return { deliveryUrl: input.outputUrl, objectKey: key, source: "blob" };
+  if (provider === "blob") {
+    try {
+      const { isPrivateBlobConfigured, privateBlobResolveDelivery } = await import(
+        "@/lib/private-history-storage.server"
+      );
+      if (isPrivateBlobConfigured()) {
+        const url = await privateBlobResolveDelivery(input.outputUrl || key);
+        if (url) {
+          return { deliveryUrl: url, objectKey: key, source: "blob" };
+        }
+      }
+    } catch (e) {
+      console.warn("[private-media] blob resolve failed:", e);
+    }
+    // Owner-scoped fallback: return stored https URL only after ownership assert
+    if (input.outputUrl?.startsWith("https://")) {
+      return { deliveryUrl: input.outputUrl, objectKey: key, source: "blob" };
+    }
   }
 
   // ── Safe passthrough: temporary provider/CDN URLs only ────────────────────
   if (input.outputUrl?.startsWith("https://")) {
-    // Never passthrough unauthorized public r2.dev for users/**
     try {
       const { extractR2ObjectKeyFromUrl } = await import("@/lib/r2.server");
       const extracted = extractR2ObjectKeyFromUrl(input.outputUrl);
       if (extracted && keyLooksLikeUserMedia(extracted)) {
-        // Last attempt: private R2 sign
         try {
           const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
             "@/lib/private-history-storage.server"
