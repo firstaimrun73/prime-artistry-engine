@@ -115,59 +115,77 @@ function HistoryPage() {
   const [pendingDelete, setPendingDelete] = useState<Generation | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const load = () => {
+  const load = async () => {
     if (!user) { setLoading(false); setGens([]); setLoadError(null); return; }
     setLoading(true); setLoadError(null);
-    supabase.from("generations").select("id, type, prompt, output_url, status, created_at, metadata, retained_as_history, deleted_at, storage_provider, r2_object_key")
-      .eq("user_id", user.id)
-      .or("retained_as_history.eq.true,retained_as_history.is.null")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(100)
-      .then(async ({ data, error }) => {
-        let rows: Generation[] = [];
-        if (error) {
-          // Real compatibility fallback: core columns only (pre-migration schema).
-          console.error("[history] load failed (full select):", error.message, error);
-          const fb = await supabase
+    try {
+      let rows: Generation[] = [];
+      const full = await supabase
+        .from("generations")
+        .select("id, type, prompt, output_url, status, created_at, metadata, retained_as_history, deleted_at, storage_provider, r2_object_key")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (!full.error && full.data) {
+        rows = ((full.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
+      } else {
+        if (full.error) console.warn("[history] full select:", full.error.message);
+        const core = await supabase
+          .from("generations")
+          .select("id, type, prompt, output_url, status, created_at, metadata")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(100);
+        if (!core.error && core.data) {
+          rows = ((core.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
+        } else {
+          if (core.error) console.warn("[history] core select:", core.error.message);
+          const min = await supabase
             .from("generations")
-            .select("id, type, prompt, output_url, status, created_at, metadata")
+            .select("id, type, prompt, output_url, status, created_at")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false })
             .limit(100);
-          if (fb.error) {
-            console.error("[history] core fallback failed:", fb.error.message, fb.error);
+          if (min.error) {
+            console.error("[history] all selects failed:", min.error.message);
             setGens([]);
-            setLoadError(fb.error.message);
+            setLoadError(min.error.message);
             toast.error("Could not load history.");
             setLoading(false);
             return;
           }
-          rows = ((fb.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
-        } else {
-          rows = ((data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
+          rows = ((min.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
         }
-        try {
-          const ids = rows.map((g) => g.id).filter(Boolean);
-          if (ids.length > 0) {
-            const resolved = await resolveHistoryMedia({ data: { generationIds: ids } });
-            const map = resolved?.urls ?? {};
-            rows = rows.map((g) => {
-              const delivery = map[g.id];
-              if (delivery && delivery.startsWith("https://")) {
-                return { ...g, output_url: delivery };
-              }
-              return g;
-            });
-          }
-        } catch (e) {
-          console.warn("[history] media resolve skipped:", e);
+      }
+      try {
+        const ids = rows.map((g) => g.id).filter(Boolean);
+        if (ids.length > 0) {
+          const resolved = await resolveHistoryMedia({ data: { generationIds: ids } });
+          const map = resolved?.urls ?? {};
+          rows = rows.map((g) => {
+            const delivery = map[g.id];
+            if (delivery && delivery.startsWith("https://")) {
+              return { ...g, output_url: delivery };
+            }
+            return g;
+          });
         }
-        setGens(rows);
-        setLoadError(null);
-        setLoading(false);
-      });
+      } catch (e) {
+        console.warn("[history] media resolve skipped:", e);
+      }
+      setGens(rows);
+      setLoadError(null);
+    } catch (e) {
+      console.error("[history] unexpected load error:", e);
+      setGens([]);
+      setLoadError(e instanceof Error ? e.message : "Unknown error");
+      toast.error("Could not load history.");
+    } finally {
+      setLoading(false);
+    }
   };
-  useEffect(load, [user]);
+  useEffect(() => { void load(); }, [user]);
+
 
   const open = (g: Generation) => { setActive(g); setZoomed(false); };
   const download = async (g: Generation) => {
