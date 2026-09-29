@@ -8,6 +8,7 @@ import { Download, Trash2, Play, Pause, Music } from "lucide-react";
 import { historyUserDelete, musicHistoryUserDelete } from "@/lib/history-retention";
 import { useServerFn } from "@tanstack/react-start";
 import { resolveHistoryMediaUrls } from "@/lib/private-media.functions";
+import { musicModeBadge } from "@/components/music/musicStudioData";
 
 type Track = {
   id: string;
@@ -20,6 +21,8 @@ type Track = {
   audio_url: string;
   created_at: string;
   source: "music_history" | "generations";
+  mode?: string | null;
+  quality?: string | null;
 };
 
 export function MusicHistoryList({ userId }: { userId: string | undefined }) {
@@ -106,6 +109,13 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
             audio_url: g.output_url as string,
             created_at: g.created_at,
             source: "generations" as const,
+            mode: typeof meta.mode === "string" ? meta.mode : null,
+            quality:
+              typeof meta.quality_tier === "string"
+                ? meta.quality_tier
+                : typeof meta.qualityTier === "string"
+                  ? meta.qualityTier
+                  : null,
           };
         });
       try {
@@ -191,49 +201,60 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
   return (
     <div className="mt-8 space-y-4">
       <audio ref={audioRef} onEnded={() => setPlayingId(null)} className="hidden" />
-      {tracks.map((t) => (
-        <div
-          key={t.id}
-          className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center"
-        >
-          <div className="flex items-center gap-4">
-            <VinylDisc playing={playingId === t.id} size={64} />
-            <button
-              onClick={() => toggle(t)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
-              aria-label={playingId === t.id ? "Pause" : "Play"}
-            >
-              {playingId === t.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </button>
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{t.track_title}</p>
-            {t.prompt && <p className="truncate text-xs text-muted-foreground">{t.prompt}</p>}
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-              {t.genre && (
-                <span className="rounded-full bg-secondary px-2 py-0.5 capitalize">{t.genre}</span>
+      {tracks.map((t) => {
+        const badge = musicModeBadge(t.mode || "song");
+        return (
+          <div
+            key={t.id}
+            className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4"
+          >
+            <div className="flex items-center gap-3">
+              <VinylDisc playing={playingId === t.id} size={56} />
+              <button
+                onClick={() => toggle(t)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                aria-label={playingId === t.id ? "Pause" : "Play"}
+              >
+                {playingId === t.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </button>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{t.track_title}</p>
+              {t.prompt && (
+                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{t.prompt}</p>
               )}
-              {t.mood && (
-                <span className="rounded-full bg-secondary px-2 py-0.5 capitalize">{t.mood}</span>
-              )}
-              {t.duration && (
-                <span className="rounded-full bg-secondary px-2 py-0.5">{t.duration}s</span>
-              )}
-              <span className="text-muted-foreground">
-                {new Date(t.created_at).toLocaleDateString()}
-              </span>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="rounded-full bg-secondary px-2 py-0.5">
+                  {badge.emoji} {badge.label}
+                </span>
+                {t.quality && (
+                  <span className="rounded-full bg-secondary px-2 py-0.5 capitalize">{t.quality}</span>
+                )}
+                {t.duration != null && (
+                  <span className="rounded-full bg-secondary px-2 py-0.5">{t.duration}s</span>
+                )}
+                {t.genre && (
+                  <span className="rounded-full bg-secondary px-2 py-0.5 capitalize">{t.genre}</span>
+                )}
+                {t.mood && (
+                  <span className="rounded-full bg-secondary px-2 py-0.5 capitalize">{t.mood}</span>
+                )}
+                <span className="text-muted-foreground">
+                  {new Date(t.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => download(t)}>
+                <Download className="mr-1.5 h-4 w-4" /> Download
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => remove(t)}>
+                <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+              </Button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => download(t)}>
-              <Download className="mr-1.5 h-4 w-4" /> Download
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => remove(t)}>
-              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-            </Button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
