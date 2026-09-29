@@ -29,6 +29,8 @@ export type MotioVideoQuality = "SD" | "HD";
 export type MotioVideoMode = "text" | "image" | "video" | "audio";
 
 export const CREDIT_PRICING_VERSION = "2026-09-motio-spend-v1";
+/** Flat credits added on top of routed cost when tier === "premium". */
+export const PREMIUM_TIER_SURCHARGE_CREDITS = 22;
 /** Spend face value: 1 Motio2edit credit = 1.86¢ in Video Studio */
 export const CREDIT_RETAIL_USD = VIDEO_CREDIT_FACE_CENTS / 100;
 export const VIDEO_CREDIT_FACE_CENTS_PUBLIC = VIDEO_CREDIT_FACE_CENTS;
@@ -182,7 +184,9 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
     };
   }
 
-  const credits = videoCogsToCredits(cogs);
+  const routedCredits = videoCogsToCredits(cogs);
+  const surcharge = tier === "premium" ? PREMIUM_TIER_SURCHARGE_CREDITS : 0;
+  const credits = routedCredits + surcharge;
   return {
     credits,
     usd: +(credits * CREDIT_RETAIL_USD).toFixed(4),
@@ -194,9 +198,9 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
       durationSec,
       quality,
       soundOn,
-      baseCredits: credits,
-      soundSurcharge: 0,
-      formula: `ceil(${cogs.toFixed(4)} USD × 100) → ${credits} credits (face ${VIDEO_CREDIT_FACE_CENTS}¢)`,
+      baseCredits: routedCredits,
+      soundSurcharge: surcharge,
+      formula: `ceil(${cogs.toFixed(4)} USD × 100) = ${routedCredits}${surcharge ? ` + ${surcharge} Premium` : ""} → ${credits} credits`,
     },
   };
 }

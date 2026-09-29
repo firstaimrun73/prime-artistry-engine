@@ -6,12 +6,14 @@ import type { VideoStudioResult } from "./video-studio-types";
 
 export function VideoOutputView({
   result,
+  tier = "standard",
   onClose,
   onRegenerate,
   onDownload,
   onWatermark,
 }: {
   result: VideoStudioResult;
+  tier?: "standard" | "premium";
   onClose: () => void;
   onRegenerate: () => void;
   onDownload: () => void;
@@ -31,16 +33,16 @@ export function VideoOutputView({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      <div className="flex items-center justify-between border-b border-border/60 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#FFF8F3]">
+      <div className="flex items-center justify-between border-b border-slate-200 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div>
-          <p className="text-base font-bold tracking-tight text-foreground">🎥 Video Studio</p>
-          <p className="text-[11px] text-muted-foreground">by Motion2Ai</p>
+          <p className="text-base font-bold tracking-tight text-slate-800">🎥 Video Studio</p>
+          <p className="text-[11px] text-slate-500">by Motio2Edit {tier === "premium" ? "■" : "■"}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="grid h-9 w-9 place-items-center rounded-full border border-border/70 bg-muted/40 text-foreground"
+          className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-slate-100 text-slate-700"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
@@ -48,7 +50,7 @@ export function VideoOutputView({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-4">
-        <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border/70 bg-black shadow-lg">
+        <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-black shadow-lg">
           <video
             src={result.outputUrl}
             controls
@@ -60,13 +62,13 @@ export function VideoOutputView({
             className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/35 px-2 py-1 text-[10px] font-semibold tracking-wide text-white/90 backdrop-blur-sm"
             aria-hidden
           >
-            Motio2edit
+            Video Studio by Motio2Edit {tier === "premium" ? "■" : "■"}
           </div>
         </div>
       </div>
 
       <div
-        className="flex flex-wrap items-center justify-center gap-2 border-t border-border/60 px-4 pt-3"
+        className="flex flex-wrap items-center justify-center gap-2 border-t border-slate-200 px-4 pt-3"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <button
@@ -79,7 +81,7 @@ export function VideoOutputView({
         <button
           type="button"
           onClick={() => void share()}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 py-2.5 text-xs font-semibold text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700"
         >
           <Share2 className="h-3.5 w-3.5" /> Share
         </button>
@@ -87,7 +89,7 @@ export function VideoOutputView({
           <button
             type="button"
             onClick={onWatermark}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 py-2.5 text-xs font-semibold text-foreground"
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700"
           >
             Watermark
           </button>
@@ -95,7 +97,7 @@ export function VideoOutputView({
         <button
           type="button"
           onClick={onRegenerate}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 py-2.5 text-xs font-semibold text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700"
         >
           <RotateCcw className="h-3.5 w-3.5" /> Edit again
         </button>

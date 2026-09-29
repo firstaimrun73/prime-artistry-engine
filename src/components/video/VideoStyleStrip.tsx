@@ -14,7 +14,7 @@ import {
 } from "@/lib/videoStyles";
 
 const GLASS =
-  "border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150 ring-1 ring-black/5 dark:border-white/[0.12] dark:bg-white/[0.06] dark:ring-white/[0.06]";
+  "border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150 ring-1 ring-black/5";
 
 function tierBadgeLabel(tier: StyleTier): string | null {
   if (tier === "ai_plus") return "AI+";
@@ -47,7 +47,7 @@ export function VideoStyleStrip({
 
   return (
     <section className="mb-4">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         Style
       </p>
       <div className="relative">
@@ -126,7 +126,6 @@ export function VideoStyleStrip({
                         className={cn(
                           "rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-800",
                           "border border-white/70 bg-white/75 backdrop-blur-md",
-                          "dark:border-white/20 dark:bg-black/50 dark:text-white",
                         )}
                       >
                         {badge}
@@ -139,7 +138,7 @@ export function VideoStyleStrip({
                     "w-full truncate text-center text-[11px] font-semibold",
                     active && !locked
                       ? "bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] bg-clip-text text-transparent"
-                      : "text-slate-600 dark:text-zinc-300",
+                      : "text-slate-600",
                   )}
                 >
                   {s.name}
@@ -149,7 +148,7 @@ export function VideoStyleStrip({
           })}
         </div>
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#FFF1E8] to-transparent dark:from-[#0A0B14]"
+          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#FFF1E8] to-transparent"
           aria-hidden
         />
       </div>
@@ -183,16 +182,16 @@ export function VideoStyleStrip({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-bold text-slate-800 dark:text-white">
+                  <p className="truncate text-sm font-bold text-slate-800">
                     {lockedStyle.name}
                   </p>
                   {tierBadgeLabel(lockedStyle.tier) && (
-                    <span className="rounded-full border border-white/70 bg-white/70 px-1.5 py-0.5 text-[9px] font-bold dark:border-white/20 dark:bg-black/50">
+                    <span className="rounded-full border border-white/70 bg-white/70 px-1.5 py-0.5 text-[9px] font-bold">
                       {tierBadgeLabel(lockedStyle.tier)}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-[12px] text-slate-500 dark:text-zinc-400">
+                <p className="mt-1 text-[12px] text-slate-500">
                   {unlockCopy(lockedStyle.tier)}
                 </p>
               </div>
@@ -208,10 +207,7 @@ export function VideoStyleStrip({
               <button
                 type="button"
                 onClick={() => setLockedStyle(null)}
-                className={cn(
-                  "h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600",
-                  "dark:border-white/15 dark:text-zinc-300",
-                )}
+                className="h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600"
               >
                 Not now
               </button>
