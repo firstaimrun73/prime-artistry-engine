@@ -10,8 +10,7 @@
  *
  * Do NOT hardcode provider prices in React components — update this file.
  *
- * Pricing notes were checked against fal.ai public pages (Aug 2026).
- * Re-verify before large pricing changes: https://fal.ai/pricing
+ * Pricing notes checked against fal.ai public pages. Re-verify before large changes.
  */
 
 import type { PlanId } from "@/lib/plans";
@@ -19,16 +18,8 @@ import type { PlanId } from "@/lib/plans";
 /** Customer-value of one Motio2edit credit in USD. */
 export const CREDIT_CUSTOMER_USD = 4 / 350; // ≈ 0.01142857
 
-/**
- * Ops multiplier on provider cost (retry risk, storage, payment fees).
- * Applied before margin conversion.
- */
 export const OPS_COST_MULTIPLIER = 1.15;
 
-/**
- * Fraction of customer value reserved as Motio2edit gross contribution
- * after provider+ops. 0.72 means customer pays ~3.6× (ops-adjusted) provider.
- */
 export const PLATFORM_GROSS_FRACTION = 0.72;
 
 export type BillingUnit =
@@ -44,30 +35,21 @@ export type InputModality = "text" | "image" | "video" | "audio";
 
 export type RegistryEntry = {
   id: string;
-  /** fal.ai endpoint id */
   modelId: string;
   category: MediaCategory;
   operation: string;
   provider: string;
   billingUnit: BillingUnit;
-  /** USD per billing unit (verified / last-checked) */
   providerUnitCostUsd: number;
   inputTypes: InputModality[];
   outputTypes: ("audio" | "video" | "image")[];
-  /** Soft product limits */
   maxDurationSeconds?: number;
   minDurationSeconds?: number;
   minimumPlan: PlanId;
-  /** Human notes */
   notes?: string;
-  /** If true, UI may expose this model */
   enabled: boolean;
 };
 
-/**
- * Convert a known provider USD cost into Motio2edit credits.
- * credits = ceil( (provider * OPS) / (1 - PLATFORM_GROSS_FRACTION) / CREDIT_CUSTOMER_USD )
- */
 export function creditsFromProviderUsd(providerUsd: number): number {
   if (!Number.isFinite(providerUsd) || providerUsd <= 0) return 1;
   const withOps = providerUsd * OPS_COST_MULTIPLIER;
@@ -116,8 +98,12 @@ export function estimateCredits(
 }
 
 /**
- * Verified / documented provider endpoints (Aug 2026 fal catalog).
- * Image Studio / Auto Edit keep their existing fixed credit costs elsewhere.
+ * Active production providers for Music Studio.
+ * Standard Song/Instrumental/BGM: MiniMax 2.0 $0.03/gen
+ * Premium Song/Instrumental/BGM: MiniMax 2.6 $0.15/audio (Pro+)
+ * Voiceover: xAI TTS $0.015/1k chars
+ * SFX: MMAudio text-to-audio $0.001/s (max 30s)
+ * Video→Music: MMAudio V2 $0.001/s (max 30s segment)
  */
 export const GENERATION_REGISTRY: RegistryEntry[] = [
   {
@@ -131,7 +117,7 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     inputTypes: ["text"],
     outputTypes: ["audio"],
     minimumPlan: "lite",
-    notes: "Style prompt + lyrics_prompt. ~$0.03/generation on fal.",
+    notes: "Standard Song/Instrumental/BGM. ~$0.03/generation.",
     enabled: true,
   },
   {
@@ -144,38 +130,9 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     providerUnitCostUsd: 0.15,
     inputTypes: ["text"],
     outputTypes: ["audio"],
-    minimumPlan: "plus",
-    notes: "Higher quality MiniMax 2.6; ~$0.15/audio on fal.",
-    enabled: true,
-  },
-  {
-    id: "music_stable_audio",
-    modelId: "fal-ai/stable-audio",
-    category: "music",
-    operation: "instrumental",
-    provider: "Stability via fal",
-    billingUnit: "per_generation",
-    providerUnitCostUsd: 0.2,
-    inputTypes: ["text"],
-    outputTypes: ["audio"],
-    maxDurationSeconds: 180,
-    minimumPlan: "lite",
-    notes: "Instrumental / soundscape oriented; ~$0.20/gen (Stable Audio 2.5 class).",
-    enabled: true,
-  },
-  {
-    id: "music_elevenlabs",
-    modelId: "fal-ai/elevenlabs/music",
-    category: "music",
-    operation: "song",
-    provider: "ElevenLabs via fal",
-    billingUnit: "per_minute",
-    providerUnitCostUsd: 0.8,
-    inputTypes: ["text"],
-    outputTypes: ["audio"],
     minimumPlan: "pro",
-    notes: "~$0.80 per output minute, rounded up. Premium only.",
-    enabled: false,
+    notes: "Premium Song/Instrumental/BGM. ~$0.15/audio. Pro+ only.",
+    enabled: true,
   },
   {
     id: "sfx_mmaudio_v2",
@@ -190,7 +147,7 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     maxDurationSeconds: 30,
     minDurationSeconds: 1,
     minimumPlan: "lite",
-    notes: "Synced audio from video±text; $0.001/s. Real video→music path.",
+    notes: "Video→Music. $0.001/s. Provider max 30s per segment. Do not silently truncate longer jobs.",
     enabled: true,
   },
   {
@@ -204,8 +161,9 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     inputTypes: ["text"],
     outputTypes: ["audio"],
     maxDurationSeconds: 30,
+    minDurationSeconds: 1,
     minimumPlan: "lite",
-    notes: "Text-only SFX / ambient; $0.001/s.",
+    notes: "Text SFX. $0.001/s. Max 30s.",
     enabled: true,
   },
   {
@@ -219,7 +177,7 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     inputTypes: ["text"],
     outputTypes: ["audio"],
     minimumPlan: "lite",
-    notes: "Verified: xai/tts/v1 — $0.015 / 1k characters. Voices: eve, ara, rex, sal, leo.",
+    notes: "xai/tts/v1 — $0.015 / 1k characters. Voices: eve, ara, rex, sal, leo. Same model for all plans.",
     enabled: true,
   },
   {
@@ -235,7 +193,6 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     maxDurationSeconds: 30,
     minDurationSeconds: 5,
     minimumPlan: "lite",
-    notes: "Align with live fal-request TEXT_TO_VIDEO models; rate approx.",
     enabled: true,
   },
   {
@@ -251,20 +208,6 @@ export const GENERATION_REGISTRY: RegistryEntry[] = [
     maxDurationSeconds: 30,
     minDurationSeconds: 5,
     minimumPlan: "lite",
-    enabled: true,
-  },
-  {
-    id: "video_v2v_mmaudio",
-    modelId: "fal-ai/mmaudio-v2",
-    category: "video",
-    operation: "video_to_audio_track",
-    provider: "MMAudio via fal",
-    billingUnit: "per_second",
-    providerUnitCostUsd: 0.001,
-    inputTypes: ["video", "text"],
-    outputTypes: ["video"],
-    minimumPlan: "lite",
-    notes: "Not full visual V2V edit — adds/syncs audio to existing video.",
     enabled: true,
   },
 ];
