@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/restore-music-functions-urgent.yml'
+      - '.restore/music_fn/music.functions.zlib.b64'
 jobs:
   restore:
     runs-on: ubuntu-latest
@@ -11,102 +12,46 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Restore full music.functions.ts from git history
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Decompress and write full music.functions.ts
         run: |
           set -euo pipefail
-          TARGET="src/lib/music.functions.ts"
-          CURRENT_SIZE=$(wc -c < "$TARGET" || echo 0)
-          echo "Current size: $CURRENT_SIZE"
-
-          # Find most recent commit where file is large (full implementation)
-          GOOD_SHA=""
-          while read -r sha; do
-            size=$(git cat-file -s "$sha:$TARGET" 2>/dev/null || echo 0)
-            echo "commit $sha file size $size"
-            if [ "$size" -gt 15000 ]; then
-              GOOD_SHA=$sha
-              break
-            fi
-          done < <(git log --format=%H -- "$TARGET" | head -80)
-
-          if [ -z "$GOOD_SHA" ]; then
-            echo "No good revision found in history"
-            exit 1
-          fi
-
-          echo "Restoring from $GOOD_SHA"
-          git show "$GOOD_SHA:$TARGET" > "$TARGET"
-
           python3 << 'PY'
+          import base64, zlib
           from pathlib import Path
-          p = Path("src/lib/music.functions.ts")
-          t = p.read_text()
+
+          payload = Path('.restore/music_fn/music.functions.zlib.b64').read_text().strip()
+          text = zlib.decompress(base64.b64decode(payload)).decode('utf-8')
+
           required = [
-              "export const generateMusic",
-              "export const estimateMusicCost",
-              "export const getVoicePreview",
-              "export const getMusicCapabilities",
-              "deduct_credits",
-              "music_history",
+              'export const generateMusic',
+              'export const estimateMusicCost',
+              'export const getVoicePreview',
+              'export const getMusicCapabilities',
+              'deduct_credits',
+              'music_history',
+              'Reject invalid media URLs',
           ]
           for r in required:
-              if r not in t:
-                  raise SystemExit(f"Missing {r}")
+              if r not in text:
+                  raise SystemExit(f'Missing required symbol: {r}')
 
-          # Safe patches
-          t = t.replace(
-              'prompt: z.string().trim().max(12_000).optional().default(""),',
-              'prompt: z.string().trim().max(15_000).optional().default(""),',
-          )
+          if 'max(15_000)' not in text and 'max(15000)' not in text:
+              text = text.replace(
+                  'prompt: z.string().trim().max(12_000).optional().default(""),',
+                  'prompt: z.string().trim().max(15_000).optional().default(""),',
+              )
 
-          old = '''    const mode = data.mode as MusicMode;
-    const qualityTier = (data.qualityTier ?? "standard") as MusicQualityTier;
-    const hasVideo = !!(data.videoUrl && isSafeExternalUrl(data.videoUrl));
-    const hasImage = !!(data.imageUrl && isSafeExternalUrl(data.imageUrl));
-    const durationSeconds = data.durationSeconds ?? 30;
-    const videoAudioMode = data.videoAudioMode ?? "replace";
-
-    if (hasVideo && data.videoUrl && !isSafeExternalUrl(data.videoUrl)) {
-      throw new Error("Invalid video URL.");
-    }
-    if (hasImage && data.imageUrl && !isSafeExternalUrl(data.imageUrl)) {
-      throw new Error("Invalid image URL.");
-    }'''
-
-          new = '''    const mode = data.mode as MusicMode;
-    const qualityTier = (data.qualityTier ?? "standard") as MusicQualityTier;
-    // Reject invalid media URLs explicitly — never silently treat as "no media"
-    if (data.videoUrl && !isSafeExternalUrl(data.videoUrl)) {
-      throw new Error("Invalid video URL.");
-    }
-    if (data.imageUrl && !isSafeExternalUrl(data.imageUrl)) {
-      throw new Error("Invalid image URL.");
-    }
-    const hasVideo = !!data.videoUrl;
-    const hasImage = !!data.imageUrl;
-    const durationSeconds = data.durationSeconds ?? 30;
-    const videoAudioMode = data.videoAudioMode ?? "replace";'''
-
-          if old in t:
-              t = t.replace(old, new)
-              print("Applied URL validation patch")
-          else:
-              print("URL validation pattern not found (may already be patched)")
-
-          p.write_text(t)
-          print("Final size", len(t))
+          out = Path('src/lib/music.functions.ts')
+          out.write_text(text)
+          print(f'Wrote {out} ({len(text)} bytes)')
           PY
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$TARGET"
+          git add src/lib/music.functions.ts
           if git diff --cached --quiet; then
-            echo "No changes to commit"
+            echo "No changes"
           else
-            git commit -m "RESTORE: full music.functions.ts from history + URL/15k patches"
+            git commit -m "RESTORE: full music.functions.ts from zlib payload (URL validation + 15k prompt)"
             git push origin HEAD:main
           fi
