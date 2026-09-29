@@ -37,23 +37,26 @@ function normalizeStudioTier(raw: unknown): WatermarkStudioTier {
 
 /**
  * Primary watermark label. Keep short so the pill stays large and readable.
- * Long "Motio2edit Standard — Free" strings were shrinking the font via lengthFactor.
  */
 export function resolveExperienceWatermarkLabel(
   studioTier: WatermarkStudioTier | undefined,
   planId: string | null | undefined,
 ): string {
-  // Free users: primary Motio2edit only — never append secondary tier text.
   const plan = (planId ?? "free").toLowerCase();
   if (plan === "free" || plan === "") return WATERMARK_BRAND_TEXT;
 
   const tier = normalizeStudioTier(studioTier);
   const exp = experienceLabelFromTier(tier);
-  // Prefer compact brand; append experience only for paid-looking tiers
   if (tier === "standard") return WATERMARK_BRAND_TEXT;
   const planName = findPlan(planId)?.name;
   if (planName && planName.length <= 12) return `${WATERMARK_BRAND_TEXT} · ${exp}`;
   return `${WATERMARK_BRAND_TEXT} · ${exp}`;
+}
+
+function prefersPrivateR2(plan: string | null | undefined, isAdmin?: boolean): boolean {
+  if (isAdmin) return true;
+  const p = (plan ?? "free").toLowerCase();
+  return p !== "free" && p !== "";
 }
 
 export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<FinalizeMediaResult> {
@@ -87,7 +90,30 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
     };
   }
   if (!policyRequiresStamp(policy.mode)) {
+    // Paid/Admin clean path: still persist master to private store when possible
     if (input.sourceUrl) {
+      try {
+        const stored = await storeCleanMaster({
+          userId: input.userId,
+          sourceUrl: input.sourceUrl,
+          sourceBuffer: input.sourceBuffer,
+          mediaKind: input.mediaKind,
+          plan: input.plan,
+          isAdmin: input.isAdmin,
+        });
+        if (stored) {
+          return {
+            finalUrl: stored.finalUrl,
+            watermarked: false,
+            mode: "none",
+            storagePath: stored.storagePath,
+            skippedAsFinalized: false,
+            timings: { totalMs: Date.now() - t0 },
+          };
+        }
+      } catch (e) {
+        console.warn("[WATERMARK_FINALIZE] clean master store skipped:", e);
+      }
       return {
         finalUrl: input.sourceUrl,
         watermarked: false,
@@ -137,6 +163,8 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
     mediaKind: input.mediaKind,
     watermarked: true,
     mode: policy.mode,
+    plan: input.plan,
+    isAdmin: input.isAdmin,
   });
   const storeMs = Date.now() - ts;
   console.log(
@@ -152,42 +180,77 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
   return { ...result, timings: { fetchMs, renderMs, storeMs, totalMs: Date.now() - t0 } };
 }
 
+async function storeCleanMaster(opts: {
+  userId: string;
+  sourceUrl: string;
+  sourceBuffer?: Buffer;
+  mediaKind: "image" | "video";
+  plan: string | null | undefined;
+  isAdmin?: boolean;
+}): Promise<{ finalUrl: string; storagePath: string } | null> {
+  let buffer = opts.sourceBuffer;
+  if (!buffer) {
+    try {
+      buffer = await fetchMediaBuffer(opts.sourceUrl);
+    } catch {
+      return null;
+    }
+  }
+  const stored = await storeAndSign({
+    userId: opts.userId,
+    buffer,
+    mediaKind: opts.mediaKind,
+    watermarked: false,
+    mode: "none",
+    plan: opts.plan,
+    isAdmin: opts.isAdmin,
+  });
+  if (!stored.storagePath) return null;
+  return { finalUrl: stored.finalUrl, storagePath: stored.storagePath };
+}
+
 async function storeAndSign(opts: {
   userId: string;
   buffer: Buffer;
   mediaKind: "image" | "video";
   watermarked: boolean;
   mode: FinalizeMediaResult["mode"];
+  plan?: string | null;
+  isAdmin?: boolean;
 }): Promise<FinalizeMediaResult> {
   const marker = opts.mediaKind === "video" ? FINALIZED_VIDEO_MARKER : FINALIZED_PATH_MARKER;
   const ext = opts.mediaKind === "video" ? "mp4" : "jpg";
   const contentType = opts.mediaKind === "video" ? "video/mp4" : "image/jpeg";
   const key = `users/${opts.userId}/outputs/${marker}${Date.now()}.${ext}`;
+  const useR2 = prefersPrivateR2(opts.plan, opts.isAdmin);
 
-  // Prefer PRIVATE user-media R2 (motio2edit-user-media) - never primary sample bucket
-  try {
-    const {
-      isPrivateR2Configured,
-      privateR2PutObject,
-      privateR2SignedGetUrl,
-    } = await import("@/lib/private-history-storage.server");
-    if (isPrivateR2Configured()) {
-      await privateR2PutObject({ key, body: opts.buffer, contentType });
-      const url = await privateR2SignedGetUrl(key);
-      if (url) {
-        return {
-          finalUrl: url,
-          watermarked: opts.watermarked,
-          mode: opts.mode,
-          storagePath: key,
-          skippedAsFinalized: false,
-        };
+  // PAID / ADMIN → private user-media R2 (motio2edit-user-media)
+  if (useR2) {
+    try {
+      const {
+        isPrivateR2Configured,
+        privateR2PutObject,
+        privateR2SignedGetUrl,
+      } = await import("@/lib/private-history-storage.server");
+      if (isPrivateR2Configured()) {
+        await privateR2PutObject({ key, body: opts.buffer, contentType });
+        const url = await privateR2SignedGetUrl(key);
+        if (url) {
+          return {
+            finalUrl: url,
+            watermarked: opts.watermarked,
+            mode: opts.mode,
+            storagePath: key,
+            skippedAsFinalized: false,
+          };
+        }
       }
+    } catch (e) {
+      console.warn("[WATERMARK_FINALIZE] private R2 store failed:", e);
     }
-  } catch (e) {
-    console.warn("[WATERMARK_FINALIZE] private R2 store failed, trying Blob/Supabase:", e);
   }
 
+  // FREE → private Vercel Blob (or R2 failed for paid)
   try {
     const { isPrivateBlobConfigured, privateBlobPutObject } = await import(
       "@/lib/private-history-storage.server"
@@ -210,6 +273,32 @@ async function storeAndSign(opts: {
     }
   } catch (e) {
     console.warn("[WATERMARK_FINALIZE] private Blob store failed:", e);
+  }
+
+  // Last resort for paid if Blob missing: try R2 even when plan routing preferred Blob
+  if (!useR2) {
+    try {
+      const {
+        isPrivateR2Configured,
+        privateR2PutObject,
+        privateR2SignedGetUrl,
+      } = await import("@/lib/private-history-storage.server");
+      if (isPrivateR2Configured()) {
+        await privateR2PutObject({ key, body: opts.buffer, contentType });
+        const url = await privateR2SignedGetUrl(key);
+        if (url) {
+          return {
+            finalUrl: url,
+            watermarked: opts.watermarked,
+            mode: opts.mode,
+            storagePath: key,
+            skippedAsFinalized: false,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("[WATERMARK_FINALIZE] fallback R2 failed:", e);
+    }
   }
 
   // Fallback: Supabase storage (legacy)
