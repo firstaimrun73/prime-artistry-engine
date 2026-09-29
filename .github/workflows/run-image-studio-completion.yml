@@ -1,0 +1,32 @@
+name: Image Studio Completion Fixes
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/run-image-studio-completion.yml"
+      - "scripts/fix_image_studio_completion.py"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply fixes
+        run: |
+          set -euo pipefail
+          python3 scripts/fix_image_studio_completion.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/components/editor/EditorOptionsPanel.tsx \
+            src/lib/studio/image/image-experience-access.ts \
+            src/lib/studio/image/ultra/validation.ts \
+            src/lib/studio/image/ultra/types.ts \
+            src/lib/studio/image/ultra/model.ts \
+            src/lib/studio/studio-tier.ts \
+            src/components/editor/image/ImageEditor.tsx
+          git diff --cached --stat
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "fix(image-studio): watermark UI for image, plan-only entitlements, Custom not 16:9"
+          git push origin HEAD:main
