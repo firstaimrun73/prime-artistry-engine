@@ -5,7 +5,6 @@ export type VoiceId = "eve" | "ara" | "rex" | "sal" | "leo";
 
 /**
  * Voice library for Voiceover mode.
- * Descriptions match official xAI TTS characteristics (not marketing fiction).
  * previewSrc: static public file when present; otherwise server getVoicePreview caches real TTS.
  */
 export const VOICES: ReadonlyArray<{
@@ -58,17 +57,37 @@ export function isVoiceId(v: string): v is VoiceId {
   return (VOICE_IDS as readonly string[]).includes(v);
 }
 
+/** Provider-backed durations only (MMAudio / pipeline max 30s). Do not expose 60s. */
 export const DURATIONS = [
   { s: 8, label: "8s" },
   { s: 15, label: "15s" },
   { s: 30, label: "30s" },
-  { s: 60, label: "60s" },
-];
+] as const;
 
 export const SFX_CATEGORIES = [
   "cinematic", "nature", "weather", "machines", "ui", "crowd",
   "animals", "fantasy", "sci-fi", "ambience", "transitions",
 ] as const;
+
+/** Mood chips with compact modern glyphs for scanability. */
+export const MOOD_CHIPS: ReadonlyArray<{ id: string; label: string; glyph: string }> = [
+  { id: "epic", label: "Epic", glyph: "✨" },
+  { id: "uplifting", label: "Uplifting", glyph: "☀️" },
+  { id: "chill", label: "Chill", glyph: "🌿" },
+  { id: "sad", label: "Sad", glyph: "🌧" },
+  { id: "romantic", label: "Romantic", glyph: "❤️" },
+  { id: "energetic", label: "Energetic", glyph: "⚡" },
+  { id: "mysterious", label: "Mysterious", glyph: "🔮" },
+  { id: "dark", label: "Dark", glyph: "🌙" },
+  { id: "peaceful", label: "Peaceful", glyph: "😌" },
+  { id: "dreamy", label: "Dreamy", glyph: "💭" },
+  { id: "playful", label: "Playful", glyph: "🎈" },
+  { id: "aggressive", label: "Aggressive", glyph: "🔥" },
+  { id: "hopeful", label: "Hopeful", glyph: "🌅" },
+  { id: "nostalgic", label: "Nostalgic", glyph: "📷" },
+  { id: "tense", label: "Tense", glyph: "⏱" },
+  { id: "triumphant", label: "Triumphant", glyph: "🏆" },
+];
 
 export const MUSIC_EXAMPLES: Array<{
   mode: MusicMode;
@@ -83,4 +102,22 @@ export const MUSIC_EXAMPLES: Array<{
   { mode: "sfx", title: "Thunder", prompt: "Heavy cinematic thunder with distant rain and wind through trees" },
 ];
 
-export const LOADING_STEPS = ["Preparing…", "Analyzing…", "Generating…", "Processing audio…", "Finalizing…"];
+export const LOADING_STEPS = ["Preparing…", "Composing…", "Generating…", "Processing audio…", "Finalizing…"];
+
+/** Compact type badges for results / history. */
+export function musicModeBadge(mode: string): { emoji: string; label: string } {
+  switch (mode) {
+    case "voiceover":
+      return { emoji: "🎙", label: "Voiceover" };
+    case "instrumental":
+    case "bgm":
+      return { emoji: "🎹", label: "Instrumental" };
+    case "sfx":
+      return { emoji: "🔊", label: "Sound Effect" };
+    case "video_music":
+      return { emoji: "🎬", label: "Video Music" };
+    case "song":
+    default:
+      return { emoji: "🎵", label: "Music" };
+  }
+}
