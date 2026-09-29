@@ -31,19 +31,34 @@ async function deleteObject(
   objectKey: string | null,
 ): Promise<void> {
   if (!objectKey) return;
+  const key = objectKey.replace(/^\//, "");
   const p = (provider || "").toLowerCase();
+
+  // Primary app R2 bucket (users/** from finalize / user-media ingest)
+  if (key.startsWith("users/")) {
+    try {
+      const { isR2Configured, r2DeleteObject } = await import("@/lib/r2.server");
+      if (isR2Configured()) {
+        await r2DeleteObject(key);
+        return;
+      }
+    } catch (e) {
+      console.warn("[history-deletion-worker] primary R2 delete:", e);
+    }
+  }
+
   if (p === "r2") {
     if (!isPrivateR2Configured()) {
       throw new Error("Private R2 not configured; cannot delete object.");
     }
-    await privateR2DeleteObject(objectKey);
+    await privateR2DeleteObject(key);
     return;
   }
   if (p === "blob") {
     if (!isPrivateBlobConfigured()) {
       throw new Error("Private Blob not configured; cannot delete object.");
     }
-    await privateBlobDeleteObject(objectKey);
+    await privateBlobDeleteObject(key);
     return;
   }
   // supabase / unknown: nothing to delete from private stores
