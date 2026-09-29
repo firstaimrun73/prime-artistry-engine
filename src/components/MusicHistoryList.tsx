@@ -38,17 +38,63 @@ export function MusicHistoryList({ userId }: { userId: string | undefined }) {
     setLoading(true);
 
     void (async () => {
-      const { data: mh, error: mhErr } = await supabase
-        .from("music_history")
-        .select("id, track_title, prompt, genre, mood, bpm, duration, audio_url, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      // Prefer extended columns (mode, quality_tier) written by generateMusic.
+      // Fall back to minimal select if migration has not landed yet.
+      const extendedSelect =
+        "id, track_title, prompt, genre, mood, bpm, duration, audio_url, created_at, mode, quality_tier";
+      const minimalSelect =
+        "id, track_title, prompt, genre, mood, bpm, duration, audio_url, created_at";
+
+      let mh: Record<string, unknown>[] | null = null;
+      let mhErr: { message?: string } | null = null;
+      {
+        const r = await supabase
+          .from("music_history")
+          .select(extendedSelect)
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(50);
+        if (r.error) {
+          const msg = (r.error.message || "").toLowerCase();
+          const missingCol =
+            msg.includes("column") ||
+            msg.includes("does not exist") ||
+            msg.includes("quality_tier") ||
+            msg.includes("mode");
+          if (missingCol) {
+            const r2 = await supabase
+              .from("music_history")
+              .select(minimalSelect)
+              .eq("user_id", userId)
+              .order("created_at", { ascending: false })
+              .limit(50);
+            mh = (r2.data as Record<string, unknown>[] | null) ?? null;
+            mhErr = r2.error;
+          } else {
+            mhErr = r.error;
+          }
+        } else {
+          mh = (r.data as Record<string, unknown>[] | null) ?? null;
+        }
+      }
 
       if (cancelled) return;
 
       if (!mhErr && mh && mh.length > 0) {
-        let tracks = mh.map((t) => ({ ...t, source: "music_history" as const }));
+        let tracks = mh.map((t) => ({
+          id: t.id as string,
+          track_title: (t.track_title as string) || "Music track",
+          prompt: (t.prompt as string | null) ?? null,
+          genre: (t.genre as string | null) ?? null,
+          mood: (t.mood as string | null) ?? null,
+          bpm: (t.bpm as number | null) ?? null,
+          duration: (t.duration as number | null) ?? null,
+          audio_url: t.audio_url as string,
+          created_at: t.created_at as string,
+          source: "music_history" as const,
+          mode: typeof t.mode === "string" ? t.mode : null,
+          quality: typeof t.quality_tier === "string" ? t.quality_tier : null,
+        }));
         try {
           const { data: gens } = await supabase
             .from("generations")
