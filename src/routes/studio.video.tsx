@@ -208,7 +208,7 @@ function VideoStudioPage() {
         tier: effectiveTier,
         durationSec: duration,
         quality: qualityFromResolution(resolution),
-        audio: audioOn,
+        soundOn: audioOn,
         mode,
         aspect,
       });
@@ -218,7 +218,7 @@ function VideoStudioPage() {
         base: 0,
         breakdown: {},
         tier,
-      };
+      } as ReturnType<typeof computeMotioVideoCredits>;
     }
   }, [tier, duration, resolution, audioOn, mode, aspect, effectiveTier]);
 
