@@ -1,118 +1,138 @@
 /**
- * MUSIC STUDIO — tier → model registry
- * Isolated from Image/Video. Aligns with music.functions + music-pricing.
- *
- * PDF planning: Standard CassetteAI, Pro MiniMax 2.5, Premium ElevenLabs Music.
- * Production uses MiniMax / xAI TTS / MMAudio already in music.functions.
+ * MUSIC STUDIO — quality tier → provider model registry
+ * Single source aligned with generation-cost-registry + music-plan-capabilities.
+ * Customer-facing UI shows Standard / Premium only — never these model IDs.
  */
 
 import type { StudioTier } from "@/lib/studio/studio-tier";
-import type { MusicMode } from "@/lib/music/music-pricing";
+import type { MusicMode } from "@/lib/music/music-plan-capabilities";
+import type { PlanId } from "@/lib/plans";
 
-export type MusicModelSlot = "song" | "instrumental" | "voiceover" | "sfx" | "video_music";
+export type MusicModelSlot = "song" | "instrumental" | "bgm" | "voiceover" | "sfx" | "video_music";
 
 export type MusicModelEntry = {
   modelId: string;
+  /** Internal admin label */
   label: string;
+  /** Customer-safe capability string */
   capability: string;
-  minimumPlan: "plus" | "pro" | "studio";
+  /** Minimum plan that may use this slot at this quality */
+  minimumPlan: PlanId;
 };
 
 export const MUSIC_MODEL_REGISTRY: Record<StudioTier, Record<MusicModelSlot, MusicModelEntry>> = {
   standard: {
     song: {
       modelId: "fal-ai/minimax-music/v2",
-      label: "MiniMax Music",
+      label: "MiniMax Music 2.0",
       capability: "Song generation",
-      minimumPlan: "plus",
+      minimumPlan: "lite",
     },
     instrumental: {
       modelId: "fal-ai/minimax-music/v2",
-      label: "MiniMax Instrumental",
+      label: "MiniMax Music 2.0",
       capability: "Instrumental track",
-      minimumPlan: "plus",
+      minimumPlan: "lite",
+    },
+    bgm: {
+      modelId: "fal-ai/minimax-music/v2",
+      label: "MiniMax Music 2.0",
+      capability: "Background music",
+      minimumPlan: "lite",
     },
     voiceover: {
       modelId: "xai/tts/v1",
-      label: "xAI Voice",
-      capability: "Voiceover TTS",
-      minimumPlan: "plus",
+      label: "xAI TTS",
+      capability: "Voiceover",
+      minimumPlan: "lite",
     },
     sfx: {
-      modelId: "fal-ai/mmaudio-v2",
-      label: "MMAudio",
+      modelId: "fal-ai/mmaudio-v2/text-to-audio",
+      label: "MMAudio text-to-audio",
       capability: "Sound effects",
-      minimumPlan: "plus",
+      minimumPlan: "lite",
     },
     video_music: {
       modelId: "fal-ai/mmaudio-v2",
-      label: "MMAudio",
+      label: "MMAudio V2",
       capability: "Video soundtrack",
-      minimumPlan: "plus",
+      minimumPlan: "lite",
     },
   },
   pro: {
     song: {
       modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Music Pro",
-      capability: "Higher quality song",
+      label: "MiniMax Music 2.6",
+      capability: "Premium song",
       minimumPlan: "pro",
     },
     instrumental: {
       modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Instrumental Pro",
-      capability: "Higher quality instrumental",
+      label: "MiniMax Music 2.6",
+      capability: "Premium instrumental",
+      minimumPlan: "pro",
+    },
+    bgm: {
+      modelId: "fal-ai/minimax-music/v2.6",
+      label: "MiniMax Music 2.6",
+      capability: "Premium BGM",
       minimumPlan: "pro",
     },
     voiceover: {
       modelId: "xai/tts/v1",
-      label: "xAI Voice",
-      capability: "Voiceover TTS",
-      minimumPlan: "pro",
+      label: "xAI TTS",
+      capability: "Voiceover",
+      minimumPlan: "lite",
     },
     sfx: {
-      modelId: "fal-ai/mmaudio-v2",
-      label: "MMAudio",
+      modelId: "fal-ai/mmaudio-v2/text-to-audio",
+      label: "MMAudio text-to-audio",
       capability: "Sound design",
-      minimumPlan: "pro",
+      minimumPlan: "lite",
     },
     video_music: {
       modelId: "fal-ai/mmaudio-v2",
-      label: "MMAudio",
+      label: "MMAudio V2",
       capability: "Video soundtrack",
-      minimumPlan: "pro",
+      minimumPlan: "lite",
     },
   },
   premium: {
     song: {
       modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Music Premium",
-      capability: "Maximum song quality",
-      minimumPlan: "studio",
+      label: "MiniMax Music 2.6",
+      capability: "Premium song",
+      minimumPlan: "pro",
     },
     instrumental: {
       modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Instrumental Premium",
-      capability: "Maximum instrumental quality",
-      minimumPlan: "studio",
+      label: "MiniMax Music 2.6",
+      capability: "Premium instrumental",
+      minimumPlan: "pro",
+    },
+    bgm: {
+      modelId: "fal-ai/minimax-music/v2.6",
+      label: "MiniMax Music 2.6",
+      capability: "Premium BGM",
+      minimumPlan: "pro",
     },
     voiceover: {
       modelId: "xai/tts/v1",
-      label: "xAI Voice",
-      capability: "Premium voiceover",
-      minimumPlan: "studio",
+      label: "xAI TTS",
+      capability: "Voiceover",
+      minimumPlan: "lite",
     },
     sfx: {
-      modelId: "fal-ai/mmaudio-v2",
-      label: "MMAudio",
-      capability: "Premium sound design",
-      minimumPlan: "studio",
+      modelId: "fal-ai/mmaudio-v2/text-to-audio",
+      label: "MMAudio text-to-audio",
+      capability: "Sound design",
+      minimumPlan: "lite",
     },
     video_music: {
       modelId: "fal-ai/mmaudio-v2",
-      label: "MMAudio",
-      capability: "Premium video soundtrack",
-      minimumPlan: "studio",
+      label: "MMAudio V2",
+      capability: "Video soundtrack",
+      minimumPlan: "lite",
     },
   },
 };
@@ -122,13 +142,19 @@ export function resolveMusicModel(tier: StudioTier, slot: MusicModelSlot): Music
 }
 
 export function musicModelPublicLabel(tier: StudioTier, slot: MusicModelSlot): string {
-  return MUSIC_MODEL_REGISTRY[tier][slot].label;
+  return MUSIC_MODEL_REGISTRY[tier][slot].capability;
 }
 
 export function musicModeToSlot(mode: MusicMode | "video-music"): MusicModelSlot {
-  if (mode === "video-music") return "video_music";
+  if (mode === "video-music" || mode === "video_music") return "video_music";
   if (mode === "sfx") return "sfx";
   if (mode === "voiceover") return "voiceover";
   if (mode === "instrumental") return "instrumental";
+  if (mode === "bgm") return "bgm";
   return "song";
+}
+
+/** Map quality tier string to StudioTier for registry lookup. */
+export function qualityToStudioTier(quality: "standard" | "premium"): StudioTier {
+  return quality === "premium" ? "pro" : "standard";
 }
