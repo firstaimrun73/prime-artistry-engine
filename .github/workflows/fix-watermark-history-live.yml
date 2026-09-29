@@ -57,7 +57,7 @@ jobs:
           print("png", png_path.stat().st_size, "b64", len(b64))
           PY
 
-      - name: Write image.ts (PNG composite, no SVG text fonts)
+      - name: Write image.ts (PNG composite)
         run: |
           cat > src/lib/watermark/image.ts << 'EOF'
           import sharp from "sharp";
@@ -199,71 +199,27 @@ jobs:
           }
           EOF
 
-      - name: Harden History load (Free + legacy rows)
+      - name: Harden History load
         run: |
           python3 << 'PY'
           from pathlib import Path
           p = Path("src/routes/_authenticated.history.tsx")
           t = p.read_text()
-          old = '''  const load = () => {
-    if (!user) { setLoading(false); setGens([]); setLoadError(null); return; }
-    setLoading(true); setLoadError(null);
-    supabase.from("generations").select("id, type, prompt, output_url, status, created_at, metadata, retained_as_history, deleted_at, storage_provider, r2_object_key")
-      .eq("user_id", user.id)
-      .or("retained_as_history.eq.true,retained_as_history.is.null")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(100)
-      .then(async ({ data, error }) => {
-        let rows: Generation[] = [];
-        if (error) {
-          // Real compatibility fallback: core columns only (pre-migration schema).
-          console.error("[history] load failed (full select):", error.message, error);
-          const fb = await supabase
-            .from("generations")
-            .select("id, type, prompt, output_url, status, created_at, metadata")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(100);
-          if (fb.error) {
-            console.error("[history] core fallback failed:", fb.error.message, fb.error);
-            setGens([]);
-            setLoadError(fb.error.message);
-            toast.error("Could not load history.");
-            setLoading(false);
-            return;
-          }
-          rows = ((fb.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
-        } else {
-          rows = ((data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
-        }
-        try {
-          const ids = rows.map((g) => g.id).filter(Boolean);
-          if (ids.length > 0) {
-            const resolved = await resolveHistoryMedia({ data: { generationIds: ids } });
-            const map = resolved?.urls ?? {};
-            rows = rows.map((g) => {
-              const delivery = map[g.id];
-              if (delivery && delivery.startsWith("https://")) {
-                return { ...g, output_url: delivery };
-              }
-              return g;
-            });
-          }
-        } catch (e) {
-          console.warn("[history] media resolve skipped:", e);
-        }
-        setGens(rows);
-        setLoadError(null);
-        setLoading(false);
-      });
-  };'''
-          new = '''  const load = async () => {
+          marker = "Attempt 3: absolute minimal"
+          if marker in t:
+              print("history already hardened")
+              raise SystemExit(0)
+          old_start = "  const load = () => {"
+          if old_start not in t:
+              raise SystemExit("load block missing")
+          # Replace from load = () to useEffect(load
+          import re
+          new_load = r'''  const load = async () => {
     if (!user) { setLoading(false); setGens([]); setLoadError(null); return; }
     setLoading(true); setLoadError(null);
     try {
       let rows: Generation[] = [];
 
-      // Attempt 1: full schema (retention + storage columns)
       const full = await supabase
         .from("generations")
         .select("id, type, prompt, output_url, status, created_at, metadata, retained_as_history, deleted_at, storage_provider, r2_object_key")
@@ -275,28 +231,22 @@ jobs:
         rows = ((full.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
       } else {
         if (full.error) console.warn("[history] full select:", full.error.message);
-
-        // Attempt 2: core columns only (legacy rows / pre-migration)
         const core = await supabase
           .from("generations")
           .select("id, type, prompt, output_url, status, created_at, metadata")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(100);
-
         if (!core.error && core.data) {
           rows = ((core.data as Generation[]) ?? []).filter((g) => isVisibleInHistory(g));
         } else {
           if (core.error) console.warn("[history] core select:", core.error.message);
-
-          // Attempt 3: absolute minimal — still show something for Free users
           const min = await supabase
             .from("generations")
             .select("id, type, prompt, output_url, status, created_at")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false })
             .limit(100);
-
           if (min.error) {
             console.error("[history] all selects failed:", min.error.message);
             setGens([]);
@@ -309,7 +259,6 @@ jobs:
         }
       }
 
-      // Best-effort private media re-sign; never fail the whole page
       try {
         const ids = rows.map((g) => g.id).filter(Boolean);
         if (ids.length > 0) {
@@ -337,29 +286,32 @@ jobs:
     } finally {
       setLoading(false);
     }
-  };'''
-          if old not in t:
-              if "Attempt 3: absolute minimal" in t:
-                  print("history already hardened")
-              else:
-                  raise SystemExit("history load block not found")
-          else:
-              p.write_text(t.replace(old, new, 1))
-              print("history load hardened")
+  };
+'''
+          t2, n = re.subn(
+              r"  const load = \(\) => \{[\s\S]*?\n  \};\n  useEffect\(load, \[user\]\);",
+              new_load + "  useEffect(() => { void load(); }, [user]);",
+              t,
+              count=1,
+          )
+          if n != 1:
+              raise SystemExit(f"regex replace failed n={n}")
+          p.write_text(t2)
+          print("history load hardened")
           PY
 
-      - name: Verify watermark asset + no tofu path
+      - name: Verify
         run: |
           set -euo pipefail
           test -f src/lib/watermark/assets/motio2edit-pill.png
-          test -f src/lib/watermark/assets/motio2edit-pill.b64.ts
+          SZ=$(wc -c < src/lib/watermark/assets/motio2edit-pill.b64.ts)
+          test "$SZ" -gt 8000
           grep -q MOTIO2EDIT_PILL_PNG_B64 src/lib/watermark/image.ts
-          grep -q "Attempt 3: absolute minimal" src/routes/_authenticated.history.tsx
-          # Ensure generate.functions not stubbed
+          grep -q "all selects failed" src/routes/_authenticated.history.tsx
           SIZE=$(wc -c < src/lib/generate.functions.ts)
           test "$SIZE" -gt 20000
 
-      - name: Commit and push
+      - name: Commit
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
