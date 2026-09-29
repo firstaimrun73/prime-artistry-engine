@@ -1,7 +1,8 @@
 /**
  * Horizontal style strip — R2 thumbnails, tier badges, locks, selected preview loop.
+ * None tile is a circle; right fade hides at end of scroll.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Lock, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,25 @@ export function VideoStyleStrip({
   const styles = videoStylesForStrip();
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [lockedStyle, setLockedStyle] = useState<VideoStyleUi | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [atEnd, setAtEnd] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const check = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setAtEnd(max <= 2 || el.scrollLeft >= max - 4);
+    };
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", check);
+      ro.disconnect();
+    };
+  }, [styles.length]);
 
   return (
     <section className="mb-4">
@@ -51,7 +71,10 @@ export function VideoStyleStrip({
         Style
       </p>
       <div className="relative">
-        <div className="studio-hide-scroll -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 snap-x snap-mandatory">
+        <div
+          ref={scrollRef}
+          className="studio-hide-scroll -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1"
+        >
           {styles.map((s) => {
             const active = styleId === s.id;
             const locked = !canUseStyle(plan, s.tier, isAdmin);
@@ -59,6 +82,7 @@ export function VideoStyleStrip({
             const imgFailed = failed[s.id];
             const grad = STYLE_FALLBACK_GRADIENT[s.id] ?? STYLE_FALLBACK_GRADIENT.none;
             const showPreview = active && !!s.preview && !locked;
+            const isNone = s.id === "none";
 
             return (
               <button
@@ -73,22 +97,28 @@ export function VideoStyleStrip({
                   onSelect(s.id);
                 }}
                 className={cn(
-                  "flex w-[96px] shrink-0 snap-start flex-col items-center gap-1 transition-transform duration-200",
+                  "flex w-[96px] shrink-0 flex-col items-center gap-1 transition-transform duration-200",
                   active && !locked && "scale-[1.04]",
                   locked && "opacity-85",
                 )}
               >
                 <span
                   className={cn(
-                    "relative block h-[54px] w-[96px] overflow-hidden rounded-xl",
-                    active && !locked && "ring-2 ring-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
-                    s.id === "none" && GLASS,
+                    "relative block overflow-hidden",
+                    isNone
+                      ? cn(
+                          "grid h-[54px] w-[54px] place-items-center rounded-full",
+                          GLASS,
+                          active && !locked && "ring-2 ring-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
+                        )
+                      : cn(
+                          "h-[54px] w-[96px] rounded-xl",
+                          active && !locked && "ring-2 ring-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)]",
+                        ),
                   )}
                 >
-                  {s.id === "none" ? (
-                    <span className="flex h-full w-full items-center justify-center">
-                      <X className="h-5 w-5 text-slate-400" aria-hidden />
-                    </span>
+                  {isNone ? (
+                    <X className="h-5 w-5 text-slate-400" aria-hidden />
                   ) : showPreview ? (
                     <video
                       key={s.preview}
@@ -114,24 +144,25 @@ export function VideoStyleStrip({
                     <span className={cn("block h-full w-full bg-gradient-to-br", grad)} />
                   )}
 
-                  {/* badges */}
-                  <span className="absolute left-1 top-1 flex items-center gap-0.5">
-                    {locked && (
-                      <span className="grid h-5 w-5 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm">
-                        <Lock className="h-3 w-3" aria-hidden />
-                      </span>
-                    )}
-                    {badge && (
-                      <span
-                        className={cn(
-                          "rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-800",
-                          "border border-white/70 bg-white/75 backdrop-blur-md",
-                        )}
-                      >
-                        {badge}
-                      </span>
-                    )}
-                  </span>
+                  {!isNone && (
+                    <span className="absolute left-1 top-1 flex items-center gap-0.5">
+                      {locked && (
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm">
+                          <Lock className="h-3 w-3" aria-hidden />
+                        </span>
+                      )}
+                      {badge && (
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-800",
+                            "border border-white/70 bg-white/75 backdrop-blur-md",
+                          )}
+                        >
+                          {badge}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </span>
                 <span
                   className={cn(
@@ -147,13 +178,14 @@ export function VideoStyleStrip({
             );
           })}
         </div>
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#FFF1E8] to-transparent"
-          aria-hidden
-        />
+        {!atEnd && (
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#FFF1E8] to-transparent"
+            aria-hidden
+          />
+        )}
       </div>
 
-      {/* Locked style upgrade sheet */}
       {lockedStyle && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal>
           <button
