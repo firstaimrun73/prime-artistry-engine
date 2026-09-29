@@ -2,7 +2,9 @@ name: Emergency restore generate.functions.ts
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
+      - "src/lib/generate.functions.ts"
       - ".github/workflows/emergency-restore-generate.yml"
 jobs:
   restore:
@@ -13,12 +15,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Restore full generate.functions.ts and persist r2 key
+      - name: Restore full generate.functions.ts if incomplete
         run: |
           set -euo pipefail
           SIZE=$(wc -c < src/lib/generate.functions.ts || echo 0)
           echo "current size=$SIZE"
-          # Last known full production file (before 9-byte / placeholder)
+          if [ "$SIZE" -gt 25000 ] && grep -q "executeStandardImage" src/lib/generate.functions.ts && grep -q "persistGenerationHistory" src/lib/generate.functions.ts && ! grep -q "restore incomplete" src/lib/generate.functions.ts; then
+            echo "generate.functions.ts already complete"
+            exit 0
+          fi
+          echo "Restoring from 7262a1179fdd..."
           git show 7262a1179fdd:src/lib/generate.functions.ts > src/lib/generate.functions.ts
           python3 << 'PY'
           from pathlib import Path
@@ -26,26 +32,28 @@ jobs:
           t = p.read_text()
           if len(t) < 10000:
               raise SystemExit(f"restore too small: {len(t)}")
-          if "PLACEHOLDER" in t or t.strip() == "see below":
-              raise SystemExit("restore still placeholder")
-          if "r2ObjectKeyFromFinalize" not in t and "finalizedR2Key" not in t:
+          if "PLACEHOLDER" in t or "restore incomplete" in t or t.strip() == "see below":
+              raise SystemExit("restore still bad")
+          if "finalizedR2Key" not in t and "r2ObjectKeyFromFinalize" not in t:
               t = t.replace(
-                  '    if (data.type === "image" && outputUrl) {\n      try {\n        const { finalizeMediaAsset }',
-                  '    let r2ObjectKeyFromFinalize: string | null = null;\n    if (data.type === "image" && outputUrl) {\n      try {\n        const { finalizeMediaAsset }',
+                  "let outputUrl: string | null = null;",
+                  "let outputUrl: string | null = null;\n    let finalizedR2Key: string | null = null;",
                   1,
               )
               t = t.replace(
                   """        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
           outputUrl = fin.finalUrl;
         }
-      } catch (wmErr) {""",
+      } catch (wmErr) {
+        // Fail closed when a stamp was required (free plan, or paid keepWatermark=true).""",
                   """        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
           outputUrl = fin.finalUrl;
         }
-        if (fin.storagePath) {
-          r2ObjectKeyFromFinalize = fin.storagePath;
+        if (fin.storagePath && typeof fin.storagePath === "string") {
+          finalizedR2Key = fin.storagePath.replace(/^\\//, "");
         }
-      } catch (wmErr) {""",
+      } catch (wmErr) {
+        // Fail closed when a stamp was required (free plan, or paid keepWatermark=true).""",
                   1,
               )
               t = t.replace(
@@ -68,13 +76,13 @@ jobs:
         output_url: outputUrl,
         status: "success",
         metadata: meta,
-        r2ObjectKey: r2ObjectKeyFromFinalize,
+        r2ObjectKey: finalizedR2Key,
       });""",
                   1,
               )
           if "executeStandardImage" not in t or "persistGenerationHistory" not in t:
               raise SystemExit("restore incomplete")
-          if "r2ObjectKeyFromFinalize" not in t and "finalizedR2Key" not in t:
+          if "finalizedR2Key" not in t and "r2ObjectKeyFromFinalize" not in t:
               raise SystemExit("r2 key patch failed")
           p.write_text(t)
           print("restored bytes", len(t))
@@ -83,5 +91,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/generate.functions.ts
           git diff --cached --quiet && echo "no changes" && exit 0
-          git commit -m "EMERGENCY RESTORE: full generate.functions.ts + r2_object_key persist"
+          git commit -m "EMERGENCY RESTORE: full generate.functions.ts + r2_object_key (auto)"
           git push
