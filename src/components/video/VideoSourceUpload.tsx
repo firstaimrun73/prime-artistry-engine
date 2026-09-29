@@ -1,0 +1,228 @@
+/**
+ * Single glass upload tile for Image→Video / Video→Video.
+ * Preview uses natural media aspect. Image tap opens full-screen lightbox.
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ImagePlus, Film, X, Replace, AlertCircle, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const MAX_MB = 40;
+const MAX_BYTES = MAX_MB * 1024 * 1024;
+
+export function VideoSourceUpload({
+  mode,
+  file,
+  previewUrl,
+  onPick,
+  onClear,
+  disabled,
+}: {
+  mode: "image" | "video";
+  file: File | null;
+  previewUrl: string | null;
+  onPick: (file: File) => void;
+  onClear: () => void;
+  disabled?: boolean;
+  /** @deprecated ignored — natural media aspect */
+  aspect?: "16:9" | "9:16" | "1:1";
+  showGrid?: boolean;
+  onToggleGrid?: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [vidDur, setVidDur] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState(false);
+
+  const accept =
+    mode === "image"
+      ? "image/jpeg,image/png,image/webp,image/*"
+      : "video/mp4,video/webm,video/*";
+  const addLabel = mode === "image" ? "Add image" : "Add video";
+  const formats =
+    mode === "image" ? "JPG, PNG, WebP · max 40MB" : "MP4, WebM · max 40MB";
+
+  useEffect(() => {
+    setVidDur(null);
+    setLightbox(false);
+  }, [previewUrl]);
+
+  const validateAndPick = useCallback(
+    (f: File | null) => {
+      setError(null);
+      if (!f) return;
+      if (f.size > MAX_BYTES) {
+        setError(`Max ${MAX_MB}MB`);
+        return;
+      }
+      const isImage = f.type.startsWith("image/");
+      const isVideo = f.type.startsWith("video/");
+      if (mode === "image" && !isImage) {
+        setError("Choose an image file");
+        return;
+      }
+      if (mode === "video" && !isVideo) {
+        setError("Choose a video file (MP4 or WebM)");
+        return;
+      }
+      onPick(f);
+    },
+    [mode, onPick],
+  );
+
+  const openPicker = () => {
+    if (!disabled) inputRef.current?.click();
+  };
+
+  const glass =
+    "rounded-3xl border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150 ring-1 ring-black/5";
+
+  const cornerBtn =
+    "grid h-9 w-9 place-items-center rounded-full border border-white/70 bg-white/70 text-slate-700 shadow-sm backdrop-blur-md";
+
+  return (
+    <div className="w-full">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        disabled={disabled}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          validateAndPick(f);
+        }}
+      />
+
+      {previewUrl ? (
+        <div className={cn("relative mx-auto max-h-[42vh] w-full overflow-hidden", glass)}>
+          <div className="relative flex max-h-[42vh] w-full items-center justify-center bg-black/5">
+            {mode === "video" ? (
+              <video
+                ref={videoRef}
+                src={previewUrl}
+                className="max-h-[42vh] w-full object-contain"
+                controls
+                playsInline
+                onLoadedMetadata={() => {
+                  const d = videoRef.current?.duration;
+                  if (d && Number.isFinite(d)) {
+                    const s = Math.round(d);
+                    setVidDur(s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : `${s}s`);
+                  }
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="block max-h-[42vh] w-full cursor-zoom-in"
+                onClick={() => setLightbox(true)}
+                aria-label="View full image"
+              >
+                <img
+                  src={previewUrl}
+                  alt="Source"
+                  className="max-h-[42vh] w-full object-contain"
+                />
+              </button>
+            )}
+            {vidDur && (
+              <span className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                {vidDur}
+              </span>
+            )}
+            <div className="absolute right-2 top-2 flex gap-1.5">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={openPicker}
+                className={cornerBtn}
+                aria-label="Replace"
+              >
+                <Replace className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={onClear}
+                className={cornerBtn}
+                aria-label="Remove"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={openPicker}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!disabled) setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (disabled) return;
+            validateAndPick(e.dataTransfer.files?.[0] ?? null);
+          }}
+          className={cn(
+            "group relative flex w-full flex-col items-center justify-center gap-2 overflow-hidden px-4 transition",
+            glass,
+            "min-h-[140px] aspect-video",
+            "shadow-[inset_0_0_0_1px_rgba(255,122,69,0.25)]",
+            dragging && "ring-2 ring-[#FF7A45]/60",
+            disabled && "opacity-50",
+          )}
+        >
+          <span className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-[#FF7A45] to-[#F43F5E] text-white shadow-[0_6px_18px_rgba(244,63,94,0.35)]">
+            {mode === "image" ? <ImagePlus className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
+          </span>
+          <span className="text-sm font-bold text-slate-800">{addLabel}</span>
+          <span className="text-center text-[11px] text-slate-500">{formats}</span>
+          {mode === "video" && (
+            <Film className="pointer-events-none absolute bottom-3 right-3 h-5 w-5 text-slate-300" aria-hidden />
+          )}
+        </button>
+      )}
+
+      {error && (
+        <p className="mt-1.5 flex items-center gap-1 text-[11px] text-amber-600">
+          <AlertCircle className="h-3 w-3 shrink-0" />
+          {error}
+        </p>
+      )}
+
+      {/* Full-screen image lightbox */}
+      {lightbox && previewUrl && mode === "image" && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4"
+          role="dialog"
+          aria-modal
+          aria-label="Full image"
+          onClick={() => setLightbox(false)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white"
+            aria-label="Close"
+            onClick={() => setLightbox(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={previewUrl}
+            alt="Full source"
+            className="max-h-[90dvh] max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
