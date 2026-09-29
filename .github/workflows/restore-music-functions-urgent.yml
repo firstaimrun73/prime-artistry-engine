@@ -11,29 +11,58 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Restore full music.functions.ts from previous good blob
+        with:
+          fetch-depth: 0
+      - name: Restore full music.functions.ts from git history
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Fetch last known good version from commit before stub (SHA from audit)
-          git fetch --depth=50 origin main
-          # Prefer file from commit 560e8e6a (ci restore) or 71862813
-          if git cat-file -e 560e8e6a4bddc8145ce71c7a7a1d6effbc6e3ee5:src/lib/music.functions.ts 2>/dev/null; then
-            git show 560e8e6a4bddc8145ce71c7a7a1d6effbc6e3ee5:src/lib/music.functions.ts > src/lib/music.functions.ts
-          elif git cat-file -e 8d5e04064ba157b06a6dc79eb471f604f0f0d788:src/lib/music.functions.ts 2>/dev/null; then
-            git show 8d5e04064ba157b06a6dc79eb471f604f0f0d788:src/lib/music.functions.ts > src/lib/music.functions.ts
-          else
-            echo "Could not find good blob"
+          TARGET="src/lib/music.functions.ts"
+          CURRENT_SIZE=$(wc -c < "$TARGET" || echo 0)
+          echo "Current size: $CURRENT_SIZE"
+
+          # Find most recent commit where file is large (full implementation)
+          GOOD_SHA=""
+          while read -r sha; do
+            size=$(git cat-file -s "$sha:$TARGET" 2>/dev/null || echo 0)
+            echo "commit $sha file size $size"
+            if [ "$size" -gt 15000 ]; then
+              GOOD_SHA=$sha
+              break
+            fi
+          done < <(git log --format=%H -- "$TARGET" | head -80)
+
+          if [ -z "$GOOD_SHA" ]; then
+            echo "No good revision found in history"
             exit 1
           fi
-          # Apply critical patches if still on old patterns
+
+          echo "Restoring from $GOOD_SHA"
+          git show "$GOOD_SHA:$TARGET" > "$TARGET"
+
           python3 << 'PY'
           from pathlib import Path
-          p = Path('src/lib/music.functions.ts')
+          p = Path("src/lib/music.functions.ts")
           t = p.read_text()
-          assert 'export const generateMusic' in t, 'restore incomplete'
-          t = t.replace('prompt: z.string().trim().max(12_000).optional().default(""),', 'prompt: z.string().trim().max(15_000).optional().default(""),')
+          required = [
+              "export const generateMusic",
+              "export const estimateMusicCost",
+              "export const getVoicePreview",
+              "export const getMusicCapabilities",
+              "deduct_credits",
+              "music_history",
+          ]
+          for r in required:
+              if r not in t:
+                  raise SystemExit(f"Missing {r}")
+
+          # Safe patches
+          t = t.replace(
+              'prompt: z.string().trim().max(12_000).optional().default(""),',
+              'prompt: z.string().trim().max(15_000).optional().default(""),',
+          )
+
           old = '''    const mode = data.mode as MusicMode;
     const qualityTier = (data.qualityTier ?? "standard") as MusicQualityTier;
     const hasVideo = !!(data.videoUrl && isSafeExternalUrl(data.videoUrl));
@@ -47,6 +76,7 @@ jobs:
     if (hasImage && data.imageUrl && !isSafeExternalUrl(data.imageUrl)) {
       throw new Error("Invalid image URL.");
     }'''
+
           new = '''    const mode = data.mode as MusicMode;
     const qualityTier = (data.qualityTier ?? "standard") as MusicQualityTier;
     // Reject invalid media URLs explicitly — never silently treat as "no media"
@@ -60,17 +90,23 @@ jobs:
     const hasImage = !!data.imageUrl;
     const durationSeconds = data.durationSeconds ?? 30;
     const videoAudioMode = data.videoAudioMode ?? "replace";'''
+
           if old in t:
-            t = t.replace(old, new)
+              t = t.replace(old, new)
+              print("Applied URL validation patch")
+          else:
+              print("URL validation pattern not found (may already be patched)")
+
           p.write_text(t)
-          print('bytes', len(t))
+          print("Final size", len(t))
           PY
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/music.functions.ts
+          git add "$TARGET"
           if git diff --cached --quiet; then
-            echo "No changes"
+            echo "No changes to commit"
           else
-            git commit -m "RESTORE: full music.functions.ts + URL validation + 15k prompt max"
+            git commit -m "RESTORE: full music.functions.ts from history + URL/15k patches"
             git push origin HEAD:main
           fi
