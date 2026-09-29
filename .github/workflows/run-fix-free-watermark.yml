@@ -1,0 +1,149 @@
+name: Run Fix Free Watermark
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/run-fix-free-watermark.yml"
+      - "scripts/fix_free_watermark.py"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply
+        run: |
+          set -euo pipefail
+          python3 scripts/fix_free_watermark.py
+          # Extra: ImageEditor watermark UI — free plan shows Locked On; paid gets toggle
+          python3 - <<'PY'
+          from pathlib import Path
+          ie = Path("src/components/editor/image/ImageEditor.tsx")
+          t = ie.read_text()
+          # Ensure isFreePlanForWm exists
+          if "isFreePlanForWm" not in t:
+              t = t.replace(
+                  'const isFree = profile?.plan === "free" && !isAdmin;',
+                  'const isFree = profile?.plan === "free" && !isAdmin;\n  const isFreePlanForWm = (profile?.plan ?? "free") === "free";',
+                  1,
+              )
+          # Force keepWatermark by plan for free
+          t = t.replace("keepWatermark: isFree ? true : keepWatermark", "keepWatermark: isFreePlanForWm ? true : keepWatermark")
+          t = t.replace("keepWatermark={isFree ? true : keepWatermark}", "keepWatermark={isFreePlanForWm ? true : keepWatermark}")
+          # Replace toggle visibility: paid only; free shows locked row
+          old = """{!isFree && !isAdmin && (
+                      <div className=\"flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md\">
+                        <div className=\"min-w-0\">
+                          <p className=\"text-xs font-semibold text-foreground\">Watermark</p>
+                          <p className=\"text-[11px] text-muted-foreground\">
+                            {keepWatermark ? \"On — stamped on generated output\" : \"Off — clean output\"}
+                          </p>
+                        </div>
+                        <button
+                          type=\"button\"
+                          role=\"switch\"
+                          aria-checked={keepWatermark}
+                          onClick={() =>
+                            setKeepWatermark((v) => {
+                              const next = !v;
+                              try {
+                                localStorage.setItem(WATERMARK_PREF_KEY, next ? \"on\" : \"off\");
+                              } catch {
+                                /* ignore */
+                              }
+                              return next;
+                            })
+                          }
+                          className={cn(
+                            \"relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]/40\",
+                            keepWatermark ? \"bg-[#FF5A1F] shadow-[0_0_12px_-2px_rgba(255,90,31,0.55)]\" : \"bg-muted\",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              \"absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow transition-transform\",
+                              keepWatermark && \"translate-x-5\",
+                            )}
+                          />
+                          <span className=\"sr-only\">{keepWatermark ? \"Watermark on\" : \"Watermark off\"}</span>
+                        </button>
+                      </div>
+                    )}"""
+          new = """{isFreePlanForWm ? (
+                      <div className=\"flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md\">
+                        <div className=\"min-w-0\">
+                          <p className=\"text-xs font-semibold text-foreground\">Watermark</p>
+                          <p className=\"text-[11px] text-muted-foreground\">On — Motio2edit (required on Free)</p>
+                        </div>
+                        <span className=\"shrink-0 rounded-full bg-[#FF5A1F]/15 px-2.5 py-1 text-[11px] font-semibold text-[#FF5A1F]\">Locked</span>
+                      </div>
+                    ) : (
+                      <div className=\"flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md\">
+                        <div className=\"min-w-0\">
+                          <p className=\"text-xs font-semibold text-foreground\">Watermark</p>
+                          <p className=\"text-[11px] text-muted-foreground\">
+                            {keepWatermark ? \"On — stamped on generated output\" : \"Off — clean output\"}
+                          </p>
+                        </div>
+                        <button
+                          type=\"button\"
+                          role=\"switch\"
+                          aria-checked={keepWatermark}
+                          onClick={() =>
+                            setKeepWatermark((v) => {
+                              const next = !v;
+                              try {
+                                localStorage.setItem(WATERMARK_PREF_KEY, next ? \"on\" : \"off\");
+                              } catch {
+                                /* ignore */
+                              }
+                              return next;
+                            })
+                          }
+                          className={cn(
+                            \"relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]/40\",
+                            keepWatermark ? \"bg-[#FF5A1F] shadow-[0_0_12px_-2px_rgba(255,90,31,0.55)]\" : \"bg-muted\",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              \"absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow transition-transform\",
+                              keepWatermark && \"translate-x-5\",
+                            )}
+                          />
+                          <span className=\"sr-only\">{keepWatermark ? \"Watermark on\" : \"Watermark off\"}</span>
+                        </button>
+                      </div>
+                    )}"""
+          if old in t:
+              t = t.replace(old, new, 1)
+              print("UI replaced")
+          else:
+              # softer: change condition only
+              if "{!isFree && !isAdmin && (" in t:
+                  t = t.replace("{!isFree && !isAdmin && (", "{!isFreePlanForWm && (", 1)
+                  print("UI condition softened")
+              else:
+                  print("UI pattern not found — leave as-is")
+          ie.write_text(t)
+          # handleDownload also force free plan
+          t2 = ie.read_text()
+          t2 = t2.replace(
+              "keepWatermark: isFree ? true : keepWatermark",
+              "keepWatermark: isFreePlanForWm ? true : keepWatermark",
+          )
+          ie.write_text(t2)
+          print("IE final", len(t2))
+          PY
+          # Verify policy
+          grep -q 'free_plan_forced' src/lib/watermark/policy.ts
+          ! grep -q 'reason: "admin"' src/lib/watermark/policy.ts
+          grep -q 'FREE_PRIMARY_SIZE_RATIO' src/lib/watermark/image.ts || grep -q 'FREE_PRIMARY_SIZE_RATIO' src/lib/watermark-config.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/watermark/image.ts src/lib/watermark/finalize.ts src/components/editor/image/ImageEditor.tsx
+          git diff --cached --stat
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "fix(watermark): Free Motio2edit-only larger primary; plan-locked UI; no admin bypass"
+          git push origin HEAD:main
