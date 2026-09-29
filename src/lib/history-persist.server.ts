@@ -96,6 +96,8 @@ export type PersistGenerationInput = {
   outputContentType?: string;
   outputExt?: string;
   generationId?: string;
+  /** Permanent R2 object key when already stored (e.g. finalizeMediaAsset storagePath). */
+  r2ObjectKey?: string | null;
 };
 
 export type PersistGenerationResult = {
@@ -122,12 +124,35 @@ export async function persistGenerationHistory(
   );
 
   let outputUrl = input.output_url;
-  let r2Key: string | null = null;
+  let r2Key: string | null = input.r2ObjectKey?.replace(/^\//, "") ?? null;
   let storageProvider: HistoryStorageProvider | null = decision.retain
     ? decision.storage_provider
     : null;
 
   const genId = input.generationId ?? crypto.randomUUID();
+
+  // If finalize already wrote to R2 users/**, capture permanent key and ensure delivery is signed.
+  try {
+    const {
+      extractR2ObjectKeyFromUrl,
+      isPrivateUserObjectKey,
+      r2ResolveDeliveryUrl,
+      isR2Configured,
+    } = await import("@/lib/r2.server");
+    const extracted =
+      r2Key ||
+      (outputUrl ? extractR2ObjectKeyFromUrl(outputUrl) : null);
+    if (extracted && isPrivateUserObjectKey(extracted) && isR2Configured()) {
+      r2Key = extracted;
+      if (!storageProvider || storageProvider === "supabase") {
+        storageProvider = "r2";
+      }
+      const signed = await r2ResolveDeliveryUrl(extracted, { preferSigned: true });
+      if (signed) outputUrl = signed;
+    }
+  } catch (e) {
+    console.warn("[history-persist] R2 key extract/sign skipped:", e);
+  }
 
   if (
     decision.retain &&
