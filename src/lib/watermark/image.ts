@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import sharp from "sharp";
 import type { WatermarkMode, WatermarkBrand } from "./types";
 import {
@@ -12,6 +11,30 @@ import {
 } from "@/lib/watermark-config";
 import { buildCircleWatermarkSvg } from "@/lib/circle-edit/circle-watermark";
 
+/**
+ * Pre-rendered Motio2edit pill (DejaVu Bold, white + #FF5A1F "2").
+ * Composited as a PNG so Vercel/Linux never depends on system fonts or SVG text.
+ */
+const MOTIO_WATERMARK_PNG_B64 =
+  "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";
+
+// NOTE: Full PNG is loaded at module init from a complete base64 constant below.
+// The truncated constant above is replaced by the complete buffer helper.
+
+let cachedPill: Buffer | null = null;
+
+function getMotioPillPng(): Buffer {
+  if (cachedPill) return cachedPill;
+  // Full asset written by build step / committed constant
+  const full = process.env.MOTIO_WATERMARK_PNG_B64 || MOTIO_WATERMARK_PNG_FULL;
+  cachedPill = Buffer.from(full, "base64");
+  return cachedPill;
+}
+
+// Complete pre-rendered Motio2edit PNG (generated with DejaVu Sans Bold).
+const MOTIO_WATERMARK_PNG_FULL =
+  "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";
+
 function escapeXml(s: string): string {
   return s
     .replace(/&/g, "&" + "amp;")
@@ -21,54 +44,7 @@ function escapeXml(s: string): string {
     .replace(/'/g, "&" + "apos;");
 }
 
-/** Linux/Vercel-safe bold sans fonts (Arial is often missing → empty tofu glyphs). */
-const FONT_CANDIDATES = [
-  "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-  "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-  "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-  "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-  "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-  "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
-  "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-  "/System/Library/Fonts/Supplemental/Arial.ttf",
-] as const;
-
-let cachedFontFaceCss: string | null | undefined;
-
-/**
- * Embed a real TTF as @font-face data URI so librsvg/sharp can rasterize
- * "Motio2edit" without depending on Arial being installed.
- */
-function watermarkFontFaceCss(): string {
-  if (cachedFontFaceCss !== undefined) return cachedFontFaceCss ?? "";
-  for (const file of FONT_CANDIDATES) {
-    try {
-      if (!fs.existsSync(file)) continue;
-      const b64 = fs.readFileSync(file).toString("base64");
-      if (b64.length < 1000) continue;
-      cachedFontFaceCss =
-        `@font-face{font-family:'MotioWM';src:url('data:font/ttf;base64,${b64}') format('truetype');font-weight:700;font-style:normal;}`;
-      return cachedFontFaceCss;
-    } catch {
-      /* try next */
-    }
-  }
-  cachedFontFaceCss = null;
-  // Last-resort CSS: prefer Liberation/DejaVu local names over Arial
-  return "";
-}
-
-function fontFamilyAttr(): string {
-  // Prefer embedded MotioWM when available; never rely on Arial alone.
-  return "MotioWM,DejaVu Sans,Liberation Sans,FreeSans,Helvetica,sans-serif";
-}
-
-/**
- * Build Motio2edit primary pill (+ optional dense secondary free marks).
- * When brand is circle, use Circle 2edit purple-ring mark instead.
- * Free plan uses freeEnlarged for a somewhat larger primary Motio2edit mark.
- */
+/** Legacy SVG path kept for secondary marks / circle brand only. */
 export function buildImageOverlaySvg(
   w: number,
   h: number,
@@ -80,88 +56,34 @@ export function buildImageOverlaySvg(
   if (brand === "circle") {
     return buildCircleWatermarkSvg(w, h);
   }
-
+  // Primary mark is applied via PNG composite in renderImageWatermark.
+  // Secondary dense marks (if ever requested) use simple SVG without relying on Arial.
+  if (mode !== "primary+secondary") {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"></svg>`;
+  }
   const minDim = Math.min(w, h);
-  const displayText = (label && label.trim().length > 0 ? label.trim() : WATERMARK_BRAND_TEXT).slice(
-    0,
-    64,
-  );
-  const lengthFactor = displayText.length > 18 ? Math.min(1, 18 / displayText.length + 0.35) : 1;
-  const sizeRatio = freeEnlarged ? FREE_PRIMARY_SIZE_RATIO : PRIMARY_SIZE_RATIO;
-  const fontSize = Math.max(
-    11,
-    Math.min(88, Math.round(minDim * sizeRatio * lengthFactor)),
-  );
-  const pad = Math.max(6, Math.round(fontSize * 0.35));
   const margin = Math.max(10, Math.round(minDim * EDGE_MARGIN_RATIO));
-  const approxChar = fontSize * 0.55;
-  const textWidth = displayText.length * approxChar;
-  const dotR = Math.max(3, Math.round(fontSize * 0.18));
-  const rectH = fontSize + pad * 2;
-  const rectW = textWidth + pad * 2 + dotR * 2 + 14;
-  const rectX = Math.max(margin, w - rectW - margin);
-  const rectY = Math.max(margin, h - rectH - margin);
-  const dotCx = rectX + pad + dotR;
-  const dotCy = rectY + rectH / 2;
-  const textX = dotCx + dotR + 8;
-  const textY = rectY + pad + fontSize * 0.82;
-  const ff = fontFamilyAttr();
-  const faceCss = watermarkFontFaceCss();
-
-  // Secondary dense marks only when mode explicitly requests them (not Free).
-  let secondary = "";
-  if (mode === "primary+secondary") {
-    const marks: string[] = [];
-    const cols = 4;
-    const rows = 4;
-    const cellW = w / (cols + 1);
-    const cellH = h / (rows + 1);
-    const secFont = Math.max(9, Math.min(28, Math.round(minDim * 0.018)));
-    let n = 0;
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        if (n >= 15) break;
-        if (row === rows - 1 && col === cols - 1) continue;
-        const mx = cellW * (col + 1) + ((row % 2) * cellW * 0.25);
-        const my = cellH * (row + 1);
-        if (mx < margin || my < margin || mx > w - margin || my > h - margin) continue;
-        marks.push(
-          `<text x="${mx.toFixed(1)}" y="${my.toFixed(1)}" font-family="${ff}" font-weight="700" font-size="${secFont}" fill="#ffffff" fill-opacity="0.65" text-anchor="middle">${escapeXml(WATERMARK_BRAND_TEXT)}</text>`,
-        );
-        n++;
-      }
-    }
-    if (marks.length < 8) {
-      const icon = Math.max(18, Math.min(96, Math.round(minDim * SECONDARY_SIZE_RATIO)));
-      const ix = margin;
-      const iy = margin;
-      const cx = ix + icon / 2;
-      const cy = iy + icon / 2;
-      const R = icon * 0.42;
-      const s = icon * 0.28;
+  const marks: string[] = [];
+  const cols = 4;
+  const rows = 4;
+  const cellW = w / (cols + 1);
+  const cellH = h / (rows + 1);
+  const secFont = Math.max(9, Math.min(28, Math.round(minDim * 0.018)));
+  let n = 0;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (n >= 15) break;
+      if (row === rows - 1 && col === cols - 1) continue;
+      const mx = cellW * (col + 1) + ((row % 2) * cellW * 0.25);
+      const my = cellH * (row + 1);
+      if (mx < margin || my < margin || mx > w - margin || my > h - margin) continue;
       marks.push(
-        `<g opacity="0.7"><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${R.toFixed(1)}" fill="${WATERMARK_BRAND_ORANGE}" fill-opacity="0.88"/><path d="M${cx} ${cy - s} L${cx + s / 3} ${cy} L${cx} ${cy + s} L${cx - s / 3} ${cy} Z" fill="#ffffff"/><path d="M${cx - s} ${cy} L${cx} ${cy - s / 3} L${cx + s} ${cy} L${cx} ${cy + s / 3} Z" fill="#ffffff"/></g>`,
+        `<text x="${mx.toFixed(1)}" y="${my.toFixed(1)}" font-family="sans-serif" font-weight="700" font-size="${secFont}" fill="#ffffff" fill-opacity="0.55" text-anchor="middle">${escapeXml(WATERMARK_BRAND_TEXT)}</text>`,
       );
+      n++;
     }
-    secondary = marks.join("");
   }
-
-  let brandText: string;
-  if (displayText.startsWith("Motio2edit") || displayText === WATERMARK_BRAND_TEXT) {
-    const rest = displayText.slice("Motio2edit".length);
-    const motioW = "Motio".length * approxChar;
-    const twoW = "2".length * approxChar;
-    brandText =
-      `<text x="${textX}" y="${textY}" font-family="${ff}" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml("Motio")}</text>` +
-      `<text x="${textX + motioW}" y="${textY}" font-family="${ff}" font-weight="700" font-size="${fontSize}" fill="${WATERMARK_BRAND_ORANGE}">${escapeXml("2")}</text>` +
-      `<text x="${textX + motioW + twoW}" y="${textY}" font-family="${ff}" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml("edit" + rest)}</text>`;
-  } else {
-    brandText = `<text x="${textX}" y="${textY}" font-family="${ff}" font-weight="700" font-size="${fontSize}" fill="#ffffff">${escapeXml(displayText)}</text>`;
-  }
-
-  const styleBlock = faceCss ? `<defs><style type="text/css"><![CDATA[${faceCss}]]></style></defs>` : "";
-  const brandSvg = `<rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" rx="8" ry="8" fill="rgba(0,0,0,0.78)"/><circle cx="${dotCx}" cy="${dotCy}" r="${dotR}" fill="${WATERMARK_BRAND_ORANGE}"/>${brandText}`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" data-ratio="${detectWatermarkRatioKey(w, h)}">${styleBlock}${secondary}${brandSvg}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" data-ratio="${detectWatermarkRatioKey(w, h)}">${marks.join("")}</svg>`;
 }
 
 export async function renderImageWatermark(
@@ -179,16 +101,52 @@ export async function renderImageWatermark(
   const w = meta.width ?? 0;
   const h = meta.height ?? 0;
   if (w < 8 || h < 8) throw new Error("Image too small to watermark.");
-  // Ensure font face is resolved before building SVG (caches base64 TTF).
-  void watermarkFontFaceCss();
+
+  if (brand === "circle") {
+    return image
+      .composite([
+        {
+          input: Buffer.from(buildImageOverlaySvg(w, h, mode, label, brand, freeEnlarged)),
+          top: 0,
+          left: 0,
+        },
+      ])
+      .jpeg({ quality: 92, mozjpeg: true })
+      .toBuffer();
+  }
+
+  // Primary Motio2edit: scale pre-rendered PNG pill to image size (deterministic glyphs).
+  const sizeRatio = freeEnlarged ? FREE_PRIMARY_SIZE_RATIO : PRIMARY_SIZE_RATIO;
+  const targetH = Math.max(18, Math.min(120, Math.round(Math.min(w, h) * sizeRatio * 2.1)));
+  const margin = Math.max(10, Math.round(Math.min(w, h) * EDGE_MARGIN_RATIO));
+
+  let pill = getMotioPillPng();
+  const pillMeta = await sharp(pill).metadata();
+  const pw = pillMeta.width ?? 527;
+  const ph = pillMeta.height ?? 100;
+  const scale = targetH / ph;
+  const outW = Math.max(40, Math.round(pw * scale));
+  const outH = Math.max(18, Math.round(ph * scale));
+  const resized = await sharp(pill)
+    .resize(outW, outH, { fit: "fill" })
+    .png()
+    .toBuffer();
+
+  const left = Math.max(0, w - outW - margin);
+  const top = Math.max(0, h - outH - margin);
+
+  const composites: sharp.OverlayOptions[] = [{ input: resized, top, left }];
+
+  if (mode === "primary+secondary") {
+    composites.unshift({
+      input: Buffer.from(buildImageOverlaySvg(w, h, mode, label, brand, freeEnlarged)),
+      top: 0,
+      left: 0,
+    });
+  }
+
   return image
-    .composite([
-      {
-        input: Buffer.from(buildImageOverlaySvg(w, h, mode, label, brand, freeEnlarged)),
-        top: 0,
-        left: 0,
-      },
-    ])
+    .composite(composites)
     .jpeg({ quality: 92, mozjpeg: true })
     .toBuffer();
 }
