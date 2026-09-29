@@ -2,6 +2,7 @@ name: Run Fix Standard Crash
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/run-fix-standard-crash.yml"
       - "scripts/fix_standard_crash.py"
