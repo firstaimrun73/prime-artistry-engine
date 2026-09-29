@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { MusicStudioPage } from "@/components/music/MusicStudioPage";
-import { StudioBackLink } from "@/components/StudioBackLink";
 
 const searchSchema = z.object({
   mode: z.enum(["song", "instrumental", "voiceover", "sfx", "video-music"]).optional(),
@@ -9,14 +8,8 @@ const searchSchema = z.object({
 });
 
 function MusicRoutePage() {
-  return (
-    <>
-      <div className="mx-auto w-full min-w-0 max-w-6xl px-4 pt-4 sm:px-6 lg:max-w-7xl lg:px-8">
-        <StudioBackLink />
-      </div>
-      <MusicStudioPage />
-    </>
-  );
+  // StudioBackLink is integrated into MusicStudioPage header (no awkward top-only placement).
+  return <MusicStudioPage />;
 }
 
 export const Route = createFileRoute("/_authenticated/music")({
