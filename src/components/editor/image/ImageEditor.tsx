@@ -1075,44 +1075,6 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                       keepWatermark={isFreePlanForWm ? true : keepWatermark}
                       studioTier={studioTier}
                     />
-                    {!isFreePlanForWm && (
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-foreground">Watermark</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {keepWatermark ? "On — stamped on generated output" : "Off — clean output"}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={keepWatermark}
-                          onClick={() =>
-                            setKeepWatermark((v) => {
-                              const next = !v;
-                              try {
-                                localStorage.setItem(WATERMARK_PREF_KEY, next ? "on" : "off");
-                              } catch {
-                                /* ignore */
-                              }
-                              return next;
-                            })
-                          }
-                          className={cn(
-                            "relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]/40",
-                            keepWatermark ? "bg-[#FF5A1F] shadow-[0_0_12px_-2px_rgba(255,90,31,0.55)]" : "bg-muted",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow transition-transform",
-                              keepWatermark && "translate-x-5",
-                            )}
-                          />
-                          <span className="sr-only">{keepWatermark ? "Watermark on" : "Watermark off"}</span>
-                        </button>
-                      </div>
-                    )}
                     <EditorResult
                       output={output}
                       loading={loading || standardCompleteHold || premiumCompleteHold || ultraCompleteHold}
