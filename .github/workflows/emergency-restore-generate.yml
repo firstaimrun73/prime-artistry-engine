@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "src/lib/generate.functions.ts"
+      - "src/lib/music.functions.ts"
       - ".github/workflows/emergency-restore-generate.yml"
 jobs:
   restore:
@@ -15,49 +16,61 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Restore full generate.functions.ts if incomplete
+      - name: Restore generate.functions.ts + music private R2 if incomplete
         run: |
           set -euo pipefail
-          SIZE=$(wc -c < src/lib/generate.functions.ts || echo 0)
-          echo "current size=$SIZE"
-          if [ "$SIZE" -gt 25000 ] && grep -q "executeStandardImage" src/lib/generate.functions.ts && grep -q "persistGenerationHistory" src/lib/generate.functions.ts && ! grep -q "restore incomplete" src/lib/generate.functions.ts; then
-            echo "generate.functions.ts already complete"
-            exit 0
-          fi
-          echo "Restoring from 7262a1179fdd..."
-          git show 7262a1179fdd:src/lib/generate.functions.ts > src/lib/generate.functions.ts
-          python3 << 'PY'
+
+          restore_generate() {
+            SIZE=$(wc -c < src/lib/generate.functions.ts || echo 0)
+            echo "generate size=$SIZE"
+            NEED=0
+            if [ "$SIZE" -lt 25000 ]; then NEED=1; fi
+            if ! grep -q "executeStandardImage" src/lib/generate.functions.ts; then NEED=1; fi
+            if grep -q "restore incomplete" src/lib/generate.functions.ts; then NEED=1; fi
+            if ! grep -q "ingestProviderMediaToUserR2" src/lib/generate.functions.ts; then NEED=1; fi
+            if [ "$NEED" = "0" ]; then
+              echo "generate.functions.ts already complete with R2 ingest"
+              return 0
+            fi
+            echo "Restoring generate from 7262a1179fdd + R2 patches..."
+            git show 7262a1179fdd:src/lib/generate.functions.ts > src/lib/generate.functions.ts
+            python3 << 'PY'
           from pathlib import Path
           p = Path("src/lib/generate.functions.ts")
           t = p.read_text()
           if len(t) < 10000:
               raise SystemExit(f"restore too small: {len(t)}")
-          if "PLACEHOLDER" in t or "restore incomplete" in t or t.strip() == "see below":
+          if "PLACEHOLDER" in t or "restore incomplete" in t:
               raise SystemExit("restore still bad")
-          if "finalizedR2Key" not in t and "r2ObjectKeyFromFinalize" not in t:
+
+          # Ensure finalizedR2Key variable
+          if "finalizedR2Key" not in t:
               t = t.replace(
                   "let outputUrl: string | null = null;",
                   "let outputUrl: string | null = null;\n    let finalizedR2Key: string | null = null;",
                   1,
               )
-              t = t.replace(
-                  """        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
+
+          # Capture storagePath from finalize
+          if "fin.storagePath" not in t:
+              needle = '''        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
           outputUrl = fin.finalUrl;
         }
-      } catch (wmErr) {
-        // Fail closed when a stamp was required (free plan, or paid keepWatermark=true).""",
-                  """        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
+      } catch (wmErr) {'''
+              repl = '''        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
           outputUrl = fin.finalUrl;
         }
         if (fin.storagePath && typeof fin.storagePath === "string") {
           finalizedR2Key = fin.storagePath.replace(/^\\//, "");
         }
-      } catch (wmErr) {
-        // Fail closed when a stamp was required (free plan, or paid keepWatermark=true).""",
-                  1,
-              )
-              t = t.replace(
-                  """      await persistGenerationHistory({
+      } catch (wmErr) {'''
+              if needle not in t:
+                  raise SystemExit("finalize block not found for storagePath patch")
+              t = t.replace(needle, repl, 1)
+
+          # Pass r2ObjectKey to persist
+          if "r2ObjectKey: finalizedR2Key" not in t:
+              needle = '''      await persistGenerationHistory({
         supabaseAdmin,
         userId,
         type: data.type === "video" ? "video" : "image",
@@ -66,8 +79,8 @@ jobs:
         output_url: outputUrl,
         status: "success",
         metadata: meta,
-      });""",
-                  """      await persistGenerationHistory({
+      });'''
+              repl = '''      await persistGenerationHistory({
         supabaseAdmin,
         userId,
         type: data.type === "video" ? "video" : "image",
@@ -77,19 +90,153 @@ jobs:
         status: "success",
         metadata: meta,
         r2ObjectKey: finalizedR2Key,
-      });""",
-                  1,
-              )
+      });'''
+              if needle not in t:
+                  raise SystemExit("persistGenerationHistory block not found")
+              t = t.replace(needle, repl, 1)
+
+          # Private R2 ingest when finalize did not store (paid OFF / video)
+          if "ingestProviderMediaToUserR2" not in t:
+              insert = '''
+    // Ensure private user R2 storage for durable History/Output delivery.
+    if (outputUrl && !finalizedR2Key) {
+      try {
+        const { ingestProviderMediaToUserR2 } = await import("@/lib/user-media.server");
+        const kind = data.type === "video" ? "video" : "image";
+        const ingested = await ingestProviderMediaToUserR2({
+          userId,
+          sourceUrl: outputUrl,
+          kind,
+        });
+        if (ingested) {
+          finalizedR2Key = ingested.objectKey;
+          outputUrl = ingested.deliveryUrl;
+        }
+      } catch (ingestErr) {
+        console.warn("[generate] user R2 ingest skipped:", ingestErr);
+      }
+    }
+
+'''
+              marker = "let newCredits = profile.credits;"
+              if marker not in t:
+                  raise SystemExit("newCredits marker not found")
+              t = t.replace(marker, insert + "    " + marker, 1)
+
           if "executeStandardImage" not in t or "persistGenerationHistory" not in t:
               raise SystemExit("restore incomplete")
-          if "finalizedR2Key" not in t and "r2ObjectKeyFromFinalize" not in t:
+          if "r2ObjectKey: finalizedR2Key" not in t:
               raise SystemExit("r2 key patch failed")
+          if "ingestProviderMediaToUserR2" not in t:
+              raise SystemExit("ingest patch failed")
           p.write_text(t)
-          print("restored bytes", len(t))
+          print("generate restored bytes", len(t))
           PY
+          }
+
+          restore_music() {
+            SIZE=$(wc -c < src/lib/music.functions.ts || echo 0)
+            echo "music size=$SIZE"
+            NEED=0
+            if [ "$SIZE" -lt 10000 ]; then NEED=1; fi
+            if grep -q "SEE_FILE" src/lib/music.functions.ts 2>/dev/null; then NEED=1; fi
+            if ! grep -q "generateMusic" src/lib/music.functions.ts 2>/dev/null; then NEED=1; fi
+            if ! grep -q "ingestProviderMediaToUserR2" src/lib/music.functions.ts 2>/dev/null; then NEED=1; fi
+            if [ "$NEED" = "0" ]; then
+              echo "music.functions.ts already complete with R2 ingest"
+              return 0
+            fi
+            echo "Restoring music from 77cfab65 + R2 ingest..."
+            git show 77cfab6537e74e669a8daa1095c92dbdbac6c8da:src/lib/music.functions.ts > src/lib/music.functions.ts
+            python3 << 'PY'
+          from pathlib import Path
+          p = Path("src/lib/music.functions.ts")
+          t = p.read_text()
+          if len(t) < 10000:
+              raise SystemExit(f"music restore too small: {len(t)}")
+          if "SEE_FILE" in t or "PLACEHOLDER" in t:
+              raise SystemExit("music still stub")
+
+          if "ingestProviderMediaToUserR2" not in t:
+              old = '''    const { data: genRow, error: genErr } = await supabase
+      .from("generations")
+      .insert({
+        user_id: userId,
+        type: "music",
+        prompt: brief.summaryPrompt.slice(0, 500),
+        title: trackTitle,
+        input_url: data.videoUrl || data.imageUrl || null,
+        output_url: outputUrl,
+        status: "success",
+        retained_as_history: retain,
+        metadata,
+      })
+      .select("id")
+      .maybeSingle();
+'''
+              new = '''    // Private user R2: copy provider audio/video into users/{userId}/
+    let musicR2Key: string | null = null;
+    let musicStorageProvider: string | null = null;
+    if (outputUrl && outputUrl.startsWith("https://")) {
+      try {
+        const { ingestProviderMediaToUserR2 } = await import("@/lib/user-media.server");
+        const kind = outputType === "video" ? "video" : "music";
+        const ingested = await ingestProviderMediaToUserR2({
+          userId,
+          sourceUrl: outputUrl,
+          kind,
+        });
+        if (ingested) {
+          musicR2Key = ingested.objectKey;
+          musicStorageProvider = "r2";
+          outputUrl = ingested.deliveryUrl;
+          if (outputType === "video") videoUrl = ingested.deliveryUrl;
+        }
+      } catch (e) {
+        console.warn("[music] user R2 ingest skipped:", e);
+      }
+    }
+
+    const { data: genRow, error: genErr } = await supabase
+      .from("generations")
+      .insert({
+        user_id: userId,
+        type: "music",
+        prompt: brief.summaryPrompt.slice(0, 500),
+        title: trackTitle,
+        input_url: data.videoUrl || data.imageUrl || null,
+        output_url: outputUrl,
+        status: "success",
+        retained_as_history: retain,
+        storage_provider: musicStorageProvider,
+        r2_object_key: musicR2Key,
+        metadata,
+      })
+      .select("id")
+      .maybeSingle();
+'''
+              if old not in t:
+                  raise SystemExit("music generations insert block not found")
+              t = t.replace(old, new, 1)
+
+          if "generateMusic" not in t:
+              raise SystemExit("music missing generateMusic")
+          if "ingestProviderMediaToUserR2" not in t:
+              raise SystemExit("music ingest patch failed")
+          p.write_text(t)
+          print("music restored bytes", len(t))
+          PY
+          }
+
+          restore_generate
+          restore_music
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/generate.functions.ts
-          git diff --cached --quiet && echo "no changes" && exit 0
-          git commit -m "EMERGENCY RESTORE: full generate.functions.ts + r2_object_key (auto)"
+          git add src/lib/generate.functions.ts src/lib/music.functions.ts
+          if git diff --cached --quiet; then
+            echo "no changes"
+            exit 0
+          fi
+          git commit -m "EMERGENCY RESTORE: full generate.functions + music private users/** R2 ingest"
           git push
