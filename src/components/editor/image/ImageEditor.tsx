@@ -128,7 +128,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
-  const stages = getEditorStages(!!inputDataUrl);
+  const stages = getEditorStages(!!(inputDataUrl || inputFile || inputPreview));
   const isStandardExp = studioTier === "standard";
   const isPremiumExp = studioTier === "pro";
   const isUltraExp = studioTier === "premium";
@@ -147,9 +147,21 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   // Keep gallery within the active experience + plan ceiling (prevents Standard 5-cap overflow crash).
   useEffect(() => {
     if (gallery.length <= effectiveMaxImages) return;
-    setGallery((prev) => prev.slice(0, effectiveMaxImages));
+    setGallery((prev) => {
+      if (prev.length <= effectiveMaxImages) return prev;
+      const kept = prev.slice(0, effectiveMaxImages);
+      for (const g of prev.slice(effectiveMaxImages)) {
+        if (g.preview?.startsWith("blob:")) {
+          try {
+            URL.revokeObjectURL(g.preview);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      return kept;
+    });
     setActiveImage((idx) => Math.min(idx, Math.max(0, effectiveMaxImages - 1)));
-    toast.message(`Showing up to ${effectiveMaxImages} images for this experience.`);
   }, [effectiveMaxImages]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
@@ -256,7 +268,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   }, [state, isPremiumExp, isUltraExp, isStandardExp, premiumGenError, ultraGenError, standardGenError]);
 
   const cost = useMemo(() => {
-    const hasSource = !!inputDataUrl;
+    const hasSource = !!(inputDataUrl || inputFile || inputPreview);
     const refCount = refImages.length;
     const hasMask = !!removeMaskDataUrl;
     const totalImages = (hasSource ? 1 : 0) + refCount;
@@ -323,7 +335,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   if (!profile) return null;
 
   const noCredits = !isAdmin && profile.credits < cost;
-  const canAddRefImages = !!inputDataUrl && effectiveMaxImages > 1;
+  const canAddRefImages = !!(inputDataUrl || inputFile || gallery.length > 0) && effectiveMaxImages > 1;
   const loading = state === "loading" || state === "analyzing";
   const suggestions = getSmartSuggestions(prompt);
   const uploadToStorage = (file: File) => uploadToStorageUtil(file, profile?.id ?? "anon");
@@ -343,7 +355,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     if (!item) return;
     setActiveImage(idx);
     setInputPreview(item.preview);
-    setInputDataUrl(item.dataUrl);
+    setInputDataUrl(item.dataUrl || item.preview);
     setInputFile(item.file);
     setInputKind("image");
     setOutput(null);
@@ -359,6 +371,14 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
   const removeImage = (idx: number) => {
     if (loading) return;
+    const doomed = gallery[idx];
+    if (doomed?.preview?.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(doomed.preview);
+      } catch {
+        /* ignore */
+      }
+    }
     const next = gallery.filter((_, i) => i !== idx);
     setGallery(next);
     if (next.length === 0) {
@@ -374,74 +394,69 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // onFile safe wrapper — never let selection errors reach the route error boundary
+    // Memory-safe multi-select: never base64 the whole selection.
+    // Preview via blob URL; File is the source of truth for upload.
     try {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length === 0) return;
-    e.target.value = "";
+      const files = Array.from(e.target.files ?? []);
+      if (files.length === 0) return;
+      e.target.value = "";
 
-    const maxAllowed = Math.max(1, effectiveMaxImages);
-    const room = Math.min(MAX_GALLERY_IMAGES, maxAllowed) - gallery.length;
-    if (room <= 0) {
-      if (isFree) {
-        return toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {
-          action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } },
-        });
-      }
-      return toast.error(
-        maxAllowed <= 5
-          ? `Standard supports up to ${maxAllowed} images (base + references).`
-          : `This experience allows up to ${maxAllowed} images at a time.`,
-      );
-    }
-    if (files.length > room) {
-      toast.message(`Only ${room} more image${room === 1 ? "" : "s"} can be added (max ${maxAllowed}).`);
-    }
-    if (isFree && files.length > 1) {
-      toast.message("Free plan: only 1 image. Extra files were ignored.");
-    }
-
-    const accepted: File[] = [];
-    for (const f of files.slice(0, room)) {
-      if (!f.type.startsWith("image")) {
-        toast.error("This workspace accepts images only. Use Video Editor for video.");
-        continue;
-      }
-      if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
-        toast.error(
-          `${f.name} is too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_IMAGE_MB} MB.`,
+      const maxAllowed = Math.max(1, effectiveMaxImages);
+      const room = Math.min(MAX_GALLERY_IMAGES, maxAllowed) - gallery.length;
+      if (room <= 0) {
+        if (isFree) {
+          return toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {
+            action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } },
+          });
+        }
+        return toast.error(
+          maxAllowed <= 5
+            ? ("Standard supports up to " + maxAllowed + " images (base + references).")
+            : ("This experience allows up to " + maxAllowed + " images at a time."),
         );
-        continue;
       }
-      accepted.push(f);
-    }
-    if (accepted.length === 0) return;
+      if (files.length > room) {
+        toast.message(
+          "Only " + room + " more image" + (room === 1 ? "" : "s") + " can be added (max " + maxAllowed + ").",
+        );
+      }
+      if (isFree && files.length > 1) {
+        toast.message("Free plan: only 1 image. Extra files were ignored.");
+      }
 
-        let items: GalleryItem[] = [];
-    try {
-    items = (
-      accepted.map((f) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      // Cap BEFORE any preview allocation (critical for 9/11-at-once mobile).
+      const accepted: File[] = [];
+      for (const f of files.slice(0, room)) {
+        if (!f.type.startsWith("image")) {
+          toast.error("This workspace accepts images only. Use Video Editor for video.");
+          continue;
+        }
+        if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+          toast.error(
+            f.name + " is too large (" + (f.size / 1024 / 1024).toFixed(1) + " MB). Maximum is " + MAX_IMAGE_MB + " MB.",
+          );
+          continue;
+        }
+        accepted.push(f);
+      }
+      if (accepted.length === 0) return;
+
+      const items: GalleryItem[] = accepted.map((f) => ({
+        id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
         preview: URL.createObjectURL(f),
         dataUrl: null,
         file: f,
       }));
-    } catch {
-      toast.error("Could not read one or more images. Try fewer or smaller files.");
-      return;
-    }
 
-
-    const next = [...gallery, ...items];
-    setGallery(next);
-    activateSlot(next, gallery.length);
-    toast.success(items.length > 1 ? `${items.length} images uploaded` : "Upload complete");
-  };
-
+      const next = [...gallery, ...items];
+      setGallery(next);
+      activateSlot(next, gallery.length);
+      toast.success(items.length > 1 ? String(items.length) + " images added" : "Upload complete");
     } catch (err) {
       console.error(err);
       toast.error("Could not add images. Try fewer or smaller files.");
     }
+  };
 
   const runImageJob = async (opts: {
     jobPrompt: string;
