@@ -1,0 +1,116 @@
+name: Watermark Free Locked UI
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/watermark-free-locked-ui.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch UI
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/components/editor/image/ImageEditor.tsx")
+          t = p.read_text()
+          old = """{!isFreePlanForWm && (
+                      <div className=\"flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md\">
+                        <div className=\"min-w-0\">
+                          <p className=\"text-xs font-semibold text-foreground\">Watermark</p>
+                          <p className=\"text-[11px] text-muted-foreground\">
+                            {keepWatermark ? \"On — stamped on generated output\" : \"Off — clean output\"}
+                          </p>
+                        </div>
+                        <button
+                          type=\"button\"
+                          role=\"switch\"
+                          aria-checked={keepWatermark}
+                          onClick={() =>
+                            setKeepWatermark((v) => {
+                              const next = !v;
+                              try {
+                                localStorage.setItem(WATERMARK_PREF_KEY, next ? \"on\" : \"off\");
+                              } catch {
+                                /* ignore */
+                              }
+                              return next;
+                            })
+                          }
+                          className={cn(
+                            \"relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]/40\",
+                            keepWatermark ? \"bg-[#FF5A1F] shadow-[0_0_12px_-2px_rgba(255,90,31,0.55)]\" : \"bg-muted\",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              \"absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow transition-transform\",
+                              keepWatermark && \"translate-x-5\",
+                            )}
+                          />
+                          <span className=\"sr-only\">{keepWatermark ? \"Watermark on\" : \"Watermark off\"}</span>
+                        </button>
+                      </div>
+                    )}"""
+          new = """{isFreePlanForWm ? (
+                      <div className=\"flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md\">
+                        <div className=\"min-w-0\">
+                          <p className=\"text-xs font-semibold text-foreground\">Watermark</p>
+                          <p className=\"text-[11px] text-muted-foreground\">On — Motio2edit (required on Free)</p>
+                        </div>
+                        <span className=\"shrink-0 rounded-full bg-[#FF5A1F]/15 px-2.5 py-1 text-[11px] font-semibold text-[#FF5A1F]\">Locked</span>
+                      </div>
+                    ) : (
+                      <div className=\"flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md\">
+                        <div className=\"min-w-0\">
+                          <p className=\"text-xs font-semibold text-foreground\">Watermark</p>
+                          <p className=\"text-[11px] text-muted-foreground\">
+                            {keepWatermark ? \"On — stamped on generated output\" : \"Off — clean output\"}
+                          </p>
+                        </div>
+                        <button
+                          type=\"button\"
+                          role=\"switch\"
+                          aria-checked={keepWatermark}
+                          onClick={() =>
+                            setKeepWatermark((v) => {
+                              const next = !v;
+                              try {
+                                localStorage.setItem(WATERMARK_PREF_KEY, next ? \"on\" : \"off\");
+                              } catch {
+                                /* ignore */
+                              }
+                              return next;
+                            })
+                          }
+                          className={cn(
+                            \"relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A1F]/40\",
+                            keepWatermark ? \"bg-[#FF5A1F] shadow-[0_0_12px_-2px_rgba(255,90,31,0.55)]\" : \"bg-muted\",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              \"absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-background shadow transition-transform\",
+                              keepWatermark && \"translate-x-5\",
+                            )}
+                          />
+                          <span className=\"sr-only\">{keepWatermark ? \"Watermark on\" : \"Watermark off\"}</span>
+                        </button>
+                      </div>
+                    )}"""
+          if old not in t:
+              raise SystemExit("watermark UI block not found")
+          t = t.replace(old, new, 1)
+          p.write_text(t)
+          assert "Locked" in t and "isFreePlanForWm ?" in t
+          print("OK", len(t))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx
+          git commit -m "fix(image-studio): Free watermark shows Locked On; paid keeps toggle"
+          git push origin HEAD:main
