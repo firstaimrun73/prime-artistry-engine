@@ -1,0 +1,51 @@
+name: Dedupe Watermark UI
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/dedupe-wm-ui.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove duplicate Output watermark block
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("src/components/editor/image/ImageEditor.tsx")
+          t = p.read_text()
+          # Remove the paid-only toggle block near Output (EditorOptionsPanel owns watermark UI).
+          # Pattern starts with {!isFreePlanForWm && ( and ends before <EditorResult
+          pat = re.compile(
+              r"\s*\{!isFreePlanForWm && \([\s\S]*?\)\}\n\s*(?=<EditorResult)",
+              re.M,
+          )
+          newt, n = pat.subn("\n                    ", t, count=1)
+          if n != 1:
+              # Try isFreePlanForWm ? (locked) : (toggle) form
+              pat2 = re.compile(
+                  r"\s*\{isFreePlanForWm \? \([\s\S]*?\) : \([\s\S]*?\)\}\n\s*(?=<EditorResult)",
+                  re.M,
+              )
+              newt, n = pat2.subn("\n                    ", t, count=1)
+          if n != 1:
+              print("WARN: duplicate block not found, n=", n)
+          else:
+              t = newt
+              print("removed duplicate")
+          p.write_text(t)
+          # Keep isFreePlanForWm for keepWatermark force on generate/download
+          assert "isFreePlanForWm" in t or "keepWatermark" in t
+          print("OK", len(t))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "fix(image-studio): single Watermark control via EditorOptionsPanel"
+          git push origin HEAD:main
