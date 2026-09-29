@@ -23,6 +23,7 @@ function escapeXml(s: string): string {
 /**
  * Build Motio2edit primary pill (+ optional dense secondary free marks).
  * When brand is circle, use Circle 2edit purple-ring mark instead.
+ * Free plan uses freeEnlarged for a somewhat larger primary Motio2edit mark.
  */
 export function buildImageOverlaySvg(
   w: number,
@@ -42,9 +43,10 @@ export function buildImageOverlaySvg(
     64,
   );
   const lengthFactor = displayText.length > 18 ? Math.min(1, 18 / displayText.length + 0.35) : 1;
+  const sizeRatio = freeEnlarged ? FREE_PRIMARY_SIZE_RATIO : PRIMARY_SIZE_RATIO;
   const fontSize = Math.max(
     11,
-    Math.min(88, Math.round(minDim * (freeEnlarged ? FREE_PRIMARY_SIZE_RATIO : PRIMARY_SIZE_RATIO) * lengthFactor)),
+    Math.min(88, Math.round(minDim * sizeRatio * lengthFactor)),
   );
   const pad = Math.max(6, Math.round(fontSize * 0.35));
   const margin = Math.max(10, Math.round(minDim * EDGE_MARGIN_RATIO));
@@ -60,6 +62,7 @@ export function buildImageOverlaySvg(
   const textX = dotCx + dotR + 8;
   const textY = rectY + pad + fontSize * 0.82;
 
+  // Secondary dense marks only when mode explicitly requests them (not Free).
   let secondary = "";
   if (mode === "primary+secondary") {
     const marks: string[] = [];
@@ -119,6 +122,7 @@ export async function renderImageWatermark(
   mode: WatermarkMode,
   label?: string,
   brand: WatermarkBrand = "generic",
+  freeEnlarged = false,
 ): Promise<Buffer> {
   if (mode === "none") {
     return sharp(input, { failOn: "none" }).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
@@ -129,7 +133,13 @@ export async function renderImageWatermark(
   const h = meta.height ?? 0;
   if (w < 8 || h < 8) throw new Error("Image too small to watermark.");
   return image
-    .composite([{ input: Buffer.from(buildImageOverlaySvg(w, h, mode, label, brand, freeEnlarged)), top: 0, left: 0 }])
+    .composite([
+      {
+        input: Buffer.from(buildImageOverlaySvg(w, h, mode, label, brand, freeEnlarged)),
+        top: 0,
+        left: 0,
+      },
+    ])
     .jpeg({ quality: 92, mozjpeg: true })
     .toBuffer();
 }
