@@ -128,6 +128,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
 
   const isAdmin = isAdminEmail(profile?.email);
   const isFree = profile?.plan === "free" && !isAdmin;
+  /** Watermark entitlement follows plan only — admin does not unlock OFF for Free. */
+  const isFreePlanForWm = (profile?.plan ?? "free") === "free";
   const stages = getEditorStages(!!(inputDataUrl || inputFile || inputPreview));
   const isStandardExp = studioTier === "standard";
   const isPremiumExp = studioTier === "pro";
@@ -583,7 +585,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           maskImageUrl,
           referenceImageUrls,
           contextTags: contextTags.length > 0 ? contextTags : undefined,
-          keepWatermark: isFree ? true : keepWatermark,
+          keepWatermark: isFreePlanForWm ? true : keepWatermark,
         },
       });
 
@@ -693,7 +695,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       const res = await secureDl({
         data: {
           imageUrl: output,
-          keepWatermark: isFree ? true : keepWatermark,
+          keepWatermark: isFreePlanForWm ? true : keepWatermark,
         },
       });
       if (res?.url) {
@@ -1073,10 +1075,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                       inputKind={inputKind}
                       isAdmin={isAdmin}
                       isFree={isFree}
-                      keepWatermark={isFree ? true : keepWatermark}
+                      keepWatermark={isFreePlanForWm ? true : keepWatermark}
                       studioTier={studioTier}
                     />
-                    {!isFree && !isAdmin && (
+                    {!isFreePlanForWm && (
                       <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/50 px-3 py-2.5 shadow-sm backdrop-blur-md">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-foreground">Watermark</p>

@@ -43,6 +43,10 @@ export function resolveExperienceWatermarkLabel(
   studioTier: WatermarkStudioTier | undefined,
   planId: string | null | undefined,
 ): string {
+  // Free users: primary Motio2edit only — never append secondary tier text.
+  const plan = (planId ?? "free").toLowerCase();
+  if (plan === "free" || plan === "") return WATERMARK_BRAND_TEXT;
+
   const tier = normalizeStudioTier(studioTier);
   const exp = experienceLabelFromTier(tier);
   // Prefer compact brand; append experience only for paid-looking tiers
@@ -120,7 +124,7 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
     stamped =
       input.mediaKind === "video"
         ? await renderVideoWatermark(buffer, policy.mode)
-        : await renderImageWatermark(buffer, policy.mode, label, brand);
+        : await renderImageWatermark(buffer, policy.mode, label, brand, policy.reason === "free_plan_forced");
   } catch (e) {
     console.error("[WATERMARK_FINALIZE] render failed:", e);
     throw new Error(PREPARE_FAILED);

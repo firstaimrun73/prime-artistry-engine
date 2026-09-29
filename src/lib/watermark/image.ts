@@ -5,6 +5,7 @@ import {
   WATERMARK_BRAND_ORANGE,
   detectWatermarkRatioKey,
   PRIMARY_SIZE_RATIO,
+  FREE_PRIMARY_SIZE_RATIO,
   SECONDARY_SIZE_RATIO,
   EDGE_MARGIN_RATIO,
 } from "@/lib/watermark-config";
@@ -29,6 +30,7 @@ export function buildImageOverlaySvg(
   mode: Exclude<WatermarkMode, "none">,
   label?: string,
   brand: WatermarkBrand = "generic",
+  freeEnlarged = false,
 ): string {
   if (brand === "circle") {
     return buildCircleWatermarkSvg(w, h);
@@ -42,7 +44,7 @@ export function buildImageOverlaySvg(
   const lengthFactor = displayText.length > 18 ? Math.min(1, 18 / displayText.length + 0.35) : 1;
   const fontSize = Math.max(
     11,
-    Math.min(72, Math.round(minDim * PRIMARY_SIZE_RATIO * lengthFactor)),
+    Math.min(88, Math.round(minDim * (freeEnlarged ? FREE_PRIMARY_SIZE_RATIO : PRIMARY_SIZE_RATIO) * lengthFactor)),
   );
   const pad = Math.max(6, Math.round(fontSize * 0.35));
   const margin = Math.max(10, Math.round(minDim * EDGE_MARGIN_RATIO));
@@ -127,7 +129,7 @@ export async function renderImageWatermark(
   const h = meta.height ?? 0;
   if (w < 8 || h < 8) throw new Error("Image too small to watermark.");
   return image
-    .composite([{ input: Buffer.from(buildImageOverlaySvg(w, h, mode, label, brand)), top: 0, left: 0 }])
+    .composite([{ input: Buffer.from(buildImageOverlaySvg(w, h, mode, label, brand, freeEnlarged)), top: 0, left: 0 }])
     .jpeg({ quality: 92, mozjpeg: true })
     .toBuffer();
 }
