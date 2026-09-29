@@ -577,7 +577,7 @@ export const generateMusic = createServerFn({ method: "POST" })
         });
         if (ingested) {
           musicR2Key = ingested.objectKey;
-          musicStorageProvider = "r2";
+          musicStorageProvider = ingested.storageProvider; // blob (free) or r2 (paid/admin)
           outputUrl = ingested.deliveryUrl;
           if (outputType === "video") videoUrl = ingested.deliveryUrl;
         }

@@ -131,27 +131,25 @@ export async function persistGenerationHistory(
 
   const genId = input.generationId ?? crypto.randomUUID();
 
-  // If finalize already wrote to R2 users/**, capture permanent key and ensure delivery is signed.
+  // If finalize already wrote to private user-media R2, capture permanent key and re-sign.
   try {
-    const {
-      extractR2ObjectKeyFromUrl,
-      isPrivateUserObjectKey,
-      r2ResolveDeliveryUrl,
-      isR2Configured,
-    } = await import("@/lib/r2.server");
+    const { extractR2ObjectKeyFromUrl, isPrivateUserObjectKey } = await import("@/lib/r2.server");
+    const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
+      "@/lib/private-history-storage.server"
+    );
     const extracted =
       r2Key ||
       (outputUrl ? extractR2ObjectKeyFromUrl(outputUrl) : null);
-    if (extracted && isPrivateUserObjectKey(extracted) && isR2Configured()) {
+    if (extracted && isPrivateUserObjectKey(extracted) && isPrivateR2Configured()) {
       r2Key = extracted;
       if (!storageProvider || storageProvider === "supabase") {
         storageProvider = "r2";
       }
-      const signed = await r2ResolveDeliveryUrl(extracted, { preferSigned: true });
+      const signed = await privateR2SignedGetUrl(extracted);
       if (signed) outputUrl = signed;
     }
   } catch (e) {
-    console.warn("[history-persist] R2 key extract/sign skipped:", e);
+    console.warn("[history-persist] private R2 key extract/sign skipped:", e);
   }
 
   if (
