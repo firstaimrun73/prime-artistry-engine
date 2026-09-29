@@ -1,0 +1,261 @@
+name: Fix Standard Multi-Image Crash
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fix-standard-crash.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch ImageEditor crash root causes
+        run: |
+          set -euo pipefail
+          python3 -u <<'ENDPY'
+          from pathlib import Path
+          import re
+
+          path = Path("src/components/editor/image/ImageEditor.tsx")
+          t = path.read_text()
+          assert len(t) > 20000, "ImageEditor too small"
+
+          # ---- 1) Replace broken onFile body with clean memory-safe version ----
+          # Match from "const onFile = async" through the end of the outer try/catch
+          # before runImageJob.
+          start = t.find("const onFile = async")
+          end = t.find("const runImageJob")
+          assert start > 0 and end > start, "onFile/runImageJob anchors missing"
+
+          new_onfile = r'''const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Memory-safe multi-select: never base64 the whole selection.
+    // Preview via blob URL; File is the source of truth for upload.
+    try {
+      const files = Array.from(e.target.files ?? []);
+      if (files.length === 0) return;
+      e.target.value = "";
+
+      const maxAllowed = Math.max(1, effectiveMaxImages);
+      const room = Math.min(MAX_GALLERY_IMAGES, maxAllowed) - gallery.length;
+      if (room <= 0) {
+        if (isFree) {
+          return toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {
+            action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } },
+          });
+        }
+        return toast.error(
+          maxAllowed <= 5
+            ? `Standard supports up to ${maxAllowed} images (base + references).`
+            : `This experience allows up to ${maxAllowed} images at a time.`,
+        );
+      }
+      if (files.length > room) {
+        toast.message(`Only ${room} more image${room === 1 ? "" : "s"} can be added (max ${maxAllowed}).`);
+      }
+      if (isFree && files.length > 1) {
+        toast.message("Free plan: only 1 image. Extra files were ignored.");
+      }
+
+      // Cap BEFORE any preview allocation (critical for 9/11-at-once mobile).
+      const accepted: File[] = [];
+      for (const f of files.slice(0, room)) {
+        if (!f.type.startsWith("image")) {
+          toast.error("This workspace accepts images only. Use Video Editor for video.");
+          continue;
+        }
+        if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+          toast.error(
+            `${f.name} is too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_IMAGE_MB} MB.`,
+          );
+          continue;
+        }
+        accepted.push(f);
+      }
+      if (accepted.length === 0) return;
+
+      const items: GalleryItem[] = accepted.map((f) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        preview: URL.createObjectURL(f),
+        dataUrl: null,
+        file: f,
+      }));
+
+      const next = [...gallery, ...items];
+      setGallery(next);
+      activateSlot(next, gallery.length);
+      toast.success(items.length > 1 ? `${items.length} images added` : "Upload complete");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not add images. Try fewer or smaller files.");
+    }
+  };
+
+  '''
+
+          t = t[:start] + new_onfile + t[end:]
+
+          # ---- 2) activateSlot: treat blob preview as display source when dataUrl is null ----
+          old_act = """activateSlot = (items: GalleryItem[], idx: number) => {
+    const item = items[idx];
+    if (!item) return;
+    setActiveImage(idx);
+    setInputPreview(item.preview);
+    setInputDataUrl(item.dataUrl);
+    setInputFile(item.file);
+    setInputKind("image");
+    setOutput(null);
+    setDownloaded(false);
+    setRemoveMaskDataUrl(null);
+    setState("idle");
+  };"""
+          new_act = """activateSlot = (items: GalleryItem[], idx: number) => {
+    const item = items[idx];
+    if (!item) return;
+    setActiveImage(idx);
+    setInputPreview(item.preview);
+    // Prefer dataUrl when present; otherwise blob preview so hasSource/canAddRef stay true.
+    setInputDataUrl(item.dataUrl || item.preview);
+    setInputFile(item.file);
+    setInputKind("image");
+    setOutput(null);
+    setDownloaded(false);
+    setRemoveMaskDataUrl(null);
+    setState("idle");
+  };"""
+          if old_act in t:
+              t = t.replace(old_act, new_act, 1)
+          else:
+              # soft fallback
+              t = t.replace(
+                  "setInputDataUrl(item.dataUrl);",
+                  "setInputDataUrl(item.dataUrl || item.preview);",
+                  1,
+              )
+
+          # ---- 3) removeImage: revoke blob URLs ----
+          old_rm = """const removeImage = (idx: number) => {
+    if (loading) return;
+    const next = gallery.filter((_, i) => i !== idx);
+    setGallery(next);
+    if (next.length === 0) {
+      setActiveImage(0);
+      setInputPreview(null);
+      setInputDataUrl(null);
+      setInputFile(null);
+      setInputKind(null);
+      setOutput(null);
+      return;
+    }
+    activateSlot(next, Math.min(idx, next.length - 1));
+  };"""
+          new_rm = """const removeImage = (idx: number) => {
+    if (loading) return;
+    const doomed = gallery[idx];
+    if (doomed?.preview?.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(doomed.preview);
+      } catch {
+        /* ignore */
+      }
+    }
+    const next = gallery.filter((_, i) => i !== idx);
+    setGallery(next);
+    if (next.length === 0) {
+      setActiveImage(0);
+      setInputPreview(null);
+      setInputDataUrl(null);
+      setInputFile(null);
+      setInputKind(null);
+      setOutput(null);
+      return;
+    }
+    activateSlot(next, Math.min(idx, next.length - 1));
+  };"""
+          if old_rm in t:
+              t = t.replace(old_rm, new_rm, 1)
+
+          # ---- 4) Source detection must not require base64 dataUrl ----
+          # stages / hasSource / canAddRefImages
+          t = t.replace(
+              "const stages = getEditorStages(!!inputDataUrl);",
+              "const stages = getEditorStages(!!(inputDataUrl || inputFile || inputPreview));",
+              1,
+          )
+          # hasSource inside cost effect
+          t = t.replace(
+              "const hasSource = !!inputDataUrl;",
+              "const hasSource = !!(inputDataUrl || inputFile || inputPreview);",
+              1,
+          )
+          t = t.replace(
+              "const canAddRefImages = !!inputDataUrl && effectiveMaxImages > 1;",
+              "const canAddRefImages = !!(inputDataUrl || inputFile || gallery.length > 0) && effectiveMaxImages > 1;",
+              1,
+          )
+
+          # ---- 5) Gallery trim effect: only shrink, never recursive crash ----
+          # Already slices; ensure it also revokes trimmed blob URLs
+          old_trim = """useEffect(() => {
+    if (gallery.length <= effectiveMaxImages) return;
+    setGallery((prev) => prev.slice(0, effectiveMaxImages));
+  }, [effectiveMaxImages]); // eslint-disable-line react-hooks/exhaustive-deps"""
+          new_trim = """useEffect(() => {
+    if (gallery.length <= effectiveMaxImages) return;
+    setGallery((prev) => {
+      if (prev.length <= effectiveMaxImages) return prev;
+      const kept = prev.slice(0, effectiveMaxImages);
+      for (const g of prev.slice(effectiveMaxImages)) {
+        if (g.preview?.startsWith("blob:")) {
+          try {
+            URL.revokeObjectURL(g.preview);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      return kept;
+    });
+  }, [effectiveMaxImages]); // eslint-disable-line react-hooks/exhaustive-deps"""
+          if old_trim in t:
+              t = t.replace(old_trim, new_trim, 1)
+
+          # Sanity: no eager multi readAsDataUrl on select
+          assert "dataUrl: await readAsDataUrl" not in t
+          assert "const onFile = async" in t
+          assert "URL.createObjectURL(f)" in t
+          assert "dataUrl: null" in t
+          # Balanced: the broken `items = (` pattern must be gone
+          assert "items = (\n      accepted.map" not in t
+          assert "items: GalleryItem[] = accepted.map" in t or "const items: GalleryItem[] = accepted.map" in t
+
+          path.write_text(t)
+          print("ImageEditor patched", len(t))
+
+          # ---- 6) Confirm generate still prefers File upload (no change required) ----
+          gen = Path("src/lib/generate.functions.ts").read_text()
+          assert len(gen) > 20000 and "Fail closed" in gen
+          print("generate.functions intact", len(gen))
+          ENDPY
+
+          # Quick syntax-ish check: node cannot parse TSX, but ensure paren balance in onFile region
+          python3 - <<'PY'
+          from pathlib import Path
+          t = Path("src/components/editor/image/ImageEditor.tsx").read_text()
+          start = t.find("const onFile = async")
+          end = t.find("const runImageJob")
+          block = t[start:end]
+          assert block.count("(") == block.count(")"), f"paren imbalance {block.count('(')} vs {block.count(')')}"
+          assert block.count("{") == block.count("}"), f"brace imbalance"
+          assert "dataUrl: await readAsDataUrl" not in t
+          print("balance OK")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx
+          git diff --cached --stat
+          git diff --cached --quiet && echo no-changes && exit 0
+          git commit -m "fix(image-studio): Standard multi-image crash — fix broken onFile, null dataUrl source detection, revoke blob URLs"
+          git push origin HEAD:main
