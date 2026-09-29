@@ -1,4 +1,5 @@
 import { isFreePlan, isPaidPlan } from "@/lib/policy";
+import { isAdminClaims } from "@/lib/admin-guard.server";
 import type { WatermarkMode, WatermarkPolicy } from "./types";
 import { FINALIZED_PATH_MARKER, FINALIZED_VIDEO_MARKER } from "./types";
 
@@ -12,17 +13,41 @@ export type ResolvePolicyInput = {
 };
 
 /**
- * Watermark entitlement is determined by subscription PLAN only.
- * Admin status must NOT bypass Free-plan watermark requirements.
+ * Watermark entitlement:
+ * - Admin (firstaimrun89@gmail.com): default OFF / clean; may opt in
+ * - Free: forced Motio2edit primary (no secondary)
+ * - Paid: respect keepWatermark (client default ON)
  */
 export function resolveWatermarkPolicy(input: ResolvePolicyInput): WatermarkPolicy {
-  void input.isAdmin;
-  void input.email;
   const url = input.sourceUrl ?? "";
   const alreadyFinalized =
     input.alreadyFinalizedHint === true ||
     url.includes(FINALIZED_PATH_MARKER) ||
     url.includes(FINALIZED_VIDEO_MARKER);
+
+  const admin =
+    input.isAdmin === true ||
+    isAdminClaims({ email: input.email ?? undefined });
+
+  // Sole admin: clean output by default; optional stamp when keepWatermark=true
+  if (admin) {
+    if (input.keepWatermark === true) {
+      return {
+        mode: "primary",
+        primary: true,
+        secondary: false,
+        alreadyFinalized,
+        reason: "admin_opt_in",
+      };
+    }
+    return {
+      mode: "none",
+      primary: false,
+      secondary: false,
+      alreadyFinalized,
+      reason: "admin_default_off",
+    };
+  }
 
   // Free: forced primary Motio2edit only — no secondary watermark.
   if (isFreePlan(input.plan)) {
