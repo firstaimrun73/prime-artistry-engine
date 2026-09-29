@@ -139,6 +139,10 @@ export function preflightCircleAdd(opts: {
 
 export function buildCircleAddHistoryMeta(preflight: CircleAddPreflightOk): Record<string, unknown> {
   return {
+    experience: "circle-2edit",
+    source: "circle",
+    feature: "circle-add",
+    operation: "circle_to_add",
     circle_operation: "add",
     circle_asset_id: preflight.resolved.assetId,
     circle_asset_name: preflight.resolved.assetName,
