@@ -7,6 +7,7 @@ import { SignedInStudioCards } from "@/components/SignedInStudioCards";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { supabase } from "@/integrations/supabase/client";
+import { isVisibleInHistory } from "@/lib/history-retention";
 import { History as HistoryIcon, Music } from "lucide-react";
 
 type RecentGen = {
@@ -15,11 +16,16 @@ type RecentGen = {
   prompt: string | null;
   output_url: string | null;
   created_at: string;
+  metadata?: unknown;
+  retained_as_history?: boolean | null;
+  deleted_at?: string | null;
+  expires_at?: string | null;
 };
 
 /**
  * Authenticated homepage body.
  * Keeps existing branding; adds discoverability without a full redesign.
+ * "Recent history" uses the same visibility rules as History / Profile Recent Projects.
  */
 export function SignedInWorkspace() {
   const { user, profile } = useAuth();
@@ -31,14 +37,34 @@ export function SignedInWorkspace() {
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("generations")
-      .select("id, type, prompt, output_url, created_at")
-      .order("created_at", { ascending: false })
-      .limit(6)
-      .then(({ data }) => {
-        if (data) setRecent(data as RecentGen[]);
-      });
+    void (async () => {
+      const full = await supabase
+        .from("generations")
+        .select(
+          "id, type, prompt, output_url, created_at, metadata, retained_as_history, deleted_at, expires_at",
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(12);
+
+      if (!full.error && full.data) {
+        const rows = (full.data as RecentGen[]).filter((g) => isVisibleInHistory(g));
+        setRecent(rows.slice(0, 6));
+        return;
+      }
+
+      // Fallback if retention columns missing
+      const core = await supabase
+        .from("generations")
+        .select("id, type, prompt, output_url, created_at, metadata")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (!core.error && core.data) {
+        const rows = (core.data as RecentGen[]).filter((g) => isVisibleInHistory(g));
+        setRecent(rows.slice(0, 6));
+      }
+    })();
   }, [user]);
 
   const quickActions: {

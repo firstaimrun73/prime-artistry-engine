@@ -39,6 +39,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
+/** Same visibility fields as History page — isVisibleInHistory needs the full row. */
 type Generation = {
   id: string;
   type: string;
@@ -47,7 +48,19 @@ type Generation = {
   status: string;
   created_at: string;
   metadata?: unknown;
+  retained_as_history?: boolean | null;
+  deleted_at?: string | null;
+  expires_at?: string | null;
+  storage_provider?: string | null;
+  r2_object_key?: string | null;
 };
+
+const HISTORY_SELECT =
+  "id, type, prompt, output_url, status, created_at, metadata, retained_as_history, deleted_at, expires_at, storage_provider, r2_object_key";
+const HISTORY_SELECT_CORE =
+  "id, type, prompt, output_url, status, created_at, metadata, retained_as_history, deleted_at, storage_provider, r2_object_key";
+const HISTORY_SELECT_MIN =
+  "id, type, prompt, output_url, status, created_at, metadata";
 
 export function Dashboard() {
   const { profile, user } = useAuth();
@@ -60,18 +73,46 @@ export function Dashboard() {
   useEffect(() => {
     if (!user) return;
     loadHistoryPrefs(user.id).then(setHistoryPrefs);
-    supabase
-      .from("generations")
-      .select("id, type, prompt, output_url, status, created_at, metadata")
-      .order("created_at", { ascending: false })
-      .limit(24)
-      .then(({ data }) => {
-        if (data) {
-          const rows = (data as Generation[]).filter((g) => isVisibleInHistory(g.metadata));
-          setGens(rows.slice(0, 8));
+
+    void (async () => {
+      // Prefer full retention columns so Profile Recent Projects matches History rules.
+      let rows: Generation[] = [];
+      const full = await supabase
+        .from("generations")
+        .select(HISTORY_SELECT)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(24);
+
+      if (!full.error && full.data) {
+        rows = (full.data as Generation[]).filter((g) => isVisibleInHistory(g));
+      } else {
+        if (full.error) console.warn("[dashboard] full select:", full.error.message);
+        const core = await supabase
+          .from("generations")
+          .select(HISTORY_SELECT_CORE)
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(24);
+        if (!core.error && core.data) {
+          rows = (core.data as Generation[]).filter((g) => isVisibleInHistory(g));
+        } else {
+          if (core.error) console.warn("[dashboard] core select:", core.error.message);
+          const min = await supabase
+            .from("generations")
+            .select(HISTORY_SELECT_MIN)
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(24);
+          if (!min.error && min.data) {
+            rows = (min.data as Generation[]).filter((g) => isVisibleInHistory(g));
+          }
         }
-        setLoading(false);
-      });
+      }
+
+      setGens(rows.slice(0, 8));
+      setLoading(false);
+    })();
   }, [user]);
 
   const toggleHistorySave = async (value: boolean) => {
