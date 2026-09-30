@@ -4,7 +4,8 @@
  * Architecture (storage-light):
  * - Do NOT copy generated media into Vercel Blob, Cloudflare R2, or Supabase Storage.
  * - Persist the fal.ai (provider) source URL + full History metadata only.
- * - retained_as_history is driven by user_settings.history_enabled (missing row = ON).
+ * - retained_as_history is driven by should_retain_as_history RPC (DB authoritative).
+ * - is_private defaults to false unless the caller passes an explicit true privacy choice.
  * - User-facing delivery may go through Motio2edit resolvers; permanent reference is the source URL.
  * - Idempotent when generationId is provided (upsert on id).
  * - Never create History rows with empty/null output URLs.
@@ -49,13 +50,36 @@ export async function readHistoryEnabled(
 }
 
 /**
- * Retain decision only — no R2/Blob provider selection for generated History media.
+ * Retain decision via DB RPC when available.
+ * Generated History media always uses fal/provider link storage — never permanent R2/Blob copy.
  */
 export async function callShouldRetainAsHistory(
   supabaseAdmin: SupabaseClient,
   userId: string,
-  _isPrivate: boolean,
+  isPrivate: boolean,
 ): Promise<RetainDecision> {
+  // Prefer the authoritative DB function. Do not reimplement plan/sensitive rules in TS.
+  try {
+    const { data, error } = await supabaseAdmin.rpc("should_retain_as_history", {
+      p_user_id: userId,
+      p_is_private: isPrivate,
+    });
+    if (!error && data != null) {
+      const d = (typeof data === "object" ? data : {}) as {
+        retain?: boolean;
+        storage_provider?: string | null;
+      };
+      const retain = d.retain === true;
+      // Generated user media is always a fal/provider link — never permanent R2/Blob copy.
+      return { retain, storage_provider: retain ? "fal" : null };
+    }
+    if (error) {
+      console.warn("[history-persist] should_retain_as_history RPC:", error.message);
+    }
+  } catch (e) {
+    console.warn("[history-persist] should_retain_as_history exception:", e);
+  }
+  // Fallback if RPC unavailable: history_enabled only (missing row = ON).
   const historyEnabled = await readHistoryEnabled(supabaseAdmin, userId);
   if (!historyEnabled) {
     return { retain: false, storage_provider: null };
@@ -107,7 +131,8 @@ function isHttpsUrl(u: string | null | undefined): u is string {
 export async function persistGenerationHistory(
   input: PersistGenerationInput,
 ): Promise<PersistGenerationResult> {
-  const isPrivate = input.is_private !== false;
+  // Explicit private only. Missing/undefined/false → not private (normal Studio output).
+  const isPrivate = input.is_private === true;
   const decision = await callShouldRetainAsHistory(
     input.supabaseAdmin,
     input.userId,

@@ -247,7 +247,8 @@ export async function runFixedImageEdit(
     input_url: "uploaded",
     output_url: outputUrl,
     status: "success",
-    is_private: true,
+    // No explicit private mode in this path — normal History-eligible result
+    is_private: false,
     metadata: {
       source: "standalone_auto",
       primary_model: IMAGE_EDIT_MODEL,
