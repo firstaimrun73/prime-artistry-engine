@@ -1,1 +1,695 @@
-PLACEHOLDER
+/**
+ * Generation + plan server functions.
+ * completeCheckout lives in checkout.functions (free-plan switch).
+ * Full generateMedia path restored from emergency snapshot.
+ * Sound: videoGenerateAudio toggle is authoritative — never auto from prompt words.
+ * History: stores fal/provider URL + metadata only (no R2/Blob media copy).
+ */
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { CREDIT_COST, type PlanId } from "@/lib/plans";
+import { maxVideoDurationForPlan } from "@/lib/video-options";
+import {
+  applyVideoStyle,
+  is4kDurationLocked,
+  MAX_4K_DURATION_SEC,
+  selectApprovedVideoRoute,
+} from "@/lib/video-model-registry";
+import type { VideoGenMode, VideoProductMode, VideoResolution, VideoAspect } from "@/lib/video/video-capability-registry";
+import {
+  quoteVideoGeneration,
+  reserveCreditsForQuote,
+  releaseReservation,
+  markGenerating,
+  finalizeQuote,
+  markFailed,
+  type GenerationQuote,
+} from "@/lib/billing";
+import { buildVideoFromRegistry } from "@/lib/video-fal-step";
+import { computeImageExperienceCredits } from "@/lib/studio/image/image-experience-credits";
+import { isAdminClaims } from "@/lib/admin-guard.server";
+import { executeStandardImage } from "@/lib/studio/image/standard";
+import {
+  executePremiumImage,
+  planPremiumMultiGptImage2,
+  isPremiumMultiGptCandidate,
+} from "@/lib/studio/image/premium";
+import { executeUltraImage } from "@/lib/studio/image/ultra";
+import { persistGenerationHistory } from "@/lib/history-persist.server";
+import {
+  buildFalRequest,
+  buildImageEdit,
+  buildImageInpaint,
+  buildVideoEnhancement,
+  buildTextToVideo,
+  buildImageToVideo,
+  type FalStep,
+} from "@/lib/fal-request";
+import { composeTaggedPrompt } from "@/lib/studio/image/tag-semantic-registry";
+import { assertCircleAddAllowed, resolveCircleCharge } from "@/lib/circle-edit/server-charge";
+
+export { completeCheckout } from "@/lib/checkout.functions";
+
+const FAL_QUEUE = "https://queue.fal.run/";
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function falErrorMessage(label: string, status: number, txt: string): string {
+  let detail = "";
+  try {
+    const parsed = JSON.parse(txt) as { detail?: unknown };
+    if (typeof parsed.detail === "string") detail = parsed.detail;
+    else if (Array.isArray(parsed.detail))
+      detail = (parsed.detail as { msg?: string }[]).map((d) => d?.msg).filter(Boolean).join("; ");
+  } catch {
+    detail = txt.slice(0, 200);
+  }
+  if (status === 429) return "AI service is rate-limited right now. Please retry in a moment.";
+  if (status === 401 || status === 403) return "AI service authentication failed (invalid or expired API key).";
+  if (/balance|locked|billing|top up|exhausted/i.test(detail))
+    return "AI service is out of credits. Top up the fal.ai account balance to continue.";
+  if (detail) return `${label} failed: ${detail.slice(0, 160)}`;
+  return `${label} failed (status ${status}). Please try again.`;
+}
+
+async function runFalStep(step: FalStep, falKey: string): Promise<string> {
+  const headers = { Authorization: `Key ${falKey}`, "Content-Type": "application/json" };
+  const submit = await fetch(`${FAL_QUEUE}${step.model}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(step.body),
+  });
+  if (!submit.ok) throw new Error(falErrorMessage(step.label, submit.status, await submit.text()));
+  const { status_url, response_url } = (await submit.json()) as {
+    status_url: string;
+    response_url: string;
+  };
+  const deadline = Date.now() + 290_000;
+  let delay = 1500;
+  let lastStatus = "";
+  while (Date.now() < deadline) {
+    await sleep(delay);
+    const st = await fetch(status_url, { headers });
+    if (!st.ok) throw new Error(falErrorMessage(step.label, st.status, await st.text()));
+    const body = (await st.json()) as { status?: string };
+    lastStatus = body.status ?? "";
+    if (lastStatus === "COMPLETED") break;
+    if (lastStatus === "FAILED" || lastStatus === "ERROR") {
+      const bodyTxt = await fetch(response_url, { headers })
+        .then((r) => r.text())
+        .catch(() => "");
+      throw new Error(falErrorMessage(step.label, 500, bodyTxt || lastStatus));
+    }
+    delay = Math.min(delay + 500, 5000);
+  }
+  if (lastStatus !== "COMPLETED") throw new Error(`${step.label} timed out. Please retry.`);
+  const res = await fetch(response_url, { headers });
+  if (!res.ok) throw new Error(falErrorMessage(step.label, res.status, await res.text()));
+  const result = (await res.json()) as {
+    images?: { url?: string }[];
+    image?: { url?: string };
+    video?: { url?: string };
+    video_url?: string;
+  };
+  const url = result.images?.[0]?.url ?? result.image?.url ?? result.video?.url ?? result.video_url ?? null;
+  if (!url || typeof url !== "string") throw new Error(`${step.label} returned no media URL.`);
+  return url;
+}
+
+async function runFalStepResilient(
+  step: FalStep,
+  falKey: string,
+  opts: { timeoutMs?: number; maxRetries?: number } = {},
+): Promise<string> {
+  const timeoutMs = opts.timeoutMs ?? (step.outputKind === "video" ? 300_000 : 120_000);
+  const maxRetries = opts.maxRetries ?? 2;
+  let attempt = 0;
+  let lastErr: unknown;
+  while (attempt <= maxRetries) {
+    try {
+      const url = await Promise.race([
+        runFalStep(step, falKey),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Generation timed out. Please retry.")), timeoutMs),
+        ),
+      ]);
+      if (url && url.trim().length > 0) return url;
+      throw new Error("No output received");
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/timed out|rate-limited|429|503|502|network|fetch failed/i.test(msg) && attempt < maxRetries) {
+        attempt += 1;
+        await sleep(1500 * attempt);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+const maskStatsSchema = z
+  .object({
+    width: z.number().int().min(1).max(30000),
+    height: z.number().int().min(1).max(30000),
+    coveragePercent: z.number().min(0).max(100),
+    paintedPixels: z.number().int().min(0),
+    totalPixels: z.number().int().min(1),
+    boundingBox: z
+      .object({
+        x: z.number().int().min(0),
+        y: z.number().int().min(0),
+        width: z.number().int().min(1),
+        height: z.number().int().min(1),
+      })
+      .nullable(),
+    centerX: z.number().min(0).max(1),
+    centerY: z.number().min(0).max(1),
+  })
+  .optional();
+
+const inputSchema = z.object({
+  type: z.enum(["image", "video"]),
+  prompt: z.string().min(1).max(10_000),
+  imageUrl: z.string().min(1).max(15_000_000).optional(),
+  maskImageUrl: z.string().min(1).max(15_000_000).optional(),
+  referenceImageUrls: z.array(z.string().min(1).max(15_000_000)).max(9).optional(),
+  strength: z.number().min(0).max(1).optional(),
+  aspectRatio: z.string().optional(),
+  imageQuality: z.string().optional(),
+  videoDurationSeconds: z.number().int().min(1).max(60).optional(),
+  videoResolution: z.string().optional(),
+  videoAspectRatio: z.string().optional(),
+  videoModelId: z.string().optional(),
+  videoStyleId: z.string().optional(),
+  videoGenerateAudio: z.boolean().optional(),
+  sourceKind: z.enum(["image", "video"]).optional(),
+  keepWatermark: z.boolean().optional(),
+  studioTier: z.enum(["standard", "pro", "premium"]).optional(),
+  circleInstant: z.boolean().optional(),
+  circlePrepCredits: z.number().int().min(0).max(100).optional(),
+  circleAssetId: z.string().max(80).optional(),
+  circleFactors: z.record(z.string().max(40)).optional(),
+  circleMaskStats: maskStatsSchema,
+  sourceWidth: z.number().int().min(1).max(30000).optional(),
+  sourceHeight: z.number().int().min(1).max(30000).optional(),
+  contextTags: z.array(z.string().max(40)).max(10).optional(),
+});
+
+function useStandardImagePath(studioTier: "standard" | "pro" | "premium" | undefined): boolean {
+  return studioTier === "standard" || studioTier === undefined;
+}
+
+export const generateMedia = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => inputSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: profile, error: pErr } = await supabase
+      .from("profiles")
+      .select("plan, credits, email")
+      .eq("id", userId)
+      .single();
+    if (pErr || !profile) throw new Error("Could not load your account.");
+    const isAdmin = isAdminClaims({ email: profile.email ?? undefined });
+    if (!isAdmin && data.type === "video" && profile.plan === "free") {
+      throw new Error("Video generation requires a paid plan.");
+    }
+    assertCircleAddAllowed({
+      isAdmin,
+      plan: profile.plan,
+      maskImageUrl: data.maskImageUrl,
+      circleInstant: data.circleInstant,
+    });
+    const requestedDuration = data.videoDurationSeconds ?? 5;
+    const maxDuration = maxVideoDurationForPlan(profile.plan);
+    const videoDuration = isAdmin ? requestedDuration : Math.min(requestedDuration, maxDuration);
+    const isVideoEnhance = data.type === "video" && data.sourceKind === "video";
+    const CIRCLE_INSTANT_CREDITS = 25;
+
+    if (
+      data.type === "video" &&
+      is4kDurationLocked(
+        videoDuration,
+        (data.videoResolution as "480p" | "720p" | "1080p" | "4k") || "1080p",
+      )
+    ) {
+      throw new Error(`4K is limited to ${MAX_4K_DURATION_SEC}s maximum.`);
+    }
+    if (data.type === "image") {
+      const { assertImageExperienceAccess } = await import("@/lib/studio/image/image-experience-access");
+      assertImageExperienceAccess(profile.plan, data.studioTier ?? "standard", isAdmin);
+      if (!isAdmin && profile.plan === "free") {
+        const refs = (data.referenceImageUrls ?? []).filter(
+          (u) => typeof u === "string" && u.startsWith("https://"),
+        );
+        if (refs.length > 0) {
+          throw new Error(
+            "Multiple reference images require a paid plan. Upgrade to unlock multi-image generation.",
+          );
+        }
+      }
+      {
+        const tier = (data.studioTier ?? "standard") as string;
+        const primary = typeof data.imageUrl === "string" && data.imageUrl.startsWith("https://") ? 1 : 0;
+        const refs = (data.referenceImageUrls ?? []).filter(
+          (u) => typeof u === "string" && u.startsWith("https://"),
+        );
+        const total = primary + refs.length;
+        if (tier === "standard" && total > 5) {
+          throw new Error("Standard supports up to 5 images total (base + references).");
+        }
+        if ((tier === "pro" || tier === "premium") && total > 10) {
+          throw new Error("This experience supports up to 10 images total (base + references).");
+        }
+        {
+          const planId = (profile.plan ?? "free") as string;
+          const promptLen = typeof data.prompt === "string" ? data.prompt.length : 0;
+          const planCeil =
+            planId === "business"
+              ? 7000
+              : planId === "pro" || planId === "studio"
+                ? 6000
+                : planId === "plus"
+                  ? 4000
+                  : 2000;
+          const ceil = isAdmin ? Math.max(planCeil, 7000) : planCeil;
+          if (promptLen > ceil) {
+            throw new Error(
+              planId === "business" || isAdmin
+                ? "Prompt exceeds the safe maximum length."
+                : `Prompt is too long for your plan (max ${planCeil} characters).`,
+            );
+          }
+        }
+        {
+          const planId = (profile.plan ?? "free") as string;
+          const tier2 = (data.studioTier ?? "standard") as string;
+          const full = isAdmin || planId === "business";
+          const ar = String(data.aspectRatio ?? "").toLowerCase();
+          const q = String(data.imageQuality ?? "").toLowerCase();
+          if (!full && tier2 === "premium") {
+            if (ar === "imax" || q === "8k_max") {
+              throw new Error("IMAX and 8K Max require Master Studio.");
+            }
+            if (ar === "custom") {
+              throw new Error("Custom aspect ratio requires Master Studio.");
+            }
+          }
+        }
+      }
+    }
+
+    let modelPrompt: string;
+    let circleAddHistoryMeta: Record<string, unknown> | null = null;
+    if (data.type === "image" && data.circleInstant === false) {
+      const { resolveCircleAddForGenerate } = await import("@/lib/circle-edit/generate-circle-add-hook");
+      const add = await resolveCircleAddForGenerate({
+        circleAssetId: data.circleAssetId,
+        clientPrompt: data.prompt,
+        imageUrl: data.imageUrl,
+        maskImageUrl: data.maskImageUrl,
+        sourceWidth: data.sourceWidth,
+        sourceHeight: data.sourceHeight,
+        factorSelection: data.circleFactors ?? null,
+        maskStats: data.circleMaskStats ?? null,
+      });
+      modelPrompt = add.modelPrompt;
+      circleAddHistoryMeta = add.historyMeta;
+    } else {
+      modelPrompt =
+        data.type === "image" ? composeTaggedPrompt(data.prompt, data.contextTags) : data.prompt;
+    }
+
+    let videoQuote: ReturnType<typeof quoteVideoGeneration> | null = null;
+    let cost = isVideoEnhance
+      ? CREDIT_COST.video_enhance
+      : data.type === "video"
+        ? (() => {
+            const mode: VideoGenMode =
+              data.sourceKind === "video" ? "video" : data.imageUrl ? "image" : "text";
+            const productMode: VideoProductMode =
+              videoDuration > 10 || data.videoResolution === "1080p" ? "premium" : "standard";
+            const resolution = (data.videoResolution as VideoResolution) || "720p";
+            const aspect = (data.videoAspectRatio as VideoAspect) || "16:9";
+            const audioRequested = data.videoGenerateAudio === true;
+            videoQuote = quoteVideoGeneration({
+              userId,
+              mode,
+              productMode,
+              durationSec: videoDuration,
+              resolution,
+              aspect,
+              audio: audioRequested,
+              idempotencyKey: `video:${userId}:${mode}:${videoDuration}:${resolution}:${aspect}:${audioRequested}:${(data.prompt || "").slice(0, 80)}`,
+            });
+            if (!videoQuote.ok) {
+              throw new Error(videoQuote.message || "This video setting isn't available right now.");
+            }
+            return videoQuote.displayCredits;
+          })()
+        : (() => {
+            const refs = (data.referenceImageUrls ?? []).filter(
+              (u) => typeof u === "string" && u.startsWith("https://"),
+            );
+            const credit = computeImageExperienceCredits({
+              studioTier: data.studioTier,
+              hasSourceImage: !!data.imageUrl,
+              referenceCount: refs.length,
+              imageQuality: data.imageQuality,
+              plan: profile.plan,
+              isAdmin,
+              circleInstant: !!(data.circleInstant && data.maskImageUrl),
+              circleInstantCredits: CIRCLE_INSTANT_CREDITS,
+            });
+            return credit.credits + 0;
+          })();
+
+    {
+      const circleCharge = resolveCircleCharge({
+        circleInstant: data.circleInstant,
+        maskImageUrl: data.maskImageUrl,
+        circleAssetId: data.circleAssetId,
+        sourceWidth: data.sourceWidth,
+        sourceHeight: data.sourceHeight,
+      });
+      if (circleCharge != null) cost = circleCharge;
+    }
+    if (!isAdmin && profile.credits < cost) {
+      const shortfall = cost - profile.credits;
+      if (data.type === "video" && videoQuote?.ok) {
+        throw new Error(
+          `INSUFFICIENT_CREDITS: need ${cost} Motio2edit credits (you have ${profile.credits}, shortfall ${shortfall}). Quote ${videoQuote.quote.quoteId}. Generation not started.`,
+        );
+      }
+      throw new Error(
+        `Not enough credits. ${data.type === "video" ? "Video" : "Image"} generation costs ${cost} credits.`,
+      );
+    }
+    const falKey = process.env.FAL_API_KEY;
+    if (!falKey) throw new Error("AI service unavailable.");
+    let outputUrl: string | null = null;
+    let finalizedR2Key: string | null = null;
+    /** Original fal/provider URL for History (never replace with R2/Blob copy). */
+    let providerSourceUrl: string | null = null;
+    let standardCharge: number | null = null;
+    let reservedVideoQuote: GenerationQuote | null = null;
+    let imageStudioMeta: Record<string, unknown> | null = null;
+
+    if (data.type === "video" && !isAdmin && videoQuote?.ok && !isVideoEnhance) {
+      const reserved = await reserveCreditsForQuote(supabaseAdmin, videoQuote.quote, profile.credits);
+      reservedVideoQuote = reserved;
+      markGenerating(reserved);
+    }
+
+    try {
+      const runStudioStep = async (step: {
+        label: string;
+        model: string;
+        body: Record<string, unknown>;
+      }): Promise<string> =>
+        runFalStepResilient(
+          {
+            label: step.label,
+            model: step.model,
+            endpoint: step.model,
+            body: step.body,
+            outputKind: "image",
+          },
+          falKey,
+        );
+
+      if (data.type === "image" && data.imageUrl && data.maskImageUrl) {
+        console.info("[Image Studio] path=inpaint tier=%s", data.studioTier ?? "n/a");
+        const step = buildImageInpaint({
+          prompt: modelPrompt,
+          imageUrl: data.imageUrl,
+          maskUrl: data.maskImageUrl,
+        });
+        outputUrl = await runFalStepResilient(step, falKey);
+        imageStudioMeta = { source: "image-studio", mode: "inpaint", model: step.model };
+      } else if (data.type === "image" && useStandardImagePath(data.studioTier)) {
+        const refs = (data.referenceImageUrls ?? []).filter(
+          (u) => typeof u === "string" && u.startsWith("https://"),
+        );
+        console.info(
+          "[Image Studio] tier=standard refs=%d hasSource=%s",
+          refs.length,
+          !!data.imageUrl,
+        );
+        const result = await executeStandardImage(
+          {
+            prompt: modelPrompt,
+            imageUrl: data.imageUrl,
+            referenceImageUrls: data.referenceImageUrls,
+            maskImageUrl: data.maskImageUrl,
+            strength: data.strength,
+            aspectRatio: data.aspectRatio,
+            imageQuality: data.imageQuality,
+            contextTags: data.contextTags,
+          },
+          { falKey },
+        );
+        outputUrl = result.outputUrl;
+        standardCharge = result.creditsCharged;
+        imageStudioMeta = result.historyMeta ?? null;
+      } else if (data.type === "image" && data.studioTier === "pro") {
+        const refs = (data.referenceImageUrls ?? []).filter(
+          (u) => typeof u === "string" && u.startsWith("https://"),
+        );
+        console.info("[Image Studio] tier=premium refs=%d", refs.length);
+        if (isPremiumMultiGptCandidate({ referenceImageUrls: data.referenceImageUrls, imageUrl: data.imageUrl })) {
+          const planned = planPremiumMultiGptImage2({
+            prompt: modelPrompt,
+            imageUrl: data.imageUrl,
+            referenceImageUrls: data.referenceImageUrls,
+            aspectRatio: data.aspectRatio,
+            imageQuality: data.imageQuality,
+          });
+          if (planned) {
+            outputUrl = await runStudioStep(planned.step);
+            imageStudioMeta = planned.historyMeta ?? null;
+          } else {
+            const result = await executePremiumImage(
+              {
+                prompt: modelPrompt,
+                imageUrl: data.imageUrl,
+                referenceImageUrls: data.referenceImageUrls,
+                aspectRatio: data.aspectRatio,
+                imageQuality: data.imageQuality,
+              },
+              { falKey, runStep: runStudioStep },
+            );
+            outputUrl = result.outputUrl;
+            imageStudioMeta = result.historyMeta ?? null;
+          }
+        } else {
+          const result = await executePremiumImage(
+            {
+              prompt: modelPrompt,
+              imageUrl: data.imageUrl,
+              referenceImageUrls: data.referenceImageUrls,
+              aspectRatio: data.aspectRatio,
+              imageQuality: data.imageQuality,
+            },
+            { falKey, runStep: runStudioStep },
+          );
+          outputUrl = result.outputUrl;
+          imageStudioMeta = result.historyMeta ?? null;
+        }
+      } else if (data.type === "image" && data.studioTier === "premium") {
+        console.info("[Image Studio] tier=ultra");
+        const result = await executeUltraImage(
+          {
+            prompt: modelPrompt,
+            imageUrl: data.imageUrl,
+            referenceImageUrls: data.referenceImageUrls,
+            aspectRatio: data.aspectRatio,
+            imageQuality: data.imageQuality,
+          },
+          { falKey, runStep: runStudioStep },
+        );
+        outputUrl = result.outputUrl;
+        imageStudioMeta = result.historyMeta ?? null;
+      } else if (data.type === "image" && data.imageUrl) {
+        const step = buildImageEdit({
+          prompt: modelPrompt,
+          imageUrl: data.imageUrl,
+          strength: data.strength,
+        });
+        outputUrl = await runFalStepResilient(step, falKey);
+        imageStudioMeta = { source: "image-studio", mode: "edit", model: step.model };
+      } else if (data.type === "image") {
+        const step = buildFalRequest({
+          type: "image",
+          prompt: modelPrompt,
+          aspectRatio: data.aspectRatio,
+          imageQuality: data.imageQuality,
+        });
+        outputUrl = await runFalStepResilient(step, falKey);
+        imageStudioMeta = { source: "image-studio", mode: "t2i", model: step.model };
+      } else if (data.type === "video" && isVideoEnhance && data.imageUrl) {
+        const step = buildVideoEnhancement({ videoUrl: data.imageUrl });
+        outputUrl = await runFalStepResilient(step, falKey);
+      } else if (data.type === "video") {
+        const mode: VideoGenMode =
+          data.sourceKind === "video" ? "video" : data.imageUrl ? "image" : "text";
+        const productMode: VideoProductMode =
+          videoDuration > 10 || data.videoResolution === "1080p" ? "premium" : "standard";
+        const resolution = (data.videoResolution as VideoResolution) || "720p";
+        const aspect = (data.videoAspectRatio as VideoAspect) || "16:9";
+        const audioRequested = data.videoGenerateAudio === true;
+        const route = selectApprovedVideoRoute({
+          mode,
+          productMode,
+          durationSec: videoDuration,
+          resolution,
+          aspect,
+          audio: audioRequested,
+        });
+        if (!route) throw new Error("This video setting isn't available right now.");
+        const styled = applyVideoStyle(data.prompt, data.videoStyleId);
+        const step = buildVideoFromRegistry({
+          route,
+          prompt: styled,
+          imageUrl: data.imageUrl,
+          durationSec: videoDuration,
+          resolution,
+          aspect,
+          audio: audioRequested,
+        });
+        outputUrl = await runFalStepResilient(step, falKey);
+      }
+    } catch (genErr) {
+      if (reservedVideoQuote) {
+        try {
+          await releaseReservation(supabaseAdmin, reservedVideoQuote);
+        } catch {
+          /* ignore */
+        }
+        try {
+          markFailed(reservedVideoQuote);
+        } catch {
+          /* ignore */
+        }
+      }
+      throw genErr;
+    }
+
+    if (!outputUrl || outputUrl.trim().length === 0) {
+      throw new Error("Generation returned no media.");
+    }
+    if (data.imageUrl && outputUrl === data.imageUrl) {
+      throw new Error("Generation returned the original image. Credits not charged.");
+    }
+
+    providerSourceUrl = outputUrl;
+
+    // Server-side watermark — ephemeral only (no R2/Blob copy). History stores fal URL.
+    if (data.type === "image" && outputUrl) {
+      try {
+        const { finalizeMediaAsset } = await import("@/lib/watermark/finalize");
+        const fin = await finalizeMediaAsset({
+          sourceUrl: outputUrl,
+          mediaKind: "image",
+          plan: profile.plan,
+          email: profile.email,
+          isAdmin,
+          keepWatermark: !isAdmin && profile.plan === "free" ? true : data.keepWatermark,
+          userId,
+          studioTier: data.studioTier,
+        });
+        if (fin.finalUrl && (fin.finalUrl.startsWith("https://") || fin.finalUrl.startsWith("data:"))) {
+          outputUrl = fin.finalUrl;
+        }
+      } catch (wmErr) {
+        console.error("[generate] watermark finalize failed:", wmErr);
+        throw new Error(
+          wmErr instanceof Error && wmErr.message
+            ? wmErr.message
+            : "Could not finalize image. Please try again.",
+        );
+      }
+    }
+
+    // History stores fal/provider URL only — do not copy generated media to R2/Blob.
+
+    let newCredits = profile.credits;
+    if (!isAdmin) {
+      if (data.type === "video" && reservedVideoQuote) {
+        try {
+          const fin = await finalizeQuote(supabaseAdmin, reservedVideoQuote, outputUrl);
+          newCredits = fin.creditsRemaining;
+        } catch (finErr) {
+          console.error("[generate] finalize quote failed:", finErr);
+          throw new Error("Could not finalize credits. Please contact support.");
+        }
+      } else {
+        const charge = standardCharge ?? cost;
+        const { data: updated, error: cErr } = await supabaseAdmin
+          .from("profiles")
+          .update({ credits: profile.credits - charge })
+          .eq("id", userId)
+          .select("credits")
+          .single();
+        if (cErr || !updated) throw new Error("Could not update credits.");
+        newCredits = updated.credits;
+      }
+    }
+
+    try {
+      const creditsUsed = isAdmin ? 0 : (standardCharge ?? cost);
+      const meta: Record<string, unknown> = {
+        ...(circleAddHistoryMeta ?? {}),
+        ...(typeof imageStudioMeta === "object" && imageStudioMeta ? imageStudioMeta : {}),
+        credits_used: creditsUsed,
+        studio_tier: data.studioTier ?? null,
+        prompt: data.prompt,
+        provider: "fal",
+        source_media_url: providerSourceUrl || outputUrl,
+      };
+      if (data.type === "image" && data.studioTier) {
+        if (!meta.source) meta.source = "image-studio";
+        if (!meta.experienceLabel) {
+          meta.experienceLabel =
+            data.studioTier === "standard"
+              ? "Standard"
+              : data.studioTier === "pro"
+                ? "Premium"
+                : data.studioTier === "premium"
+                  ? "Ultra AI"
+                  : data.studioTier;
+        }
+      }
+      await persistGenerationHistory({
+        supabaseAdmin,
+        userId,
+        type: data.type === "video" ? "video" : "image",
+        prompt: data.prompt,
+        input_url: data.imageUrl ?? null,
+        output_url: providerSourceUrl || outputUrl || "",
+        sourceMediaUrl: providerSourceUrl || outputUrl,
+        status: "success",
+        metadata: meta,
+      });
+    } catch (histErr) {
+      console.error("[generate] persistGenerationHistory failed:", histErr);
+    }
+
+    return { outputUrl, credits: newCredits };
+  });
+
+export const getMyPlan = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("plan, credits")
+      .eq("id", userId)
+      .single();
+    if (error || !profile) throw new Error("Could not load your plan.");
+    return { ok: true, plan: profile.plan as PlanId, credits: profile.credits ?? 0 };
+  });
