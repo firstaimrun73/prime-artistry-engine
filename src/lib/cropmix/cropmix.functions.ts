@@ -2,6 +2,7 @@
  * Cropmix AI+ collage — one server endpoint.
  * Price fixed at CROPMIX_AI_PLUS_CREDITS; charge only on success.
  * Uses per-cell fit/fill/offset/zoom to match client preview.
+ * No History row: result is a data URL (no durable provider media reference).
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -311,28 +312,7 @@ export const generateCropmixCollage = createServerFn({ method: "POST" })
       newCredits = (deduction as { credits: number }).credits;
     }
 
-    try {
-      const { supabaseAdmin } = await import(
-        "@/integrations/supabase/client.server"
-      );
-      await supabaseAdmin.from("generations").insert({
-        user_id: userId,
-        type: "image",
-        prompt: `Cropmix · ${style.name}`,
-        output_url: null,
-        credits_used: creditsCharged,
-        metadata: {
-          source: "cropmix",
-          experience: "cropmix-collage",
-          style_id: data.styleId,
-          ratio: data.ratio,
-          photo_count: n,
-          credits_charged: creditsCharged,
-        },
-      });
-    } catch (e) {
-      console.error("[cropmix] history insert failed", e);
-    }
+    // No History insert: data-URL result has no durable fal/provider reference.
 
     return {
       dataUrl,

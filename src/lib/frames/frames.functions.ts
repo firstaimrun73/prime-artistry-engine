@@ -1,6 +1,7 @@
 /**
  * Server-authoritative Frames quote + charge.
  * Composition runs on the client; server validates IDs and deducts credits once on success.
+ * No History row: client has no durable provider URL to store (local canvas export only).
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -89,30 +90,7 @@ export const finalizeFramesExport = createServerFn({ method: "POST" })
       newCredits = (deduction as { credits: number }).credits;
     }
 
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const frame = getFrameById(data.frameId);
-      const glass = getGlassById(data.glassId);
-      await supabaseAdmin.from("generations").insert({
-        user_id: userId,
-        type: "image",
-        prompt: `Frames · ${frame?.name ?? data.frameId} · ${glass?.name ?? data.glassId} · ${data.ratioId}`,
-        output_url: null,
-        credits_used: isAdmin ? 0 : quote.credits,
-        metadata: {
-          source: "frames",
-          experience: "frames",
-          frame_id: data.frameId,
-          glass_id: data.glassId,
-          ratio_id: data.ratioId,
-          output_format: data.outputFormat,
-          long_edge: data.longEdge,
-          credits_charged: isAdmin ? 0 : quote.credits,
-        },
-      });
-    } catch (e) {
-      console.error("[frames] history insert failed", e);
-    }
+    // No History insert: Frames export is client-canvas only (no durable fal/provider URL).
 
     return {
       ok: true as const,

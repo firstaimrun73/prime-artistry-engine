@@ -1,6 +1,7 @@
 /**
  * Server-authoritative unlock for Filters and Lenses.
  * One-time credit charge; free items never charge.
+ * Not a media generation — no History generations row.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -71,24 +72,7 @@ export const unlockFilterOrLens = createServerFn({ method: "POST" })
       newCredits = (deduction as { credits: number }).credits;
     }
 
-    try {
-      await supabase.from("generations").insert({
-        user_id: userId,
-        type: "image",
-        prompt: `Unlock ${data.kind}: ${name}`,
-        input_url: null,
-        output_url: null,
-        status: "success",
-        metadata: {
-          operation: data.kind === "filter" ? "filter_unlock" : "lens_unlock",
-          item_id: data.itemId,
-          item_name: name,
-          credits_charged: isAdmin ? 0 : unlockCost,
-        },
-      });
-    } catch {
-      /* ignore */
-    }
+    // No generations insert — unlock is entitlement, not generative media.
 
     return {
       ok: true as const,
