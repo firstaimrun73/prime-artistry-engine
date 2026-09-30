@@ -1,14 +1,10 @@
 /**
  * Shared private media delivery (server-only).
  *
- * PAID/ADMIN (storage_provider=r2):
- *   motio2edit-user-media via private-history-storage (CLOUDFLARE_R2_USER_*)
- * FREE (storage_provider=blob):
- *   private Vercel Blob (BLOB_READ_WRITE_TOKEN)
+ * New History architecture: generated media stays on fal.ai (provider URL).
+ * storage_provider=fal|provider → passthrough stored source URL after ownership check.
  *
- * Never signs paid user keys with the primary public/sample R2 (motio2edit-media).
- * Never returns public r2.dev URLs for users/**.
- * Admin is NOT a cross-user media bypass.
+ * Legacy rows may still use r2/blob keys — signed delivery retained for those only.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -18,7 +14,6 @@ export type MediaResolveInput = {
   outputUrl?: string | null;
   storageProvider?: string | null;
   userId: string;
-  /** Row owner — must match authenticated user. */
   ownerUserId: string;
 };
 
@@ -40,15 +35,27 @@ function keyLooksLikeUserMedia(key: string | null | undefined): boolean {
   return key.replace(/^\//, "").startsWith("users/");
 }
 
-/**
- * Resolve a browser-loadable temporary URL for private user media.
- */
+function looksLikeProviderUrl(url: string): boolean {
+  return /fal\.media|fal\.ai|fal\.run|cdn\.fal|media\.fal/i.test(url);
+}
+
 export async function resolvePrivateMediaDelivery(
   input: MediaResolveInput & { isAdmin?: boolean },
 ): Promise<MediaResolveResult> {
   assertOwner(input.ownerUserId, input.userId, !!input.isAdmin);
 
   const provider = (input.storageProvider ?? "").toLowerCase();
+
+  // fal/provider link-only History: return stored source URL after ownership check
+  if (
+    (provider === "fal" || provider === "provider" || provider === "") &&
+    input.outputUrl?.startsWith("https://")
+  ) {
+    if (provider === "fal" || provider === "provider" || looksLikeProviderUrl(input.outputUrl)) {
+      return { deliveryUrl: input.outputUrl, objectKey: null, source: "passthrough" };
+    }
+  }
+
   let key = (input.r2ObjectKey && input.r2ObjectKey.replace(/^\//, "")) || null;
 
   if (!key && input.outputUrl) {
@@ -60,8 +67,8 @@ export async function resolvePrivateMediaDelivery(
     }
   }
 
-  // ── Private user-media R2 (paid/admin) ────────────────────────────────────
-  if ((provider === "r2" || keyLooksLikeUserMedia(key)) && key && provider !== "blob") {
+  // Legacy private R2 (old rows only)
+  if ((provider === "r2" || keyLooksLikeUserMedia(key)) && key && provider !== "blob" && provider !== "fal") {
     try {
       const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
         "@/lib/private-history-storage.server"
@@ -75,7 +82,7 @@ export async function resolvePrivateMediaDelivery(
     }
   }
 
-  // ── Private Blob (free History) ───────────────────────────────────────────
+  // Legacy Blob
   if (provider === "blob") {
     try {
       const { isPrivateBlobConfigured, privateBlobResolveDelivery } = await import(
@@ -90,43 +97,19 @@ export async function resolvePrivateMediaDelivery(
     } catch (e) {
       console.warn("[private-media] blob resolve failed:", e);
     }
-    // Owner-scoped fallback: return stored https URL only after ownership assert
     if (input.outputUrl?.startsWith("https://")) {
       return { deliveryUrl: input.outputUrl, objectKey: key, source: "blob" };
     }
   }
 
-  // ── Safe passthrough: temporary provider/CDN URLs only ────────────────────
+  // Safe https passthrough (provider CDN, etc.) after ownership check
   if (input.outputUrl?.startsWith("https://")) {
-    try {
-      const { extractR2ObjectKeyFromUrl } = await import("@/lib/r2.server");
-      const extracted = extractR2ObjectKeyFromUrl(input.outputUrl);
-      if (extracted && keyLooksLikeUserMedia(extracted)) {
-        try {
-          const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
-            "@/lib/private-history-storage.server"
-          );
-          if (isPrivateR2Configured()) {
-            const url = await privateR2SignedGetUrl(extracted);
-            return { deliveryUrl: url, objectKey: extracted, source: "signed_private_r2" };
-          }
-        } catch {
-          /* unavailable */
-        }
-        return { deliveryUrl: null, objectKey: extracted, source: "unavailable" };
-      }
-    } catch {
-      /* ignore */
-    }
     return { deliveryUrl: input.outputUrl, objectKey: key, source: "passthrough" };
   }
 
   return { deliveryUrl: null, objectKey: key, source: "unavailable" };
 }
 
-/**
- * Batch-resolve delivery URLs for History rows owned by the requester.
- */
 export async function resolveGenerationsMediaBatch(opts: {
   supabase: SupabaseClient;
   userId: string;
