@@ -1,17 +1,15 @@
 /**
  * Shared History retention preference helpers.
  *
- * Live contract (Claude SQL applied):
- *   should_retain_as_history(p_user_id, p_is_private)
- *   history_user_delete(p_generation_id)
- *   music_history_user_delete(p_track_id)
- *   generations.retained_as_history, deleted_at, storage_provider, …
- *
- * Prefs UI still reads/writes user_settings.history_enabled when present;
- * localStorage is a non-authoritative cache only.
+ * user_settings.history_enabled is the server source of truth.
+ * Missing row = History ON.
+ * localStorage is a non-authoritative UI cache only.
  */
 
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const HISTORY_PREFS_KEY = "motio2edit-history-prefs";
 
@@ -43,40 +41,88 @@ export function writeLocalHistoryPrefs(prefs: HistoryPrefs): void {
   }
 }
 
-/** Client: load prefs — prefer user_settings when columns exist. */
+/** Client: load prefs — prefer user_settings; missing row = ON (not local false). */
 export async function loadHistoryPrefs(userId: string): Promise<HistoryPrefs> {
-  const local = readLocalHistoryPrefs();
   try {
     const { data, error } = await supabase
       .from("user_settings")
       .select("history_enabled, sensitive_mode")
       .eq("user_id", userId)
       .maybeSingle();
-    if (error || !data) return local;
+    if (error) {
+      console.warn("[history-retention] load:", error.message);
+      return { ...DEFAULT_HISTORY_PREFS };
+    }
+    if (!data) {
+      // No row yet → product default History ON (ignore stale localStorage OFF)
+      return { ...DEFAULT_HISTORY_PREFS };
+    }
     return {
       history_enabled:
-        typeof (data as { history_enabled?: unknown }).history_enabled === "boolean"
-          ? Boolean((data as { history_enabled: boolean }).history_enabled)
-          : local.history_enabled,
+        (data as { history_enabled?: unknown }).history_enabled === false ? false : true,
       sensitive_mode:
-        typeof (data as { sensitive_mode?: unknown }).sensitive_mode === "boolean"
-          ? Boolean((data as { sensitive_mode: boolean }).sensitive_mode)
-          : local.sensitive_mode,
+        (data as { sensitive_mode?: unknown }).sensitive_mode === true ? true : false,
     };
   } catch {
-    return local;
+    return { ...DEFAULT_HISTORY_PREFS };
   }
 }
 
+const prefsSchema = z.object({
+  history_enabled: z.boolean(),
+  sensitive_mode: z.boolean().optional(),
+});
+
+/**
+ * Server: upsert user_settings for the authenticated user only (service role).
+ * Fixes client RLS upsert failures that left user_settings empty in production.
+ */
+export const saveHistoryPrefsServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => prefsSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const userId = context.userId;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const payload = {
+      user_id: userId,
+      history_enabled: data.history_enabled,
+      sensitive_mode: data.sensitive_mode ?? false,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabaseAdmin.from("user_settings").upsert(payload, {
+      onConflict: "user_id",
+    });
+    if (error) {
+      console.error("[history-retention] server upsert failed:", error.message);
+      throw new Error(error.message || "Could not save History preference.");
+    }
+    return { ok: true as const, backend: true as const };
+  });
+
 /**
  * Client: persist prefs.
- * Writes localStorage always; upserts user_settings when columns exist.
+ * Always updates local cache; prefers server upsert (authoritative).
  */
 export async function saveHistoryPrefs(
   userId: string,
   prefs: HistoryPrefs,
 ): Promise<{ ok: boolean; backend: boolean; message?: string }> {
   writeLocalHistoryPrefs(prefs);
+
+  // Prefer server path (service role, scoped to auth userId)
+  try {
+    const res = await saveHistoryPrefsServer({
+      data: {
+        history_enabled: prefs.history_enabled,
+        sensitive_mode: prefs.sensitive_mode,
+      },
+    });
+    if (res?.ok) return { ok: true, backend: true };
+  } catch (e) {
+    console.warn("[history-retention] server save failed, trying client upsert:", e);
+  }
+
+  // Fallback: direct client upsert (requires RLS allow)
   try {
     const { error } = await supabase.from("user_settings").upsert(
       {
@@ -89,19 +135,17 @@ export async function saveHistoryPrefs(
     );
     if (error) {
       console.warn("[history-retention] backend write:", error.message);
-      return { ok: true, backend: false, message: error.message };
+      return { ok: false, backend: false, message: error.message };
     }
     return { ok: true, backend: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { ok: true, backend: false, message: msg };
+    return { ok: false, backend: false, message: msg };
   }
 }
 
 /**
  * Whether a generations row should appear in History UI.
- * Live: retained_as_history === true && deleted_at IS NULL.
- * Legacy rows (no new columns): treat as visible if not soft-hidden in metadata.
  */
 export function isVisibleInHistory(row: {
   retained_as_history?: boolean | null;
@@ -112,7 +156,6 @@ export function isVisibleInHistory(row: {
   if (typeof row.retained_as_history === "boolean") {
     return row.retained_as_history === true;
   }
-  // Legacy fallback until all rows have the column populated
   if (row.metadata && typeof row.metadata === "object") {
     const m = row.metadata as Record<string, unknown>;
     if (m.history_hidden === true) return false;
@@ -121,9 +164,6 @@ export function isVisibleInHistory(row: {
   return true;
 }
 
-/**
- * History delete via RPC — queues media deletion; does not hard-delete from browser.
- */
 export async function historyUserDelete(
   generationId: string,
 ): Promise<{ ok: boolean; message?: string }> {
@@ -144,9 +184,7 @@ export async function musicHistoryUserDelete(
   return { ok: true };
 }
 
-/**
- * @deprecated Use historyUserDelete. Kept as alias for any residual callers.
- */
+/** @deprecated Use historyUserDelete. */
 export async function softHideFromHistory(
   generationId: string,
   _existingMetadata?: unknown,
@@ -155,29 +193,40 @@ export async function softHideFromHistory(
 }
 
 /**
- * Server-side decision — prefer RPC when available.
+ * Server-side retain decision — matches history-persist (toggle default ON).
  */
 export async function shouldRetainAsHistoryServer(args: {
-  supabaseAdmin: { rpc: (fn: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> };
+  supabaseAdmin: {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (
+          col: string,
+          val: string,
+        ) => {
+          maybeSingle: () => Promise<{ data: { history_enabled?: boolean } | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    rpc: (
+      fn: string,
+      params: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+  };
   userId: string;
   isPrivate?: boolean;
 }): Promise<boolean> {
   try {
-    const { data, error } = await args.supabaseAdmin.rpc("should_retain_as_history", {
-      p_user_id: args.userId,
-      p_is_private: args.isPrivate !== false,
-    });
+    const { data, error } = await args.supabaseAdmin
+      .from("user_settings")
+      .select("history_enabled")
+      .eq("user_id", args.userId)
+      .maybeSingle();
     if (error) {
-      console.warn("[history-retention] should_retain_as_history:", error.message);
+      console.warn("[history-retention] shouldRetain settings:", error.message);
       return true;
     }
-    if (data === false) return false;
-    if (data === true) return true;
-    if (data && typeof data === "object") {
-      const o = data as Record<string, unknown>;
-      if (o.retain === false || o.should_retain === false) return false;
-      return true;
-    }
+    if (!data) return true;
+    if (data.history_enabled === false) return false;
     return true;
   } catch {
     return true;
