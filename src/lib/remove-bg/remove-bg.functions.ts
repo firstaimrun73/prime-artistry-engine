@@ -4,6 +4,7 @@
  * - Free → SD (long edge capped); paid → HD full model output
  * - No watermark on result
  * - Does not use generateMedia (isolated product path)
+ * - History: fal provider URL + metadata via persistGenerationHistory
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -16,6 +17,7 @@ import {
   REMOVE_BG_SD_MAX_EDGE,
   type RemoveBgQuality,
 } from "@/lib/remove-bg/constants";
+import { persistGenerationHistory } from "@/lib/history-persist.server";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -119,30 +121,27 @@ export const runRemoveBg = createServerFn({ method: "POST" })
         throw new Error("Could not deduct credits. Please contact support.");
       }
       newCredits = next;
+    }
 
-      try {
-        await supabaseAdmin.from("generations").insert({
-          user_id: userId,
-          type: "image",
-          prompt: "remove-bg",
-          status: "completed",
-          output_url: outputUrl,
-          credits_used: cost,
-          meta: { product: "remove-bg", quality, noWatermark: true },
-        });
-      } catch (hErr) {
-        console.warn("[remove-bg] generations insert skipped", hErr);
-      }
-      try {
-        await supabaseAdmin.from("generation_history").insert({
-          user_id: userId,
-          gen_type: "remove-bg",
-          output_url: outputUrl,
-          credits: cost,
-        });
-      } catch {
-        /* optional table */
-      }
+    // History for all users (incl. admin) — fal provider URL only
+    try {
+      await persistGenerationHistory({
+        supabaseAdmin,
+        userId,
+        type: "image",
+        prompt: "remove-bg",
+        input_url: data.imageUrl.startsWith("https://") ? data.imageUrl : null,
+        output_url: outputUrl,
+        status: "success",
+        metadata: {
+          product: "remove-bg",
+          quality,
+          noWatermark: true,
+          credits_charged: isAdmin ? 0 : cost,
+        },
+      });
+    } catch (hErr) {
+      console.warn("[remove-bg] history persist skipped", hErr);
     }
 
     return {
