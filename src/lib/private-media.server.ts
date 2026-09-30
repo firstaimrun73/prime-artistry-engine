@@ -1,12 +1,21 @@
 /**
  * Shared private media delivery (server-only).
  *
- * New History architecture: generated media stays on fal.ai (provider URL).
- * storage_provider=fal|provider → passthrough stored source URL after ownership check.
+ * fal.ai remains the generated-media origin. This resolver only returns a
+ * delivery reference after application-level authorization.
  *
- * Legacy rows may still use r2/blob keys — signed delivery retained for those only.
+ * Mandatory checks (service role bypasses RLS — these are required):
+ * 1. Authenticated caller (enforced by server-fn middleware)
+ * 2. Ownership (generation.user_id === requester, unless admin)
+ * 3. Not soft-deleted (deleted_at)
+ * 4. Not past expires_at (free ~6h / paid retention)
+ * 5. History entitlement for History routes (paid plan or admin)
+ *
+ * Never trust client-supplied ownership, plan, or expiry.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isPaidPlan } from "@/lib/policy";
+import { isAdminEmail } from "@/lib/admin-config";
 
 export type MediaResolveInput = {
   generationId?: string;
@@ -15,6 +24,12 @@ export type MediaResolveInput = {
   storageProvider?: string | null;
   userId: string;
   ownerUserId: string;
+  plan?: string | null;
+  isAdmin?: boolean;
+  deletedAt?: string | null;
+  expiresAt?: string | null;
+  retainedAsHistory?: boolean | null;
+  requireHistoryEntitlement?: boolean;
 };
 
 export type MediaResolveResult = {
@@ -23,11 +38,49 @@ export type MediaResolveResult = {
   source: "signed_private_r2" | "blob" | "passthrough" | "unavailable";
 };
 
-function assertOwner(ownerUserId: string, requesterId: string, isAdmin: boolean): void {
-  if (ownerUserId !== requesterId) {
-    throw new Error("Not authorized to access this media.");
+export class MediaAccessError extends Error {
+  status: number;
+  constructor(message: string, status = 403) {
+    super(message);
+    this.name = "MediaAccessError";
+    this.status = status;
   }
-  void isAdmin;
+}
+
+function assertOwner(ownerUserId: string, requesterId: string, isAdmin: boolean): void {
+  if (isAdmin) return;
+  if (ownerUserId !== requesterId) {
+    throw new MediaAccessError("Not authorized to access this media.", 403);
+  }
+}
+
+function assertNotDeleted(deletedAt?: string | null): void {
+  if (deletedAt) {
+    throw new MediaAccessError("This media is no longer available.", 404);
+  }
+}
+
+function assertNotExpired(expiresAt?: string | null): void {
+  if (!expiresAt) return;
+  const t = Date.parse(expiresAt);
+  if (Number.isFinite(t) && Date.now() > t) {
+    throw new MediaAccessError("This media reference has expired.", 404);
+  }
+}
+
+function assertHistoryEntitlement(
+  plan: string | null | undefined,
+  isAdmin: boolean,
+  requireHistoryEntitlement: boolean,
+): void {
+  if (!requireHistoryEntitlement) return;
+  if (isAdmin) return;
+  if (!isPaidPlan(plan)) {
+    throw new MediaAccessError(
+      "History is locked. Upgrade your plan to access generation history media.",
+      403,
+    );
+  }
 }
 
 function keyLooksLikeUserMedia(key: string | null | undefined): boolean {
@@ -40,13 +93,18 @@ function looksLikeProviderUrl(url: string): boolean {
 }
 
 export async function resolvePrivateMediaDelivery(
-  input: MediaResolveInput & { isAdmin?: boolean },
+  input: MediaResolveInput,
 ): Promise<MediaResolveResult> {
-  assertOwner(input.ownerUserId, input.userId, !!input.isAdmin);
+  const isAdmin = !!input.isAdmin;
+  const requireHistory = input.requireHistoryEntitlement !== false;
+
+  assertOwner(input.ownerUserId, input.userId, isAdmin);
+  assertNotDeleted(input.deletedAt);
+  assertNotExpired(input.expiresAt);
+  assertHistoryEntitlement(input.plan, isAdmin, requireHistory);
 
   const provider = (input.storageProvider ?? "").toLowerCase();
 
-  // fal/provider link-only History: return stored source URL after ownership check
   if (
     (provider === "fal" || provider === "provider" || provider === "") &&
     input.outputUrl?.startsWith("https://")
@@ -67,7 +125,6 @@ export async function resolvePrivateMediaDelivery(
     }
   }
 
-  // Legacy private R2 (old rows only)
   if ((provider === "r2" || keyLooksLikeUserMedia(key)) && key && provider !== "blob" && provider !== "fal") {
     try {
       const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
@@ -82,7 +139,6 @@ export async function resolvePrivateMediaDelivery(
     }
   }
 
-  // Legacy Blob
   if (provider === "blob") {
     try {
       const { isPrivateBlobConfigured, privateBlobResolveDelivery } = await import(
@@ -102,7 +158,6 @@ export async function resolvePrivateMediaDelivery(
     }
   }
 
-  // Safe https passthrough (provider CDN, etc.) after ownership check
   if (input.outputUrl?.startsWith("https://")) {
     return { deliveryUrl: input.outputUrl, objectKey: key, source: "passthrough" };
   }
@@ -110,10 +165,26 @@ export async function resolvePrivateMediaDelivery(
   return { deliveryUrl: null, objectKey: key, source: "unavailable" };
 }
 
+export async function loadMediaCallerContext(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ plan: string | null; isAdmin: boolean; email: string | null }> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email, plan")
+    .eq("id", userId)
+    .maybeSingle();
+  const email = (profile?.email as string | undefined)?.trim().toLowerCase() ?? null;
+  const plan = (profile?.plan as string | undefined) ?? "free";
+  const isAdmin = !!email && isAdminEmail(email);
+  return { plan, isAdmin, email };
+}
+
 export async function resolveGenerationsMediaBatch(opts: {
   supabase: SupabaseClient;
   userId: string;
   isAdmin?: boolean;
+  plan?: string | null;
   generationIds?: string[];
   limit?: number;
 }): Promise<
@@ -124,9 +195,16 @@ export async function resolveGenerationsMediaBatch(opts: {
     type: string;
   }>
 > {
+  if (!opts.isAdmin && !isPaidPlan(opts.plan)) {
+    return [];
+  }
+
+  const selectCols =
+    "id, type, output_url, r2_object_key, storage_provider, user_id, deleted_at, retained_as_history, expires_at, created_at";
+
   let q = opts.supabase
     .from("generations")
-    .select("id, type, output_url, r2_object_key, storage_provider, user_id")
+    .select(selectCols)
     .eq("user_id", opts.userId)
     .order("created_at", { ascending: false })
     .limit(opts.limit ?? 100);
@@ -134,12 +212,33 @@ export async function resolveGenerationsMediaBatch(opts: {
   if (opts.generationIds && opts.generationIds.length > 0) {
     q = opts.supabase
       .from("generations")
-      .select("id, type, output_url, r2_object_key, storage_provider, user_id")
+      .select(selectCols)
       .eq("user_id", opts.userId)
       .in("id", opts.generationIds);
   }
 
-  const { data, error } = await q;
+  let { data, error } = await q;
+
+  if (error && /column|expires_at|deleted_at|retained_as_history/i.test(error.message)) {
+    const coreSelect = "id, type, output_url, r2_object_key, storage_provider, user_id, created_at";
+    const fb =
+      opts.generationIds && opts.generationIds.length > 0
+        ? opts.supabase
+            .from("generations")
+            .select(coreSelect)
+            .eq("user_id", opts.userId)
+            .in("id", opts.generationIds)
+        : opts.supabase
+            .from("generations")
+            .select(coreSelect)
+            .eq("user_id", opts.userId)
+            .order("created_at", { ascending: false })
+            .limit(opts.limit ?? 100);
+    const res = await fb;
+    data = res.data as typeof data;
+    error = res.error;
+  }
+
   if (error || !data) {
     console.error("[private-media] batch load failed:", error?.message);
     return [];
@@ -159,16 +258,32 @@ export async function resolveGenerationsMediaBatch(opts: {
     r2_object_key: string | null;
     storage_provider: string | null;
     user_id: string;
+    deleted_at?: string | null;
+    retained_as_history?: boolean | null;
+    expires_at?: string | null;
   }>) {
+    if (row.deleted_at) continue;
+    if (row.retained_as_history === false) continue;
+    if (row.expires_at) {
+      const t = Date.parse(row.expires_at);
+      if (Number.isFinite(t) && Date.now() > t) continue;
+    }
+    if (!row.output_url) continue;
+
     try {
       const resolved = await resolvePrivateMediaDelivery({
         userId: opts.userId,
         ownerUserId: row.user_id,
         isAdmin: opts.isAdmin,
+        plan: opts.plan,
         r2ObjectKey: row.r2_object_key,
         outputUrl: row.output_url,
         storageProvider: row.storage_provider,
         generationId: row.id,
+        deletedAt: row.deleted_at ?? null,
+        expiresAt: row.expires_at ?? null,
+        retainedAsHistory: row.retained_as_history ?? true,
+        requireHistoryEntitlement: true,
       });
       out.push({
         id: row.id,
@@ -177,8 +292,12 @@ export async function resolveGenerationsMediaBatch(opts: {
         type: row.type,
       });
     } catch (e) {
-      console.warn("[private-media] row resolve denied/failed:", row.id, e);
-      out.push({ id: row.id, deliveryUrl: null, objectKey: row.r2_object_key, type: row.type });
+      console.warn(
+        "[private-media] row resolve denied:",
+        row.id,
+        e instanceof Error ? e.message : e,
+      );
+      out.push({ id: row.id, deliveryUrl: null, objectKey: null, type: row.type });
     }
   }
   return out;
