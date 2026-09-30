@@ -4,6 +4,9 @@
  * user_settings.history_enabled is the server source of truth.
  * Missing row = History ON.
  * localStorage is a non-authoritative UI cache only.
+ *
+ * Visibility also respects generations.expires_at / deleted_at / retained_as_history
+ * (Claude Supabase retention architecture — do not reimplement DB logic here).
  */
 
 import { createServerFn } from "@tanstack/react-start";
@@ -146,13 +149,22 @@ export async function saveHistoryPrefs(
 
 /**
  * Whether a generations row should appear in History UI.
+ * Respects deleted_at, retained_as_history, and expires_at (Claude retention).
  */
 export function isVisibleInHistory(row: {
   retained_as_history?: boolean | null;
   deleted_at?: string | null;
+  expires_at?: string | null;
   metadata?: unknown;
+  output_url?: string | null;
 }): boolean {
   if (row.deleted_at) return false;
+  if (row.expires_at) {
+    const t = Date.parse(row.expires_at);
+    if (Number.isFinite(t) && Date.now() > t) return false;
+  }
+  // Hide fake/null-output tracking rows
+  if (row.output_url != null && String(row.output_url).trim() === "") return false;
   if (typeof row.retained_as_history === "boolean") {
     return row.retained_as_history === true;
   }

@@ -1,10 +1,9 @@
 /**
  * Motion2AI Creation — Discover (post-login).
  * Horizontal strips: fixed height, width follows aspect ratio.
- * Likes: silent toggle (no success toast).
+ * Likes: local UI state only (no Supabase / no sample_favourites).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
+import { useCallback, useMemo, useState } from "react";
 import {
   getAllDiscoverSamples,
   getImagineOnlySamples,
@@ -16,10 +15,6 @@ import {
 import { GalleryMediaCard } from "@/components/home/GalleryMediaCard";
 import { DiscoveryMediaViewer } from "@/components/home/DiscoveryMediaViewer";
 import { useAuth } from "@/lib/auth";
-import {
-  getMyFavouriteIds,
-  toggleSampleFavourite,
-} from "@/lib/sample-favourites.functions";
 import { cn } from "@/lib/utils";
 
 type TabId = "all" | "img" | "video" | "music";
@@ -86,8 +81,6 @@ export function VisualDiscoveryGallery() {
   const [tab, setTab] = useState<TabId>("all");
   const [viewer, setViewer] = useState<R2Sample | null>(null);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-  const toggleFn = useServerFn(toggleSampleFavourite);
-  const listIdsFn = useServerFn(getMyFavouriteIds);
 
   const all = useMemo(() => getAllDiscoverSamples(), []);
   const images = useMemo(() => getImagineOnlySamples(), []);
@@ -95,59 +88,17 @@ export function VisualDiscoveryGallery() {
   const music = useMemo(() => getMusicVideoSamples(), []);
   const allVideos = useMemo(() => getActiveR2VideoSamples(), []);
 
-  useEffect(() => {
-    if (!user) {
-      setLikedIds(new Set());
-      return;
-    }
-    let cancelled = false;
-    void listIdsFn()
-      .then((res) => {
-        if (!cancelled) setLikedIds(new Set(res.ids ?? []));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [user, listIdsFn]);
-
   const onToggleLike = useCallback(
-    async (sample: R2Sample) => {
+    (sample: R2Sample) => {
       if (!user) return;
-      const wasLiked = likedIds.has(sample.id);
       setLikedIds((prev) => {
         const next = new Set(prev);
-        if (wasLiked) next.delete(sample.id);
+        if (next.has(sample.id)) next.delete(sample.id);
         else next.add(sample.id);
         return next;
       });
-      try {
-        const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
-        const res = await toggleFn({
-          data: {
-            sampleId: sample.id,
-            sampleTitle: sample.title,
-            sampleUrl: sample.url,
-            sampleKind: isVideo ? "video" : "image",
-            sampleAspect: sample.aspectRatio,
-          },
-        });
-        setLikedIds((prev) => {
-          const next = new Set(prev);
-          if (res.liked) next.add(sample.id);
-          else next.delete(sample.id);
-          return next;
-        });
-      } catch {
-        setLikedIds((prev) => {
-          const next = new Set(prev);
-          if (wasLiked) next.add(sample.id);
-          else next.delete(sample.id);
-          return next;
-        });
-      }
     },
-    [user, likedIds, toggleFn],
+    [user],
   );
 
   const gridSamples =
