@@ -7,6 +7,7 @@
  *
  * Billing: shared @/lib/billing lifecycle (quote → reserve → generate → finalize/release).
  * Legacy credit amounts used as bridge until final economics review.
+ * History: fal provider URL via persistGenerationHistory (no permanent Motio2edit media copy).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -20,6 +21,7 @@ import {
   type AutoEditQuality,
 } from "./constants";
 import { quoteForProduct, runWithBillingLifecycle } from "@/lib/billing";
+import { persistGenerationHistory } from "@/lib/history-persist.server";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -173,8 +175,6 @@ export async function runAutoKontextEdit(
   const cost = autoEditCreditCost(quality);
   const targetMp = autoEditTargetMegapixels(quality);
 
-  // Server quote via shared lifecycle. Legacy customer credits bridge until final economics.
-  // providerCogsUsd: 0 until Auto Edit has a dedicated provider-cost estimator (internal only).
   const quote = quoteForProduct({
     userId: args.userId,
     product: "auto_edit",
@@ -258,7 +258,6 @@ export async function runAutoKontextEdit(
     }
   }
 
-  // Credits already reserved+finalized by runWithBillingLifecycle (or 0 for admin).
   let creditsCharged = creditsChargedFromLifecycle;
   let newCredits = args.profile.credits;
   if (!args.isAdmin && creditsCharged > 0) {
@@ -267,48 +266,43 @@ export async function runAutoKontextEdit(
     console.log("[auto-edit/kontext] lifecycle charged", creditsCharged, "credits → remaining", newCredits);
   }
 
-  const historyBase = {
-    user_id: args.userId,
-    type: "image" as const,
-    prompt: "Maluto AI Auto Edit",
-    input_url: args.imageUrl.startsWith("https://") ? args.imageUrl : null,
-    output_url: outputUrl,
-    status: "success" as const,
-  };
-  const historyMeta = {
-    experience: "auto-edit",
-    source: "standalone_auto",
-    operation: "auto_edit",
-    analysis_model: AUTO_EDIT_VISION_LLM,
-    analysis_provider: "fal.ai",
-    primary_model: AUTO_EDIT_FAL_MODEL,
-    quality,
-    target_megapixels: targetMp,
-    actual_megapixels: kontext.actualMegapixels ?? null,
-    credits_charged: creditsCharged,
-    credits_used: creditsCharged,
-    watermark_position: AUTO_EDIT_WATERMARK_POSITION,
-    single_image: true,
-    analysis_completed: true,
-    edit_completed: true,
-  };
-  let histErr = (
-    await args.supabaseAdmin.from("generations").insert({ ...historyBase, metadata: historyMeta })
-  ).error;
-  if (histErr && /metadata|column|schema/i.test(histErr.message + (histErr.details ?? ""))) {
-    console.warn("[auto-edit/kontext] metadata column missing — retrying without metadata");
-    histErr = (await args.supabaseAdmin.from("generations").insert(historyBase)).error;
-  }
-  if (histErr) {
-    console.error(
-      "[auto-edit/kontext] history insert failed:",
-      histErr.message,
-      histErr.code,
-      histErr.details,
-      histErr.hint,
-    );
-  } else {
-    console.log("[auto-edit/kontext] history saved for user", args.userId);
+  // Prefer clean fal URL for History reference; display may use watermarked outputUrl
+  const providerUrl = kontext.outputUrl;
+  try {
+    const persist = await persistGenerationHistory({
+      supabaseAdmin: args.supabaseAdmin,
+      userId: args.userId,
+      type: "image",
+      prompt: "Maluto AI Auto Edit",
+      input_url: args.imageUrl.startsWith("https://") ? args.imageUrl : null,
+      output_url: providerUrl,
+      sourceMediaUrl: providerUrl,
+      status: "success",
+      metadata: {
+        experience: "auto-edit",
+        source: "standalone_auto",
+        operation: "auto_edit",
+        analysis_model: AUTO_EDIT_VISION_LLM,
+        analysis_provider: "fal.ai",
+        primary_model: AUTO_EDIT_FAL_MODEL,
+        quality,
+        target_megapixels: targetMp,
+        actual_megapixels: kontext.actualMegapixels ?? null,
+        credits_charged: creditsCharged,
+        credits_used: creditsCharged,
+        watermark_position: AUTO_EDIT_WATERMARK_POSITION,
+        single_image: true,
+        analysis_completed: true,
+        edit_completed: true,
+      },
+    });
+    if (persist.error) {
+      console.error("[auto-edit/kontext] history persist failed:", persist.error);
+    } else {
+      console.log("[auto-edit/kontext] history saved id=%s for user", persist.id, args.userId);
+    }
+  } catch (histErr) {
+    console.error("[auto-edit/kontext] history persist exception:", histErr);
   }
 
   return {
