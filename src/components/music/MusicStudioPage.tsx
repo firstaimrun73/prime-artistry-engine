@@ -10,7 +10,7 @@ import { MusicInstrumentCards } from "@/components/music/MusicInstrumentCards";
 import { MusicResultCard } from "@/components/music/MusicResultCard";
 import { MusicVoiceLibrary } from "@/components/music/MusicVoiceLibrary";
 import {
-  DURATIONS, SFX_CATEGORIES, MUSIC_EXAMPLES as EXAMPLES, LOADING_STEPS as LOADING,
+  DURATIONS, SFX_CATEGORIES, LOADING_STEPS as LOADING,
   MOOD_CHIPS,
   type VoiceId,
 } from "@/components/music/musicStudioData";
@@ -42,23 +42,11 @@ function Label({ children }: { children: React.ReactNode }) {
   return <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground">{children}</p>;
 }
 
-/** Controlled auto-grow multiline input — no native resize handle. */
 function AutoGrowTextarea({
-  value,
-  onChange,
-  placeholder,
-  className,
-  minRows = 3,
-  maxHeight = 220,
-  mono,
+  value, onChange, placeholder, className, minRows = 3, maxHeight = 220, mono,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  className?: string;
-  minRows?: number;
-  maxHeight?: number;
-  mono?: boolean;
+  value: string; onChange: (v: string) => void; placeholder?: string; className?: string;
+  minRows?: number; maxHeight?: number; mono?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
@@ -70,28 +58,14 @@ function AutoGrowTextarea({
     el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
   }, [value, maxHeight, minRows]);
   return (
-    <textarea
-      ref={ref}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={minRows}
-      className={cn(
-        "min-h-[72px] w-full resize-none rounded-xl border border-border/60 bg-card px-3 py-2.5 text-sm shadow-sm",
-        "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        mono && "font-mono",
-        className,
-      )}
-    />
+    <textarea ref={ref} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={minRows}
+      className={cn("min-h-[72px] w-full resize-none rounded-xl border border-border/60 bg-card px-3 py-2.5 text-sm shadow-sm",
+        "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", mono && "font-mono", className)} />
   );
 }
 
 export function MusicStudioPage() {
-  return (
-    <MusicAccessGate>
-      <MusicStudio />
-    </MusicAccessGate>
-  );
+  return (<MusicAccessGate><MusicStudio /></MusicAccessGate>);
 }
 
 function MusicStudio() {
@@ -101,8 +75,7 @@ function MusicStudio() {
   const estimate = useServerFn(estimateMusicCost);
   const getCaps = useServerFn(getMusicCapabilities);
 
-  const initialMode: MusicMode =
-    search.mode === "video-music" ? "sfx" : ((search.mode as MusicMode) || "song");
+  const initialMode: MusicMode = search.mode === "video-music" ? "sfx" : ((search.mode as MusicMode) || "song");
 
   const [mode, setMode] = useState<MusicMode>(initialMode);
   const [prompt, setPrompt] = useState("");
@@ -130,19 +103,10 @@ function MusicStudio() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const estSeqRef = useRef(0);
-  const [showCostInfo, setShowCostInfo] = useState(false);
-  const [musicCaps, setMusicCaps] = useState<{
-    qualityTiers: ("standard" | "premium")[];
-    promptMaxChars: number;
-    lyricsMaxChars: number;
-  } | null>(null);
+  const [musicCaps, setMusicCaps] = useState<{ qualityTiers: ("standard" | "premium")[]; promptMaxChars: number; lyricsMaxChars: number } | null>(null);
 
   useEffect(() => {
-    if (search.videoUrl) {
-      setVideoUrl(search.videoUrl);
-      setVideoName("From Video Studio");
-      setMode("sfx");
-    }
+    if (search.videoUrl) { setVideoUrl(search.videoUrl); setVideoName("From Video Studio"); setMode("sfx"); }
   }, [search.videoUrl]);
 
   useEffect(() => {
@@ -156,13 +120,9 @@ function MusicStudio() {
           promptMaxChars: typeof res.promptMaxChars === "number" ? res.promptMaxChars : 0,
           lyricsMaxChars: typeof res.lyricsMaxChars === "number" ? res.lyricsMaxChars : 0,
         });
-      } catch {
-        /* capability fetch is best-effort; server still enforces */
-      }
+      } catch { /* best-effort */ }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [getCaps]);
 
   const premiumAllowed = !musicCaps || musicCaps.qualityTiers.includes("premium");
@@ -237,13 +197,6 @@ function MusicStudio() {
     } finally { setUploading(false); }
   }
 
-  function applyExample(ex: (typeof EXAMPLES)[number]) {
-    setMode(ex.mode); setPrompt(ex.prompt);
-    if (ex.genre) setGenre(ex.genre);
-    if (ex.mood) setMood(ex.mood);
-    toast.message("Example loaded.");
-  }
-
   async function onGenerate() {
     if (loading || uploading) return;
     if (mode === "voiceover" && !prompt.trim()) return toast.error("Enter a script.");
@@ -301,21 +254,14 @@ function MusicStudio() {
               </div>
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-extrabold tracking-tight sm:text-xl">
-                  Music{" "}
-                  <span className="bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 bg-clip-text text-transparent">
-                    Studio
-                  </span>
+                  Music <span className="bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 bg-clip-text text-transparent">Studio</span>
                 </h1>
-                <p className="hidden text-xs text-muted-foreground sm:block">
-                  Songs · Instrumentals · AI Voice · Sound
-                </p>
+                <p className="hidden text-xs text-muted-foreground sm:block">Songs · Instrumentals · AI Voice · Sound</p>
               </div>
             </div>
             <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-card px-2.5 py-1 text-sm shadow-sm">
               <Coins className="h-3.5 w-3.5 text-orange-500" />
-              <span className="tabular-nums font-semibold">
-                {profile?.credits != null ? profile.credits.toLocaleString() : "—"}
-              </span>
+              <span className="tabular-nums font-semibold">{profile?.credits != null ? profile.credits.toLocaleString() : "—"}</span>
             </div>
           </div>
           <div className="mt-3 h-px w-full bg-gradient-to-r from-orange-500/40 via-rose-500/30 to-purple-600/40" />
@@ -325,51 +271,19 @@ function MusicStudio() {
           <MusicModeCards mode={mode} onChange={setMode} />
         </section>
 
-        <section className="mb-4">
-          <Label>Quick start</Label>
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex.title}
-                type="button"
-                onClick={() => applyExample(ex)}
-                className="rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:border-orange-500/40 hover:text-foreground"
-              >
-                {ex.title}
-              </button>
-            ))}
-          </div>
-        </section>
-
         <div className="grid w-full min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]">
           <div className="min-w-0 space-y-4">
             <section>
               <div className="mb-1.5 flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">{promptLabel}</p>
                 {promptMax != null && (
-                  <span
-                    className={cn(
-                      "text-[10px] tabular-nums text-muted-foreground",
-                      prompt.length > promptMax && "text-destructive",
-                    )}
-                  >
+                  <span className={cn("text-[10px] tabular-nums text-muted-foreground", prompt.length > promptMax && "text-destructive")}>
                     {String(prompt.length)} / {String(promptMax)}
                   </span>
                 )}
               </div>
-              <AutoGrowTextarea
-                value={prompt}
-                onChange={setPrompt}
-                minRows={mode === "voiceover" ? 4 : 3}
-                maxHeight={mode === "voiceover" ? 280 : 200}
-                placeholder={
-                  mode === "voiceover"
-                    ? "Write the script…"
-                    : mode === "sfx"
-                      ? "e.g. soft rain, distant thunder"
-                      : "e.g. nostalgic piano for a family photo"
-                }
-              />
+              <AutoGrowTextarea value={prompt} onChange={setPrompt} minRows={mode === "voiceover" ? 4 : 3} maxHeight={mode === "voiceover" ? 280 : 200}
+                placeholder={mode === "voiceover" ? "Write the script…" : mode === "sfx" ? "e.g. soft rain, distant thunder" : "e.g. nostalgic piano for a family photo"} />
             </section>
 
             {mode === "song" && (
@@ -377,61 +291,33 @@ function MusicStudio() {
                 <div className="mb-1.5 flex items-center justify-between gap-2">
                   <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">Lyrics (optional)</p>
                   {lyricsMax != null && (
-                    <span
-                      className={cn(
-                        "text-[10px] tabular-nums text-muted-foreground",
-                        lyrics.length > lyricsMax && "text-destructive",
-                      )}
-                    >
+                    <span className={cn("text-[10px] tabular-nums text-muted-foreground", lyrics.length > lyricsMax && "text-destructive")}>
                       {String(lyrics.length)} / {String(lyricsMax)}
                     </span>
                   )}
                 </div>
-                <AutoGrowTextarea
-                  value={lyrics}
-                  onChange={setLyrics}
-                  minRows={2}
-                  maxHeight={160}
-                  mono
-                  placeholder={"[Verse]\n…\n[Chorus]\n…"}
-                />
+                <AutoGrowTextarea value={lyrics} onChange={setLyrics} minRows={2} maxHeight={160} mono placeholder={"[Verse]\n…\n[Chorus]\n…"} />
               </section>
             )}
 
-            {mode === "voiceover" && (
-              <MusicVoiceLibrary value={voice} onChange={setVoice} />
-            )}
+            {mode === "voiceover" && (<MusicVoiceLibrary value={voice} onChange={setVoice} />)}
 
             {(mode === "song" || mode === "instrumental") && (
               <>
-                <section className="min-w-0">
-                  <Label>Genre</Label>
-                  <MusicScrollChips items={MUSIC_GENRES} value={genre} onChange={setGenre} />
-                </section>
-                <section className="min-w-0">
-                  <Label>Mood</Label>
-                  <MusicScrollChips
-                    items={MOOD_CHIPS}
-                    value={mood}
-                    onChange={setMood}
-                    activeClass="border-transparent bg-gradient-to-r from-violet-500 to-purple-700 text-white shadow-sm"
-                  />
+                <section className="min-w-0"><Label>Genre</Label><MusicScrollChips items={MUSIC_GENRES} value={genre} onChange={setGenre} /></section>
+                <section className="min-w-0"><Label>Mood</Label>
+                  <MusicScrollChips items={MOOD_CHIPS} value={mood} onChange={setMood}
+                    activeClass="border-transparent bg-gradient-to-r from-violet-500 to-purple-700 text-white shadow-sm" />
                 </section>
               </>
             )}
 
             {mode === "instrumental" && (
-              <section className="min-w-0">
-                <Label>Instrument</Label>
-                <MusicInstrumentCards value={instrument} onChange={setInstrument} />
-              </section>
+              <section className="min-w-0"><Label>Instrument</Label><MusicInstrumentCards value={instrument} onChange={setInstrument} /></section>
             )}
 
             {mode === "sfx" && (
-              <section className="min-w-0">
-                <Label>Category</Label>
-                <MusicScrollChips items={[...SFX_CATEGORIES]} value={sfxCategory} onChange={setSfxCategory} />
-              </section>
+              <section className="min-w-0"><Label>Category</Label><MusicScrollChips items={[...SFX_CATEGORIES]} value={sfxCategory} onChange={setSfxCategory} /></section>
             )}
 
             {(mode === "song" || mode === "instrumental" || mode === "sfx") && (
@@ -439,17 +325,9 @@ function MusicStudio() {
                 <Label>Duration</Label>
                 <div className="flex flex-wrap gap-2">
                   {DURATIONS.map((d) => (
-                    <button
-                      key={d.s}
-                      type="button"
-                      onClick={() => setDuration(d.s)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                        duration === d.s
-                          ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm"
-                          : "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40",
-                      )}
-                    >
+                    <button key={d.s} type="button" onClick={() => setDuration(d.s)}
+                      className={cn("rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                        duration === d.s ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm" : "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40")}>
                       {d.label}
                     </button>
                   ))}
@@ -464,19 +342,10 @@ function MusicStudio() {
                   {(["standard", "premium"] as const).map((q) => {
                     const locked = q === "premium" && !premiumAllowed;
                     return (
-                      <button
-                        key={q}
-                        type="button"
-                        disabled={locked}
-                        onClick={() => !locked && setQualityTier(q)}
-                        className={cn(
-                          "rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition",
-                          qualityTier === q
-                            ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm"
-                            : "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40",
-                          locked && "opacity-50 cursor-not-allowed",
-                        )}
-                      >
+                      <button key={q} type="button" disabled={locked} onClick={() => !locked && setQualityTier(q)}
+                        className={cn("rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition",
+                          qualityTier === q ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm" : "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40",
+                          locked && "opacity-50 cursor-not-allowed")}>
                         {q}{locked ? " 🔒" : ""}
                       </button>
                     );
@@ -486,38 +355,22 @@ function MusicStudio() {
             )}
 
             <section className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={uploading}
-                className="flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border/60 bg-card p-3 text-xs text-muted-foreground transition hover:border-orange-500/40"
-              >
-                {imagePreview ? (
-                  <img src={imagePreview} alt="" className="h-10 w-10 rounded object-cover" />
-                ) : (
-                  <ImagePlus className="h-5 w-5" />
-                )}
+              <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploading}
+                className="flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border/60 bg-card p-3 text-xs text-muted-foreground transition hover:border-orange-500/40">
+                {imagePreview ? <img src={imagePreview} alt="" className="h-10 w-10 rounded object-cover" /> : <ImagePlus className="h-5 w-5" />}
                 Photo
               </button>
               <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onImageFile(e.target.files[0])} />
-              <button
-                type="button"
-                onClick={() => videoInputRef.current?.click()}
-                disabled={uploading}
-                className="flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border/60 bg-card p-3 text-xs text-muted-foreground transition hover:border-orange-500/40"
-              >
+              <button type="button" onClick={() => videoInputRef.current?.click()} disabled={uploading}
+                className="flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border/60 bg-card p-3 text-xs text-muted-foreground transition hover:border-orange-500/40">
                 <Video className="h-5 w-5" />
                 {videoName ? videoName.slice(0, 18) : "Video → audio"}
               </button>
               <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => e.target.files?.[0] && onVideoFile(e.target.files[0])} />
             </section>
 
-            <Button
-              type="button"
-              disabled={loading || uploading || !canAfford}
-              onClick={() => void onGenerate()}
-              className="w-full gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-md"
-            >
+            <Button type="button" disabled={loading || uploading || !canAfford} onClick={() => void onGenerate()}
+              className="w-full gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-md">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {loading ? LOADING[loadingStep] : `Generate${estCredits != null ? ` · ${estCredits}` : ""}`}
             </Button>
@@ -525,20 +378,10 @@ function MusicStudio() {
 
           <div className="min-w-0">
             {audioUrl && (
-              <MusicResultCard
-                audioUrl={audioUrl}
-                title={trackTitle}
-                model={resultModel}
-                credits={charged}
-                mode={mode}
+              <MusicResultCard audioUrl={audioUrl} title={trackTitle} model={resultModel} credits={charged} mode={mode}
                 quality={mode === "song" || mode === "instrumental" ? qualityTier : undefined}
-                durationSeconds={mode !== "voiceover" ? duration : undefined}
-                videoUrl={videoUrl}
-                onAgain={() => {
-                  setAudioUrl(null);
-                  setTrackTitle(null);
-                }}
-              />
+                durationSeconds={mode !== "voiceover" ? duration : undefined} videoUrl={videoUrl}
+                onAgain={() => { setAudioUrl(null); setTrackTitle(null); }} />
             )}
             {!loading && !audioUrl && (
               <div className="hidden rounded-xl border border-dashed border-border/50 p-8 text-center lg:block">
@@ -550,10 +393,7 @@ function MusicStudio() {
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          Need video?{" "}
-          <Link to="/studio/video" className="text-primary underline-offset-2 hover:underline">
-            Video Studio
-          </Link>
+          Need video? <Link to="/studio/video" className="text-primary underline-offset-2 hover:underline">Video Studio</Link>
         </p>
         <EditorDisclaimer className="mt-4" />
       </main>
