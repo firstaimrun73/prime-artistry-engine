@@ -1,7 +1,11 @@
 /**
  * Shared server-side History persistence for new generations.
- * Calls should_retain_as_history RPC; sets retained_as_history + storage fields.
- * Does NOT migrate existing rows. Does NOT hard-delete.
+ *
+ * retained_as_history is driven by user_settings.history_enabled
+ * (missing row = History ON). is_private is orthogonal (private R2/Blob).
+ *
+ * Permanent media identity = storage_provider + r2_object_key.
+ * output_url may be a short-lived delivery URL for immediate UI only.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -18,57 +22,107 @@ export type RetainDecision = {
 };
 
 /**
- * Call live RPC should_retain_as_history(p_user_id, p_is_private).
- * Accepts boolean or { retain, storage_provider } / jsonb shapes.
+ * Authoritative History toggle for a user.
+ * Missing user_settings row → true (History ON).
+ * Only explicit history_enabled === false turns History OFF.
+ */
+export async function readHistoryEnabled(
+  supabaseAdmin: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("user_settings")
+      .select("history_enabled")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) {
+      console.warn("[history-persist] user_settings read:", error.message);
+      return true;
+    }
+    if (!data) return true;
+    if ((data as { history_enabled?: unknown }).history_enabled === false) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn("[history-persist] user_settings exception:", e);
+    return true;
+  }
+}
+
+function parseRetainFlag(value: unknown): boolean | null {
+  if (value === true || value === 1 || value === "true" || value === "t") return true;
+  if (value === false || value === 0 || value === "false" || value === "f") return false;
+  return null;
+}
+
+/**
+ * Decide whether to retain + which storage_provider to prefer.
+ *
+ * Primary retain source: user_settings.history_enabled (default ON).
+ * RPC should_retain_as_history is used for storage_provider hints only when retain=true.
+ * is_private NEVER forces retain=false.
  */
 export async function callShouldRetainAsHistory(
   supabaseAdmin: SupabaseClient,
   userId: string,
   isPrivate: boolean,
 ): Promise<RetainDecision> {
+  const historyEnabled = await readHistoryEnabled(supabaseAdmin, userId);
+  if (!historyEnabled) {
+    return { retain: false, storage_provider: null };
+  }
+
+  // History ON — pick storage provider (plan / RPC / env)
   try {
     const { data, error } = await supabaseAdmin.rpc("should_retain_as_history", {
       p_user_id: userId,
       p_is_private: isPrivate,
     });
-    if (error) {
+    if (!error && data != null) {
+      // Boolean-only legacy
+      if (data === true) return chooseProviderFallback(isPrivate);
+      if (data === false) {
+        // RPC said false but our authoritative toggle is ON — do not drop History
+        // solely because of a private-media flag in an old RPC revision.
+        console.warn(
+          "[history-persist] RPC returned false while history_enabled=ON; retaining with fallback provider",
+        );
+        return chooseProviderFallback(isPrivate);
+      }
+      if (typeof data === "object") {
+        const o = data as Record<string, unknown>;
+        const rpcRetain = parseRetainFlag(o.retain ?? o.should_retain ?? o.retained_as_history);
+        // If RPC explicitly says do not retain AND we already checked toggle ON,
+        // still retain (toggle is source of truth). Use RPC only for provider.
+        const sp = String(o.storage_provider ?? o.provider ?? "").toLowerCase();
+        if (sp === "blob" || sp === "r2" || sp === "supabase") {
+          return { retain: true, storage_provider: sp as HistoryStorageProvider };
+        }
+        if (rpcRetain === false) {
+          console.warn(
+            "[history-persist] RPC retain=false with history_enabled=ON; using fallback provider",
+          );
+        }
+        return chooseProviderFallback(isPrivate);
+      }
+    } else if (error) {
       console.warn("[history-persist] should_retain_as_history:", error.message);
-      // Fail open for job tracking: retain with supabase until storage is ready
-      return { retain: true, storage_provider: "supabase" };
     }
-    if (data === false || data === true) {
-      if (!data) return { retain: false, storage_provider: null };
-      // Boolean true: choose provider from plan heuristics via env availability
-      return chooseProviderFallback(isPrivate);
-    }
-    if (data && typeof data === "object") {
-      const o = data as Record<string, unknown>;
-      const retain =
-        o.retain === true ||
-        o.should_retain === true ||
-        o.retained_as_history === true ||
-        (typeof o.retain === "undefined" && o.storage_provider != null);
-      if (!retain && o.retain === false) {
-        return { retain: false, storage_provider: null };
-      }
-      const sp = String(o.storage_provider ?? o.provider ?? "").toLowerCase();
-      if (sp === "blob" || sp === "r2" || sp === "supabase") {
-        return { retain: true, storage_provider: sp as HistoryStorageProvider };
-      }
-      if (retain) return chooseProviderFallback(isPrivate);
-      return { retain: false, storage_provider: null };
-    }
-    return { retain: true, storage_provider: "supabase" };
   } catch (e) {
     console.warn("[history-persist] RPC exception:", e);
-    return { retain: true, storage_provider: "supabase" };
   }
+
+  return chooseProviderFallback(isPrivate);
 }
 
-function chooseProviderFallback(isPrivate: boolean): RetainDecision {
-  // FREE/private → Blob; PAID → R2 when configured
-  if (isPrivateBlobConfigured() && !isPrivateR2Configured()) {
-    return { retain: true, storage_provider: "blob" };
+function chooseProviderFallback(_isPrivate: boolean): RetainDecision {
+  // Prefer R2 when configured (paid/admin path typically); Blob when only Blob is set.
+  // Actual Free vs Paid routing for *bytes* is also enforced at ingest/finalize.
+  if (isPrivateR2Configured() && isPrivateBlobConfigured()) {
+    // Both available — prefer R2 for durable paid path; Free ingest still uses Blob upstream.
+    return { retain: true, storage_provider: "r2" };
   }
   if (isPrivateR2Configured()) {
     return { retain: true, storage_provider: "r2" };
@@ -81,22 +135,21 @@ function chooseProviderFallback(isPrivate: boolean): RetainDecision {
 
 export type PersistGenerationInput = {
   supabaseAdmin: SupabaseClient;
-  /** User-scoped client optional; admin preferred for insert */
   userId: string;
   type: "image" | "video" | "music";
   prompt: string | null;
   input_url?: string | null;
   output_url: string;
   status?: "success" | "failed" | "pending" | "processing";
+  /** Private media flag — independent of History retention. */
   is_private?: boolean;
   title?: string | null;
   metadata?: Record<string, unknown> | null;
-  /** Optional bytes to copy into private storage when retaining */
   outputBytes?: Buffer | Uint8Array | null;
   outputContentType?: string;
   outputExt?: string;
   generationId?: string;
-  /** Permanent R2 object key when already stored (e.g. finalizeMediaAsset storagePath). */
+  /** Permanent object key (R2 or Blob pathname). */
   r2ObjectKey?: string | null;
 };
 
@@ -111,7 +164,6 @@ export type PersistGenerationResult = {
 
 /**
  * Insert a generations row with live retention fields.
- * If retain + private provider + bytes provided, uploads to Blob/R2 first.
  */
 export async function persistGenerationHistory(
   input: PersistGenerationInput,
@@ -131,20 +183,21 @@ export async function persistGenerationHistory(
 
   const genId = input.generationId ?? crypto.randomUUID();
 
-  // If finalize already wrote to private user-media R2, capture permanent key and re-sign.
+  // Capture permanent private-user key; refresh short-lived delivery URL for immediate UI only.
   try {
     const { extractR2ObjectKeyFromUrl, isPrivateUserObjectKey } = await import("@/lib/r2.server");
     const { isPrivateR2Configured, privateR2SignedGetUrl } = await import(
       "@/lib/private-history-storage.server"
     );
     const extracted =
-      r2Key ||
-      (outputUrl ? extractR2ObjectKeyFromUrl(outputUrl) : null);
+      r2Key || (outputUrl ? extractR2ObjectKeyFromUrl(outputUrl) : null);
     if (extracted && isPrivateUserObjectKey(extracted) && isPrivateR2Configured()) {
       r2Key = extracted;
       if (!storageProvider || storageProvider === "supabase") {
         storageProvider = "r2";
       }
+      // Short-lived signed URL for the generate response / first paint only.
+      // Permanent identity remains r2_object_key; History re-signs on load.
       const signed = await privateR2SignedGetUrl(extracted);
       if (signed) outputUrl = signed;
     }
@@ -163,7 +216,9 @@ export async function persistGenerationHistory(
         userId: input.userId,
         generationId: genId,
         kind: "output",
-        ext: input.outputExt || (input.type === "video" ? "mp4" : input.type === "music" ? "mp3" : "jpg"),
+        ext:
+          input.outputExt ||
+          (input.type === "video" ? "mp4" : input.type === "music" ? "mp3" : "jpg"),
         body: input.outputBytes,
         contentType:
           input.outputContentType ||
@@ -183,6 +238,8 @@ export async function persistGenerationHistory(
     }
   }
 
+  // When History is OFF we still insert a job row for tracking, but not retained.
+  // When History is ON, retained_as_history=true even if is_private=true.
   const row: Record<string, unknown> = {
     id: genId,
     user_id: input.userId,
@@ -193,13 +250,18 @@ export async function persistGenerationHistory(
     status: input.status ?? "success",
     retained_as_history: decision.retain,
     is_private: isPrivate,
-    storage_provider: storageProvider ?? "supabase",
+    storage_provider: storageProvider ?? (decision.retain ? "supabase" : null),
     r2_object_key: r2Key,
     thumbnail_key: null,
     deleted_at: null,
   };
   if (input.title != null) row.title = input.title;
-  if (input.metadata != null) row.metadata = input.metadata;
+  if (input.metadata != null) {
+    row.metadata = {
+      ...input.metadata,
+      history_saved: decision.retain,
+    };
+  }
 
   const { data, error } = await input.supabaseAdmin
     .from("generations")
@@ -208,7 +270,6 @@ export async function persistGenerationHistory(
     .maybeSingle();
 
   if (error) {
-    // Retry without new columns if schema cache lag
     if (/column|schema|retained_as_history|storage_provider/i.test(error.message)) {
       const legacy: Record<string, unknown> = {
         user_id: input.userId,
@@ -220,7 +281,11 @@ export async function persistGenerationHistory(
       };
       if (input.title != null) legacy.title = input.title;
       if (input.metadata != null) legacy.metadata = input.metadata;
-      const retry = await input.supabaseAdmin.from("generations").insert(legacy).select("id").maybeSingle();
+      const retry = await input.supabaseAdmin
+        .from("generations")
+        .insert(legacy)
+        .select("id")
+        .maybeSingle();
       return {
         id: (retry.data as { id?: string } | null)?.id ?? null,
         retained_as_history: decision.retain,
@@ -239,6 +304,15 @@ export async function persistGenerationHistory(
       error: error.message,
     };
   }
+
+  console.log(
+    "[history-persist] saved id=%s retain=%s provider=%s key=%s private=%s",
+    (data as { id?: string } | null)?.id ?? genId,
+    decision.retain,
+    storageProvider,
+    r2Key ? "yes" : "no",
+    isPrivate,
+  );
 
   return {
     id: (data as { id?: string } | null)?.id ?? genId,
