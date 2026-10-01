@@ -23,20 +23,20 @@ export type MusicModelEntry = {
 export const MUSIC_MODEL_REGISTRY: Record<StudioTier, Record<MusicModelSlot, MusicModelEntry>> = {
   standard: {
     song: {
-      modelId: "fal-ai/minimax-music/v2",
-      label: "MiniMax Music 2.0",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Song generation",
       minimumPlan: "lite",
     },
     instrumental: {
-      modelId: "fal-ai/minimax-music/v2",
-      label: "MiniMax Music 2.0",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Instrumental track",
       minimumPlan: "lite",
     },
     bgm: {
-      modelId: "fal-ai/minimax-music/v2",
-      label: "MiniMax Music 2.0",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Background music",
       minimumPlan: "lite",
     },
@@ -61,20 +61,20 @@ export const MUSIC_MODEL_REGISTRY: Record<StudioTier, Record<MusicModelSlot, Mus
   },
   pro: {
     song: {
-      modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Music 2.6",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Premium song",
       minimumPlan: "pro",
     },
     instrumental: {
-      modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Music 2.6",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Premium instrumental",
       minimumPlan: "pro",
     },
     bgm: {
-      modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Music 2.6",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Premium BGM",
       minimumPlan: "pro",
     },
@@ -97,22 +97,22 @@ export const MUSIC_MODEL_REGISTRY: Record<StudioTier, Record<MusicModelSlot, Mus
       minimumPlan: "lite",
     },
   },
-  premium: {
+  ultra: {
     song: {
-      modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Music 2.6",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Premium song",
       minimumPlan: "pro",
     },
     instrumental: {
-      modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Music 2.6",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Premium instrumental",
       minimumPlan: "pro",
     },
     bgm: {
-      modelId: "fal-ai/minimax-music/v2.6",
-      label: "MiniMax Music 2.6",
+      modelId: "minimax/music-3",
+      label: "MiniMax Music 3",
       capability: "Premium BGM",
       minimumPlan: "pro",
     },

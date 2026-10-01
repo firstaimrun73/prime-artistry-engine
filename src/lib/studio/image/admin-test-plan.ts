@@ -1,6 +1,6 @@
 /**
- * Admin-only plan override for testing Image Studio experience access.
- * Does NOT grant infinite credits or bypass credit deduction for non-admin paths.
+ * Admin-only plan override for testing Image Studio / Music Studio experience access.
+ * Does NOT grant infinite credits or bypass credit deduction when a test plan is selected.
  * Real customer entitlements remain driven by profiles.plan.
  *
  * Client stores selection in localStorage; server only honors adminTestPlan
@@ -13,10 +13,10 @@ import { normalizePlanId } from "@/lib/studio/image/image-experience-access";
 
 export const ADMIN_TEST_PLAN_STORAGE_KEY = "motio2edit.adminTestPlan";
 
-/** All selectable test plans (same ids as customer plans). */
-export const ADMIN_TEST_PLAN_OPTIONS: { id: PlanId; label: string }[] = PLANS.map(
-  (p) => ({ id: p.id, label: p.name }),
-);
+/** Public plans only — Business/Master Studio is internal and not a test option. */
+export const ADMIN_TEST_PLAN_OPTIONS: { id: PlanId; label: string }[] = PLANS
+  .filter((p) => p.id !== "business")
+  .map((p) => ({ id: p.id, label: p.name }));
 
 export function isValidPlanId(value: string | null | undefined): value is PlanId {
   if (!value) return false;
