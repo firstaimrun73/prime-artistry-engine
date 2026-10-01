@@ -69,11 +69,22 @@ export function isVoiceId(v: string): v is VoiceId {
   return (VOICE_IDS as readonly string[]).includes(v);
 }
 
-/** Provider-backed durations only (MMAudio / pipeline max 30s). Do not expose 60s. */
+/**
+ * Song / instrumental durations (MiniMax produces full tracks; UI target up to 2 min).
+ * SFX / video-music stay provider-capped at 30s — filtered in the page.
+ */
 export const DURATIONS = [
-  { s: 8, label: "8s", emoji: "⏱" },
-  { s: 15, label: "15s", emoji: "⏱" },
-  { s: 30, label: "30s", emoji: "⏱" },
+  { s: 15, label: "15s" },
+  { s: 30, label: "30s" },
+  { s: 60, label: "1 min" },
+  { s: 120, label: "2 min" },
+] as const;
+
+/** SFX-only durations (MMAudio hard max 30s). */
+export const SFX_DURATIONS = [
+  { s: 8, label: "8s" },
+  { s: 15, label: "15s" },
+  { s: 30, label: "30s" },
 ] as const;
 
 /** SFX categories with sticker emojis for fast scanning. */
