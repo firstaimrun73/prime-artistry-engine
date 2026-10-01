@@ -236,12 +236,23 @@ export const generateMusic = createServerFn({ method: "POST" })
 
     const imageMoodText = hasImage && data.imageUrl ? await analyzeImageMoodServer(data.imageUrl) : "";
     const brief = buildMusicBrief({
-      mode, prompt: data.prompt || "", lyrics: data.lyrics, genre: data.genre, mood: data.mood,
-      instrument: data.instrument, imageMood: imageMoodText || undefined,
+      text: data.prompt || "",
+      imageUrl: data.imageUrl,
+      videoUrl: data.videoUrl,
+      preferredGenre: data.genre,
+      preferredMood: data.mood,
+      instrumental: mode === "instrumental" || mode === "bgm" || data.instrumental === true,
     });
     const composed = composeMusicPrompts({
-      brief,
+      mode,
+      qualityTier,
+      userPrompt: data.prompt || "",
+      lyrics: data.lyrics,
       instrumental: mode === "instrumental" || mode === "bgm" || data.instrumental === true,
+      imageMood: imageMoodText || undefined,
+      genre: data.genre,
+      mood: data.mood,
+      briefSummary: brief.summaryPrompt,
     });
 
     const usedModel = quote.modelId || quote.modelLabel;
@@ -331,12 +342,12 @@ export const generateMusic = createServerFn({ method: "POST" })
     }
 
     const trackTitle = (brief.summaryPrompt || data.prompt || "Generated track").slice(0, 80);
-    const retain = await shouldRetainAsHistoryServer({
-      userId,
-      product: "music",
-      planId: plan,
-      historyEnabled: caps.historyEnabled,
-    });
+    const retain = caps.historyEnabled
+      ? await shouldRetainAsHistoryServer({
+          supabaseAdmin: supabaseAdmin as never,
+          userId,
+        })
+      : false;
 
     // Provider URL preserved — do not copy generated Music media to R2/Blob.
     try {
