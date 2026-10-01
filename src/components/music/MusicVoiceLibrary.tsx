@@ -5,8 +5,10 @@ import { cn } from "@/lib/utils";
 import { VOICES, type VoiceId } from "@/components/music/musicStudioData";
 import { getVoicePreview } from "@/lib/music.functions";
 
-/** Module-level URL cache so previews never re-fetch across remounts in the same session. */
+/** Session cache — never re-fetch the same voice. */
 const urlCache = new Map<VoiceId, string>();
+/** In-flight fetch promises so double-taps share one request. */
+const inflight = new Map<VoiceId, Promise<string>>();
 
 async function resolvePreviewUrl(
   voiceId: VoiceId,
@@ -16,19 +18,27 @@ async function resolvePreviewUrl(
   const cached = urlCache.get(voiceId);
   if (cached) return cached;
 
-  if (staticSrc && staticSrc.startsWith("/")) {
-    urlCache.set(voiceId, staticSrc);
-    return staticSrc;
-  }
+  const pending = inflight.get(voiceId);
+  if (pending) return pending;
 
-  const url = await fetchPreview(voiceId);
-  urlCache.set(voiceId, url);
-  return url;
+  const work = (async () => {
+    if (staticSrc && staticSrc.startsWith("/")) {
+      urlCache.set(voiceId, staticSrc);
+      return staticSrc;
+    }
+    const url = await fetchPreview(voiceId);
+    urlCache.set(voiceId, url);
+    return url;
+  })();
+
+  inflight.set(voiceId, work);
+  try {
+    return await work;
+  } finally {
+    inflight.delete(voiceId);
+  }
 }
 
-/**
- * Voiceover-only voice picker — horizontal sticker cards with color + play animation.
- */
 export function MusicVoiceLibrary({
   value,
   onChange,
@@ -52,6 +62,12 @@ export function MusicVoiceLibrary({
 
   useEffect(() => () => stop(), [stop]);
 
+  useEffect(() => {
+    const first = VOICES[0];
+    if (!first || urlCache.has(first.id)) return;
+    if (first.previewSrc.startsWith("/")) urlCache.set(first.id, first.previewSrc);
+  }, []);
+
   const play = useCallback(
     async (id: VoiceId, staticSrc: string) => {
       if (playingId === id) {
@@ -69,47 +85,65 @@ export function MusicVoiceLibrary({
           return res.url;
         });
 
-        const audio = new Audio(url);
+        const audio = new Audio();
         audio.preload = "auto";
+        audio.src = url;
         audioRef.current = audio;
 
         audio.onended = () => setPlayingId(null);
         audio.onerror = () => {
           urlCache.delete(id);
           setPlayingId(null);
-          setLoadingId(null);
+          setLoadingId(id);
+          void (async () => {
+            try {
+              const res = await getPreview({ data: { voice: id } });
+              if (!res?.url) return;
+              urlCache.set(id, res.url);
+              const a2 = new Audio(res.url);
+              a2.preload = "auto";
+              audioRef.current = a2;
+              a2.onended = () => setPlayingId(null);
+              a2.onerror = () => {
+                setPlayingId(null);
+                setLoadingId(null);
+              };
+              await a2.play();
+              setPlayingId(id);
+            } catch {
+              /* ignore */
+            } finally {
+              setLoadingId(null);
+            }
+          })();
         };
 
-        try {
-          await audio.play();
-          setPlayingId(id);
-        } catch {
-          urlCache.delete(id);
-          const res = await getPreview({ data: { voice: id } });
-          if (res?.url) {
-            urlCache.set(id, res.url);
-            const a2 = new Audio(res.url);
-            a2.preload = "auto";
-            audioRef.current = a2;
-            a2.onended = () => setPlayingId(null);
-            await a2.play();
+        const tryPlay = async () => {
+          try {
+            await audio.play();
             setPlayingId(id);
+            setLoadingId(null);
+          } catch {
+            setLoadingId(null);
+            setPlayingId(null);
           }
+        };
+
+        if (audio.readyState >= 2) {
+          void tryPlay();
+        } else {
+          audio.addEventListener("canplay", () => void tryPlay(), { once: true });
+          window.setTimeout(() => {
+            void tryPlay();
+          }, 400);
         }
       } catch {
         setPlayingId(null);
-      } finally {
         setLoadingId(null);
       }
     },
     [getPreview, playingId, stop],
   );
-
-  useEffect(() => {
-    const first = VOICES[0];
-    if (!first || urlCache.has(first.id)) return;
-    if (first.previewSrc.startsWith("/")) urlCache.set(first.id, first.previewSrc);
-  }, []);
 
   return (
     <section>
@@ -147,21 +181,11 @@ export function MusicVoiceLibrary({
                     <span className="text-base leading-none" aria-hidden>
                       {v.emoji}
                     </span>
-                    <p
-                      className={cn(
-                        "text-sm font-bold",
-                        active ? "text-white" : "text-foreground",
-                      )}
-                    >
+                    <p className={cn("text-sm font-bold", active ? "text-white" : "text-foreground")}>
                       {v.label}
                     </p>
                   </div>
-                  <p
-                    className={cn(
-                      "text-[10px] leading-snug",
-                      active ? "text-white/85" : "text-muted-foreground",
-                    )}
-                  >
+                  <p className={cn("text-[10px] leading-snug", active ? "text-white/85" : "text-muted-foreground")}>
                     {v.desc}
                   </p>
                 </button>
