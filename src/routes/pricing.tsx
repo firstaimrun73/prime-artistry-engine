@@ -124,7 +124,7 @@ function PricingPage() {
                   <CrownBadge plan={plan.id} />
                   <h2 className="text-lg font-bold">{plan.name}</h2>
                 </div>
-                <p className="mt-3 text-3xl font-extrabold tracking-tight">{value}</p>
+                <p className="mt-3 text-3xl font-extrabold tracking-tight">{symbol}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {plan.id === "free" ? "Forever free" : "per month"}
                 </p>
