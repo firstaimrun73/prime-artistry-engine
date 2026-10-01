@@ -1,0 +1,83 @@
+name: RESTORE MusicStudioPage UI patches
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/restore-music-page-ui.yml"
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore page + apply patches
+        run: |
+          set -euo pipefail
+          FOUND=""
+          for SHA in $(git log --pretty=format:%H -n 50 -- src/components/music/MusicStudioPage.tsx); do
+            SIZE=$(git cat-file -s "$SHA:src/components/music/MusicStudioPage.tsx" 2>/dev/null || echo 0)
+            echo "try $SHA size=$SIZE"
+            if [ "$SIZE" -gt 15000 ]; then
+              CONTENT=$(git show "$SHA:src/components/music/MusicStudioPage.tsx")
+              if echo "$CONTENT" | grep -q "showLyrics\|AutoGrowTextarea\|MusicModeCards"; then
+                echo "$CONTENT" > /tmp/msp.tsx
+                FOUND=$SHA
+                break
+              fi
+            fi
+          done
+          if [ -z "$FOUND" ]; then echo "no good page"; exit 1; fi
+          echo "Using $FOUND"
+          python3 - <<'PY'
+          from pathlib import Path
+          t = Path("/tmp/msp.tsx").read_text()
+          # Import SFX_DURATIONS if missing
+          if "SFX_DURATIONS" not in t:
+              t = t.replace(
+                  "DURATIONS, SFX_CATEGORIES, LOADING_STEPS as LOADING,",
+                  "DURATIONS, SFX_DURATIONS, SFX_CATEGORIES, LOADING_STEPS as LOADING,",
+              )
+          if "Info" not in t.split("lucide-react")[0] + t.split("lucide-react")[1][:200]:
+              t = t.replace(
+                  'import { Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, Music2, Lock } from "lucide-react";',
+                  'import { Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, Music2, Lock, Info } from "lucide-react";',
+              )
+          if "showCostInfo" not in t:
+              t = t.replace(
+                  "const [musicCaps, setMusicCaps] = useState<{",
+                  "const [showCostInfo, setShowCostInfo] = useState(false);\n  const [musicCaps, setMusicCaps] = useState<{",
+              )
+          # Duration list: use SFX_DURATIONS for sfx
+          t = t.replace(
+              "{DURATIONS.map((d) => (",
+              "{(mode === \"sfx\" ? SFX_DURATIONS : DURATIONS).map((d) => (",
+          )
+          # Remove credits from Generate label patterns
+          import re
+          t = re.sub(
+              r"`Generate\$\{estCredits[^`]*`",
+              '"Generate"',
+              t,
+          )
+          # If still has Generate with estCredits template variants
+          t = t.replace(
+              "{loading\n                ? LOADING[loadingStep]\n                : `Generate${estCredits != null ? ` · ${estCredits}` : estLoading ? \" · …\" : \"\"}`}",
+              '{loading ? LOADING[loadingStep] : "Generate"}',
+          )
+          Path("src/components/music/MusicStudioPage.tsx").write_text(t)
+          print("wrote", len(t))
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name "music-restore"
+          git config user.email "restore@motio2edit.local"
+          git add src/components/music/MusicStudioPage.tsx
+          git commit -m "ui(music): restore page + credits info / duration patches" || echo nochange
+          git push
