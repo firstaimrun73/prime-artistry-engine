@@ -52,14 +52,18 @@ export function canAccessVideo(opts: {
   return isPaidPlan(opts.plan);
 }
 
-/** Music: all paid plans (Lite includes music). Free never. */
+/**
+ * Music: all signed-in users.
+ * Free = limited (standard, song/instrumental, short prompts) via music-plan-capabilities.
+ * Paid plans unlock modes, longer tracks, Premium, SFX, voiceover, video→music.
+ */
 export function canAccessMusic(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
   isAdmin?: boolean;
 }): boolean {
   if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
-  return isPaidPlan(opts.plan);
+  return true;
 }
 
 export function shouldShowAds(opts: {
