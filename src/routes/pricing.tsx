@@ -11,8 +11,6 @@ import {
   DISPLAY_PRICES,
   DISPLAY_CURRENCIES,
   toCheckoutCurrency,
-  CREDIT_COST,
-  getPlan,
   PRICING_SHOW_PLAN_IDS,
   type DisplayCurrency,
   type PlanId,
@@ -34,7 +32,7 @@ function PricingPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("motio2edit-display-currency");
-      if (saved && (DISPLAY_CURRENCIES as readonly string[]).includes(saved)) {
+      if (saved && DISPLAY_CURRENCIES.some((c) => c.code === saved)) {
         setCurrency(saved as DisplayCurrency);
       }
     } catch {
@@ -71,24 +69,24 @@ function PricingPage() {
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           {DISPLAY_CURRENCIES.map((c) => (
             <button
-              key={c}
+              key={c.code}
               type="button"
               onClick={() => {
-                setCurrency(c);
+                setCurrency(c.code);
                 try {
-                  localStorage.setItem("motio2edit-display-currency", c);
+                  localStorage.setItem("motio2edit-display-currency", c.code);
                 } catch {
                   /* ignore */
                 }
               }}
               className={cn(
                 "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-                currency === c
+                currency === c.code
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border text-muted-foreground hover:border-primary",
               )}
             >
-              {c}
+              {c.code}
             </button>
           ))}
         </div>
@@ -97,15 +95,8 @@ function PricingPage() {
           {visiblePlans.map((plan) => {
             const highlight = plan.id === "pro" || plan.id === "studio";
             const isCurrent = profile?.plan === plan.id;
-            const price = DISPLAY_PRICES[plan.id]?.[currency];
-            const symbol =
-              price == null
-                ? "—"
-                : currency === "INR"
-                  ? `₹${price.toLocaleString("en-IN")}`
-                  : currency === "EUR"
-                    ? `€${price}`
-                    : `$${price}`;
+            // DISPLAY_PRICES values are already formatted strings (e.g. "$4.99", "₹399")
+            const priceLabel = DISPLAY_PRICES[plan.id]?.[currency] ?? "—";
 
             return (
               <div
@@ -124,7 +115,7 @@ function PricingPage() {
                   <CrownBadge plan={plan.id} />
                   <h2 className="text-lg font-bold">{plan.name}</h2>
                 </div>
-                <p className="mt-3 text-3xl font-extrabold tracking-tight">{symbol}</p>
+                <p className="mt-3 text-3xl font-extrabold tracking-tight">{priceLabel}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {plan.id === "free" ? "Forever free" : "per month"}
                 </p>
