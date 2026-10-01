@@ -16,8 +16,6 @@ async function resolvePreviewUrl(
   const cached = urlCache.get(voiceId);
   if (cached) return cached;
 
-  // Prefer known static public asset path directly (no HEAD).
-  // Playback onerror falls back to server-generated preview.
   if (staticSrc && staticSrc.startsWith("/")) {
     urlCache.set(voiceId, staticSrc);
     return staticSrc;
@@ -29,9 +27,7 @@ async function resolvePreviewUrl(
 }
 
 /**
- * Voiceover-only voice picker.
- * - Card click → select voice (does not touch Music/SFX state).
- * - Speaker → play real xAI voice sample (cached); never charges credits.
+ * Voiceover-only voice picker — horizontal sticker cards with color + play animation.
  */
 export function MusicVoiceLibrary({
   value,
@@ -109,7 +105,6 @@ export function MusicVoiceLibrary({
     [getPreview, playingId, stop],
   );
 
-  // Cache static path for first voice only (no network on mount).
   useEffect(() => {
     const first = VOICES[0];
     if (!first || urlCache.has(first.id)) return;
@@ -118,58 +113,95 @@ export function MusicVoiceLibrary({
 
   return (
     <section>
-      <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground">Voice library</p>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {VOICES.map((v) => {
-          const active = value === v.id;
-          const isPlaying = playingId === v.id;
-          const isLoading = loadingId === v.id;
-          return (
-            <div
-              key={v.id}
-              className={cn(
-                "flex min-w-0 items-center gap-3 rounded-2xl border p-3 transition-colors",
-                active
-                  ? "border-transparent bg-gradient-to-r from-orange-500/15 to-purple-600/15 ring-2 ring-orange-500/50"
-                  : "border-border/70 bg-card",
-              )}
-            >
-              <button
-                type="button"
-                onClick={() => onChange(v.id)}
-                className="min-w-0 flex-1 text-left"
-                aria-pressed={active}
-              >
-                <p className="text-sm font-semibold">{v.label}</p>
-                <p className="text-[11px] text-muted-foreground">{v.desc}</p>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void play(v.id, v.previewSrc);
-                }}
-                disabled={isLoading}
+      <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground">
+        🎙 Voice library
+      </p>
+      <div className="w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain pb-1 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex w-max gap-2.5">
+          {VOICES.map((v) => {
+            const active = value === v.id;
+            const isPlaying = playingId === v.id;
+            const isLoading = loadingId === v.id;
+            return (
+              <div
+                key={v.id}
                 className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border transition-colors",
-                  isPlaying && "border-orange-500/60 bg-orange-500/15 text-orange-600",
+                  "relative flex w-[140px] shrink-0 flex-col rounded-2xl border p-3 transition-all",
+                  active
+                    ? "border-transparent bg-gradient-to-br shadow-md ring-2 ring-orange-500/40 " + v.color
+                    : "border-border/70 bg-card hover:border-orange-500/40",
                 )}
-                aria-label={isPlaying ? `Stop ${v.label} preview` : `Preview ${v.label}`}
               >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isPlaying ? (
-                  <Pause className="h-4 w-4" />
-                ) : (
-                  <Volume2 className="h-4 w-4" />
+                {isPlaying && (
+                  <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden rounded-t-2xl">
+                    <div className="h-full w-full animate-pulse bg-white/80" />
+                  </div>
                 )}
-              </button>
-            </div>
-          );
-        })}
+                <button
+                  type="button"
+                  onClick={() => onChange(v.id)}
+                  className="min-w-0 text-left"
+                  aria-pressed={active}
+                >
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <span className="text-base leading-none" aria-hidden>
+                      {v.emoji}
+                    </span>
+                    <p
+                      className={cn(
+                        "text-sm font-bold",
+                        active ? "text-white" : "text-foreground",
+                      )}
+                    >
+                      {v.label}
+                    </p>
+                  </div>
+                  <p
+                    className={cn(
+                      "text-[10px] leading-snug",
+                      active ? "text-white/85" : "text-muted-foreground",
+                    )}
+                  >
+                    {v.desc}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void play(v.id, v.previewSrc);
+                  }}
+                  disabled={isLoading}
+                  className={cn(
+                    "mt-2.5 flex h-8 w-full items-center justify-center gap-1.5 rounded-full border text-xs font-medium transition-colors",
+                    active
+                      ? "border-white/30 bg-white/20 text-white hover:bg-white/30"
+                      : "border-border bg-muted/50 text-foreground hover:border-orange-500/40",
+                    isPlaying && !active && "border-orange-500/50 bg-orange-500/10 text-orange-600",
+                  )}
+                  aria-label={isPlaying ? `Stop ${v.label} preview` : `Preview ${v.label}`}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : isPlaying ? (
+                    <>
+                      <Pause className="h-3.5 w-3.5" />
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="h-3.5 w-3.5" />
+                      Preview
+                    </>
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <p className="mt-2 text-[10px] text-muted-foreground">
-        Preview uses the real voice sample. Generate uses the same selected voice — no credits for preview.
+        Free preview · same voice used on generate
       </p>
     </section>
   );
