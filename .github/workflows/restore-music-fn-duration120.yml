@@ -1,84 +1,11 @@
-name: RESTORE music.functions duration-120
-
+name: DISABLED — Music restore blocked
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/workflows/restore-music-fn-duration120.yml"
-
 jobs:
-  restore:
+  blocked:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Restore music.functions from last good SHA and patch duration
+      - name: Refuse legacy Music restore
         run: |
-          set -euo pipefail
-          # Last known good full body before placeholder accident
-          GOOD=e3cf26f0c614fb111b25e818a1e237fe445ad5c0
-          git show "$GOOD:src/lib/music.functions.ts" > /tmp/mf.ts
-          SIZE=$(wc -c < /tmp/mf.ts)
-          echo "restored size=$SIZE"
-          if [ "$SIZE" -lt 5000 ]; then
-            echo "Restore too small — abort"
-            exit 1
-          fi
-          # Raise zod duration max 30 -> 120 (both generate + estimate)
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("/tmp/mf.ts")
-          t = p.read_text()
-          t2 = t.replace(
-              "durationSeconds: z.number().int().min(1).max(30).optional().default(30),",
-              "durationSeconds: z.number().int().min(1).max(120).optional().default(30),",
-          )
-          # Free message
-          t2 = t2.replace(
-              "Music Studio requires Lite or a higher plan. Upgrade to unlock Music Studio.",
-              "Music Studio is limited on Free. Upgrade for full modes, longer tracks, and Premium quality.",
-          )
-          # MiniMax duration best-effort
-          old = '''        const json = await runFalQueue(
-          usedModel,
-          {
-            prompt: composed.stylePrompt,
-            lyrics_prompt: composed.lyricsPrompt || undefined,
-          },
-          falKey,
-          "MiniMax",
-        );'''
-          new = '''        const json = await runFalQueue(
-          usedModel,
-          {
-            prompt: composed.stylePrompt,
-            lyrics_prompt: composed.lyricsPrompt || undefined,
-            duration: Math.min(Math.max(durationSeconds, 15), 120),
-          },
-          falKey,
-          "MiniMax",
-        );'''
-          if old in t2:
-              t2 = t2.replace(old, new)
-              print("minimax duration injected")
-          else:
-              print("minimax block not exact — skip")
-          Path("src/lib/music.functions.ts").write_text(t2)
-          print("final", len(t2), "max120", t2.count("max(120)"))
-          PY
-
-      - name: Commit and push
-        run: |
-          git config user.name "music-restore"
-          git config user.email "restore@motio2edit.local"
-          git add src/lib/music.functions.ts
-          if git diff --cached --quiet; then
-            echo "No changes"
-          else
-            git commit -m "fix(music): restore music.functions + duration max 120s"
-            git push
-          fi
+          echo "Disabled. Must not overwrite Music Studio or reintroduce R2 ingest."
+          exit 0

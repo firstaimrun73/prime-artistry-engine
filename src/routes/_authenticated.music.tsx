@@ -3,12 +3,11 @@ import { z } from "zod";
 import { MusicStudioPage } from "@/components/music/MusicStudioPage";
 
 const searchSchema = z.object({
-  mode: z.enum(["song", "instrumental", "voiceover", "sfx", "video-music"]).optional(),
+  mode: z.enum(["song", "instrumental", "bgm", "voiceover", "sfx", "video-music", "video_music"]).optional(),
   videoUrl: z.string().url().optional(),
 });
 
 function MusicRoutePage() {
-  // StudioBackLink is integrated into MusicStudioPage header (no awkward top-only placement).
   return <MusicStudioPage />;
 }
 
@@ -22,10 +21,11 @@ export const Route = createFileRoute("/_authenticated/music")({
   },
   head: () => ({
     meta: [
-      { title: "Music Studio — MOTIO2EDIT" },
+      { title: "Music Studio — Motio2edit" },
       {
         name: "description",
-        content: "Create songs, instrumentals, voiceovers and sound effects with AI.",
+        content:
+          "Motio2edit Music Studio: create songs, instrumentals, BGM, AI voice narration, sound effects, and video soundtracks — with plan-based quality, duration, and voice limits.",
       },
     ],
   }),

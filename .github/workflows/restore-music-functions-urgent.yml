@@ -1,57 +1,11 @@
-name: Urgent restore music.functions
+name: DISABLED — Music restore blocked
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/restore-music-functions-urgent.yml'
-      - '.restore/music_fn/music.functions.zlib.b64'
 jobs:
-  restore:
+  blocked:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Decompress and write full music.functions.ts
+      - name: Refuse legacy Music restore
         run: |
-          set -euo pipefail
-          python3 << 'PY'
-          import base64, zlib
-          from pathlib import Path
-
-          payload = Path('.restore/music_fn/music.functions.zlib.b64').read_text().strip()
-          text = zlib.decompress(base64.b64decode(payload)).decode('utf-8')
-
-          required = [
-              'export const generateMusic',
-              'export const estimateMusicCost',
-              'export const getVoicePreview',
-              'export const getMusicCapabilities',
-              'deduct_credits',
-              'music_history',
-              'Reject invalid media URLs',
-          ]
-          for r in required:
-              if r not in text:
-                  raise SystemExit(f'Missing required symbol: {r}')
-
-          if 'max(15_000)' not in text and 'max(15000)' not in text:
-              text = text.replace(
-                  'prompt: z.string().trim().max(12_000).optional().default(""),',
-                  'prompt: z.string().trim().max(15_000).optional().default(""),',
-              )
-
-          out = Path('src/lib/music.functions.ts')
-          out.write_text(text)
-          print(f'Wrote {out} ({len(text)} bytes)')
-          PY
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/music.functions.ts
-          if git diff --cached --quiet; then
-            echo "No changes"
-          else
-            git commit -m "RESTORE: full music.functions.ts from zlib payload (URL validation + 15k prompt)"
-            git push origin HEAD:main
-          fi
+          echo "Disabled. Must not overwrite Music Studio or reintroduce R2 ingest."
+          exit 0

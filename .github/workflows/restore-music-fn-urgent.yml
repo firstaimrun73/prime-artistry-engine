@@ -1,64 +1,11 @@
-name: URGENT restore music.functions
-
+name: DISABLED — Music restore blocked
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/workflows/restore-music-fn-urgent.yml"
-
 jobs:
-  restore:
+  blocked:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Restore from git history (prefer size > 10KB)
+      - name: Refuse legacy Music restore
         run: |
-          set -euo pipefail
-          # Walk recent commits for a full music.functions.ts
-          FOUND=""
-          for SHA in $(git log --pretty=format:%H -n 40 -- src/lib/music.functions.ts); do
-            SIZE=$(git cat-file -s "$SHA:src/lib/music.functions.ts" 2>/dev/null || echo 0)
-            echo "try $SHA size=$SIZE"
-            if [ "$SIZE" -gt 10000 ]; then
-              git show "$SHA:src/lib/music.functions.ts" > /tmp/mf.ts
-              FOUND=$SHA
-              break
-            fi
-          done
-          if [ -z "$FOUND" ]; then
-            echo "No good revision found"
-            exit 1
-          fi
-          echo "Using $FOUND"
-          python3 - <<'PY'
-          from pathlib import Path
-          t = Path("/tmp/mf.ts").read_text()
-          t = t.replace(
-              "durationSeconds: z.number().int().min(1).max(30).optional().default(30),",
-              "durationSeconds: z.number().int().min(1).max(120).optional().default(30),",
-          )
-          t = t.replace(
-              "Music Studio requires Lite or a higher plan. Upgrade to unlock Music Studio.",
-              "Music Studio is limited on Free. Upgrade for full modes, longer tracks, and Premium quality.",
-          )
-          old = """        const json = await runFalQueue(\n          usedModel,\n          {\n            prompt: composed.stylePrompt,\n            lyrics_prompt: composed.lyricsPrompt || undefined,\n          },\n          falKey,\n          \"MiniMax\",\n        );"""
-          new = """        const json = await runFalQueue(\n          usedModel,\n          {\n            prompt: composed.stylePrompt,\n            lyrics_prompt: composed.lyricsPrompt || undefined,\n            duration: Math.min(Math.max(durationSeconds, 15), 120),\n          },\n          falKey,\n          \"MiniMax\",\n        );"""
-          if old in t:
-              t = t.replace(old, new)
-              print("minimax duration ok")
-          Path("src/lib/music.functions.ts").write_text(t)
-          print("wrote", len(t), "max120", t.count("max(120)"))
-          PY
-
-      - name: Commit
-        run: |
-          git config user.name "music-restore"
-          git config user.email "restore@motio2edit.local"
-          git add src/lib/music.functions.ts
-          git commit -m "fix(music): emergency restore music.functions + duration max 120s" || echo "no change"
-          git push
+          echo "Disabled. Must not overwrite Music Studio or reintroduce R2 ingest."
+          exit 0

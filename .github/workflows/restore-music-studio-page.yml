@@ -1,47 +1,11 @@
-name: RESTORE MusicStudioPage full UI redesign
-
+name: DISABLED — Music restore blocked
 on:
-  push:
-    paths:
-      - ".restore/music_studio/**"
-      - ".github/workflows/restore-music-studio-page.yml"
   workflow_dispatch:
-
 jobs:
-  restore:
+  blocked:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Assemble and write MusicStudioPage.tsx
+      - name: Refuse legacy Music restore
         run: |
-          set -euo pipefail
-          mkdir -p src/components/music
-          cat .restore/music_studio/part*.b64 | tr -d '\n' | base64 -d | python3 -c "
-          import sys, zlib
-          data = sys.stdin.buffer.read()
-          out = zlib.decompress(data)
-          open('src/components/music/MusicStudioPage.tsx','wb').write(out)
-          print('wrote', len(out), 'bytes')
-          "
-          grep -q "export function MusicStudioPage" src/components/music/MusicStudioPage.tsx
-          grep -q "AutoGrowTextarea" src/components/music/MusicStudioPage.tsx
-          grep -q "MusicGenerationScreen" src/components/music/MusicStudioPage.tsx
-          ! grep -q "PLACEHOLDER" src/components/music/MusicStudioPage.tsx
-          wc -l src/components/music/MusicStudioPage.tsx
-
-      - name: Commit if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/components/music/MusicStudioPage.tsx
-          if git diff --cached --quiet; then
-            echo "No change"
-          else
-            git commit -m "RESTORE: full MusicStudioPage UI redesign (auto-grow, unified media, gen screen, hierarchy)"
-            git push
-          fi
+          echo "Disabled. Must not overwrite Music Studio or reintroduce R2 ingest."
+          exit 0
