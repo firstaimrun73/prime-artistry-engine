@@ -22,6 +22,8 @@ export type MusicPlanCapabilities = {
   allowedQualityTiers: MusicQualityTier[];
   promptMaxChars: number;
   lyricsMaxChars: number;
+  /** Max duration for song / instrumental / bgm (seconds). */
+  maxTrackDurationSeconds: number;
   maxSfxDurationSeconds: number;
   maxVideoAudioDurationSeconds: number;
   maxInputVideoDurationSeconds: number;
@@ -40,6 +42,9 @@ export type MusicPlanCapabilities = {
 /** MMAudio provider hard limit — never silently exceed. */
 export const MMAUDIO_MAX_SEGMENT_SECONDS = 30;
 
+/** Product max for MiniMax song/instrumental UI target (2 minutes). */
+export const MUSIC_TRACK_MAX_SECONDS = 120;
+
 /**
  * Customer plan limit for Master Studio (business id).
  * Provider-specific limits stay in music-prompt-compose.ts.
@@ -47,12 +52,17 @@ export const MMAUDIO_MAX_SEGMENT_SECONDS = 30;
 export const MASTER_STUDIO_PROMPT_MAX_CHARS = 15_000;
 export const SERVER_LYRICS_ABUSE_CEILING = 3_500;
 
+/**
+ * Free — limited Music access (not full lockout).
+ * Standard quality only · song + instrumental · short prompts · 30s max.
+ */
 const FREE_CAPS: MusicPlanCapabilities = {
-  musicEnabled: false,
-  allowedModes: [],
-  allowedQualityTiers: [],
-  promptMaxChars: 0,
-  lyricsMaxChars: 0,
+  musicEnabled: true,
+  allowedModes: ["song", "instrumental"],
+  allowedQualityTiers: ["standard"],
+  promptMaxChars: 500,
+  lyricsMaxChars: 800,
+  maxTrackDurationSeconds: 30,
   maxSfxDurationSeconds: 0,
   maxVideoAudioDurationSeconds: 0,
   maxInputVideoDurationSeconds: 0,
@@ -63,7 +73,7 @@ const FREE_CAPS: MusicPlanCapabilities = {
   voiceoverEnabled: false,
   voicePreviewEnabled: false,
   historyEnabled: true,
-  maxConcurrentMusicJobs: 0,
+  maxConcurrentMusicJobs: 1,
   priorityQueue: false,
 };
 
@@ -73,6 +83,7 @@ const LITE_CAPS: MusicPlanCapabilities = {
   allowedQualityTiers: ["standard"],
   promptMaxChars: 2_000,
   lyricsMaxChars: 3_000,
+  maxTrackDurationSeconds: 60,
   maxSfxDurationSeconds: 30,
   maxVideoAudioDurationSeconds: 30,
   maxInputVideoDurationSeconds: 30,
@@ -91,6 +102,7 @@ const PLUS_CAPS: MusicPlanCapabilities = {
   ...LITE_CAPS,
   promptMaxChars: 4_000,
   lyricsMaxChars: 3_500,
+  maxTrackDurationSeconds: 90,
   maxConcurrentMusicJobs: 1,
   priorityQueue: false,
 };
@@ -100,6 +112,7 @@ const PRO_CAPS: MusicPlanCapabilities = {
   allowedQualityTiers: ["standard", "premium"],
   promptMaxChars: 6_000,
   lyricsMaxChars: 3_500,
+  maxTrackDurationSeconds: MUSIC_TRACK_MAX_SECONDS,
   maxConcurrentMusicJobs: 2,
   priorityQueue: true,
 };
@@ -138,10 +151,10 @@ export function assertMusicModeAllowed(
   mode: MusicMode,
 ): { ok: true } | { ok: false; reason: string } {
   if (!caps.musicEnabled) {
-    return { ok: false, reason: "Music Studio requires Lite or a higher plan. Upgrade to unlock." };
+    return { ok: false, reason: "Music Studio is not available on your plan. Upgrade to unlock." };
   }
   if (!caps.allowedModes.includes(mode)) {
-    return { ok: false, reason: `Mode "${mode}" is not available on your plan.` };
+    return { ok: false, reason: `Mode "${mode}" is not available on your plan. Upgrade for more modes.` };
   }
   return { ok: true };
 }
@@ -173,6 +186,7 @@ export function musicCapabilitiesPublicPayload(
     modes: caps.allowedModes,
     promptMaxChars: caps.promptMaxChars,
     lyricsMaxChars: caps.lyricsMaxChars,
+    maxTrackDurationSeconds: caps.maxTrackDurationSeconds,
     videoAudioReplacement: caps.replaceOriginalVideoAudio,
     maxVideoSegmentSeconds: MMAUDIO_MAX_SEGMENT_SECONDS,
     maxVideoAudioDurationSeconds: caps.maxVideoAudioDurationSeconds,
