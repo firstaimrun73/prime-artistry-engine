@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Image as ImageIcon, Video, Music, ArrowRight, Check } from "lucide-react";
+import { Image as ImageIcon, Video, Music, ArrowRight, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HomeHero } from "@/components/home/HomeHero";
 import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
@@ -39,11 +39,19 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
-  // CRITICAL: never gate the entire homepage on auth.loading.
-  // A hung/slow getSession left users on a permanent white spinner (mobile especially).
-  // Show signed-out marketing immediately; switch to signed-in shell when user is known.
+  // While auth is resolving: show a neutral spinner so signed-in users never
+  // flash the pre-login marketing homepage. After logout, loading becomes false
+  // with user=null → pre-login is shown correctly.
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading" />
+      </div>
+    );
+  }
+
   if (user) return <SignedInHome />;
   return <SignedOutHome />;
 }
