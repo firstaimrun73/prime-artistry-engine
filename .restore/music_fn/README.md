@@ -1,1 +1,1 @@
-Temporary restore payload for music.functions.ts — safe to delete after restore workflow succeeds.
+Temporary restore payload for music.functions.ts. Safe to delete after assemble workflow runs.
