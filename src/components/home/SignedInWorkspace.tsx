@@ -6,9 +6,10 @@ import { FooterAd } from "@/components/ads";
 import { SignedInStudioCards } from "@/components/SignedInStudioCards";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 import { supabase } from "@/integrations/supabase/client";
 import { isVisibleInHistory } from "@/lib/history-retention";
-import { History as HistoryIcon, Music } from "lucide-react";
+import { History as HistoryIcon, Music, Lock } from "lucide-react";
 
 type RecentGen = {
   id: string;
@@ -30,6 +31,7 @@ type RecentGen = {
 export function SignedInWorkspace() {
   const { user, profile } = useAuth();
   const isAdmin = isAdminEmail(profile?.email);
+  const historyUnlocked = isAdmin || isPaidPlan(profile?.plan);
   const [recent, setRecent] = useState<RecentGen[]>([]);
   const plan = (profile?.plan ?? "free") as string;
   const planLabel =
@@ -188,13 +190,9 @@ export function SignedInWorkspace() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-              {recent.map((g) => (
-                <Link
-                  key={g.id}
-                  to="/history"
-                  className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-card"
-                >
-                  {g.output_url && g.type !== "music" ? (
+              {recent.map((g) => {
+                const media =
+                  g.output_url && g.type !== "music" ? (
                     g.type === "video" ? (
                       <video
                         src={g.output_url}
@@ -214,9 +212,33 @@ export function SignedInWorkspace() {
                     <div className="flex h-full w-full items-center justify-center bg-muted">
                       <Music className="h-6 w-6 text-muted-foreground" />
                     </div>
-                  )}
-                </Link>
-              ))}
+                  );
+                if (historyUnlocked) {
+                  return (
+                    <Link
+                      key={g.id}
+                      to="/history"
+                      className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-card"
+                    >
+                      {media}
+                    </Link>
+                  );
+                }
+                return (
+                  <div
+                    key={g.id}
+                    className="relative aspect-square overflow-hidden rounded-lg border border-border bg-card opacity-90"
+                  >
+                    {media}
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 bg-background/55 backdrop-blur-[2px]">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card/90 shadow-sm">
+                        <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <span className="text-[9px] font-semibold text-muted-foreground">Locked</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
