@@ -205,6 +205,7 @@ const dict: TranslationDict = {
   "dashboard.myWorkspace": "My workspace",
 
   "pricing.title": "Pricing",
+  "pricing.lead": "Simple pricing for Motio 2 edit. Start free — upgrade for video, more credits, and watermark-free downloads.",
 
   "music.title": "AI Music",
   "music.generate": "Generate music",
