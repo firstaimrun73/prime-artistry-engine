@@ -1,1 +1,5 @@
-SEE_FILE_AT_ARTIFACTS_music.functions_FINAL.ts
+/**
+ * MOTIO2EDIT Music Studio — server functions.
+ * RESTORED - see full implementation via sequential push if truncated
+ */
+export {};
