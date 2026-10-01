@@ -1,156 +1,21 @@
-name: Patch music R2 ingest
+name: Guard music storage architecture
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
+      - "src/lib/music.functions.ts"
       - ".github/workflows/patch-music-r2-ingest.yml"
 jobs:
-  patch:
+  guard:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Restore music.functions and apply R2 ingest
+      - name: Ensure Music does not re-ingest provider media to R2
         run: |
           set -euo pipefail
-          # Restore last good music.functions if corrupted
-          SIZE=$(wc -c < src/lib/music.functions.ts || echo 0)
-          if [ "$SIZE" -lt 10000 ] || grep -q 'SEE_FILE' src/lib/music.functions.ts; then
-            echo "Restoring music.functions.ts from d0dd196c"
-            git show d0dd196c6271095696e3c8afaf33b70fcbb8977b:src/lib/music.functions.ts > src/lib/music.functions.ts
+          if grep -n "ingestProviderMediaToUserR2" src/lib/music.functions.ts; then
+            echo "ERROR: music.functions.ts must not call ingestProviderMediaToUserR2"
+            exit 1
           fi
-          python3 << 'PY'
-          from pathlib import Path
-          p = Path("src/lib/music.functions.ts")
-          t = p.read_text()
-          if "ingestProviderMediaToUserR2" in t:
-              print("already patched")
-          else:
-              marker = '''    } catch (err) {
-      const raw = err instanceof Error ? err.message : "Generation failed.";
-      // Credits not charged yet — safe failure
-      throw new Error(`Music generation failed. Credits not charged. (${raw})`);
-    }
-
-    // Charge only after successful provider output
-'''
-              insert = '''    } catch (err) {
-      const raw = err instanceof Error ? err.message : "Generation failed.";
-      // Credits not charged yet — safe failure
-      throw new Error(`Music generation failed. Credits not charged. (${raw})`);
-    }
-
-    // Store provider result into private user R2 (stable key + signed delivery)
-    let musicR2Key: string | null = null;
-    try {
-      const { ingestProviderMediaToUserR2 } = await import("@/lib/user-media.server");
-      const ingested = await ingestProviderMediaToUserR2({
-        userId,
-        sourceUrl: outputUrl,
-        kind: outputType === "video" ? "video" : "music",
-        generationId: data.idempotencyKey ?? null,
-      });
-      if (ingested) {
-        musicR2Key = ingested.objectKey;
-        outputUrl = ingested.deliveryUrl;
-        if (videoUrl && outputType === "video") {
-          videoUrl = ingested.deliveryUrl;
-        }
-      }
-    } catch (storeErr) {
-      console.warn("[music] private R2 ingest skipped:", storeErr);
-    }
-
-    // Charge only after successful provider output
-'''
-              if marker not in t:
-                  raise SystemExit("music marker not found")
-              t = t.replace(marker, insert, 1)
-              old_ins = '''        output_url: outputUrl,
-        status: "success",
-        retained_as_history: retain,
-        metadata,
-'''
-              new_ins = '''        output_url: outputUrl,
-        status: "success",
-        retained_as_history: retain,
-        r2_object_key: musicR2Key,
-        storage_provider: musicR2Key ? "r2" : null,
-        metadata,
-'''
-              if old_ins in t:
-                  t = t.replace(old_ins, new_ins, 1)
-              t = t.replace(
-                  "historyPayload.generation_id = generationId;",
-                  "historyPayload.generation_id = generationId;\n    if (musicR2Key) historyPayload.r2_object_key = musicR2Key;",
-                  1,
-              )
-              p.write_text(t)
-              print("patched", len(t))
-          # Also restore generate.functions if stub
-          g = Path("src/lib/generate.functions.ts")
-          gs = g.read_text() if g.exists() else ""
-          if len(gs) < 10000 or "restore incomplete" in gs or "PLACEHOLDER" in gs or "SEE_FILE" in gs:
-              print("Restoring generate.functions.ts from 7262a1179fdd")
-              import subprocess
-              subprocess.check_call(["git", "show", "7262a1179fdd:src/lib/generate.functions.ts"], stdout=open("src/lib/generate.functions.ts", "w"))
-              t2 = Path("src/lib/generate.functions.ts").read_text()
-              if "finalizedR2Key" not in t2:
-                  t2 = t2.replace(
-                      "let outputUrl: string | null = null;",
-                      "let outputUrl: string | null = null;\n    let finalizedR2Key: string | null = null;",
-                      1,
-                  )
-                  t2 = t2.replace(
-                      '''        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
-          outputUrl = fin.finalUrl;
-        }
-      } catch (wmErr) {
-        // Fail closed when a stamp was required (free plan, or paid keepWatermark=true).''',
-                      '''        if (fin.finalUrl && fin.finalUrl.startsWith("https://")) {
-          outputUrl = fin.finalUrl;
-        }
-        if (fin.storagePath && typeof fin.storagePath === "string") {
-          finalizedR2Key = fin.storagePath.replace(/^\\//, "");
-        }
-      } catch (wmErr) {
-        // Fail closed when a stamp was required (free plan, or paid keepWatermark=true).''',
-                      1,
-                  )
-                  t2 = t2.replace(
-                      '''      await persistGenerationHistory({
-        supabaseAdmin,
-        userId,
-        type: data.type === "video" ? "video" : "image",
-        prompt: data.prompt,
-        input_url: data.imageUrl ?? null,
-        output_url: outputUrl,
-        status: "success",
-        metadata: meta,
-      });''',
-                      '''      await persistGenerationHistory({
-        supabaseAdmin,
-        userId,
-        type: data.type === "video" ? "video" : "image",
-        prompt: data.prompt,
-        input_url: data.imageUrl ?? null,
-        output_url: outputUrl,
-        status: "success",
-        metadata: meta,
-        r2ObjectKey: finalizedR2Key,
-      });''',
-                      1,
-                  )
-                  Path("src/lib/generate.functions.ts").write_text(t2)
-              print("generate restored", len(Path("src/lib/generate.functions.ts").read_text()))
-          PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/music.functions.ts src/lib/generate.functions.ts
-          git diff --cached --quiet && echo "no changes" && exit 0
-          git commit -m "fix(media): restore generate.functions + music private R2 ingest"
-          git push
+          echo "OK: no Music provider-media R2 ingest"

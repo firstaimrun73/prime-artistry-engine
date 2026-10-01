@@ -1,4 +1,4 @@
-import { Music, Waves, Mic2, Sparkles } from "lucide-react";
+import { Music, Waves, Mic2, Sparkles, Film, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MusicMode } from "@/lib/music.functions";
 
@@ -24,6 +24,13 @@ const MODES: {
     gradient: "from-violet-500/90 to-purple-600/90",
   },
   {
+    id: "bgm",
+    label: "BGM",
+    hint: "Background score",
+    icon: Radio,
+    gradient: "from-teal-500/90 to-emerald-600/90",
+  },
+  {
     id: "voiceover",
     label: "AI Voice",
     hint: "Script → speech",
@@ -37,27 +44,39 @@ const MODES: {
     icon: Sparkles,
     gradient: "from-amber-500/90 to-orange-600/90",
   },
+  {
+    id: "video_music",
+    label: "Video Music",
+    hint: "Video soundtrack",
+    icon: Film,
+    gradient: "from-fuchsia-500/90 to-pink-600/90",
+  },
 ];
 
 export function MusicModeCards({
   mode,
   onChange,
+  allowedModes,
 }: {
   mode: MusicMode;
   onChange: (m: MusicMode) => void;
+  allowedModes?: MusicMode[] | null;
 }) {
   return (
-    <div className="grid w-full grid-cols-2 gap-2 md:grid-cols-4 md:gap-2.5">
+    <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 md:gap-2.5">
       {MODES.map((m) => {
-        const active = mode === m.id;
+        const locked = Array.isArray(allowedModes) && allowedModes.length > 0 && !allowedModes.includes(m.id);
+        const active = mode === m.id && !locked;
         const Icon = m.icon;
         return (
           <button
             key={m.id}
             type="button"
-            onClick={() => onChange(m.id)}
+            disabled={locked}
+            onClick={() => !locked && onChange(m.id)}
             className={cn(
               "group relative min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all",
+              locked && "cursor-not-allowed opacity-45",
               active
                 ? "border-transparent shadow-md shadow-orange-500/15 ring-2 ring-orange-500/35"
                 : "border-border/60 bg-card hover:border-orange-500/35",
@@ -94,7 +113,7 @@ export function MusicModeCards({
                     active ? "text-white/80" : "text-muted-foreground",
                   )}
                 >
-                  {m.hint}
+                  {locked ? "Upgrade" : m.hint}
                 </p>
               </div>
             </div>
