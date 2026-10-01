@@ -1,1 +1,317 @@
-LOAD_FROM_ARTIFACT
+// Checkout-side currency (what the payment backends actually charge in).
+// Razorpay handles INR; NOWPayments crypto is priced in USD/EUR.
+export type Currency = "USD" | "EUR" | "INR";
+export type PaymentMethod = "card" | "crypto" | "paypal";
+
+export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
+  { id: "card", label: "Credit / Debit Card" },
+  { id: "crypto", label: "Crypto" },
+];
+
+export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
+  INR: ["card", "crypto"],
+  USD: ["card", "crypto"],
+  EUR: ["card", "crypto"],
+};
+
+export type CardProvider = "paypal" | "razorpay";
+export const CARD_PROVIDERS: { id: CardProvider; label: string; note: string }[] = [
+  { id: "paypal", label: "PayPal", note: "Pay with PayPal or any card via PayPal (USD)" },
+  { id: "razorpay", label: "Razorpay", note: "Credit / Debit card via Razorpay (INR)" },
+];
+
+export const CURRENCY_SYMBOL: Record<Currency, string> = {
+  USD: "$",
+  EUR: "€",
+  INR: "₹",
+};
+
+/**
+ * Internal plan ids stored in profiles.plan / payments.
+ * User-facing names may differ (e.g. id "business" displays as "Master Studio").
+ * Do not rename the "business" id without a data migration for existing subscribers.
+ */
+export type PlanId = "free" | "lite" | "plus" | "pro" | "studio" | "business";
+
+export const TRANSACTION_FEE: Record<Currency, number> = {
+  USD: 1,
+  EUR: 1,
+  INR: 85,
+};
+
+// ── Display / marketing credit hints only (NOT server debit authority) ───
+// FINAL ECONOMICS TO BE DESIGNED AFTER CROSS-REVIEW BY CHATGPT + GROK + CLAUDE.
+/** @deprecated Prefer @/lib/billing quote lifecycle for server debits. */
+export const CREDIT_COST = {
+  image: 25,
+  video: 125,
+  music: 100,
+  music_lite: 50,
+  video_enhance: 200,
+} as const;
+
+/** High-balance sentinel used only for display helpers (not an unlimited product promise). */
+export const UNLIMITED_CREDITS = 9_999_999;
+
+/** Free signup bonus — MUST match public.handle_new_user() in Supabase. */
+export const FREE_SIGNUP_CREDITS = 40;
+
+export const CREDIT_TOPUP = {
+  id: "credit-topup-499",
+  name: "Credit Top-up",
+  price: 4.99,
+  credits: 320,
+  type: "one_time" as const,
+  description: "320 AI credits, valid forever, works with any plan.",
+  bullets: [
+    "320 AI credits",
+    "Valid forever (no expiry)",
+    "Works with any plan",
+    "≈ 12 image edits at 25 credits each",
+    "Can be purchased multiple times",
+  ],
+} as const;
+
+export function creditsLabel(credits: number): string {
+  return credits >= UNLIMITED_CREDITS ? "Unlimited" : String(credits);
+}
+
+export function estimatedGenerations(credits: number) {
+  return {
+    images: Math.floor(credits / CREDIT_COST.image),
+    videos: Math.floor(credits / CREDIT_COST.video),
+    music: Math.floor(credits / CREDIT_COST.music),
+  };
+}
+
+export type GenerationType = keyof typeof CREDIT_COST;
+
+export type Plan = {
+  id: PlanId;
+  name: string;
+  credits: number;
+  video: boolean;
+  priority: boolean;
+  bestQuality?: boolean;
+  price: Record<Currency, number>;
+  features: string[];
+};
+
+export const PLANS: Plan[] = [
+  {
+    id: "free",
+    name: "Free",
+    credits: 40,
+    video: false,
+    priority: false,
+    price: { USD: 0, EUR: 0, INR: 0 },
+    features: [
+      "40 free credits on signup",
+      "AI image generation and editing",
+      "Circle to Remove included",
+      "Single image per edit",
+      "Watermark on outputs",
+      "Video and music require upgrade",
+      "Private History — up to 6 hours",
+      "Community support",
+    ],
+  },
+  {
+    id: "lite",
+    name: "Lite",
+    credits: 350,
+    video: true,
+    priority: false,
+    price: { USD: 4.99, EUR: 4.49, INR: 399 },
+    features: [
+      "350 credits / month",
+      "Standard Image Studio",
+      "Up to 5 reference images",
+      "Prompt: 2,000 characters",
+      "≈ 14 image edits or ≈ 2–3 videos",
+      "720p video · music included",
+      "Circle 2edit · no watermark",
+      "Private History",
+      "Standard queue · email support",
+      "Watermark-free downloads",
+    ],
+  },
+  {
+    id: "plus",
+    name: "Plus",
+    credits: 750,
+    video: true,
+    priority: false,
+    price: { USD: 9.99, EUR: 8.99, INR: 849 },
+    features: [
+      "750 monthly credits",
+      "Standard Image Studio",
+      "Up to 10 reference images",
+      "Prompt: 4,000 characters",
+      "HD AI image generation",
+      "720p AI video generation",
+      "Music generation included",
+      "Faster processing",
+      "Private History",
+      "JPG and PNG downloads",
+      "Watermark-free downloads",
+    ],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    credits: 2500,
+    video: true,
+    priority: true,
+    price: { USD: 29.99, EUR: 27.99, INR: 2499 },
+    features: [
+      "2,500 credits / month",
+      "Standard + Premium Image Studio",
+      "Up to 10 Premium references",
+      "Prompt: 6,000 characters",
+      "≈ 100 images or ≈ 20 videos",
+      "1080p video · music included",
+      "Priority queue · no watermark",
+      "Private History",
+      "Priority support",
+      "Watermark-free downloads",
+    ],
+  },
+  {
+    id: "studio",
+    name: "Studio",
+    credits: 5000,
+    video: true,
+    priority: true,
+    bestQuality: true,
+    price: { USD: 55, EUR: 50.99, INR: 4599 },
+    features: [
+      "5,000 credits / month",
+      "Standard + Premium + Ultra AI",
+      "Prompt: 6,000 characters",
+      "Ultra AI available",
+      "IMAX locked · 8K Max locked · Custom locked",
+      "≈ 200 images or ≈ 40 videos",
+      "4K video · full music studio",
+      "Fastest queue",
+      "Private History",
+      "Premium support",
+      "Watermark-free downloads",
+    ],
+  },
+  {
+    id: "business",
+    name: "Master Studio",
+    credits: 10000,
+    video: true,
+    priority: true,
+    bestQuality: true,
+    price: { USD: 110, EUR: 99.99, INR: 9199 },
+    features: [
+      "10,000 credits / month",
+      "Standard + Premium + Ultra AI",
+      "Prompt: Unlimited*",
+      "IMAX, 8K Max, Custom aspects",
+      "Advanced Image, Video and Music studios",
+      "Latest AI features and editor improvements",
+      "Upcoming AI feature updates",
+      "Priority access to new tools as they ship",
+      "4K Ultra image and video generation",
+      "No ads",
+      "No watermark",
+      "VIP Master Studio badge and priority support",
+      "Private History",
+      "Watermark-free downloads",
+    ],
+  },
+];
+
+/** Plans shown on the public pricing page (backend ids preserved for subscribers). */
+export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "plus", "pro", "studio", "business"];
+
+export const PLAN_CREDITS: Record<PlanId, number> = {
+  free: 40,
+  lite: 350,
+  plus: 750,
+  pro: 2500,
+  studio: 5000,
+  business: 10000,
+};
+
+export function getPlan(id: PlanId): Plan {
+  return PLANS.find((p) => p.id === id) ?? PLANS[0];
+}
+
+export function findPlan(id: string | undefined | null): Plan | undefined {
+  if (!id) return undefined;
+  return PLANS.find((p) => p.id === id);
+}
+
+export type DisplayCurrency =
+  | "USD"
+  | "EUR"
+  | "INR"
+  | "GBP"
+  | "AED"
+  | "AUD"
+  | "CAD"
+  | "JPY"
+  | "SGD";
+
+export const DISPLAY_CURRENCIES: { code: DisplayCurrency; label: string }[] = [
+  { code: "USD", label: "USD ($)" },
+  { code: "EUR", label: "EUR (€)" },
+  { code: "INR", label: "INR (₹)" },
+  { code: "GBP", label: "GBP (£)" },
+  { code: "AED", label: "AED" },
+  { code: "AUD", label: "AUD (A$)" },
+  { code: "CAD", label: "CAD (C$)" },
+  { code: "JPY", label: "JPY (¥)" },
+  { code: "SGD", label: "SGD (S$)" },
+];
+
+export function currencyForCountry(country: string | null | undefined): DisplayCurrency {
+  const c = (country || "").toUpperCase();
+  if (c === "IN") return "INR";
+  if (c === "GB" || c === "UK") return "GBP";
+  if (c === "AE") return "AED";
+  if (c === "AU") return "AUD";
+  if (c === "CA") return "CAD";
+  if (c === "JP") return "JPY";
+  if (c === "SG") return "SGD";
+  if (["DE", "FR", "IT", "ES", "NL", "BE", "AT", "IE", "PT", "FI", "GR"].includes(c)) return "EUR";
+  return "USD";
+}
+
+export function toCheckoutCurrency(dc: DisplayCurrency): Currency {
+  if (dc === "EUR") return "EUR";
+  if (dc === "INR") return "INR";
+  return "USD";
+}
+
+export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, string>> = {
+  free: {
+    USD: "$0", INR: "₹0", GBP: "£0", EUR: "€0", AED: "0 AED",
+    AUD: "A$0", CAD: "C$0", JPY: "¥0", SGD: "S$0",
+  },
+  lite: {
+    USD: "$4.99", INR: "₹399", GBP: "£3.99", EUR: "€4.49", AED: "18 AED",
+    AUD: "A$7.49", CAD: "C$6.49", JPY: "¥749", SGD: "S$6.49",
+  },
+  plus: {
+    USD: "$9.99", INR: "₹849", GBP: "£7.99", EUR: "€8.99", AED: "36 AED",
+    AUD: "A$14.99", CAD: "C$12.99", JPY: "¥1,499", SGD: "S$12.99",
+  },
+  pro: {
+    USD: "$29.99", INR: "₹2,499", GBP: "£23.99", EUR: "€27.99", AED: "110 AED",
+    AUD: "A$44.99", CAD: "C$39.99", JPY: "¥4,499", SGD: "S$39.99",
+  },
+  studio: {
+    USD: "$55", INR: "₹4,599", GBP: "£44.99", EUR: "€50.99", AED: "201 AED",
+    AUD: "A$82.99", CAD: "C$74.99", JPY: "¥8,299", SGD: "S$74.99",
+  },
+  business: {
+    USD: "$110", INR: "₹9,199", GBP: "£89.99", EUR: "€99.99", AED: "403 AED",
+    AUD: "A$164.99", CAD: "C$149.99", JPY: "¥16,499", SGD: "S$144.99",
+  },
+};
