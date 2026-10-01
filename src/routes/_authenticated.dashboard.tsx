@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { getPlan, PLAN_CREDITS, CREDIT_COST } from "@/lib/plans";
+import { getPlan, PLAN_CREDITS } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
@@ -23,16 +23,11 @@ import {
   ArrowRight,
   BookOpen,
   Lock,
+  Settings,
 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import {
-  loadHistoryPrefs,
-  saveHistoryPrefs,
   isVisibleInHistory,
-  type HistoryPrefs,
-  DEFAULT_HISTORY_PREFS,
 } from "@/lib/history-retention";
-import { toast } from "sonner";
 import { isPaidPlan } from "@/lib/policy";
 import { isAdminEmail } from "@/lib/admin-config";
 
@@ -68,12 +63,9 @@ export function Dashboard() {
   const { t } = useI18n();
   const [gens, setGens] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [historyPrefs, setHistoryPrefs] = useState<HistoryPrefs>(DEFAULT_HISTORY_PREFS);
-  const [historySaving, setHistorySaving] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    loadHistoryPrefs(user.id).then(setHistoryPrefs);
 
     void (async () => {
       // Prefer full retention columns so Profile Recent Projects matches History rules.
@@ -116,16 +108,6 @@ export function Dashboard() {
     })();
   }, [user]);
 
-  const toggleHistorySave = async (value: boolean) => {
-    if (!user) return;
-    const next = { ...historyPrefs, history_enabled: value };
-    setHistoryPrefs(next);
-    setHistorySaving(true);
-    const res = await saveHistoryPrefs(user.id, next);
-    setHistorySaving(false);
-    toast.success(value ? "History Save on." : "History Save off.");
-  };
-
   if (!profile) return null;
   const historyUnlocked = isPaidPlan(profile.plan) || isAdminEmail(profile.email);
   const plan = getPlan(profile.plan);
@@ -135,15 +117,8 @@ export function Dashboard() {
   const videos = gens.filter((g) => g.type === "video").length;
   const musicCount = gens.filter((g) => g.type === "music").length;
 
-  const shortcuts = [
-    { to: "/editor" as const, label: t("studio.openEditor"), primary: true },
-    { to: "/studio/image" as const, label: t("studio.image") },
-    { to: "/studio/video" as const, label: t("studio.video") },
-    { to: "/music" as const, label: t("studio.music") },
-    { to: "/history" as const, label: t("nav.history") },
-  ];
-
   const resources = [
+    { to: "/settings" as const, icon: Settings, title: "Settings", body: "Theme, language, avatar, logout & preferences" },
     { to: "/about" as const, icon: BookOpen, title: "About Product", body: "Product overview — studios, tools, credits, and how editing works" },
     { to: "/pricing" as const, icon: Crown, title: t("nav.pricing"), body: "Plans and credits" },
     { to: "/faq" as const, icon: HelpCircle, title: "FAQ", body: "Common questions" },
@@ -196,7 +171,7 @@ export function Dashboard() {
           <p className="mt-3 text-xs text-muted-foreground">{t("settings.creditsRemaining")}</p>
           <p className="mt-1 text-2xl font-extrabold">{profile.credits.toLocaleString()}</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Image {CREDIT_COST.image} · Video {CREDIT_COST.video} · Music {CREDIT_COST.music}
+            Credits available across Image · Video · Music
           </p>
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
@@ -226,32 +201,6 @@ export function Dashboard() {
           </p>
         </div>
       </div>
-
-      <section className="mt-8">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Workspace</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {shortcuts.map((s) => (
-            <Button key={s.to} asChild size="sm" variant={s.primary ? "default" : "outline"}>
-              <Link to={s.to}>{s.label}</Link>
-            </Button>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-8 rounded-xl border border-border bg-card px-4 py-3 sm:px-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">History Save</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Save new creations to History.</p>
-          </div>
-          <Switch
-            checked={historyPrefs.history_enabled}
-            disabled={historySaving}
-            onCheckedChange={toggleHistorySave}
-            aria-label="History Save"
-          />
-        </div>
-      </section>
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
