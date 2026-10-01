@@ -18,9 +18,9 @@ import {
   type VideoAudioMode,
 } from "@/lib/music/music-plan-capabilities";
 
-export const MUSIC_PRICING_VERSION = "music-v2026-09-29";
+export const MUSIC_PRICING_VERSION = "music-v2026-10-01";
 
-/** Product floors (customer credits). */
+/** Product floors (customer credits) — flat per track; duration does not scale song/instrumental. */
 const FLOOR = {
   song_standard: 50,
   song_premium: 100,
@@ -54,7 +54,6 @@ export type MusicQuoteResult = {
   qualityTier: MusicQualityTier;
   provider: string;
   modelId: string;
-  /** Safe customer-facing label — never raw fal path in UI. */
   modelLabel: string;
   providerCostUsd: number;
   customerCredits: number;
@@ -99,7 +98,6 @@ function registryFor(mode: MusicMode, quality: MusicQualityTier, hasVideo: boole
     if (!e?.enabled) throw new Error("SFX pricing not configured.");
     return e;
   }
-  // song | instrumental | bgm
   if (quality === "premium") {
     const e = getRegistryEntry("music_minimax_v26");
     if (e?.enabled) return e;
@@ -130,9 +128,6 @@ function floorFor(mode: MusicMode, quality: MusicQualityTier): number {
   return quality === "premium" ? FLOOR.song_premium : FLOOR.song_standard;
 }
 
-/**
- * Single credit calculator for estimate + generation.
- */
 export function quoteMusicGeneration(input: MusicQuoteInput): MusicQuoteResult {
   const plan = input.plan;
   const caps = getMusicPlanCapabilities(plan);
@@ -173,7 +168,6 @@ export function quoteMusicGeneration(input: MusicQuoteInput): MusicQuoteResult {
   const modeOk = assertMusicModeAllowed(caps, mode === "video_music" ? "video_music" : input.mode);
   if (!modeOk.ok) return denied(modeOk.reason);
 
-  // Premium only when plan allows
   const qOk = assertMusicQualityAllowed(caps, quality);
   if (!qOk.ok) return denied(qOk.reason);
 
@@ -185,10 +179,15 @@ export function quoteMusicGeneration(input: MusicQuoteInput): MusicQuoteResult {
   }
 
   const durationRequested = Math.max(1, Math.round(input.durationSeconds ?? 30));
-
-  // Duration caps — never silently truncate past provider/plan limits
   let durationBillable = durationRequested;
   let segments = 1;
+
+  if (mode === "song" || mode === "instrumental" || mode === "bgm") {
+    if (durationRequested > caps.maxTrackDurationSeconds) {
+      return denied(`Track maximum is ${caps.maxTrackDurationSeconds}s on your plan.`);
+    }
+    durationBillable = durationRequested;
+  }
 
   if (mode === "sfx") {
     if (durationRequested > caps.maxSfxDurationSeconds) {
@@ -207,17 +206,14 @@ export function quoteMusicGeneration(input: MusicQuoteInput): MusicQuoteResult {
           `please use a clip ≤ ${caps.maxVideoAudioDurationSeconds}s.`,
       );
     }
-    // Bill full requested duration in ≤30s segments for cost; generation enforces segment pipeline.
     segments = Math.ceil(durationRequested / MMAUDIO_MAX_SEGMENT_SECONDS);
     durationBillable = durationRequested;
   }
 
   const entry = registryFor(mode, quality, mode === "video_music");
   const providerEst = estimateCredits(entry, {
-    durationSeconds:
-      entry.billingUnit === "per_second" ? durationBillable : undefined,
-    characters:
-      mode === "voiceover" ? Math.max(1, input.characters ?? 1) : undefined,
+    durationSeconds: entry.billingUnit === "per_second" ? durationBillable : undefined,
+    characters: mode === "voiceover" ? Math.max(1, input.characters ?? 1) : undefined,
   });
 
   let base = Math.max(floorFor(mode, quality), providerEst.credits);
@@ -262,7 +258,6 @@ export function quoteMusicGeneration(input: MusicQuoteInput): MusicQuoteResult {
   };
 }
 
-/** Backward-compatible wrapper used by older call sites. */
 export function estimateMusicCustomerCredits(input: {
   mode: "song" | "instrumental" | "voiceover" | "sfx" | "bgm" | "video_music";
   durationSeconds: number;
