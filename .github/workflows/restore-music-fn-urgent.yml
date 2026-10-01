@@ -1,11 +1,12 @@
-name: DISABLED — Music restore blocked
+name: restore-music-fn-urgent
+# NEUTRALIZED (2026-10-01): obsolete Music functions restore.
 on:
   workflow_dispatch:
 jobs:
-  blocked:
+  neutralized:
     runs-on: ubuntu-latest
     steps:
-      - name: Refuse legacy Music restore
+      - name: Refuse obsolete Music restore
         run: |
-          echo "Disabled. Must not overwrite Music Studio or reintroduce R2 ingest."
-          exit 0
+          echo "Neutralized."
+          exit 1

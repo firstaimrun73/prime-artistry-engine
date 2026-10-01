@@ -1,11 +1,12 @@
-name: DISABLED — Music restore blocked
+name: restore-music-fn-duration120
+# NEUTRALIZED (2026-10-01): obsolete duration restore path.
 on:
   workflow_dispatch:
 jobs:
-  blocked:
+  neutralized:
     runs-on: ubuntu-latest
     steps:
-      - name: Refuse legacy Music restore
+      - name: Refuse obsolete Music restore
         run: |
-          echo "Disabled. Must not overwrite Music Studio or reintroduce R2 ingest."
-          exit 0
+          echo "Neutralized: Music 3 duration is wired in registry/functions."
+          exit 1

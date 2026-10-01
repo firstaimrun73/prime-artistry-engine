@@ -1,43 +1,12 @@
-name: Force restore media generation backends
+name: force-restore-media-backends
+# NEUTRALIZED (2026-10-01): obsolete Music R2 restore path.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/force-restore-media-backends.yml"
-      - "scripts/apply-media-r2-patches.py"
 jobs:
-  restore:
+  neutralized:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Restore generate backend only (Music keeps provider-URL architecture)
+      - name: Refuse obsolete Music restore
         run: |
-          set -euo pipefail
-          if [ ! -f src/lib/generate.functions.ts ] || [ "$(wc -c < src/lib/generate.functions.ts)" -lt 10000 ] || grep -q "restore incomplete" src/lib/generate.functions.ts; then
-            git show 7262a1179fdd:src/lib/generate.functions.ts > /tmp/generate.functions.ts
-            python3 scripts/apply-media-r2-patches.py /tmp/generate.functions.ts src/lib/music.functions.ts || true
-            cp /tmp/generate.functions.ts src/lib/generate.functions.ts
-          fi
-          if grep -q "ingestProviderMediaToUserR2" src/lib/music.functions.ts; then
-            echo "Music must not call ingestProviderMediaToUserR2"
-            exit 1
-          fi
-          grep -q generateMusic src/lib/music.functions.ts
-          grep -q executeStandardImage src/lib/generate.functions.ts
-          ! grep -q "restore incomplete" src/lib/generate.functions.ts
-          ! grep -q SEE_FILE src/lib/music.functions.ts
-          echo "RESTORE_OK"
-      - name: Commit
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/generate.functions.ts src/lib/music.functions.ts scripts/apply-media-r2-patches.py || true
-          if git diff --cached --quiet; then echo no-changes; exit 0; fi
-          git commit -m "chore: restore generate backend; keep Music provider-URL storage"
-          git push
+          echo "Neutralized: must not restore R2 ingest for Music."
+          exit 1
