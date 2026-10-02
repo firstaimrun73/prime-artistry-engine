@@ -12,7 +12,9 @@ export function VideoPromptBar({
   onChange,
   disabled,
   placeholder,
-  maxLength = STANDARD_VIDEO_PROMPT_MAX,
+  maxLength,
+  maxChars,
+  durationSec: _durationSec,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -20,16 +22,19 @@ export function VideoPromptBar({
   placeholder?: string;
   /** Enforced on input; server also validates. */
   maxLength?: number;
+  /** Live page alias for maxLength */
+  maxChars?: number;
+  durationSec?: number;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const limit = Math.max(1, maxLength);
+  const limit = Math.max(1, maxChars ?? maxLength ?? STANDARD_VIDEO_PROMPT_MAX);
 
   return (
     <div className="space-y-2">
       <div
         className={cn(
-          "relative rounded-2xl border border-border/70 bg-background/80",
-          "focus-within:ring-2 focus-within:ring-red-500/30 dark:bg-background/60",
+          "relative rounded-2xl border border-white/70 bg-white/55 shadow-sm backdrop-blur-xl ring-1 ring-black/5",
+          "focus-within:ring-2 focus-within:ring-[#F43F5E]/30",
         )}
       >
         <textarea
@@ -41,17 +46,14 @@ export function VideoPromptBar({
           onChange={(e) => onChange(e.target.value.slice(0, limit))}
           placeholder={placeholder ?? "Describe what you want to create…"}
           className={cn(
-            "w-full resize-y rounded-2xl bg-transparent px-3 py-3 pr-20 text-sm outline-none",
-            "disabled:opacity-60 placeholder:text-muted-foreground/70",
-            /* Thin, theme-aware scrollbar — kills the silver OS bar look */
-            "scrollbar-thin scrollbar-track-transparent",
+            "w-full resize-y rounded-2xl bg-transparent px-3 py-3 pr-20 text-sm text-slate-900 outline-none",
+            "disabled:opacity-60 placeholder:text-slate-400",
+            /* Thin scrollbar — no silver OS bar */
             "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5",
             "[&::-webkit-scrollbar-track]:bg-transparent",
             "[&::-webkit-scrollbar-thumb]:rounded-full",
-            "[&::-webkit-scrollbar-thumb]:bg-muted-foreground/25",
-            "hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40",
-            "dark:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30",
-            "dark:hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50",
+            "[&::-webkit-scrollbar-thumb]:bg-slate-300/70",
+            "hover:[&::-webkit-scrollbar-thumb]:bg-slate-400/80",
           )}
         />
         <div className="absolute bottom-2 right-2 flex items-center gap-1">
@@ -60,8 +62,8 @@ export function VideoPromptBar({
               type="button"
               onClick={() => onChange("")}
               className={cn(
-                "rounded-full p-1.5 text-muted-foreground transition-all duration-150",
-                "hover:bg-muted hover:text-foreground active:scale-90",
+                "rounded-full p-1.5 text-slate-400 transition-all duration-150",
+                "hover:bg-slate-100 hover:text-slate-700 active:scale-90",
               )}
               aria-label="Clear prompt"
             >
@@ -77,7 +79,7 @@ export function VideoPromptBar({
           />
         </div>
       </div>
-      <p className="text-right text-[11px] tabular-nums text-muted-foreground">
+      <p className="text-right text-[11px] tabular-nums text-slate-500">
         {value.length}/{limit}
       </p>
     </div>

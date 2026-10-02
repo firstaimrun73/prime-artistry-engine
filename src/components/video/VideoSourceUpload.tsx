@@ -2,36 +2,42 @@ import { useRef } from "react";
 import { Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/** Accepts live page props (file, previewUrl) and legacy (preview). */
 export function VideoSourceUpload({
   mode,
   preview,
+  previewUrl,
+  file: _file,
   onPick,
   onClear,
   disabled,
 }: {
   mode: "image" | "video";
-  preview: string | null;
+  preview?: string | null;
+  previewUrl?: string | null;
+  file?: File | null;
   onPick: (file: File) => void;
   onClear: () => void;
   disabled?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const accept = mode === "image" ? "image/*" : "video/*";
+  const src = previewUrl ?? preview ?? null;
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-card/80 p-4 dark:bg-card/60">
+    <div className="rounded-2xl border border-white/70 bg-white/55 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/5">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           {mode === "image" ? "Source image" : "Source video"}
         </p>
-        {preview && (
+        {src && (
           <button
             type="button"
             disabled={disabled}
             onClick={onClear}
             className={cn(
-              "rounded-full p-1.5 text-muted-foreground transition-all duration-150",
-              "hover:bg-muted hover:text-foreground active:scale-90",
+              "rounded-full p-1.5 text-slate-400 transition-all duration-150",
+              "hover:bg-slate-100 hover:text-slate-700 active:scale-90",
               disabled && "pointer-events-none opacity-50",
             )}
             aria-label="Clear source"
@@ -51,12 +57,12 @@ export function VideoSourceUpload({
           if (f) onPick(f);
         }}
       />
-      {preview ? (
-        <div className="overflow-hidden rounded-xl border border-border bg-black/5 dark:bg-black/20">
+      {src ? (
+        <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-black/5">
           {mode === "video" ? (
-            <video src={preview} controls className="mx-auto max-h-52 w-full object-contain" />
+            <video src={src} controls className="mx-auto max-h-52 w-full object-contain" />
           ) : (
-            <img src={preview} alt="" className="mx-auto max-h-52 object-contain" />
+            <img src={src} alt="" className="mx-auto max-h-52 object-contain" />
           )}
         </div>
       ) : (
@@ -65,15 +71,15 @@ export function VideoSourceUpload({
           disabled={disabled}
           onClick={() => ref.current?.click()}
           className={cn(
-            "flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-red-300/50",
-            "bg-background/50 py-12 text-sm text-muted-foreground",
+            "flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-[#FF7A45]/40",
+            "bg-white/40 py-12 text-sm text-slate-500",
             "transition-all duration-150 ease-out active:scale-[0.99]",
-            "hover:border-red-500 hover:bg-red-500/5 dark:hover:bg-red-500/10",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30",
+            "hover:border-[#F43F5E] hover:bg-[#FF7A45]/5",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F43F5E]/30",
             disabled && "pointer-events-none opacity-50",
           )}
         >
-          <Upload className="h-6 w-6 text-red-500 transition-transform duration-150 group-active:scale-90" />
+          <Upload className="h-6 w-6 text-[#F43F5E]" />
           {mode === "image" ? "Upload image to animate" : "Upload video to enhance"}
         </button>
       )}
