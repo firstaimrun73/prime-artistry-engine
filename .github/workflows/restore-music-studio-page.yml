@@ -11,41 +11,110 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch last-known-good MusicStudioPage
+      - name: Fetch last-known-good MusicStudioPage and apply locks
         run: |
-          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/64e6770723784ee120185ed8dd7678ded5cab879/src/components/music/MusicStudioPage.tsx" \
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/29fdf8c8307cdd1d1e32ef73566bc5df5d549dcb/src/components/music/MusicStudioPage.tsx" \
             -o src/components/music/MusicStudioPage.tsx
-          # Image-only media: remove Video button from optional Media row
           python3 <<'PY'
           from pathlib import Path
-          import re
           p = Path("src/components/music/MusicStudioPage.tsx")
           t = p.read_text()
-          # Remove the Video optional button block (keep Image)
-          t2, n = re.subn(
-              r'<Button\s+type="button"\s+size="sm"\s+variant="outline"\s+disabled=\{imageUploading \|\| videoUploading\}[\s\S]*?\{videoUploading \? "Uploading…" : "Video"\}\s*</Button>',
-              '',
-              t,
-              count=1,
+          assert "PLACEHOLDER" not in t and "MusicStudioPage" in t
+
+          old = '''  const isAdmin = isAdminEmail(profile?.email);
+  const [adminTestPlan, setAdminTestPlan] = useState<PlanId | null>(() => (typeof window !== "undefined" ? readAdminTestPlan() : null));'''
+          new = '''  const isAdmin = isAdminEmail(profile?.email);
+  const [adminTestPlan, setAdminTestPlan] = useState<PlanId | null>(null);
+  useEffect(() => {
+    if (!isAdmin) {
+      writeAdminTestPlan(null);
+      setAdminTestPlan(null);
+      return;
+    }
+    setAdminTestPlan(readAdminTestPlan());
+  }, [isAdmin]);'''
+          if old not in t:
+              raise SystemExit("admin init block missing")
+          t = t.replace(old, new, 1)
+          t = t.replace(
+              "const res = await getCaps({ data: { adminTestPlan: adminTestPlan ?? undefined } });",
+              "const res = await getCaps({ data: { adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined } });",
           )
-          print("video button removals", n)
-          # Restrict media section modes away from forcing video UI if possible
-          t2 = t2.replace(
-              '(mode === "song" || mode === "instrumental" || mode === "bgm" || mode === "sfx" || mode === "video_music")',
-              '(mode === "song" || mode === "instrumental" || mode === "bgm" || mode === "sfx")',
-              1,
+          t = t.replace(
+              "adminTestPlan: adminTestPlan ?? undefined,",
+              "adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined,",
           )
-          # Strip any Estimate/info leftovers if present
-          for banned in ["Quotes use the same server engine", "showCostInfo", "estCredits", "estLoading"]:
-              if banned in t2:
-                  print("WARN still has", banned)
-          p.write_text(t2)
-          print("final len", len(t2))
+          t = t.replace(
+              '{isAdmin && (\n          <section className="mb-4 rounded-xl border border-dashed border-orange-500/40 bg-orange-500/5 p-3">',
+              '{isAdmin && profile?.email && isAdminEmail(profile.email) && (\n          <section className="mb-4 rounded-xl border border-dashed border-orange-500/40 bg-orange-500/5 p-3">',
+          )
+
+          old_dur = '''            {(mode === "song" || mode === "instrumental" || mode === "sfx" || mode === "bgm" || mode === "video_music") && (
+              <section>
+                <Label>Duration</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(mode === "sfx" || mode === "video_music" ? SFX_DURATIONS : DURATIONS).map((d) => (
+                    <button key={d.s} type="button" onClick={() => setDuration(d.s)}
+                      className={cn("rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                        duration === d.s ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm" : "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40")}>
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}'''
+          new_dur = '''            {(mode === "song" || mode === "instrumental" || mode === "sfx" || mode === "bgm" || mode === "video_music") && (
+              <section>
+                <Label>Duration</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(mode === "sfx" || mode === "video_music" ? SFX_DURATIONS : DURATIONS).map((d) => {
+                    const maxAllowed =
+                      !musicCaps ? d.s
+                      : mode === "sfx" ? musicCaps.maxSfxDurationSeconds
+                      : mode === "video_music" ? musicCaps.maxVideoAudioDurationSeconds
+                      : musicCaps.maxTrackDurationSeconds;
+                    const locked = maxAllowed > 0 && d.s > maxAllowed;
+                    return (
+                      <button
+                        key={d.s}
+                        type="button"
+                        disabled={locked}
+                        title={locked ? `Upgrade to unlock ${d.label}` : undefined}
+                        onClick={() => { if (!locked) setDuration(d.s); }}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                          locked && "cursor-not-allowed opacity-45",
+                          !locked && duration === d.s
+                            ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm"
+                            : !locked
+                              ? "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40"
+                              : "border-border/40 bg-card/60 text-muted-foreground",
+                        )}
+                      >
+                        {locked ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Lock className="h-3 w-3" />
+                            {d.label}
+                          </span>
+                        ) : (
+                          d.label
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}'''
+          if old_dur not in t:
+              raise SystemExit("duration block missing")
+          t = t.replace(old_dur, new_dur, 1)
+          p.write_text(t)
+          print("restored+locked", len(t))
           PY
       - name: Commit
         run: |
           git config user.name "music-restore"
           git config user.email "restore@motio2edit.local"
           git add src/components/music/MusicStudioPage.tsx
-          git commit -m "fix(music): restore MusicStudioPage — Image-only media, no Estimate/info" || echo nochange
+          git commit -m "fix(music): restore MusicStudioPage — admin-only panel + locked durations" || echo nochange
           git push
