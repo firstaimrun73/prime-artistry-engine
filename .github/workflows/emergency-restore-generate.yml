@@ -1,12 +1,28 @@
-name: emergency-restore-generate
-# NEUTRALIZED (2026-10-01): obsolete Music R2 / duration restore path.
+name: emergency-restore-generate-functions
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/generate.functions.FIXED.b64'
 jobs:
-  neutralized:
+  restore:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Refuse obsolete Music restore
+      - uses: actions/checkout@v4
+      - name: Decode and restore generate.functions.ts
         run: |
-          echo "Neutralized: must not restore R2 ingest for Music or rewrite plan IDs."
-          exit 1
+          base64 -d scripts/generate.functions.FIXED.b64 > src/lib/generate.functions.ts
+          wc -c src/lib/generate.functions.ts
+          head -5 src/lib/generate.functions.ts
+          grep -c "finalizeQuote(reservedVideoQuote" src/lib/generate.functions.ts
+          grep -c "GENERATE_FUNCTIONS_NEEDS_RESTORE" src/lib/generate.functions.ts || true
+      - name: Commit restore
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          git diff --cached --stat
+          git commit -m "fix(video): restore full generate.functions.ts from FIXED base64 artifact" || echo "no change"
+          git push
