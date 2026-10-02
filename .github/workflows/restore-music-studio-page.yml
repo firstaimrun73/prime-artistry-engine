@@ -1,1 +1,51 @@
-LOADING
+name: restore-music-studio-page
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/restore-music-studio-page.yml"
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch last-known-good MusicStudioPage
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/64e6770723784ee120185ed8dd7678ded5cab879/src/components/music/MusicStudioPage.tsx" \
+            -o src/components/music/MusicStudioPage.tsx
+          # Image-only media: remove Video button from optional Media row
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("src/components/music/MusicStudioPage.tsx")
+          t = p.read_text()
+          # Remove the Video optional button block (keep Image)
+          t2, n = re.subn(
+              r'<Button\s+type="button"\s+size="sm"\s+variant="outline"\s+disabled=\{imageUploading \|\| videoUploading\}[\s\S]*?\{videoUploading \? "Uploading…" : "Video"\}\s*</Button>',
+              '',
+              t,
+              count=1,
+          )
+          print("video button removals", n)
+          # Restrict media section modes away from forcing video UI if possible
+          t2 = t2.replace(
+              '(mode === "song" || mode === "instrumental" || mode === "bgm" || mode === "sfx" || mode === "video_music")',
+              '(mode === "song" || mode === "instrumental" || mode === "bgm" || mode === "sfx")',
+              1,
+          )
+          # Strip any Estimate/info leftovers if present
+          for banned in ["Quotes use the same server engine", "showCostInfo", "estCredits", "estLoading"]:
+              if banned in t2:
+                  print("WARN still has", banned)
+          p.write_text(t2)
+          print("final len", len(t2))
+          PY
+      - name: Commit
+        run: |
+          git config user.name "music-restore"
+          git config user.email "restore@motio2edit.local"
+          git add src/components/music/MusicStudioPage.tsx
+          git commit -m "fix(music): restore MusicStudioPage — Image-only media, no Estimate/info" || echo nochange
+          git push
