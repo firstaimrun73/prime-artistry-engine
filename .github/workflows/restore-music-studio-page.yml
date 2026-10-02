@@ -11,63 +11,71 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch last-known-good MusicStudioPage and apply locks
+      - name: Fetch known-good MusicStudioPage and harden admin + duration locks
         run: |
-          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/29fdf8c8307cdd1d1e32ef73566bc5df5d549dcb/src/components/music/MusicStudioPage.tsx" \
+          set -euo pipefail
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/2061f1f3b02617248d0a8288371de0b0ec3bb026/src/components/music/MusicStudioPage.tsx" \
             -o src/components/music/MusicStudioPage.tsx
           python3 <<'PY'
           from pathlib import Path
           p = Path("src/components/music/MusicStudioPage.tsx")
           t = p.read_text()
-          assert "PLACEHOLDER" not in t and "MusicStudioPage" in t
+          assert "PLACEHOLDER" not in t and "MusicStudioPage" in t and "Loading Music Studio" not in t
 
-          old = '''  const isAdmin = isAdminEmail(profile?.email);
-  const [adminTestPlan, setAdminTestPlan] = useState<PlanId | null>(() => (typeof window !== "undefined" ? readAdminTestPlan() : null));'''
-          new = '''  const isAdmin = isAdminEmail(profile?.email);
-  const [adminTestPlan, setAdminTestPlan] = useState<PlanId | null>(null);
-  useEffect(() => {
-    if (!isAdmin) {
-      writeAdminTestPlan(null);
-      setAdminTestPlan(null);
-      return;
-    }
-    setAdminTestPlan(readAdminTestPlan());
-  }, [isAdmin]);'''
-          if old not in t:
-              raise SystemExit("admin init block missing")
-          t = t.replace(old, new, 1)
-          t = t.replace(
+          # Ensure Lock is imported
+          if "Lock" not in t.split("from \"lucide-react\"")[0][-200:] and "Lock" not in t:
+              t = t.replace(
+                  'from "lucide-react";',
+                  'from "lucide-react";  // Lock used for plan-gated durations',
+              )
+          if ", Lock" not in t and " Lock " not in t:
+              t = t.replace(
+                  "Music2, Coins",
+                  "Music2, Coins, Lock",
+              )
+              if "Lock" not in t:
+                  t = t.replace(
+                      "Music2 }",
+                      "Music2, Lock }",
+                  )
+                  t = t.replace(
+                      "Music2, X",
+                      "Music2, X, Lock",
+                  )
+
+          # Harden admin init: only admin email may hold test plan
+          for old, new in [
+            (
               "const res = await getCaps({ data: { adminTestPlan: adminTestPlan ?? undefined } });",
               "const res = await getCaps({ data: { adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined } });",
-          )
-          t = t.replace(
+            ),
+            (
               "adminTestPlan: adminTestPlan ?? undefined,",
               "adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined,",
-          )
+            ),
+          ]:
+              if old in t:
+                  t = t.replace(old, new)
+
+          # Double-gate admin panel UI
           t = t.replace(
-              '{isAdmin && (\n          <section className="mb-4 rounded-xl border border-dashed border-orange-500/40 bg-orange-500/5 p-3">',
-              '{isAdmin && profile?.email && isAdminEmail(profile.email) && (\n          <section className="mb-4 rounded-xl border border-dashed border-orange-500/40 bg-orange-500/5 p-3">',
+              "{isAdmin && (",
+              "{isAdmin && profile?.email && isAdminEmail(profile.email) && (",
+          )
+          # avoid double-double gate
+          t = t.replace(
+              "{isAdmin && profile?.email && isAdminEmail(profile.email) && profile?.email && isAdminEmail(profile.email) && (",
+              "{isAdmin && profile?.email && isAdminEmail(profile.email) && (",
           )
 
-          old_dur = '''            {(mode === "song" || mode === "instrumental" || mode === "sfx" || mode === "bgm" || mode === "video_music") && (
-              <section>
-                <Label>Duration</Label>
-                <div className="flex flex-wrap gap-2">
-                  {(mode === "sfx" || mode === "video_music" ? SFX_DURATIONS : DURATIONS).map((d) => (
-                    <button key={d.s} type="button" onClick={() => setDuration(d.s)}
-                      className={cn("rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                        duration === d.s ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm" : "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40")}>
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}'''
-          new_dur = '''            {(mode === "song" || mode === "instrumental" || mode === "sfx" || mode === "bgm" || mode === "video_music") && (
-              <section>
-                <Label>Duration</Label>
-                <div className="flex flex-wrap gap-2">
-                  {(mode === "sfx" || mode === "video_music" ? SFX_DURATIONS : DURATIONS).map((d) => {
+          # Duration locks if missing
+          if "Upgrade to unlock" not in t and "maxTrackDurationSeconds" in t:
+              old_dur_btn = '''{(mode === "sfx" || mode === "video_music" ? SFX_DURATIONS : DURATIONS).map((d) => (
+                    <button key={d.s} type="button" onClick={() => setDuration(d.s)}'''
+              if old_dur_btn in t:
+                  t = t.replace(
+                      old_dur_btn,
+                      '''{(mode === "sfx" || mode === "video_music" ? SFX_DURATIONS : DURATIONS).map((d) => {
                     const maxAllowed =
                       !musicCaps ? d.s
                       : mode === "sfx" ? musicCaps.maxSfxDurationSeconds
@@ -80,36 +88,27 @@ jobs:
                         type="button"
                         disabled={locked}
                         title={locked ? `Upgrade to unlock ${d.label}` : undefined}
-                        onClick={() => { if (!locked) setDuration(d.s); }}
-                        className={cn(
-                          "rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                          locked && "cursor-not-allowed opacity-45",
-                          !locked && duration === d.s
+                        onClick={() => { if (!locked) setDuration(d.s); }}''',
+                      1,
+                  )
+                  t = t.replace(
+                      "duration === d.s ? \"border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm\" : \"border-border/60 bg-card text-muted-foreground hover:border-orange-500/40\")}>\n                      {d.label}\n                    </button>\n                  ))}",
+                      '''!locked && duration === d.s
                             ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm"
                             : !locked
                               ? "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40"
                               : "border-border/40 bg-card/60 text-muted-foreground",
-                        )}
-                      >
-                        {locked ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Lock className="h-3 w-3" />
-                            {d.label}
-                          </span>
-                        ) : (
-                          d.label
-                        )}
+                          locked && "cursor-not-allowed opacity-45",
+                        )}>
+                        {locked ? (<span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{d.label}</span>) : d.label}
                       </button>
                     );
-                  })}
-                </div>
-              </section>
-            )}'''
-          if old_dur not in t:
-              raise SystemExit("duration block missing")
-          t = t.replace(old_dur, new_dur, 1)
+                  })}''',
+                      1,
+                  )
+
           p.write_text(t)
-          print("restored+locked", len(t))
+          print("restored", len(t), "admin_gate", t.count("isAdminEmail(profile.email)"))
           PY
       - name: Commit
         run: |
