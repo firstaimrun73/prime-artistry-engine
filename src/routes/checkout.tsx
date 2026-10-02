@@ -27,7 +27,7 @@ import {
 } from "@/lib/payments.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CreditCard, Bitcoin, Lock, Copy, Check, Wallet } from "lucide-react";
+import { CreditCard, Lock, Copy, Check, Wallet } from "lucide-react";
 
 declare global {
   interface Window {
@@ -46,7 +46,6 @@ export const Route = createFileRoute("/checkout")({
 
 const METHOD_ICON: Record<PaymentMethod, typeof CreditCard> = {
   card: CreditCard,
-  crypto: Bitcoin,
   paypal: Wallet,
 };
 
@@ -433,7 +432,7 @@ function Checkout() {
               )}
 
 
-              {method === "crypto" && !invoice && (
+              {false && method === "crypto" && !invoice && (
                 <div className="mt-6">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Select coin</h3>
                   <div className="mt-3 flex gap-3">
@@ -452,7 +451,7 @@ function Checkout() {
                 </div>
               )}
 
-              {method === "crypto" && invoice && (
+              {false && method === "crypto" && invoice && (
                 <div className="mt-6 rounded-2xl border border-border bg-card p-6">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold">Send crypto payment</h3>
@@ -505,7 +504,7 @@ function Checkout() {
               )}
 
               {/* Crypto cancelled — instant retry options, no cooldown. */}
-              {method === "crypto" && !invoice && cryptoCancelled && (
+              {false && method === "crypto" && !invoice && cryptoCancelled && (
                 <div className="mt-6 rounded-xl border border-border bg-card p-4">
                   <p className="text-sm text-muted-foreground">Try again anytime.</p>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -562,10 +561,10 @@ function Checkout() {
                       className="flex-1"
                       onClick={() => {
                         setCardRetry(null);
-                        setMethod("crypto");
+                        setMethod("card");
                       }}
                     >
-                      Switch to Crypto Instead
+                      Pay with card
                     </Button>
                   </div>
                 </div>
@@ -580,7 +579,7 @@ function Checkout() {
               ? cardProvider === "paypal"
                 ? "Secured payments. Card payments are processed in USD via PayPal."
                 : "Secured payments. Card payments are processed in INR via Razorpay."
-              : "Secured payments. Crypto payments are processed via NOWPayments."}
+              : "Secured payments via Razorpay and PayPal."}
           </p>
 
         </div>
