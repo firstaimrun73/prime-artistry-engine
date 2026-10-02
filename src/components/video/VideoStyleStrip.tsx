@@ -1,6 +1,7 @@
 /**
  * Horizontal style strip — R2 thumbnails, tier badges, locks, selected preview loop.
  * None tile is a circle; right fade hides at end of scroll.
+ * Accepts styleId (canonical) or selectedId (live page alias).
  */
 import { useEffect, useRef, useState } from "react";
 import { Lock, X } from "lucide-react";
@@ -31,17 +32,20 @@ function unlockCopy(tier: StyleTier): string {
 
 export function VideoStyleStrip({
   styleId,
+  selectedId,
   onSelect,
   plan,
   isAdmin = false,
   disabled,
 }: {
-  styleId: string;
+  styleId?: string;
+  selectedId?: string;
   onSelect: (id: string) => void;
   plan: string | null | undefined;
   isAdmin?: boolean;
   disabled?: boolean;
 }) {
+  const current = selectedId ?? styleId ?? "none";
   const styles = videoStylesForStrip();
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [lockedStyle, setLockedStyle] = useState<VideoStyleUi | null>(null);
@@ -67,16 +71,13 @@ export function VideoStyleStrip({
 
   return (
     <section className="mb-4">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-        Style
-      </p>
       <div className="relative">
         <div
           ref={scrollRef}
           className="studio-hide-scroll -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1"
         >
           {styles.map((s) => {
-            const active = styleId === s.id;
+            const active = current === s.id;
             const locked = !canUseStyle(plan, s.tier, isAdmin);
             const badge = tierBadgeLabel(s.tier);
             const imgFailed = failed[s.id];
@@ -97,9 +98,11 @@ export function VideoStyleStrip({
                   onSelect(s.id);
                 }}
                 className={cn(
-                  "flex w-[96px] shrink-0 flex-col items-center gap-1 transition-transform duration-200",
+                  "flex w-[96px] shrink-0 flex-col items-center gap-1",
+                  "transition-transform duration-150 ease-out active:scale-95 select-none",
                   active && !locked && "scale-[1.04]",
                   locked && "opacity-85",
+                  disabled && "pointer-events-none opacity-50",
                 )}
               >
                 <span
@@ -214,18 +217,14 @@ export function VideoStyleStrip({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-bold text-slate-800">
-                    {lockedStyle.name}
-                  </p>
+                  <p className="truncate text-sm font-bold text-slate-800">{lockedStyle.name}</p>
                   {tierBadgeLabel(lockedStyle.tier) && (
                     <span className="rounded-full border border-white/70 bg-white/70 px-1.5 py-0.5 text-[9px] font-bold">
                       {tierBadgeLabel(lockedStyle.tier)}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-[12px] text-slate-500">
-                  {unlockCopy(lockedStyle.tier)}
-                </p>
+                <p className="mt-1 text-[12px] text-slate-500">{unlockCopy(lockedStyle.tier)}</p>
               </div>
             </div>
             <div className="mt-4 flex gap-2">
@@ -239,7 +238,7 @@ export function VideoStyleStrip({
               <button
                 type="button"
                 onClick={() => setLockedStyle(null)}
-                className="h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600"
+                className="h-11 rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 active:scale-95 transition-transform"
               >
                 Not now
               </button>
