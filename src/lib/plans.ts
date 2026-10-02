@@ -79,7 +79,7 @@ export function estimatedGenerations(credits: number) {
   return {
     images: Math.floor(credits / CREDIT_COST.image),
     videos: Math.floor(credits / CREDIT_COST.video),
-    music: Math.floor(credits / CREDIT_COST.music),
+    music: Math.floor(credits / CREDIT_COST.music_lite),
   };
 }
 
@@ -91,7 +91,7 @@ export type Plan = {
   credits: number;
   video: boolean;
   priority: boolean;
-  bestQuality?: boolean;
+  bestQuality: boolean;
   price: Record<Currency, number>;
   features: string[];
 };
@@ -103,27 +103,28 @@ export const PLANS: Plan[] = [
     credits: FREE_SIGNUP_CREDITS,
     video: false,
     priority: false,
+    bestQuality: false,
     price: { USD: 0, EUR: 0, INR: 0 },
     features: [
-      "40 free AI credits",
-      "Standard image quality",
-      "Basic Music (song + instrumental)",
-      "Watermark on exports",
+      `${FREE_SIGNUP_CREDITS} starter credits`,
+      "Image Studio basics",
+      "Watermark-free downloads",
+      "Music Studio limited",
     ],
   },
   {
     id: "lite",
     name: "Lite",
     credits: 500,
-    video: false,
+    video: true,
     priority: false,
-    price: { USD: 9, EUR: 9, INR: 799 },
+    bestQuality: false,
+    price: { USD: 9, EUR: 8.49, INR: 799 },
     features: [
-      "500 AI credits / month",
-      "All Music modes (Standard)",
-      "Limited AI voices",
-      "60s music tracks",
-      "No watermark on images (Lite rules apply)",
+      "500 credits / month",
+      "Image + Video Studio",
+      "Music Studio full modes",
+      "Standard quality",
     ],
   },
   {
@@ -132,13 +133,13 @@ export const PLANS: Plan[] = [
     credits: 1200,
     video: true,
     priority: false,
-    price: { USD: 19, EUR: 19, INR: 1699 },
+    bestQuality: false,
+    price: { USD: 15, EUR: 13.99, INR: 1299 },
     features: [
-      "1,200 AI credits / month",
-      "All Music modes",
-      "More AI voices",
-      "90s music tracks",
-      "Short video generation",
+      "1,200 credits / month",
+      "Longer tracks",
+      "Image + Video + Music",
+      "Standard quality",
     ],
   },
   {
@@ -148,14 +149,12 @@ export const PLANS: Plan[] = [
     video: true,
     priority: true,
     bestQuality: true,
-    price: { USD: 39, EUR: 39, INR: 3499 },
+    price: { USD: 29, EUR: 26.99, INR: 2499 },
     features: [
-      "3,000 AI credits / month",
+      "3,000 credits / month",
       "Premium Music quality",
-      "All 5 AI voices",
-      "120s music tracks",
-      "Higher concurrency",
       "Priority queue",
+      "Longer video clips",
     ],
   },
   {
@@ -165,11 +164,9 @@ export const PLANS: Plan[] = [
     video: true,
     priority: true,
     bestQuality: true,
-    price: { USD: 79, EUR: 79, INR: 6999 },
+    price: { USD: 55, EUR: 50.99, INR: 4599 },
     features: [
-      "8,000 AI credits / month",
-      "Premium Music quality",
-      "All 5 AI voices",
+      "8,000 credits / month",
       "120s music tracks",
       "Highest concurrency",
       "Priority queue",
@@ -209,4 +206,23 @@ export function getPlan(id: PlanId): Plan {
 export function findPlan(id: string | undefined | null): Plan | undefined {
   if (!id) return undefined;
   return PLANS.find((p) => p.id === id);
+}
+
+/** Display currency for pricing UI (same set as checkout Currency). */
+export type DisplayCurrency = "USD" | "EUR" | "INR";
+
+export const DISPLAY_CURRENCIES: DisplayCurrency[] = ["USD", "EUR", "INR"];
+
+export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
+  free: { USD: 0, EUR: 0, INR: 0 },
+  lite: { USD: 9, EUR: 8.49, INR: 799 },
+  plus: { USD: 15, EUR: 13.99, INR: 1299 },
+  pro: { USD: 29, EUR: 26.99, INR: 2499 },
+  studio: { USD: 55, EUR: 50.99, INR: 4599 },
+  business: { USD: 110, EUR: 99.99, INR: 9199 },
+};
+
+/** Map display currency → payment backend currency. */
+export function toCheckoutCurrency(c: DisplayCurrency): Currency {
+  return c;
 }
