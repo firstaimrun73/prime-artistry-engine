@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Music,
   Image as ImageIcon,
@@ -9,7 +10,6 @@ import {
   Filter,
   Crop,
   Eraser,
-  Coins,
   ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -26,19 +26,39 @@ import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
-/** Compact creative tags above Quick Create — colored pills. */
-const HOME_CREATE_TAGS: { label: string; className: string }[] = [
-  { label: "Portrait", className: "border-rose-400/50 bg-rose-500/10 text-rose-700 dark:text-rose-300" },
-  { label: "Product", className: "border-amber-400/50 bg-amber-500/10 text-amber-700 dark:text-amber-300" },
-  { label: "Travel", className: "border-sky-400/50 bg-sky-500/10 text-sky-700 dark:text-sky-300" },
-  { label: "Food", className: "border-orange-400/50 bg-orange-500/10 text-orange-700 dark:text-orange-300" },
-  { label: "Nature", className: "border-emerald-400/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
-  { label: "Fashion", className: "border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300" },
-  { label: "Cinematic", className: "border-violet-400/50 bg-violet-500/10 text-violet-700 dark:text-violet-300" },
-  { label: "Abstract", className: "border-cyan-400/50 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300" },
+/** Only 3–4 creative tags — open Image Studio with style prompt (no forced 1:1). */
+const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] = [
+  {
+    label: "Portrait",
+    prompt: "cinematic portrait photo, natural light, sharp focus",
+    className: "border-rose-400/50 bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  },
+  {
+    label: "Product",
+    prompt: "studio product shot, clean background, commercial lighting",
+    className: "border-amber-400/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  },
+  {
+    label: "Travel",
+    prompt: "travel photography, scenic landscape, golden hour",
+    className: "border-sky-400/50 bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  },
+  {
+    label: "Food",
+    prompt: "food photography, appetizing, soft natural light",
+    className: "border-orange-400/50 bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  },
 ];
 
-/** Same fixed width for every quick-create icon — Cropmix → Remove BG → rest */
+/** Rotating slogan carousel for the promo strip. */
+const HOME_SLOGANS = [
+  { title: "Try a plan that fits you", sub: "Lite · Plus · Pro · AI Studio · Master" },
+  { title: "Use Motio2edit AI for best edits", sub: "Image · Video · Music in one place" },
+  { title: "Circle 2edit · Cropmix · Remove BG", sub: "Pro tools, simple credits" },
+  { title: "From idea to download in seconds", sub: "Standard · Premium · Ultra AI modes" },
+  { title: "More credits. More modes. No watermark.", sub: "Upgrade anytime — cancel anytime" },
+] as const;
+
 const QUICK_CREATE = [
   { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
   { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
@@ -57,11 +77,19 @@ export function SignedInHomeBody() {
 
   const planId = (profile?.plan ?? "free") as PlanId;
   const firstName = profile?.display_name ? profile.display_name.split(" ")[0] : "";
-  // Always show real numeric balance — never infinity as a credit face value.
   const credits = (profile?.credits ?? 0).toLocaleString();
   const videoOk = canAccessVideo({ plan: planId, email: profile?.email, isAdmin });
   const musicOk = canAccessMusic({ plan: planId, email: profile?.email, isAdmin });
-  const isFree = planId === "free" && !isAdmin;
+
+  const [sloganIdx, setSloganIdx] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setSloganIdx((i) => (i + 1) % HOME_SLOGANS.length);
+    }, 3800);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const slogan = HOME_SLOGANS[sloganIdx];
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:pb-12">
@@ -91,29 +119,53 @@ export function SignedInHomeBody() {
         </div>
       </div>
 
-      {/* Pricing strip — always visible so users can see plans & purchase */}
-      <section className="mt-4" aria-label="Plans and credits">
+      {/* Gradient slogan carousel → pricing */}
+      <section className="mt-4" aria-label="Promo">
         <Link
           to="/pricing"
-          className="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-3 transition hover:border-primary/40 hover:from-primary/15"
+          className="group relative block overflow-hidden rounded-2xl border border-white/10 shadow-lg shadow-orange-500/10"
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-              <Coins className="h-4.5 w-4.5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight">
-                {isFree ? "Upgrade for more credits & modes" : "Manage plan & buy credits"}
+          <div
+            className="absolute inset-0 bg-[linear-gradient(135deg,#ff6b35_0%,#f7931e_25%,#c44569_50%,#6c5ce7_75%,#00cec9_100%)] opacity-90"
+            aria-hidden
+          />
+          <div
+            className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.25),transparent_55%)]"
+            aria-hidden
+          />
+          <div
+            className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/20 blur-2xl"
+            aria-hidden
+          />
+          <div
+            className="absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-cyan-300/30 blur-2xl"
+            aria-hidden
+          />
+          <div className="relative flex items-center justify-between gap-3 px-4 py-4 sm:px-5">
+            <div className="min-w-0 flex-1">
+              <p
+                key={sloganIdx}
+                className="text-sm font-bold leading-snug text-white drop-shadow-sm sm:text-base"
+              >
+                {slogan.title}
               </p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                Lite $4.99 · Plus $9.99 · Pro $29.99 · AI Studio $55 · Master $110
-              </p>
+              <p className="mt-0.5 truncate text-xs text-white/85">{slogan.sub}</p>
+              <div className="mt-2 flex gap-1.5" aria-hidden>
+                {HOME_SLOGANS.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1 rounded-full transition-all ${
+                      i === sloganIdx ? "w-4 bg-white" : "w-1.5 bg-white/40"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-orange-600 shadow-sm transition group-hover:bg-white">
+              View plans
+              <ArrowRight className="h-3.5 w-3.5" />
+            </span>
           </div>
-          <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary">
-            View plans
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
         </Link>
       </section>
 
@@ -121,12 +173,13 @@ export function SignedInHomeBody() {
         <p className="mb-2 text-xs font-medium text-muted-foreground">
           Use tags to create your photo in seconds
         </p>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex flex-wrap gap-2">
           {HOME_CREATE_TAGS.map((tag) => (
             <Link
               key={tag.label}
               to="/editor"
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition hover:opacity-90 ${tag.className}`}
+              search={{ prompt: tag.prompt } as never}
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition hover:opacity-90 ${tag.className}`}
             >
               {tag.label}
             </Link>
