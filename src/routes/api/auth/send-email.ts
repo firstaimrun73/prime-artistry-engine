@@ -118,7 +118,7 @@ export const APIRoute = createAPIFileRoute("/api/auth/send-email")({
       const isRate = /too many/i.test(message);
       console.error("[auth/send-email] deliver:", message);
       return errorResponse(
-        isRate ? 429 : 500 500,
+        isRate ? 429 : 500,
         isRate
           ? message
           : "Failed to send email. Please try again in a moment.",
