@@ -1,0 +1,40 @@
+name: fix-r2-real-aspects
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fix-r2-real-aspects.yml"
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Correct aspect ratios from real PNG dimensions
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("src/lib/r2-catalog.ts")
+          t = p.read_text()
+          pairs = [
+            ('filename: "w1pcYswbXbt1l7BC9ikID_5XbprD0B.png",\n    aspectRatio: "1:1",', 'filename: "w1pcYswbXbt1l7BC9ikID_5XbprD0B.png",\n    aspectRatio: "3:4",'),
+            ('filename: "S2BsFD6zTY2WAUTFn7nXd_bshYNJCt.png",\n    aspectRatio: "1:1",', 'filename: "S2BsFD6zTY2WAUTFn7nXd_bshYNJCt.png",\n    aspectRatio: "9:16",'),
+            ('description: "Music Studio–style performance sample for the homepage music row."', 'description: "Stage performance motion sample."'),
+            ('description: "Performance clip for Music Studio homepage samples."', 'description: "Expressive performance motion sample."'),
+          ]
+          for a,b in pairs:
+              if a in t:
+                  t = t.replace(a,b,1)
+                  print("patched", a[:40])
+              else:
+                  print("skip", a[:40])
+          p.write_text(t)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "r2-aspect-fix"
+          git config user.email "fix@motio2edit.local"
+          git add src/lib/r2-catalog.ts
+          git commit -m "fix(r2): real aspects 3:4 and 9:16 for non-square media_6 images" || echo nochange
+          git push
