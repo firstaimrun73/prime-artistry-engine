@@ -52,17 +52,31 @@ export function maskTransactionId(id: string | null | undefined): string {
 
 const REFUND_WINDOW_HOURS = 24;
 
-/** Matches PLAN_CREDITS / PLAN_PURCHASE (including legacy credit amounts). */
+/**
+ * Matches PLAN_CREDITS / PLAN_PURCHASE and $0.0178 top-up packs.
+ * Includes legacy credit amounts for historical payment rows.
+ */
 function planFromCreditsLocal(credits: number): string {
   const map: Record<number, string> = {
+    // Current monthly plan allocations
+    500: "lite",
+    1200: "plus",
+    3000: "pro",
+    8000: "studio",
+    10000: "business", // Master Studio (internal id)
+    // $0.0178 top-up packs (floor(USD / 0.0178))
+    280: "topup",
+    561: "topup",
+    1684: "topup",
+    3089: "topup",
+    6179: "topup",
+    // Legacy plan / pack amounts still present in payment history
     350: "lite",
     750: "plus",
-    500: "plus", // legacy
     2500: "pro",
-    2000: "pro", // legacy
+    2000: "pro",
     5000: "studio",
-    10000: "business", // Master Studio (internal id)
-    9_999_999: "business", // legacy unlimited sentinel
+    9_999_999: "business",
   };
   return map[credits] ?? "custom";
 }
