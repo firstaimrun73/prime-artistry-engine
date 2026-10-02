@@ -1,21 +1,24 @@
 // Server-only payment helpers. Never imported by client/route files directly.
 import { createHmac, timingSafeEqual } from "crypto";
 
-/** One-time credit top-up packs (USD list price; INR approximates). */
+/**
+ * One-time credit top-up packs.
+ * credits = floor(USD / 0.0178) — purchase face, not Video spend face.
+ */
 export const RAZORPAY_PACKAGES = {
-  starter: { credits: 350, amountINR: 449 },
-  basic: { credits: 800, amountINR: 899 },
-  pro: { credits: 2500, amountINR: 2699 },
-  studio: { credits: 5000, amountINR: 4999 },
-  enterprise: { credits: 10000, amountINR: 9999 },
+  starter: { credits: 280, amountINR: 449 },
+  basic: { credits: 561, amountINR: 899 },
+  pro: { credits: 1684, amountINR: 2699 },
+  studio: { credits: 3089, amountINR: 4999 },
+  enterprise: { credits: 6179, amountINR: 9999 },
 } as const;
 
 export const CRYPTO_PACKAGES = {
-  starter: { credits: 350, amountUSD: 4.99 },
-  basic: { credits: 800, amountUSD: 10 },
-  pro: { credits: 2500, amountUSD: 29.99 },
-  studio: { credits: 5000, amountUSD: 55 },
-  enterprise: { credits: 10000, amountUSD: 110 },
+  starter: { credits: 280, amountUSD: 4.99 },
+  basic: { credits: 561, amountUSD: 10 },
+  pro: { credits: 1684, amountUSD: 29.99 },
+  studio: { credits: 3089, amountUSD: 55 },
+  enterprise: { credits: 6179, amountUSD: 110 },
 } as const;
 
 export type PackageId = keyof typeof RAZORPAY_PACKAGES;
