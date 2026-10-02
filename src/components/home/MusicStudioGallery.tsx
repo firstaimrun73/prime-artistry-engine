@@ -1,6 +1,6 @@
 /**
  * Music section — instrumental performance video samples from R2 catalog.
- * Media-first cards; native aspect; inline play.
+ * Media-first cards; native aspect; inline play; quality tier badges.
  */
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Music, Pause, Play, Volume2, VolumeX } from "lucide-react";
@@ -91,6 +91,18 @@ function MusicVideoCard({ sample }: { sample: R2Sample }) {
           onError={() => setFailed(true)}
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
+        {sample.qualityTier ? (
+          <span
+            className={cn(
+              "absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-[9px] font-bold shadow-sm backdrop-blur-sm",
+              sample.qualityTier === "Premium" && "bg-amber-500/95 text-black",
+              sample.qualityTier === "Ultra AI" && "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-400 text-white",
+              sample.qualityTier === "Standard" && "bg-white/90 text-zinc-800",
+            )}
+          >
+            {sample.qualityTier}
+          </span>
+        ) : null}
         <span
           className={cn(
             "absolute bottom-2 left-2 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur-md",
