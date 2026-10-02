@@ -1,0 +1,95 @@
+/**
+ * Motio2edit branded emails — approved design (motio2edit-emails.html).
+ * Image base: https://assets.motio2edit.com/email/
+ */
+import { PLANS, FREE_SIGNUP_CREDITS, type PlanId } from "@/lib/plans";
+
+export const EMAIL_IMAGE_BASE = "https://assets.motio2edit.com/email/" as const;
+export type EmailResult = { subject: string; html: string };
+
+export function fillTemplate(raw: string, vars: Record<string, string | number>): string {
+  return raw.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, k) =>
+    vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : `{{${k}}}`,
+  );
+}
+
+function formatUsd(n: number): string {
+  if (n === 0) return "Free";
+  if (Number.isInteger(n)) return `$${n}`;
+  return `$${n.toFixed(2)}`;
+}
+
+function formatCredits(n: number): string {
+  return n.toLocaleString("en-US");
+}
+
+function planById(id: PlanId) {
+  return PLANS.find((p) => p.id === id)!;
+}
+
+/** Plan prices + credits sourced from @/lib/plans (single source of truth). */
+export function buildPlanEmailVars(): Record<string, string> {
+  const free = planById("free");
+  const lite = planById("lite");
+  const plus = planById("plus");
+  const pro = planById("pro");
+  const studio = planById("studio");
+  const business = planById("business");
+  return {
+    price_free: formatUsd(free.price.USD),
+    price_lite: formatUsd(lite.price.USD),
+    price_plus: formatUsd(plus.price.USD),
+    price_pro: formatUsd(pro.price.USD),
+    price_studio: formatUsd(studio.price.USD),
+    price_business: formatUsd(business.price.USD),
+    credits_free: formatCredits(free.credits),
+    credits_lite: formatCredits(lite.credits),
+    credits_plus: formatCredits(plus.credits),
+    credits_pro: formatCredits(pro.credits),
+    credits_studio: formatCredits(studio.credits),
+    credits_business: formatCredits(business.credits),
+    free_credits: formatCredits(FREE_SIGNUP_CREDITS),
+    plans_url: "https://motio2edit.com/pricing",
+  };
+}
+
+export const DEFAULT_PLAN_EMAIL_VARS: Record<string, string> = buildPlanEmailVars();
+
+const O = "#FF5A1F";
+const R = "#FF3B1F";
+
+function logo(): string {
+  // Prefer hosted PNG when available; CSS fallback keeps emails rendering without asset.
+  return `<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:${R};background-image:linear-gradient(135deg,#FF2D1A,#FF8A1F);width:44px;height:44px;border-radius:12px;text-align:center;color:#fff;font-size:24px;line-height:44px">✦</td><td style="padding-left:10px;font:800 24px Arial,sans-serif;color:#17171c">Motio<span style="color:${O}">2</span>edit</td></tr></table>`;
+}
+
+function btn(t: string, u: string): string {
+  return `<a href="${u}" style="display:inline-block;background:${O};background-image:linear-gradient(90deg,${R},#FF8A1F);color:#fff;text-decoration:none;font:700 16px Arial,sans-serif;padding:14px 32px;border-radius:12px">${t}</a>`;
+}
+
+function h1(t: string): string {
+  return `<h1 style="margin:0 0 12px;font:800 26px Arial,sans-serif;color:#17171c">${t}</h1>`;
+}
+
+function p(t: string): string {
+  return `<p style="margin:0 0 16px;font:15px/1.6 Arial,sans-serif;color:#4a4a55">${t}</p>`;
+}
+
+function otpBox(c: string): string {
+  return `<div style="margin:20px 0;padding:18px;text-align:center;background:#FFF3EC;border:2px dashed ${O};border-radius:14px;font:800 36px 'Courier New',monospace;letter-spacing:10px;color:${R}">${c}</div>`;
+}
+
+function note(t: string): string {
+  return `<p style="margin:16px 0 0;padding:12px 14px;background:#f6f3f1;border-radius:10px;font:13px/1.5 Arial,sans-serif;color:#6b6b76">${t}</p>`;
+}
+
+function img(f: string, a: string, w = 520): string {
+  return `<img src="${EMAIL_IMAGE_BASE}${f}" alt="${a}" width="${w}" style="display:block;width:100%;max-width:${w}px;border-radius:14px;background:#1a1a2e" >`;
+}
+
+function wrap(pre: string, body: string, marketing = false): string {
+  const foot = marketing
+    ? `You get this because you have a Motio2edit account. <a href="{{unsubscribe_url}}" style="color:#FF8A1F">Unsubscribe</a> · `
+    : `This is a security / account email. You can't unsubscribe from these. `;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head><body style="margin:0;background:#efeae6"><div style="display:none;max-he`;
+}
