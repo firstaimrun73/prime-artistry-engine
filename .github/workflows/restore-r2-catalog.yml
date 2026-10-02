@@ -8,47 +8,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Restore catalog from known good + warrior
+      - name: Write restored catalog
         run: |
-          set -euo pipefail
-          python3 << 'PY2'
+          python3 - <<'PY'
+          import base64
           from pathlib import Path
-          import urllib.request
-          url = "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/a8142377fefade0d12e893c183c83a7322281f1e/src/lib/r2-catalog.ts"
-          t = urllib.request.urlopen(url).read().decode()
-          entry = """  {
-    id: \"vid-m4-forest-warrior\",
-    title: \"Forest Armored Warrior\",
-    description: \"Armored warrior woman holds a sword in a sunlit forest.\",
-    studio: \"video\",
-    feature: \"video-generation\",
-    homepageCategory: \"video\",
-    url: media(\"media_4\", \"HLAHFATYQIey8FLk8LOE6_4PNRF7tc.mp4\"),
-    filename: \"HLAHFATYQIey8FLk8LOE6_4PNRF7tc.mp4\",
-    width: 1080,
-    height: 1920,
-    aspectRatio: \"9:16\",
-    format: \"MP4\",
-    qualityTier: \"Standard\",
-    hasAudio: true,
-    sortOrder: 165,
-    active: true,
-  },
-"""
-          marker = """    sortOrder: 160,
-    active: true,
-  },
-  {
-    id: \"vid-m4-empire-ape\","""
-          if "vid-m4-forest-warrior" not in t:
-            t = t.replace(marker, """    sortOrder: 160,
-    active: true,
-  },
-""" + entry + """  {
-    id: \"vid-m4-empire-ape\",""", 1)
-          Path("src/lib/r2-catalog.ts").write_text(t)
-          print("wrote", len(t), "warrior" in t)
-          PY2
+          b64 = open('.github/workflows/_r2_catalog.b64').read().replace('\n','').replace(' ','')
+          data = base64.b64decode(b64)
+          Path('src/lib/r2-catalog.ts').write_bytes(data)
+          text = data.decode()
+          assert 'Music_banner' in text
+          assert 'vid-m4-forest-warrior' in text
+          print('ok', len(text))
+          PY
+      - name: Commit and push
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/r2-catalog.ts
