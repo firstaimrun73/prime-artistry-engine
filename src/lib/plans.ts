@@ -55,15 +55,20 @@ export const UNLIMITED_CREDITS = 9_999_999;
 /** Free signup bonus — MUST match public.handle_new_user() in Supabase. */
 export const FREE_SIGNUP_CREDITS = 40;
 
+/**
+ * Legacy single-pack marketing object for old checkout links.
+ * Authoritative pack math lives in @/lib/credit-topups (1 credit = $0.0178).
+ * $4.99 → floor(4.99 / 0.0178) = 280 credits.
+ */
 export const CREDIT_TOPUP = {
   id: "credit-topup-499",
   name: "Credit Top-up",
   price: 4.99,
-  credits: 350,
+  credits: 280,
   type: "one_time" as const,
-  description: "350 AI credits, valid forever, works with any plan.",
+  description: "280 AI credits, valid forever, works with any plan.",
   bullets: [
-    "350 AI credits",
+    "280 AI credits",
     "Valid forever (no expiry)",
     "Works with any plan",
     "Can be purchased multiple times",
