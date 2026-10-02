@@ -1,114 +1,59 @@
 import { useState } from "react";
 import { Info, X } from "lucide-react";
-import { CREDIT_RETAIL_USD } from "@/lib/motio-video-credits";
+import { cn } from "@/lib/utils";
 
-type Breakdown = {
-  tier?: string;
-  mode?: string;
-  durationSec?: number;
-  quality?: string;
-  resolution?: string;
-  soundOn?: boolean;
-};
-
-function modeLabel(mode?: string) {
-  if (mode === "video") return "Video → Video";
-  if (mode === "image") return "Image → Video";
-  if (mode === "audio") return "Audio → Video";
-  return "Text → Video";
-}
-
-function qualityLabel(b?: Breakdown) {
-  if (b?.quality) return b.quality;
-  if (b?.resolution === "1080p" || b?.resolution === "2k") return "HD";
-  if (b?.resolution === "720p" || b?.resolution === "480p") return "SD";
-  return b?.resolution ?? "—";
-}
-
-/** Credit details — never shows backend model names. */
-export function VideoCreditsInfo({
-  credits,
-  breakdown,
-  usd,
-}: {
-  credits: number;
-  breakdown?: Breakdown;
-  usd?: number;
-}) {
+/** Credit details — never shows backend model names or USD. */
+export function VideoCreditsInfo({ credits }: { credits: number }) {
   const [open, setOpen] = useState(false);
-  const displayUsd =
-    usd != null ? usd : +(credits * CREDIT_RETAIL_USD).toFixed(2);
-
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+        className={cn(
+          "inline-flex items-center justify-center rounded-full p-2 text-muted-foreground",
+          "transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-90",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30",
+        )}
         aria-label="Credit details"
       >
         <Info className="h-4 w-4" />
       </button>
       {open && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px] dark:bg-black/60"
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-border bg-background p-5 shadow-xl"
+            className="w-full max-w-sm rounded-2xl border border-border bg-background p-5 shadow-xl dark:bg-card"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold">How credits are calculated</h3>
-              <button type="button" onClick={() => setOpen(false)} className="rounded-full p-1 hover:bg-muted">
+              <h3 className="text-sm font-bold">Video generation credits</h3>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-full p-1.5 transition-all duration-150 hover:bg-muted active:scale-90"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <ul className="space-y-1.5 text-xs text-muted-foreground">
-              <li>
-                · Tier:{" "}
-                <span className="font-medium text-foreground">
-                  {breakdown?.tier === "premium"
-                    ? "Premium"
-                    : breakdown?.tier === "standard"
-                      ? "Standard"
-                      : "—"}
-                </span>
-              </li>
-              <li>
-                · Mode:{" "}
-                <span className="font-medium text-foreground">{modeLabel(breakdown?.mode)}</span>
-              </li>
-              <li>
-                · Duration:{" "}
-                <span className="font-medium text-foreground">
-                  {breakdown?.durationSec != null ? `${breakdown.durationSec}s` : "—"}
-                </span>
-              </li>
-              <li>
-                · Quality:{" "}
-                <span className="font-medium text-foreground">{qualityLabel(breakdown)}</span>
-              </li>
-              <li>
-                · Sound:{" "}
-                <span className="font-medium text-foreground">
-                  {breakdown?.soundOn == null ? "—" : breakdown.soundOn ? "Enabled" : "Silent"}
-                </span>
-              </li>
-            </ul>
-            <p className="mt-4 text-sm">
+            <p className="mb-3 text-xs text-muted-foreground">
+              Your final credit usage depends on duration, quality, resolution, sound, generation complexity, and
+              processing requirements.
+            </p>
+            <p className="text-sm">
               Estimated charge:{" "}
-              <span className="font-bold tabular-nums text-red-600">
-                {credits} credits (${displayUsd.toFixed(2)})
-              </span>
+              <span className="font-bold tabular-nums text-red-600 dark:text-red-400">{credits} credits</span>
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              1 credit = $0.01. Prices rounded to clean 25-credit steps. Charged only after a successful generation.
-            </p>
+            <p className="mt-2 text-[11px] text-muted-foreground">Minimum charge is 125 credits per generation.</p>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="mt-4 w-full rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white"
+              className={cn(
+                "mt-4 w-full rounded-xl bg-red-500 py-2.5 text-sm font-semibold text-white",
+                "transition-all duration-150 active:scale-[0.98] hover:bg-red-600",
+              )}
             >
               Close
             </button>

@@ -1,81 +1,51 @@
-import { Type, Image as ImageIcon, Film } from "lucide-react";
+import { Sparkles, Camera, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { VideoGenMode } from "@/lib/video-model-registry";
+import type { VideoMode } from "./video-studio-types";
 
-const MODES: {
-  id: VideoGenMode;
-  label: string;
-  aria: string;
-  helper: string;
-  Icon: typeof Type;
-}[] = [
-  { id: "text", label: "Text", aria: "Text to Video", helper: "Describe a scene", Icon: Type },
-  { id: "image", label: "Image", aria: "Image to Video", helper: "Animate a photo", Icon: ImageIcon },
-  { id: "video", label: "Video", aria: "Video to Video", helper: "Enhance a clip", Icon: Film },
+const MODES: { id: VideoMode; icon: typeof Sparkles; label: string; hint: string }[] = [
+  { id: "text", icon: Sparkles, label: "Text → Video", hint: "Describe a scene" },
+  { id: "image", icon: Camera, label: "Image → Video", hint: "Animate a photo" },
+  { id: "video", icon: Film, label: "Video → Video", hint: "Enhance a clip" },
 ];
-
-export function modeHelperText(mode: VideoGenMode): string {
-  return MODES.find((m) => m.id === mode)?.helper ?? "";
-}
 
 export function VideoModeSelector({
   value,
   onChange,
   disabled,
 }: {
-  value: VideoGenMode;
-  onChange: (m: VideoGenMode) => void;
+  value: VideoMode;
+  onChange: (m: VideoMode) => void;
   disabled?: boolean;
 }) {
-  const activeIdx = Math.max(0, MODES.findIndex((m) => m.id === value));
-
   return (
-    <div className="w-full">
-      <div
-        role="tablist"
-        aria-label="Video generation mode"
-        className={cn(
-          "relative grid grid-cols-3 overflow-hidden rounded-[20px] p-1",
-          "border border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150",
-          "ring-1 ring-black/5",
-          "dark:border-white/[0.12] dark:bg-white/[0.06] dark:ring-white/[0.06]",
-        )}
-      >
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1 bottom-1 rounded-[16px] bg-gradient-to-r from-[#FF7A45] to-[#F43F5E] shadow-[0_6px_18px_rgba(244,63,94,0.35)] transition-all duration-[250ms] ease-out"
-          style={{
-            left: `calc(${activeIdx} * 33.333% + 4px)`,
-            width: "calc(33.333% - 8px)",
-          }}
-        />
-        {MODES.map((m) => {
-          const active = value === m.id;
-          const Icon = m.Icon;
-          return (
-            <button
-              key={m.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              aria-label={m.aria}
-              disabled={disabled}
-              onClick={() => onChange(m.id)}
-              className={cn(
-                "relative z-10 flex flex-col items-center gap-0.5 rounded-[16px] px-2 py-2.5 text-center transition-colors duration-200",
-                active ? "text-white" : "text-slate-600 dark:text-zinc-300",
-                disabled && "opacity-50",
-              )}
-            >
-              <Icon className="h-4 w-4" aria-hidden />
-              <span className="text-[12px] font-bold leading-tight">{m.label}</span>
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-2 text-center text-[12px] text-slate-500 dark:text-zinc-400">
-        {modeHelperText(value)}
-      </p>
+    <div className="grid grid-cols-3 gap-2">
+      {MODES.map((m) => {
+        const Icon = m.icon;
+        const active = value === m.id;
+        return (
+          <button
+            key={m.id}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(m.id)}
+            className={cn(
+              "flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-3 text-center",
+              "transition-all duration-150 ease-out select-none",
+              "active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30",
+              active
+                ? "border-red-500 bg-gradient-to-b from-red-500 to-orange-500 text-white shadow-md shadow-red-500/20"
+                : "border-border/70 bg-card text-foreground hover:border-red-400/50 dark:hover:border-red-400/40",
+              disabled && "pointer-events-none opacity-50",
+            )}
+          >
+            <Icon className={cn("h-4 w-4 transition-transform duration-150", active && "scale-110")} />
+            <span className="text-[11px] font-bold leading-tight sm:text-xs">{m.label}</span>
+            <span className={cn("text-[10px]", active ? "text-white/80" : "text-muted-foreground")}>
+              {m.hint}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
