@@ -1,7 +1,8 @@
 /**
  * Media-first discovery card.
- * Horizontal strips: fixed row height, width = height × ratio (Claude fix).
+ * Horizontal strips: fixed row height, width = height × ratio.
  * Bottoms align · no empty gap · native ratio · no crop when media matches card AR.
+ * Title + exact 10-word description overlay (compact).
  */
 import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -98,7 +99,6 @@ export function GalleryMediaCard({
   const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
   const large = size === "large" || stripMode;
   const [failed, setFailed] = useState(false);
-  const ratio = parseRatio(sample.aspectRatio);
 
   const openMedia = useCallback(
     (e?: React.MouseEvent | React.TouchEvent) => {
@@ -124,6 +124,7 @@ export function GalleryMediaCard({
   const tier = sample.qualityTier ?? null;
   const span = stripMode ? "" : spanClassForSample(sample);
   const title = sample.title?.trim() || null;
+  const description = sample.description?.trim() || null;
 
   return (
     <article
@@ -201,7 +202,7 @@ export function GalleryMediaCard({
           />
         )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
 
         <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
           {badge ? (
@@ -224,21 +225,28 @@ export function GalleryMediaCard({
           </span>
         ) : null}
 
-        {title ? (
+        {(title || description) ? (
           <div
             className={cn(
               "pointer-events-none absolute inset-x-0 bottom-0 px-2.5 pb-2.5",
               isVideo && "pl-12",
             )}
           >
-            <p
-              className={cn(
-                "line-clamp-2 font-semibold leading-snug text-white drop-shadow-sm",
-                large ? "text-[13px]" : "text-[12px]",
-              )}
-            >
-              {title}
-            </p>
+            {title ? (
+              <p
+                className={cn(
+                  "line-clamp-2 font-semibold leading-snug text-white drop-shadow-sm",
+                  large ? "text-[13px]" : "text-[12px]",
+                )}
+              >
+                {title}
+              </p>
+            ) : null}
+            {description ? (
+              <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/80 drop-shadow-sm">
+                {description}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </button>
