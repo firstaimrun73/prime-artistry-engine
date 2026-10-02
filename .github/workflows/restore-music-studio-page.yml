@@ -14,78 +14,149 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Fetch known-good page and apply admin-only + duration locks
+      - name: Restore known-good MusicStudioPage + credit estimate near Generate
         run: |
           set -euo pipefail
-          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/2061f1f3b02617248d0a8288371de0b0ec3bb026/src/components/music/MusicStudioPage.tsx" \
-            -o src/components/music/MusicStudioPage.tsx
+          # Known-good body before PLACEHOLDER stub
+          git show 95b7448529147f61f7cabf1b997a4f6a9784a4d6:src/components/music/MusicStudioPage.tsx > src/components/music/MusicStudioPage.tsx
           python3 <<'PY'
-          from pathlib import Path
-          p = Path("src/components/music/MusicStudioPage.tsx")
-          t = p.read_text()
-          assert "MusicStudioPage" in t and "PLACEHOLDER" not in t
+from pathlib import Path
+p = Path("src/components/music/MusicStudioPage.tsx")
+t = p.read_text()
+assert "MusicStudioPage" in t and "PLACEHOLDER" not in t
 
-          # Lock import
-          if "Lock" not in t:
-              t = t.replace(
-                  'from "lucide-react";',
-                  'from "lucide-react";\n// Lock icon for plan-gated chips',
-              )
-              t = t.replace("Music2, Coins", "Music2, Coins, Lock")
-              t = t.replace("Coins, X, Music2", "Coins, X, Music2, Lock")
-              t = t.replace("Music2 } from", "Music2, Lock } from")
-              if ", Lock" not in t and " Lock," not in t:
-                  t = t.replace(
-                      "Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, Music2",
-                      "Sparkles, Loader2, Mic2, Video, ImagePlus, Coins, X, Music2, Lock",
-                  )
+# 1) Import estimateMusicCost
+old_imp = """import {
+  generateMusic, getMusicCapabilities, MUSIC_GENRES, MUSIC_MOODS, type MusicMode,
+} from \"@/lib/music.functions\";"""
+new_imp = """import {
+  generateMusic, getMusicCapabilities, estimateMusicCost, MUSIC_GENRES, MUSIC_MOODS, type MusicMode,
+} from \"@/lib/music.functions\";"""
+if old_imp in t:
+    t = t.replace(old_imp, new_imp)
 
-          # Admin-only: never pass adminTestPlan for non-admin
-          t = t.replace(
-              "adminTestPlan: adminTestPlan ?? undefined",
-              "adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined",
-          )
-          t = t.replace(
-              "adminTestPlan: adminTestPlan ?? undefined",
-              "adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined",
-          )
+# 2) State
+old_state = "  const [charged, setCharged] = useState<number | null>(null);"
+new_state = """  const [charged, setCharged] = useState<number | null>(null);
+  const [estimatedCredits, setEstimatedCredits] = useState<number | null>(null);
+  const [estimateLoading, setEstimateLoading] = useState(false);"""
+if old_state in t:
+    t = t.replace(old_state, new_state)
 
-          # Double-gate panel
-          if "isAdminEmail(profile.email)" not in t:
-              t = t.replace(
-                  "{isAdmin && (",
-                  "{isAdmin && profile?.email && isAdminEmail(profile.email) && (",
-              )
+# 3) Server fn
+old_gen = """  const generate = useServerFn(generateMusic);
+  const getCaps = useServerFn(getMusicCapabilities);"""
+new_gen = """  const generate = useServerFn(generateMusic);
+  const getCaps = useServerFn(getMusicCapabilities);
+  const estimateCost = useServerFn(estimateMusicCost);"""
+if old_gen in t:
+    t = t.replace(old_gen, new_gen)
 
-          # Duration locks
-          if "Upgrade to unlock" not in t:
-              needle = '(mode === "sfx" || mode === "video_music" ? SFX_DURATIONS : DURATIONS).map((d) => ('
-              if needle in t:
-                  t = t.replace(
-                      needle,
-                      '(mode === "sfx" || mode === "video_music" ? SFX_DURATIONS : DURATIONS).map((d) => {\n                    const maxAllowed = !musicCaps ? d.s : mode === "sfx" ? musicCaps.maxSfxDurationSeconds : mode === "video_music" ? musicCaps.maxVideoAudioDurationSeconds : musicCaps.maxTrackDurationSeconds;\n                    const locked = maxAllowed > 0 && d.s > maxAllowed;\n                    return (',
-                      1,
-                  )
-                  t = t.replace(
-                      'onClick={() => setDuration(d.s)}',
-                      'disabled={locked} title={locked ? `Upgrade to unlock ${d.label}` : undefined} onClick={() => { if (!locked) setDuration(d.s); }}',
-                      1,
-                  )
-                  t = t.replace(
-                      'duration === d.s ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm" : "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40")}>\n                      {d.label}\n                    </button>\n                  ))}',
-                      'locked && "cursor-not-allowed opacity-45", !locked && duration === d.s ? "border-transparent bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-sm" : !locked ? "border-border/60 bg-card text-muted-foreground hover:border-orange-500/40" : "border-border/40 bg-card/60 text-muted-foreground")}>{locked ? (<span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{d.label}</span>) : d.label}</button>);})}',
-                      1,
-                  )
+# 4) Debounced estimate effect
+marker = """  useEffect(() => {
+    if (!loading) return;
+    setLoadingStep(0);
+    const id = window.setInterval(() => setLoadingStep((s) => Math.min(s + 1, LOADING.length - 1)), 2400);
+    return () => window.clearInterval(id);
+  }, [loading]);"""
+estimate_effect = """
+  // Debounced credit estimate near Generate button
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setEstimateLoading(true);
+        try {
+          const res = await estimateCost({
+            data: {
+              mode,
+              durationSeconds: duration,
+              promptLength: prompt.trim().length,
+              hasVideo: Boolean(videoUrl),
+              hasImage: Boolean(imageUrl),
+              qualityTier: mode === \"song\" || mode === \"instrumental\" || mode === \"bgm\" ? qualityTier : \"standard\",
+              videoAudioMode: mode === \"video_music\" ? videoAudioMode : undefined,
+              adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined,
+            },
+          });
+          if (!cancelled && res && typeof (res as { credits?: number }).credits === \"number\") {
+            setEstimatedCredits((res as { credits: number }).credits);
+          }
+        } catch {
+          if (!cancelled) setEstimatedCredits(null);
+        } finally {
+          if (!cancelled) setEstimateLoading(false);
+        }
+      })();
+    }, 600);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [mode, duration, prompt, videoUrl, imageUrl, qualityTier, videoAudioMode, adminTestPlan, isAdmin, estimateCost]);
+"""
+if marker in t and "estimatedCredits" not in t:
+    t = t.replace(marker, marker + estimate_effect)
 
-          p.write_text(t)
-          print("ok", len(t), "locks", "Upgrade to unlock" in t, "admin", t.count("isAdminEmail"))
-          PY
+# 5) UI near Generate button
+old_btn = """            <div className=\"space-y-2 pt-1\">
+              <Button
+                type=\"button\"
+                className=\"w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-95\"
+                disabled={loading || uploading || videoUploading || imageUploading}
+                onClick={() => void onGenerate()}
+              >
+                {loading ? (
+                  <><Loader2 className=\"mr-2 h-4 w-4 animate-spin\" /> Generating…</>
+                ) : videoUploading || imageUploading ? (
+                  <><Loader2 className=\"mr-2 h-4 w-4 animate-spin\" /> Uploading media…</>
+                ) : (
+                  <><Sparkles className=\"mr-2 h-4 w-4\" /> Generate</>
+                )}
+              </Button>
+            </div>"""
+new_btn = """            <div className=\"space-y-2 pt-1\">
+              {(estimatedCredits != null || estimateLoading) && (
+                <p className=\"text-center text-[12px] text-muted-foreground\">
+                  {estimateLoading ? (
+                    <span className=\"inline-flex items-center gap-1\">
+                      <Loader2 className=\"h-3 w-3 animate-spin\" /> Calculating cost…
+                    </span>
+                  ) : (
+                    <>
+                      <span className=\"font-semibold text-foreground tabular-nums\">{estimatedCredits}</span>
+                      {\" \"}credits for this generation
+                    </>
+                  )}
+                </p>
+              )}
+              <Button
+                type=\"button\"
+                className=\"w-full bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:opacity-95\"
+                disabled={loading || uploading || videoUploading || imageUploading}
+                onClick={() => void onGenerate()}
+              >
+                {loading ? (
+                  <><Loader2 className=\"mr-2 h-4 w-4 animate-spin\" /> Generating…</>
+                ) : videoUploading || imageUploading ? (
+                  <><Loader2 className=\"mr-2 h-4 w-4 animate-spin\" /> Uploading media…</>
+                ) : (
+                  <><Sparkles className=\"mr-2 h-4 w-4\" /> Generate{estimatedCredits != null ? ` · ${estimatedCredits} cr` : \"\"}</>
+                )}
+              </Button>
+            </div>"""
+if old_btn in t:
+    t = t.replace(old_btn, new_btn)
+
+p.write_text(t)
+print("ok", len(t), "has estimate", "estimatedCredits" in t)
+PY
       - name: Commit and push
         run: |
           git config user.name "music-restore"
           git config user.email "restore@motio2edit.local"
           git add src/components/music/MusicStudioPage.tsx
           if git diff --cached --quiet; then echo nochange; exit 0; fi
-          git commit -m "fix(music): restore MusicStudioPage — admin-only panel + locked durations"
+          git commit -m "fix(music): restore MusicStudioPage + show credit cost near Generate (debounced)"
           git pull --rebase origin main || git pull --rebase --autostash origin main || true
           git push origin HEAD:main
