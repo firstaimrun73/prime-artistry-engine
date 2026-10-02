@@ -1,15 +1,13 @@
 /**
  * Motion2AI Creation — Discover (post-login).
  * Horizontal strips: fixed height, width follows aspect ratio.
- * Strict separation: Images | Video (no music) | Music (music category only).
- * Likes: local UI state only (no Supabase / no sample_favourites).
+ * Images + Video only — no Music category / no Filters on homepage.
+ * Likes: local UI state only.
  */
 import { useCallback, useMemo, useState } from "react";
 import {
   getAllDiscoverSamples,
   getImagineOnlySamples,
-  getActiveR2VideoSamples,
-  getMusicVideoSamples,
   getVideoOnlySamples,
   type R2Sample,
 } from "@/lib/r2-catalog";
@@ -18,13 +16,12 @@ import { DiscoveryMediaViewer } from "@/components/home/DiscoveryMediaViewer";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-type TabId = "all" | "img" | "video" | "music";
+type TabId = "all" | "img" | "video";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "all", label: "All" },
   { id: "img", label: "Img" },
   { id: "video", label: "Video" },
-  { id: "music", label: "Music" },
 ];
 
 function HorizontalStrip({
@@ -83,12 +80,8 @@ export function VisualDiscoveryGallery() {
   const [viewer, setViewer] = useState<R2Sample | null>(null);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
-  // Strict lists — never merge music into video or images into music
   const images = useMemo(() => getImagineOnlySamples(), []);
   const videosOnly = useMemo(() => getVideoOnlySamples(), []);
-  const music = useMemo(() => getMusicVideoSamples(), []);
-  // Video tab = video-only (excludes homepageCategory music)
-  const videoTab = useMemo(() => videosOnly, [videosOnly]);
 
   const onToggleLike = useCallback(
     (sample: R2Sample) => {
@@ -103,14 +96,7 @@ export function VisualDiscoveryGallery() {
     [user],
   );
 
-  const gridSamples =
-    tab === "all"
-      ? [] // All tab uses separate strips, not one mixed grid
-      : tab === "img"
-        ? images
-        : tab === "video"
-          ? videoTab
-          : music;
+  const gridSamples = tab === "img" ? images : tab === "video" ? videosOnly : [];
 
   return (
     <section className="space-y-5" data-discovery="motion2ai-creation">
@@ -122,7 +108,7 @@ export function VisualDiscoveryGallery() {
           <h2 className="mt-0.5 text-[18px] font-extrabold tracking-tight sm:text-[20px]">
             Discover
           </h2>
-          <p className="mt-1 text-[12px] text-white/60">Images · videos · music samples</p>
+          <p className="mt-1 text-[12px] text-white/60">Images · videos</p>
         </div>
         <div className="flex gap-1 overflow-x-auto border-t border-white/10 px-2 py-2 scrollbar-none">
           {TABS.map((t) => (
@@ -159,22 +145,13 @@ export function VisualDiscoveryGallery() {
             onToggleLike={onToggleLike}
             onOpenViewer={setViewer}
           />
-          {music.length > 0 && (
-            <HorizontalStrip
-              title="Music"
-              samples={music}
-              likedIds={likedIds}
-              onToggleLike={onToggleLike}
-              onOpenViewer={setViewer}
-            />
-          )}
         </div>
       )}
 
       {tab !== "all" && (
         <div className="space-y-4">
           <HorizontalStrip
-            title={tab === "img" ? "Images" : tab === "video" ? "Video" : "Music"}
+            title={tab === "img" ? "Images" : "Video"}
             samples={gridSamples}
             likedIds={likedIds}
             onToggleLike={onToggleLike}
@@ -182,9 +159,7 @@ export function VisualDiscoveryGallery() {
           />
           {gridSamples.length === 0 && (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              {tab === "music"
-                ? "No music samples yet."
-                : "No samples in this section yet."}
+              No samples in this section yet.
             </p>
           )}
         </div>
