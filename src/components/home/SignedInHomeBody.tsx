@@ -129,7 +129,7 @@ export function SignedInHomeBody() {
                 {...(!locked && q.label === "Circle"
                   ? { search: { mode: "remove" as const, from: "home" as const } }
                   : !locked && q.label === "Remove BG"
-                    ? { search: { from: "home" as const }
+                    ? { search: { from: "home" as const } }
                     : {})}
                 className="flex h-auto w-[72px] min-w-[72px] max-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-1.5 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
               >
