@@ -24,6 +24,18 @@ import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
+/** Compact creative tags above Quick Create. */
+const HOME_CREATE_TAGS = [
+  "Portrait",
+  "Product",
+  "Travel",
+  "Food",
+  "Nature",
+  "Fashion",
+  "Cinematic",
+  "Abstract",
+] as const;
+
 /** Same fixed width for every quick-create icon — Cropmix → Remove BG → rest */
 const QUICK_CREATE = [
   { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
@@ -70,7 +82,21 @@ export function SignedInHomeBody() {
         </div>
       </div>
 
-      <section className="mt-6">
+      <section className="mt-5" aria-label="Creative tags">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {HOME_CREATE_TAGS.map((tag) => (
+            <Link
+              key={tag}
+              to="/editor"
+              className="shrink-0 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-semibold text-foreground/90 shadow-sm backdrop-blur transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            >
+              {tag}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-5">
         <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
           Quick create
         </h2>
