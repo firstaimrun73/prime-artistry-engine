@@ -1,21 +1,23 @@
 /**
  * Permanent voice-preview assets on Cloudflare R2 / public CDN.
- * When a URL is set, getVoicePreview serves it directly (no credit, no xAI call).
- * Leave empty string to fall back to generate-once + cache.
+ * getVoicePreview and MusicVoiceLibrary must use these URLs only —
+ * never call xAI / fal for sample playback.
  */
 export const XAI_VOICES = ["eve", "ara", "rex", "sal", "leo"] as const;
 export type XaiVoiceId = (typeof XAI_VOICES)[number];
 
+const MEDIA6 = "https://assets.motio2edit.com/samples/media_6";
+
 /**
- * Public HTTPS URLs only (assets.motio2edit.com or equivalent).
- * Populate after uploading pre-rendered previews to R2.
+ * Public HTTPS URLs for pre-rendered AI Voice samples (no generation).
+ * Leo filename includes a space before .mp3 on R2 — encoded below.
  */
 export const VOICE_PREVIEW_ASSETS: Record<XaiVoiceId, string> = {
-  eve: process.env.VOICE_PREVIEW_EVE_URL?.trim() || "",
-  ara: process.env.VOICE_PREVIEW_ARA_URL?.trim() || "",
-  rex: process.env.VOICE_PREVIEW_REX_URL?.trim() || "",
-  sal: process.env.VOICE_PREVIEW_SAL_URL?.trim() || "",
-  leo: process.env.VOICE_PREVIEW_LEO_URL?.trim() || "",
+  eve: `${MEDIA6}/Eve-Aivoice-sample_music-studio.mp3`,
+  ara: `${MEDIA6}/Ara-Aivoice-sample_music-studio.mp3`,
+  rex: `${MEDIA6}/Rex-Aivoice-sample_music-studio.mp3`,
+  sal: `${MEDIA6}/Sal-Aivoice-sample_music-studio.mp3`,
+  leo: `${MEDIA6}/${encodeURIComponent("Leo-Aivoice-sample_music-studio .mp3")}`,
 };
 
 export const PREVIEW_LINES: Record<XaiVoiceId, string> = {
