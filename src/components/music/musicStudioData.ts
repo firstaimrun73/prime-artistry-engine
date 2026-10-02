@@ -1,11 +1,11 @@
-import type { MusicMode } from "@/lib/music.functions";
+/** Shared Music Studio constants — modes, durations, chips, voices. */
 
 /** Canonical xAI TTS voice IDs — must match xai/tts/v1 VoiceEnum. */
 export type VoiceId = "eve" | "ara" | "rex" | "sal" | "leo";
 
 /**
- * Voice library for Voiceover mode.
- * previewSrc: static public file when present; otherwise server getVoicePreview caches real TTS.
+ * Voice library entries.
+ * previewSrc: permanent R2 CDN sample — never generate on click.
  */
 export const VOICES: ReadonlyArray<{
   id: VoiceId;
@@ -19,26 +19,26 @@ export const VOICES: ReadonlyArray<{
   {
     id: "eve",
     label: "Eve",
-    desc: "Energetic · Upbeat",
-    previewSrc: "/voice-previews/eve.mp3",
+    desc: "Clear · Energetic",
+    previewSrc: "https://assets.motio2edit.com/samples/media_6/Eve-Aivoice-sample_music-studio.mp3",
     sampleLine: "Hi, I'm Eve — clear, energetic, and ready for your story.",
-    color: "from-rose-500 to-orange-500",
-    emoji: "⚡",
+    color: "from-orange-500 to-rose-500",
+    emoji: "✨",
   },
   {
     id: "ara",
     label: "Ara",
     desc: "Warm · Friendly",
-    previewSrc: "/voice-previews/ara.mp3",
+    previewSrc: "https://assets.motio2edit.com/samples/media_6/Ara-Aivoice-sample_music-studio.mp3",
     sampleLine: "Hello, I'm Ara. Warm, friendly, and easy to listen to.",
-    color: "from-amber-400 to-rose-400",
+    color: "from-pink-500 to-rose-600",
     emoji: "🌸",
   },
   {
     id: "rex",
     label: "Rex",
     desc: "Confident · Clear",
-    previewSrc: "/voice-previews/rex.mp3",
+    previewSrc: "https://assets.motio2edit.com/samples/media_6/Rex-Aivoice-sample_music-studio.mp3",
     sampleLine: "I'm Rex. Confident, clear, and built for strong narration.",
     color: "from-sky-500 to-indigo-600",
     emoji: "🎯",
@@ -47,7 +47,7 @@ export const VOICES: ReadonlyArray<{
     id: "sal",
     label: "Sal",
     desc: "Smooth · Balanced",
-    previewSrc: "/voice-previews/sal.mp3",
+    previewSrc: "https://assets.motio2edit.com/samples/media_6/Sal-Aivoice-sample_music-studio.mp3",
     sampleLine: "Hey, I'm Sal — smooth, balanced, and conversational.",
     color: "from-emerald-500 to-teal-600",
     emoji: "🌊",
@@ -56,7 +56,7 @@ export const VOICES: ReadonlyArray<{
     id: "leo",
     label: "Leo",
     desc: "Authoritative · Strong",
-    previewSrc: "/voice-previews/leo.mp3",
+    previewSrc: "https://assets.motio2edit.com/samples/media_6/Leo-Aivoice-sample_music-studio%20.mp3",
     sampleLine: "This is Leo. Authoritative, strong, and made to lead.",
     color: "from-violet-500 to-purple-700",
     emoji: "🦁",
@@ -69,81 +69,68 @@ export function isVoiceId(v: string): v is VoiceId {
   return (VOICE_IDS as readonly string[]).includes(v);
 }
 
-/**
- * Song / instrumental durations (MiniMax produces full tracks; UI target up to 2 min).
- * SFX / video-music stay provider-capped at 30s — filtered in the page.
- */
 export const DURATIONS = [
   { s: 15, label: "15s" },
   { s: 30, label: "30s" },
-  { s: 60, label: "1 min" },
-  { s: 120, label: "2 min" },
+  { s: 60, label: "60s" },
+  { s: 90, label: "90s" },
+  { s: 120, label: "120s" },
 ] as const;
 
-/** SFX-only durations (MMAudio hard max 30s). */
 export const SFX_DURATIONS = [
-  { s: 8, label: "8s" },
+  { s: 5, label: "5s" },
+  { s: 10, label: "10s" },
   { s: 15, label: "15s" },
   { s: 30, label: "30s" },
 ] as const;
 
-/** SFX categories with sticker emojis for fast scanning. */
-export const SFX_CATEGORIES: ReadonlyArray<{ id: string; label: string; glyph: string }> = [
-  { id: "cinematic", label: "Cinematic", glyph: "🎬" },
-  { id: "nature", label: "Nature", glyph: "🌲" },
-  { id: "weather", label: "Weather", glyph: "🌧" },
-  { id: "machines", label: "Machines", glyph: "⚙️" },
-  { id: "ui", label: "UI", glyph: "📱" },
-  { id: "crowd", label: "Crowd", glyph: "👥" },
-  { id: "animals", label: "Animals", glyph: "🐾" },
-  { id: "fantasy", label: "Fantasy", glyph: "✨" },
-  { id: "sci-fi", label: "Sci-fi", glyph: "🚀" },
-  { id: "ambience", label: "Ambience", glyph: "🌙" },
-  { id: "transitions", label: "Transitions", glyph: "↪️" },
-];
+export const SFX_CATEGORIES = [
+  "Ambience",
+  "Nature",
+  "Urban",
+  "Foley",
+  "Sci-Fi",
+  "Horror",
+  "Comedy",
+  "Impact",
+] as const;
 
-/** Mood chips with compact modern glyphs for scanability. */
-export const MOOD_CHIPS: ReadonlyArray<{ id: string; label: string; glyph: string }> = [
-  { id: "epic", label: "Epic", glyph: "✨" },
-  { id: "uplifting", label: "Uplifting", glyph: "☀️" },
-  { id: "chill", label: "Chill", glyph: "🌿" },
-  { id: "sad", label: "Sad", glyph: "🌧" },
-  { id: "romantic", label: "Romantic", glyph: "❤️" },
-  { id: "energetic", label: "Energetic", glyph: "⚡" },
-  { id: "mysterious", label: "Mysterious", glyph: "🔮" },
-  { id: "dark", label: "Dark", glyph: "🌙" },
-  { id: "peaceful", label: "Peaceful", glyph: "😌" },
-  { id: "dreamy", label: "Dreamy", glyph: "💭" },
-  { id: "playful", label: "Playful", glyph: "🎈" },
-  { id: "aggressive", label: "Aggressive", glyph: "🔥" },
-  { id: "hopeful", label: "Hopeful", glyph: "🌅" },
-  { id: "nostalgic", label: "Nostalgic", glyph: "📷" },
-  { id: "tense", label: "Tense", glyph: "⏱" },
-  { id: "triumphant", label: "Triumphant", glyph: "🏆" },
-];
+export const MOOD_CHIPS = [
+  "epic",
+  "uplifting",
+  "chill",
+  "sad",
+  "romantic",
+  "energetic",
+  "mysterious",
+  "dark",
+  "peaceful",
+  "dreamy",
+] as const;
 
 export const LOADING_STEPS = [
-  "Preparing…",
-  "Composing…",
-  "Generating…",
-  "Processing audio…",
-  "Finalizing…",
-];
+  "Tuning instruments…",
+  "Writing the arrangement…",
+  "Mixing the track…",
+  "Mastering…",
+  "Almost ready…",
+] as const;
 
-/** Compact type badges for results / history. */
-export function musicModeBadge(mode: string): { emoji: string; label: string } {
+export function modeHint(mode: string): string {
   switch (mode) {
-    case "voiceover":
-      return { emoji: "🎙", label: "Voiceover" };
-    case "instrumental":
-    case "bgm":
-      return { emoji: "🎹", label: "Instrumental" };
-    case "sfx":
-      return { emoji: "🔊", label: "Sound Effect" };
-    case "video_music":
-      return { emoji: "🎬", label: "Video Music" };
     case "song":
+      return "Vocals + full arrangement";
+    case "instrumental":
+      return "No vocals";
+    case "bgm":
+      return "Background score";
+    case "voiceover":
+      return "Script → speech";
+    case "sfx":
+      return "SFX & ambience";
+    case "video_music":
+      return "Video soundtrack";
     default:
-      return { emoji: "🎵", label: "Music" };
+      return "";
   }
 }
