@@ -1,0 +1,36 @@
+name: fix-r2-aspects
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fix-r2-aspects.yml"
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix aspects and music category
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("src/lib/r2-catalog.ts")
+          t = p.read_text()
+          t = t.replace('aspectRatio: "3:4"', 'aspectRatio: "1:1"')
+          t = t.replace(
+            'filename: "Music_banner.png",\n    aspectRatio: "16:9"',
+            'filename: "Music_banner.png",\n    aspectRatio: "1:1"',
+          )
+          t = t.replace('homepageCategory: "music"', 'homepageCategory: "video"')
+          p.write_text(t)
+          print("3:4 left", t.count('aspectRatio: "3:4"'))
+          print("music cat left", t.count('homepageCategory: "music"'))
+          PY
+      - name: Commit
+        run: |
+          git config user.name "catalog-fix"
+          git config user.email "fix@motio2edit.local"
+          git add src/lib/r2-catalog.ts
+          git commit -m "fix(samples): image aspect 1:1 real pixels; drop music homepageCategory" || echo nochange
+          git push
