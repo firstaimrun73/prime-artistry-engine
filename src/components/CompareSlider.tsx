@@ -14,7 +14,7 @@ type Props = {
    * Remove BG: pass rose e.g. #f43f5e.
    */
   accentColor?: string;
-  /** Show checkerboard behind after image (for transparent PNGs). */
+  /** Show checkerboard behind after image (for transparent PNGs / keyed JPEGs). */
   transparentAfter?: boolean;
 };
 
@@ -29,9 +29,72 @@ const CHECKER = {
 } as const;
 
 /**
- * If after is JPEG with solid black bg (no alpha), convert near-black to transparent
- * so checkerboard shows — matches Rose PNG behaviour for Portrait/Car demos.
+ * Convert solid black (or near-black) demo backgrounds to transparent so the
+ * checkerboard shows — matches true PNG cutouts (Rose).
+ * Uses edge flood-fill so dark subject pixels (hair, car paint) stay opaque.
  */
+function keyBlackBackgroundToTransparent(
+  img: HTMLImageElement,
+): string | null {
+  try {
+    const w = img.naturalWidth || 1;
+    const h = img.naturalHeight || 1;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const d = imageData.data;
+    const n = w * h;
+    const visited = new Uint8Array(n);
+
+    const isBg = (i: number) => {
+      const o = i * 4;
+      const r = d[o]!;
+      const g = d[o + 1]!;
+      const b = d[o + 2]!;
+      return r < 42 && g < 42 && b < 42;
+    };
+
+    const stack: number[] = [];
+    const push = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x >= w || y >= h) return;
+      const i = y * w + x;
+      if (visited[i]) return;
+      if (!isBg(i)) return;
+      visited[i] = 1;
+      stack.push(i);
+    };
+
+    for (let x = 0; x < w; x++) {
+      push(x, 0);
+      push(x, h - 1);
+    }
+    for (let y = 0; y < h; y++) {
+      push(0, y);
+      push(w - 1, y);
+    }
+
+    while (stack.length) {
+      const i = stack.pop()!;
+      d[i * 4 + 3] = 0;
+      const x = i % w;
+      const y = (i / w) | 0;
+      push(x + 1, y);
+      push(x - 1, y);
+      push(x, y + 1);
+      push(x, y - 1);
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
+}
+
 function useTransparentAfterUrl(afterUrl: string, enabled: boolean) {
   const [url, setUrl] = useState(afterUrl);
 
@@ -45,34 +108,8 @@ function useTransparentAfterUrl(afterUrl: string, enabled: boolean) {
     img.crossOrigin = "anonymous";
     img.onload = () => {
       if (cancelled) return;
-      try {
-        const w = img.naturalWidth || 1;
-        const h = img.naturalHeight || 1;
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          setUrl(afterUrl);
-          return;
-        }
-        ctx.drawImage(img, 0, 0);
-        const data = ctx.getImageData(0, 0, w, h);
-        const d = data.data;
-        // Key out near-black pixels (demo assets with solid black bg)
-        for (let i = 0; i < d.length; i += 4) {
-          const r = d[i]!;
-          const g = d[i + 1]!;
-          const b = d[i + 2]!;
-          if (r < 18 && g < 18 && b < 18) {
-            d[i + 3] = 0;
-          }
-        }
-        ctx.putImageData(data, 0, 0);
-        setUrl(canvas.toDataURL("image/png"));
-      } catch {
-        setUrl(afterUrl);
-      }
+      const keyed = keyBlackBackgroundToTransparent(img);
+      setUrl(keyed || afterUrl);
     };
     img.onerror = () => {
       if (!cancelled) setUrl(afterUrl);
@@ -111,7 +148,8 @@ export function CompareSlider({
 
   useEffect(() => {
     let cancelled = false;
-    if (!rawAfter) {
+    const src = beforeUrl || rawAfter;
+    if (!src) {
       setRatio(1);
       return;
     }
@@ -125,11 +163,11 @@ export function CompareSlider({
     img.onerror = () => {
       if (!cancelled) setRatio(1);
     };
-    img.src = rawAfter;
+    img.src = src;
     return () => {
       cancelled = true;
     };
-  }, [rawAfter]);
+  }, [beforeUrl, rawAfter]);
 
   useEffect(() => {
     const outer = outerRef.current;
@@ -228,7 +266,7 @@ export function CompareSlider({
           alt="After"
           draggable={false}
           className="pointer-events-none absolute inset-0 h-full w-full"
-          style={{ objectFit: "contain" }}
+          style={{ objectFit: "contain", objectPosition: "center" }}
         />
         <div
           className="pointer-events-none absolute inset-0"
@@ -239,7 +277,7 @@ export function CompareSlider({
             alt="Before"
             draggable={false}
             className="absolute inset-0 h-full w-full"
-            style={{ objectFit: "contain" }}
+            style={{ objectFit: "contain", objectPosition: "center" }}
           />
         </div>
         <div
