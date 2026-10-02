@@ -1,10 +1,10 @@
-/** Shared Music Studio constants — modes, durations, chips, voices. */
+import type { MusicMode } from "@/lib/music.functions";
 
 /** Canonical xAI TTS voice IDs — must match xai/tts/v1 VoiceEnum. */
 export type VoiceId = "eve" | "ara" | "rex" | "sal" | "leo";
 
 /**
- * Voice library entries.
+ * Voice library for AI Voice mode.
  * previewSrc: permanent R2 CDN sample — never generate on click.
  */
 export const VOICES: ReadonlyArray<{
@@ -84,29 +84,29 @@ export const SFX_DURATIONS = [
   { s: 30, label: "30s" },
 ] as const;
 
-export const SFX_CATEGORIES = [
-  "Ambience",
-  "Nature",
-  "Urban",
-  "Foley",
-  "Sci-Fi",
-  "Horror",
-  "Comedy",
-  "Impact",
-] as const;
+export const SFX_CATEGORIES: ReadonlyArray<{ id: string; label: string; glyph: string }> = [
+  { id: "ambience", label: "Ambience", glyph: "🌫️" },
+  { id: "nature", label: "Nature", glyph: "🌿" },
+  { id: "urban", label: "Urban", glyph: "🏙️" },
+  { id: "foley", label: "Foley", glyph: "👣" },
+  { id: "sci-fi", label: "Sci-Fi", glyph: "🛸" },
+  { id: "horror", label: "Horror", glyph: "👻" },
+  { id: "comedy", label: "Comedy", glyph: "😄" },
+  { id: "impact", label: "Impact", glyph: "💥" },
+];
 
-export const MOOD_CHIPS = [
-  "epic",
-  "uplifting",
-  "chill",
-  "sad",
-  "romantic",
-  "energetic",
-  "mysterious",
-  "dark",
-  "peaceful",
-  "dreamy",
-] as const;
+export const MOOD_CHIPS: ReadonlyArray<{ id: string; label: string; glyph: string }> = [
+  { id: "epic", label: "Epic", glyph: "⚔️" },
+  { id: "uplifting", label: "Uplifting", glyph: "☀️" },
+  { id: "chill", label: "Chill", glyph: "😌" },
+  { id: "sad", label: "Sad", glyph: "😢" },
+  { id: "romantic", label: "Romantic", glyph: "💕" },
+  { id: "energetic", label: "Energetic", glyph: "⚡" },
+  { id: "mysterious", label: "Mysterious", glyph: "🔮" },
+  { id: "dark", label: "Dark", glyph: "🌑" },
+  { id: "peaceful", label: "Peaceful", glyph: "🕊️" },
+  { id: "dreamy", label: "Dreamy", glyph: "✨" },
+];
 
 export const LOADING_STEPS = [
   "Tuning instruments…",
@@ -116,21 +116,21 @@ export const LOADING_STEPS = [
   "Almost ready…",
 ] as const;
 
-export function modeHint(mode: string): string {
+export function musicModeBadge(mode: string): { emoji: string; label: string } {
   switch (mode) {
     case "song":
-      return "Vocals + full arrangement";
+      return { emoji: "🎵", label: "Music" };
     case "instrumental":
-      return "No vocals";
+      return { emoji: "🎹", label: "Instrumental" };
     case "bgm":
-      return "Background score";
+      return { emoji: "📻", label: "BGM" };
     case "voiceover":
-      return "Script → speech";
+      return { emoji: "🎙️", label: "AI Voice" };
     case "sfx":
-      return "SFX & ambience";
+      return { emoji: "🔊", label: "Sound" };
     case "video_music":
-      return "Video soundtrack";
+      return { emoji: "🎬", label: "Video Music" };
     default:
-      return "";
+      return { emoji: "🎵", label: mode || "Music" };
   }
 }
