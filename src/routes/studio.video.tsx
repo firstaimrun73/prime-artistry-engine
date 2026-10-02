@@ -418,7 +418,7 @@ function VideoStudioPage() {
         {/* Mode selector */}
         <VideoModeSelector mode={mode} onChange={handleModeChange} disabled={busy} />
 
-        {/* Source upload (image / video modes) */
+        {/* Source upload (image / video modes) */}
         {(mode === "image" || mode === "video") && (
           <VideoSourceUpload
             mode={mode === "image" ? "image" : "video"}
