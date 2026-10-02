@@ -23,6 +23,15 @@ export const Route = createFileRoute("/pricing")({
   component: PricingPage,
 });
 
+function formatPlanPrice(amount: number, currency: DisplayCurrency): string {
+  if (amount === 0) return "Free";
+  const symbols: Record<DisplayCurrency, string> = { USD: "$", EUR: "€", INR: "₹" };
+  const sym = symbols[currency] ?? "$";
+  if (currency === "INR") return `${sym}${Math.round(amount).toLocaleString("en-IN")}`;
+  if (Number.isInteger(amount)) return `${sym}${amount}`;
+  return `${sym}${amount.toFixed(2)}`;
+}
+
 function PricingPage() {
   const { profile } = useAuth();
   const { t } = useI18n();
@@ -32,7 +41,7 @@ function PricingPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("motio2edit-display-currency");
-      if (saved && DISPLAY_CURRENCIES.some((c) => c.code === saved)) {
+      if (saved && (DISPLAY_CURRENCIES as string[]).includes(saved)) {
         setCurrency(saved as DisplayCurrency);
       }
     } catch {
@@ -67,26 +76,26 @@ function PricingPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          {DISPLAY_CURRENCIES.map((c) => (
+          {DISPLAY_CURRENCIES.map((code) => (
             <button
-              key={c.code}
+              key={code}
               type="button"
               onClick={() => {
-                setCurrency(c.code);
+                setCurrency(code);
                 try {
-                  localStorage.setItem("motio2edit-display-currency", c.code);
+                  localStorage.setItem("motio2edit-display-currency", code);
                 } catch {
                   /* ignore */
                 }
               }}
               className={cn(
                 "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
-                currency === c.code
+                currency === code
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border text-muted-foreground hover:border-primary",
               )}
             >
-              {c.code}
+              {code}
             </button>
           ))}
         </div>
@@ -95,8 +104,9 @@ function PricingPage() {
           {visiblePlans.map((plan) => {
             const highlight = plan.id === "pro" || plan.id === "studio";
             const isCurrent = profile?.plan === plan.id;
-            // DISPLAY_PRICES values are already formatted strings (e.g. "$4.99", "₹399")
-            const priceLabel = DISPLAY_PRICES[plan.id]?.[currency] ?? "—";
+            const raw = DISPLAY_PRICES[plan.id]?.[currency];
+            const priceLabel =
+              typeof raw === "number" ? formatPlanPrice(raw, currency) : raw ?? "—";
 
             return (
               <div
