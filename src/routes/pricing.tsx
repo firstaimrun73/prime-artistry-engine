@@ -12,6 +12,7 @@ import {
   DISPLAY_CURRENCIES,
   toCheckoutCurrency,
   PRICING_SHOW_PLAN_IDS,
+  PRICING_POPULAR_PLAN_ID,
   type DisplayCurrency,
   type PlanId,
 } from "@/lib/plans";
@@ -102,7 +103,7 @@ function PricingPage() {
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visiblePlans.map((plan) => {
-            const highlight = plan.id === "pro" || plan.id === "studio";
+            const highlight = plan.id === PRICING_POPULAR_PLAN_ID;
             const isCurrent = profile?.plan === plan.id;
             const raw = DISPLAY_PRICES[plan.id]?.[currency];
             const priceLabel =
@@ -126,9 +127,7 @@ function PricingPage() {
                   <h2 className="text-lg font-bold">{plan.name}</h2>
                 </div>
                 <p className="mt-3 text-3xl font-extrabold tracking-tight">{priceLabel}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {plan.id === "free" ? "Forever free" : "per month"}
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">per month</p>
                 <div className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
                   <Coins className="h-4 w-4" />
                   {plan.credits.toLocaleString()} credits / month
@@ -141,11 +140,9 @@ function PricingPage() {
                     </li>
                   ))}
                 </ul>
-                {plan.id !== "free" && (
-                  <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
-                    <Check className="h-3.5 w-3.5" /> Watermark-free downloads
-                  </p>
-                )}
+                <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
+                  <Check className="h-3.5 w-3.5" /> Watermark-free downloads
+                </p>
                 {isCurrent ? (
                   <Button className="mt-8 w-full" variant="outline" disabled style={{ marginTop: "auto" }}>
                     Activated
@@ -154,18 +151,10 @@ function PricingPage() {
                   <Button
                     className="mt-8 w-full"
                     variant={highlight ? "default" : "outline"}
-                    onClick={() =>
-                      plan.id === "free"
-                        ? navigate({ to: "/auth", search: { redirect: undefined } })
-                        : selectPlan(plan.id)
-                    }
+                    onClick={() => selectPlan(plan.id)}
                     style={{ marginTop: "auto" }}
                   >
-                    {plan.id === "free"
-                      ? profile
-                        ? "Free Plan"
-                        : "Get Started Free"
-                      : `Upgrade to ${plan.name}`}
+                    {`Upgrade to ${plan.name}`}
                   </Button>
                 )}
               </div>
@@ -178,7 +167,7 @@ function PricingPage() {
             *Master Studio supports the longest prompts on Motio2edit.
           </p>
           <p className="text-xs text-muted-foreground">
-            Secure checkout via Razorpay, PayPal or crypto.
+            Secure checkout via Razorpay and PayPal.
           </p>
         </div>
       </div>
