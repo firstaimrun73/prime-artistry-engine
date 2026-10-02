@@ -1,12 +1,19 @@
 /**
- * Video credit pricing — single source of truth (AI Video Studio blueprint §2).
- *
- * Retail rate: $0.004 / credit
- * Base generation: 125 credits ≈ $0.50 for a 5s Standard clip
- *
- * Frontend MUST call computeVideoCreditCost for live previews.
- * Server MUST re-run the same function before charging.
+ * @deprecated LEGACY display helpers only.
+ * Authoritative Video billing: video-capability-registry COGS → customer-pricing staircase.
+ * Do NOT use VIDEO_DURATION_BASE_CREDITS for live charges.
+ * Max user-facing duration is 15s.
  */
+/**
+ * @deprecated LEGACY client estimate helpers only.
+ * Authoritative Video billing is:
+ *   video-capability-registry → provider COGS → customer-pricing staircase → quote lifecycle
+ * Do NOT use computeVideoCreditCost for live charges.
+ * Live path: @/lib/motio-video-credits + @/lib/billing/customer-pricing
+ *
+ * Historical fixed tables (125/220/320/…) retained for old UI imports only.
+ */
+
 
 import type { PlanId } from "./plans";
 
@@ -15,13 +22,13 @@ export const CREDIT_RETAIL_USD = 0.004;
 /** Base credits for one 5-second Standard generation. */
 export const VIDEO_BASE_CREDITS = 125;
 
-export type VideoDurationSec = 5 | 10 | 15 | 20 | 25 | 30;
+export type VideoDurationSec = 5 | 10 | 15; // max 15s — 20/25/30 removed
 export type VideoAspectId = "16:9" | "9:16" | "1:1" | "4:3" | "custom";
 export type VideoQualityId = "480p" | "720p" | "1080p" | "2k" | "4k" | "8k";
 /** User-facing tier — never expose underlying model vendor names. */
 export type VideoModelTierUi = "standard" | "advanced";
 
-export const VIDEO_DURATION_OPTIONS: VideoDurationSec[] = [5, 10, 15, 20, 25, 30];
+export const VIDEO_DURATION_OPTIONS: VideoDurationSec[] = [5, 10, 15];
 
 export const VIDEO_QUALITY_OPTIONS: {
   id: VideoQualityId;
@@ -44,9 +51,6 @@ export const VIDEO_DURATION_BASE_CREDITS: Record<VideoDurationSec, number> = {
   5: 125,
   10: 220,
   15: 320,
-  20: 420,
-  25: 520,
-  30: 620,
 };
 
 /**
@@ -57,9 +61,6 @@ export const VIDEO_ADVANCED_BASE_CREDITS: Record<VideoDurationSec, number> = {
   5: 800,
   10: 1500,
   15: 2200,
-  20: 2900,
-  25: 3600,
-  30: 4300,
 };
 
 export type VideoPriceInput = {
@@ -127,7 +128,7 @@ export function videoEfficiencyScore(input: {
   quality: VideoQualityId;
   tier: VideoModelTierUi;
 }): number {
-  const durPart = (input.duration - 5) / 25; // 0..1
+  const durPart = (input.duration - 5) / 10; // 0..1
   const qIdx = VIDEO_QUALITY_OPTIONS.findIndex((o) => o.id === input.quality);
   const qPart = Math.max(0, qIdx) / Math.max(1, VIDEO_QUALITY_OPTIONS.length - 1);
   const tierPart = input.tier === "advanced" ? 0.35 : 0;
