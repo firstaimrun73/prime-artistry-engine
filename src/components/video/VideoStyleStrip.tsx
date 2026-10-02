@@ -2,8 +2,9 @@
  * Horizontal style strip — R2 thumbnails, tier badges, locks, selected preview loop.
  * None tile is a circle; right fade hides at end of scroll.
  * Accepts styleId (canonical) or selectedId (live page alias).
+ * Locks: AI+ → Plus+, Premium → Pro+ (already in canUseStyle).
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Lock, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
@@ -50,24 +51,41 @@ export function VideoStyleStrip({
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [lockedStyle, setLockedStyle] = useState<VideoStyleUi | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [atEnd, setAtEnd] = useState(false);
+  const [atEnd, setAtEnd] = useState(true); // start true so fade is off until measured
+
+  const checkEnd = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    // No overflow → treat as at end (fade off)
+    if (max <= 4) {
+      setAtEnd(true);
+      return;
+    }
+    // At (or very near) the right edge → fade off
+    setAtEnd(el.scrollLeft >= max - 6);
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const check = () => {
-      const max = el.scrollWidth - el.clientWidth;
-      setAtEnd(max <= 2 || el.scrollLeft >= max - 4);
-    };
-    check();
-    el.addEventListener("scroll", check, { passive: true });
-    const ro = new ResizeObserver(check);
+    checkEnd();
+    // Re-check after layout / images settle
+    const t1 = window.setTimeout(checkEnd, 50);
+    const t2 = window.setTimeout(checkEnd, 300);
+    el.addEventListener("scroll", checkEnd, { passive: true });
+    const ro = new ResizeObserver(() => {
+      // next frame so scrollWidth is accurate after size change
+      requestAnimationFrame(checkEnd);
+    });
     ro.observe(el);
     return () => {
-      el.removeEventListener("scroll", check);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      el.removeEventListener("scroll", checkEnd);
       ro.disconnect();
     };
-  }, [styles.length]);
+  }, [styles.length, checkEnd]);
 
   return (
     <section className="mb-4">
@@ -181,9 +199,10 @@ export function VideoStyleStrip({
             );
           })}
         </div>
+        {/* Far-edge fade: only while there is more content to the right */}
         {!atEnd && (
           <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#FFF1E8] to-transparent"
+            className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#FFF8F3] via-[#FFF8F3]/80 to-transparent"
             aria-hidden
           />
         )}
