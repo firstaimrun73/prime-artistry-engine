@@ -1,44 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { Loader2, Pause, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VOICES, type VoiceId } from "@/components/music/musicStudioData";
-import { getVoicePreview } from "@/lib/music.functions";
 
-/** Session cache — never re-fetch the same voice. */
-const urlCache = new Map<VoiceId, string>();
-/** In-flight fetch promises so double-taps share one request. */
-const inflight = new Map<VoiceId, Promise<string>>();
-
-async function resolvePreviewUrl(
-  voiceId: VoiceId,
-  staticSrc: string,
-  fetchPreview: (id: VoiceId) => Promise<string>,
-): Promise<string> {
-  const cached = urlCache.get(voiceId);
-  if (cached) return cached;
-
-  const pending = inflight.get(voiceId);
-  if (pending) return pending;
-
-  const work = (async () => {
-    // Prefer permanent CDN / public static previews — never generate for samples.
-    if (staticSrc && (staticSrc.startsWith("/") || staticSrc.startsWith("https://"))) {
-      urlCache.set(voiceId, staticSrc);
-      return staticSrc;
-    }
-    const url = await fetchPreview(voiceId);
-    urlCache.set(voiceId, url);
-    return url;
-  })();
-
-  inflight.set(voiceId, work);
-  try {
-    return await work;
-  } finally {
-    inflight.delete(voiceId);
-  }
-}
+/**
+ * AI Voice library — static R2 CDN previews only.
+ * Never calls getVoicePreview / xAI / fal for sample playback.
+ * One voice at a time; race-safe play token.
+ */
 
 export function MusicVoiceLibrary({
   value,
@@ -47,29 +16,32 @@ export function MusicVoiceLibrary({
   value: VoiceId;
   onChange: (id: VoiceId) => void;
 }) {
-  const getPreview = useServerFn(getVoicePreview);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playTokenRef = useRef(0);
   const [playingId, setPlayingId] = useState<VoiceId | null>(null);
   const [loadingId, setLoadingId] = useState<VoiceId | null>(null);
 
   const stop = useCallback(() => {
+    playTokenRef.current += 1;
     const a = audioRef.current;
     if (a) {
-      a.pause();
-      a.currentTime = 0;
+      a.onended = null;
+      a.onerror = null;
+      a.oncanplay = null;
+      try {
+        a.pause();
+        a.removeAttribute("src");
+        a.load();
+      } catch {
+        /* ignore */
+      }
     }
+    audioRef.current = null;
     setPlayingId(null);
+    setLoadingId(null);
   }, []);
 
   useEffect(() => () => stop(), [stop]);
-
-  useEffect(() => {
-    const first = VOICES[0];
-    if (!first || urlCache.has(first.id)) return;
-    if (first.previewSrc.startsWith("/") || first.previewSrc.startsWith("https://")) {
-      urlCache.set(first.id, first.previewSrc);
-    }
-  }, []);
 
   const play = useCallback(
     async (id: VoiceId, staticSrc: string) => {
@@ -79,55 +51,75 @@ export function MusicVoiceLibrary({
       }
 
       stop();
+      const token = ++playTokenRef.current;
       setLoadingId(id);
 
-      try {
-        const url = await resolvePreviewUrl(id, staticSrc, async (voiceId) => {
-          // Fallback only if static CDN missing — still returns R2 static URL from server.
-          const res = await getPreview({ data: { voice: voiceId } });
-          if (!res?.url) throw new Error("No preview URL");
-          return res.url;
-        });
+      const url = (staticSrc || "").trim();
+      if (!url.startsWith("https://") && !url.startsWith("/")) {
+        setLoadingId(null);
+        return;
+      }
 
+      try {
         const audio = new Audio();
         audio.preload = "auto";
+        audio.crossOrigin = "anonymous";
         audio.src = url;
         audioRef.current = audio;
 
-        audio.onended = () => setPlayingId(null);
-        audio.onerror = () => {
-          setPlayingId(null);
-          setLoadingId(null);
-        };
-
-        const tryPlay = async () => {
-          try {
-            await audio.play();
-            setPlayingId(id);
-            setLoadingId(null);
-          } catch {
-            setLoadingId(null);
+        audio.onended = () => {
+          if (playTokenRef.current === token) {
             setPlayingId(null);
+            setLoadingId(null);
+          }
+        };
+        audio.onerror = () => {
+          if (playTokenRef.current === token) {
+            setPlayingId(null);
+            setLoadingId(null);
           }
         };
 
-        if (audio.readyState >= 2) {
-          void tryPlay();
-        } else {
-          audio.oncanplay = () => {
-            void tryPlay();
+        await new Promise<void>((resolve, reject) => {
+          const onReady = () => {
+            audio.removeEventListener("canplaythrough", onReady);
+            audio.removeEventListener("error", onErr);
+            resolve();
           };
-          // Safety timeout so spinner does not stick if CDN is slow
-          window.setTimeout(() => {
-            if (loadingId === id) setLoadingId(null);
-          }, 8000);
+          const onErr = () => {
+            audio.removeEventListener("canplaythrough", onReady);
+            audio.removeEventListener("error", onErr);
+            reject(new Error("preview load failed"));
+          };
+          if (audio.readyState >= 3) resolve();
+          else {
+            audio.addEventListener("canplaythrough", onReady);
+            audio.addEventListener("error", onErr);
+            window.setTimeout(() => resolve(), 2500);
+          }
+        });
+
+        if (playTokenRef.current !== token) return;
+
+        await audio.play();
+        if (playTokenRef.current !== token) {
+          try {
+            audio.pause();
+          } catch {
+            /* ignore */
+          }
+          return;
         }
-      } catch {
+        setPlayingId(id);
         setLoadingId(null);
-        setPlayingId(null);
+      } catch {
+        if (playTokenRef.current === token) {
+          setLoadingId(null);
+          setPlayingId(null);
+        }
       }
     },
-    [getPreview, playingId, stop, loadingId],
+    [playingId, stop],
   );
 
   return (
