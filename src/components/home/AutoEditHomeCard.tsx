@@ -2,11 +2,10 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
 /**
- * ACE Auto Edit — Ace of Diamonds card with overlapping flow carousel.
- * 3 example loops: original → process → result.
- * Auto-plays only 1–2 full cycles, then stays on last frame (not constant).
- * Skips any step whose image fails to load — never leaves blank placeholders.
- * Powered by Maluto AI (matches /studio/image/auto-edit branding).
+ * ACE Auto Edit — Ace of Diamonds card with before → process → result carousel.
+ * Uses real Motio2edit sample pairs (photo enhance demos).
+ * Auto-plays a few cycles, then holds on the last frame.
+ * Powered by Maluto AI (product name for Auto Edit).
  */
 
 type Step = { src: string; label: string };
@@ -16,6 +15,7 @@ type Example = {
   steps: Step[];
 };
 
+/** Before / process / result from public R2 samples (circle + image studio). */
 const EXAMPLES: Example[] = [
   {
     id: "street",
@@ -35,24 +35,7 @@ const EXAMPLES: Example[] = [
     ],
   },
   {
-    id: "rose",
-    steps: [
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/file_000000001b80821091ce891b23fc036f.png",
-        label: "Original",
-      },
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/file_000000008dc481f4b1f73107c3caa1c1.png",
-        label: "Processing",
-      },
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/file_000000008dc481f4b1f73107c3caa1c1.png",
-        label: "Result",
-      },
-    ],
-  },
-  {
-    id: "car",
+    id: "detail",
     steps: [
       {
         src: "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0003.jpg",
@@ -83,7 +66,6 @@ export function AutoEditHomeCard() {
 
   const example = EXAMPLES[exIdx]!;
 
-  // Preload all images; mark failures so we skip them
   useEffect(() => {
     const map: Record<string, boolean> = {};
     let pending = 0;
@@ -110,7 +92,6 @@ export function AutoEditHomeCard() {
     return example.steps.filter((s) => loaded[s.src] !== false);
   }, [example, loaded]);
 
-  // Auto-play limited cycles only
   useEffect(() => {
     if (!playing || cycles >= MAX_AUTO_CYCLES) return;
     if (visibleSteps.length === 0) return;
@@ -118,24 +99,19 @@ export function AutoEditHomeCard() {
     const t = window.setTimeout(() => {
       if (stepIdx < visibleSteps.length - 1) {
         setStepIdx((i) => i + 1);
+      } else if (exIdx < EXAMPLES.length - 1) {
+        setExIdx((i) => i + 1);
+        setStepIdx(0);
       } else {
-        // end of example → next example or finish cycle
-        if (exIdx < EXAMPLES.length - 1) {
-          setExIdx((i) => i + 1);
-          setStepIdx(0);
-        } else {
-          setCycles((c) => c + 1);
-          setExIdx(0);
-          setStepIdx(0);
-          if (cycles + 1 >= MAX_AUTO_CYCLES) setPlaying(false);
-        }
+        setCycles((c) => c + 1);
+        setExIdx(0);
+        setStepIdx(0);
+        if (cycles + 1 >= MAX_AUTO_CYCLES) setPlaying(false);
       }
     }, stepIdx === visibleSteps.length - 1 ? EXAMPLE_PAUSE_MS : STEP_MS);
 
     return () => window.clearTimeout(t);
   }, [playing, cycles, stepIdx, exIdx, visibleSteps.length]);
-
-  const current = visibleSteps[Math.min(stepIdx, Math.max(0, visibleSteps.length - 1))];
 
   return (
     <Link
@@ -153,7 +129,7 @@ export function AutoEditHomeCard() {
           <span className="text-[12px] text-red-600">♦</span>
         </div>
 
-        {/* Overlapping flow stage cards */}
+        {/* Stage */}
         <div className="relative mx-auto mt-8 h-[52%] w-[88%]">
           {visibleSteps.map((s, i) => {
             const active = i === stepIdx;
@@ -194,7 +170,6 @@ export function AutoEditHomeCard() {
             );
           })}
 
-          {/* Tiny flow dots under stage */}
           <div className="absolute -bottom-5 left-0 right-0 flex items-center justify-center gap-1.5">
             {visibleSteps.map((_, i) => (
               <span
