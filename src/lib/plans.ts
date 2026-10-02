@@ -106,6 +106,12 @@ export type Plan = {
  *   Lite $4.99 / 350 · Plus $9.99 / 800 · Pro $29.99 / 2,500
  *   AI Studio $55 / 5,000 · Master Studio $110 / 10,000
  * Free stays in the array for profile.plan === "free" only — not sold.
+ *
+ * Modes:
+ *   Image: Standard · Premium · Ultra AI
+ *   Video: Standard · Premium
+ *   Music: Standard · Premium + 6 generation categories (Song, Instrumental, Voiceover, SFX, BGM, AI Voice)
+ *   + Circle 2edit, Cropmix, Remove BG, Auto Edit, Filters, multi-image
  */
 export const PLANS: Plan[] = [
   {
@@ -118,7 +124,7 @@ export const PLANS: Plan[] = [
     price: { USD: 0, EUR: 0, INR: 0 },
     features: [
       `${FREE_SIGNUP_CREDITS} starter credits`,
-      "Image Studio basics",
+      "Image Studio — Standard mode",
       "Watermark-free downloads",
       "Music Studio limited",
     ],
@@ -133,10 +139,12 @@ export const PLANS: Plan[] = [
     price: { USD: 4.99, EUR: 4.59, INR: 449 },
     features: [
       "350 credits / month",
-      "Image Studio",
-      "Video Studio (standard)",
-      "Music Studio — song & instrumental",
-      "Standard quality",
+      "Image Studio — Standard mode",
+      "Video Studio — Standard mode",
+      "Music Studio — Standard · Song & Instrumental",
+      "Circle 2edit · Cropmix · Remove BG",
+      "Multi-image (up to 5 references)",
+      "Watermark-free downloads",
     ],
   },
   {
@@ -149,10 +157,13 @@ export const PLANS: Plan[] = [
     price: { USD: 9.99, EUR: 9.19, INR: 899 },
     features: [
       "800 credits / month",
-      "Image + Video + Music",
-      "All music modes (BGM, voice, SFX)",
+      "Image Studio — Standard mode",
+      "Video Studio — Standard mode",
+      "Music — Standard · all 6 modes (Song, Instrumental, Voiceover, SFX, BGM, AI Voice)",
       "Longer tracks (up to 90s)",
-      "Standard quality",
+      "Circle 2edit · Cropmix · Auto Edit · Filters",
+      "Multi-image (up to 10 references)",
+      "Watermark-free downloads",
     ],
   },
   {
@@ -165,10 +176,13 @@ export const PLANS: Plan[] = [
     price: { USD: 29.99, EUR: 27.49, INR: 2699 },
     features: [
       "2,500 credits / month",
-      "Premium Music quality",
-      "Priority queue",
-      "Longer video clips",
-      "All music modes + 120s tracks",
+      "Image Studio — Standard + Premium",
+      "Video Studio — Standard + Premium",
+      "Music — Premium quality · all 6 generation modes",
+      "Priority queue · longer video clips",
+      "120s music tracks",
+      "Circle 2edit · all image tools · multi-image (10)",
+      "Watermark-free downloads",
     ],
   },
   {
@@ -181,10 +195,12 @@ export const PLANS: Plan[] = [
     price: { USD: 55, EUR: 50.99, INR: 4999 },
     features: [
       "5,000 credits / month",
-      "Ultra AI quality access",
-      "120s music tracks",
-      "Higher concurrency",
-      "Priority queue",
+      "Image Studio — Standard + Premium + Ultra AI",
+      "Video Studio — Standard + Premium",
+      "Music — Premium · all 6 modes · 120s tracks",
+      "Higher concurrency · priority queue",
+      "Circle 2edit · full toolset · multi-image (10)",
+      "Watermark-free downloads",
     ],
   },
   {
@@ -197,11 +213,13 @@ export const PLANS: Plan[] = [
     price: { USD: 110, EUR: 101.99, INR: 9999 },
     features: [
       "10,000 credits / month",
-      "Everything in AI Studio",
-      "Full Ultra AI + every mode",
+      "Image — Standard + Premium + full Ultra AI",
+      "Video — Standard + Premium",
+      "Music — Premium · all 6 modes · longest tracks",
       "IMAX + 8K Max + custom aspect",
       "Highest concurrency & priority",
-      "Master Studio tools",
+      "Circle 2edit · every studio tool · multi-image (10)",
+      "Master Studio tools · watermark-free",
     ],
   },
 ];
