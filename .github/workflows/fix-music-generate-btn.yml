@@ -1,115 +1,19 @@
-name: FIX Music Generate button credits
+name: FIX Music Generate button credits (NEUTRALIZED)
+
+# Permanently disabled. Do not re-enable.
+# This workflow used to inject Estimate credits, Info button, and
+# "Quotes use the same server engine…" backend text under Generate.
+# Those UI elements are banned. MusicStudioPage owns Generate UI only.
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - ".github/workflows/fix-music-generate-btn.yml"
 
 jobs:
-  fix:
+  noop:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Patch Generate button area
+      - name: Neutralized
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-          p = Path("src/components/music/MusicStudioPage.tsx")
-          t = p.read_text()
-          # Ensure Info import
-          if "Info" not in t:
-              t = t.replace(
-                  'from "lucide-react";',
-                  'Info } from "lucide-react";'.replace("Info }", "Info") if False else t,
-              )
-              t = t.replace(
-                  'Lock } from "lucide-react";',
-                  'Lock, Info } from "lucide-react";',
-              )
-          if "showCostInfo" not in t:
-              t = t.replace(
-                  "const [musicCaps, setMusicCaps]",
-                  "const [showCostInfo, setShowCostInfo] = useState(false);\n  const [musicCaps, setMusicCaps]",
-              )
-          # Replace broken Generate button block with clean version
-          # Match from {/* Generate */} through not-enough-credits paragraph
-          pattern = re.compile(
-              r"\{/\* Generate \*/\}.*?\{!canAfford && estCredits != null && \([\s\S]*?</p>\s*\)\}",
-              re.MULTILINE,
-          )
-          replacement = '''{/* Generate */}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                disabled={loading || uploading || !canAfford}
-                onClick={() => void onGenerate()}
-                className="min-w-0 flex-1 gap-2 bg-gradient-to-r from-orange-500 to-purple-600 text-white shadow-md"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {loading ? LOADING[loadingStep] : "Generate"}
-              </Button>
-              <button
-                type="button"
-                onClick={() => setShowCostInfo((v) => !v)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground transition hover:border-orange-500/40 hover:text-foreground"
-                aria-label="Cost info"
-                aria-expanded={showCostInfo}
-              >
-                <Info className="h-4 w-4" />
-              </button>
-            </div>
-            {showCostInfo && (
-              <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-                {estLoading ? (
-                  <span>Estimating cost…</span>
-                ) : estCredits != null ? (
-                  <span>
-                    Estimated cost: <strong className="text-foreground">{estCredits} credits</strong>
-                    {" · "}
-                    Balance: {(profile?.credits ?? 0).toLocaleString()}
-                    {!canAfford ? " · Not enough credits" : ""}
-                  </span>
-                ) : (
-                  <span>Cost appears after you set mode and options.</span>
-                )}
-              </div>
-            )}
-            {!canAfford && estCredits != null && !showCostInfo && (
-              <p className="text-center text-[11px] text-destructive">
-                Need {estCredits} credits · you have {profile?.credits ?? 0}
-              </p>
-            )}'''
-          new_t, n = pattern.subn(replacement, t, count=1)
-          print("replacements", n)
-          if n == 0:
-              # Fallback: simple string cleanup of broken template
-              new_t = t
-              new_t = re.sub(
-                  r'\{loading\s*\?\s*LOADING\[loadingStep\]\s*:\s*[^}]+\}',
-                  '{loading ? LOADING[loadingStep] : "Generate"}',
-                  new_t,
-                  count=1,
-              )
-              print("fallback applied")
-          # Duration: SFX vs track
-          if "SFX_DURATIONS" in new_t and "mode === \"sfx\" ? SFX_DURATIONS" not in new_t:
-              new_t = new_t.replace(
-                  "{DURATIONS.map((d) => (",
-                  "{(mode === \"sfx\" ? SFX_DURATIONS : DURATIONS).map((d) => (",
-              )
-          p.write_text(new_t)
-          print("final len", len(new_t))
-          PY
-
-      - name: Commit
-        run: |
-          git config user.name "music-restore"
-          git config user.email "restore@motio2edit.local"
-          git add src/components/music/MusicStudioPage.tsx
-          git commit -m "ui(music): Generate button clean + cost info panel" || echo nochange
-          git push
+          echo "fix-music-generate-btn is permanently neutralized."
+          echo "Do not reinstate Estimate/info/backend-reveal UI."
+          exit 0
