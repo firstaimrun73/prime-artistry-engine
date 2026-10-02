@@ -176,5 +176,16 @@
 .studio-tier-premium input,
 .studio-tier-premium textarea { color: #F1F5F9; }
 
+/* Hide horizontal/vertical scrollbar for style strips & similar carousels */
+.studio-hide-scroll {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.studio-hide-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Opera */
+  width: 0;
+  height: 0;
+}
+
 /* Remaining studio overlay / vinyl / voice utilities live in brand-motion + prior commits;
    core tokens restored here after accidental truncate. */
