@@ -20,7 +20,6 @@ import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
 import { RemoveBgHomeCard } from "@/components/remove-bg/RemoveBgHomeCard";
 import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery";
-import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
@@ -122,10 +121,6 @@ export function SignedInHomeBody() {
       <div className="mt-12">
         <VisualDiscoveryGallery />
       </div>
-
-      {/* Music samples live only in Discover → Music tab (no second gallery = no duplicates) */}
-
-      <FilterLensHomeSection />
 
       <ObserveBuildProtect />
 
