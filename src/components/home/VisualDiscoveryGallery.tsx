@@ -1,6 +1,7 @@
 /**
  * Motion2AI Creation — Discover (post-login).
  * Horizontal strips: fixed height, width follows aspect ratio.
+ * Strict separation: Images | Video (no music) | Music (music category only).
  * Likes: local UI state only (no Supabase / no sample_favourites).
  */
 import { useCallback, useMemo, useState } from "react";
@@ -82,11 +83,12 @@ export function VisualDiscoveryGallery() {
   const [viewer, setViewer] = useState<R2Sample | null>(null);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
-  const all = useMemo(() => getAllDiscoverSamples(), []);
+  // Strict lists — never merge music into video or images into music
   const images = useMemo(() => getImagineOnlySamples(), []);
   const videosOnly = useMemo(() => getVideoOnlySamples(), []);
   const music = useMemo(() => getMusicVideoSamples(), []);
-  const allVideos = useMemo(() => getActiveR2VideoSamples(), []);
+  // Video tab = video-only (excludes homepageCategory music)
+  const videoTab = useMemo(() => videosOnly, [videosOnly]);
 
   const onToggleLike = useCallback(
     (sample: R2Sample) => {
@@ -103,11 +105,11 @@ export function VisualDiscoveryGallery() {
 
   const gridSamples =
     tab === "all"
-      ? all
+      ? [] // All tab uses separate strips, not one mixed grid
       : tab === "img"
         ? images
         : tab === "video"
-          ? allVideos
+          ? videoTab
           : music;
 
   return (
@@ -120,7 +122,7 @@ export function VisualDiscoveryGallery() {
           <h2 className="mt-0.5 text-[18px] font-extrabold tracking-tight sm:text-[20px]">
             Discover
           </h2>
-          <p className="mt-1 text-[12px] text-white/60">Images · videos · samples</p>
+          <p className="mt-1 text-[12px] text-white/60">Images · videos · music samples</p>
         </div>
         <div className="flex gap-1 overflow-x-auto border-t border-white/10 px-2 py-2 scrollbar-none">
           {TABS.map((t) => (
@@ -152,7 +154,7 @@ export function VisualDiscoveryGallery() {
           />
           <HorizontalStrip
             title="Video"
-            samples={videosOnly.length ? videosOnly : allVideos}
+            samples={videosOnly}
             likedIds={likedIds}
             onToggleLike={onToggleLike}
             onOpenViewer={setViewer}
@@ -181,7 +183,7 @@ export function VisualDiscoveryGallery() {
           {gridSamples.length === 0 && (
             <p className="py-8 text-center text-sm text-muted-foreground">
               {tab === "music"
-                ? "Music samples coming soon. Instrumental clips are under Video for now."
+                ? "No music samples yet."
                 : "No samples in this section yet."}
             </p>
           )}
