@@ -1,6 +1,11 @@
 /**
  * Video Studio — UI style registry only (Phase 1).
  * Client never sees recipes. Selecting a style sets styleId only.
+ *
+ * Style tier locks (server + UI must agree):
+ *   common  → Free+
+ *   ai_plus → Plus, Pro, Studio, Master Studio only (NOT Free/Lite)
+ *   premium → Pro, Studio, Master Studio only (NOT Free/Lite/Plus)
  */
 
 export const VIDEO_STYLE_ASSET_BASE =
@@ -23,11 +28,11 @@ export type VideoStyleUi = {
   enabled: boolean;
 };
 
-/** Temporary plan mapping — single constant for later plan finalisation. */
+/** Plan floor per style tier — lower plans never receive AI+ or Premium. */
 export const STYLE_TIER_MIN_PLAN = {
   common: "free",
-  ai_plus: "plus", // Plus, Pro, Studio, Business
-  premium: "pro", // Pro, Studio, Business
+  ai_plus: "plus", // Plus, Pro, Studio, Business — NOT lite
+  premium: "pro", // Pro, Studio, Business — NOT lite/plus
 } as const;
 
 const PLAN_RANK: Record<string, number> = {
@@ -72,7 +77,7 @@ export const VIDEO_STYLE_UI: VideoStyleUi[] = [
   { id: "documentary", name: "Documentary", tier: "common", thumb: thumbUrl("documentary"), enabled: true },
   { id: "minimal", name: "Minimal", tier: "common", thumb: thumbUrl("minimal"), enabled: true },
   { id: "nature", name: "Nature", tier: "common", thumb: thumbUrl("nature"), enabled: true },
-  // AI+
+  // AI+ (Plus+)
   { id: "futuristic", name: "Futuristic", tier: "ai_plus", thumb: thumbUrl("futuristic"), enabled: true },
   { id: "cyberpunk", name: "Cyberpunk", tier: "ai_plus", thumb: thumbUrl("cyberpunk"), enabled: true },
   { id: "retro-future", name: "Retro Future", tier: "ai_plus", thumb: thumbUrl("retro-future"), enabled: true },
@@ -84,9 +89,9 @@ export const VIDEO_STYLE_UI: VideoStyleUi[] = [
     name: "Soft Portrait",
     tier: "ai_plus",
     thumb: thumbUrl("soft-portrait"),
-    enabled: false, // not uploaded yet
+    enabled: false,
   },
-  // Premium
+  // Premium (Pro+)
   { id: "fantasy", name: "Fantasy", tier: "premium", thumb: thumbUrl("fantasy"), enabled: true },
   { id: "dark-fantasy", name: "Dark Fantasy", tier: "premium", thumb: thumbUrl("dark-fantasy"), enabled: true },
   { id: "anime-inspired", name: "Anime-Inspired", tier: "premium", thumb: thumbUrl("anime-inspired"), enabled: true },
@@ -109,7 +114,6 @@ export const VIDEO_STYLE_UI: VideoStyleUi[] = [
   },
 ];
 
-/** Enabled styles only (soft-portrait excluded until enabled:true). */
 export function videoStylesForStrip(): VideoStyleUi[] {
   return VIDEO_STYLE_UI.filter((s) => s.enabled);
 }
