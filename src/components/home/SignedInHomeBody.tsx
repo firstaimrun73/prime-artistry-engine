@@ -23,7 +23,6 @@ import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery
 import { FilterLensHomeSection } from "@/components/home/FilterLensHomeSection";
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
-import { MusicStudioGallery } from "@/components/home/MusicStudioGallery";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
 /** Same fixed width for every quick-create icon — Cropmix → Remove BG → rest */
@@ -124,7 +123,7 @@ export function SignedInHomeBody() {
         <VisualDiscoveryGallery />
       </div>
 
-      <MusicStudioGallery />
+      {/* Music samples live only in Discover → Music tab (no second gallery = no duplicates) */}
 
       <FilterLensHomeSection />
 
