@@ -201,7 +201,7 @@ export function GalleryMediaCard({
           />
         )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
 
         <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
           {badge ? (
@@ -233,7 +233,7 @@ export function GalleryMediaCard({
           >
             <p
               className={cn(
-                "line-clamp-1 font-semibold leading-tight text-white drop-shadow-sm",
+                "line-clamp-2 font-semibold leading-snug text-white drop-shadow-sm",
                 large ? "text-[13px]" : "text-[12px]",
               )}
             >
