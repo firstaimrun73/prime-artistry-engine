@@ -1,11 +1,1 @@
-name: DISABLED — Music restore blocked
-on:
-  workflow_dispatch:
-jobs:
-  blocked:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Refuse legacy Music restore
-        run: |
-          echo "Disabled. Must not overwrite Music Studio or reintroduce R2 ingest."
-          exit 0
+LOADING
