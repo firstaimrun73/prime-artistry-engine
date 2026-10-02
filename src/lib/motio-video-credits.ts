@@ -1,12 +1,12 @@
 /**
  * Motio2edit Video Studio — customer-facing credit estimates.
  *
- * Spend rule (authoritative on server via billing/customer-pricing):
- *   credits = max(25, ceil(fal_cogs_usd × 100))
+ * Authoritative spend rule (server via billing/customer-pricing):
+ *   TOTAL provider COGS (video + audio) → Video COGS staircase → customer credits
  *
- * Surcharges (stack):
- *   Premium tier: +25
- *   Image→Video mode: +50
+ * Face value: 1 Motio2edit credit = $0.01
+ * Do NOT add Premium/Image flat surcharges on top of the staircase.
+ * Do NOT use COGS×100 or 1.86¢ face for Video.
  */
 
 import {
@@ -17,19 +17,22 @@ import {
   type VideoResolution,
   type VideoAspect,
 } from "@/lib/video/video-capability-registry";
-import { videoCogsToCredits } from "@/lib/billing/customer-pricing";
+import {
+  videoCogsToCredits,
+  VIDEO_COGS_TIER_UNDEFINED,
+} from "@/lib/billing/customer-pricing";
 import { VIDEO_CREDIT_FACE_CENTS } from "@/lib/billing/types";
 
 export type MotioVideoTier = "standard" | "premium";
 export type MotioVideoQuality = "SD" | "HD";
 export type MotioVideoMode = "text" | "image" | "video" | "audio";
 
-export const CREDIT_PRICING_VERSION = "2026-09-motio-spend-v1";
-/** Flat credits added on top of routed cost when tier === "premium". */
-export const PREMIUM_TIER_SURCHARGE_CREDITS = 25;
-/** Flat credits added when mode is Image→Video (stacks with Premium). */
-export const IMAGE_MODE_SURCHARGE_CREDITS = 50;
-/** Spend face value: 1 Motio2edit credit = 1.86¢ in Video Studio */
+export const CREDIT_PRICING_VERSION = "2026-10-video-staircase-v1";
+/** @deprecated Flat surcharges removed — staircase is the only customer charge. */
+export const PREMIUM_TIER_SURCHARGE_CREDITS = 0;
+/** @deprecated Flat surcharges removed — staircase is the only customer charge. */
+export const IMAGE_MODE_SURCHARGE_CREDITS = 0;
+/** Spend face value: 1 Motio2edit credit = $0.01 in Video Studio */
 export const CREDIT_RETAIL_USD = VIDEO_CREDIT_FACE_CENTS / 100;
 export const VIDEO_CREDIT_FACE_CENTS_PUBLIC = VIDEO_CREDIT_FACE_CENTS;
 
@@ -85,7 +88,7 @@ function toGenMode(mode?: MotioVideoMode): VideoGenMode {
 
 /**
  * Estimate Motio2edit credits for Video Studio UI.
- * Server re-computes from live COGS and is authoritative.
+ * Server re-computes from live COGS + staircase and is authoritative.
  */
 export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVideoPriceResult {
   const { tier, durationSec, quality, soundOn, mode } = input;
@@ -100,7 +103,7 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
       total: 0,
       usd: 0,
       supported: false,
-      reason: "Video to Video isn’t available yet. Try Text to Video or Image to Video.",
+      reason: "Video to Video isn't available yet. Try Text to Video or Image to Video.",
       breakdown: {
         tier,
         mode,
@@ -144,8 +147,8 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
       supported: false,
       reason:
         tier === "standard"
-          ? "This combination isn’t available on Standard. Try a shorter duration or Premium."
-          : "This combination isn’t available right now. Try a shorter duration or lower quality.",
+          ? "This combination isn't available on Standard. Try a shorter duration or Premium."
+          : "This combination isn't available right now. Try a shorter duration or lower quality.",
       breakdown: {
         tier,
         mode,
@@ -187,29 +190,66 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
     };
   }
 
-  const routedCredits = videoCogsToCredits(cogs);
-  const premiumSurcharge = tier === "premium" ? PREMIUM_TIER_SURCHARGE_CREDITS : 0;
-  const imageSurcharge = genMode === "image" ? IMAGE_MODE_SURCHARGE_CREDITS : 0;
-  const surcharge = premiumSurcharge + imageSurcharge;
-  const credits = routedCredits + surcharge;
-  return {
-    credits,
-    total: credits,
-    usd: +(credits * CREDIT_RETAIL_USD).toFixed(4),
-    supported: true,
-    providerCogsUsd: cogs,
-    breakdown: {
-      tier,
-      mode,
-      durationSec,
-      quality,
-      soundOn,
-      baseCredits: routedCredits,
-      // Internal only — UI must not expose surcharge lines
-      soundSurcharge: surcharge,
-      formula: `base ${routedCredits} + surcharges → ${credits}`,
-    },
-  };
+  try {
+    const credits = videoCogsToCredits(cogs);
+    return {
+      credits,
+      total: credits,
+      usd: +(credits * CREDIT_RETAIL_USD).toFixed(4),
+      supported: true,
+      providerCogsUsd: cogs,
+      breakdown: {
+        tier,
+        mode,
+        durationSec,
+        quality,
+        soundOn: effectiveSound,
+        baseCredits: credits,
+        soundSurcharge: 0,
+        formula: `video staircase on total COGS $${cogs.toFixed(4)} → ${credits} credits`,
+      },
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === VIDEO_COGS_TIER_UNDEFINED) {
+      return {
+        credits: 0,
+        total: 0,
+        usd: 0,
+        supported: false,
+        reason: "This video setting exceeds the current pricing range. Try a shorter duration or lower quality.",
+        providerCogsUsd: cogs,
+        breakdown: {
+          tier,
+          mode,
+          durationSec,
+          quality,
+          soundOn: effectiveSound,
+          baseCredits: 0,
+          soundSurcharge: 0,
+          formula: VIDEO_COGS_TIER_UNDEFINED,
+        },
+      };
+    }
+    return {
+      credits: 0,
+      total: 0,
+      usd: 0,
+      supported: false,
+      reason: "Pricing unavailable for this option.",
+      providerCogsUsd: cogs,
+      breakdown: {
+        tier,
+        mode,
+        durationSec,
+        quality,
+        soundOn: effectiveSound,
+        baseCredits: 0,
+        soundSurcharge: 0,
+        formula: "error",
+      },
+    };
+  }
 }
 
 export function allowedDurationsForTier(tier: MotioVideoTier): number[] {
@@ -220,11 +260,11 @@ export const TIER_COPY = {
   standard: {
     title: "Standard",
     headline: "Fast, dependable generations for everyday ideas.",
-    supporting: "Fast clips · SD/HD · from 125 credits",
+    supporting: "Fast clips · SD/HD · staircase credits from 50",
   },
   premium: {
     title: "Premium",
     headline: "More detail, stronger image preservation and better prompt adherence.",
-    supporting: "Higher quality · longer clips · from 200 credits",
+    supporting: "Higher quality · longer clips · staircase credits from 50",
   },
 } as const;
