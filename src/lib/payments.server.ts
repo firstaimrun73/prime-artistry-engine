@@ -1,18 +1,21 @@
 // Server-only payment helpers. Never imported by client/route files directly.
 import { createHmac, timingSafeEqual } from "crypto";
 
+/** One-time credit top-up packs (USD list price; INR approximates). */
 export const RAZORPAY_PACKAGES = {
-  starter: { credits: 100, amountINR: 99 },
-  basic: { credits: 300, amountINR: 249 },
-  pro: { credits: 1000, amountINR: 699 },
-  enterprise: { credits: 5000, amountINR: 2999 },
+  starter: { credits: 350, amountINR: 449 },
+  basic: { credits: 800, amountINR: 899 },
+  pro: { credits: 2500, amountINR: 2699 },
+  studio: { credits: 5000, amountINR: 4999 },
+  enterprise: { credits: 10000, amountINR: 9999 },
 } as const;
 
 export const CRYPTO_PACKAGES = {
-  starter: { credits: 100, amountUSD: 2 },
-  basic: { credits: 300, amountUSD: 5 },
-  pro: { credits: 1000, amountUSD: 12 },
-  enterprise: { credits: 5000, amountUSD: 49 },
+  starter: { credits: 350, amountUSD: 4.99 },
+  basic: { credits: 800, amountUSD: 10 },
+  pro: { credits: 2500, amountUSD: 29.99 },
+  studio: { credits: 5000, amountUSD: 55 },
+  enterprise: { credits: 10000, amountUSD: 110 },
 } as const;
 
 export type PackageId = keyof typeof RAZORPAY_PACKAGES;
@@ -20,11 +23,11 @@ export type PackageId = keyof typeof RAZORPAY_PACKAGES;
 // Plan-based purchases — credits MUST match src/lib/plans.ts PLAN_CREDITS.
 // Internal id "business" is the Master Studio tier (user-facing name only).
 export const PLAN_PURCHASE = {
-  lite: { credits: 350, amountINR: 399, amountUSD: 4.99 },
-  plus: { credits: 750, amountINR: 849, amountUSD: 9.99 },
-  pro: { credits: 2500, amountINR: 2499, amountUSD: 29.99 },
-  studio: { credits: 5000, amountINR: 4199, amountUSD: 49.99 },
-  business: { credits: 10000, amountINR: 8299, amountUSD: 99 },
+  lite: { credits: 500, amountINR: 799, amountUSD: 9 },
+  plus: { credits: 1200, amountINR: 1299, amountUSD: 15 },
+  pro: { credits: 3000, amountINR: 2499, amountUSD: 29 },
+  studio: { credits: 8000, amountINR: 4599, amountUSD: 55 },
+  business: { credits: 10000, amountINR: 12999, amountUSD: 149 },
 } as const;
 
 export type PurchasablePlan = keyof typeof PLAN_PURCHASE;
