@@ -22,7 +22,8 @@ async function resolvePreviewUrl(
   if (pending) return pending;
 
   const work = (async () => {
-    if (staticSrc && staticSrc.startsWith("/")) {
+    // Prefer permanent CDN / public static previews — never generate for samples.
+    if (staticSrc && (staticSrc.startsWith("/") || staticSrc.startsWith("https://"))) {
       urlCache.set(voiceId, staticSrc);
       return staticSrc;
     }
@@ -65,7 +66,9 @@ export function MusicVoiceLibrary({
   useEffect(() => {
     const first = VOICES[0];
     if (!first || urlCache.has(first.id)) return;
-    if (first.previewSrc.startsWith("/")) urlCache.set(first.id, first.previewSrc);
+    if (first.previewSrc.startsWith("/") || first.previewSrc.startsWith("https://")) {
+      urlCache.set(first.id, first.previewSrc);
+    }
   }, []);
 
   const play = useCallback(
@@ -80,6 +83,7 @@ export function MusicVoiceLibrary({
 
       try {
         const url = await resolvePreviewUrl(id, staticSrc, async (voiceId) => {
+          // Fallback only if static CDN missing — still returns R2 static URL from server.
           const res = await getPreview({ data: { voice: voiceId } });
           if (!res?.url) throw new Error("No preview URL");
           return res.url;
@@ -92,30 +96,8 @@ export function MusicVoiceLibrary({
 
         audio.onended = () => setPlayingId(null);
         audio.onerror = () => {
-          urlCache.delete(id);
           setPlayingId(null);
-          setLoadingId(id);
-          void (async () => {
-            try {
-              const res = await getPreview({ data: { voice: id } });
-              if (!res?.url) return;
-              urlCache.set(id, res.url);
-              const a2 = new Audio(res.url);
-              a2.preload = "auto";
-              audioRef.current = a2;
-              a2.onended = () => setPlayingId(null);
-              a2.onerror = () => {
-                setPlayingId(null);
-                setLoadingId(null);
-              };
-              await a2.play();
-              setPlayingId(id);
-            } catch {
-              /* ignore */
-            } finally {
-              setLoadingId(null);
-            }
-          })();
+          setLoadingId(null);
         };
 
         const tryPlay = async () => {
@@ -132,101 +114,82 @@ export function MusicVoiceLibrary({
         if (audio.readyState >= 2) {
           void tryPlay();
         } else {
-          audio.addEventListener("canplay", () => void tryPlay(), { once: true });
-          window.setTimeout(() => {
+          audio.oncanplay = () => {
             void tryPlay();
-          }, 400);
+          };
+          // Safety timeout so spinner does not stick if CDN is slow
+          window.setTimeout(() => {
+            if (loadingId === id) setLoadingId(null);
+          }, 8000);
         }
       } catch {
-        setPlayingId(null);
         setLoadingId(null);
+        setPlayingId(null);
       }
     },
-    [getPreview, playingId, stop],
+    [getPreview, playingId, stop, loadingId],
   );
 
   return (
-    <section>
-      <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground">
-        🎙 Voice library
-      </p>
-      <div className="w-full max-w-full min-w-0 overflow-x-auto overscroll-x-contain pb-1 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex w-max gap-2.5">
-          {VOICES.map((v) => {
-            const active = value === v.id;
-            const isPlaying = playingId === v.id;
-            const isLoading = loadingId === v.id;
-            return (
-              <div
-                key={v.id}
+    <section className="space-y-2">
+      <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">AI Voice</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {VOICES.map((v) => {
+          const active = value === v.id;
+          const playing = playingId === v.id;
+          const loading = loadingId === v.id;
+          return (
+            <div
+              key={v.id}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border px-3 py-2.5 transition",
+                active
+                  ? "border-transparent bg-gradient-to-r from-orange-500/15 to-purple-600/15 ring-1 ring-orange-500/40"
+                  : "border-border/60 bg-card hover:border-orange-500/30",
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => onChange(v.id)}
+                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+              >
+                <span
+                  className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm text-white shadow-sm",
+                    v.color,
+                  )}
+                >
+                  {v.emoji}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{v.label}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">{v.desc}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-label={playing ? `Stop ${v.label} preview` : `Play ${v.label} preview`}
+                disabled={loading}
+                onClick={() => void play(v.id, v.previewSrc)}
                 className={cn(
-                  "relative flex w-[140px] shrink-0 flex-col rounded-2xl border p-3 transition-all",
-                  active
-                    ? "border-transparent bg-gradient-to-br shadow-md ring-2 ring-orange-500/40 " + v.color
-                    : "border-border/70 bg-card hover:border-orange-500/40",
+                  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition",
+                  playing
+                    ? "border-orange-500/50 bg-orange-500/15 text-orange-600"
+                    : "border-border/60 bg-background text-muted-foreground hover:border-orange-500/40 hover:text-foreground",
                 )}
               >
-                {isPlaying && (
-                  <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden rounded-t-2xl">
-                    <div className="h-full w-full animate-pulse bg-white/80" />
-                  </div>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : playing ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Volume2 className="h-4 w-4" />
                 )}
-                <button
-                  type="button"
-                  onClick={() => onChange(v.id)}
-                  className="min-w-0 text-left"
-                  aria-pressed={active}
-                >
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <span className="text-base leading-none" aria-hidden>
-                      {v.emoji}
-                    </span>
-                    <p className={cn("text-sm font-bold", active ? "text-white" : "text-foreground")}>
-                      {v.label}
-                    </p>
-                  </div>
-                  <p className={cn("text-[10px] leading-snug", active ? "text-white/85" : "text-muted-foreground")}>
-                    {v.desc}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void play(v.id, v.previewSrc);
-                  }}
-                  disabled={isLoading}
-                  className={cn(
-                    "mt-2.5 flex h-8 w-full items-center justify-center gap-1.5 rounded-full border text-xs font-medium transition-colors",
-                    active
-                      ? "border-white/30 bg-white/20 text-white hover:bg-white/30"
-                      : "border-border bg-muted/50 text-foreground hover:border-orange-500/40",
-                    isPlaying && !active && "border-orange-500/50 bg-orange-500/10 text-orange-600",
-                  )}
-                  aria-label={isPlaying ? `Stop ${v.label} preview` : `Preview ${v.label}`}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : isPlaying ? (
-                    <>
-                      <Pause className="h-3.5 w-3.5" />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Volume2 className="h-3.5 w-3.5" />
-                      Preview
-                    </>
-                  )}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+              </button>
+            </div>
+          );
+        })}
       </div>
-      <p className="mt-2 text-[10px] text-muted-foreground">
-        Free preview · same voice used on generate
-      </p>
     </section>
   );
 }
