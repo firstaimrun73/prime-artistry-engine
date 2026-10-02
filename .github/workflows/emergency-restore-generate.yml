@@ -1,9 +1,6 @@
 name: emergency-restore-generate-functions
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'scripts/generate.functions.FIXED.b64'
 jobs:
   restore:
     runs-on: ubuntu-latest
@@ -11,18 +8,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Decode and restore generate.functions.ts
+        with:
+          fetch-depth: 0
+      - name: Restore generate.functions.ts from good commit 02b9cc02
         run: |
-          base64 -d scripts/generate.functions.FIXED.b64 > src/lib/generate.functions.ts
+          git show 02b9cc022e4c563169bb2521e511a13f9dc09d9f:src/lib/generate.functions.ts > src/lib/generate.functions.ts
           wc -c src/lib/generate.functions.ts
-          head -5 src/lib/generate.functions.ts
+          head -8 src/lib/generate.functions.ts
           grep -c "finalizeQuote(reservedVideoQuote" src/lib/generate.functions.ts
-          grep -c "GENERATE_FUNCTIONS_NEEDS_RESTORE" src/lib/generate.functions.ts || true
+          grep -c "quoteVideoGeneration" src/lib/generate.functions.ts
+          ! grep -q "GENERATE_FUNCTIONS_NEEDS_RESTORE\|RESTORED_MARKER\|PLACEHOLDER" src/lib/generate.functions.ts
       - name: Commit restore
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/lib/generate.functions.ts
-          git diff --cached --stat
-          git commit -m "fix(video): restore full generate.functions.ts from FIXED base64 artifact" || echo "no change"
+          git status
+          git commit -m "fix(video): restore generate.functions.ts from commit 02b9cc02 (full body + finalizeQuote)" || echo "no change"
           git push
