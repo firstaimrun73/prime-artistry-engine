@@ -16,9 +16,9 @@ export type VideoStudioResult = {
 };
 
 export const VIDEO_PROMPT_SUGGESTIONS = [
-  "Cinematic drone shot over misty mountains at sunrise",
-  "Slow orbit around a neon-lit city street at night",
-  "Product hero shot with soft studio lighting and gentle push-in",
-  "Documentary handheld walk through a busy market",
-  "Abstract fluid motion, vibrant colors, seamless loop",
+  "Cinematic city street at night, neon reflections on wet asphalt",
+  "Slow-motion ocean waves at sunset, golden light",
+  "Cinematic product reveal on a minimal studio table",
+  "Aerial mountain landscape at sunrise, soft fog in valleys",
+  "Futuristic city walk, handheld, soft rain and reflections",
 ] as const;
