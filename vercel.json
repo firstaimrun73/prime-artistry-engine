@@ -1,1 +1,11 @@
-PLACEHOLDER
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
+  "crons": [
+    {
+      "path": "/api/cron/marketing-emails",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}
