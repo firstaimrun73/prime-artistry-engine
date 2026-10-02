@@ -4,11 +4,10 @@
  * Universal Motio2edit credits across all studios.
  * Spend conversion (NOT purchase pricing):
  *   Image Studio: 1 credit face = 1.45¢  ($0.0145)
- *   Video Studio: 1 credit face = 1.86¢  ($0.0186)
+ *   Video Studio: 1 credit = $0.01 (1¢); staircase tiers — not COGS×100
  *
- * Video spend rule (owner-defined):
- *   credits = ceil(provider_cogs_usd * 100)
- *   Example: fal COGS $0.50 → 50 credits deducted after successful delivery.
+ * Video spend rule (owner-defined staircase on TOTAL provider COGS including audio):
+ *   <$0.35→50, <$0.50→80, <$0.65→100, <$1.00→125, <$1.25→180, <$2.00→250, ≥$2.00→undefined
  * Purchase pack pricing is separate and unchanged by these face values.
  */
 
@@ -112,7 +111,7 @@ export type BillingConfig = {
   creditFaceUsd: number;
   /** Image Studio spend face value (1 credit = 1.45¢) */
   imageCreditFaceUsd: number;
-  /** Video Studio spend face value (1 credit = 1.86¢) */
+  /** Video Studio spend face value (1 credit = $0.01) */
   videoCreditFaceUsd: number;
   minRealizedCreditUsd: number;
   targetGrossMargin: number;
@@ -127,27 +126,28 @@ export type BillingConfig = {
  * Spend-side Motio2edit credit economics (universal wallet).
  * Does NOT change how users purchase credit packs.
  *
- * Video: 1 Motio2edit credit = 1.86¢ face; charge = ceil(fal_cogs_usd × 100)
+ * Video: 1 Motio2edit credit = $0.01 (1¢); customer charge = COGS staircase (see customer-pricing)
  * Image: 1 Motio2edit credit = 1.45¢ face
  */
 export const DEFAULT_BILLING_CONFIG: BillingConfig = {
-  creditFaceUsd: 0.0186,
+  creditFaceUsd: 0.01,
   imageCreditFaceUsd: 0.0145,
-  videoCreditFaceUsd: 0.0186,
-  minRealizedCreditUsd: 0.0186,
+  videoCreditFaceUsd: 0.01,
+  minRealizedCreditUsd: 0.01,
   targetGrossMargin: 0,
   operatingReserveUsd: 0,
   roundingStep: 1,
   productMinimumCredits: {
-    video: 25,
+    // Video: staircase is authoritative — do not apply a separate minimum that overrides tiers.
+    // image_* minimums retained for Image Studio only.
     image_standard: 10,
     image_premium: 15,
   },
   quoteTtlSeconds: 300,
-  pricingVersion: "2026-09-motio-spend-v1",
+  pricingVersion: "2026-10-video-staircase-v1",
 };
 
-/** Video Studio: 1 credit = 1.86¢ (spend accounting only) */
-export const VIDEO_CREDIT_FACE_CENTS = 1.86;
+/** Video Studio: 1 credit = 1¢ ($0.01) spend accounting */
+export const VIDEO_CREDIT_FACE_CENTS = 1;
 /** Image Studio: 1 credit = 1.45¢ (spend accounting only) */
 export const IMAGE_CREDIT_FACE_CENTS = 1.45;
