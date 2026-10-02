@@ -5,6 +5,7 @@
  * - Explicit Standard/Premium toggle
  * - Light-only theme
  * - Generate label only; credits in (i) as single total
+ * - Prompt limit = min(plan ceiling, tier ceiling)
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +32,7 @@ import {
   STANDARD_VIDEO_PROMPT_MAX,
   PREMIUM_VIDEO_PROMPT_MAX,
 } from "@/components/video/VideoPromptBar";
+import { maxPromptCharsForPlan } from "@/utils/planLimits";
 import { VideoFeaturePanel } from "@/components/video/VideoFeaturePanel";
 import { VideoSourceUpload } from "@/components/video/VideoSourceUpload";
 import { VideoGeneratingOverlay } from "@/components/video/VideoGeneratingOverlay";
@@ -194,8 +196,12 @@ function VideoStudioPage() {
     return map;
   }, [caps.resolutions, tier]);
 
-  const maxChars =
+  // Character limit = min(plan ceiling, tier ceiling). Plans: free/lite 2k, plus 4k, pro/studio 6k, business 7k.
+  // Premium tier still allows up to PREMIUM_VIDEO_PROMPT_MAX when plan allows.
+  const planChars = maxPromptCharsForPlan(profile?.plan, admin);
+  const tierChars =
     tier === "premium" || admin ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
+  const maxChars = Math.min(planChars, tierChars);
 
   const effectiveTier: VideoTier =
     tier === "premium" || duration >= 15 || resolution === "1080p"
@@ -412,7 +418,7 @@ function VideoStudioPage() {
         {/* Mode selector */}
         <VideoModeSelector mode={mode} onChange={handleModeChange} disabled={busy} />
 
-        {/* Source upload (image / video modes) */}
+        {/* Source upload (image / video modes) */
         {(mode === "image" || mode === "video") && (
           <VideoSourceUpload
             mode={mode === "image" ? "image" : "video"}
@@ -424,7 +430,7 @@ function VideoStudioPage() {
           />
         )}
 
-        {/* Prompt */}
+        {/* Prompt — resize handle kept (bottom-right expander works as expected) */}
         <VideoPromptBar
           value={prompt}
           onChange={setPrompt}
@@ -554,7 +560,7 @@ function VideoStudioPage() {
               <span className="ml-1 text-base font-semibold text-slate-500">credits</span>
             </p>
             <p className="mt-2 text-xs text-slate-500">
-              Based on current settings ({tier === "premium" ? "Premium" : "Standard"}, {" "}
+              Based on current settings ({tier === "premium" ? "Premium" : "Standard"},{" "}
               {duration}s, {resolution}
               {audioOn ? ", audio" : ""}, {mode} mode).
             </p>
