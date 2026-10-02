@@ -9,6 +9,8 @@ import {
   Filter,
   Crop,
   Eraser,
+  Coins,
+  ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -24,17 +26,17 @@ import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 
-/** Compact creative tags above Quick Create. */
-const HOME_CREATE_TAGS = [
-  "Portrait",
-  "Product",
-  "Travel",
-  "Food",
-  "Nature",
-  "Fashion",
-  "Cinematic",
-  "Abstract",
-] as const;
+/** Compact creative tags above Quick Create — colored pills. */
+const HOME_CREATE_TAGS: { label: string; className: string }[] = [
+  { label: "Portrait", className: "border-rose-400/50 bg-rose-500/10 text-rose-700 dark:text-rose-300" },
+  { label: "Product", className: "border-amber-400/50 bg-amber-500/10 text-amber-700 dark:text-amber-300" },
+  { label: "Travel", className: "border-sky-400/50 bg-sky-500/10 text-sky-700 dark:text-sky-300" },
+  { label: "Food", className: "border-orange-400/50 bg-orange-500/10 text-orange-700 dark:text-orange-300" },
+  { label: "Nature", className: "border-emerald-400/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
+  { label: "Fashion", className: "border-fuchsia-400/50 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300" },
+  { label: "Cinematic", className: "border-violet-400/50 bg-violet-500/10 text-violet-700 dark:text-violet-300" },
+  { label: "Abstract", className: "border-cyan-400/50 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300" },
+];
 
 /** Same fixed width for every quick-create icon — Cropmix → Remove BG → rest */
 const QUICK_CREATE = [
@@ -59,6 +61,7 @@ export function SignedInHomeBody() {
   const credits = (profile?.credits ?? 0).toLocaleString();
   const videoOk = canAccessVideo({ plan: planId, email: profile?.email, isAdmin });
   const musicOk = canAccessMusic({ plan: planId, email: profile?.email, isAdmin });
+  const isFree = planId === "free" && !isAdmin;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:pb-12">
@@ -88,15 +91,44 @@ export function SignedInHomeBody() {
         </div>
       </div>
 
+      {/* Pricing strip — always visible so users can see plans & purchase */}
+      <section className="mt-4" aria-label="Plans and credits">
+        <Link
+          to="/pricing"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-3 transition hover:border-primary/40 hover:from-primary/15"
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <Coins className="h-4.5 w-4.5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight">
+                {isFree ? "Upgrade for more credits & modes" : "Manage plan & buy credits"}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                Lite $4.99 · Plus $9.99 · Pro $29.99 · AI Studio $55 · Master $110
+              </p>
+            </div>
+          </div>
+          <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary">
+            View plans
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+      </section>
+
       <section className="mt-5" aria-label="Creative tags">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">
+          Use tags to create your photo in seconds
+        </p>
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {HOME_CREATE_TAGS.map((tag) => (
             <Link
-              key={tag}
+              key={tag.label}
               to="/editor"
-              className="shrink-0 rounded-full border border-border/70 bg-card/70 px-3 py-1.5 text-xs font-semibold text-foreground/90 shadow-sm backdrop-blur transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition hover:opacity-90 ${tag.className}`}
             >
-              {tag}
+              {tag.label}
             </Link>
           ))}
         </div>
