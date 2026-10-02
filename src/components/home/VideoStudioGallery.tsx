@@ -1,10 +1,8 @@
 /**
- * VIDEO gallery — Motion2AI Creation.
- * Native video size drives card height (no aspect-ratio wrapper, no object-cover).
- * Single shared unmuted source — unmuting one mutes every other video immediately.
- * Real title under card. items-start grid so no white stretch under shorter cards.
+ * VIDEO gallery — Motion2AI Creation samples.
+ * Media-first cards; native aspect; hover/touch preview; one unmuted video at a time.
  */
-import { useMemo, useRef, useCallback, useState, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { Volume2, VolumeX } from "lucide-react";
 import { getActiveR2VideoSamples, type R2Sample } from "@/lib/r2-catalog";
@@ -13,9 +11,9 @@ import { cn } from "@/lib/utils";
 function isPortraitRatio(aspectRatio: string): boolean {
   return (
     aspectRatio === "9:16" ||
-    aspectRatio === "4:5" ||
     aspectRatio === "3:4" ||
-    aspectRatio === "2:3"
+    aspectRatio === "2:3" ||
+    aspectRatio === "4:5"
   );
 }
 
@@ -149,6 +147,18 @@ function VideoCard({
         >
           {isUnmuted ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
         </button>
+        {sample.qualityTier ? (
+          <span
+            className={cn(
+              "absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-[9px] font-bold shadow-sm backdrop-blur-sm",
+              sample.qualityTier === "Premium" && "bg-amber-500/95 text-black",
+              sample.qualityTier === "Ultra AI" && "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-400 text-white",
+              sample.qualityTier === "Standard" && "bg-white/90 text-zinc-800",
+            )}
+          >
+            {sample.qualityTier}
+          </span>
+        ) : null}
       </div>
       {sample.title ? (
         <p className="truncate px-1.5 pt-1.5 text-[11px] font-medium leading-tight text-foreground/80">
@@ -163,58 +173,47 @@ export function VideoStudioGallery() {
   const samples = useMemo(() => {
     const all = getActiveR2VideoSamples();
     const seen = new Set<string>();
-    const unique: R2Sample[] = [];
-    for (const s of all) {
-      if (seen.has(s.url)) continue;
+    return all.filter((s) => {
+      if (s.homepageCategory === "music") return false;
+      if (seen.has(s.url)) return false;
       seen.add(s.url);
-      unique.push(s);
-    }
-    return unique.sort((a, b) => a.sortOrder - b.sortOrder);
+      return true;
+    });
   }, []);
 
-  const activeRef = useRef<HTMLVideoElement | null>(null);
-  const videoEls = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [unmutedId, setUnmutedId] = useState<string | null>(null);
+  const els = useRef(new Map<string, HTMLVideoElement>());
 
   const registerEl = useCallback((id: string, el: HTMLVideoElement | null) => {
-    if (el) videoEls.current.set(id, el);
-    else videoEls.current.delete(id);
-  }, []);
-
-  const onActivate = useCallback((el: HTMLVideoElement) => {
-    if (activeRef.current && activeRef.current !== el && activeRef.current.muted) {
-      activeRef.current.pause();
-    }
-    activeRef.current = el;
-  }, []);
-
-  const onDeactivate = useCallback((el: HTMLVideoElement) => {
-    if (activeRef.current === el) activeRef.current = null;
-  }, []);
-
-  const onRequestUnmute = useCallback((id: string, el: HTMLVideoElement) => {
-    videoEls.current.forEach((other, otherId) => {
-      if (otherId !== id) other.muted = true;
-    });
-    el.muted = false;
-    void el.play().catch(() => {});
-    videoEls.current.set(id, el);
-    setUnmutedId(id);
+    if (el) els.current.set(id, el);
+    else els.current.delete(id);
   }, []);
 
   const onMuteAll = useCallback(() => {
-    videoEls.current.forEach((v) => {
+    setUnmutedId(null);
+    els.current.forEach((v) => {
       v.muted = true;
     });
-    setUnmutedId(null);
   }, []);
+
+  const onRequestUnmute = useCallback((id: string, el: HTMLVideoElement) => {
+    setUnmutedId(id);
+    els.current.forEach((v, key) => {
+      v.muted = key !== id;
+    });
+    el.muted = false;
+    void el.play().catch(() => {});
+  }, []);
+
+  const onActivate = useCallback((_el: HTMLVideoElement) => {}, []);
+  const onDeactivate = useCallback((_el: HTMLVideoElement) => {}, []);
 
   if (samples.length === 0) return null;
 
   return (
     <section className="space-y-4" data-creation-section="video">
       <h3 className="text-[14px] font-bold tracking-tight">Video</h3>
-      <div className="mx-auto grid max-w-[1200px] grid-cols-2 items-start justify-items-center gap-3 sm:gap-5 lg:grid-cols-3">
+      <div className="mx-auto grid max-w-[1200px] grid-cols-2 items-start justify-items-center gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
         {samples.map((s) => (
           <VideoCard
             key={s.id}
