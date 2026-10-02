@@ -1,0 +1,24 @@
+name: restore-email-templates
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-email-templates.yml'
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write templates.ts
+        run: |
+          python3 << 'PY'
+          import base64, pathlib
+          parts = [
+            "PLACEHOLDER_CHUNK0",
+          ]
+          data = base64.b64decode("".join(parts))
+          pathlib.Path("src/emails/templates.ts").write_bytes(data)
+          print("wrote", len(data), "bytes")
+          PY
