@@ -59,14 +59,13 @@ export const CREDIT_TOPUP = {
   id: "credit-topup-499",
   name: "Credit Top-up",
   price: 4.99,
-  credits: 320,
+  credits: 350,
   type: "one_time" as const,
-  description: "320 AI credits, valid forever, works with any plan.",
+  description: "350 AI credits, valid forever, works with any plan.",
   bullets: [
-    "320 AI credits",
+    "350 AI credits",
     "Valid forever (no expiry)",
     "Works with any plan",
-    "≈ 12 image edits at 25 credits each",
     "Can be purchased multiple times",
   ],
 } as const;
@@ -181,14 +180,17 @@ export const PLANS: Plan[] = [
     bestQuality: true,
     price: { USD: 149, EUR: 149, INR: 12999 },
     features: [
-      "Internal / legacy plan",
-      "Not sold on public pricing",
+      "10,000 credits / month",
+      "Full Ultra AI access",
+      "IMAX + 8K Max + Custom aspect",
+      "Highest concurrency & priority",
+      "Master Studio tools",
     ],
   },
 ];
 
-/** Public pricing page plan ids — Business is internal only. */
-export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "plus", "pro", "studio"];
+/** Public pricing page plan ids — includes Master Studio (internal id business). */
+export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "plus", "pro", "studio", "business"];
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
   free: FREE_SIGNUP_CREDITS,
@@ -219,7 +221,7 @@ export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
   plus: { USD: 15, EUR: 13.99, INR: 1299 },
   pro: { USD: 29, EUR: 26.99, INR: 2499 },
   studio: { USD: 55, EUR: 50.99, INR: 4599 },
-  business: { USD: 110, EUR: 99.99, INR: 9199 },
+  business: { USD: 149, EUR: 149, INR: 12999 },
 };
 
 /** Map display currency → payment backend currency. */
