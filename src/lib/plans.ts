@@ -1,17 +1,17 @@
 // Checkout-side currency (what the payment backends actually charge in).
-// Razorpay handles INR; NOWPayments crypto is priced in USD/EUR.
+// Razorpay handles INR; PayPal handles USD card.
+// Crypto / NOWPayments removed from product — do not re-add.
 export type Currency = "USD" | "EUR" | "INR";
-export type PaymentMethod = "card" | "crypto" | "paypal";
+export type PaymentMethod = "card" | "paypal";
 
 export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "card", label: "Credit / Debit Card" },
-  { id: "crypto", label: "Crypto" },
 ];
 
 export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
-  INR: ["card", "crypto"],
-  USD: ["card", "crypto"],
-  EUR: ["card", "crypto"],
+  INR: ["card"],
+  USD: ["card"],
+  EUR: ["card"],
 };
 
 export type CardProvider = "paypal" | "razorpay";
@@ -28,8 +28,10 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
 
 /**
  * Internal plan ids stored in profiles.plan / payments.
- * User-facing names may differ (e.g. id "business" displays as "Master Studio").
+ * User-facing names may differ (e.g. id "business" displays as "Master Studio",
+ * id "studio" displays as "AI Studio").
  * Do not rename the "business" id without a data migration for existing subscribers.
+ * "free" remains for signup / profiles.plan only — never shown on the pricing page.
  */
 export type PlanId = "free" | "lite" | "plus" | "pro" | "studio" | "business";
 
@@ -52,13 +54,12 @@ export const CREDIT_COST = {
 /** High-balance sentinel used only for display helpers (not an unlimited product promise). */
 export const UNLIMITED_CREDITS = 9_999_999;
 
-/** Free signup bonus — MUST match public.handle_new_user() in Supabase. */
+/** Free signup bonus — MUST match public.handle_new_user() in Supabase. Not a priced plan. */
 export const FREE_SIGNUP_CREDITS = 40;
 
 /**
  * Legacy single-pack marketing object for old checkout links.
  * Authoritative pack math lives in @/lib/credit-topups (1 credit = $0.0178).
- * $4.99 → floor(4.99 / 0.0178) = 280 credits.
  */
 export const CREDIT_TOPUP = {
   id: "credit-topup-499",
@@ -100,6 +101,12 @@ export type Plan = {
   features: string[];
 };
 
+/**
+ * Paid plans (pricing page):
+ *   Lite $4.99 / 350 · Plus $9.99 / 800 · Pro $29.99 / 2,500
+ *   AI Studio $55 / 5,000 · Master Studio $110 / 10,000
+ * Free stays in the array for profile.plan === "free" only — not sold.
+ */
 export const PLANS: Plan[] = [
   {
     id: "free",
@@ -119,60 +126,64 @@ export const PLANS: Plan[] = [
   {
     id: "lite",
     name: "Lite",
-    credits: 500,
+    credits: 350,
     video: true,
     priority: false,
     bestQuality: false,
-    price: { USD: 9, EUR: 8.49, INR: 799 },
+    price: { USD: 4.99, EUR: 4.59, INR: 449 },
     features: [
-      "500 credits / month",
-      "Image + Video Studio",
-      "Music Studio full modes",
+      "350 credits / month",
+      "Image Studio",
+      "Video Studio (standard)",
+      "Music Studio — song & instrumental",
       "Standard quality",
     ],
   },
   {
     id: "plus",
     name: "Plus",
-    credits: 1200,
+    credits: 800,
     video: true,
     priority: false,
     bestQuality: false,
-    price: { USD: 15, EUR: 13.99, INR: 1299 },
+    price: { USD: 9.99, EUR: 9.19, INR: 899 },
     features: [
-      "1,200 credits / month",
-      "Longer tracks",
+      "800 credits / month",
       "Image + Video + Music",
+      "All music modes (BGM, voice, SFX)",
+      "Longer tracks (up to 90s)",
       "Standard quality",
     ],
   },
   {
     id: "pro",
     name: "Pro",
-    credits: 3000,
+    credits: 2500,
     video: true,
     priority: true,
     bestQuality: true,
-    price: { USD: 29, EUR: 26.99, INR: 2499 },
+    price: { USD: 29.99, EUR: 27.49, INR: 2699 },
     features: [
-      "3,000 credits / month",
+      "2,500 credits / month",
       "Premium Music quality",
       "Priority queue",
       "Longer video clips",
+      "All music modes + 120s tracks",
     ],
   },
   {
     id: "studio",
-    name: "Studio",
-    credits: 8000,
+    name: "AI Studio",
+    credits: 5000,
     video: true,
     priority: true,
     bestQuality: true,
-    price: { USD: 55, EUR: 50.99, INR: 4599 },
+    price: { USD: 55, EUR: 50.99, INR: 4999 },
     features: [
-      "8,000 credits / month",
+      "5,000 credits / month",
+      "Ultra AI quality access",
       "120s music tracks",
-      "Highest concurrency",
+      "Higher concurrency",
       "Priority queue",
     ],
   },
@@ -183,26 +194,30 @@ export const PLANS: Plan[] = [
     video: true,
     priority: true,
     bestQuality: true,
-    price: { USD: 149, EUR: 149, INR: 12999 },
+    price: { USD: 110, EUR: 101.99, INR: 9999 },
     features: [
       "10,000 credits / month",
-      "Full Ultra AI access",
-      "IMAX + 8K Max + Custom aspect",
+      "Everything in AI Studio",
+      "Full Ultra AI + every mode",
+      "IMAX + 8K Max + custom aspect",
       "Highest concurrency & priority",
       "Master Studio tools",
     ],
   },
 ];
 
-/** Public pricing page plan ids — includes Master Studio (internal id business). */
-export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["free", "lite", "plus", "pro", "studio", "business"];
+/** Public pricing page — paid plans only (no Free card). */
+export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["lite", "plus", "pro", "studio", "business"];
+
+/** Single plan highlighted as Popular on the pricing page. */
+export const PRICING_POPULAR_PLAN_ID: PlanId = "pro";
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
   free: FREE_SIGNUP_CREDITS,
-  lite: 500,
-  plus: 1200,
-  pro: 3000,
-  studio: 8000,
+  lite: 350,
+  plus: 800,
+  pro: 2500,
+  studio: 5000,
   business: 10000,
 };
 
@@ -222,11 +237,11 @@ export const DISPLAY_CURRENCIES: DisplayCurrency[] = ["USD", "EUR", "INR"];
 
 export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
   free: { USD: 0, EUR: 0, INR: 0 },
-  lite: { USD: 9, EUR: 8.49, INR: 799 },
-  plus: { USD: 15, EUR: 13.99, INR: 1299 },
-  pro: { USD: 29, EUR: 26.99, INR: 2499 },
-  studio: { USD: 55, EUR: 50.99, INR: 4599 },
-  business: { USD: 149, EUR: 149, INR: 12999 },
+  lite: { USD: 4.99, EUR: 4.59, INR: 449 },
+  plus: { USD: 9.99, EUR: 9.19, INR: 899 },
+  pro: { USD: 29.99, EUR: 27.49, INR: 2699 },
+  studio: { USD: 55, EUR: 50.99, INR: 4999 },
+  business: { USD: 110, EUR: 101.99, INR: 9999 },
 };
 
 /** Map display currency → payment backend currency. */
