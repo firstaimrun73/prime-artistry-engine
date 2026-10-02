@@ -1,6 +1,10 @@
-// Server-only email helper for payment alerts via the Resend HTTP API.
-// SMTP/nodemailer cannot run on the Workers runtime, so we use Resend's REST API
-// directly with your own Resend API key (RESEND_API_KEY).
+// Server-only email helpers via Resend HTTP API.
+// Production path: RESEND_API_KEY + EMAIL_FROM / SUPPORT_EMAIL.
+// Lovable email queue is not required for these transactional sends.
+
+import { planPurchasedEmail, welcomeEmail } from "@/emails/templates";
+import { sendTemplateEmail } from "@/emails/send";
+
 const RESEND_URL = "https://api.resend.com/emails";
 
 export async function sendPaymentErrorReport(args: {
@@ -12,8 +16,8 @@ export async function sendPaymentErrorReport(args: {
   currency: string;
 }): Promise<void> {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  const supportEmail = process.env.SUPPORT_EMAIL;
-  if (!RESEND_API_KEY || !supportEmail) {
+  const supportEmail = process.env.SUPPORT_EMAIL || "support@motio2edit.com";
+  if (!RESEND_API_KEY) {
     console.error("[payments] payment error (email not configured):", args);
     return;
   }
@@ -38,10 +42,10 @@ export async function sendPaymentErrorReport(args: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
-
       body: JSON.stringify({
         from: `Motio2edit Alerts <${supportEmail}>`,
         to: [supportEmail],
+        reply_to: supportEmail,
         subject: `[PAYMENT ERROR] ${args.paymentMethod} — ${args.transactionId}`,
         html,
       }),
@@ -60,8 +64,8 @@ export async function sendBrandedEmail(args: {
   bodyHtml: string;
 }): Promise<void> {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  const supportEmail = process.env.SUPPORT_EMAIL;
-  if (!RESEND_API_KEY || !supportEmail || !args.to) {
+  const supportEmail = process.env.SUPPORT_EMAIL || "support@motio2edit.com";
+  if (!RESEND_API_KEY || !args.to) {
     console.error("[email] not configured, skipping:", args.subject);
     return;
   }
@@ -83,6 +87,7 @@ export async function sendBrandedEmail(args: {
       body: JSON.stringify({
         from: `Motio2edit <${supportEmail}>`,
         to: [args.to],
+        reply_to: supportEmail,
         subject: args.subject,
         html,
       }),
@@ -91,4 +96,47 @@ export async function sendBrandedEmail(args: {
   } catch (err) {
     console.error("[email] send error:", err);
   }
+}
+
+/**
+ * Transactional: plan purchase confirmation.
+ * Always send — not gated on marketing opt-in.
+ */
+export async function sendPlanPurchasedEmail(args: {
+  to: string;
+  name?: string;
+  planName: string;
+  amount: string;
+  creditsAdded: number | string;
+  expiry?: string;
+  orderId: string;
+}): Promise<void> {
+  if (!args.to) return;
+  const result = planPurchasedEmail({
+    name: args.name || "there",
+    plan_name: args.planName,
+    amount: args.amount,
+    credits_added: String(args.creditsAdded),
+    expiry: args.expiry || "—",
+    order_id: args.orderId,
+  });
+  const send = await sendTemplateEmail(args.to, result, {
+    idempotencyKey: `plan-purchased-${args.orderId}`,
+  });
+  if (!send.ok) console.error("[email] plan purchased failed:", send.error);
+}
+
+/** Transactional welcome after signup/confirm — not marketing-gated. */
+export async function sendWelcomeEmail(args: {
+  to: string;
+  name?: string;
+  freeCredits?: number;
+}): Promise<void> {
+  if (!args.to) return;
+  const result = welcomeEmail({
+    name: args.name || "there",
+    free_credits: String(args.freeCredits ?? 40),
+  });
+  const send = await sendTemplateEmail(args.to, result);
+  if (!send.ok) console.error("[email] welcome failed:", send.error);
 }
