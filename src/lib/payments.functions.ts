@@ -4,8 +4,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const planSchema = z.enum(["lite", "plus", "pro", "studio", "business"]);
 
-// SECURITY: generous limit of 10 payment attempts per user per hour (abuse guard
-// only — never blocks legitimate retries). Logs the attempt via the service client.
 const MAX_PAYMENT_ATTEMPTS_PER_HOUR = 10;
 async function enforcePaymentRateLimit(db: any, userId: string, method: string) {
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -20,7 +18,47 @@ async function enforcePaymentRateLimit(db: any, userId: string, method: string) 
   await db.from("payment_attempts").insert({ user_id: userId, payment_method: method });
 }
 
-// ── Razorpay: create order for a plan ──
+/** Best-effort plan-purchased email after successful credit apply. Never blocks payment. */
+async function notifyPlanPurchased(args: {
+  userId: string;
+  plan: string | null;
+  credits: number;
+  amount: number | string;
+  currency: string;
+  orderId: string;
+  db: any;
+}) {
+  try {
+    const { sendPlanPurchasedEmail } = await import("@/lib/email.server");
+    const { getPlan } = await import("@/lib/plans");
+    const { data: profile } = await args.db
+      .from("profiles")
+      .select("email, display_name")
+      .eq("id", args.userId)
+      .maybeSingle();
+    const email = profile?.email;
+    if (!email) return;
+    const planName = args.plan ? getPlan(args.plan as any).name : "Plan";
+    const amountLabel =
+      args.currency === "INR"
+        ? `₹${args.amount}`
+        : args.currency === "EUR"
+          ? `€${args.amount}`
+          : `$${args.amount}`;
+    await sendPlanPurchasedEmail({
+      to: email,
+      name: profile?.display_name?.split(" ")[0] || "there",
+      planName,
+      amount: amountLabel,
+      creditsAdded: args.credits,
+      expiry: "Renews monthly",
+      orderId: args.orderId,
+    });
+  } catch (e) {
+    console.error("[email] notifyPlanPurchased failed:", e);
+  }
+}
+
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { plan: string }) => z.object({ plan: planSchema }).parse(d))
@@ -30,7 +68,6 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "razorpay");
     const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
     if (!pkg) throw new Error("Selected plan is not available for purchase.");
-    // FIX: Razorpay receipt must be < 40 chars. Keep it short to avoid BAD_REQUEST_ERROR.
     const internalOrderId = `rzp_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
     const order = await createOrder({
@@ -61,7 +98,6 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     };
   });
 
-// ── Razorpay: verify payment from the browser checkout callback ──
 export const verifyRazorpayPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
@@ -130,16 +166,24 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       throw new Error("Payment received but credit allocation failed. Support has been notified.");
     }
 
-    // Activate the purchased plan on the profile.
     const plan = planFromCredits(tx.credits_purchased);
     if (plan) {
       await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
     }
 
+    await notifyPlanPurchased({
+      userId: context.userId,
+      plan,
+      credits: tx.credits_purchased,
+      amount: tx.amount,
+      currency: "INR",
+      orderId: tx.transaction_id,
+      db,
+    });
+
     return { success: true, credits: tx.credits_purchased, transactionId: tx.transaction_id };
   });
 
-// ── NOWPayments: create a direct crypto payment for a plan ──
 export const createCryptoInvoice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { plan: string; payCurrency: string }) =>
@@ -192,7 +236,6 @@ export const createCryptoInvoice = createServerFn({ method: "POST" })
     };
   });
 
-// ── NOWPayments: poll status (fallback to the webhook) ──
 export const getCryptoStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { invoiceId: string }) => z.object({ invoiceId: z.string().min(1) }).parse(d))
@@ -225,6 +268,15 @@ export const getCryptoStatus = createServerFn({ method: "POST" })
         if (plan) {
           await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
         }
+        await notifyPlanPurchased({
+          userId: context.userId,
+          plan,
+          credits: tx.credits_purchased,
+          amount: tx.amount,
+          currency: tx.currency || "USD",
+          orderId: tx.transaction_id,
+          db,
+        });
       }
     }
 
@@ -240,12 +292,10 @@ export const getCryptoStatus = createServerFn({ method: "POST" })
     };
   });
 
-// ── PayPal: expose the publishable client id for the JS SDK ──
 export const getPaypalClientId = createServerFn({ method: "GET" }).handler(async () => {
   return { clientId: process.env.PAYPAL_CLIENT_ID || "" };
 });
 
-// ── PayPal: create an order for a plan ──
 export const createPaypalOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { plan: string }) => z.object({ plan: planSchema }).parse(d))
@@ -278,7 +328,6 @@ export const createPaypalOrder = createServerFn({ method: "POST" })
     return { orderId: order.id, internalOrderId, credits: pkg.credits };
   });
 
-// ── PayPal: capture the order after buyer approval ──
 export const capturePaypalOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orderId: string; internalOrderId: string }) =>
@@ -340,6 +389,15 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
       await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
     }
 
+    await notifyPlanPurchased({
+      userId: context.userId,
+      plan,
+      credits: tx.credits_purchased,
+      amount: tx.amount,
+      currency: "USD",
+      orderId: tx.transaction_id,
+      db,
+    });
+
     return { success: true, credits: tx.credits_purchased, transactionId: tx.transaction_id };
   });
-
