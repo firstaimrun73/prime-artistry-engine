@@ -1,184 +1,85 @@
-/**
- * Video Studio prompt bar — glass, mic, empty-state idea chips, char counter.
- */
-import { useMemo, useRef } from "react";
-import { cn } from "@/lib/utils";
+import { useRef } from "react";
+import { X } from "lucide-react";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
-import {
-  parsePromptTiming,
-  timingChipLabel,
-  validateTimingAgainstDuration,
-  type TimingCue,
-} from "@/lib/video/prompt-timing";
+import { cn } from "@/lib/utils";
 
+/** Standard video prompts: 3,000 chars. Premium: 10,000 chars. */
 export const STANDARD_VIDEO_PROMPT_MAX = 3000;
 export const PREMIUM_VIDEO_PROMPT_MAX = 10000;
-
-export const PROMPT_IDEA_CHIPS = [
-  { id: "drone", label: "Drone sunrise", text: "A cinematic drone shot over a mountain range at sunrise, golden light, smooth camera glide" },
-  { id: "city", label: "Neon city", text: "A stylish woman walks through a neon-lit Tokyo street at night, reflections on wet pavement" },
-  { id: "ocean", label: "Ocean waves", text: "Powerful waves crash against dark rocks at golden hour, spray catching the light" },
-  { id: "forest", label: "Misty forest", text: "Slow push through a misty pine forest at dawn, volumetric light rays through the trees" },
-  { id: "portrait", label: "Soft portrait", text: "Close-up portrait of a person looking out a rainy window, soft natural light, shallow depth of field" },
-  { id: "product", label: "Product spin", text: "Elegant product turntable shot of a perfume bottle on black glass, studio lighting, slow rotation" },
-  { id: "sports", label: "Sports action", text: "Dynamic slow-motion of a soccer player kicking the ball, dirt flying, stadium lights" },
-  { id: "food", label: "Food pour", text: "Chocolate sauce poured over a dessert in slow motion, appetizing macro shot" },
-] as const;
-
-function timingAria(cue: TimingCue): string {
-  if (cue.kind === "timestamp") return `Timing marker at ${cue.startSec} seconds`;
-  return `Timing interval from ${cue.startSec} to ${cue.endSec} seconds`;
-}
 
 export function VideoPromptBar({
   value,
   onChange,
-  maxChars,
   disabled,
   placeholder,
-  compact,
-  durationSec,
+  maxLength = STANDARD_VIDEO_PROMPT_MAX,
 }: {
   value: string;
   onChange: (v: string) => void;
-  maxChars: number;
   disabled?: boolean;
   placeholder?: string;
-  compact?: boolean;
-  durationSec?: number;
-  audioActive?: boolean;
+  /** Enforced on input; server also validates. */
+  maxLength?: number;
 }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const timing = useMemo(() => parsePromptTiming(value), [value]);
-  const durationErrors = useMemo(() => {
-    if (!durationSec || durationSec <= 0) return [] as string[];
-    return validateTimingAgainstDuration(timing.cues, durationSec);
-  }, [timing.cues, durationSec]);
-
-  const removeCue = (cue: TimingCue) => {
-    const next = value
-      .replace(cue.raw, "")
-      .replace(/[ \t]{2,}/g, " ")
-      .replace(/\n{3,}/g, "\n\n")
-      .trimStart();
-    onChange(next);
-  };
-
-  const invalidRaws = new Set(
-    durationErrors.map((e) => e.match(/^(#\S+)/)?.[1]).filter(Boolean) as string[],
-  );
-
-  const empty = !value.trim();
-  const limit = Number.isFinite(maxChars) && maxChars > 0 ? maxChars : 3000;
+  const limit = Math.max(1, maxLength);
 
   return (
-    <div
-      className={cn(
-        "relative flex flex-col overflow-hidden rounded-[22px] border transition-shadow duration-300",
-        "border-white/70 bg-white/55 shadow-[0_8px_32px_rgba(80,60,140,0.12)] backdrop-blur-xl saturate-150",
-        "ring-1 ring-black/5",
-        "focus-within:ring-[#FF7A45]/30",
-        compact ? "min-h-[5.5rem]" : "min-h-[7rem]",
-      )}
-    >
-      {timing.cues.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 border-b border-black/5 px-3 pb-2 pt-2.5">
-          {timing.cues.map((c, i) => {
-            const invalid = invalidRaws.has(c.raw);
-            return (
-              <button
-                key={`${c.raw}-${i}`}
-                type="button"
-                disabled={disabled}
-                onClick={() => removeCue(c)}
-                aria-label={`${timingAria(c)}. Tap to remove this timing tag only.`}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
-                  invalid
-                    ? "border-red-500/50 bg-red-500/15 text-red-700"
-                    : "border-slate-200 bg-white/70 text-slate-700",
-                )}
-              >
-                {timingChipLabel(c)}
-                <span className="opacity-50" aria-hidden>
-                  ×
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <label className="sr-only" htmlFor="video-prompt">
-        Describe your video
-      </label>
-      <textarea
-        ref={taRef}
-        id="video-prompt"
-        value={value}
-        disabled={disabled}
-        maxLength={limit}
-        rows={compact ? 3 : 5}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? "Describe your video…"}
+    <div className="space-y-2">
+      <div
         className={cn(
-          "w-full flex-1 resize-none overflow-y-auto bg-transparent px-3.5 pb-14 pt-3 text-sm leading-relaxed",
-          "text-slate-800 placeholder:text-slate-400",
-          "focus:outline-none",
-          disabled && "opacity-60",
+          "relative rounded-2xl border border-border/70 bg-background/80",
+          "focus-within:ring-2 focus-within:ring-red-500/30 dark:bg-background/60",
         )}
-      />
-
-      {(timing.errors[0] || durationErrors[0]) && (
-        <p className="px-3 pb-1 text-[11px] text-red-600" role="alert">
-          {timing.errors[0] || durationErrors[0]}
-        </p>
-      )}
-
-      <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between gap-2">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span
-            className={cn(
-              "text-[10px] tabular-nums",
-              value.length > limit * 0.9 ? "text-amber-600" : "text-slate-400",
-            )}
-          >
-            {value.length}/{limit}
-          </span>
-          <div
-            className={cn(
-              "studio-hide-scroll flex gap-1.5 overflow-x-auto transition-opacity duration-200",
-              empty ? "opacity-100" : "pointer-events-none h-0 opacity-0",
-            )}
-          >
-            {PROMPT_IDEA_CHIPS.map((idea) => (
-              <button
-                key={idea.id}
-                type="button"
-                disabled={disabled || !empty}
-                onClick={() => {
-                  onChange(idea.text.slice(0, limit));
-                  requestAnimationFrame(() => taRef.current?.focus());
-                }}
-                className="h-7 shrink-0 rounded-full border border-white/70 bg-white/70 px-2.5 text-[11px] font-semibold text-slate-600 backdrop-blur-md"
-              >
-                {idea.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <VoiceInputButton
+      >
+        <textarea
+          ref={taRef}
+          value={value}
           disabled={disabled}
-          onTranscript={(text) => {
-            const next = value.trim() ? `${value.trim()} ${text}` : text;
-            onChange(next.slice(0, limit));
-          }}
+          rows={4}
+          maxLength={limit}
+          onChange={(e) => onChange(e.target.value.slice(0, limit))}
+          placeholder={placeholder ?? "Describe what you want to create…"}
           className={cn(
-            "!h-10 !w-10 !min-h-[40px] !rounded-full border",
-            "border-white/70 bg-white/70 text-slate-700",
+            "w-full resize-y rounded-2xl bg-transparent px-3 py-3 pr-20 text-sm outline-none",
+            "disabled:opacity-60 placeholder:text-muted-foreground/70",
+            /* Thin, theme-aware scrollbar — kills the silver OS bar look */
+            "scrollbar-thin scrollbar-track-transparent",
+            "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:h-1.5",
+            "[&::-webkit-scrollbar-track]:bg-transparent",
+            "[&::-webkit-scrollbar-thumb]:rounded-full",
+            "[&::-webkit-scrollbar-thumb]:bg-muted-foreground/25",
+            "hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40",
+            "dark:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30",
+            "dark:hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/50",
           )}
         />
+        <div className="absolute bottom-2 right-2 flex items-center gap-1">
+          {value && !disabled && (
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className={cn(
+                "rounded-full p-1.5 text-muted-foreground transition-all duration-150",
+                "hover:bg-muted hover:text-foreground active:scale-90",
+              )}
+              aria-label="Clear prompt"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+          <VoiceInputButton
+            disabled={disabled}
+            onTranscript={(t) => {
+              const next = value.trim() ? `${value.trim()} ${t}` : t;
+              onChange(next.slice(0, limit));
+            }}
+          />
+        </div>
       </div>
+      <p className="text-right text-[11px] tabular-nums text-muted-foreground">
+        {value.length}/{limit}
+      </p>
     </div>
   );
 }
