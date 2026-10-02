@@ -1,0 +1,52 @@
+name: strip-crypto-checkout
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/strip-crypto-checkout.yml"
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove crypto from checkout
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("src/routes/checkout.tsx")
+          t = p.read_text()
+          t = t.replace("CreditCard, Bitcoin, Lock", "CreditCard, Lock")
+          t = t.replace(
+          '''const METHOD_ICON: Record<PaymentMethod, typeof CreditCard> = {
+            card: CreditCard,
+            crypto: Bitcoin,
+            paypal: Wallet,
+          };''',
+          '''const METHOD_ICON: Record<PaymentMethod, typeof CreditCard> = {
+            card: CreditCard,
+            paypal: Wallet,
+          };'''
+          )
+          # normalize spacing variants
+          t = t.replace("crypto: Bitcoin,\n", "")
+          t = t.replace('{method === "crypto" &&', '{false && method === "crypto" &&')
+          t = t.replace('setMethod("crypto")', 'setMethod("card")')
+          t = t.replace(
+            "Secured payments. Crypto payments are processed via NOWPayments.",
+            "Secured payments via Razorpay and PayPal.",
+          )
+          t = t.replace("Switch to Crypto Instead", "Pay with card")
+          p.write_text(t)
+          assert "crypto: Bitcoin" not in t
+          print("patched checkout", len(t))
+          PY
+      - name: Commit
+        run: |
+          git config user.name "pricing-bot"
+          git config user.email "bot@motio2edit.local"
+          git add src/routes/checkout.tsx
+          git commit -m "fix(checkout): remove crypto payment option" || echo nochange
+          git pull --rebase origin main || true
+          git push origin HEAD:main
