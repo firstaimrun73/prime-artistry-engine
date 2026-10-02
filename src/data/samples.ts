@@ -1,6 +1,8 @@
 /**
  * Modular sample catalog for Motio2edit homepage & galleries.
  * Prefer real paired assets under src/assets/ for before/after honesty.
+ * Music: no external SoundHelix placeholders (those mixed random audio into UI).
+ * Homepage Discover music uses R2 media_6 via getMusicVideoSamples().
  */
 
 import sampleObjectBefore from "@/assets/sample-object-before.jpg";
@@ -154,53 +156,8 @@ export const VIDEO_SAMPLES: SampleItem[] = [
   },
 ];
 
-export const MUSIC_SAMPLES: SampleItem[] = [
-  {
-    id: "mus-epic",
-    title: "Epic Cinematic Trailer",
-    description: "Soaring strings and triumphant brass",
-    category: "music",
-    editor: "music",
-    mediaUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    prompt:
-      "Epic cinematic trailer track with soaring strings, deep taiko drums and a triumphant brass finale.",
-    duration: "30s",
-    genre: "Orchestral",
-    mood: "Epic",
-    planRequired: "lite",
-    creditCost: 100,
-  },
-  {
-    id: "mus-lofi",
-    title: "Lo-fi Study Beats",
-    description: "Warm dusty vinyl and mellow Rhodes",
-    category: "music",
-    editor: "music",
-    mediaUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    prompt:
-      "Warm lofi hip hop beat with dusty vinyl crackle, mellow Rhodes piano chords and a laid-back bassline.",
-    duration: "30s",
-    genre: "Lo-fi",
-    mood: "Chill",
-    planRequired: "lite",
-    creditCost: 50,
-  },
-  {
-    id: "mus-edm",
-    title: "Electronic Dance",
-    description: "Pulsing synth bass and euphoric drop",
-    category: "music",
-    editor: "music",
-    mediaUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    prompt:
-      "High-energy electronic dance track with pulsing synth bass, bright arpeggios and a euphoric drop.",
-    duration: "30s",
-    genre: "Electronic",
-    mood: "Energetic",
-    planRequired: "lite",
-    creditCost: 100,
-  },
-];
+/** Empty — homepage Music uses R2 getMusicVideoSamples() only. No text/emoji cards, no external MP3s. */
+export const MUSIC_SAMPLES: SampleItem[] = [];
 
 export const ALL_SAMPLES: SampleItem[] = [
   ...IMAGE_SAMPLES,
