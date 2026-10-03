@@ -1,16 +1,17 @@
 /**
- * Public Watch Demo — approved marketing video for pre-login (prominent)
+ * Public Watch Demo — media_4 Demo_Video for pre-login (prominent)
  * and post-login (intentionally low-discoverability via `variant`).
- * Asset: VID_20260831_011245.mp4 only.
  */
 import { useRef, useCallback, useState, useEffect } from "react";
 import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getDemoVideoSample } from "@/lib/r2-catalog";
 
-/** Approved public Watch Demo asset — exact R2 URL required. */
+const DEMO = getDemoVideoSample();
+
 const PUBLIC_WATCH_DEMO = {
-  url: "https://assets.motio2edit.com/samples/video/VID_20260831_011245.mp4",
-  title: "Watch Demo",
+  url: DEMO.url,
+  title: DEMO.title,
 } as const;
 
 type Props = {
