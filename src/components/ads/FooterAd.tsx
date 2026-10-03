@@ -1,19 +1,16 @@
-import { AdContainer } from "./AdContainer";
-import { useAdsVisible } from "@/lib/site-settings";
+import { StaticBanner } from "./StaticBanner";
 import type { AdPlacement } from "@/lib/admin-control.functions";
 
+/** Footer static banner — Free users only; never on pricing/security/auth. */
 export function FooterAd({
-  slot,
   placement,
+  seed = "footer",
 }: {
   slot?: string;
   placement?: AdPlacement;
+  seed?: string;
 }) {
-  const visible = useAdsVisible(placement);
-  if (!visible) return null;
-  return (
-    <div className="mx-auto my-6 flex w-full max-w-[728px] justify-center px-4">
-      <AdContainer slot={slot} format="auto" responsive className="w-full" />
-    </div>
-  );
+  // Explicit hard-block: pricing must never show ads
+  if (placement === "pricing") return null;
+  return <StaticBanner placement={placement} seed={seed} className="my-4" />;
 }
