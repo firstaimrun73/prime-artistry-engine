@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-/** Focused creative pages — no top Header (matches Image Editor focus). */
+/** Focused creative pages — no top Header / sidebar chrome. Chatbot KEEPS top chrome. */
 function hideChromeHeader(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
   if (pathname.startsWith("/studio/video")) return true;
@@ -20,6 +20,7 @@ function hideChromeHeader(pathname: string): boolean {
   if (pathname.startsWith("/studio/music")) return true;
   if (pathname.startsWith("/studio/image/auto-edit")) return true;
   if (pathname.startsWith("/studio/image/circle-remove")) return true;
+  // Chatbot: do NOT hide top Header — only bottom tab is hidden via hideBottomNav
   return false;
 }
 
@@ -49,8 +50,6 @@ function AuthenticatedLayout() {
 
   const isMusicRoute = pathname === "/music" || pathname.startsWith("/music/");
   const noHeader = hideChromeHeader(pathname);
-  // Image Studio (/editor) owns its own shell background (Standard/Premium/Ultra AI).
-  // Do not force light bg-background underneath — that causes a white strip at the bottom.
   const isEditorShell = pathname.startsWith("/editor");
 
   const main = isMusicRoute ? (
