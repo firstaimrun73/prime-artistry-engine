@@ -48,6 +48,7 @@ function SettingsPage() {
   const [name, setName] = useState(profile?.display_name ?? "");
   const [saving, setSaving] = useState(false);
   const [pw, setPw] = useState("");
+  const [currentPw, setCurrentPw] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [notifs, setNotifs] = useState<NotifPrefs>(DEFAULT_NOTIFS);
@@ -92,17 +93,41 @@ function SettingsPage() {
   };
 
   const changePassword = async () => {
+    if (!currentPw) {
+      toast.error("Enter your current password to continue.");
+      return;
+    }
     if (pw.length < 8) {
       toast.error("Password must be at least 8 characters.");
       return;
     }
+    if (!user?.email) {
+      toast.error("No email on this account.");
+      return;
+    }
     setPwSaving(true);
-    const { error } = await supabase.auth.updateUser({ password: pw });
-    setPwSaving(false);
-    if (error) toast.error(error.message);
-    else {
+    try {
+      // Re-authenticate with current password before allowing a change.
+      const { error: reauthErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPw,
+      });
+      if (reauthErr) {
+        toast.error("Current password is incorrect.");
+        return;
+      }
+      const { error } = await supabase.auth.updateUser({ password: pw });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
       setPw("");
+      setCurrentPw("");
       toast.success("Password changed.");
+      // Security email: prefer Supabase Auth hook (password_changed).
+      // Avoid dual-send from client.
+    } finally {
+      setPwSaving(false);
     }
   };
 
@@ -257,7 +282,22 @@ function SettingsPage() {
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">{t("settings.security")}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Confirm your current password before setting a new one. Minimum 8 characters.
+        </p>
         <div className="mt-4 space-y-4">
+          <div>
+            <Label htmlFor="current-pw">Current password</Label>
+            <Input
+              id="current-pw"
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              placeholder="Current password"
+              className="mt-1.5"
+              autoComplete="current-password"
+            />
+          </div>
           <div>
             <Label htmlFor="pw">New password</Label>
             <Input
@@ -267,6 +307,7 @@ function SettingsPage() {
               onChange={(e) => setPw(e.target.value)}
               placeholder="At least 8 characters"
               className="mt-1.5"
+              autoComplete="new-password"
             />
           </div>
           <Button onClick={changePassword} disabled={pwSaving} variant="outline">
@@ -298,7 +339,6 @@ function SettingsPage() {
         </div>
       </section>
 
-      {/* History only — sensitive-eye removed completely */}
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">History</h2>
         <p className="mt-1 text-sm text-muted-foreground">
