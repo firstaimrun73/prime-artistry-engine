@@ -3,31 +3,30 @@ import { FooterAd } from "@/components/ads";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import {
-  LifeBuoy,
   Ticket as TicketIcon,
   BookOpen,
   Wrench,
   Activity,
   Mail,
-  Clock,
-  HelpCircle,
-  ShieldCheck,
+  MessageCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/support")({
   head: () => ({
     meta: [
-      { title: "Support Center — MOTIO2EDIT" },
-      { name: "description", content: "Get help with MOTIO2EDIT: help center, knowledge base, troubleshooting guides, system status, support tickets, and contact options." },
-      { property: "og:title", content: "Support Center — MOTIO2EDIT" },
-      { property: "og:description", content: "Help center, knowledge base, troubleshooting, and ticket support." },
+      { title: "Support — Motio2edit" },
+      {
+        name: "description",
+        content:
+          "Get help with MOTIO2EDIT: help center, knowledge base, troubleshooting guides, system status, support tickets, and contact options.",
+      },
     ],
   }),
-  component: Support,
+  component: SupportPage,
 });
 
 type Resource = {
-  icon: typeof LifeBuoy;
+  icon: typeof TicketIcon;
   title: string;
   body: string;
   to?: string;
@@ -35,38 +34,38 @@ type Resource = {
 };
 
 const RESOURCES: Resource[] = [
-  { icon: HelpCircle, title: "Help Center", body: "Browse common questions and quick answers in our FAQ.", to: "/faq" },
   { icon: TicketIcon, title: "Contact Support", body: "Create a ticket and track its status until it's resolved.", to: "/tickets" },
-  { icon: BookOpen, title: "Knowledge Base", body: "Guides on credits, generation, and getting the best results.", to: "/faq" },
+  { icon: BookOpen, title: "Knowledge Base", body: "Browse guides for studios, credits, and account settings.", to: "/faq" },
   { icon: Wrench, title: "Troubleshooting Guides", body: "Fix upload, rendering, and login issues step by step.", to: "/faq" },
-  { icon: Activity, title: "System Status", body: "Check current platform availability and incident history.", href: "https://status.motio2edit.com" },
-  { icon: ShieldCheck, title: "Security & Privacy", body: "Learn how we protect your account and your content.", to: "/security" },
+  { icon: Activity, title: "Troubleshooting", body: "Common fixes for upload, rendering, login, and account issues.", to: "/faq" },
+  { icon: MessageCircle, title: "Community tips", body: "Product FAQs and how-to answers for Motio2edit features.", to: "/faq" },
 ];
 
-function Support() {
+function SupportPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-5xl px-4 py-16">
+      <div className="mx-auto max-w-5xl px-4 py-12 pb-24 sm:py-16 md:pb-16">
         <div className="text-center">
-          <LifeBuoy className="mx-auto h-10 w-10 text-primary" />
-          <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">Support Center</h1>
-          <p className="mt-3 text-muted-foreground">Everything you need to get help, fast.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Support Center</h1>
+          <p className="mt-3 text-muted-foreground">
+            We are here to help you get the most out of Motio2edit.
+          </p>
         </div>
 
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {RESOURCES.map(({ icon: Icon, title, body, to, href }) => {
+            const className =
+              "flex h-full min-h-[10rem] flex-col rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary";
             const inner = (
               <>
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
                 <h2 className="mt-4 font-semibold">{title}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">{body}</p>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{body}</p>
               </>
             );
-            const className =
-              "block rounded-2xl border border-border bg-card p-6 transition-colors hover:border-primary";
             if (href) {
               return (
                 <a key={title} href={href} target="_blank" rel="noopener noreferrer" className={className}>
@@ -74,32 +73,31 @@ function Support() {
                 </a>
               );
             }
+            if (to) {
+              return (
+                <Link key={title} to={to} className={className}>
+                  {inner}
+                </Link>
+              );
+            }
             return (
-              <Link key={title} to={to!} className={className}>
+              <div key={title} className={className}>
                 {inner}
-              </Link>
+              </div>
             );
           })}
         </div>
 
-        <div className="mt-12 grid gap-6 sm:grid-cols-2">
-          <section className="rounded-xl border border-border bg-card p-6">
-            <h2 className="flex items-center gap-2 font-semibold">
-              <Mail className="h-4 w-4 text-primary" /> Email support
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Prefer email? Reach us at{" "}
-              <a href="mailto:support@motio2edit.com" className="text-primary hover:underline">support@motio2edit.com</a>.
-            </p>
-          </section>
-          <section className="rounded-xl border border-border bg-card p-6">
-            <h2 className="flex items-center gap-2 font-semibold">
-              <Clock className="h-4 w-4 text-primary" /> Response time
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              We typically respond within 24 hours. Paid plans receive priority handling for faster replies.
-            </p>
-          </section>
+        <div className="mt-12 rounded-2xl border border-border bg-card p-6 text-center">
+          <Mail className="mx-auto h-8 w-8 text-primary" />
+          <h2 className="mt-3 text-lg font-semibold">Email us</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Reach{" "}
+            <a href="mailto:support@motio2edit.com" className="text-primary hover:underline">
+              support@motio2edit.com
+            </a>
+            .
+          </p>
         </div>
       </div>
       <FooterAd />
