@@ -1,7 +1,13 @@
 /**
  * Motion2AI Creation — Discover (post-login).
- * Shows EVERY active sample in a straight 2-col grid.
- * Each card uses the sample's real aspect ratio — no wrong AR, no hidden slices.
+ *
+ * STRICT aspect-ratio sections (never mix ratios in one grid):
+ *   - 16:9 wide  → full-width stacked cards (proper video size)
+ *   - 9:16 / 3:4 → 2-column vertical grid
+ *   - 1:1 / 2:3  → 2-column square grid
+ *   - 4:3        → full-width (landscape stills)
+ *
+ * No horizontal scroll. Every active sample is shown.
  */
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -23,22 +29,71 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "video", label: "Videos" },
 ];
 
-function parseRatio(ar: string): number {
-  const m = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec((ar || "1:1").trim());
-  if (!m) return 1;
-  const w = Number(m[1]);
-  const h = Number(m[2]);
-  if (!w || !h) return 1;
-  return w / h;
+type RatioBucket = "wide" | "vertical" | "square" | "landscape";
+
+function normalizeAr(ar: string): string {
+  return (ar || "1:1").replace(/\s/g, "");
 }
 
-/** Featured = first wide item; rest fill the grid in sort order. */
-function splitFeatured(pool: R2Sample[]): { featured: R2Sample | null; rest: R2Sample[] } {
-  const wideIdx = pool.findIndex((s) => parseRatio(s.aspectRatio) >= 1.4);
-  if (wideIdx < 0) return { featured: null, rest: pool };
-  const featured = pool[wideIdx]!;
-  const rest = pool.filter((_, i) => i !== wideIdx);
-  return { featured, rest };
+function bucketFor(sample: R2Sample): RatioBucket {
+  const ar = normalizeAr(sample.aspectRatio);
+  if (ar === "16:9" || ar === "21:9") return "wide";
+  if (ar === "9:16" || ar === "3:4") return "vertical";
+  if (ar === "4:3" || ar === "3:2") return "landscape";
+  // 1:1, 2:3, and anything else square-ish
+  return "square";
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-7">
+      <h3 className="mb-2.5 text-[13px] font-bold tracking-tight text-foreground">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function CardList({
+  samples,
+  likedIds,
+  onToggleLike,
+  onOpenViewer,
+  layout,
+}: {
+  samples: R2Sample[];
+  likedIds: Set<string>;
+  onToggleLike: (s: R2Sample) => void;
+  onOpenViewer: (s: R2Sample) => void;
+  /** full = 16:9 / 4:3 full width; pair = 2-col for vertical/square */
+  layout: "full" | "pair";
+}) {
+  if (samples.length === 0) return null;
+  return (
+    <div
+      className={cn(
+        layout === "full"
+          ? "grid grid-cols-1 gap-3"
+          : "grid grid-cols-2 gap-2.5 sm:gap-3",
+      )}
+    >
+      {samples.map((s) => (
+        <GalleryMediaCard
+          key={s.id}
+          sample={s}
+          liked={likedIds.has(s.id)}
+          onToggleLike={onToggleLike}
+          onOpenViewer={onOpenViewer}
+          size="large"
+        />
+      ))}
+    </div>
+  );
 }
 
 export function VisualDiscoveryGallery() {
@@ -53,7 +108,20 @@ export function VisualDiscoveryGallery() {
 
   const pool = tab === "img" ? images : tab === "video" ? videosOnly : all;
 
-  const { featured, rest } = useMemo(() => splitFeatured(pool), [pool]);
+  const { wide, vertical, square, landscape } = useMemo(() => {
+    const wide: R2Sample[] = [];
+    const vertical: R2Sample[] = [];
+    const square: R2Sample[] = [];
+    const landscape: R2Sample[] = [];
+    for (const s of pool) {
+      const b = bucketFor(s);
+      if (b === "wide") wide.push(s);
+      else if (b === "vertical") vertical.push(s);
+      else if (b === "landscape") landscape.push(s);
+      else square.push(s);
+    }
+    return { wide, vertical, square, landscape };
+  }, [pool]);
 
   const onToggleLike = useCallback(
     (sample: R2Sample) => {
@@ -96,31 +164,57 @@ export function VisualDiscoveryGallery() {
         </p>
       ) : (
         <>
-          {featured ? (
-            <div className="mb-4">
-              <GalleryMediaCard
-                sample={featured}
-                liked={likedIds.has(featured.id)}
+          {/* 16:9 — FULL WIDTH, never squeezed into half column */}
+          {wide.length > 0 && (
+            <Section title="Wide 16:9">
+              <CardList
+                samples={wide}
+                likedIds={likedIds}
                 onToggleLike={onToggleLike}
                 onOpenViewer={setViewer}
-                size="large"
+                layout="full"
               />
-            </div>
-          ) : null}
+            </Section>
+          )}
 
-          {/* All remaining samples — full list, native aspect, 2-col straight grid */}
-          <div className="grid grid-cols-2 items-start gap-2.5 sm:gap-3">
-            {rest.map((s) => (
-              <GalleryMediaCard
-                key={s.id}
-                sample={s}
-                liked={likedIds.has(s.id)}
+          {/* 9:16 + 3:4 — vertical pair grid only */}
+          {vertical.length > 0 && (
+            <Section title="Vertical 9:16">
+              <CardList
+                samples={vertical}
+                likedIds={likedIds}
                 onToggleLike={onToggleLike}
                 onOpenViewer={setViewer}
-                size="large"
+                layout="pair"
               />
-            ))}
-          </div>
+            </Section>
+          )}
+
+          {/* 1:1 — square pair grid only */}
+          {square.length > 0 && (
+            <Section title="Square 1:1">
+              <CardList
+                samples={square}
+                likedIds={likedIds}
+                onToggleLike={onToggleLike}
+                onOpenViewer={setViewer}
+                layout="pair"
+              />
+            </Section>
+          )}
+
+          {/* 4:3 landscape stills — full width */}
+          {landscape.length > 0 && (
+            <Section title="Landscape 4:3">
+              <CardList
+                samples={landscape}
+                likedIds={likedIds}
+                onToggleLike={onToggleLike}
+                onOpenViewer={setViewer}
+                layout="full"
+              />
+            </Section>
+          )}
         </>
       )}
 
