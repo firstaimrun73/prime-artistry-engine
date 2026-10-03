@@ -1,26 +1,14 @@
 /**
- * Marketing emails (plans nudge + promptless edits) — daily cron.
- * Auth: Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY> or CRON_SECRET.
- *
- * Transactional emails are NOT handled here (always send, no opt-in).
- *
- * Eligibility (ALL existing users, not only new signups):
- *   - confirmed email (auth.users.email_confirmed_at set)
- *   - profiles.marketing_unsubscribed = false
- *   - non-null email on profile
- * Cap: 80 sends per run (Resend free = 100/day; leave headroom for transactional).
- * Dedup: email_send_log (same template, WINDOW_DAYS) — no unique index (OTP must repeat same day).
- * Order: oldest profiles first so backlog drains over several days.
- *
- * marketing_unsubscribed column already exists — no SQL from this handler.
+ * Marketing emails — daily cron. Cap 80/day (Resend free 100).
+ * Confirmed email + not marketing_unsubscribed. Oldest first. Dedup via log.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { plansNudgeEmail, promptlessEditsEmail } from "@/emails/templates";
 import { sendTemplateEmail } from "@/emails/send";
+import { marketingUnsubscribeUrl } from "@/lib/unsubscribe-token";
 
 const WINDOW_DAYS = 4;
-/** Resend free daily quota is 100; keep headroom for auth/transactional. */
 const DAILY_SEND_CAP = 80;
 
 function authorized(request: Request): boolean {
@@ -38,17 +26,14 @@ export const Route = createFileRoute("/api/cron/marketing-emails")({
         if (!authorized(request)) {
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
-
         const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
         const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
         if (!supabaseUrl || !key) {
           return Response.json({ error: "Missing Supabase env" }, { status: 500 });
         }
-
         const db = createClient(supabaseUrl, key);
         const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-        // Confirmed emails from Auth Admin API (paginated)
         const confirmedEmails = new Set<string>();
         {
           let page = 1;
@@ -56,24 +41,18 @@ export const Route = createFileRoute("/api/cron/marketing-emails")({
           for (;;) {
             const { data, error: listErr } = await db.auth.admin.listUsers({ page, perPage });
             if (listErr) {
-              return Response.json(
-                { error: `listUsers failed: ${listErr.message}` },
-                { status: 500 },
-              );
+              return Response.json({ error: `listUsers failed: ${listErr.message}` }, { status: 500 });
             }
             const users = data?.users || [];
             for (const u of users) {
-              if (u.email && u.email_confirmed_at) {
-                confirmedEmails.add(u.email.toLowerCase());
-              }
+              if (u.email && u.email_confirmed_at) confirmedEmails.add(u.email.toLowerCase());
             }
             if (users.length < perPage) break;
             page += 1;
-            if (page > 50) break; // safety
+            if (page > 50) break;
           }
         }
 
-        // All eligible profiles: not unsubscribed, has email, oldest first
         const { data: candidates, error } = await db
           .from("profiles")
           .select("id, email, display_name, credits, marketing_unsubscribed, created_at")
@@ -82,9 +61,7 @@ export const Route = createFileRoute("/api/cron/marketing-emails")({
           .order("created_at", { ascending: true })
           .limit(500);
 
-        if (error) {
-          return Response.json({ error: error.message }, { status: 500 });
-        }
+        if (error) return Response.json({ error: error.message }, { status: 500 });
 
         const eligible = (candidates || []).filter(
           (u) => u.email && confirmedEmails.has(String(u.email).toLowerCase()),
@@ -92,14 +69,13 @@ export const Route = createFileRoute("/api/cron/marketing-emails")({
 
         let sent = 0;
         let skipped = 0;
-        let skippedUnconfirmed = (candidates || []).length - eligible.length;
+        const skippedUnconfirmed = (candidates || []).length - eligible.length;
         const templateName = "plansNudge";
 
         for (const u of eligible) {
           if (sent >= DAILY_SEND_CAP) break;
           if (!u.email) continue;
 
-          // Dedup: same template already sent within WINDOW_DAYS
           const { data: recent } = await db
             .from("email_send_log")
             .select("id")
@@ -114,7 +90,7 @@ export const Route = createFileRoute("/api/cron/marketing-emails")({
             continue;
           }
 
-          const unsub = `https://motio2edit.com/settings?unsubscribe=1`;
+          const unsub = marketingUnsubscribeUrl(u.email);
           const result = plansNudgeEmail({
             name: (u.display_name || "there").split(" ")[0],
             credits_left: String(u.credits ?? 0),
