@@ -1,7 +1,7 @@
 /**
  * Central R2 sample catalog — production public URLs only.
  * Domain: https://assets.motio2edit.com
- * Titles/descriptions from visual inspection. Every description is EXACTLY 10 words.
+ * Titles/descriptions from visual inspection. Detailed descriptions; tiers: Standard/Premium for video, Standard/Premium/Ultra AI for image.
  */
 
 export const R2_PUBLIC = "https://assets.motio2edit.com" as const;
@@ -75,11 +75,11 @@ export const CIRCLE_ADD_DEER = {
   aspectRatio: "2:3",
 } as const;
 
-/** Pre-login demo only — not in authenticated discovery gallery. */
+/** Pre-login demo + post-login discovery. */
 export const DEMO_VIDEO_SAMPLE: R2Sample = {
   id: "vid-demo-media4",
   title: "Motio2edit Demo Reel",
-  description: "Official Motio2edit product demo reel for the pre-login homepage only.",
+  description: "Official Motio2edit product demo reel showcasing image video and edit tools.",
   studio: "video",
   feature: "video-generation",
   homepageCategory: "demo",
@@ -383,6 +383,108 @@ export const R2_IMAGE_SAMPLES: R2Sample[] = [
     sortOrder: 660,
     active: true,
   },
+  {
+    id: "img-m4-studio-portrait",
+    title: "Studio Portrait Headshot",
+    description: "Clean circular studio headshot of a person with short hair and calm expression under soft light.",
+    studio: "image",
+    feature: "portrait",
+    homepageCategory: "samples",
+    url: media("media_4", "FwyhxvcR6FayAiU2QF0Zs_vgYXDNfP.png"),
+    filename: "FwyhxvcR6FayAiU2QF0Zs_vgYXDNfP.png",
+    width: 1024,
+    height: 1024,
+    aspectRatio: "1:1",
+    format: "PNG",
+    qualityTier: "Premium",
+    sortOrder: 670,
+    active: true,
+  },
+  {
+    id: "img-m4-glow-mushrooms",
+    title: "Bioluminescent Forest Path",
+    description: "Glowing purple and cyan mushrooms line a mossy path deep inside a misty forest.",
+    studio: "image",
+    feature: "image-generation",
+    homepageCategory: "samples",
+    url: media("media_4", "IKyCKxz4XJvoW_pglvnZP_start_frame.png"),
+    filename: "IKyCKxz4XJvoW_pglvnZP_start_frame.png",
+    width: 1344,
+    height: 768,
+    aspectRatio: "16:9",
+    format: "PNG",
+    qualityTier: "Ultra AI",
+    sortOrder: 680,
+    active: true,
+  },
+  {
+    id: "img-m4-need-type",
+    title: "NEED Pixel Typography",
+    description: "Bold pixel-style NEED lettering sits centered on a vivid purple dotted background.",
+    studio: "image",
+    feature: "image-generation",
+    homepageCategory: "samples",
+    url: media("media_4", "eL-v6BoTzF6nQ6gNCJ4Zu_7N2joClt.png"),
+    filename: "eL-v6BoTzF6nQ6gNCJ4Zu_7N2joClt.png",
+    width: 1024,
+    height: 1024,
+    aspectRatio: "1:1",
+    format: "PNG",
+    qualityTier: "Standard",
+    sortOrder: 690,
+    active: true,
+  },
+  {
+    id: "img-m4-hands-face",
+    title: "Hands Covering Face",
+    description: "A person covers their face with both hands in a quiet emotional portrait moment.",
+    studio: "image",
+    feature: "portrait",
+    homepageCategory: "samples",
+    url: media("media_4", "gVxB7doJNASiVsHxd2E6f_aeOPq6Ki.png"),
+    filename: "gVxB7doJNASiVsHxd2E6f_aeOPq6Ki.png",
+    width: 1024,
+    height: 768,
+    aspectRatio: "4:3",
+    format: "PNG",
+    qualityTier: "Premium",
+    sortOrder: 700,
+    active: true,
+  },
+  {
+    id: "img-m4-manga-spread",
+    title: "Motio2edit Manga Spread",
+    description: "Open manga pages feature Motio2edit branding across black and white character panels.",
+    studio: "image",
+    feature: "image-generation",
+    homepageCategory: "samples",
+    url: media("media_4", "ilLqzjcdIIvgTIf_mhtgH_vVW4aOUh.png"),
+    filename: "ilLqzjcdIIvgTIf_mhtgH_vVW4aOUh.png",
+    width: 1024,
+    height: 1024,
+    aspectRatio: "1:1",
+    format: "PNG",
+    qualityTier: "Standard",
+    sortOrder: 710,
+    active: true,
+  },
+  {
+    id: "img-m4-alpine-lake",
+    title: "Alpine Lake Reflection",
+    description: "Snowy mountain peaks mirror perfectly in a still alpine lake under a pink sunset sky.",
+    studio: "image",
+    feature: "image-generation",
+    homepageCategory: "samples",
+    url: media("media_4", "jRa0Str3dRt_PJyWMhc73_6Ob2UKxx.png"),
+    filename: "jRa0Str3dRt_PJyWMhc73_6Ob2UKxx.png",
+    width: 1024,
+    height: 1024,
+    aspectRatio: "1:1",
+    format: "PNG",
+    qualityTier: "Premium",
+    sortOrder: 720,
+    active: true,
+  },
 ];
 
 export const R2_VIDEO_SAMPLES: R2Sample[] = [
@@ -567,6 +669,86 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
     active: true,
   },
   {
+    id: "vid-m4-output-iqfm",
+    title: "Cinematic Motion Clip",
+    description: "Smooth cinematic motion clip generated in Video Studio with natural camera movement.",
+    studio: "video",
+    feature: "video-generation",
+    homepageCategory: "video",
+    url: media("media_4", "IQfm1ZwHaXpH5TQCGAjjK_output.mp4"),
+    filename: "IQfm1ZwHaXpH5TQCGAjjK_output.mp4",
+    aspectRatio: "16:9",
+    format: "MP4",
+    qualityTier: "Standard",
+    hasAudio: true,
+    sortOrder: 182,
+    active: true,
+  },
+  {
+    id: "vid-m4-output-km4e",
+    title: "Story Scene Motion",
+    description: "Narrative scene motion clip with consistent subjects and fluid camera path.",
+    studio: "video",
+    feature: "video-generation",
+    homepageCategory: "video",
+    url: media("media_4", "KM4eXRAh78HX2aDbiqtPo_output.mp4"),
+    filename: "KM4eXRAh78HX2aDbiqtPo_output.mp4",
+    aspectRatio: "16:9",
+    format: "MP4",
+    qualityTier: "Standard",
+    hasAudio: true,
+    sortOrder: 184,
+    active: true,
+  },
+  {
+    id: "vid-m4-output-h26q",
+    title: "Vertical Story Reel",
+    description: "Vertical storytelling reel with clear subjects and steady cinematic pacing throughout.",
+    studio: "video",
+    feature: "video-generation",
+    homepageCategory: "video",
+    url: media("media_4", "h26Q6hmdWaZAbN36AUaVF_7rul5Taa.mp4"),
+    filename: "h26Q6hmdWaZAbN36AUaVF_7rul5Taa.mp4",
+    aspectRatio: "9:16",
+    format: "MP4",
+    qualityTier: "Standard",
+    hasAudio: true,
+    sortOrder: 186,
+    active: true,
+  },
+  {
+    id: "vid-m4-output-j0hr",
+    title: "Dynamic Action Clip",
+    description: "Dynamic action motion clip with crisp detail and natural environmental motion.",
+    studio: "video",
+    feature: "video-generation",
+    homepageCategory: "video",
+    url: media("media_4", "j0HrZ8jTC7ybEr9YX9f9n_output.mp4"),
+    filename: "j0HrZ8jTC7ybEr9YX9f9n_output.mp4",
+    aspectRatio: "16:9",
+    format: "MP4",
+    qualityTier: "Standard",
+    hasAudio: true,
+    sortOrder: 188,
+    active: true,
+  },
+  {
+    id: "vid-m4-output-khcl",
+    title: "Atmospheric Scene Clip",
+    description: "Atmospheric scene motion with soft lighting and coherent subject continuity.",
+    studio: "video",
+    feature: "video-generation",
+    homepageCategory: "video",
+    url: media("media_4", "khcLtf5buGg1e0v8ykzyc_output.mp4"),
+    filename: "khcLtf5buGg1e0v8ykzyc_output.mp4",
+    aspectRatio: "16:9",
+    format: "MP4",
+    qualityTier: "Premium",
+    hasAudio: true,
+    sortOrder: 190,
+    active: true,
+  },
+  {
     id: "vid-m6-tron-racing",
     title: "Neon Grid Race",
     description: "A neon light-cycle races through glowing digital grid tunnel walls.",
@@ -665,7 +847,7 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
     height: 1920,
     aspectRatio: "9:16",
     format: "MP4",
-    qualityTier: "Ultra AI",
+    qualityTier: "Standard",
     hasAudio: true,
     sortOrder: 300,
     active: true,
@@ -673,12 +855,16 @@ export const R2_VIDEO_SAMPLES: R2Sample[] = [
 ];
 
 function dedupeByUrl(samples: R2Sample[]): R2Sample[] {
-  const seen = new Set<string>();
+  const seenUrl = new Set<string>();
+  const seenFile = new Set<string>();
   const out: R2Sample[] = [];
   for (const s of samples) {
     if (!s.active) continue;
-    if (seen.has(s.url)) continue;
-    seen.add(s.url);
+    if (seenUrl.has(s.url)) continue;
+    const fn = (s.filename || s.url.split("/").pop() || "").toLowerCase();
+    if (fn && seenFile.has(fn)) continue;
+    seenUrl.add(s.url);
+    if (fn) seenFile.add(fn);
     out.push(s);
   }
   return out;
@@ -702,15 +888,15 @@ export function getMusicVideoSamples(): R2Sample[] {
   return getActiveR2VideoSamples().filter((s) => s.homepageCategory === "music");
 }
 
-/** Authenticated homepage videos — excludes pre-login Demo_Video. */
+/** Authenticated homepage videos — includes Demo_Video when present. */
 export function getVideoOnlySamples(): R2Sample[] {
-  return getActiveR2VideoSamples().filter(
-    (s) => s.homepageCategory !== "music" && s.homepageCategory !== "demo",
-  );
+  const base = getActiveR2VideoSamples().filter((s) => s.homepageCategory !== "music");
+  // Also surface official demo reel on post-login (deduped by URL).
+  return dedupeByUrl([DEMO_VIDEO_SAMPLE, ...base]).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export function getAllDiscoverSamples(): R2Sample[] {
-  return dedupeByUrl([...R2_IMAGE_SAMPLES, ...R2_VIDEO_SAMPLES]).sort(
+  return dedupeByUrl([DEMO_VIDEO_SAMPLE, ...R2_IMAGE_SAMPLES, ...R2_VIDEO_SAMPLES]).sort(
     (a, b) => a.sortOrder - b.sortOrder,
   );
 }
