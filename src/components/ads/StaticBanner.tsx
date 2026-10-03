@@ -1,6 +1,7 @@
 /**
  * Compact static clickable banner for Free users only.
  * Destinations come from ADS_CONFIG — never shown as raw text.
+ * Mobile ~320×50, desktop ~468×60. Normal document flow.
  */
 import { bannerHref } from "@/config/ads";
 import { useAdsVisible } from "@/lib/site-settings";
@@ -27,14 +28,17 @@ export function StaticBanner({ placement, seed = "default", className }: Props) 
         target="_blank"
         rel="noopener noreferrer sponsored"
         className={cn(
-          "flex h-[50px] w-full max-w-[320px] items-center justify-center rounded-lg border border-border/60",
-          "bg-secondary/40 text-center text-xs font-medium text-muted-foreground",
-          "transition-colors hover:border-primary/40 hover:text-foreground",
+          "flex h-[50px] w-full max-w-[320px] items-center justify-center gap-2 rounded-lg border border-border",
+          "bg-gradient-to-r from-secondary/80 via-card to-secondary/80 text-center text-xs font-semibold text-foreground",
+          "shadow-sm transition-colors hover:border-primary/50 hover:from-secondary hover:to-secondary",
           "sm:h-[60px] sm:max-w-[468px] sm:text-sm",
         )}
         aria-label="Sponsored"
       >
-        <span className="px-3">Sponsored</span>
+        <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary sm:text-[11px]">
+          Sponsored
+        </span>
+        <span className="text-muted-foreground">Discover more</span>
       </a>
     </div>
   );

@@ -8,8 +8,14 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Send, Lock, ArrowLeft, MessageSquare } from "lucide-react";
+import { Send, Lock, MessageSquare } from "lucide-react";
 
+/**
+ * Chatbot page.
+ * TOP HEADER / AppSidebar: provided by `_authenticated` layout (kept).
+ * BOTTOM TAB BAR: hidden via hideBottomNav("/chat").
+ * Access: Master Studio (business) + admin only — enforced UI + server.
+ */
 export const Route = createFileRoute("/_authenticated/chat")({
   component: ChatbotPage,
 });
@@ -49,18 +55,15 @@ function ChatbotPage() {
 
   if (!profile || !allowed) {
     return (
-      <div className="min-h-screen bg-background">
-        <SimpleNav />
-        <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-16 text-center">
-          <Lock className="h-8 w-8 text-primary" />
-          <h1 className="text-xl font-bold">Chatbot is a paid-plan feature</h1>
-          <p className="text-sm text-muted-foreground">
-            Upgrade to a paid plan to use Chatbot.
-          </p>
-          <Button asChild>
-            <Link to="/pricing">View plans</Link>
-          </Button>
-        </div>
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-16 text-center">
+        <Lock className="h-8 w-8 text-primary" />
+        <h1 className="text-xl font-bold">Chatbot is a Master Studio feature</h1>
+        <p className="text-sm text-muted-foreground">
+          Upgrade to Master Studio to use Chatbot.
+        </p>
+        <Button asChild>
+          <Link to="/pricing">View plans</Link>
+        </Button>
       </div>
     );
   }
@@ -87,74 +90,55 @@ function ChatbotPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <SimpleNav />
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-4">
-        <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-          <MessageSquare className="h-5 w-5 text-primary" />
-          Chatbot
-        </h1>
-        <p className="mt-1 text-xs text-muted-foreground">Product help for your plan</p>
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-4 pb-8">
+      <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+        <MessageSquare className="h-5 w-5 text-primary" />
+        Chatbot
+      </h1>
+      <p className="mt-1 text-xs text-muted-foreground">Product help for your plan</p>
 
-        <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                  m.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary/80 text-secondary-foreground"
-                }`}
-              >
-                {m.content}
-              </div>
+      <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm min-h-[50vh]">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                m.role === "user"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary/80 text-secondary-foreground"
+              }`}
+            >
+              {m.content}
             </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="rounded-2xl bg-secondary/80 px-3.5 py-2 text-sm text-muted-foreground">
-                Thinking…
-              </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="rounded-2xl bg-secondary/80 px-3.5 py-2 text-sm text-muted-foreground">
+              Thinking…
             </div>
-          )}
-          <div ref={endRef} />
-        </div>
-
-        <div className="mt-3 flex gap-2 pb-4">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value.slice(0, CHATBOT_MAX_INPUT_CHARS))}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-            placeholder="Ask Chatbot…"
-            className="rounded-xl"
-            maxLength={CHATBOT_MAX_INPUT_CHARS}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={loading || !input.trim()}
-            size="icon"
-            className="shrink-0 rounded-xl"
-            aria-label="Send"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+          </div>
+        )}
+        <div ref={endRef} />
       </div>
-    </div>
-  );
-}
 
-function SimpleNav() {
-  return (
-    <div className="border-b border-border bg-background/80 backdrop-blur-sm md:hidden">
-      <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      <div className="mt-3 flex gap-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value.slice(0, CHATBOT_MAX_INPUT_CHARS))}
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+          placeholder="Ask Chatbot…"
+          className="rounded-xl"
+          maxLength={CHATBOT_MAX_INPUT_CHARS}
+        />
+        <Button
+          onClick={handleSend}
+          disabled={loading || !input.trim()}
+          size="icon"
+          className="shrink-0 rounded-xl"
+          aria-label="Send"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Home
-        </Link>
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
