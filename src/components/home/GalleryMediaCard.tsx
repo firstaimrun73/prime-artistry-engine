@@ -1,8 +1,7 @@
 /**
  * Media-first discovery card.
- * Native aspect ratio · title + description overlay.
- * Standard / Premium / Ultra badge at top-left.
- * Like + info at top-right (never overlap badge).
+ * Always sizes to the sample's declared aspect ratio so media is never stretched into the wrong frame.
+ * Badge top-left · like/info top-right.
  */
 import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -21,18 +20,13 @@ function parseRatio(ar: string): number {
 
 export function spanClassForSample(sample: R2Sample): string {
   const r = parseRatio(sample.aspectRatio);
-  const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
-  if (r >= 2.2) return "col-span-2";
-  if (isVideo && r >= 1.6) return "col-span-2";
-  if (r >= 1.5 && r < 2.2) return "col-span-2";
+  if (r >= 1.5) return "col-span-2";
   return "col-span-1";
 }
 
-/** Fixed strip height (px). Width = height × ratio. */
 export const STRIP_ROW_HEIGHT_PX = 220;
 export const STRIP_ROW_HEIGHT_PX_SM = 240;
 
-/** Inline style for strip cards — fixed height, width from aspect ratio. */
 export function stripCardStyle(sample: R2Sample): React.CSSProperties {
   const r = parseRatio(sample.aspectRatio);
   return {
@@ -82,7 +76,6 @@ type Props = {
   onOpenViewer?: (sample: R2Sample) => void;
   className?: string;
   size?: "default" | "large";
-  /** When true, card uses fixed-height strip layout (width from ratio). */
   stripMode?: boolean;
 };
 
@@ -98,6 +91,7 @@ export function GalleryMediaCard({
   const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
   const large = size === "large" || stripMode;
   const [failed, setFailed] = useState(false);
+  const ratio = parseRatio(sample.aspectRatio);
 
   const openMedia = useCallback(
     (e?: React.MouseEvent | React.TouchEvent) => {
@@ -107,7 +101,6 @@ export function GalleryMediaCard({
     },
     [onOpenViewer, sample],
   );
-
   const onLike = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
       e.preventDefault();
@@ -121,26 +114,22 @@ export function GalleryMediaCard({
 
   const badge = categoryBadge(sample);
   const tier = sample.qualityTier ?? null;
-  const span = stripMode ? "" : spanClassForSample(sample);
   const title = sample.title?.trim() || null;
   const description = sample.description?.trim() || null;
 
   return (
     <article
       className={cn(
-        "group relative overflow-hidden rounded-[14px]",
+        "group relative w-full overflow-hidden rounded-[14px]",
         "bg-muted/15 ring-1 ring-border/25 transition duration-300",
         "hover:ring-primary/30 hover:shadow-md",
-        !stripMode && "w-full self-start",
-        span,
         className,
       )}
-      style={stripMode ? stripCardStyle(sample) : undefined}
+      style={stripMode ? stripCardStyle(sample) : { aspectRatio: String(ratio) }}
       data-sample-id={sample.id}
       data-aspect={sample.aspectRatio}
       data-ratio={sample.aspectRatio}
     >
-      {/* Controls top-right */}
       <div className="gallery-card__controls absolute right-2 top-2 z-20 flex items-center gap-1.5">
         <button
           type="button"
@@ -168,10 +157,7 @@ export function GalleryMediaCard({
 
       <button
         type="button"
-        className={cn(
-          "relative block overflow-hidden rounded-[14px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-          stripMode ? "h-full w-full" : "w-full",
-        )}
+        className="relative block h-full w-full overflow-hidden rounded-[14px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         onClick={openMedia}
         aria-label={isVideo ? `Open video ${title || ""}` : `View ${title || "media"}`}
       >
@@ -182,20 +168,14 @@ export function GalleryMediaCard({
             playsInline
             loop
             preload="metadata"
-            className={cn(
-              "pointer-events-none block",
-              stripMode ? "h-full w-full object-cover" : "h-auto w-full",
-            )}
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
             onError={() => setFailed(true)}
           />
         ) : (
           <img
             src={sample.url}
             alt={title || "Sample"}
-            className={cn(
-              "block",
-              stripMode ? "h-full w-full object-cover" : "h-auto w-full",
-            )}
+            className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
             decoding="async"
             onError={() => setFailed(true)}
@@ -204,7 +184,6 @@ export function GalleryMediaCard({
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
 
-        {/* Badge at LEFT TOP corner — original position */}
         <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-col gap-1">
           {badge ? (
             <span className="rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/95 backdrop-blur-sm">
