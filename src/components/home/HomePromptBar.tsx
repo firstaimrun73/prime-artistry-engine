@@ -1,7 +1,7 @@
 /**
  * Homepage multi-reference prompt card.
- * One prompt → five larger reference frames in a vertical zigzag,
- * linked by a flowing dotted path animation.
+ * Compact vertical zigzag of 5 refs + flowing dotted path.
+ * Strict height cap — never bleeds under/over the Ace card.
  */
 import { Link } from "@tanstack/react-router";
 import { WALKING_MAN_SAMPLES } from "@/lib/samples/walking-man";
@@ -12,22 +12,18 @@ const EXAMPLE_PROMPT =
 
 const REFS = WALKING_MAN_SAMPLES.slice(0, 5);
 
-/** Left / right zigzag positions (percent of track width). */
-const ZIG = [
-  { x: 18, y: 0 },
-  { x: 62, y: 1 },
-  { x: 18, y: 2 },
-  { x: 62, y: 3 },
-  { x: 18, y: 4 },
-] as const;
-
-/** Card size in the track (px-ish via %). */
-const CARD = 38; // % of container width
+/**
+ * Compact zigzag: left / right alternating.
+ * Card ~112px, step ~128px → total track ~ 5*128 - 16 ≈ 624px max.
+ */
+const CARD_PX = 112;
+const STEP_PX = 128;
+const TRACK_H = STEP_PX * (REFS.length - 1) + CARD_PX; // 624
 
 export function HomePromptBar() {
   return (
     <section
-      className="mt-10 rounded-3xl border border-border/80 bg-card/95 p-4 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-card/80 sm:p-5"
+      className="relative z-0 mt-10 overflow-hidden rounded-3xl border border-border/80 bg-card/95 p-4 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-card/80 sm:p-5"
       data-home-section="prompt-bar"
     >
       <Link
@@ -64,46 +60,57 @@ export function HomePromptBar() {
         </div>
       </Link>
 
-      {/* Vertical zigzag track — larger cards, flowing dotted path */}
+      {/* Compact zigzag — fixed height, full-bleed images, contained */}
       <div
-        className="relative mx-auto mt-5 w-full max-w-sm"
-        style={{ aspectRatio: "1 / 2.15" }}
+        className="relative mx-auto mt-4 w-full max-w-[320px] overflow-hidden"
+        style={{ height: TRACK_H }}
       >
-        {/* Animated dotted path through centers */}
+        {/* Flowing dotted path through card centers */}
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full"
-          viewBox="0 0 100 215"
+          viewBox={`0 0 320 ${TRACK_H}`}
           preserveAspectRatio="none"
           aria-hidden
         >
-          <path
-            d={`M ${ZIG[0].x + CARD / 2} ${18 + CARD / 2}
-                C ${50} ${18 + CARD / 2 + 8}, ${50} ${18 + 42 + CARD / 2 - 8}, ${ZIG[1].x + CARD / 2} ${18 + 42 + CARD / 2}
-                C ${50} ${18 + 42 + CARD / 2 + 8}, ${50} ${18 + 84 + CARD / 2 - 8}, ${ZIG[2].x + CARD / 2} ${18 + 84 + CARD / 2}
-                C ${50} ${18 + 84 + CARD / 2 + 8}, ${50} ${18 + 126 + CARD / 2 - 8}, ${ZIG[3].x + CARD / 2} ${18 + 126 + CARD / 2}
-                C ${50} ${18 + 126 + CARD / 2 + 8}, ${50} ${18 + 168 + CARD / 2 - 8}, ${ZIG[4].x + CARD / 2} ${18 + 168 + CARD / 2}`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.1"
-            strokeDasharray="3.5 4.5"
-            strokeLinecap="round"
-            className="text-primary/55"
-            style={{ animation: "ref-dash-flow 1.6s linear infinite" }}
-          />
+          {REFS.slice(0, -1).map((_, i) => {
+            const leftSide = i % 2 === 0;
+            const x1 = leftSide ? 16 + CARD_PX / 2 : 320 - 16 - CARD_PX / 2;
+            const x2 = leftSide ? 320 - 16 - CARD_PX / 2 : 16 + CARD_PX / 2;
+            const y1 = i * STEP_PX + CARD_PX / 2;
+            const y2 = (i + 1) * STEP_PX + CARD_PX / 2;
+            const mx = 160;
+            const my = (y1 + y2) / 2;
+            return (
+              <path
+                key={i}
+                d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeDasharray="6 7"
+                strokeLinecap="round"
+                className="text-orange-400/80"
+                style={{ animation: "ref-dash-flow 1.4s linear infinite" }}
+              />
+            );
+          })}
         </svg>
 
         {REFS.map((s, i) => {
-          const pos = ZIG[i]!;
-          const top = 18 + i * 42;
+          const leftSide = i % 2 === 0;
+          const left = leftSide ? 16 : undefined;
+          const right = leftSide ? undefined : 16;
+          const top = i * STEP_PX;
           return (
             <div
               key={s.id}
-              className="absolute overflow-hidden rounded-2xl border-2 border-border/70 bg-muted shadow-md ring-1 ring-black/5 dark:border-white/15 dark:ring-white/5"
+              className="absolute z-[1] overflow-hidden rounded-2xl border border-border/60 bg-black shadow-md dark:border-white/15"
               style={{
-                left: `${pos.x}%`,
-                top: `${top}%`,
-                width: `${CARD}%`,
-                aspectRatio: "1 / 1",
+                left,
+                right,
+                top,
+                width: CARD_PX,
+                height: CARD_PX,
               }}
             >
               <img
@@ -111,12 +118,12 @@ export function HomePromptBar() {
                 alt={s.alt}
                 loading="lazy"
                 decoding="async"
-                className="h-full w-full object-cover object-center"
+                className="absolute inset-0 h-full w-full object-cover object-center"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.opacity = "0.35";
                 }}
               />
-              <span className="absolute left-1.5 top-1.5 z-[1] flex h-5 min-w-5 items-center justify-center rounded-full bg-black/70 px-1.5 text-[11px] font-bold leading-none text-white">
+              <span className="absolute left-1.5 top-1.5 z-[1] flex h-5 min-w-5 items-center justify-center rounded-full bg-black/75 px-1.5 text-[11px] font-bold leading-none text-white">
                 {i + 1}
               </span>
             </div>
@@ -124,13 +131,13 @@ export function HomePromptBar() {
         })}
       </div>
 
-      <p className="mt-4 text-center text-[12px] font-medium leading-snug text-muted-foreground">
+      <p className="mt-3 text-center text-[12px] font-medium leading-snug text-muted-foreground">
         One prompt · many photo types · Motion2AI turns them into coherent possibilities
       </p>
 
       <style>{`
         @keyframes ref-dash-flow {
-          to { stroke-dashoffset: -16; }
+          to { stroke-dashoffset: -26; }
         }
       `}</style>
     </section>
