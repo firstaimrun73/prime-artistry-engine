@@ -6,7 +6,7 @@ import { featsTable, pricingTable } from "./tables";
 export function plansNudgeEmail(vars: Record<string, string | number> = {}) {
   const body =
     h1("Create more, {{name}} ✨") +
-    p("You have <b>{{credits_left}} credits</b> left. Upgrade for premium quality, more credits and a <b>commercial-use licence</b> for everything you make.") +
+    p("You have <b>{{credits_left}} credits</b> left. Upgrade for premium quality, more credits and a <b>licence for use under your plan</b> for everything you make.") +
     img("sample-jewelry.jpg", "Jewelry product shot") +
     `<h2 style="margin:22px 0 4px;font:800 18px Arial;color:#17171c">Choose your plan</h2>` +
     pricingTable() +
@@ -15,7 +15,7 @@ export function plansNudgeEmail(vars: Record<string, string | number> = {}) {
     `<table role="presentation" width="100%"><tr><td width="50%" style="padding:0 4px 0 0">${img("sample-bike.jpg", "Neon city bike", 250)}</td><td width="50%" style="padding:0 0 0 4px">${img("sample-portrait.jpg", "Pencil portrait", 250)}</td></tr><tr><td colspan="2" style="height:8px"></td></tr><tr><td width="50%" style="padding:0 4px 0 0">${img("sample-tea.jpg", "Tea hills", 250)}</td><td width="50%" style="padding:0 0 0 4px">${img("sample-music.jpg", "Orchestra", 250)}</td></tr></table>` +
     `<h2 style="margin:22px 0 4px;font:800 18px Arial;color:#17171c">Also inside</h2>` +
     featsTable() +
-    note("Sample images are Motio2edit creations. Paid plans include licence for commercial use of your own creations.");
+    note("Sample images are Motio2edit creations. Paid plans include a licence for use under your plan for your own creations.");
   return finish(
     "Unlock more credits with a Motio2edit plan",
     wrap("Pick a plan. Try it now.", body, true),
