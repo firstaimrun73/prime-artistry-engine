@@ -1,7 +1,7 @@
 /**
  * Homepage multi-reference prompt card.
- * Compact vertical zigzag of 5 refs + flowing dotted path.
- * Strict height cap — never bleeds under/over the Ace card.
+ * Compact vertical zigzag of 5 refs + flowing orange dotted path.
+ * Each card: full photo + "Image N" caption (no empty black bar).
  */
 import { Link } from "@tanstack/react-router";
 import { WALKING_MAN_SAMPLES } from "@/lib/samples/walking-man";
@@ -12,13 +12,10 @@ const EXAMPLE_PROMPT =
 
 const REFS = WALKING_MAN_SAMPLES.slice(0, 5);
 
-/**
- * Compact zigzag: left / right alternating.
- * Card ~112px, step ~128px → total track ~ 5*128 - 16 ≈ 624px max.
- */
-const CARD_PX = 112;
-const STEP_PX = 128;
-const TRACK_H = STEP_PX * (REFS.length - 1) + CARD_PX; // 624
+const CARD_W = 120;
+const CARD_H = 138; // photo + caption
+const STEP_PX = 148;
+const TRACK_H = STEP_PX * (REFS.length - 1) + CARD_H;
 
 export function HomePromptBar() {
   return (
@@ -60,12 +57,10 @@ export function HomePromptBar() {
         </div>
       </Link>
 
-      {/* Compact zigzag — fixed height, full-bleed images, contained */}
       <div
         className="relative mx-auto mt-4 w-full max-w-[320px] overflow-hidden"
         style={{ height: TRACK_H }}
       >
-        {/* Flowing dotted path through card centers */}
         <svg
           className="pointer-events-none absolute inset-0 h-full w-full"
           viewBox={`0 0 320 ${TRACK_H}`}
@@ -74,10 +69,10 @@ export function HomePromptBar() {
         >
           {REFS.slice(0, -1).map((_, i) => {
             const leftSide = i % 2 === 0;
-            const x1 = leftSide ? 16 + CARD_PX / 2 : 320 - 16 - CARD_PX / 2;
-            const x2 = leftSide ? 320 - 16 - CARD_PX / 2 : 16 + CARD_PX / 2;
-            const y1 = i * STEP_PX + CARD_PX / 2;
-            const y2 = (i + 1) * STEP_PX + CARD_PX / 2;
+            const x1 = leftSide ? 16 + CARD_W / 2 : 320 - 16 - CARD_W / 2;
+            const x2 = leftSide ? 320 - 16 - CARD_W / 2 : 16 + CARD_W / 2;
+            const y1 = i * STEP_PX + CARD_H / 2;
+            const y2 = (i + 1) * STEP_PX + CARD_H / 2;
             const mx = 160;
             const my = (y1 + y2) / 2;
             return (
@@ -89,7 +84,7 @@ export function HomePromptBar() {
                 strokeWidth="2"
                 strokeDasharray="6 7"
                 strokeLinecap="round"
-                className="text-orange-400/80"
+                className="text-orange-400/85"
                 style={{ animation: "ref-dash-flow 1.4s linear infinite" }}
               />
             );
@@ -98,34 +93,41 @@ export function HomePromptBar() {
 
         {REFS.map((s, i) => {
           const leftSide = i % 2 === 0;
-          const left = leftSide ? 16 : undefined;
-          const right = leftSide ? undefined : 16;
           const top = i * STEP_PX;
           return (
             <div
               key={s.id}
-              className="absolute z-[1] overflow-hidden rounded-2xl border border-border/60 bg-black shadow-md dark:border-white/15"
+              className="absolute z-[1] flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-md dark:border-white/15"
               style={{
-                left,
-                right,
+                left: leftSide ? 16 : undefined,
+                right: leftSide ? undefined : 16,
                 top,
-                width: CARD_PX,
-                height: CARD_PX,
+                width: CARD_W,
+                height: CARD_H,
               }}
             >
-              <img
-                src={s.url}
-                alt={s.alt}
-                loading="lazy"
-                decoding="async"
-                className="absolute inset-0 h-full w-full object-cover object-center"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.opacity = "0.35";
-                }}
-              />
-              <span className="absolute left-1.5 top-1.5 z-[1] flex h-5 min-w-5 items-center justify-center rounded-full bg-black/75 px-1.5 text-[11px] font-bold leading-none text-white">
-                {i + 1}
-              </span>
+              {/* Photo fills top — no black letterbox */}
+              <div className="relative min-h-0 flex-1 overflow-hidden bg-muted">
+                <img
+                  src={s.url}
+                  alt={s.alt}
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-cover object-center"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.opacity = "0.35";
+                  }}
+                />
+                <span className="absolute left-1.5 top-1.5 z-[1] flex h-5 min-w-5 items-center justify-center rounded-full bg-black/75 px-1.5 text-[11px] font-bold leading-none text-white">
+                  {i + 1}
+                </span>
+              </div>
+              {/* Caption instead of awkward black bar */}
+              <div className="flex h-7 shrink-0 items-center justify-center border-t border-border/50 bg-background/95 px-2">
+                <span className="text-[11px] font-semibold tracking-wide text-foreground">
+                  Image {i + 1}
+                </span>
+              </div>
             </div>
           );
         })}
