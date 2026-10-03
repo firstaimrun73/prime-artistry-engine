@@ -10,6 +10,5 @@ export function FooterAd({
   placement?: AdPlacement;
   seed?: string;
 }) {
-  if (placement === "pricing") return null;
   return <StaticBanner placement={placement} seed={seed} className="my-4" />;
 }
