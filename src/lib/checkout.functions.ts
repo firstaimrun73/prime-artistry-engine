@@ -1,30 +1,30 @@
 /**
- * Checkout server functions (free-plan switch).
+ * Checkout server functions.
+ * Free is NOT activatable via checkout — signup grants FREE_SIGNUP_CREDITS once
+ * via public.handle_new_user() + credit_ledger FREE-SIGNUP-<user_id>.
  * Paid plans go through payment providers in payments.functions.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { PlanId } from "@/lib/plans";
 
 const checkoutSchema = z.object({
   plan: z.enum(["free", "lite", "plus", "pro", "studio", "business"]),
   currency: z.string().min(1).max(8),
 });
 
-/** Free-plan switch only. Paid plans must go through payment providers. */
+/**
+ * Rejected for free. Paid plans must use payment providers.
+ * Kept so any stale client call fails safely without granting credits.
+ */
 export const completeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => checkoutSchema.parse(data))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    if (data.plan !== "free") {
-      throw new Error("Paid plans must be purchased through the secure payment checkout.");
+  .handler(async ({ data }) => {
+    if (data.plan === "free") {
+      throw new Error(
+        "Free credits are granted automatically at signup. There is no free plan checkout.",
+      );
     }
-    const { error } = await supabase
-      .from("profiles")
-      .update({ plan: "free", currency: data.currency, updated_at: new Date().toISOString() })
-      .eq("id", userId);
-    if (error) throw new Error("Could not update your plan.");
-    return { ok: true, plan: "free" as PlanId, credits: 0 };
+    throw new Error("Paid plans must be purchased through the secure payment checkout.");
   });
