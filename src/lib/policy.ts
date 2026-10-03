@@ -29,14 +29,14 @@ export function isFreePlan(plan: string | null | undefined): boolean {
   return !isPaidPlan(plan);
 }
 
-/** Chat: all paid plans (including Lite). Free never. */
+/** Chatbot: Master Studio (business) + admin only. Server must re-check. */
 export function canAccessChat(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
   isAdmin?: boolean;
 }): boolean {
   if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
-  return isPaidPlan(opts.plan);
+  return opts.plan === "business";
 }
 
 /**
