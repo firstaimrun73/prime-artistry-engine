@@ -3,6 +3,7 @@
  * Horizontal strips: fixed row height, width = height × ratio.
  * Bottoms align · no empty gap · native ratio · no crop when media matches card AR.
  * Title + exact 10-word description overlay (compact).
+ * Premium / Ultra badge sits below the like/info row so it never hides behind controls.
  */
 import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -30,14 +31,14 @@ export function spanClassForSample(sample: R2Sample): string {
 }
 
 /** Fixed strip height (px). Width = height × ratio. */
-export const STRIP_ROW_HEIGHT_PX = 200;
-export const STRIP_ROW_HEIGHT_PX_SM = 220;
+export const STRIP_ROW_HEIGHT_PX = 220;
+export const STRIP_ROW_HEIGHT_PX_SM = 240;
 
 /** Inline style for strip cards — fixed height, width from aspect ratio. */
 export function stripCardStyle(sample: R2Sample): React.CSSProperties {
   const r = parseRatio(sample.aspectRatio);
   return {
-    height: "var(--strip-h, 200px)",
+    height: "var(--strip-h, 220px)",
     aspectRatio: String(r),
     width: "auto",
     flexShrink: 0,
@@ -141,12 +142,12 @@ export function GalleryMediaCard({
       data-aspect={sample.aspectRatio}
       data-ratio={sample.aspectRatio}
     >
-      <div className="gallery-card__controls absolute right-2 top-2 z-20 flex items-center gap-1.5">
+      <div className="gallery-card__controls absolute right-1.5 top-1.5 z-20 flex items-center gap-1">
         <button
           type="button"
           onClick={onLike}
           className={cn(
-            "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
+            "grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md",
             liked
               ? "border-primary/40 bg-primary/25 text-primary"
               : "border-white/20 bg-black/40 text-white",
@@ -159,7 +160,7 @@ export function GalleryMediaCard({
           to="/sample/$id"
           params={{ id: sample.id }}
           onClick={(e) => e.stopPropagation()}
-          className="grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md"
+          className="grid h-7 w-7 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md"
           aria-label="View details"
         >
           <Info className="h-3.5 w-3.5" />
@@ -204,7 +205,8 @@ export function GalleryMediaCard({
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
 
-        <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
+        {/* Badges sit under the control row so Premium never hides behind heart/info */}
+        <div className="pointer-events-none absolute left-1.5 top-10 flex flex-col gap-1">
           {badge ? (
             <span className="rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/95 backdrop-blur-sm">
               {badge}

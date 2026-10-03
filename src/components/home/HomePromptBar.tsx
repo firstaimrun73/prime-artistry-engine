@@ -1,6 +1,7 @@
 /**
  * Homepage multi-reference prompt card.
  * Tappable demo → Image Studio with example prompt (multi-ref story).
+ * Shows one prompt can drive many coherent reference-guided outputs.
  */
 import { Link } from "@tanstack/react-router";
 import { WALKING_MAN_SAMPLES } from "@/lib/samples/walking-man";
@@ -49,21 +50,21 @@ export function HomePromptBar() {
         </div>
       </Link>
 
-      {/* Reference thumbnails — taller crop so figures stay readable */}
-      <div className="mt-4 grid grid-cols-5 gap-2 sm:gap-2.5">
+      {/* Reference thumbnails — larger, fill the row, no wasted blank space */}
+      <div className="mt-3 flex gap-1.5 sm:gap-2">
         {WALKING_MAN_SAMPLES.slice(0, 5).map((s, i) => (
-          <figure key={s.id} className="min-w-0">
-            <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border/70 bg-muted shadow-sm dark:border-white/10">
+          <figure key={s.id} className="min-w-0 flex-1">
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm dark:border-white/10">
               <img
                 src={s.url}
                 alt={s.alt}
                 loading="lazy"
-                className="h-full w-full object-cover object-center"
+                className="absolute inset-0 h-full w-full object-cover object-center"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.opacity = "0.35";
                 }}
               />
-              <span className="absolute left-1 top-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              <span className="absolute left-1 top-1 rounded-full bg-black/65 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
                 {i + 1}
               </span>
             </div>
@@ -71,7 +72,7 @@ export function HomePromptBar() {
         ))}
       </div>
 
-      <p className="mt-3.5 text-center text-[12px] font-medium text-muted-foreground">
+      <p className="mt-3 text-center text-[12px] font-medium leading-snug text-muted-foreground">
         One prompt · many references · Motion2AI studies them all and delivers one coherent result
       </p>
     </section>

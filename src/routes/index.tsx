@@ -16,7 +16,6 @@ import { TrustSection } from "@/components/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
 import { FooterAd } from "@/components/ads";
-import { ConstructionNotice } from "@/components/home/ConstructionNotice";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -62,7 +61,6 @@ function SignedInHome() {
       <Header />
       <SignedInHomeBody />
       <Footer />
-      <ConstructionNotice />
     </div>
   );
 }
@@ -92,7 +90,6 @@ function SignedOutHome() {
       <FinalCTA />
       <FooterAd placement="home" />
       <Footer />
-      <ConstructionNotice />
     </div>
   );
 }

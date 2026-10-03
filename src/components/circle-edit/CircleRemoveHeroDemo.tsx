@@ -3,7 +3,8 @@
  * CSS/React only (no canvas). Used inside RemoveHeroCard image area.
  *
  * Media: absolute public URLs on assets.motio2edit.com (circle-2edit sample set).
- * Wired directly into the homepage Remove hero card animation.
+ * Paint path tightly circles the crowd at the base of the pyramid.
+ * Cleaner hand cursor + smoother paint animation.
  */
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
@@ -20,15 +21,15 @@ type DemoPhase =
   | "result";
 
 const PHASE_MS: Record<DemoPhase, number> = {
-  intro: 1400,
-  tools: 800,
-  selectBrush: 1000,
-  paint: 3600,
-  selectErase: 900,
-  analysing: 1500,
-  removing: 1500,
-  generating: 1500,
-  result: 2800,
+  intro: 1200,
+  tools: 700,
+  selectBrush: 900,
+  paint: 3200,
+  selectErase: 800,
+  analysing: 1400,
+  removing: 1400,
+  generating: 1400,
+  result: 2600,
 };
 
 const ORDER: DemoPhase[] = [
@@ -46,7 +47,6 @@ const ORDER: DemoPhase[] = [
 /**
  * Homepage Circle 2edit Remove hero card media (public assets.motio2edit.com).
  * Sequence: original → marked selection → clean result → loop.
- * These absolute URLs are the source of truth for the card animation.
  */
 const DEMO_STAGE_URLS = {
   stage1:
@@ -57,27 +57,31 @@ const DEMO_STAGE_URLS = {
     "https://assets.motio2edit.com/samples/circle-2edit/file_000000004e6481faa6caad771de9c84c.png",
 } as const;
 
+/**
+ * Tight oval path around the crowd at the base of the pyramid (lower half of frame).
+ * Coordinates are % of the media box; calibrated to the Giza sample.
+ */
 const PAINT_PATH: { x: number; y: number; r: number }[] = [
-  { x: 22, y: 78, r: 11 },
-  { x: 30, y: 74, r: 12 },
-  { x: 38, y: 80, r: 13 },
-  { x: 46, y: 72, r: 12 },
-  { x: 54, y: 76, r: 13 },
-  { x: 62, y: 70, r: 12 },
-  { x: 70, y: 66, r: 11 },
-  { x: 76, y: 58, r: 12 },
-  { x: 80, y: 48, r: 11 },
-  { x: 78, y: 38, r: 12 },
-  { x: 72, y: 30, r: 11 },
-  { x: 62, y: 24, r: 12 },
-  { x: 52, y: 22, r: 11 },
-  { x: 42, y: 26, r: 12 },
-  { x: 34, y: 34, r: 11 },
-  { x: 28, y: 44, r: 12 },
-  { x: 26, y: 54, r: 11 },
-  { x: 28, y: 64, r: 12 },
-  { x: 34, y: 72, r: 11 },
-  { x: 42, y: 76, r: 12 },
+  { x: 28, y: 72, r: 10 },
+  { x: 34, y: 78, r: 11 },
+  { x: 42, y: 82, r: 12 },
+  { x: 52, y: 84, r: 12 },
+  { x: 62, y: 82, r: 11 },
+  { x: 70, y: 76, r: 11 },
+  { x: 74, y: 68, r: 10 },
+  { x: 72, y: 58, r: 10 },
+  { x: 66, y: 52, r: 11 },
+  { x: 56, y: 50, r: 12 },
+  { x: 46, y: 52, r: 11 },
+  { x: 36, y: 56, r: 11 },
+  { x: 30, y: 62, r: 10 },
+  { x: 28, y: 68, r: 10 },
+  { x: 32, y: 74, r: 11 },
+  { x: 40, y: 80, r: 11 },
+  { x: 50, y: 82, r: 12 },
+  { x: 58, y: 80, r: 11 },
+  { x: 64, y: 74, r: 10 },
+  { x: 68, y: 66, r: 10 },
 ];
 
 function ToolIcon({
@@ -130,18 +134,21 @@ function ToolIcon({
   );
 }
 
+/** Clean pointing-hand cursor (simpler silhouette, clearer tip). */
 function HandCursor({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <div className={cn("pointer-events-none absolute z-30", className)} style={style} aria-hidden>
-      <svg width="32" height="36" viewBox="0 0 36 40" fill="none">
+      <svg width="28" height="32" viewBox="0 0 28 32" fill="none">
         <path
-          d="M12 18V9.5a2.2 2.2 0 0 1 4.4 0V17M16.4 16.5V8.2a2.2 2.2 0 0 1 4.4 0V17M20.8 16.8v-5.2a2.2 2.2 0 0 1 4.4 0V19M25.2 19.2v-2.4a2.2 2.2 0 0 1 3.6 1.7c0 1.2-.2 4.4-1.4 7.4C26 29.5 24 32 18.5 32c-4.2 0-7.2-1.6-9-4.2-1.5-2.2-2.3-4.6-2.8-6.5L6 18.5a2 2 0 0 1 3.5-1.8l2.5 3.2"
-          fill="white"
+          d="M10.5 14.5V7.2a2 2 0 0 1 4 0V13.5M14.5 13V6.2a2 2 0 0 1 4 0V13.8M18.5 13.5v-4.2a2 2 0 0 1 4 0V16M22.5 16.2v-1.8a2 2 0 0 1 3.2 1.6c0 1.1-.2 4-1.3 6.7C23.2 26 21.4 28.2 16.5 28.2c-3.8 0-6.5-1.4-8.1-3.8-1.4-2-2.1-4.2-2.5-5.9L5.2 15.2a1.8 1.8 0 0 1 3.2-1.6l2.1 2.9"
+          fill="#fff"
           stroke="#1A1C24"
-          strokeWidth="1.4"
+          strokeWidth="1.35"
           strokeLinejoin="round"
           strokeLinecap="round"
         />
+        {/* Tip highlight so the paint origin is obvious */}
+        <circle cx="12.5" cy="6.5" r="2.2" fill="#7B6FE0" opacity="0.9" />
       </svg>
     </div>
   );
@@ -303,10 +310,11 @@ export function CircleRemoveHeroDemo() {
       return;
     }
     const start = performance.now();
-    const dur = PHASE_MS.paint - 200;
+    const dur = PHASE_MS.paint - 150;
     let raf = 0;
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / dur);
+      // Smooth ease-in-out so the hand doesn't jump
       const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
       setPaintT(eased);
       if (p < 1) raf = requestAnimationFrame(tick);
@@ -332,11 +340,11 @@ export function CircleRemoveHeroDemo() {
   const handPt = PAINT_PATH[paintIdx]!;
   const handPos =
     phase === "selectBrush"
-      ? { left: "72%", top: "18%" }
+      ? { left: "78%", top: "22%" }
       : phase === "paint"
         ? { left: `${handPt.x}%`, top: `${handPt.y}%` }
         : phase === "selectErase"
-          ? { left: "78%", top: "22%" }
+          ? { left: "78%", top: "28%" }
           : { left: "50%", top: "50%" };
 
   const processKind =
@@ -406,10 +414,10 @@ export function CircleRemoveHeroDemo() {
               key={i}
               cx={d.x}
               cy={d.y}
-              r={d.r * 0.35}
-              fill="rgba(123, 111, 224, 0.55)"
-              stroke="rgba(255,255,255,0.7)"
-              strokeWidth="0.4"
+              r={d.r * 0.38}
+              fill="rgba(123, 111, 224, 0.6)"
+              stroke="rgba(255,255,255,0.75)"
+              strokeWidth="0.45"
             />
           ))}
         </svg>
@@ -431,11 +439,11 @@ export function CircleRemoveHeroDemo() {
 
       {showHand && (
         <HandCursor
-          className="transition-[left,top] duration-75 ease-linear"
+          className="transition-[left,top] duration-60 ease-linear"
           style={{
             left: handPos.left,
             top: handPos.top,
-            transform: "translate(-20%, -10%)",
+            transform: "translate(-30%, -15%)",
           }}
         />
       )}

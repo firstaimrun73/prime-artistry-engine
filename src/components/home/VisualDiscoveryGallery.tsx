@@ -3,6 +3,7 @@
  * Aspect-ratio rails matching approved home HTML:
  * vertical 9:16 strips, wide 16:9, square pairs, featured card.
  * Images + Video only. Likes: local UI state.
+ * Cards expanded for better readability; less empty gap between items.
  */
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -51,7 +52,7 @@ function Rail({
 }) {
   if (samples.length === 0) return null;
   return (
-    <div className="mb-5">
+    <div className="mb-4">
       {title ? (
         <div className="mb-2 flex items-center justify-between px-0.5">
           <h3 className="text-[13px] font-bold text-foreground">{title}</h3>
@@ -59,8 +60,8 @@ function Rail({
         </div>
       ) : null}
       <div
-        className="gallery-row -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2 scrollbar-none"
-        style={{ scrollSnapType: "x mandatory", scrollPadding: "0 14px" }}
+        className="gallery-row -mx-1 flex gap-2 overflow-x-auto px-1 pb-2 scrollbar-none"
+        style={{ scrollSnapType: "x mandatory", scrollPadding: "0 12px" }}
       >
         {samples.map((s) => (
           <div
@@ -97,7 +98,7 @@ function PairGrid({
 }) {
   if (samples.length === 0) return null;
   return (
-    <div className="mb-5 grid grid-cols-2 gap-2.5">
+    <div className="mb-4 grid grid-cols-2 gap-2">
       {samples.slice(0, 2).map((s) => (
         <GalleryMediaCard
           key={s.id}
@@ -145,7 +146,7 @@ export function VisualDiscoveryGallery() {
   const square = byRatio(pool, "1:1");
 
   return (
-    <section className="space-y-4" data-discovery="motion2ai-creation">
+    <section className="space-y-3" data-discovery="motion2ai-creation">
       <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 pb-2 pt-1 backdrop-blur">
         <div className="flex gap-2 overflow-x-auto scrollbar-none">
           {TABS.map((t) => (
@@ -173,7 +174,7 @@ export function VisualDiscoveryGallery() {
       ) : (
         <>
           {wide[0] && (
-            <div className="mb-5">
+            <div className="mb-4">
               <GalleryMediaCard
                 sample={wide[0]}
                 liked={likedIds.has(wide[0].id)}
@@ -190,7 +191,7 @@ export function VisualDiscoveryGallery() {
             likedIds={likedIds}
             onToggleLike={onToggleLike}
             onOpenViewer={setViewer}
-            cardClass="w-[42%] min-w-[140px] max-w-[180px]"
+            cardClass="w-[48%] min-w-[160px] max-w-[200px]"
           />
 
           <PairGrid
@@ -206,11 +207,11 @@ export function VisualDiscoveryGallery() {
             likedIds={likedIds}
             onToggleLike={onToggleLike}
             onOpenViewer={setViewer}
-            cardClass="w-[82%] min-w-[240px] max-w-[360px]"
+            cardClass="w-[88%] min-w-[260px] max-w-[400px]"
           />
 
           {vertical[6] && (
-            <div className="mx-auto mb-5 w-[72%] max-w-[280px]">
+            <div className="mx-auto mb-4 w-[78%] max-w-[300px]">
               <GalleryMediaCard
                 sample={vertical[6]}
                 liked={likedIds.has(vertical[6].id)}
@@ -228,7 +229,7 @@ export function VisualDiscoveryGallery() {
             likedIds={likedIds}
             onToggleLike={onToggleLike}
             onOpenViewer={setViewer}
-            cardClass="w-[58%] min-w-[160px] max-w-[220px]"
+            cardClass="w-[64%] min-w-[180px] max-w-[240px]"
           />
 
           <Rail
@@ -237,7 +238,7 @@ export function VisualDiscoveryGallery() {
             likedIds={likedIds}
             onToggleLike={onToggleLike}
             onOpenViewer={setViewer}
-            cardClass="w-[42%] min-w-[140px] max-w-[180px]"
+            cardClass="w-[48%] min-w-[160px] max-w-[200px]"
           />
         </>
       )}
