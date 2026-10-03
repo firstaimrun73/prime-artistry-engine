@@ -1,4 +1,4 @@
-/** Routes where the global mobile bottom tab bar must be hidden. */
+/** Routes where the global mobile bottom tab bar must be hidden. Top Header is unrelated. */
 export function hideBottomNav(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
   if (pathname.startsWith("/studio/video")) return true;
@@ -11,13 +11,17 @@ export function hideBottomNav(pathname: string): boolean {
   if (pathname.startsWith("/studio/image/circle-add-discover")) return true;
   if (pathname.startsWith("/studio/image/auto-edit")) return true;
   if (pathname.startsWith("/studio/image/remove-bg")) return true;
-  // Dedicated filter editor surfaces — never cover intensity/Apply controls
   if (pathname.startsWith("/studio/image/filters")) return true;
   if (pathname.startsWith("/studio/image/filter-editor")) return true;
   if (pathname.startsWith("/studio/image/age")) return true;
-  // About Product — editorial page; hide app bottom nav on mobile
   if (pathname === "/about" || pathname.startsWith("/about/")) return true;
-  // Sample detail — dedicated media page; no bottom studio tabs
   if (pathname.startsWith("/sample/")) return true;
+  // Dedicated surfaces: keep TOP HEADER, hide BOTTOM tab bar only
+  if (pathname === "/pricing" || pathname.startsWith("/pricing/")) return true;
+  if (pathname.startsWith("/profile/subscription")) return true;
+  if (pathname.startsWith("/profile/billing")) return true;
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) return true;
+  if (pathname.startsWith("/checkout")) return true;
+  if (pathname.startsWith("/pay")) return true;
   return false;
 }

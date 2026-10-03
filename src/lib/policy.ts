@@ -29,7 +29,10 @@ export function isFreePlan(plan: string | null | undefined): boolean {
   return !isPaidPlan(plan);
 }
 
-/** Chat: all paid plans (including Lite). Free never. */
+/**
+ * Chatbot: all paid plans + admin.
+ * Free users must not access Chatbot (UI + server both enforce).
+ */
 export function canAccessChat(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
