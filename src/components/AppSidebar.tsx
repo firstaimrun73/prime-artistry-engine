@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n";
 /**
  * Desktop vertical sidebar for authenticated routes.
  * Free: Home, Image, History (+ Profile/Settings).
- * Paid Lite+: Image + Video + Music + Chat per canAccess* helpers.
+ * Paid: Image + Video + Music + Chatbot per canAccess* helpers.
  */
 export function AppSidebar() {
   const { user, profile } = useAuth();
@@ -31,7 +31,8 @@ export function AppSidebar() {
   if (showVideo) items.push({ to: "/studio/video", label: t("nav.video"), icon: Video });
   if (showMusic) items.push({ to: "/studio/music", label: t("nav.music"), icon: Music });
   items.push({ to: "/history", label: t("nav.history"), icon: History });
-  if (showChat) items.push({ to: "/chat", label: t("nav.chat"), icon: MessageSquare });
+  // User-facing name is exactly "Chatbot"
+  if (showChat) items.push({ to: "/chat", label: "Chatbot", icon: MessageSquare });
 
   return (
     <aside
