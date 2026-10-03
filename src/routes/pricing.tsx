@@ -2,85 +2,133 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Header } from "@/components/Header";
 import { CrownBadge } from "@/components/CrownBadge";
 import { useAuth } from "@/lib/auth";
-import { getPlan, PLANS, type PlanId } from "@/lib/plans";
+import {
+  PLANS,
+  DISPLAY_PRICES,
+  DISPLAY_CURRENCIES,
+  toCheckoutCurrency,
+  PRICING_SHOW_PLAN_IDS,
+  PRICING_POPULAR_PLAN_ID,
+  type DisplayCurrency,
+  type PlanId,
+} from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
-import { Check, Coins } from "lucide-react";
+import { Check, Coins, Crown, ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pricing")({
   component: PricingPage,
 });
 
+function formatPlanPrice(amount: number, currency: DisplayCurrency): string {
+  if (amount === 0) return "Free";
+  const symbols: Record<DisplayCurrency, string> = { USD: "$", EUR: "€", INR: "₹" };
+  const sym = symbols[currency] ?? "$";
+  if (currency === "INR") return `${sym}${Math.round(amount).toLocaleString("en-IN")}`;
+  if (Number.isInteger(amount)) return `${sym}${amount}`;
+  return `${sym}${amount.toFixed(2)}`;
+}
+
 function PricingPage() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [currency, setCurrency] = useState<"USD" | "EUR" | "INR">("USD");
+  const [currency, setCurrency] = useState<DisplayCurrency>("USD");
 
   useEffect(() => {
-    if (profile?.currency === "INR" || profile?.currency === "EUR" || profile?.currency === "USD") {
-      setCurrency(profile.currency);
+    try {
+      const saved = localStorage.getItem("motio2edit-display-currency");
+      if (saved && (DISPLAY_CURRENCIES as string[]).includes(saved)) {
+        setCurrency(saved as DisplayCurrency);
+      }
+    } catch {
+      /* ignore */
     }
-  }, [profile?.currency]);
+  }, []);
 
-  const selectPlan = (id: PlanId) => {
-    if (!user) {
-      navigate({ to: "/auth", search: { redirect: "/pricing" } });
-      return;
-    }
-    navigate({ to: "/checkout", search: { plan: id } });
+  const selectPlan = (planId: PlanId) => {
+    if (planId === "free") return;
+    navigate({
+      to: "/checkout",
+      search: {
+        plan: planId,
+        currency: toCheckoutCurrency(currency),
+        method: undefined,
+      },
+    });
   };
 
-  const visible = PLANS.filter((p) => p.id !== "free");
+  const visiblePlans = PLANS.filter((p) => PRICING_SHOW_PLAN_IDS.includes(p.id));
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <div className="mx-auto max-w-6xl px-4 py-12 pb-24 sm:py-16 md:pb-16">
+      <div className="border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Home
+          </Link>
+        </div>
+      </div>
+      <div className="mx-auto max-w-6xl px-4 py-12 pb-24 md:pb-12">
         <div className="text-center">
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t("pricing.title")}</h1>
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+            <Crown className="h-6 w-6 text-primary" />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{t("pricing.title")}</h1>
           <p className="mx-auto mt-2 max-w-xl text-muted-foreground">{t("pricing.lead")}</p>
         </div>
 
-        <div className="mt-8 flex justify-center gap-2">
-          {(["USD", "EUR", "INR"] as const).map((c) => (
-            <Button
-              key={c}
-              size="sm"
-              variant={currency === c ? "default" : "outline"}
-              onClick={() => setCurrency(c)}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          {DISPLAY_CURRENCIES.map((code) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => {
+                setCurrency(code);
+                try {
+                  localStorage.setItem("motio2edit-display-currency", code);
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                currency === code
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/50",
+              )}
             >
-              {c}
-            </Button>
+              {code}
+            </button>
           ))}
         </div>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((plan) => {
-            const highlight = plan.id === "pro";
+          {visiblePlans.map((plan) => {
+            const highlight = plan.id === PRICING_POPULAR_PLAN_ID;
             const isCurrent = profile?.plan === plan.id;
-            const price = plan.price[currency];
+            const amount = DISPLAY_PRICES[plan.id]?.[currency] ?? plan.price[currency] ?? 0;
+            const priceLabel = formatPlanPrice(amount, currency);
             return (
               <div
                 key={plan.id}
-                className={`flex flex-col rounded-2xl border bg-card p-6 ${
-                  highlight ? "border-primary shadow-md shadow-primary/10" : "border-border"
-                }`}
+                className={cn(
+                  "flex flex-col rounded-2xl border bg-card p-6",
+                  highlight ? "border-primary shadow-md shadow-primary/10" : "border-border",
+                )}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-lg font-bold">{plan.name}</h2>
+                <div className="flex items-center gap-2">
                   <CrownBadge plan={plan.id} />
+                  <h2 className="text-lg font-bold">{plan.name}</h2>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-3xl font-extrabold">
-                    {currency === "INR" ? "₹" : currency === "EUR" ? "€" : "$"}
-                    {price}
-                  </span>
-                  <span className="text-sm text-muted-foreground">/ mo</span>
-                </div>
+                <p className="mt-3 text-3xl font-extrabold tracking-tight">{priceLabel}</p>
+                <p className="mt-1 text-xs text-muted-foreground">per month</p>
                 <div className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
                   <Coins className="h-4 w-4" />
                   {plan.credits.toLocaleString()} credits / month
