@@ -1,42 +1,82 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
-import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { AppSidebar } from "@/components/AppSidebar";
+import { FirstGenerationFeedback } from "@/components/FirstGenerationFeedback";
 import { FreePlanNotices } from "@/components/FreePlanNotices";
-import { Loader2 } from "lucide-react";
+import { MusicAccessGate } from "@/components/MusicAccessGate";
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async ({ context, location }) => {
-    // Auth is handled client-side via useAuth in the layout component.
-  },
   component: AuthenticatedLayout,
 });
 
-function AuthenticatedLayout() {
-  const { user, loading } = useAuth();
+/** Focused creative pages — no top Header / sidebar chrome. Chatbot KEEPS top chrome. */
+function hideChromeHeader(pathname: string): boolean {
+  if (pathname.startsWith("/editor")) return true;
+  if (pathname.startsWith("/studio/video")) return true;
+  if (pathname === "/music" || pathname.startsWith("/music/")) return true;
+  if (pathname.startsWith("/studio/music")) return true;
+  if (pathname.startsWith("/studio/image/auto-edit")) return true;
+  if (pathname.startsWith("/studio/image/circle-remove")) return true;
+  return false;
+}
 
-  if (loading) {
+function AuthenticatedLayout() {
+  const { loading, user } = useAuth();
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        router.navigate({ to: "/auth", search: { redirect: window.location.pathname } });
+      } else {
+        setChecked(true);
+      }
+    }
+  }, [loading, user, router]);
+
+  if (loading || !checked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
 
-  if (!user) {
-    // Client-side redirect handled by AuthProvider / route guards elsewhere
-    if (typeof window !== "undefined") {
-      window.location.href = `/auth?redirect=${encodeURIComponent(window.location.pathname)}`;
-    }
-    return null;
-  }
+  const isMusicRoute = pathname === "/music" || pathname.startsWith("/music/");
+  const noHeader = hideChromeHeader(pathname);
+  const isEditorShell = pathname.startsWith("/editor");
+
+  const main = isMusicRoute ? (
+    <MusicAccessGate>
+      <Outlet />
+    </MusicAccessGate>
+  ) : (
+    <Outlet />
+  );
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <Outlet />
-      <MobileBottomNav />
-      <FreePlanNotices />
+    <div
+      className={
+        isEditorShell
+          ? "min-h-screen w-full min-w-0 overflow-x-clip bg-transparent"
+          : "min-h-screen w-full min-w-0 overflow-x-clip bg-background"
+      }
+    >
+      {!noHeader && <AppSidebar />}
+      <div className={noHeader ? "w-full min-w-0" : "w-full min-w-0 md:pl-56"}>
+        {!noHeader && (
+          <div className={pathname === "/chat" || pathname.startsWith("/chat/") ? undefined : "md:hidden"}>
+            <Header />
+          </div>
+        )}
+        {main}
+        <FirstGenerationFeedback />
+        <FreePlanNotices />
+      </div>
     </div>
   );
 }
