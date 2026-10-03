@@ -1,7 +1,6 @@
 /**
  * Homepage multi-reference prompt card.
- * Tappable demo → Image Studio with example prompt (multi-ref story).
- * Shows one prompt can drive many coherent reference-guided outputs.
+ * One prompt → five reference frames that fill the row with no blank space.
  */
 import { Link } from "@tanstack/react-router";
 import { WALKING_MAN_SAMPLES } from "@/lib/samples/walking-man";
@@ -50,25 +49,26 @@ export function HomePromptBar() {
         </div>
       </Link>
 
-      {/* Reference thumbnails — larger, fill the row, no wasted blank space */}
-      <div className="mt-3 flex gap-1.5 sm:gap-2">
+      {/* Five equal reference frames — full width, no leftover blank */}
+      <div className="mt-3 grid grid-cols-5 gap-1.5 sm:gap-2">
         {WALKING_MAN_SAMPLES.slice(0, 5).map((s, i) => (
-          <figure key={s.id} className="min-w-0 flex-1">
-            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm dark:border-white/10">
-              <img
-                src={s.url}
-                alt={s.alt}
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover object-center"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.opacity = "0.35";
-                }}
-              />
-              <span className="absolute left-1 top-1 rounded-full bg-black/65 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                {i + 1}
-              </span>
-            </div>
-          </figure>
+          <div
+            key={s.id}
+            className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm dark:border-white/10"
+          >
+            <img
+              src={s.url}
+              alt={s.alt}
+              loading="lazy"
+              className="h-full w-full object-cover object-center"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.opacity = "0.35";
+              }}
+            />
+            <span className="absolute left-1 top-1 z-[1] rounded-full bg-black/65 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+              {i + 1}
+            </span>
+          </div>
         ))}
       </div>
 

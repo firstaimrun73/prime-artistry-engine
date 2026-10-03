@@ -1,9 +1,7 @@
 /**
  * Motion2AI Creation — Discover (post-login).
- * Aspect-ratio rails matching approved home HTML:
- * vertical 9:16 strips, wide 16:9, square pairs, featured card.
- * Images + Video only. Likes: local UI state.
- * Cards expanded for better readability; less empty gap between items.
+ * Straight responsive grid — no horizontal swipe rails.
+ * Medium / large cards only. Featured wide on top, then 2-col grid.
  */
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -35,80 +33,17 @@ function byRatio(samples: R2Sample[], want: string): R2Sample[] {
   });
 }
 
-function Rail({
+function Section({
   title,
-  samples,
-  likedIds,
-  onToggleLike,
-  onOpenViewer,
-  cardClass,
+  children,
 }: {
-  title?: string;
-  samples: R2Sample[];
-  likedIds: Set<string>;
-  onToggleLike: (s: R2Sample) => void;
-  onOpenViewer: (s: R2Sample) => void;
-  cardClass: string;
+  title: string;
+  children: React.ReactNode;
 }) {
-  if (samples.length === 0) return null;
   return (
-    <div className="mb-4">
-      {title ? (
-        <div className="mb-2 flex items-center justify-between px-0.5">
-          <h3 className="text-[13px] font-bold text-foreground">{title}</h3>
-          <span className="text-[11px] text-muted-foreground">Swipe →</span>
-        </div>
-      ) : null}
-      <div
-        className="gallery-row -mx-1 flex gap-2 overflow-x-auto px-1 pb-2 scrollbar-none"
-        style={{ scrollSnapType: "x mandatory", scrollPadding: "0 12px" }}
-      >
-        {samples.map((s) => (
-          <div
-            key={s.id}
-            className={cn("shrink-0 snap-start", cardClass)}
-            data-ratio={s.aspectRatio}
-          >
-            <GalleryMediaCard
-              sample={s}
-              liked={likedIds.has(s.id)}
-              onToggleLike={onToggleLike}
-              onOpenViewer={onOpenViewer}
-              stripMode
-              size="large"
-            />
-          </div>
-        ))}
-        <div className="w-1 shrink-0" aria-hidden />
-      </div>
-    </div>
-  );
-}
-
-function PairGrid({
-  samples,
-  likedIds,
-  onToggleLike,
-  onOpenViewer,
-}: {
-  samples: R2Sample[];
-  likedIds: Set<string>;
-  onToggleLike: (s: R2Sample) => void;
-  onOpenViewer: (s: R2Sample) => void;
-}) {
-  if (samples.length === 0) return null;
-  return (
-    <div className="mb-4 grid grid-cols-2 gap-2">
-      {samples.slice(0, 2).map((s) => (
-        <GalleryMediaCard
-          key={s.id}
-          sample={s}
-          liked={likedIds.has(s.id)}
-          onToggleLike={onToggleLike}
-          onOpenViewer={onOpenViewer}
-          size="large"
-        />
-      ))}
+    <div className="mb-6">
+      <h3 className="mb-2.5 text-[13px] font-bold text-foreground">{title}</h3>
+      {children}
     </div>
   );
 }
@@ -146,7 +81,7 @@ export function VisualDiscoveryGallery() {
   const square = byRatio(pool, "1:1");
 
   return (
-    <section className="space-y-3" data-discovery="motion2ai-creation">
+    <section className="space-y-1" data-discovery="motion2ai-creation">
       <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 pb-2 pt-1 backdrop-blur">
         <div className="flex gap-2 overflow-x-auto scrollbar-none">
           {TABS.map((t) => (
@@ -173,8 +108,9 @@ export function VisualDiscoveryGallery() {
         </p>
       ) : (
         <>
+          {/* Featured wide — full width, large */}
           {wide[0] && (
-            <div className="mb-4">
+            <div className="mb-6">
               <GalleryMediaCard
                 sample={wide[0]}
                 liked={likedIds.has(wide[0].id)}
@@ -185,61 +121,95 @@ export function VisualDiscoveryGallery() {
             </div>
           )}
 
-          <Rail
-            title="Vertical picks"
-            samples={vertical.slice(0, 6)}
-            likedIds={likedIds}
-            onToggleLike={onToggleLike}
-            onOpenViewer={setViewer}
-            cardClass="w-[48%] min-w-[160px] max-w-[200px]"
-          />
-
-          <PairGrid
-            samples={square.slice(0, 2)}
-            likedIds={likedIds}
-            onToggleLike={onToggleLike}
-            onOpenViewer={setViewer}
-          />
-
-          <Rail
-            title="Wide to swipe"
-            samples={wide.slice(1, 5)}
-            likedIds={likedIds}
-            onToggleLike={onToggleLike}
-            onOpenViewer={setViewer}
-            cardClass="w-[88%] min-w-[260px] max-w-[400px]"
-          />
-
-          {vertical[6] && (
-            <div className="mx-auto mb-4 w-[78%] max-w-[300px]">
-              <GalleryMediaCard
-                sample={vertical[6]}
-                liked={likedIds.has(vertical[6].id)}
-                onToggleLike={onToggleLike}
-                onOpenViewer={setViewer}
-                stripMode
-                size="large"
-              />
-            </div>
+          {/* Vertical picks — 2-col straight grid, medium-large */}
+          {vertical.length > 0 && (
+            <Section title="Vertical picks">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                {vertical.slice(0, 4).map((s) => (
+                  <GalleryMediaCard
+                    key={s.id}
+                    sample={s}
+                    liked={likedIds.has(s.id)}
+                    onToggleLike={onToggleLike}
+                    onOpenViewer={setViewer}
+                    size="large"
+                  />
+                ))}
+              </div>
+            </Section>
           )}
 
-          <Rail
-            title="Square picks"
-            samples={square.slice(2, 8)}
-            likedIds={likedIds}
-            onToggleLike={onToggleLike}
-            onOpenViewer={setViewer}
-            cardClass="w-[64%] min-w-[180px] max-w-[240px]"
-          />
+          {/* Square picks — 2-col straight grid */}
+          {square.length > 0 && (
+            <Section title="Square picks">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                {square.slice(0, 4).map((s) => (
+                  <GalleryMediaCard
+                    key={s.id}
+                    sample={s}
+                    liked={likedIds.has(s.id)}
+                    onToggleLike={onToggleLike}
+                    onOpenViewer={setViewer}
+                    size="large"
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
 
-          <Rail
-            title="More vertical"
-            samples={vertical.slice(7, 12)}
-            likedIds={likedIds}
-            onToggleLike={onToggleLike}
-            onOpenViewer={setViewer}
-            cardClass="w-[48%] min-w-[160px] max-w-[200px]"
-          />
+          {/* More wide — full width */}
+          {wide.length > 1 && (
+            <Section title="Wide picks">
+              <div className="grid grid-cols-1 gap-2.5 sm:gap-3">
+                {wide.slice(1, 4).map((s) => (
+                  <GalleryMediaCard
+                    key={s.id}
+                    sample={s}
+                    liked={likedIds.has(s.id)}
+                    onToggleLike={onToggleLike}
+                    onOpenViewer={setViewer}
+                    size="large"
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* More vertical — 2-col */}
+          {vertical.length > 4 && (
+            <Section title="More vertical">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                {vertical.slice(4, 8).map((s) => (
+                  <GalleryMediaCard
+                    key={s.id}
+                    sample={s}
+                    liked={likedIds.has(s.id)}
+                    onToggleLike={onToggleLike}
+                    onOpenViewer={setViewer}
+                    size="large"
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* Remaining square */}
+          {square.length > 4 && (
+            <Section title="More square">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                {square.slice(4, 8).map((s) => (
+                  <GalleryMediaCard
+                    key={s.id}
+                    sample={s}
+                    liked={likedIds.has(s.id)}
+                    onToggleLike={onToggleLike}
+                    onOpenViewer={setViewer}
+                    size="large"
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
         </>
       )}
 

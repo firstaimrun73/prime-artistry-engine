@@ -1,9 +1,8 @@
 /**
  * Media-first discovery card.
- * Horizontal strips: fixed row height, width = height × ratio.
- * Bottoms align · no empty gap · native ratio · no crop when media matches card AR.
- * Title + exact 10-word description overlay (compact).
- * Premium / Ultra badge sits below the like/info row so it never hides behind controls.
+ * Native aspect ratio · title + description overlay.
+ * Standard / Premium / Ultra badge at top-left.
+ * Like + info at top-right (never overlap badge).
  */
 import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -23,10 +22,9 @@ function parseRatio(ar: string): number {
 export function spanClassForSample(sample: R2Sample): string {
   const r = parseRatio(sample.aspectRatio);
   const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
-  if (r >= 2.2) return "col-span-2 md:col-span-3 lg:col-span-4";
-  if (isVideo && r >= 1.6) return "col-span-2 md:col-span-2 lg:col-span-2";
-  if (r >= 1.5 && r < 2.2) return "col-span-1 md:col-span-2 lg:col-span-2";
-  if (r < 0.85) return "col-span-1";
+  if (r >= 2.2) return "col-span-2";
+  if (isVideo && r >= 1.6) return "col-span-2";
+  if (r >= 1.5 && r < 2.2) return "col-span-2";
   return "col-span-1";
 }
 
@@ -142,12 +140,13 @@ export function GalleryMediaCard({
       data-aspect={sample.aspectRatio}
       data-ratio={sample.aspectRatio}
     >
-      <div className="gallery-card__controls absolute right-1.5 top-1.5 z-20 flex items-center gap-1">
+      {/* Controls top-right */}
+      <div className="gallery-card__controls absolute right-2 top-2 z-20 flex items-center gap-1.5">
         <button
           type="button"
           onClick={onLike}
           className={cn(
-            "grid h-7 w-7 place-items-center rounded-full border backdrop-blur-md",
+            "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
             liked
               ? "border-primary/40 bg-primary/25 text-primary"
               : "border-white/20 bg-black/40 text-white",
@@ -160,7 +159,7 @@ export function GalleryMediaCard({
           to="/sample/$id"
           params={{ id: sample.id }}
           onClick={(e) => e.stopPropagation()}
-          className="grid h-7 w-7 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md"
+          className="grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md"
           aria-label="View details"
         >
           <Info className="h-3.5 w-3.5" />
@@ -205,8 +204,8 @@ export function GalleryMediaCard({
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
 
-        {/* Badges sit under the control row so Premium never hides behind heart/info */}
-        <div className="pointer-events-none absolute left-1.5 top-10 flex flex-col gap-1">
+        {/* Badge at LEFT TOP corner — original position */}
+        <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-col gap-1">
           {badge ? (
             <span className="rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/95 backdrop-blur-sm">
               {badge}
@@ -256,7 +255,6 @@ export function GalleryMediaCard({
   );
 }
 
-// keep export for any legacy imports
 export function stripWidthClassForSample(_sample: R2Sample): string {
   return "";
 }
