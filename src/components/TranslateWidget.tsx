@@ -115,7 +115,7 @@ function injectHideStyles() {
   style.textContent = `
     .goog-te-banner-frame, .goog-te-balloon-frame, #goog-gt-tt,
     .goog-te-menu-frame, iframe.goog-te-banner-frame, .goog-te-ftab-frame,
-    .goog-te-gadget, .goog-logo-link,
+    .goog-te-gadget,
     .VIpgJd-ZVi9od-ORHb-OEVmcd, .VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
     .VIpgJd-ZVi9od-l4eHX-hSRGPd {
       display: none !important;
