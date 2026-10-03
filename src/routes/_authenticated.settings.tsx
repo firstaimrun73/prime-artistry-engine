@@ -1,1 +1,475 @@
-PLACEHOLDER
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
+import { supabase } from "@/integrations/supabase/client";
+import { getPlan } from "@/lib/plans";
+import { CrownBadge } from "@/components/CrownBadge";
+import { GoogleLanguageSelect } from "@/components/TranslateWidget";
+import { isAdminEmail } from "@/lib/admin-config";
+import { useI18n } from "@/lib/i18n";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Moon, Sun } from "lucide-react";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/_authenticated/settings")({
+  component: SettingsPage,
+});
+
+import {
+  loadHistoryPrefs,
+  saveHistoryPrefs,
+  type HistoryPrefs,
+  DEFAULT_HISTORY_PREFS,
+} from "@/lib/history-retention";
+
+const NOTIF_KEY = "motio2edit-notifications";
+
+type NotifPrefs = {
+  product: boolean;
+  marketing: boolean;
+  security: boolean;
+};
+
+const DEFAULT_NOTIFS: NotifPrefs = { product: true, marketing: false, security: true };
+
+function SettingsPage() {
+  const { profile, user, refreshProfile, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const [name, setName] = useState(profile?.display_name ?? "");
+  const [saving, setSaving] = useState(false);
+  const [pw, setPw] = useState("");
+  const [currentPw, setCurrentPw] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [notifs, setNotifs] = useState<NotifPrefs>(DEFAULT_NOTIFS);
+  const [historyPrefs, setHistoryPrefs] = useState<HistoryPrefs>(DEFAULT_HISTORY_PREFS);
+  const [historySaving, setHistorySaving] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    try {
+      const n = localStorage.getItem(NOTIF_KEY);
+      if (n) setNotifs({ ...DEFAULT_NOTIFS, ...JSON.parse(n) });
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    loadHistoryPrefs(user.id).then((prefs) => {
+      if (!cancelled) setHistoryPrefs(prefs);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  if (!profile) return null;
+  const plan = getPlan(profile.plan);
+
+  const save = async () => {
+    setSaving(true);
+    const { error } = await supabase.from("profiles").update({ display_name: name }).eq("id", profile.id);
+    setSaving(false);
+    if (error) toast.error(error.message);
+    else {
+      await refreshProfile();
+      toast.success("Profile updated.");
+    }
+  };
+
+  const changePassword = async () => {
+    if (!currentPw) {
+      toast.error("Enter your current password to continue.");
+      return;
+    }
+    if (pw.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    if (!user?.email) {
+      toast.error("No email on this account.");
+      return;
+    }
+    setPwSaving(true);
+    try {
+      // Re-authenticate with current password before allowing a change.
+      const { error: reauthErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPw,
+      });
+      if (reauthErr) {
+        toast.error("Current password is incorrect.");
+        return;
+      }
+      const { error } = await supabase.auth.updateUser({ password: pw });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      setPw("");
+      setCurrentPw("");
+      toast.success("Password changed.");
+      // Security email: prefer Supabase Auth hook (password_changed).
+      // Avoid dual-send from client.
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/auth", search: { redirect: undefined } });
+  };
+
+  const uploadAvatar = async (file: File) => {
+    if (!["image/jpeg", "image/png", "image/webp", "image/svg+xml"].includes(file.type)) {
+      toast.error("Please choose a JPG, PNG or WebP image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be 5MB or smaller.");
+      return;
+    }
+    setAvatarBusy(true);
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${profile.id}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (upErr) {
+      setAvatarBusy(false);
+      toast.error(upErr.message);
+      return;
+    }
+    if (profile.avatar_url) {
+      await supabase.storage.from("avatars").remove([profile.avatar_url]);
+    }
+    const { error } = await supabase.from("profiles").update({ avatar_url: path }).eq("id", profile.id);
+    setAvatarBusy(false);
+    if (error) toast.error(error.message);
+    else {
+      await refreshProfile();
+      toast.success("Profile picture updated.");
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (!profile.avatar_url) return;
+    setAvatarBusy(true);
+    await supabase.storage.from("avatars").remove([profile.avatar_url]);
+    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", profile.id);
+    setAvatarBusy(false);
+    if (error) toast.error(error.message);
+    else {
+      await refreshProfile();
+      toast.success("Profile picture removed.");
+    }
+  };
+
+  /** Simple emoji avatar — SVG upload via existing avatars bucket (no schema change). */
+  const SIMPLE_AVATARS = ["🎨", "🎬", "✨", "🚀", "🌟", "🎵", "📷", "🔥"] as const;
+  const setSimpleAvatar = async (emoji: string) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" rx="64" fill="#1c1917"/><text x="64" y="76" text-anchor="middle" font-size="56">${emoji}</text></svg>`;
+    const blob = new Blob([svg], { type: "image/svg+xml" });
+    const file = new File([blob], `avatar-${Date.now()}.svg`, { type: "image/svg+xml" });
+    setAvatarBusy(true);
+    const path = `${profile.id}/avatar-${Date.now()}.svg`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, {
+      upsert: true,
+      contentType: "image/svg+xml",
+    });
+    if (upErr) {
+      setAvatarBusy(false);
+      toast.error(upErr.message);
+      return;
+    }
+    if (profile.avatar_url) {
+      await supabase.storage.from("avatars").remove([profile.avatar_url]);
+    }
+    const { error } = await supabase.from("profiles").update({ avatar_url: path }).eq("id", profile.id);
+    setAvatarBusy(false);
+    if (error) toast.error(error.message);
+    else {
+      await refreshProfile();
+      toast.success("Avatar updated.");
+    }
+  };
+
+  const toggleNotif = (key: keyof NotifPrefs, value: boolean) => {
+    const next = { ...notifs, [key]: value };
+    setNotifs(next);
+    try {
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
+
+  const toggleHistoryPref = async (key: keyof HistoryPrefs, value: boolean) => {
+    const next = { ...historyPrefs, [key]: value };
+    setHistoryPrefs(next);
+    if (!user?.id) return;
+    setHistorySaving(true);
+    const res = await saveHistoryPrefs(user.id, next);
+    setHistorySaving(false);
+    if (res.backend) toast.success("History preference saved.");
+    else {
+      console.warn("[settings] history prefs backend write:", res.message);
+      toast.message("Preference saved on this device.", {
+        description: "Backend history_enabled columns not applied yet.",
+      });
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-12 pb-24 md:pb-12">
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
+        <CrownBadge plan={profile.plan} showLabel size="md" />
+      </div>
+
+      <section className="mt-8 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">{t("settings.profilePicture")}</h2>
+        <div className="mt-4 flex items-center gap-4">
+          <Avatar className="h-16 w-16">
+            <AvatarImage src={profile.avatar_signed_url ?? undefined} alt={profile.display_name ?? "Avatar"} />
+            <AvatarFallback className="text-lg">
+              {(profile.display_name || profile.email || "U").slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={avatarBusy} onClick={() => fileRef.current?.click()}>
+              {profile.avatar_url ? "Change" : "Upload"}
+            </Button>
+            {profile.avatar_url && (
+              <Button size="sm" variant="ghost" disabled={avatarBusy} onClick={removeAvatar}>
+                Remove
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={avatarBusy || !profile.avatar_url}
+              onClick={removeAvatar}
+              title="Use initials"
+            >
+              Initials
+            </Button>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/svg+xml"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadAvatar(f);
+              e.target.value = "";
+            }}
+          />
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">JPG, PNG or WebP · Max 5MB. Or pick a simple avatar:</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {SIMPLE_AVATARS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              disabled={avatarBusy}
+              onClick={() => void setSimpleAvatar(e)}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary/50 text-lg transition-colors hover:border-primary hover:bg-secondary disabled:opacity-50"
+              aria-label={`Avatar ${e}`}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">{t("settings.profile")}</h2>
+        <div className="mt-4 space-y-4">
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" value={user?.email ?? ""} disabled className="mt-1.5" />
+          </div>
+          <div>
+            <Label htmlFor="name">Username / display name</Label>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5" />
+          </div>
+          <Button onClick={save} disabled={saving}>
+            {saving ? t("common.loading") : t("settings.save")}
+          </Button>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">{t("settings.security")}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Confirm your current password before setting a new one. Minimum 8 characters.
+        </p>
+        <div className="mt-4 space-y-4">
+          <div>
+            <Label htmlFor="current-pw">Current password</Label>
+            <Input
+              id="current-pw"
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              placeholder="Current password"
+              className="mt-1.5"
+              autoComplete="current-password"
+            />
+          </div>
+          <div>
+            <Label htmlFor="pw">New password</Label>
+            <Input
+              id="pw"
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder="At least 8 characters"
+              className="mt-1.5"
+              autoComplete="new-password"
+            />
+          </div>
+          <Button onClick={changePassword} disabled={pwSaving} variant="outline">
+            {pwSaving ? t("common.loading") : "Change password"}
+          </Button>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">{t("settings.appearance")}</h2>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">{t("settings.theme")}</span>
+          <div className="flex gap-2">
+            <Button
+              variant={theme === "light" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTheme("light")}
+            >
+              <Sun className="mr-1.5 h-4 w-4" /> {t("settings.light")}
+            </Button>
+            <Button
+              variant={theme === "dark" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTheme("dark")}
+            >
+              <Moon className="mr-1.5 h-4 w-4" /> {t("settings.dark")}
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">History</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Controls whether your present generations are saved to History.
+        </p>
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">Save my history</p>
+            <p className="text-xs text-muted-foreground">
+              When on, new generations are saved here. When off, no more present generations are stored.
+            </p>
+          </div>
+          <Switch
+            checked={historyPrefs.history_enabled}
+            disabled={historySaving}
+            onCheckedChange={(v) => toggleHistoryPref("history_enabled", v)}
+          />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">{t("settings.language")}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Translate the Motio2edit interface using Google Translate. Your choice is saved and applied across pages.
+        </p>
+        <div className="mt-4">
+          <GoogleLanguageSelect />
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Numbers, credits, plan IDs, and form values are not meant to be translated. Brand name Motio2edit stays as written.
+        </p>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">{t("settings.notifications")}</h2>
+        <div className="mt-4 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Product updates</p>
+              <p className="text-xs text-muted-foreground">New features and improvements.</p>
+            </div>
+            <Switch checked={notifs.product} onCheckedChange={(v) => toggleNotif("product", v)} />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Marketing & offers</p>
+              <p className="text-xs text-muted-foreground">Promotions and tips.</p>
+            </div>
+            <Switch checked={notifs.marketing} onCheckedChange={(v) => toggleNotif("marketing", v)} />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Security alerts</p>
+              <p className="text-xs text-muted-foreground">Important account and security notices.</p>
+            </div>
+            <Switch checked={notifs.security} onCheckedChange={(v) => toggleNotif("security", v)} />
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">{t("settings.subscription")}</h2>
+        <div className="mt-4 space-y-2 text-sm">
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t("settings.currentPlan")}</span>
+            <span className="font-medium capitalize">{plan.name}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t("settings.creditsRemaining")}</span>
+            <span className="font-medium">{isAdminEmail(profile.email) ? "∞" : profile.credits}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">Currency</span>
+            <span className="font-medium">{profile.currency}</span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">Video generation</span>
+            <span className="font-medium">{plan.video ? "Enabled" : "Disabled"}</span>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {profile.plan !== "business" && (
+            <Button asChild>
+              <Link to="/pricing">{t("common.upgrade")}</Link>
+            </Button>
+          )}
+          <Button asChild variant="outline">
+            <Link to="/profile/subscription">{t("settings.subscription")}</Link>
+          </Button>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">{t("settings.account")}</h2>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button variant="outline" onClick={handleSignOut}>
+            {t("settings.logout")}
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
