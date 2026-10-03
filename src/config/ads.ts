@@ -20,12 +20,13 @@ export const ADS_CONFIG = {
     footer: true,
     sidebar: false,
   },
-  /** Routes that must never show ads. */
+  /**
+   * Routes that must never show ads.
+   * Do NOT blanket-block homepage, history, profile, FAQ, about.
+   * Editor/studio controls stay clean because banners only render in
+   * reserved FooterAd / InContentAd slots — not over canvas.
+   */
   excludedRoutes: [
-    "/editor",
-    "/studio",
-    "/music",
-    "/chat",
     "/login",
     "/auth",
     "/checkout",
@@ -33,6 +34,7 @@ export const ADS_CONFIG = {
     "/payment",
     "/pricing",
     "/security",
+    "/chat",
     "/profile/subscription",
     "/profile/billing",
   ],

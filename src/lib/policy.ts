@@ -30,8 +30,8 @@ export function isFreePlan(plan: string | null | undefined): boolean {
 }
 
 /**
- * Chatbot: all paid plans + admin.
- * Free users must not access Chatbot (UI + server both enforce).
+ * Chatbot: Master Studio (internal plan id "business") + admin only.
+ * Free / Lite / Plus / Pro / Studio must not access Chatbot (UI + server both enforce).
  */
 export function canAccessChat(opts: {
   plan: string | null | undefined;
@@ -39,78 +39,6 @@ export function canAccessChat(opts: {
   isAdmin?: boolean;
 }): boolean {
   if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
-  return isPaidPlan(opts.plan);
-}
-
-/**
- * Video: all paid plans including Lite. Free never.
- * Aligns product matrix; keep plans.ts lite.video in sync so editor plan.video gate matches.
- */
-export function canAccessVideo(opts: {
-  plan: string | null | undefined;
-  email?: string | null | undefined;
-  isAdmin?: boolean;
-}): boolean {
-  if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
-  return isPaidPlan(opts.plan);
-}
-
-/**
- * Music: all signed-in users.
- * Free = limited (standard, song/instrumental, short prompts) via music-plan-capabilities.
- * Paid plans unlock modes, longer tracks, Premium, SFX, voiceover, video→music.
- */
-export function canAccessMusic(opts: {
-  plan: string | null | undefined;
-  email?: string | null | undefined;
-  isAdmin?: boolean;
-}): boolean {
-  if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
-  return true;
-}
-
-export function shouldShowAds(opts: {
-  plan: string | null | undefined;
-  email?: string | null | undefined;
-  isAdmin?: boolean;
-}): boolean {
-  const admin = opts.isAdmin === true || isAdminEmail(opts.email);
-  if (admin) return false;
-  if (isPaidPlan(opts.plan)) return false;
-  return true;
-}
-
-export function getWatermarkMode(opts: {
-  plan: string | null | undefined;
-  email?: string | null | undefined;
-  isAdmin?: boolean;
-  keepWatermark?: boolean;
-  forDownload?: boolean;
-}): WatermarkMode {
-  const admin = opts.isAdmin === true || isAdminEmail(opts.email);
-  if (admin) return "none";
-  if (isFreePlan(opts.plan)) {
-    return "primary+secondary";
-  }
-  if (opts.keepWatermark) return "primary";
-  return "none";
-}
-
-export function shouldApplyWatermark(opts: {
-  plan: string | null | undefined;
-  email?: string | null | undefined;
-  isAdmin?: boolean;
-  keepWatermark?: boolean;
-}): boolean {
-  return getWatermarkMode(opts) !== "none";
-}
-
-export function shouldApplySecondaryWatermark(opts: {
-  plan: string | null | undefined;
-  email?: string | null | undefined;
-  isAdmin?: boolean;
-}): boolean {
-  const admin = opts.isAdmin === true || isAdminEmail(opts.email);
-  if (admin) return false;
-  return isFreePlan(opts.plan);
+  const id = (opts.plan ?? "").toLowerCase();
+  return id === "business";
 }
