@@ -71,7 +71,7 @@ function AuthenticatedLayout() {
       {!noHeader && <AppSidebar />}
       <div className={noHeader ? "w-full min-w-0" : "w-full min-w-0 md:pl-56"}>
         {!noHeader && (
-          <div className="md:hidden">
+          <div className={pathname === "/chat" || pathname.startsWith("/chat/") ? undefined : "md:hidden"}>
             <Header />
           </div>
         )}
