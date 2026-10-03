@@ -1,7 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { FooterAd } from "@/components/ads";
 import { useEffect, useState } from "react";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
@@ -17,7 +16,7 @@ import {
   type PlanId,
 } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
-import { Check, Coins, Crown } from "lucide-react";
+import { Check, Coins, Crown, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pricing")({
@@ -66,7 +65,17 @@ function PricingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <div className="border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Home
+          </Link>
+        </div>
+      </div>
       <div className="mx-auto max-w-6xl px-4 py-12 pb-24 md:pb-12">
         <div className="text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
