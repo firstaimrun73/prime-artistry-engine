@@ -1,34 +1,28 @@
 /**
- * Central ad configuration — static banner destinations only.
- * No AdSense, Monetag, vignette, popup, or push.
- * Audience: Free plan only (enforced in policy + useAdsVisible).
+ * Static banner destinations only. No popup, push, or third-party brand assets.
+ * Audience: Free plan only (enforced in useAdsVisible).
  */
 
-/** Click destinations (not image URLs). */
-export const BANNER_DESTINATIONS = [
-  "https://omg10.com/4/11947054",
-  "https://omg10.com/4/11947056",
-] as const;
+/** Approved Monetag direct link (server-side investigation: neutral banner only). */
+export const BANNER_DESTINATIONS = ["https://omg10.com/4/11949338"] as const;
 
 export const ADS_CONFIG = {
-  /** Master compile-time switch. Admin settings.ads.enabled also required. */
   enabled: true,
   destinations: BANNER_DESTINATIONS,
+  /** Default copy for neutral Motio2edit banner */
+  heading: "Free offers just for you",
+  subline: "Explore curated deals — no credits or rewards for clicking.",
+  buttonText: "Explore now",
   placements: {
     topBanner: true,
     inContent: true,
     footer: true,
     sidebar: false,
   },
-  /**
-   * Routes that must never show ads.
-   * Do NOT blanket-block homepage, history, profile, FAQ, about.
-   * Editor/studio controls stay clean because banners only render in
-   * reserved FooterAd / InContentAd slots — not over canvas.
-   */
   excludedRoutes: [
     "/login",
     "/auth",
+    "/signup",
     "/checkout",
     "/pay",
     "/payment",
@@ -45,10 +39,6 @@ export function isAdRouteAllowed(pathname: string): boolean {
   return !ADS_CONFIG.excludedRoutes.some((r) => pathname === r || pathname.startsWith(r + "/"));
 }
 
-/** Pick a destination by rotation index (stable per placement + page). */
-export function bannerHref(seed: string): string {
-  const list = ADS_CONFIG.destinations;
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h + seed.charCodeAt(i) * (i + 1)) % 997;
-  return list[h % list.length]!;
+export function bannerHref(_seed?: string): string {
+  return ADS_CONFIG.destinations[0]!;
 }
