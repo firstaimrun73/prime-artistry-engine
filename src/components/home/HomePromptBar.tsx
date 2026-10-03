@@ -1,6 +1,7 @@
 /**
  * Homepage multi-reference prompt card.
- * One prompt → five reference frames that fill the row with no blank space.
+ * One prompt → five reference frames.
+ * Slots are 1:1 to match sample images so nothing is blank or letterboxed.
  */
 import { Link } from "@tanstack/react-router";
 import { WALKING_MAN_SAMPLES } from "@/lib/samples/walking-man";
@@ -49,18 +50,19 @@ export function HomePromptBar() {
         </div>
       </Link>
 
-      {/* Five equal reference frames — full width, no leftover blank */}
+      {/* Five equal 1:1 frames — images fill edge-to-edge, no blank bands */}
       <div className="mt-3 grid grid-cols-5 gap-1.5 sm:gap-2">
         {WALKING_MAN_SAMPLES.slice(0, 5).map((s, i) => (
           <div
             key={s.id}
-            className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm dark:border-white/10"
+            className="relative aspect-square w-full overflow-hidden rounded-xl border border-border/60 bg-muted shadow-sm dark:border-white/10"
           >
             <img
               src={s.url}
               alt={s.alt}
               loading="lazy"
-              className="h-full w-full object-cover object-center"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover object-center"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.opacity = "0.35";
               }}
@@ -73,7 +75,7 @@ export function HomePromptBar() {
       </div>
 
       <p className="mt-3 text-center text-[12px] font-medium leading-snug text-muted-foreground">
-        One prompt · many references · Motion2AI studies them all and delivers one coherent result
+        One prompt · many photo types · Motion2AI turns them into coherent possibilities
       </p>
     </section>
   );

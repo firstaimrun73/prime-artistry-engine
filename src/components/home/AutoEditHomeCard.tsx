@@ -1,122 +1,16 @@
-import { Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-
 /**
- * ACE Auto Edit — Ace of Diamonds card with before → process → result carousel.
- * Uses real Motio2edit sample pairs (photo enhance demos).
- * Auto-plays a few cycles, then holds on the last frame.
- * Powered by Maluto AI (product name for Auto Edit).
+ * ACE Auto Edit — Ace of Diamonds card.
+ * No photos, no carousel. Pure CSS/SVG animation.
+ * Entire card is a link to /studio/image/auto-edit.
  */
-
-type Step = { src: string; label: string };
-
-type Example = {
-  id: string;
-  steps: Step[];
-};
-
-/** Before / process / result from public R2 samples (circle + image studio). */
-const EXAMPLES: Example[] = [
-  {
-    id: "street",
-    steps: [
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0001.jpg",
-        label: "Original",
-      },
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/file_000000001b80821091ce891b23fc036f.png",
-        label: "Processing",
-      },
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0002.jpg",
-        label: "Result",
-      },
-    ],
-  },
-  {
-    id: "detail",
-    steps: [
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0003.jpg",
-        label: "Original",
-      },
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0000.jpg",
-        label: "Processing",
-      },
-      {
-        src: "https://assets.motio2edit.com/samples/circle-2edit/IMG-20260927-WA0000.jpg",
-        label: "Result",
-      },
-    ],
-  },
-];
-
-const MAX_AUTO_CYCLES = 2;
-const STEP_MS = 1600;
-const EXAMPLE_PAUSE_MS = 900;
+import { Link } from "@tanstack/react-router";
 
 export function AutoEditHomeCard() {
-  const [exIdx, setExIdx] = useState(0);
-  const [stepIdx, setStepIdx] = useState(0);
-  const [loaded, setLoaded] = useState<Record<string, boolean>>({});
-  const [cycles, setCycles] = useState(0);
-  const [playing, setPlaying] = useState(true);
-
-  const example = EXAMPLES[exIdx]!;
-
-  useEffect(() => {
-    const map: Record<string, boolean> = {};
-    let pending = 0;
-    EXAMPLES.forEach((ex) => {
-      ex.steps.forEach((s) => {
-        pending += 1;
-        const img = new Image();
-        img.onload = () => {
-          map[s.src] = true;
-          pending -= 1;
-          if (pending <= 0) setLoaded({ ...map });
-        };
-        img.onerror = () => {
-          map[s.src] = false;
-          pending -= 1;
-          if (pending <= 0) setLoaded({ ...map });
-        };
-        img.src = s.src;
-      });
-    });
-  }, []);
-
-  const visibleSteps = useMemo(() => {
-    return example.steps.filter((s) => loaded[s.src] !== false);
-  }, [example, loaded]);
-
-  useEffect(() => {
-    if (!playing || cycles >= MAX_AUTO_CYCLES) return;
-    if (visibleSteps.length === 0) return;
-
-    const t = window.setTimeout(() => {
-      if (stepIdx < visibleSteps.length - 1) {
-        setStepIdx((i) => i + 1);
-      } else if (exIdx < EXAMPLES.length - 1) {
-        setExIdx((i) => i + 1);
-        setStepIdx(0);
-      } else {
-        setCycles((c) => c + 1);
-        setExIdx(0);
-        setStepIdx(0);
-        if (cycles + 1 >= MAX_AUTO_CYCLES) setPlaying(false);
-      }
-    }, stepIdx === visibleSteps.length - 1 ? EXAMPLE_PAUSE_MS : STEP_MS);
-
-    return () => window.clearTimeout(t);
-  }, [playing, cycles, stepIdx, exIdx, visibleSteps.length]);
-
   return (
     <Link
       to="/studio/image/auto-edit"
       className="group relative mt-10 block overflow-hidden rounded-[1.15rem] border border-zinc-200 bg-white text-zinc-900 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.18)] transition duration-200 hover:shadow-[0_16px_48px_-12px_rgba(0,0,0,0.22)] active:scale-[0.99] dark:border-zinc-300"
+      aria-label="Open Auto Edit"
     >
       <div className="relative aspect-[5/7] w-full p-3.5 sm:p-4">
         {/* Corner Ace marks */}
@@ -129,57 +23,64 @@ export function AutoEditHomeCard() {
           <span className="text-[12px] text-red-600">♦</span>
         </div>
 
-        {/* Stage */}
-        <div className="relative mx-auto mt-8 h-[52%] w-[88%]">
-          {visibleSteps.map((s, i) => {
-            const active = i === stepIdx;
-            const behind = i < stepIdx;
-            return (
-              <div
-                key={`${example.id}-${s.src}-${i}`}
-                className="absolute inset-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 shadow-md transition-all duration-500"
-                style={{
-                  opacity: active ? 1 : behind ? 0.35 : 0,
-                  transform: active
-                    ? "scale(1) translateY(0)"
-                    : behind
-                      ? `scale(0.92) translateY(${(stepIdx - i) * 6}px)`
-                      : "scale(0.96) translateY(12px)",
-                  zIndex: active ? 10 : behind ? 5 - i : 1,
-                }}
-              >
-                {loaded[s.src] !== false && (
-                  <img
-                    src={s.src}
-                    alt={s.label}
-                    className="h-full w-full object-cover"
-                    draggable={false}
-                  />
-                )}
-                <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                  {s.label}
-                </span>
-                {active && i === 0 && (
-                  <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white shadow-lg animate-pulse">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        {/* Animated stage — no images */}
+        <div className="relative mx-auto mt-10 flex h-[48%] w-[88%] items-center justify-center">
+          {/* Soft ambient glow */}
+          <div
+            className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-red-500/10 via-transparent to-rose-400/15"
+            aria-hidden
+          />
 
-          <div className="absolute -bottom-5 left-0 right-0 flex items-center justify-center gap-1.5">
-            {visibleSteps.map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                  i === stepIdx ? "bg-red-600" : "bg-zinc-300"
-                }`}
-              />
-            ))}
+          {/* Orbit ring */}
+          <div
+            className="absolute h-[72%] w-[72%] rounded-full border border-red-500/25"
+            style={{ animation: "ace-spin 12s linear infinite" }}
+            aria-hidden
+          >
+            <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
+            <span className="absolute -bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-rose-400" />
           </div>
+
+          {/* Inner dashed ring (counter-spin) */}
+          <div
+            className="absolute h-[48%] w-[48%] rounded-full border border-dashed border-red-400/40"
+            style={{ animation: "ace-spin-rev 8s linear infinite" }}
+            aria-hidden
+          />
+
+          {/* Center diamond pulse */}
+          <div className="relative z-10 flex flex-col items-center">
+            <span
+              className="select-none text-[42px] leading-none text-red-600 drop-shadow-sm sm:text-[48px]"
+              style={{ animation: "ace-pulse 2.2s ease-in-out infinite" }}
+              aria-hidden
+            >
+              ♦
+            </span>
+            {/* Scan line across diamond area */}
+            <span
+              className="pointer-events-none absolute inset-x-[-28px] top-0 h-[2px] bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-80"
+              style={{ animation: "ace-scan 2.4s ease-in-out infinite" }}
+              aria-hidden
+            />
+          </div>
+
+          {/* Floating spark dots */}
+          <span
+            className="absolute left-[18%] top-[22%] h-1.5 w-1.5 rounded-full bg-red-400"
+            style={{ animation: "ace-float 3s ease-in-out infinite" }}
+            aria-hidden
+          />
+          <span
+            className="absolute right-[20%] top-[30%] h-1 w-1 rounded-full bg-rose-300"
+            style={{ animation: "ace-float 3.6s ease-in-out 0.4s infinite" }}
+            aria-hidden
+          />
+          <span
+            className="absolute bottom-[28%] left-[28%] h-1 w-1 rounded-full bg-red-300"
+            style={{ animation: "ace-float 2.8s ease-in-out 0.8s infinite" }}
+            aria-hidden
+          />
         </div>
 
         {/* Branding + CTA */}
@@ -196,6 +97,33 @@ export function AutoEditHomeCard() {
           </span>
         </div>
       </div>
+
+      {/* Keyframes scoped to this card */}
+      <style>{`
+        @keyframes ace-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes ace-spin-rev {
+          from { transform: rotate(360deg); }
+          to { transform: rotate(0deg); }
+        }
+        @keyframes ace-pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.12); opacity: 0.85; }
+        }
+        @keyframes ace-scan {
+          0% { top: 8%; opacity: 0; }
+          15% { opacity: 0.9; }
+          50% { top: 70%; opacity: 0.75; }
+          85% { opacity: 0.9; }
+          100% { top: 8%; opacity: 0; }
+        }
+        @keyframes ace-float {
+          0%, 100% { transform: translateY(0); opacity: 0.55; }
+          50% { transform: translateY(-8px); opacity: 1; }
+        }
+      `}</style>
     </Link>
   );
 }
