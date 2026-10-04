@@ -1,21 +1,28 @@
+/**
+ * Compile-time ad config. Third-party scripts (AdSense/Monetag) are disabled.
+ * Only static in-page banners from ad_settings.banners are used.
+ */
 export const ADS_CONFIG = {
-  publisherId: "ca-pub-7901147042865442",
+  publisherId: "",
   enabled: true,
   placements: {
-    topBanner: true,
-    leftSidebar: true,
-    rightSidebar: true,
+    topBanner: false,
+    leftSidebar: false,
+    rightSidebar: false,
     inContent: true,
-    footer: true,
+    footer: false,
   },
+  /** Hard-coded OFF routes — never show banners here. */
   excludedRoutes: [
-    "/editor",
-    "/studio/image",
-    "/studio/video",
-    "/studio/music",
-    "/login",
-    "/auth",
+    "/pricing",
     "/checkout",
+    "/auth",
+    "/login",
+    "/signup",
+    "/forgot",
+    "/reset",
+    "/settings",
+    "/profile/subscription",
     "/payment-success",
     "/payment-failed",
   ],
