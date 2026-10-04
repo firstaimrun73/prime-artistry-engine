@@ -25,6 +25,7 @@ import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
+import { StaticBanner } from "@/components/ads/StaticBanner";
 
 /** Only 3–4 creative tags — open Image Studio with style prompt (no forced 1:1). */
 const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] = [
@@ -231,7 +232,12 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
+      {/* Banner slot 1 — after quick create, not above the fold */}
+      <StaticBanner placement="home-1" slotIndex={0} />
+
       <CircleSampleGallery />
+
+      <StaticBanner placement="home-2" slotIndex={1} />
 
       <RemoveBgHomeCard />
 
@@ -239,9 +245,13 @@ export function SignedInHomeBody() {
         <VisualDiscoveryGallery />
       </div>
 
+      <StaticBanner placement="home-3" slotIndex={2} />
+
       <ObserveBuildProtect />
 
       <HomePromptBar />
+
+      <StaticBanner placement="home-4" slotIndex={3} />
 
       <AutoEditHomeCard />
     </main>
