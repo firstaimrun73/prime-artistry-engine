@@ -1,13 +1,13 @@
+/**
+ * Single controlled Direct Link ad configuration.
+ * ONE destination only. No popups, vignettes, page-push, or notification ads.
+ */
+export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
+
 export const ADS_CONFIG = {
-  publisherId: "ca-pub-7901147042865442",
+  /** Compile-time kill switch. When false, no ad UI or scripts. */
   enabled: true,
-  placements: {
-    topBanner: true,
-    leftSidebar: true,
-    rightSidebar: true,
-    inContent: true,
-    footer: true,
-  },
+  /** Routes where ads must never appear. */
   excludedRoutes: [
     "/editor",
     "/studio/image",
@@ -18,16 +18,14 @@ export const ADS_CONFIG = {
     "/checkout",
     "/payment-success",
     "/payment-failed",
+    "/pricing",
+    "/billing",
+    "/settings",
+    "/account",
   ],
 } as const;
 
 export function isAdRouteAllowed(pathname: string): boolean {
   if (!ADS_CONFIG.enabled) return false;
   return !ADS_CONFIG.excludedRoutes.some((r) => pathname.startsWith(r));
-}
-
-declare global {
-  interface Window {
-    adsbygoogle?: unknown[];
-  }
 }
