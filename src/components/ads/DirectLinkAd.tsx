@@ -1,13 +1,16 @@
 import { useAdsVisible } from "@/lib/site-settings";
 import { DIRECT_LINK_URL, isAdRouteAllowed } from "@/config/ads";
 import { useRouterState } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
+import { shouldShowAds } from "@/lib/policy";
 
 /**
  * Static in-page Direct Link ad card.
  * - ONE clickable target only → DIRECT_LINK_URL
  * - Visible "Ad" label
  * - No auto-open, popup, vignette, page-push, or notification behavior
- * - Free signed-in non-admin only (via useAdsVisible + shouldShowAds policy)
+ * - Free signed-in non-admin only (useAdsVisible + shouldShowAds)
  * - Never on excluded routes
  *
  * Destination research (2026-10-05):
@@ -25,9 +28,18 @@ export function DirectLinkAd({
   className?: string;
 }) {
   const adsOn = useAdsVisible();
+  const { profile, user } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  const admin = isAdminEmail(profile?.email);
+  const audienceOk = shouldShowAds({
+    plan: profile?.plan ?? (user ? "free" : "free"),
+    email: profile?.email,
+    isAdmin: admin,
+  });
+
   if (!adsOn) return null;
+  if (!audienceOk) return null;
   if (!isAdRouteAllowed(pathname)) return null;
 
   return (
