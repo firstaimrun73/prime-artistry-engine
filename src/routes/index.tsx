@@ -15,7 +15,7 @@ import { FeedbackCard } from "@/components/FeedbackCard";
 import { TrustSection } from "@/components/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
-import { FooterAd } from "@/components/ads";
+import { DirectLinkAd } from "@/components/ads/DirectLinkAd";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -40,9 +40,6 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const { user, loading } = useAuth();
 
-  // While auth is resolving: show a neutral spinner so signed-in users never
-  // flash the pre-login marketing homepage. After logout, loading becomes false
-  // with user=null → pre-login is shown correctly.
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -65,11 +62,6 @@ function SignedInHome() {
   );
 }
 
-/**
- * Signed-out homepage — PUBLIC MARKETING ONLY.
- * Hard rule: do NOT render private creation/sample galleries here.
- * Editor buttons are display-only CTAs → always /auth (never open an editor logged-out).
- */
 function SignedOutHome() {
   return (
     <div className="min-h-screen bg-background">
@@ -79,8 +71,7 @@ function SignedOutHome() {
 
       <WatchDemoSection variant="prominent" />
 
-      <div className="mx-auto w-full max-w-6xl px-4">
-      </div>
+      <div className="mx-auto w-full max-w-6xl px-4" />
 
       <ArchitectureFlowSection />
 
@@ -88,7 +79,8 @@ function SignedOutHome() {
       <TrustSection />
       <HomeTestimonials />
       <FinalCTA />
-      <FooterAd placement="home" />
+      {/* Lower page only — free users who sign in will see policy-gated ads */}
+      <DirectLinkAd placement="home-signed-out-footer" />
       <Footer />
     </div>
   );
@@ -155,7 +147,6 @@ const STUDIO_CARDS: StudioCardSpec[] = [
 ];
 
 function StudioShowcase() {
-  /* Pre-login marketing only — cards are showcases; click → login only. */
   const navigate = useNavigate();
 
   return (
@@ -168,7 +159,6 @@ function StudioShowcase() {
         {STUDIO_CARDS.map((c) => {
           const Icon = c.icon;
           const onClick = () => {
-            // Never open editors pre-login — always auth.
             navigate({ to: "/auth", search: { redirect: c.href } });
           };
           return (
