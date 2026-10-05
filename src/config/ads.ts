@@ -1,23 +1,35 @@
+/**
+ * Single Direct Link monetization config.
+ * ONE destination only — never open automatically; user must click.
+ */
+export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
+
 export const ADS_CONFIG = {
-  publisherId: "ca-pub-7901147042865442",
+  /** Compile-time kill switch. Admin master switch still required at runtime. */
   enabled: true,
+  /**
+   * Third-party script publishers disabled. Kept empty so no AdSense/Monetag inject.
+   */
+  publisherId: "",
   placements: {
-    topBanner: true,
-    leftSidebar: true,
-    rightSidebar: true,
+    topBanner: false,
+    leftSidebar: false,
+    rightSidebar: false,
     inContent: true,
     footer: true,
   },
+  /** Routes where no in-page Direct Link ad is shown. */
   excludedRoutes: [
-    "/editor",
-    "/studio/image",
-    "/studio/video",
-    "/studio/music",
-    "/login",
     "/auth",
+    "/login",
+    "/signup",
     "/checkout",
+    "/pricing",
     "/payment-success",
     "/payment-failed",
+    "/settings",
+    "/profile/subscription",
+    "/profile/top-up",
   ],
 } as const;
 
