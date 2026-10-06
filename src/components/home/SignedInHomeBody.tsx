@@ -25,6 +25,7 @@ import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
+import { DirectLinkAd } from "@/components/ads";
 
 /** Only 3–4 creative tags — open Image Studio with style prompt (no forced 1:1). */
 const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] = [
@@ -235,11 +236,15 @@ export function SignedInHomeBody() {
 
       <RemoveBgHomeCard />
 
+      <DirectLinkAd placement="home-mid" />
+
       <div className="mt-12">
         <VisualDiscoveryGallery />
       </div>
 
       <ObserveBuildProtect />
+
+      <DirectLinkAd placement="home-lower" />
 
       <HomePromptBar />
 
