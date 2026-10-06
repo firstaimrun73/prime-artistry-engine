@@ -55,7 +55,6 @@ export function SignedInWorkspace() {
         return;
       }
 
-      // Fallback if retention columns missing
       const core = await supabase
         .from("generations")
         .select("id, type, prompt, output_url, created_at, metadata")
@@ -154,6 +153,8 @@ export function SignedInWorkspace() {
             ))}
           </div>
         </section>
+
+        <DirectLinkAd placement="workspace-upper" variant="compact" />
 
         <SignedInStudioCards />
 
