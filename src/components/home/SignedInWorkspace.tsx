@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { FooterAd } from "@/components/ads";
+import { DirectLinkAd } from "@/components/ads";
 import { SignedInStudioCards } from "@/components/SignedInStudioCards";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -157,6 +157,8 @@ export function SignedInWorkspace() {
 
         <SignedInStudioCards />
 
+        <DirectLinkAd placement="workspace-mid" />
+
         <section className="mt-10">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             What you can do
@@ -242,8 +244,9 @@ export function SignedInWorkspace() {
             </div>
           )}
         </section>
+
+        <DirectLinkAd placement="workspace-lower" />
       </main>
-      <FooterAd placement="home" />
       <Footer />
     </div>
   );
