@@ -7,6 +7,7 @@
  */
 
 import { buildGptImage2MultiStep } from "@/lib/studio/image/gpt-image-2";
+import { classifyEdit, classifyEditSize } from "@/lib/image-edit/classify";
 import {
   STANDARD_MODELS,
   kleinImageSize,
@@ -26,6 +27,65 @@ export const STANDARD_I2I_IDENTITY_PRESERVATION =
  */
 export const STANDARD_MULTI_IDENTITY_PRESERVATION =
   "Image 1 is the base/source person. Preserve the identity and face of every person in image 1 (same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair). References may influence the requested object, outfit, style, or other attributes only. Never copy a different person's face from a reference onto the base person unless the user explicitly asks for a face or identity replacement. Keep all unrequested subjects and scene details unchanged as much as possible.";
+
+/**
+ * Active restoration contract — must drive real repair work, not a no-op copy of the input.
+ * Does not auto-colorize B&W unless the user asked for colorization.
+ */
+export const STANDARD_RESTORE_INSTRUCTION =
+  "ACTIVE RESTORATION: Repair degradation in this photograph. Repair scratches, tears, stains, and damage. Reduce fading, noise, and blur. Recover detail where possible and reconstruct damaged areas faithfully. Improve natural contrast and color balance when appropriate. Preserve original composition and camera framing. Do not creatively reinterpret the scene. Do not colorize a black-and-white image unless the user explicitly asked for colorization. Preserve the exact identity of every person.";
+
+export const STANDARD_ENHANCE_INSTRUCTION =
+  "ACTIVE ENHANCEMENT: Improve sharpness, clarity, and natural detail. Reduce noise and softness where helpful. Keep the same scene, subjects, and composition. Do not invent new content.";
+
+export const STANDARD_OUTFIT_INSTRUCTION =
+  "Change the clothing/outfit on the person as requested. Do not keep the original clothes when the user asked to change them. Keep face, identity, pose, and background the same unless asked otherwise.";
+
+export const STANDARD_BACKGROUND_INSTRUCTION =
+  "Change ONLY the background as requested. Keep subject edges, body, and identity unchanged.";
+
+export const STANDARD_REMOVAL_INSTRUCTION =
+  "Remove only the requested object or person. Fill the area naturally with surrounding background. Preserve all other subjects and identity.";
+
+export const STANDARD_COLOR_INSTRUCTION =
+  "Adjust only the requested color or lighting. Keep subjects, composition, and identity unchanged.";
+
+export const STANDARD_FACE_EDIT_INSTRUCTION =
+  "Apply only the requested face, expression, or skin change. Keep the same person's identity and facial structure; change only the requested attribute.";
+
+function buildStandardI2ICorePrompt(raw: string): string {
+  const editSize = classifyEditSize(raw);
+  const editType = classifyEdit(raw);
+
+  // Restoration must be active — not a preserve-only no-op.
+  if (editSize === "restore" || editType === "restore") {
+    return `${raw}\n\n${STANDARD_RESTORE_INSTRUCTION}`;
+  }
+  if (editType === "enhance") {
+    return `${raw}\n\n${STANDARD_ENHANCE_INSTRUCTION}`;
+  }
+  if (editSize === "outfit" || editType === "outfit") {
+    return `${raw}\n\n${STANDARD_OUTFIT_INSTRUCTION}`;
+  }
+  if (editSize === "background" || editType === "background") {
+    return `${raw}\n\n${STANDARD_BACKGROUND_INSTRUCTION}`;
+  }
+  if (editSize === "remove_people" || editType === "removal") {
+    return `${raw}\n\n${STANDARD_REMOVAL_INSTRUCTION}`;
+  }
+  if (editSize === "face_fix" || editType === "portrait") {
+    return `${raw}\n\n${STANDARD_FACE_EDIT_INSTRUCTION}`;
+  }
+  if (editType === "color") {
+    return `${raw}\n\n${STANDARD_COLOR_INSTRUCTION}`;
+  }
+
+  // Generic edit: keep mild framing if the user did not use an action verb.
+  if (/\b(edit|enhance|sharpen|brighten|clear|fix|improve|make|change|remove|add|restore|repair)\b/i.test(raw)) {
+    return raw;
+  }
+  return `Edit this photo: ${raw}. Keep the same scene, layout, and subjects.`;
+}
 
 export function buildTextToImageStep(req: StandardValidationOk): StandardFalStep {
   const model = standardTextToImageModel(req.imageQuality);
@@ -49,17 +109,14 @@ export function buildTextToImageStep(req: StandardValidationOk): StandardFalStep
  * Do NOT use strength — Kontext does not take a denoise strength parameter.
  * Always send the real HTTPS image_url.
  * Always append identity-preservation contract; never enable enhance_prompt.
+ * Restore/enhance/outfit/etc. get active intent instructions via existing classifiers.
  */
 export function buildImageToImageStep(req: StandardValidationOk): StandardFalStep {
   if (!req.imageUrl || !req.imageUrl.startsWith("https://")) {
     throw new Error("Image → Image requires a valid HTTPS source image URL.");
   }
   const raw = req.prompt.trim();
-  const core =
-    /\b(edit|enhance|sharpen|brighten|clear|fix|improve|make|change|remove|add)\b/i.test(raw)
-      ? raw
-      : `Edit this photo: ${raw}. Keep the same scene, layout, and subjects.`;
-
+  const core = buildStandardI2ICorePrompt(raw);
   const prompt = `${core}\n\n${STANDARD_I2I_IDENTITY_PRESERVATION}`;
 
   return {

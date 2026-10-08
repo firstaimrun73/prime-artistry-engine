@@ -1,16 +1,16 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Image as ImageIcon, Video, Music, History, MessageSquare, User, Settings } from "lucide-react";
+import { Home, Image as ImageIcon, Video, Music, History, MessageSquare, User, Settings, Crown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { isAdminEmail } from "@/lib/admin-config";
-import { canAccessChat, canAccessVideo, canAccessMusic } from "@/lib/policy";
+import { canAccessChat, canAccessVideo, canAccessMusic, isPaidPlan } from "@/lib/policy";
 import { BrandMark } from "@/components/BrandMark";
 import { useI18n } from "@/lib/i18n";
 
 /**
  * Desktop vertical sidebar for authenticated routes.
- * Free: Home, Image, History (+ Profile/Settings).
- * Paid Lite+: Image + Video + Music + Chat per canAccess* helpers.
+ * Free: Home, Image, Plans (+ Profile/Settings) — History slot becomes Pricing.
+ * Paid Lite+: Image + Video + Music + History + Chat per canAccess* helpers.
  */
 export function AppSidebar() {
   const { user, profile } = useAuth();
@@ -18,6 +18,7 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
+  const paid = admin || isPaidPlan(plan);
 
   const showVideo = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
   const showMusic = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
@@ -30,7 +31,12 @@ export function AppSidebar() {
   ];
   if (showVideo) items.push({ to: "/studio/video", label: t("nav.video"), icon: Video });
   if (showMusic) items.push({ to: "/studio/music", label: t("nav.music"), icon: Music });
-  items.push({ to: "/history", label: t("nav.history"), icon: History });
+  // Free: History slot → Pricing/Plans. Paid: History.
+  if (paid) {
+    items.push({ to: "/history", label: t("nav.history"), icon: History });
+  } else {
+    items.push({ to: "/pricing", label: "Plans", icon: Crown });
+  }
   if (showChat) items.push({ to: "/chat", label: t("nav.chat"), icon: MessageSquare });
 
   return (

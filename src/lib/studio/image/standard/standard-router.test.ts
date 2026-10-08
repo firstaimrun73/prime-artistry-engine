@@ -11,6 +11,13 @@ import {
   buildStandardStep,
   STANDARD_I2I_IDENTITY_PRESERVATION,
   STANDARD_MULTI_IDENTITY_PRESERVATION,
+  STANDARD_RESTORE_INSTRUCTION,
+  STANDARD_ENHANCE_INSTRUCTION,
+  STANDARD_OUTFIT_INSTRUCTION,
+  STANDARD_BACKGROUND_INSTRUCTION,
+  STANDARD_REMOVAL_INSTRUCTION,
+  STANDARD_COLOR_INSTRUCTION,
+  STANDARD_FACE_EDIT_INSTRUCTION,
 } from "./request-builders";
 import { STANDARD_MODELS } from "./models";
 import { GPT_IMAGE_2_EDIT_MODEL, quoteGptImage2MultiCredits } from "@/lib/studio/image/gpt-image-2";
@@ -266,7 +273,6 @@ describe("Standard I2I identity preservation", () => {
     assert.equal(step.body.image_url, "https://cdn.example/person.png");
     assert.equal(step.body.enhance_prompt, false);
     assert.equal(step.model, STANDARD_MODELS.imageToImage);
-    // Must remain I2I — never silently become T2I
     assert.ok(step.body.image_url, "I2I must retain image_url");
     assert.equal((step.body as { image_urls?: unknown }).image_urls, undefined);
   });
@@ -301,12 +307,87 @@ describe("Standard I2I identity preservation", () => {
 
     const prompt = String(step.body.prompt);
     assert.ok(prompt.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+    assert.ok(prompt.includes(STANDARD_FACE_EDIT_INSTRUCTION));
     assert.ok(
       /same person's identity|same person|facial structure/i.test(prompt),
       "must keep same-person identity on explicit face edits",
     );
     assert.equal(step.body.enhance_prompt, false);
     assert.equal(step.body.image_url, "https://cdn.example/portrait.png");
+  });
+});
+
+describe("Standard I2I intent instructions", () => {
+  function i2i(prompt: string) {
+    return buildStandardStep({
+      ok: true,
+      mode: "image_to_image",
+      prompt,
+      imageUrl: "https://cdn.example/src.png",
+      referenceImageUrls: [],
+      imageQuality: "sd",
+    } as StandardValidationOk);
+  }
+
+  it("restore gets ACTIVE restoration + identity", () => {
+    const step = i2i("restore this old photo");
+    const p = String(step.body.prompt);
+    assert.ok(p.includes(STANDARD_RESTORE_INSTRUCTION));
+    assert.ok(p.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+    assert.ok(/ACTIVE RESTORATION/i.test(p));
+    assert.ok(!/colorize a black-and-white image unless/i.test(p) || p.includes("Do not colorize"));
+    assert.equal(step.body.enhance_prompt, false);
+    assert.equal(step.body.image_url, "https://cdn.example/src.png");
+  });
+
+  it("repair scratches / faded photo triggers restore", () => {
+    const step = i2i("remove scratches and fix this faded photo");
+    const p = String(step.body.prompt);
+    assert.ok(p.includes(STANDARD_RESTORE_INSTRUCTION));
+    assert.ok(p.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+  });
+
+  it("enhancement gets active enhance instruction", () => {
+    const step = i2i("enhance and sharpen this photo");
+    const p = String(step.body.prompt);
+    assert.ok(p.includes(STANDARD_ENHANCE_INSTRUCTION));
+    assert.ok(p.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+  });
+
+  it("outfit keeps identity and requires clothing change", () => {
+    const step = i2i("change the outfit to a red jacket");
+    const p = String(step.body.prompt);
+    assert.ok(p.includes(STANDARD_OUTFIT_INSTRUCTION));
+    assert.ok(p.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+  });
+
+  it("background change preserves identity", () => {
+    const step = i2i("change background to a beach");
+    const p = String(step.body.prompt);
+    assert.ok(p.includes(STANDARD_BACKGROUND_INSTRUCTION));
+    assert.ok(p.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+  });
+
+  it("remove gets removal instruction", () => {
+    const step = i2i("remove the car in the background");
+    const p = String(step.body.prompt);
+    assert.ok(p.includes(STANDARD_REMOVAL_INSTRUCTION));
+    assert.ok(p.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+  });
+
+  it("color change gets color instruction", () => {
+    const step = i2i("make the shirt blue and increase saturation");
+    const p = String(step.body.prompt);
+    assert.ok(p.includes(STANDARD_COLOR_INSTRUCTION) || p.includes(STANDARD_OUTFIT_INSTRUCTION));
+    assert.ok(p.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+  });
+
+  it("never silently changes I2I into T2I", () => {
+    const i2iStep = i2i("remove the car");
+    assert.ok(i2iStep.body.image_url);
+    assert.equal((i2iStep.body as { image_urls?: unknown }).image_urls, undefined);
+    assert.notEqual(i2iStep.model, STANDARD_MODELS.textToImageSd);
+    assert.notEqual(i2iStep.model, STANDARD_MODELS.textToImageHd);
   });
 });
 
@@ -339,20 +420,5 @@ describe("Standard multi-image identity + order", () => {
     );
     assert.ok(prompt.includes("Image 1 is the base"));
     assert.ok(prompt.includes("put the jacket from the reference on the person"));
-  });
-
-  it("never silently changes I2I into T2I", () => {
-    const i2i = buildStandardStep({
-      ok: true,
-      mode: "image_to_image",
-      prompt: "remove the car",
-      imageUrl: "https://cdn.example/street.png",
-      referenceImageUrls: [],
-      imageQuality: "sd",
-    } as StandardValidationOk);
-    assert.ok(i2i.body.image_url);
-    assert.equal((i2i.body as { image_urls?: unknown }).image_urls, undefined);
-    assert.notEqual(i2i.model, STANDARD_MODELS.textToImageSd);
-    assert.notEqual(i2i.model, STANDARD_MODELS.textToImageHd);
   });
 });

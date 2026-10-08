@@ -1,9 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, History, User, Plus } from "lucide-react";
+import { Home, LayoutGrid, History, User, Plus, Crown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 
 import { hideBottomNav } from "@/components/hideBottomNav";
 export { hideBottomNav };
@@ -141,10 +143,12 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
 }
 
 export function BottomTabBar() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [hiddenByScroll, setHiddenByScroll] = useState(false);
+  const admin = isAdminEmail(profile?.email);
+  const paid = admin || isPaidPlan(profile?.plan);
 
   useEffect(() => {
     if (pathname !== "/") {
@@ -171,10 +175,16 @@ export function BottomTabBar() {
     { to: "/" as const, label: t("nav.home") || "Home", icon: Home },
     { to: "/studio" as const, label: t("nav.studio") || "Studio", icon: LayoutGrid },
   ];
-  const right = [
-    { to: "/history" as const, label: t("nav.history") || "History", icon: History },
-    { to: "/profile" as const, label: t("nav.profile") || "Profile", icon: User },
-  ];
+  // Free: History slot → Pricing (Plans). Paid: History.
+  const right = paid
+    ? [
+        { to: "/history" as const, label: t("nav.history") || "History", icon: History },
+        { to: "/profile" as const, label: t("nav.profile") || "Profile", icon: User },
+      ]
+    : [
+        { to: "/pricing" as const, label: "Plans", icon: Crown },
+        { to: "/profile" as const, label: t("nav.profile") || "Profile", icon: User },
+      ];
 
   // iPhone / iOS: floating curved glass bar (Android keeps full-width bar).
   const isIOS =

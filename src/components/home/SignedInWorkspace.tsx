@@ -68,15 +68,20 @@ export function SignedInWorkspace() {
     })();
   }, [user]);
 
+  // Free: History quick action → Pricing/Plans. Paid: History.
+  const historyOrPlans = historyUnlocked
+    ? { to: "/history" as const, label: "History", desc: "Recent projects" }
+    : { to: "/pricing" as const, label: "Plans", desc: "Upgrade for history" };
+
   const quickActions: {
-    to: "/editor" | "/studio/image" | "/history" | "/dashboard";
+    to: "/editor" | "/studio/image" | "/history" | "/dashboard" | "/pricing";
     label: string;
     desc: string;
     primary?: boolean;
   }[] = [
     { to: "/editor", label: "Open Image Editor", desc: "Full workspace", primary: true },
     { to: "/studio/image", label: "Image tools", desc: "Presets & shortcuts" },
-    { to: "/history", label: "History", desc: "Recent projects" },
+    historyOrPlans,
     { to: "/dashboard", label: "Profile", desc: "Plan & account" },
   ];
 
@@ -183,9 +188,15 @@ export function SignedInWorkspace() {
             <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               <HistoryIcon className="h-4 w-4" /> Recent history
             </h2>
-            <Link to="/history" className="text-xs font-medium text-primary hover:underline">
-              View all →
-            </Link>
+            {historyUnlocked ? (
+              <Link to="/history" className="text-xs font-medium text-primary hover:underline">
+                View all →
+              </Link>
+            ) : (
+              <Link to="/pricing" className="text-xs font-medium text-primary hover:underline">
+                Unlock with a plan →
+              </Link>
+            )}
           </div>
           {recent.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center text-sm text-muted-foreground">

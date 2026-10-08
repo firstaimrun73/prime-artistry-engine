@@ -10,7 +10,7 @@ import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 
-import { Coins, ShieldCheck, AlertTriangle, Menu } from "lucide-react";
+import { Coins, ShieldCheck, Menu } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NavItem = { to: any; label: string };
@@ -25,15 +25,6 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/support", label: "Support" },
 ];
 
-/** Auth users: app navigation (not marketing page links). */
-const AUTH_LINKS_BASE: NavItem[] = [
-  { to: "/", label: "Home" },
-  { to: "/studio", label: "Studio" },
-  { to: "/history", label: "History" },
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/pricing", label: "Plans" },
-];
-
 const CHAT_LINK: NavItem = { to: "/chat", label: "Chat" };
 
 export function Header() {
@@ -41,13 +32,28 @@ export function Header() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const admin = isAdminEmail(profile?.email);
-  const showChat = admin || isPaidPlan(profile?.plan);
+  const paid = admin || isPaidPlan(profile?.plan);
+  const showChat = paid;
 
-  const authLinks: NavItem[] = showChat
-    ? [...AUTH_LINKS_BASE, CHAT_LINK]
-    : AUTH_LINKS_BASE;
-  // Signed-in: application nav only (Home, Studio, History, optional Chat).
-  // Pre-login: full marketing links.
+  // Free: History slot → Pricing/Plans (discoverability). Paid: History stays.
+  // Avoid flashing History for free users: until profile.plan is known, treat as free if signed in.
+  const historyOrPlans: NavItem = paid
+    ? { to: "/history", label: "History" }
+    : { to: "/pricing", label: "Plans" };
+
+  const authLinksBase: NavItem[] = [
+    { to: "/", label: "Home" },
+    { to: "/studio", label: "Studio" },
+    historyOrPlans,
+    { to: "/dashboard", label: "Dashboard" },
+  ];
+  // Paid already has History in the slot; keep a Plans link only for free (already in slot).
+  // Paid users can still reach pricing via dashboard/settings; free gets Plans in the History slot.
+  if (paid) {
+    authLinksBase.push({ to: "/pricing", label: "Plans" });
+  }
+
+  const authLinks: NavItem[] = showChat ? [...authLinksBase, CHAT_LINK] : authLinksBase;
   const links: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 
   return (
@@ -66,7 +72,7 @@ export function Header() {
         <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 lg:flex">
           {links.map((l) => (
             <Link
-              key={l.to}
+              key={`${l.to}-${l.label}`}
               to={l.to}
               activeProps={{ className: "text-foreground" }}
               activeOptions={l.to === "/" ? { exact: true } : undefined}
@@ -144,7 +150,7 @@ export function Header() {
               <nav className="flex flex-col p-2">
                 {links.map((l) => (
                   <Link
-                    key={l.to}
+                    key={`${l.to}-${l.label}`}
                     to={l.to}
                     onClick={() => setMenuOpen(false)}
                     activeProps={{ className: "bg-secondary text-foreground" }}
