@@ -1,6 +1,7 @@
 /**
  * Build fal body for openai/gpt-image-2/edit multi-reference path.
- * quality is always "low". Prompt is the user prompt (trimmed, not expanded).
+ * quality is always "low". Prompt is the user prompt (trimmed, not expanded)
+ * plus optional identity contract when experience is standard.
  */
 
 import {
@@ -39,8 +40,9 @@ export function buildGptImage2MultiStep(opts: {
   }
   const prompt = opts.prompt.trim();
   if (!prompt) throw new Error("Prompt is required.");
-  if (prompt.length > 2000) {
-    throw new Error("Prompt must be at most 2000 characters.");
+  if (prompt.length > 2500) {
+    // Raised slightly so Standard identity contract + user prompt can both fit.
+    throw new Error("Prompt must be at most 2500 characters.");
   }
 
   return {

@@ -7,7 +7,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { validateStandardImageRequest, normalizeOrderedRefs } from "./validation";
 import { quoteStandardCredits, STANDARD_CREDITS } from "./credits";
-import { buildStandardStep } from "./request-builders";
+import {
+  buildStandardStep,
+  STANDARD_I2I_IDENTITY_PRESERVATION,
+  STANDARD_MULTI_IDENTITY_PRESERVATION,
+} from "./request-builders";
 import { STANDARD_MODELS } from "./models";
 import { GPT_IMAGE_2_EDIT_MODEL, quoteGptImage2MultiCredits } from "@/lib/studio/image/gpt-image-2";
 import type { StandardValidationOk } from "./types";
@@ -245,5 +249,110 @@ describe("buildStandardStep models", () => {
     assert.equal(circle.model, STANDARD_MODELS.circleToRemove);
     assert.equal(circle.body.image_url, "https://cdn.example/base.png");
     assert.equal(circle.body.mask_url, "https://cdn.example/mask.png");
+  });
+});
+
+describe("Standard I2I identity preservation", () => {
+  it("keeps original HTTPS image_url and enhance_prompt false", () => {
+    const step = buildStandardStep({
+      ok: true,
+      mode: "image_to_image",
+      prompt: "make the shirt blue",
+      imageUrl: "https://cdn.example/person.png",
+      referenceImageUrls: [],
+      imageQuality: "hd",
+    } as StandardValidationOk);
+
+    assert.equal(step.body.image_url, "https://cdn.example/person.png");
+    assert.equal(step.body.enhance_prompt, false);
+    assert.equal(step.model, STANDARD_MODELS.imageToImage);
+    // Must remain I2I — never silently become T2I
+    assert.ok(step.body.image_url, "I2I must retain image_url");
+    assert.equal((step.body as { image_urls?: unknown }).image_urls, undefined);
+  });
+
+  it("prompt contains identity-preservation contract", () => {
+    const step = buildStandardStep({
+      ok: true,
+      mode: "image_to_image",
+      prompt: "change background to beach",
+      imageUrl: "https://cdn.example/face.png",
+      referenceImageUrls: [],
+      imageQuality: "sd",
+    } as StandardValidationOk);
+
+    const prompt = String(step.body.prompt);
+    assert.ok(
+      prompt.includes(STANDARD_I2I_IDENTITY_PRESERVATION),
+      "I2I prompt must include identity preservation contract",
+    );
+    assert.ok(prompt.includes("change background to beach"));
+  });
+
+  it("explicit face/expression request still preserves same-person identity", () => {
+    const step = buildStandardStep({
+      ok: true,
+      mode: "image_to_image",
+      prompt: "make her smile and look slightly younger",
+      imageUrl: "https://cdn.example/portrait.png",
+      referenceImageUrls: [],
+      imageQuality: "sd",
+    } as StandardValidationOk);
+
+    const prompt = String(step.body.prompt);
+    assert.ok(prompt.includes(STANDARD_I2I_IDENTITY_PRESERVATION));
+    assert.ok(
+      /same person's identity|same person|facial structure/i.test(prompt),
+      "must keep same-person identity on explicit face edits",
+    );
+    assert.equal(step.body.enhance_prompt, false);
+    assert.equal(step.body.image_url, "https://cdn.example/portrait.png");
+  });
+});
+
+describe("Standard multi-image identity + order", () => {
+  it("keeps [base, ref1, ref2...] order and protects base person identity", () => {
+    const step = buildStandardStep({
+      ok: true,
+      mode: "multi_image_to_image",
+      prompt: "put the jacket from the reference on the person",
+      imageUrl: "https://cdn.example/base-person.png",
+      referenceImageUrls: [
+        "https://cdn.example/jacket.png",
+        "https://cdn.example/style.png",
+      ],
+      imageQuality: "sd",
+    } as StandardValidationOk);
+
+    assert.deepEqual(step.body.image_urls, [
+      "https://cdn.example/base-person.png",
+      "https://cdn.example/jacket.png",
+      "https://cdn.example/style.png",
+    ]);
+    assert.equal(step.body.quality, "low");
+    assert.equal(step.model, GPT_IMAGE_2_EDIT_MODEL);
+
+    const prompt = String(step.body.prompt);
+    assert.ok(
+      prompt.includes(STANDARD_MULTI_IDENTITY_PRESERVATION),
+      "multi prompt must include base-person identity rule",
+    );
+    assert.ok(prompt.includes("Image 1 is the base"));
+    assert.ok(prompt.includes("put the jacket from the reference on the person"));
+  });
+
+  it("never silently changes I2I into T2I", () => {
+    const i2i = buildStandardStep({
+      ok: true,
+      mode: "image_to_image",
+      prompt: "remove the car",
+      imageUrl: "https://cdn.example/street.png",
+      referenceImageUrls: [],
+      imageQuality: "sd",
+    } as StandardValidationOk);
+    assert.ok(i2i.body.image_url);
+    assert.equal((i2i.body as { image_urls?: unknown }).image_urls, undefined);
+    assert.notEqual(i2i.model, STANDARD_MODELS.textToImageSd);
+    assert.notEqual(i2i.model, STANDARD_MODELS.textToImageHd);
   });
 });

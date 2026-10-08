@@ -14,6 +14,19 @@ import {
 } from "./models";
 import type { StandardFalStep, StandardValidationOk } from "./types";
 
+/**
+ * Strong identity-preservation contract for Standard single-image I2I (Kontext Pro).
+ * Appended after the user request so the model keeps the same person while applying only the requested change.
+ */
+export const STANDARD_I2I_IDENTITY_PRESERVATION =
+  "Preserve the exact identity of every person in the source image: same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair. Do not replace, redesign, or invent faces. Only change the specific thing requested by the user. If the user explicitly requests a face/expression change, keep the same person's identity and change only that requested attribute.";
+
+/**
+ * Identity rule for Standard multi-image (GPT Image 2): image 1 is the base person/source.
+ */
+export const STANDARD_MULTI_IDENTITY_PRESERVATION =
+  "Image 1 is the base/source person. Preserve the identity and face of every person in image 1 (same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair). References may influence the requested object, outfit, style, or other attributes only. Never copy a different person's face from a reference onto the base person unless the user explicitly asks for a face or identity replacement. Keep all unrequested subjects and scene details unchanged as much as possible.";
+
 export function buildTextToImageStep(req: StandardValidationOk): StandardFalStep {
   const model = standardTextToImageModel(req.imageQuality);
   return {
@@ -35,16 +48,19 @@ export function buildTextToImageStep(req: StandardValidationOk): StandardFalStep
  * This is an instruction-following editor (not Flux Dev denoise/style-transfer).
  * Do NOT use strength — Kontext does not take a denoise strength parameter.
  * Always send the real HTTPS image_url.
+ * Always append identity-preservation contract; never enable enhance_prompt.
  */
 export function buildImageToImageStep(req: StandardValidationOk): StandardFalStep {
   if (!req.imageUrl || !req.imageUrl.startsWith("https://")) {
     throw new Error("Image → Image requires a valid HTTPS source image URL.");
   }
   const raw = req.prompt.trim();
-  const prompt =
+  const core =
     /\b(edit|enhance|sharpen|brighten|clear|fix|improve|make|change|remove|add)\b/i.test(raw)
       ? raw
       : `Edit this photo: ${raw}. Keep the same scene, layout, and subjects.`;
+
+  const prompt = `${core}\n\n${STANDARD_I2I_IDENTITY_PRESERVATION}`;
 
   return {
     label: `standard I2I kontext-pro ${req.imageQuality === "hd" ? "HD" : "SD"}`,
@@ -64,6 +80,7 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
 /**
  * Multi: image_urls = [base, ref1, ref2, ...] in exact upload order.
  * GPT Image 2 quality hard-locked to low.
+ * Prompt includes base-person identity protection so references cannot replace faces.
  */
 export function buildMultiImageStep(req: StandardValidationOk): StandardFalStep {
   if (!req.imageUrl) {
@@ -75,8 +92,11 @@ export function buildMultiImageStep(req: StandardValidationOk): StandardFalStep 
     throw new Error("Multiple Image requires 2–5 total images.");
   }
 
+  const userPrompt = req.prompt.trim();
+  const promptWithIdentity = `${userPrompt}\n\n${STANDARD_MULTI_IDENTITY_PRESERVATION}`;
+
   const step = buildGptImage2MultiStep({
-    prompt: req.prompt,
+    prompt: promptWithIdentity,
     imageUrls: image_urls,
     outputClass: req.imageQuality === "hd" ? "hd" : "sd",
     aspectRatio: req.aspectRatio,
