@@ -35,8 +35,13 @@ export const STANDARD_MULTI_IDENTITY_PRESERVATION =
 export const STANDARD_RESTORE_INSTRUCTION =
   "ACTIVE RESTORATION: Repair degradation in this photograph. Repair scratches, tears, stains, and damage. Reduce fading, noise, and blur. Recover detail where possible and reconstruct damaged areas faithfully. Improve natural contrast and color balance when appropriate. Preserve original composition and camera framing. Do not creatively reinterpret the scene. Do not colorize a black-and-white image unless the user explicitly asked for colorization. Preserve the exact identity of every person.";
 
+/**
+ * Active sharpen/enhance — must produce a visibly clearer result, not a near-copy.
+ * Kontext tends to under-edit pure quality requests when identity lock is strong;
+ * this instruction is intentionally forceful about edge clarity and micro-detail.
+ */
 export const STANDARD_ENHANCE_INSTRUCTION =
-  "ACTIVE ENHANCEMENT: Improve sharpness, clarity, and natural detail. Reduce noise and softness where helpful. Keep the same scene, subjects, and composition. Do not invent new content.";
+  "ACTIVE SHARPEN AND ENHANCE: Make this photo visibly sharper and clearer. Increase edge definition and micro-detail on faces, hair, fabric, and textures. Reduce blur, softness, and haze. Improve local contrast so details read crisp at 100% zoom. Do not leave the image looking the same softness as the input. Do not change identity, pose, composition, colors, or add new objects. Photorealistic only — no oversharpen halos or artificial look.";
 
 export const STANDARD_OUTFIT_INSTRUCTION =
   "Change the clothing/outfit on the person as requested. Do not keep the original clothes when the user asked to change them. Keep face, identity, pose, and background the same unless asked otherwise.";
@@ -53,15 +58,32 @@ export const STANDARD_COLOR_INSTRUCTION =
 export const STANDARD_FACE_EDIT_INSTRUCTION =
   "Apply only the requested face, expression, or skin change. Keep the same person's identity and facial structure; change only the requested attribute.";
 
+/** Phrases users type for sharpness that classifyEdit may miss (e.g. blurry, crisper, unblur). */
+const SHARPEN_PHRASE =
+  /\b(sharp(er|en|ness)?|crisp(er|ness)?|clear(er)?|clarity|detail|details|focus|focused|unblur|deblur|denoise|upscale|enhance|enhancement|quality|hd|4k|soft(ness)?|blur(ry|riness)?|haze|hazy|pixelat)\b/i;
+
+export function isStandardEnhanceIntent(prompt: string): boolean {
+  const p = prompt || "";
+  if (classifyEdit(p) === "enhance") return true;
+  // Explicit sharpen family even when another weak type matched first
+  if (SHARPEN_PHRASE.test(p) && !/\b(restor|coloriz|colouriz|old\s+photo|faded\s+photo|scratch)\b/i.test(p)) {
+    // Prefer enhance over generic when sharpen words are present and not restore
+    return true;
+  }
+  return false;
+}
+
 function buildStandardI2ICorePrompt(raw: string): string {
   const editSize = classifyEditSize(raw);
   const editType = classifyEdit(raw);
+  const enhanceIntent = isStandardEnhanceIntent(raw);
 
   // Restoration must be active — not a preserve-only no-op.
   if (editSize === "restore" || editType === "restore") {
     return `${raw}\n\n${STANDARD_RESTORE_INSTRUCTION}`;
   }
-  if (editType === "enhance") {
+  // Sharpen/enhance before outfit/bg so "sharpen and change background" still gets sharpen when primary
+  if (enhanceIntent || editType === "enhance") {
     return `${raw}\n\n${STANDARD_ENHANCE_INSTRUCTION}`;
   }
   if (editSize === "outfit" || editType === "outfit") {
@@ -118,6 +140,9 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
   const raw = req.prompt.trim();
   const core = buildStandardI2ICorePrompt(raw);
   const prompt = `${core}\n\n${STANDARD_I2I_IDENTITY_PRESERVATION}`;
+  const enhanceIntent = isStandardEnhanceIntent(raw);
+  // Slightly higher guidance so sharpen/enhance instructions are followed more strongly.
+  const guidance_scale = enhanceIntent ? 4.2 : 3.5;
 
   return {
     label: `standard I2I kontext-pro ${req.imageQuality === "hd" ? "HD" : "SD"}`,
@@ -125,7 +150,7 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
     body: {
       prompt,
       image_url: req.imageUrl,
-      guidance_scale: 3.5,
+      guidance_scale,
       num_images: 1,
       output_format: "png",
       safety_tolerance: "2",
