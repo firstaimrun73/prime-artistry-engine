@@ -54,6 +54,18 @@ const LARGE_EDIT_MATCH =
 export const OUTFIT_MATCH =
   /\b(outfit|clothing|clothes|cloth|dress|shirt|jacket|armor|armour|costume|suit|wear|wearing|change\s+the\s+outfit|replace\s+outfit|swap\s+outfit|put\s+on|dress\s+(him|her|them)|clothes\s+from|from\s+the\s+ref|from\s+ref|reference\s+(img|image)|refrence)\b/i;
 
+/**
+ * Explicit sharpen / deblur / enhance family.
+ * Avoid bare quality|hd|detail|clear (too many false positives on non-sharpen prompts).
+ * Shared by classifyEdit and Standard isStandardEnhanceIntent.
+ */
+export const EXPLICIT_SHARPEN =
+  /\b(sharp(er|en|ness)?|crisp(er|ness)?|unblur|deblur|denoise|upscale|enhanc(e|ement)|less\s+blur(ry)?|more\s+detail|increase\s+detail|improve\s+(sharpness|clarity|quality)|make\s+(it\s+)?(sharp(er)?|clear(er)?|crisp(er)?))\b/i;
+
+export function isExplicitSharpenIntent(prompt: string): boolean {
+  return EXPLICIT_SHARPEN.test(prompt || "");
+}
+
 export function isOutfitIntent(prompt: string): boolean {
   return OUTFIT_MATCH.test(prompt || "");
 }
@@ -88,8 +100,8 @@ export function classifyEdit(prompt: string): EditType {
   )
     return "portrait";
   if (/(cartoon|anime|painting|sketch|watercolor|artistic|style)/.test(p)) return "style";
-  if (/(sharp|enhance|upscale|denoise|quality|hd|4k|clear)/.test(p) && !RESTORE_MATCH.test(p))
-    return "enhance";
+  // Explicit sharpen family only — not bare quality/hd/4k/clear
+  if (isExplicitSharpenIntent(p) && !RESTORE_MATCH.test(p)) return "enhance";
   if (/(bright|dark|contrast|colou?r|saturation|warm|cool|light)/.test(p)) return "color";
   return "general";
 }

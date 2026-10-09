@@ -7,7 +7,11 @@
  */
 
 import { buildGptImage2MultiStep } from "@/lib/studio/image/gpt-image-2";
-import { classifyEdit, classifyEditSize } from "@/lib/image-edit/classify";
+import {
+  classifyEdit,
+  classifyEditSize,
+  isExplicitSharpenIntent,
+} from "@/lib/image-edit/classify";
 import {
   STANDARD_MODELS,
   kleinImageSize,
@@ -58,10 +62,6 @@ export const STANDARD_COLOR_INSTRUCTION =
 export const STANDARD_FACE_EDIT_INSTRUCTION =
   "Apply only the requested face, expression, or skin change. Keep the same person's identity and facial structure; change only the requested attribute.";
 
-/** Explicit sharpen / deblur family — avoid bare quality|hd|detail|clear (too many false positives). */
-const EXPLICIT_SHARPEN =
-  /\b(sharp(er|en|ness)?|crisp(er|ness)?|unblur|deblur|denoise|upscale|enhanc(e|ement)|less\s+blur(ry)?|more\s+detail|increase\s+detail|improve\s+(sharpness|clarity|quality)|make\s+(it\s+)?(sharp(er)?|clear(er)?|crisp(er)?))\b/i;
-
 export function isStandardEnhanceIntent(prompt: string): boolean {
   const p = prompt || "";
   const editSize = classifyEditSize(p);
@@ -74,12 +74,12 @@ export function isStandardEnhanceIntent(prompt: string): boolean {
   if (editSize === "background" || editType === "background") return false;
 
   // Face-primary edits stay face unless user also asked to sharpen explicitly
-  if ((editSize === "face_fix" || editType === "portrait") && !EXPLICIT_SHARPEN.test(p)) {
+  if ((editSize === "face_fix" || editType === "portrait") && !isExplicitSharpenIntent(p)) {
     return false;
   }
 
   if (editType === "enhance") return true;
-  if (EXPLICIT_SHARPEN.test(p)) return true;
+  if (isExplicitSharpenIntent(p)) return true;
   return false;
 }
 

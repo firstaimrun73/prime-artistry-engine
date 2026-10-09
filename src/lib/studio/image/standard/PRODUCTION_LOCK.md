@@ -11,6 +11,7 @@ Do not change locked models or credits without explicit product approval.
 | Image → Image (1 image) | `fal-ai/flux-pro/kontext` |
 | Multiple Image → Image (2–5 total) | `openai/gpt-image-2/edit` (quality **low** only) |
 | Circle to Remove | `fal-ai/flux-pro/v1/erase` |
+| Circle to Add | `fal-ai/flux-pro/v1/fill` |
 
 ## Credits
 
@@ -25,6 +26,7 @@ Do not change locked models or credits without explicit product approval.
 | Multi 4 imgs SD/HD | 35 / 40 |
 | Multi 5 imgs SD/HD | 40 / 45 |
 | Circle to Remove | 25 flat |
+| Circle to Add | 25 flat |
 
 Aspect ratio adds 0 credits. GPT Image 2 model quality is always `low`.
 
@@ -44,3 +46,4 @@ Provider (fal) price for Kontext Pro is fixed per image; product credits may sti
 - Never pass medium/high quality to GPT Image 2.
 - Circle mask must match original image pixel dimensions.
 - History `input_url` must store the real uploaded HTTPS URL for I2I.
+- Enhance intent: explicit sharpen family only (not bare quality/hd/clear); see `isExplicitSharpenIntent` / `isStandardEnhanceIntent`.
