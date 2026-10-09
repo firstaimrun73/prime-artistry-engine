@@ -76,4 +76,14 @@ export type StandardExecuteResult = {
   mode: StandardImageMode;
   model: string;
   credits: number;
+  /** Optional audit fields for history / prompt↔output matching. */
+  historyMeta?: {
+    source: "standard-image-studio";
+    mode: StandardImageMode;
+    model: string;
+    experienceLabel: "Standard";
+    promptHead?: string;
+    enhanceIntent?: boolean;
+    imageUrlPresent?: boolean;
+  };
 };

@@ -51,7 +51,21 @@ export async function runStandardFalStep(
   };
   const timeoutMs = opts?.timeoutMs ?? 120_000;
 
-  console.log("[standard-fal] ▶", step.label, "|", step.model);
+  const promptHead =
+    typeof step.body.prompt === "string" ? String(step.body.prompt).slice(0, 120) : "";
+  const hasImage =
+    typeof step.body.image_url === "string" ||
+    (Array.isArray(step.body.image_urls) && (step.body.image_urls as unknown[]).length > 0);
+  console.log(
+    "[standard-fal] ▶",
+    step.label,
+    "|",
+    step.model,
+    "| image=",
+    hasImage,
+    "| promptHead=",
+    promptHead,
+  );
 
   const submit = await fetch(`${FAL_QUEUE}${step.model}`, {
     method: "POST",
@@ -60,6 +74,7 @@ export async function runStandardFalStep(
   });
   if (!submit.ok) {
     const txt = await submit.text();
+    console.error("[standard-fal] submit failed", step.label, submit.status, txt.slice(0, 300));
     throw new Error(falErrorMessage(step.label, submit.status, txt));
   }
 
@@ -87,6 +102,7 @@ export async function runStandardFalStep(
       const body = await fetch(response_url, { headers })
         .then((r) => r.text())
         .catch(() => "");
+      console.error("[standard-fal] job failed", step.label, body.slice(0, 400));
       throw new Error(falErrorMessage(step.label, 500, body));
     }
     delay = Math.min(delay * 1.3, 5000);
@@ -107,7 +123,9 @@ export async function runStandardFalStep(
   };
   const url = json.image?.url ?? json.images?.[0]?.url ?? null;
   if (!url || typeof url !== "string" || !url.startsWith("http")) {
+    console.error("[standard-fal] no output URL", step.label, JSON.stringify(json).slice(0, 200));
     throw new Error(`${step.label} returned no output URL. Credits not charged.`);
   }
+  console.log("[standard-fal] ✓", step.label, "→", url.slice(0, 80));
   return url;
 }

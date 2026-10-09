@@ -58,18 +58,28 @@ export const STANDARD_COLOR_INSTRUCTION =
 export const STANDARD_FACE_EDIT_INSTRUCTION =
   "Apply only the requested face, expression, or skin change. Keep the same person's identity and facial structure; change only the requested attribute.";
 
-/** Phrases users type for sharpness that classifyEdit may miss (e.g. blurry, crisper, unblur). */
-const SHARPEN_PHRASE =
-  /\b(sharp(er|en|ness)?|crisp(er|ness)?|clear(er)?|clarity|detail|details|focus|focused|unblur|deblur|denoise|upscale|enhance|enhancement|quality|hd|4k|soft(ness)?|blur(ry|riness)?|haze|hazy|pixelat)\b/i;
+/** Explicit sharpen / deblur family — avoid bare quality|hd|detail|clear (too many false positives). */
+const EXPLICIT_SHARPEN =
+  /\b(sharp(er|en|ness)?|crisp(er|ness)?|unblur|deblur|denoise|upscale|enhanc(e|ement)|less\s+blur(ry)?|more\s+detail|increase\s+detail|improve\s+(sharpness|clarity|quality)|make\s+(it\s+)?(sharp(er)?|clear(er)?|crisp(er)?))\b/i;
 
 export function isStandardEnhanceIntent(prompt: string): boolean {
   const p = prompt || "";
-  if (classifyEdit(p) === "enhance") return true;
-  // Explicit sharpen family even when another weak type matched first
-  if (SHARPEN_PHRASE.test(p) && !/\b(restor|coloriz|colouriz|old\s+photo|faded\s+photo|scratch)\b/i.test(p)) {
-    // Prefer enhance over generic when sharpen words are present and not restore
-    return true;
+  const editSize = classifyEditSize(p);
+  const editType = classifyEdit(p);
+
+  // Never steal restore / outfit / removal / background as "enhance"
+  if (editSize === "restore" || editType === "restore") return false;
+  if (editSize === "outfit" || editType === "outfit") return false;
+  if (editSize === "remove_people" || editType === "removal") return false;
+  if (editSize === "background" || editType === "background") return false;
+
+  // Face-primary edits stay face unless user also asked to sharpen explicitly
+  if ((editSize === "face_fix" || editType === "portrait") && !EXPLICIT_SHARPEN.test(p)) {
+    return false;
   }
+
+  if (editType === "enhance") return true;
+  if (EXPLICIT_SHARPEN.test(p)) return true;
   return false;
 }
 
@@ -82,10 +92,7 @@ function buildStandardI2ICorePrompt(raw: string): string {
   if (editSize === "restore" || editType === "restore") {
     return `${raw}\n\n${STANDARD_RESTORE_INSTRUCTION}`;
   }
-  // Sharpen/enhance before outfit/bg so "sharpen and change background" still gets sharpen when primary
-  if (enhanceIntent || editType === "enhance") {
-    return `${raw}\n\n${STANDARD_ENHANCE_INSTRUCTION}`;
-  }
+  // Semantic edits first so enhance does not swallow outfit/bg/face/remove
   if (editSize === "outfit" || editType === "outfit") {
     return `${raw}\n\n${STANDARD_OUTFIT_INSTRUCTION}`;
   }
@@ -95,8 +102,11 @@ function buildStandardI2ICorePrompt(raw: string): string {
   if (editSize === "remove_people" || editType === "removal") {
     return `${raw}\n\n${STANDARD_REMOVAL_INSTRUCTION}`;
   }
-  if (editSize === "face_fix" || editType === "portrait") {
+  if ((editSize === "face_fix" || editType === "portrait") && !enhanceIntent) {
     return `${raw}\n\n${STANDARD_FACE_EDIT_INSTRUCTION}`;
+  }
+  if (enhanceIntent) {
+    return `${raw}\n\n${STANDARD_ENHANCE_INSTRUCTION}`;
   }
   if (editType === "color") {
     return `${raw}\n\n${STANDARD_COLOR_INSTRUCTION}`;

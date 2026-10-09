@@ -1,4 +1,4 @@
-import { buildImageToImageStep } from "../request-builders";
+import { buildImageToImageStep, isStandardEnhanceIntent } from "../request-builders";
 import type { StandardExecuteInput, StandardExecuteResult } from "../types";
 import { quoteStandardCredits } from "../credits";
 
@@ -22,10 +22,20 @@ export async function handleImageToImage(
     throw new Error("Image → Image returned the original image. Credits not charged.");
   }
   const quote = quoteStandardCredits({ mode: "image_to_image", imageQuality: input.imageQuality });
+  const promptSent = typeof step.body.prompt === "string" ? step.body.prompt : input.prompt;
   return {
     outputUrl,
     mode: "image_to_image",
     model: step.model,
     credits: quote.credits,
+    historyMeta: {
+      source: "standard-image-studio",
+      mode: "image_to_image",
+      model: step.model,
+      experienceLabel: "Standard",
+      promptHead: promptSent.slice(0, 280),
+      enhanceIntent: isStandardEnhanceIntent(input.prompt),
+      imageUrlPresent: true,
+    },
   };
 }
