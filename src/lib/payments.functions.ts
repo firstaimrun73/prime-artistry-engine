@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { resolvePlanToAssign } from "@/lib/payments.plan-resolve";
 
 const planSchema = z.enum(["lite", "plus", "pro", "studio", "business"]);
 
@@ -16,19 +17,6 @@ async function enforcePaymentRateLimit(db: any, userId: string, method: string) 
     throw new Error("Too many payment attempts. Please try again in an hour.");
   }
   await db.from("payment_attempts").insert({ user_id: userId, payment_method: method });
-}
-
-/** Prefer stored plan id; fall back to unique credit count (legacy rows). */
-function resolvePlanFromTx(tx: {
-  credits_purchased?: number;
-  metadata?: { plan?: string } | null;
-}): string | null {
-  const fromMeta = tx.metadata?.plan;
-  if (fromMeta && ["lite", "plus", "pro", "studio", "business"].includes(fromMeta)) {
-    return fromMeta;
-  }
-  // Lazy import avoided — caller may pass planFromCredits result
-  return null;
 }
 
 /** Best-effort plan-purchased email after successful credit apply. Never blocks payment. */
@@ -75,10 +63,13 @@ async function notifyPlanPurchased(args: {
 async function assignPlanIfNeeded(
   db: any,
   userId: string,
-  tx: { credits_purchased?: number; metadata?: { plan?: string } | null },
-  planFromCredits: (c: number) => string | null,
+  tx: {
+    transaction_id?: string | null;
+    credits_purchased?: number | null;
+    metadata?: { kind?: string; plan?: string } | null;
+  },
 ): Promise<string | null> {
-  const plan = resolvePlanFromTx(tx) ?? planFromCredits(Number(tx.credits_purchased) || 0);
+  const plan = resolvePlanToAssign(tx);
   if (plan) {
     await db
       .from("profiles")
@@ -146,7 +137,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { verifyRazorpaySignature, planFromCredits } = await import("@/lib/payments.server");
+    const { verifyRazorpaySignature } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { sendPaymentErrorReport } = await import("@/lib/email.server");
 
@@ -173,7 +164,8 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
         payment_status: "processing",
         gateway_response: {
           razorpay_order_id: data.razorpay_order_id,
-          razorpay_payment_id: data.razorpay_payment_id,
+          razorpay_payment_id: data.razorpay_signature,
+          razorpay_payment_id_real: data.razorpay_payment_id,
         },
       })
       .eq("transaction_id", data.internalOrderId);
@@ -196,7 +188,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       throw new Error("Payment received but credit allocation failed. Support has been notified.");
     }
 
-    const plan = await assignPlanIfNeeded(db, context.userId, tx, planFromCredits);
+    const plan = await assignPlanIfNeeded(db, context.userId, tx);
 
     await notifyPlanPurchased({
       userId: context.userId,
@@ -268,7 +260,7 @@ export const getCryptoStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { invoiceId: string }) => z.object({ invoiceId: z.string().min(1) }).parse(d))
   .handler(async ({ data, context }) => {
-    const { getNowPaymentsPayment, NP_STATUS_MAP, planFromCredits } = await import("@/lib/payments.server");
+    const { getNowPaymentsPayment, NP_STATUS_MAP } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
 
@@ -292,7 +284,7 @@ export const getCryptoStatus = createServerFn({ method: "POST" })
           _credits: tx.credits_purchased,
           _reason: "nowpayments_polling",
         });
-        const plan = await assignPlanIfNeeded(db, context.userId, tx, planFromCredits);
+        const plan = await assignPlanIfNeeded(db, context.userId, tx);
         await notifyPlanPurchased({
           userId: context.userId,
           plan,
@@ -370,7 +362,7 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { capturePaypalOrder: capture, planFromCredits } = await import("@/lib/payments.server");
+    const { capturePaypalOrder: capture } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { sendPaymentErrorReport } = await import("@/lib/email.server");
     const db = supabaseAdmin as any;
@@ -415,7 +407,7 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
       throw new Error("Payment received but credit allocation failed. Support has been notified.");
     }
 
-    const plan = await assignPlanIfNeeded(db, context.userId, tx, planFromCredits);
+    const plan = await assignPlanIfNeeded(db, context.userId, tx);
 
     await notifyPlanPurchased({
       userId: context.userId,
