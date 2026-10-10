@@ -1,5 +1,6 @@
 // Server-only payment helpers. Never imported by client/route files directly.
 import { createHmac, timingSafeEqual } from "crypto";
+import { DISPLAY_PRICES, PLAN_CREDITS, type PlanId } from "@/lib/plans";
 
 /**
  * One-time credit top-up packs.
@@ -23,21 +24,42 @@ export const CRYPTO_PACKAGES = {
 
 export type PackageId = keyof typeof RAZORPAY_PACKAGES;
 
-// Plan-based purchases — credits MUST match src/lib/plans.ts PLAN_CREDITS.
-// Internal id "business" is the Master Studio tier (user-facing name only).
-export const PLAN_PURCHASE = {
-  lite: { credits: 500, amountINR: 799, amountUSD: 9 },
-  plus: { credits: 1200, amountINR: 1299, amountUSD: 15 },
-  pro: { credits: 3000, amountINR: 2499, amountUSD: 29 },
-  studio: { credits: 8000, amountINR: 4599, amountUSD: 55 },
-  business: { credits: 10000, amountINR: 12999, amountUSD: 149 },
-} as const;
+/**
+ * Plan-based purchases — MUST match src/lib/plans.ts PLAN_CREDITS + DISPLAY_PRICES.
+ * Derived at module load so public pricing page and PayPal/Razorpay never diverge.
+ * Internal id "business" is the Master Studio tier (user-facing name only).
+ */
+export type PurchasablePlan = Exclude<PlanId, "free">;
 
-export type PurchasablePlan = keyof typeof PLAN_PURCHASE;
+function buildPlanPurchase(): Record<
+  PurchasablePlan,
+  { credits: number; amountINR: number; amountUSD: number }
+> {
+  const ids: PurchasablePlan[] = ["lite", "plus", "pro", "studio", "business"];
+  const out = {} as Record<
+    PurchasablePlan,
+    { credits: number; amountINR: number; amountUSD: number }
+  >;
+  for (const id of ids) {
+    out[id] = {
+      credits: PLAN_CREDITS[id],
+      amountUSD: DISPLAY_PRICES[id].USD,
+      amountINR: DISPLAY_PRICES[id].INR,
+    };
+  }
+  return out;
+}
 
+export const PLAN_PURCHASE = buildPlanPurchase();
+
+/** Resolve plan id from a completed purchase (prefer metadata.plan; fallback unique credits). */
 export function planFromCredits(credits: number): PurchasablePlan | null {
   const entry = Object.entries(PLAN_PURCHASE).find(([, p]) => p.credits === credits);
   return (entry?.[0] as PurchasablePlan) ?? null;
+}
+
+export function isPurchasablePlan(id: string | null | undefined): id is PurchasablePlan {
+  return !!id && id in PLAN_PURCHASE;
 }
 
 export const ACCEPTED_COINS = ["usdtbsc", "btc", "eth"] as const;
