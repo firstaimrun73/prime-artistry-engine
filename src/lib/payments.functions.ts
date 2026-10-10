@@ -18,6 +18,19 @@ async function enforcePaymentRateLimit(db: any, userId: string, method: string) 
   await db.from("payment_attempts").insert({ user_id: userId, payment_method: method });
 }
 
+/** Prefer stored plan id; fall back to unique credit count (legacy rows). */
+function resolvePlanFromTx(tx: {
+  credits_purchased?: number;
+  metadata?: { plan?: string } | null;
+}): string | null {
+  const fromMeta = tx.metadata?.plan;
+  if (fromMeta && ["lite", "plus", "pro", "studio", "business"].includes(fromMeta)) {
+    return fromMeta;
+  }
+  // Lazy import avoided — caller may pass planFromCredits result
+  return null;
+}
+
 /** Best-effort plan-purchased email after successful credit apply. Never blocks payment. */
 async function notifyPlanPurchased(args: {
   userId: string;
@@ -59,6 +72,22 @@ async function notifyPlanPurchased(args: {
   }
 }
 
+async function assignPlanIfNeeded(
+  db: any,
+  userId: string,
+  tx: { credits_purchased?: number; metadata?: { plan?: string } | null },
+  planFromCredits: (c: number) => string | null,
+): Promise<string | null> {
+  const plan = resolvePlanFromTx(tx) ?? planFromCredits(Number(tx.credits_purchased) || 0);
+  if (plan) {
+    await db
+      .from("profiles")
+      .update({ plan, updated_at: new Date().toISOString() })
+      .eq("id", userId);
+  }
+  return plan;
+}
+
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { plan: string }) => z.object({ plan: planSchema }).parse(d))
@@ -71,7 +100,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const internalOrderId = `rzp_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
     const order = await createOrder({
-      amountPaise: pkg.amountINR * 100,
+      amountPaise: Math.round(pkg.amountINR * 100),
       receipt: internalOrderId,
       notes: { user_id: context.userId, plan: data.plan, credits: pkg.credits },
     });
@@ -85,6 +114,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       transaction_id: internalOrderId,
       gateway_order_id: order.id,
       payment_status: "pending",
+      metadata: { kind: "plan_purchase", plan: data.plan },
     });
     if (error) throw new Error(error.message);
 
@@ -166,10 +196,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       throw new Error("Payment received but credit allocation failed. Support has been notified.");
     }
 
-    const plan = planFromCredits(tx.credits_purchased);
-    if (plan) {
-      await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
-    }
+    const plan = await assignPlanIfNeeded(db, context.userId, tx, planFromCredits);
 
     await notifyPlanPurchased({
       userId: context.userId,
@@ -222,6 +249,7 @@ export const createCryptoInvoice = createServerFn({ method: "POST" })
       gateway_order_id: payment.payment_id?.toString(),
       payment_status: "pending",
       gateway_response: payment,
+      metadata: { kind: "plan_purchase", plan: data.plan },
     });
     if (error) throw new Error(error.message);
 
@@ -264,10 +292,7 @@ export const getCryptoStatus = createServerFn({ method: "POST" })
           _credits: tx.credits_purchased,
           _reason: "nowpayments_polling",
         });
-        const plan = planFromCredits(tx.credits_purchased);
-        if (plan) {
-          await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
-        }
+        const plan = await assignPlanIfNeeded(db, context.userId, tx, planFromCredits);
         await notifyPlanPurchased({
           userId: context.userId,
           plan,
@@ -310,7 +335,7 @@ export const createPaypalOrder = createServerFn({ method: "POST" })
     const order = await createOrder({
       amountUSD: pkg.amountUSD,
       referenceId: internalOrderId,
-      description: `Motio2Edit ${pkg.credits} Credits`,
+      description: `Motio2Edit ${data.plan} — ${pkg.credits} Credits`,
     });
 
     const { error } = await (supabaseAdmin as any).from("payment_transactions").insert({
@@ -322,10 +347,16 @@ export const createPaypalOrder = createServerFn({ method: "POST" })
       transaction_id: internalOrderId,
       gateway_order_id: order.id,
       payment_status: "pending",
+      metadata: { kind: "plan_purchase", plan: data.plan },
     });
     if (error) throw new Error(error.message);
 
-    return { orderId: order.id, internalOrderId, credits: pkg.credits };
+    return {
+      orderId: order.id,
+      internalOrderId,
+      credits: pkg.credits,
+      amountUSD: pkg.amountUSD,
+    };
   });
 
 export const capturePaypalOrder = createServerFn({ method: "POST" })
@@ -384,10 +415,7 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
       throw new Error("Payment received but credit allocation failed. Support has been notified.");
     }
 
-    const plan = planFromCredits(tx.credits_purchased);
-    if (plan) {
-      await db.from("profiles").update({ plan, updated_at: new Date().toISOString() }).eq("id", context.userId);
-    }
+    const plan = await assignPlanIfNeeded(db, context.userId, tx, planFromCredits);
 
     await notifyPlanPurchased({
       userId: context.userId,

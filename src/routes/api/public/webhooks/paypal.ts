@@ -81,6 +81,25 @@ export const Route = createFileRoute("/api/public/webhooks/paypal")({
               _credits: tx.credits_purchased,
               _reason: "paypal_webhook",
             });
+
+            // Assign plan from stored metadata (preferred) or credit-count fallback.
+            const metaPlan = tx.metadata?.plan;
+            let plan: string | null =
+              typeof metaPlan === "string" &&
+              ["lite", "plus", "pro", "studio", "business"].includes(metaPlan)
+                ? metaPlan
+                : null;
+            if (!plan) {
+              const { planFromCredits } = await import("@/lib/payments.server");
+              plan = planFromCredits(Number(tx.credits_purchased) || 0);
+            }
+            // Skip plan overwrite for credit top-ups
+            if (plan && tx.metadata?.kind !== "credit_topup") {
+              await db
+                .from("profiles")
+                .update({ plan, updated_at: new Date().toISOString() })
+                .eq("id", tx.user_id);
+            }
           }
         }
 
