@@ -18,6 +18,7 @@ import {
   labelIssue,
   labelImprovement,
   type AutoEditQuality,
+  AUTO_EDIT_PRODUCT_VERSION,
 } from "./constants";
 import { analyzeImageWithGemini } from "./fal-vision.server";
 import { runAutoKontextEdit } from "./kontext.server";
@@ -71,13 +72,12 @@ export async function executeStandaloneAutoEdit(
   const recommended = analysis.recommended_actions.map(labelImprovement).slice(0, 6);
 
   if (analysis.no_change || !analysis.final_edit_prompt.trim()) {
-    // Still record History so the job is visible (0 credits, no edit applied).
     try {
       const persist = await persistGenerationHistory({
         supabaseAdmin: args.supabaseAdmin,
         userId: args.userId,
         type: "image",
-        prompt: "Maluto AI Auto Edit",
+        prompt: "Maluto AI 1.8 Auto Edit",
         input_url: typeof validated.imageUrl === "string" ? validated.imageUrl : null,
         output_url: validated.imageUrl,
         status: "success",
@@ -85,6 +85,7 @@ export async function executeStandaloneAutoEdit(
           experience: "auto-edit",
           source: "standalone_auto",
           operation: "auto_edit_no_change",
+          product_version: AUTO_EDIT_PRODUCT_VERSION,
           quality,
           credits_charged: 0,
           credits_used: 0,
@@ -150,6 +151,6 @@ export async function executeStandaloneAutoEdit(
       detectedIssues,
       recommended,
     },
-    message: "MOTIO2EDIT Auto Edit complete",
+    message: "Maluto AI 1.8 complete",
   };
 }
