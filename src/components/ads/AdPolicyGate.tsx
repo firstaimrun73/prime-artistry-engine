@@ -8,11 +8,9 @@ import { useAdsMasterEnabled } from "@/lib/site-settings";
  * Cleanup of disallowed ad-provider artifacts.
  * - Always strips AdSense / googlesyndication / doubleclick.
  * - Strips Monetag scripts that are NOT marked data-motio-allowed="1".
- * - When the user is ineligible (paid / admin / logged-out / master off),
- *   also strips our allowed Monetag In-Page Push script so it cannot linger.
- * - Does NOT unregister arbitrary service workers (only those that may have
- *   been installed by known ad script origins are left alone; we no longer
- *   blanket-unregister all SWs).
+ * - When the user is ineligible (paid / admin / logged-out / master off /
+ *   profile not loaded / auth loading), also strips our authorized IPP script.
+ * - Does NOT unregister service workers (blanket unregister was removed).
  * Static Direct Link ads are pure UI and require no scripts.
  */
 function removeDisallowedAdScripts(stripAllowedMonetag: boolean) {
@@ -36,12 +34,16 @@ function removeDisallowedAdScripts(stripAllowedMonetag: boolean) {
   document.querySelectorAll('meta[name="monetag"]').forEach((el) => el.remove());
 
   // Monetag scripts: keep only those explicitly allowed by our loader
-  document.querySelectorAll('script[src*="n6wxm.com"], script[src*="nap5k.com"], script[src*="monetag"]').forEach((el) => {
-    const allowed = el.getAttribute("data-motio-allowed") === "1";
-    if (!allowed || stripAllowedMonetag) {
-      el.remove();
-    }
-  });
+  document
+    .querySelectorAll(
+      'script[src*="n6wxm.com"], script[src*="nap5k.com"], script[src*="monetag"]',
+    )
+    .forEach((el) => {
+      const allowed = el.getAttribute("data-motio-allowed") === "1";
+      if (!allowed || stripAllowedMonetag) {
+        el.remove();
+      }
+    });
 
   try {
     if ((window as Window & { adsbygoogle?: unknown[] }).adsbygoogle) {
@@ -57,14 +59,18 @@ export function AdPolicyGate() {
   const masterOn = useAdsMasterEnabled();
 
   useEffect(() => {
+    // Fail closed until auth + profile are known for a signed-in user
     const admin = isAdminEmail(profile?.email);
-    const plan = profile?.plan ?? (user ? "free" : undefined);
-    // Fail closed while loading or when master is off / not eligible
     const eligible =
       !loading &&
       masterOn &&
       !!user &&
-      shouldShowAds({ plan: plan ?? "free", email: profile?.email, isAdmin: admin });
+      !!profile &&
+      shouldShowAds({
+        plan: profile.plan,
+        email: profile.email,
+        isAdmin: admin,
+      });
 
     const stripAllowed = !eligible;
     removeDisallowedAdScripts(stripAllowed);
@@ -77,7 +83,7 @@ export function AdPolicyGate() {
       subtree: true,
     });
     return () => observer.disconnect();
-  }, [user, profile?.plan, profile?.email, loading, masterOn]);
+  }, [user, profile, loading, masterOn]);
 
   return null;
 }
