@@ -5,6 +5,8 @@
  *   1) fal-ai/any-llm/vision (google/gemini-2.5-flash-lite) — analyse + decide + final_edit_prompt
  *   2) fal-ai/flux-kontext-lora — single-image edit with that prompt
  *   3) watermark / finalize → charge once
+ *
+ * Product: Maluto AI 1.8
  */
 
 /** Auto Edit quality tiers (includes backend-only 8k_max). */
@@ -23,7 +25,6 @@ export const AUTO_EDIT_TARGET_MP: Record<AutoEditQuality, number> = {
 /**
  * Total Auto Edit credits by quality (legacy product table / bridge).
  * Debit flows through @/lib/billing lifecycle; amounts remain until final economics review.
- * FINAL ECONOMICS TO BE DESIGNED AFTER CROSS-REVIEW BY CHATGPT + GROK + CLAUDE.
  */
 export const AUTO_EDIT_CREDITS_BY_QUALITY: Record<AutoEditQuality, number> = {
   sd: 45,
@@ -56,7 +57,10 @@ export const AUTO_EDIT_FAL_MODEL = "fal-ai/flux-kontext-lora" as const;
 export const AUTO_EDIT_WATERMARK_POSITION = "bottom-right" as const;
 
 /** Product name shown in UI. */
-export const AUTO_EDIT_PRODUCT_NAME = "Maluto AI" as const;
+export const AUTO_EDIT_PRODUCT_NAME = "Maluto AI 1.8" as const;
+
+/** Semantic version for History / metadata. */
+export const AUTO_EDIT_PRODUCT_VERSION = "1.8" as const;
 
 /** Pipeline states for client progress (no GPT-specific wording). */
 export const AUTO_EDIT_PIPELINE_STATES = [
@@ -74,7 +78,6 @@ export type AutoEditPipelineState = (typeof AUTO_EDIT_PIPELINE_STATES)[number];
 export function labelIssue(issue: string): string {
   const key = (issue || "").trim();
   if (!key) return "Issue";
-  // Title-case snake/kebab keys; leave natural sentences as-is
   if (/^[a-z0-9_\-]+$/i.test(key) && /[_\-]/.test(key)) {
     return key
       .replace(/[_\-]+/g, " ")
