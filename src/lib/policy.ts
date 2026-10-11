@@ -66,6 +66,10 @@ export function canAccessMusic(opts: {
   return true;
 }
 
+/**
+ * Ads only for the explicit free plan. Fail closed for paid, admin,
+ * missing, null, or any unrecognized plan id.
+ */
 export function shouldShowAds(opts: {
   plan: string | null | undefined;
   email?: string | null | undefined;
@@ -73,8 +77,8 @@ export function shouldShowAds(opts: {
 }): boolean {
   const admin = opts.isAdmin === true || isAdminEmail(opts.email);
   if (admin) return false;
-  if (isPaidPlan(opts.plan)) return false;
-  return true;
+  if (opts.plan === "free") return true;
+  return false;
 }
 
 export function getWatermarkMode(opts: {

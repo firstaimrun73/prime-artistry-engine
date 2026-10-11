@@ -145,6 +145,7 @@ export const PLANS: Plan[] = [
       "Circle 2edit · Cropmix · Remove BG",
       "Multi-image (up to 5 references)",
       "Watermark-free downloads",
+      "No ads",
     ],
   },
   {
@@ -164,6 +165,7 @@ export const PLANS: Plan[] = [
       "Circle 2edit · Cropmix · Auto Edit · Filters",
       "Multi-image (up to 10 references)",
       "Watermark-free downloads",
+      "No ads",
     ],
   },
   {
@@ -183,6 +185,7 @@ export const PLANS: Plan[] = [
       "120s music tracks",
       "Circle 2edit · all image tools · multi-image (10)",
       "Watermark-free downloads",
+      "No ads",
     ],
   },
   {
@@ -201,6 +204,7 @@ export const PLANS: Plan[] = [
       "Higher concurrency · priority queue",
       "Circle 2edit · full toolset · multi-image (10)",
       "Watermark-free downloads",
+      "No ads",
     ],
   },
   {
@@ -220,6 +224,7 @@ export const PLANS: Plan[] = [
       "Highest concurrency & priority",
       "Circle 2edit · every studio tool · multi-image (10)",
       "Master Studio tools · watermark-free",
+      "No ads",
     ],
   },
 ];

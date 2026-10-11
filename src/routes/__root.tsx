@@ -22,6 +22,7 @@ import { TranslateWidget } from "../components/TranslateWidget";
 import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
+import { MonetagInPagePush } from "../components/ads/MonetagInPagePush";
 
 function NotFoundComponent() {
   return (
@@ -260,6 +261,7 @@ function RootComponent() {
         <AuthProvider>
           <PageViewTracker />
           <AdPolicyGate />
+          <MonetagInPagePush />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />
