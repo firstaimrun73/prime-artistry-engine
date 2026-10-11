@@ -11,6 +11,7 @@ import { shouldShowAds } from "@/lib/policy";
  * - Visible "Ad" label
  * - No auto-open, popup, vignette, page-push, or notification behavior
  * - Free signed-in non-admin only (useAdsVisible + shouldShowAds)
+ * - Fail closed when profile/plan not yet loaded
  * - Never on excluded routes
  */
 export function DirectLinkAd({
@@ -25,18 +26,22 @@ export function DirectLinkAd({
 }) {
   const category = adPlacementCategory(placement);
   const adsOn = useAdsVisible(category ?? undefined);
-  const { profile, user } = useAuth();
+  const { profile, user, loading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const admin = isAdminEmail(profile?.email);
+  // Fail closed: no user, still loading, or profile/plan unknown
+  if (loading) return null;
+  if (!user) return null;
+  if (!profile) return null;
+  if (!adsOn) return null;
+
+  const admin = isAdminEmail(profile.email);
   const audienceOk = shouldShowAds({
-    plan: profile?.plan ?? (user ? "free" : "free"),
-    email: profile?.email,
+    plan: profile.plan,
+    email: profile.email,
     isAdmin: admin,
   });
 
-  if (!user) return null;
-  if (!adsOn) return null;
   if (!audienceOk) return null;
   if (!isAdRouteAllowed(pathname)) return null;
 
