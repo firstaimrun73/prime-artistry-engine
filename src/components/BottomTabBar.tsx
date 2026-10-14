@@ -222,13 +222,14 @@ export function BottomTabBar() {
         <li className="flex justify-center">
           <Link
             to="/studio/image/auto-edit"
-            aria-label="Auto Edit"
+            aria-label="Maluto AI"
             className={cn(
-              "flex flex-col items-center justify-end pb-2",
+              "flex flex-col items-center justify-end pb-1",
               autoActive ? "text-primary" : "text-muted-foreground",
             )}
           >
             <AutoCenterIcon active={autoActive} />
+            <span className="-mt-1 text-[9px] font-semibold leading-none tracking-tight">Maluto AI</span>
           </Link>
         </li>
 

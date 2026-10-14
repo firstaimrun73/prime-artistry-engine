@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Image as ImageIcon, Video, Music, History, MessageSquare, User, Settings, Crown } from "lucide-react";
+import { Home, Image as ImageIcon, Video, Music, History, MessageSquare, User, Settings, Crown, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -9,7 +9,7 @@ import { useI18n } from "@/lib/i18n";
 
 /**
  * Desktop vertical sidebar for authenticated routes.
- * Free: Home, Image, Plans (+ Profile/Settings) — History slot becomes Pricing.
+ * Free: Home, Image, Maluto AI, Plans (+ Profile/Settings) — History slot becomes Pricing.
  * Paid Lite+: Image + Video + Music + History + Chat per canAccess* helpers.
  */
 export function AppSidebar() {
@@ -28,6 +28,7 @@ export function AppSidebar() {
   const items: NavItem[] = [
     { to: "/", label: t("nav.home"), icon: Home, exact: true },
     { to: "/studio/image", label: t("nav.image"), icon: ImageIcon },
+    { to: "/studio/image/auto-edit", label: "Maluto AI", icon: Sparkles },
   ];
   if (showVideo) items.push({ to: "/studio/video", label: t("nav.video"), icon: Video });
   if (showMusic) items.push({ to: "/studio/music", label: t("nav.music"), icon: Music });
