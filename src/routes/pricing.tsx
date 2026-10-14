@@ -137,32 +137,7 @@ function PricingPage() {
           ))}
         </div>
 
-        {/* Credit examples from server-side rules (not every generation costs the same). */}
-        <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-border bg-card/60 px-4 py-4 text-left sm:px-6">
-          <p className="text-sm font-semibold text-foreground">What credits buy (examples)</p>
-          <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground sm:text-sm">
-            <li>
-              <span className="font-medium text-foreground">Standard image:</span> text→image SD 20 · HD 25;
-              image→image SD 25 · HD 30; Circle add/remove 25
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Premium image:</span> T2I SD/HD/2K 25 / 30 / 35
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Ultra image:</span> T2I from 30 (SD) up to 50 (4K)
-            </li>
-            <li>
-              <span className="font-medium text-foreground">Maluto AI Auto Edit:</span> 45–65 credits by quality
-              (SD/HD 45 · 2K 50 · 4K/8K 60 · 8K Max 65)
-            </li>
-            <li className="text-[11px] sm:text-xs">
-              Exact cost is quoted in the studio before you generate. Costs vary by mode, quality, and references —
-              not a flat per-generation rate.
-            </li>
-          </ul>
-        </div>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visiblePlans.map((plan) => {
             const highlight = plan.id === PRICING_POPULAR_PLAN_ID;
             const isCurrent = profile?.plan === plan.id;
