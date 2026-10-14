@@ -19,6 +19,7 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
   { to: "/about", label: "About" },
+  { to: "/studio/image/auto-edit", label: "Maluto AI" },
   { to: "/pricing", label: "Pricing" },
   { to: "/faq", label: "FAQs" },
   { to: "/security", label: "Security" },
@@ -44,6 +45,7 @@ export function Header() {
   const authLinksBase: NavItem[] = [
     { to: "/", label: "Home" },
     { to: "/studio", label: "Studio" },
+    { to: "/studio/image/auto-edit", label: "Maluto AI" },
     historyOrPlans,
     { to: "/dashboard", label: "Dashboard" },
   ];

@@ -1,15 +1,18 @@
 import { useEffect } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
 import { useAdsMasterEnabled } from "@/lib/site-settings";
+import { isAdRouteAllowed } from "@/config/ads";
 
 /**
  * Cleanup of disallowed ad-provider artifacts.
  * - Always strips AdSense / googlesyndication / doubleclick.
  * - Strips Monetag scripts that are NOT marked data-motio-allowed="1".
  * - When the user is ineligible (paid / admin / logged-out / master off /
- *   profile not loaded / auth loading), also strips our authorized IPP script.
+ *   profile not loaded / auth loading / excluded route), also strips our
+ *   authorized IPP script.
  * - Does NOT unregister service workers (blanket unregister was removed).
  * Static Direct Link ads are pure UI and require no scripts.
  */
@@ -57,15 +60,18 @@ function removeDisallowedAdScripts(stripAllowedMonetag: boolean) {
 export function AdPolicyGate() {
   const { user, profile, loading } = useAuth();
   const masterOn = useAdsMasterEnabled();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
     // Fail closed until auth + profile are known for a signed-in user
     const admin = isAdminEmail(profile?.email);
+    const routeOk = isAdRouteAllowed(pathname);
     const eligible =
       !loading &&
       masterOn &&
       !!user &&
       !!profile &&
+      routeOk &&
       shouldShowAds({
         plan: profile.plan,
         email: profile.email,
@@ -83,7 +89,7 @@ export function AdPolicyGate() {
       subtree: true,
     });
     return () => observer.disconnect();
-  }, [user, profile, loading, masterOn]);
+  }, [user, profile, loading, masterOn, pathname]);
 
   return null;
 }

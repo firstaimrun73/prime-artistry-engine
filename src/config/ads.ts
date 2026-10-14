@@ -11,6 +11,7 @@ export const ADS_CONFIG = {
    * Routes where ads must never appear.
    * Studios (except full /editor canvas), history, profile/dashboard may show
    * tasteful static Direct Link cards for free users only.
+   * Includes auth, pricing, checkout, billing, settings, security, password-reset.
    */
   excludedRoutes: [
     "/editor",
@@ -24,6 +25,9 @@ export const ADS_CONFIG = {
     "/settings",
     "/reset-password",
     "/admin",
+    "/security",
+    "/sign-up",
+    "/signup",
   ],
 } as const;
 
