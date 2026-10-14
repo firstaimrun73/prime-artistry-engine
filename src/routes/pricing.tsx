@@ -32,6 +32,33 @@ function formatPlanPrice(amount: number, currency: DisplayCurrency): string {
   return `${sym}${amount.toFixed(2)}`;
 }
 
+/** Concise differentiators so plans are easy to compare (not a full feature dump). */
+const PLAN_DIFFS: Record<
+  Exclude<PlanId, "free">,
+  { summary: string; unlocks: string[] }
+> = {
+  lite: {
+    summary: "Entry paid plan — Standard image & video, Song & Instrumental music.",
+    unlocks: ["Video Studio (Standard)", "No ads", "Watermark-free"],
+  },
+  plus: {
+    summary: "Best for daily creators — Auto Edit, Filters, all 6 music modes.",
+    unlocks: ["Maluto AI Auto Edit", "Filters · Cropmix", "All music modes · 90s"],
+  },
+  pro: {
+    summary: "Premium image & video + priority queue — most popular upgrade.",
+    unlocks: ["Image Premium", "Video Premium", "Priority · 120s music"],
+  },
+  studio: {
+    summary: "Ultra AI image path + higher concurrency for power users.",
+    unlocks: ["Image Ultra AI", "Higher concurrency", "Full toolset"],
+  },
+  business: {
+    summary: "Master Studio — max credits, IMAX/8K paths, chatbot access.",
+    unlocks: ["10k credits / mo", "IMAX · 8K Max", "Master Studio chat"],
+  },
+};
+
 function PricingPage() {
   const { profile } = useAuth();
   const { t } = useI18n();
@@ -110,6 +137,31 @@ function PricingPage() {
           ))}
         </div>
 
+        {/* Credit examples from server-side rules (not every generation costs the same). */}
+        <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-border bg-card/60 px-4 py-4 text-left sm:px-6">
+          <p className="text-sm font-semibold text-foreground">What credits buy (examples)</p>
+          <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground sm:text-sm">
+            <li>
+              <span className="font-medium text-foreground">Standard image:</span> text→image SD 20 · HD 25;
+              image→image SD 25 · HD 30; Circle add/remove 25
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Premium image:</span> T2I SD/HD/2K 25 / 30 / 35
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Ultra image:</span> T2I from 30 (SD) up to 50 (4K)
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Maluto AI Auto Edit:</span> 45–65 credits by quality
+              (SD/HD 45 · 2K 50 · 4K/8K 60 · 8K Max 65)
+            </li>
+            <li className="text-[11px] sm:text-xs">
+              Exact cost is quoted in the studio before you generate. Costs vary by mode, quality, and references —
+              not a flat per-generation rate.
+            </li>
+          </ul>
+        </div>
+
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visiblePlans.map((plan) => {
             const highlight = plan.id === PRICING_POPULAR_PLAN_ID;
@@ -117,18 +169,19 @@ function PricingPage() {
             const raw = DISPLAY_PRICES[plan.id]?.[currency];
             const priceLabel =
               typeof raw === "number" ? formatPlanPrice(raw, currency) : raw ?? "—";
+            const diff = PLAN_DIFFS[plan.id as Exclude<PlanId, "free">];
 
             return (
               <div
                 key={plan.id}
                 className={cn(
                   "relative flex flex-col rounded-2xl border bg-card p-6",
-                  highlight ? "border-primary shadow-md shadow-primary/10" : "border-border",
+                  highlight ? "border-primary shadow-md shadow-primary/10 ring-1 ring-primary/20" : "border-border",
                 )}
               >
                 {highlight && (
                   <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-                    Popular
+                    Popular · best fit
                   </span>
                 )}
                 <div className="flex items-center gap-2">
@@ -141,6 +194,21 @@ function PricingPage() {
                   <Coins className="h-4 w-4" />
                   {plan.credits.toLocaleString()} credits / month
                 </div>
+                {diff && (
+                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{diff.summary}</p>
+                )}
+                {diff && (
+                  <ul className="mt-3 flex flex-wrap gap-1.5">
+                    {diff.unlocks.map((u) => (
+                      <li
+                        key={u}
+                        className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary"
+                      >
+                        {u}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <ul className="mt-5 flex-1 space-y-2">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -150,7 +218,7 @@ function PricingPage() {
                   ))}
                 </ul>
                 <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
-                  <Check className="h-3.5 w-3.5" /> Watermark-free downloads
+                  <Check className="h-3.5 w-3.5" /> Watermark-free downloads · No ads
                 </p>
                 {isCurrent ? (
                   <Button className="mt-8 w-full" variant="outline" disabled style={{ marginTop: "auto" }}>
@@ -158,12 +226,13 @@ function PricingPage() {
                   </Button>
                 ) : (
                   <Button
-                    className="mt-8 w-full"
+                    className={cn("mt-8 w-full", highlight && "text-base font-semibold")}
                     variant={highlight ? "default" : "outline"}
+                    size={highlight ? "lg" : "default"}
                     onClick={() => selectPlan(plan.id)}
                     style={{ marginTop: "auto" }}
                   >
-                    {`Upgrade to ${plan.name}`}
+                    {highlight ? `Upgrade to ${plan.name} — recommended` : `Upgrade to ${plan.name}`}
                   </Button>
                 )}
               </div>
@@ -171,12 +240,37 @@ function PricingPage() {
           })}
         </div>
 
-        <div className="mx-auto mt-10 max-w-2xl space-y-3 text-center">
+        <div className="mx-auto mt-10 max-w-2xl space-y-3 rounded-2xl border border-border bg-muted/30 px-4 py-5 text-left sm:px-6">
+          <p className="text-sm font-semibold text-foreground">Credits, renewal & cancellation</p>
+          <ul className="space-y-2 text-xs text-muted-foreground sm:text-sm">
+            <li>
+              <span className="font-medium text-foreground">Monthly credits:</span> each paid plan adds its credit
+              allocation when the billing period starts. Credits are used for generation across Image, Video, Music,
+              and Maluto AI according to the quoted cost in the studio.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Renewal:</span> subscriptions renew about every 30 days
+              from purchase unless you cancel. Next billing date is shown on your subscription / dashboard after
+              checkout.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Cancellation:</span> turn off auto-renew anytime. You keep
+              plan benefits and remaining credits until the end of the paid period (no immediate lockout on cancel).
+            </li>
+            <li>
+              <span className="font-medium text-foreground">When credits run out:</span> generation is blocked until you
+              upgrade, wait for the next monthly allocation, or buy a credit top-up (where available). Your plan
+              features stay active for the billing period.
+            </li>
+          </ul>
+          <p className="pt-1 text-[11px] text-muted-foreground">
+            Secure checkout via Razorpay (INR) and PayPal (USD). Plan IDs and prices match server billing configuration.
+          </p>
+        </div>
+
+        <div className="mx-auto mt-6 max-w-2xl space-y-2 text-center">
           <p className="text-xs text-muted-foreground">
             *Master Studio supports the longest prompts on Motio2edit.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Secure checkout via Razorpay and PayPal.
           </p>
         </div>
       </div>
