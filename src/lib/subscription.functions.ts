@@ -58,11 +58,11 @@ const REFUND_WINDOW_HOURS = 24;
  */
 function planFromCreditsLocal(credits: number): string {
   const map: Record<number, string> = {
-    // Current monthly plan allocations
-    500: "lite",
-    1200: "plus",
-    3000: "pro",
-    8000: "studio",
+    // Current monthly plan allocations (must match PLAN_CREDITS / PLAN_PURCHASE)
+    350: "lite",
+    800: "plus",
+    2500: "pro",
+    5000: "studio",
     10000: "business", // Master Studio (internal id)
     // $0.0178 top-up packs (floor(USD / 0.0178))
     280: "topup",
@@ -71,11 +71,12 @@ function planFromCreditsLocal(credits: number): string {
     3089: "topup",
     6179: "topup",
     // Legacy plan / pack amounts still present in payment history
-    350: "lite",
+    500: "lite",
+    1200: "plus",
+    3000: "pro",
+    8000: "studio",
     750: "plus",
-    2500: "pro",
     2000: "pro",
-    5000: "studio",
     9_999_999: "business",
   };
   return map[credits] ?? "custom";
