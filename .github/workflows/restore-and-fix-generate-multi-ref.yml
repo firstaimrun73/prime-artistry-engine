@@ -1,0 +1,114 @@
+name: restore-and-fix-generate-multi-ref
+on:
+  workflow_dispatch:
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore base generate.functions.ts
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/444ed38ae4557c278a2ecc5906472127afbee93f/src/lib/generate.functions.ts" \
+            -o src/lib/generate.functions.ts
+          wc -c src/lib/generate.functions.ts
+      - name: Apply multi-ref surgical patch
+        run: |
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path("src/lib/generate.functions.ts")
+          t = p.read_text()
+          t2 = t
+          if "routeStandardImage" not in t2:
+              t2 = t2.replace(
+                  'import { executeStandardImage, quoteStandardCredits } from "@/lib/studio/image/standard";\nimport type { StandardImageMode } from "@/lib/studio/image/standard";',
+                  '''import {
+            executeStandardImage,
+            quoteStandardCredits,
+            routeStandardImage,
+            quoteAfterValidation,
+          } from "@/lib/studio/image/standard";
+          import type { StandardImageMode, StandardImageRequest } from "@/lib/studio/image/standard";'''
+              )
+          if "referenceImageUrls:" not in t2:
+              t2 = t2.replace(
+                  "imageUrls: z.array(z.string().url()).max(10).optional().nullable(),",
+                  '''imageUrls: z.array(z.string().url()).max(10).optional().nullable(),
+            referenceImageUrls: z.array(z.string().url()).max(10).optional().nullable(),
+            maskImageUrl: z.string().url().optional().nullable(),
+            aspectRatio: z.string().optional().nullable(),
+            strength: z.number().optional().nullable(),'''
+              )
+          broken_cost = '''        } else if (data.studioTier === "standard" || data.standardMode) {
+                    const mode = (data.standardMode as StandardImageMode) || "edit";
+                    cost = (quoteStandardCredits as any)(mode)?.credits ?? (quoteStandardCredits as any)(mode) ?? CREDIT_COST.image;
+                    if (typeof cost !== "number") cost = CREDIT_COST.image;
+                    standardCharge = cost;'''
+          fixed_cost = '''        } else if (data.studioTier === "standard" || data.standardMode) {
+                    const refs = ((data as any).referenceImageUrls || data.imageUrls || []).filter(Boolean) as string[];
+                    const standardRequest: StandardImageRequest = {
+                      prompt: data.prompt,
+                      imageUrl: data.imageUrl ?? undefined,
+                      referenceImageUrls: refs.filter((u) => u !== data.imageUrl),
+                      maskImageUrl: ((data as any).maskImageUrl || data.maskUrl) ?? undefined,
+                      imageQuality: data.imageQuality === "hd" or data.imageQuality === "sd" ? data.imageQuality : "sd",
+                      aspectRatio: (data as any).aspectRatio ?? undefined,
+                      strength: typeof (data as any).strength === "number" ? (data as any).strength : undefined,
+                      circleInstant: data.circleInstant ?? undefined,
+                    };
+                    const validated = routeStandardImage(standardRequest);
+                    if (!validated.ok) throw new Error(validated.error);
+                    const quote = quoteAfterValidation(validated);
+                    cost = quote.credits;
+                    standardCharge = cost;
+                    (data as any).__standardRequest = standardRequest;'''
+          # Fix the Python 'or' typo to JS ||
+          fixed_cost = fixed_cost.replace(' or ', ' || ')
+          if broken_cost in t2:
+              t2 = t2.replace(broken_cost, fixed_cost, 1)
+          else:
+              raise SystemExit("broken cost block not found")
+          broken_exec = '''        } else if (data.studioTier === "standard" || data.standardMode) {
+                    const result = await executeStandardImage({
+                      falKey,
+                      prompt: data.prompt,
+                      imageUrl: data.imageUrl ?? undefined,
+                      maskUrl: data.maskUrl ?? undefined,
+                      mode: (data.standardMode as StandardImageMode) || "edit",
+                      tags: data.tags ?? undefined,
+                    } as any);
+                    outputUrl = (result as any).outputUrl;
+                    providerSourceUrl = outputUrl;
+                    imageStudioMeta = { ...(imageStudioMeta || {}), ...(((result as any).meta as object) || {}) };'''
+          fixed_exec = '''        } else if (data.studioTier === "standard" || data.standardMode) {
+                    const standardRequest = (data as any).__standardRequest as StandardImageRequest;
+                    const result = await executeStandardImage(standardRequest, { falKey });
+                    outputUrl = result.outputUrl;
+                    providerSourceUrl = outputUrl;
+                    imageStudioMeta = {
+                      ...(imageStudioMeta || {}),
+                      mode: result.mode,
+                      model: result.model,
+                      credits: result.credits,
+                    };
+                    if (typeof result.credits === "number") standardCharge = result.credits;'''
+          if broken_exec in t2:
+              t2 = t2.replace(broken_exec, fixed_exec, 1)
+          else:
+              raise SystemExit("broken exec block not found")
+          p.write_text(t2)
+          print("patched bytes", len(t2))
+          assert "routeStandardImage" in t2
+          assert "referenceImageUrls:" in t2
+          assert "executeStandardImage(standardRequest, { falKey })" in t2
+          assert "(quoteStandardCredits as any)(mode)" not in t2
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          git status
+          git commit -m "fix(image): Standard multi-ref wiring — pass referenceImageUrls, quote before debit" || exit 0
+          git push
