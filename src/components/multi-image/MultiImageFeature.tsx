@@ -211,6 +211,7 @@ export function MultiImageFeature() {
             sourceKind: "image",
             referenceImageUrls: built.payload.referenceImageUrls,
             imageQuality: built.payload.imageQuality,
+            studioTier: "standard",
           },
         });
         if (res.outputUrl) results.push(res.outputUrl);
