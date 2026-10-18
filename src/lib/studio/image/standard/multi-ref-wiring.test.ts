@@ -11,6 +11,7 @@ import {
 import {
   isPremiumMultiGptCandidate,
   planPremiumMultiGptImage2,
+  validatePremiumImageRequest,
 } from "@/lib/studio/image/premium";
 import {
   isUltraMultiSeedreamCandidate,
@@ -69,6 +70,38 @@ describe("Standard multi-ref wiring", () => {
       assert.deepEqual(v5.referenceImageUrls, refs5);
     }
   });
+
+  it("single-image I2I still routes (no multi)", () => {
+    const v = routeStandardImage({
+      prompt: "restyle",
+      imageUrl: "https://cdn.example/only.png",
+      imageQuality: "hd",
+    });
+    assert.equal(v.ok, true);
+    if (v.ok) {
+      assert.equal(v.mode, "image_to_image");
+      assert.deepEqual(v.referenceImageUrls, []);
+    }
+  });
+
+  it("rejects more than 5 total images for Standard", () => {
+    const refs = Array.from({ length: 5 }, (_, i) => `https://cdn.example/r${i}.png`);
+    const v = routeStandardImage({
+      prompt: "too many",
+      imageUrl: "https://cdn.example/base.png",
+      referenceImageUrls: refs,
+    });
+    assert.equal(v.ok, false);
+  });
+
+  it("rejects invalid empty prompt", () => {
+    const v = routeStandardImage({
+      prompt: "   ",
+      imageUrl: "https://cdn.example/base.png",
+      referenceImageUrls: ["https://cdn.example/r1.png"],
+    });
+    assert.equal(v.ok, false);
+  });
 });
 
 describe("Premium multi GPT candidate + plan", () => {
@@ -112,6 +145,34 @@ describe("Premium multi GPT candidate + plan", () => {
       assert.equal(plan.step.body.quality, "low");
     }
   });
+
+  it("collectMultiReferenceUrls prefers primary then refs without dupes", () => {
+    const urls = collectMultiReferenceUrls("https://cdn.example/a.png", [
+      "https://cdn.example/a.png",
+      "https://cdn.example/b.png",
+    ]);
+    assert.deepEqual(urls, ["https://cdn.example/a.png", "https://cdn.example/b.png"]);
+  });
+
+  it("Premium single I2I still validates when only one image", () => {
+    const v = validatePremiumImageRequest({
+      prompt: "enhance",
+      imageUrl: "https://cdn.example/one.png",
+      imageQuality: "sd",
+    });
+    assert.equal(v.ok, true);
+    if (v.ok) assert.equal(v.mode, "image_to_image");
+  });
+
+  it("Premium single rejects multi refs with not_single", () => {
+    const v = validatePremiumImageRequest({
+      prompt: "merge",
+      imageUrl: "https://cdn.example/a.png",
+      referenceImageUrls: ["https://cdn.example/b.png"],
+    });
+    assert.equal(v.ok, false);
+    if (!v.ok) assert.equal(v.error, "not_single");
+  });
 });
 
 describe("Ultra multi Seedream candidate + validation", () => {
@@ -145,6 +206,19 @@ describe("Ultra multi Seedream candidate + validation", () => {
         "https://cdn.example/2.png",
         "https://cdn.example/3.png",
       ]);
+    }
+  });
+
+  it("Ultra single I2I still validates", () => {
+    const v = validateUltraImageRequest({
+      prompt: "upscale mood",
+      imageUrl: "https://cdn.example/solo.png",
+      imageQuality: "2k",
+    });
+    assert.equal(v.ok, true);
+    if (v.ok) {
+      assert.equal(v.mode, "image_to_image");
+      assert.equal(v.referenceCount, 1);
     }
   });
 });
