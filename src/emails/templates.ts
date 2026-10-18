@@ -2,6 +2,8 @@
  * Motio2edit branded emails — approved design (motio2edit-emails.html).
  * Image base: https://motio2edit.com/email/
  */
+import { DISPLAY_PRICES, PLAN_CREDITS, FREE_SIGNUP_CREDITS } from "@/lib/plans";
+
 export const EMAIL_IMAGE_BASE = "https://motio2edit.com/email/" as const;
 export type EmailResult = { subject: string; html: string };
 
@@ -11,20 +13,28 @@ export function fillTemplate(raw: string, vars: Record<string, string | number>)
   );
 }
 
-export const DEFAULT_PLAN_EMAIL_VARS: Record<string, string> = {
-  price_free: "Free",
-  price_lite: "$9",
-  price_plus: "$15",
-  price_pro: "$29",
-  price_studio: "$55",
-  credits_free: "40",
-  credits_lite: "500",
-  credits_plus: "1,200",
-  credits_pro: "3,000",
-  credits_studio: "8,000",
-  free_credits: "40",
-  plans_url: "https://motio2edit.com/pricing",
-};
+/** Canonical plan email vars from plans.ts — never hardcode stale prices. */
+export function buildDefaultPlanEmailVars(): Record<string, string> {
+  const fmt = (n: number) => n.toLocaleString("en-US");
+  return {
+    price_free: "Free",
+    price_lite: `$${DISPLAY_PRICES.lite.USD}`,
+    price_plus: `$${DISPLAY_PRICES.plus.USD}`,
+    price_pro: `$${DISPLAY_PRICES.pro.USD}`,
+    price_studio: `$${DISPLAY_PRICES.studio.USD}`,
+    price_business: `$${DISPLAY_PRICES.business.USD}`,
+    credits_free: fmt(FREE_SIGNUP_CREDITS),
+    credits_lite: fmt(PLAN_CREDITS.lite),
+    credits_plus: fmt(PLAN_CREDITS.plus),
+    credits_pro: fmt(PLAN_CREDITS.pro),
+    credits_studio: fmt(PLAN_CREDITS.studio),
+    credits_business: fmt(PLAN_CREDITS.business),
+    free_credits: fmt(FREE_SIGNUP_CREDITS),
+    plans_url: "https://motio2edit.com/pricing",
+  };
+}
+
+export const DEFAULT_PLAN_EMAIL_VARS: Record<string, string> = buildDefaultPlanEmailVars();
 
 const O = "#FF5A1F";
 const R = "#FF3B1F";
@@ -77,7 +87,8 @@ function pricingTable(): string {
     ["Lite", "Light creators", "lite", ""],
     ["Plus", "Regular use", "plus", ""],
     ["Pro", "Power users", "pro", "MOST POPULAR"],
-    ["Studio", "Full studio, max credits", "studio", "BEST VALUE"],
+    ["AI Studio", "Full studio", "studio", "BEST VALUE"],
+    ["Master Studio", "Maximum credits & tools", "business", ""],
   ];
   const parts = rows.map(([n, t, k, tag]) => {
     const tagHtml = tag
