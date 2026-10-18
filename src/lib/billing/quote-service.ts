@@ -193,13 +193,17 @@ export async function releaseReservation(
   if (quote.status === "released" || quote.status === "finalized") {
     return quote;
   }
-  if (quote.reservationTxId) {
+  // Capture then clear tx id so markFailed + second release cannot double-refund.
+  const txId = quote.reservationTxId;
+  if (txId) {
     const { error } = await admin.rpc("refund_credits", {
-      _transaction_id: quote.reservationTxId,
+      _transaction_id: txId,
       _user_id: quote.userId,
     });
     if (error) {
       console.error("[billing] releaseReservation failed", quote.quoteId, error.message);
+    } else {
+      quote.reservationTxId = undefined;
     }
   }
   quote.status = "released";
