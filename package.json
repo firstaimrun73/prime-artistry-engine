@@ -10,8 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "tsx --test src/lib/plan-purchase.sync.test.ts src/lib/billing/image-reservation.test.ts src/lib/studio/image/multi-ref-wiring.test.ts src/emails/plan-email-vars.test.ts src/lib/studio/image/standard/standard-router.test.ts",
-    "test:unit": "tsx --test src/lib/plan-purchase.sync.test.ts src/lib/billing/image-reservation.test.ts src/lib/studio/image/multi-ref-wiring.test.ts src/emails/plan-email-vars.test.ts src/lib/studio/image/standard/standard-router.test.ts"
+    "test": "tsx --test src/lib/plan-purchase.sync.test.ts src/lib/billing/image-reservation.test.ts src/lib/studio/image/multi-ref-wiring.test.ts src/lib/studio/image/standard/multi-ref-wiring.test.ts src/emails/plan-email-vars.test.ts src/lib/studio/image/standard/standard-router.test.ts",
+    "test:unit": "tsx --test src/lib/plan-purchase.sync.test.ts src/lib/billing/image-reservation.test.ts src/lib/studio/image/multi-ref-wiring.test.ts src/lib/studio/image/standard/multi-ref-wiring.test.ts src/emails/plan-email-vars.test.ts src/lib/studio/image/standard/standard-router.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
