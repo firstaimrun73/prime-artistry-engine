@@ -1,0 +1,1 @@
+{{FILE:/home/workdir/artifacts/multi-ref-wiring.test.ts}}
