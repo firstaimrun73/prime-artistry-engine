@@ -89,7 +89,6 @@ export function MultiImageFeature() {
     });
 
   const onFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Logic gate (not UI-only): Free never reaches here because of eligibility.allowed
     if (!eligibility.allowed) {
       toast.error(eligibility.reason ?? "Multi-Image requires a paid plan.");
       e.target.value = "";
@@ -199,7 +198,6 @@ export function MultiImageFeature() {
       }
       for (const w of built.warnings) toast.message(w);
 
-      // Existing server path: one output. Loop only if executable count > 1 becomes available later.
       const results: string[] = [];
       const runs = creditEstimate.executableOutputCount;
       for (let i = 0; i < runs; i++) {
@@ -211,6 +209,7 @@ export function MultiImageFeature() {
             sourceKind: "image",
             referenceImageUrls: built.payload.referenceImageUrls,
             imageQuality: built.payload.imageQuality,
+            studioTier: "standard",
           },
         });
         if (res.outputUrl) results.push(res.outputUrl);
@@ -227,7 +226,6 @@ export function MultiImageFeature() {
 
   return (
     <div className="space-y-6">
-      {/* 1. Input images */}
       <section className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           1. Input images
@@ -284,7 +282,6 @@ export function MultiImageFeature() {
         )}
       </section>
 
-      {/* 2. Output count */}
       <section className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           2. Output configuration
@@ -316,7 +313,6 @@ export function MultiImageFeature() {
         </p>
       </section>
 
-      {/* 3. Model */}
       <section className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           3. Model
@@ -344,7 +340,6 @@ export function MultiImageFeature() {
         </div>
       </section>
 
-      {/* 4. Quality */}
       <section className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           4. Quality
@@ -369,7 +364,6 @@ export function MultiImageFeature() {
         </div>
       </section>
 
-      {/* 5. Aspect (UI; edit path keeps source framing today) */}
       <section className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           5. Image size / aspect ratio
@@ -397,7 +391,6 @@ export function MultiImageFeature() {
         </p>
       </section>
 
-      {/* 6–7. Prompt */}
       <section className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           6. Prompt
@@ -413,7 +406,6 @@ export function MultiImageFeature() {
         <p className="text-[11px] text-muted-foreground">{prompt.length}/2000</p>
       </section>
 
-      {/* Credits + generate */}
       <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs">
         <div className="flex items-center gap-1.5 font-semibold">
           <Coins className="h-3.5 w-3.5 text-primary" />
