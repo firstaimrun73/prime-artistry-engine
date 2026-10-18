@@ -2,7 +2,7 @@
  * Generation + plan server functions.
  * completeCheckout lives in checkout.functions (free-plan switch).
  * Restored so Vite resolves generateMedia (main had see_artifact placeholder).
- * Handler body from last READY preview build of this branch (ddb744c0).
+ * Handler: image reserve lifecycle + multi-ref wiring (Standard/Premium/Ultra).
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -23,8 +23,10 @@ import {
   markGenerating,
   finalizeQuote,
   markFailed,
+  createGenerationQuote,
   type GenerationQuote,
 } from "@/lib/billing";
+import { collectMultiReferenceUrls } from "@/lib/studio/image/gpt-image-2";
 import { buildVideoFromRegistry } from "@/lib/video-fal-step";
 import { computeImageExperienceCredits } from "@/lib/studio/image/image-experience-credits";
 import { isAdminClaims } from "@/lib/admin-guard.server";
@@ -188,6 +190,7 @@ export const generateMedia = createServerFn({ method: "POST" })
 
     let cost = 0;
     let reservedVideoQuote: GenerationQuote | null = null;
+    let reservedImageQuote: GenerationQuote | null = null;
     let standardCharge: number | null = null;
     let circleAddHistoryMeta: Record<string, unknown> | null = null;
     let imageStudioMeta: Record<string, unknown> | null =
@@ -282,10 +285,39 @@ export const generateMedia = createServerFn({ method: "POST" })
           standardCharge = cost;
           (data as any).__standardRequest = standardRequest;
         } else if (data.studioTier === "pro") {
-          cost = (computeImageExperienceCredits as any)("pro", multiUrls.length > 1) ?? CREDIT_COST.image;
-          if (typeof cost === "object") cost = (cost as any).credits ?? CREDIT_COST.image;
+          const refList = ((data as any).referenceImageUrls || data.imageUrls || []).filter(
+            (u: unknown) => typeof u === "string" && (u as string).startsWith("https://"),
+          ) as string[];
+          (data as any).__proRefs = refList;
+          const multiCand = isPremiumMultiGptCandidate({
+            studioTier: data.studioTier,
+            imageUrl: data.imageUrl,
+            referenceImageUrls: refList,
+            maskImageUrl: ((data as any).maskImageUrl || data.maskUrl) ?? undefined,
+            circleInstant: data.circleInstant ?? undefined,
+          });
+          if (multiCand) {
+            const planned = planPremiumMultiGptImage2({
+              prompt: data.prompt,
+              imageUrl: data.imageUrl ?? undefined,
+              referenceImageUrls: refList,
+              imageQuality: data.imageQuality ?? undefined,
+              aspectRatio: (data as any).aspectRatio ?? undefined,
+            });
+            if (!planned.ok) throw new Error(planned.error);
+            cost = planned.credits;
+            standardCharge = cost;
+            (data as any).__premiumMultiPlanned = planned;
+          } else {
+            cost = (computeImageExperienceCredits as any)("pro", refList.length >= 1) ?? CREDIT_COST.image;
+            if (typeof cost === "object") cost = (cost as any).credits ?? CREDIT_COST.image;
+          }
         } else if (data.studioTier === "premium") {
-          cost = (computeImageExperienceCredits as any)("premium", multiUrls.length > 1) ?? CREDIT_COST.image;
+          const refList = ((data as any).referenceImageUrls || data.imageUrls || []).filter(
+            (u: unknown) => typeof u === "string" && (u as string).startsWith("https://"),
+          ) as string[];
+          (data as any).__ultraRefs = refList;
+          cost = (computeImageExperienceCredits as any)("premium", refList.length >= 1 || !!data.imageUrl) ?? CREDIT_COST.image;
           if (typeof cost === "object") cost = (cost as any).credits ?? CREDIT_COST.image;
         } else {
           cost = CREDIT_COST.image;
@@ -295,12 +327,28 @@ export const generateMedia = createServerFn({ method: "POST" })
           throw new Error(`Not enough credits (need ${cost}, have ${credits}).`);
         }
 
+        // Reserve before provider; release once on failure (no early non-releasable debit).
         if (!isAdmin && cost > 0) {
-          const { error: debitErr } = await supabase.rpc("debit_credits", {
-            p_user_id: userId,
-            p_amount: cost,
+          const product =
+            data.studioTier === "pro"
+              ? "image_premium"
+              : data.studioTier === "premium"
+                ? "image_ultra"
+                : "image_standard";
+          const imageQuote = createGenerationQuote({
+            userId,
+            product,
+            operation: "image_generate",
+            provider: "fal",
+            modelId: String(data.studioTier || "standard"),
+            endpoint: "fal.image",
+            providerCogsUsd: 0.01,
+            metadata: { studioTier: data.studioTier ?? "standard", quotedCredits: cost },
           });
-          if (debitErr) throw new Error(debitErr.message || "Credit debit failed");
+          imageQuote.customerCredits = cost;
+          await reserveCreditsForQuote(supabase, imageQuote, credits);
+          reservedImageQuote = imageQuote;
+          markGenerating(imageQuote);
         }
 
         if (isCircleAdd) {
@@ -324,31 +372,60 @@ export const generateMedia = createServerFn({ method: "POST" })
           };
           if (typeof result.credits === "number") standardCharge = result.credits;
         } else if (data.studioTier === "pro") {
-          const result = await executePremiumImage({
-            falKey,
-            prompt: data.prompt,
-            imageUrls: data.imageUrl ? [data.imageUrl] : multiUrls,
-          } as any);
-          outputUrl = (result as any).outputUrl;
-          providerSourceUrl = outputUrl;
+          const planned = (data as any).__premiumMultiPlanned as
+            | { ok: true; step: any; credits: number; imageUrls: string[] }
+            | undefined;
+          if (planned?.ok) {
+            outputUrl = await runFal(planned.step as any, falKey);
+            providerSourceUrl = outputUrl;
+            standardCharge = planned.credits;
+            imageStudioMeta = {
+              ...(imageStudioMeta || {}),
+              mode: "reference_images",
+              referenceCount: planned.imageUrls.length,
+              credits: planned.credits,
+            };
+          } else {
+            const refList = ((data as any).__proRefs || []) as string[];
+            const ordered = collectMultiReferenceUrls(data.imageUrl, refList);
+            const result = await executePremiumImage({
+              falKey,
+              prompt: data.prompt,
+              imageUrl: data.imageUrl ?? undefined,
+              referenceImageUrls: refList,
+              imageUrls: ordered.length ? ordered : undefined,
+              imageQuality: data.imageQuality ?? undefined,
+              aspectRatio: (data as any).aspectRatio ?? undefined,
+            } as any);
+            outputUrl = (result as any).outputUrl;
+            providerSourceUrl = outputUrl;
+            if (typeof (result as any).credits === "number") standardCharge = (result as any).credits;
+          }
         } else if (data.studioTier === "premium") {
+          const refList = ((data as any).__ultraRefs || []) as string[];
+          const ordered = collectMultiReferenceUrls(data.imageUrl, refList);
           const result = await executeUltraImage({
             falKey,
             prompt: data.prompt,
             imageUrl: data.imageUrl ?? undefined,
-            imageUrls: multiUrls.length ? multiUrls : undefined,
+            referenceImageUrls: refList,
+            imageUrls: ordered.length ? ordered : undefined,
+            imageQuality: data.imageQuality ?? undefined,
+            aspectRatio: (data as any).aspectRatio ?? undefined,
           } as any);
           outputUrl = (result as any).outputUrl;
           providerSourceUrl = outputUrl;
         } else if (hasMask && data.imageUrl && data.maskUrl) {
-          const result = await executeStandardImage({
-            falKey,
-            prompt: data.prompt,
-            imageUrl: data.imageUrl,
-            maskUrl: data.maskUrl,
-            mode: "remove",
-          } as any);
-          outputUrl = (result as any).outputUrl;
+          const result = await executeStandardImage(
+            {
+              prompt: data.prompt,
+              imageUrl: data.imageUrl,
+              maskImageUrl: data.maskUrl,
+              circleInstant: true,
+            } as any,
+            { falKey },
+          );
+          outputUrl = result.outputUrl;
           providerSourceUrl = outputUrl;
         } else if (data.imageUrl) {
           const step = buildImageEdit({ imageUrl: data.imageUrl, prompt: data.prompt } as any);
@@ -358,6 +435,12 @@ export const generateMedia = createServerFn({ method: "POST" })
           const step = buildFalRequest({ type: "image", prompt: data.prompt } as any);
           outputUrl = await runFal(step as any, falKey);
           providerSourceUrl = outputUrl;
+        }
+
+        if (reservedImageQuote) {
+          finalizeQuote(reservedImageQuote, {
+            finalCredits: standardCharge ?? cost,
+          });
         }
       }
 
@@ -418,6 +501,14 @@ export const generateMedia = createServerFn({ method: "POST" })
         sourceMediaUrl: providerSourceUrl || null,
       };
     } catch (err) {
+      if (reservedImageQuote) {
+        try {
+          await releaseReservation(supabase, reservedImageQuote);
+          markFailed(reservedImageQuote);
+        } catch (relErr) {
+          console.error("[generate] image reservation release failed:", relErr);
+        }
+      }
       if (reservedVideoQuote) {
         try {
           await releaseReservation(supabase, reservedVideoQuote);
