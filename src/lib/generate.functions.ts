@@ -1,1 +1,1 @@
-{{FILE:/home/workdir/artifacts/generate.functions.ts}}
+see_file
