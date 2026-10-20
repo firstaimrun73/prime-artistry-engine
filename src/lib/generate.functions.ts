@@ -38,6 +38,7 @@ import {
   quoteAfterValidation,
 } from "@/lib/studio/image/standard";
 import type { StandardImageMode, StandardImageRequest } from "@/lib/studio/image/standard";
+import { buildLegacyMaskEditRequest } from "@/lib/studio/image/standard/legacy-mask";
 import {
   executePremiumImage,
   planPremiumMultiGptImage2,
@@ -105,6 +106,7 @@ async function runFal(step: FalStep, falKey: string): Promise<string> {
   const responseUrl = submitJson.response_url;
   if (!statusUrl || !responseUrl) throw new Error(`${step.label}: missing status/response URL`);
 
+  let completed = false;
   for (let i = 0; i < 120; i++) {
     await sleep(i < 5 ? 1000 : 2000);
     const st = await fetch(statusUrl, {
@@ -118,10 +120,16 @@ async function runFal(step: FalStep, falKey: string): Promise<string> {
     } catch {
       continue;
     }
-    if (stJson.status === "COMPLETED") break;
+    if (stJson.status === "COMPLETED") {
+      completed = true;
+      break;
+    }
     if (stJson.status === "FAILED" || stJson.status === "CANCELLED") {
       throw new Error(`${step.label} ${stJson.status}`);
     }
+  }
+  if (!completed) {
+    throw new Error(`${step.label}: timed out waiting for provider (${120} status polls)`);
   }
 
   const res = await fetch(responseUrl, {
@@ -378,15 +386,24 @@ export const generateMedia = createServerFn({ method: "POST" })
           outputUrl = (result as any).outputUrl;
           providerSourceUrl = outputUrl;
         } else if (hasMask && data.imageUrl && data.maskUrl) {
-          const result = await executeStandardImage({
-            falKey,
+          // Legacy mask fallback (no studioTier). Route via Standard validation:
+          // circleInstant true (default) → erase; explicit false → fill.
+          const maskRequest = buildLegacyMaskEditRequest({
             prompt: data.prompt,
             imageUrl: data.imageUrl,
-            maskUrl: data.maskUrl,
-            mode: "remove",
-          } as any);
-          outputUrl = (result as any).outputUrl;
+            maskUrl: ((data as { maskImageUrl?: string | null }).maskImageUrl || data.maskUrl) as string,
+            circleInstant: data.circleInstant,
+          });
+          const result = await executeStandardImage(maskRequest, { falKey });
+          outputUrl = result.outputUrl;
           providerSourceUrl = outputUrl;
+          imageStudioMeta = {
+            ...(imageStudioMeta || {}),
+            mode: result.mode,
+            model: result.model,
+            credits: result.credits,
+            source: "legacy-mask",
+          };
         } else if (data.imageUrl) {
           const step = buildImageEdit({ imageUrl: data.imageUrl, prompt: data.prompt } as any);
           outputUrl = await runFal(step as any, falKey);
