@@ -3,7 +3,9 @@
     {
       "path": "src/lib/generate.functions.ts",
       "prefix": "genfix",
-      "parts": 6
+      "parts": 18,
+      "expected_bytes": 23816,
+      "expected_md5": "cd50ecaf9c05e0bd792c20e0cd995f6c"
     }
   ]
 }

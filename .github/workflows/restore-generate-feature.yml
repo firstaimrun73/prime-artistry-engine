@@ -1,0 +1,62 @@
+name: Restore generate.functions on feature branch
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/backend-image-billing-kontext-standard
+    paths:
+      - ".restore/genfix.part*.b64"
+      - ".restore/manifest.json"
+      - ".github/workflows/restore-generate-feature.yml"
+concurrency:
+  group: restore-generate-feature
+  cancel-in-progress: true
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/backend-image-billing-kontext-standard
+          fetch-depth: 0
+      - name: Reassemble and verify generate.functions.ts
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import base64, json, hashlib
+          from pathlib import Path
+          manifest = json.loads(Path(".restore/manifest.json").read_text())
+          item = manifest["items"][0]
+          assert item["path"] == "src/lib/generate.functions.ts"
+          b64 = ""
+          for i in range(item["parts"]):
+              p = Path(f".restore/{item['prefix']}.part{i}.b64")
+              assert p.exists(), p
+              b64 += p.read_text().strip()
+          data = base64.b64decode(b64)
+          assert len(data) == item["expected_bytes"], (len(data), item["expected_bytes"])
+          md5 = hashlib.md5(data).hexdigest()
+          assert md5 == item["expected_md5"], (md5, item["expected_md5"])
+          text = data.decode()
+          assert "PLACEHOLDER" not in text
+          assert "LOADING_FROM_FILE" not in text
+          assert "export const generateMedia" in text
+          assert "export const getMyPlan" in text
+          assert "deduct_credits" in text
+          assert "reservedVideoQuote = null" in text
+          Path("src/lib/generate.functions.ts").write_bytes(data)
+          print("restored", len(data), md5)
+          PY
+      - name: Commit restored file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          if git diff --cached --quiet; then
+            echo "no changes"
+            exit 0
+          fi
+          git commit -m "fix(billing): restore generate.functions.ts after corruption"
+          git push origin HEAD:fix/backend-image-billing-kontext-standard
