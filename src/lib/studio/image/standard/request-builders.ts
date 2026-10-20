@@ -3,10 +3,9 @@
  * Never reorder multi-image URLs. Never drop the source image for I2I.
  * enhance_prompt is always false — do not silently rewrite user prompts.
  *
- * Multi (2+ images) → GPT Image 2 edit @ quality low only.
+ * Multi (2+ images) → fal-ai/flux-pro/kontext/max/multi (not GPT Image 2).
  */
 
-import { buildGptImage2MultiStep } from "@/lib/studio/image/gpt-image-2";
 import {
   classifyEdit,
   classifyEditSize,
@@ -27,7 +26,7 @@ export const STANDARD_I2I_IDENTITY_PRESERVATION =
   "Preserve the exact identity of every person in the source image: same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair. Do not replace, redesign, or invent faces. Only change the specific thing requested by the user. If the user explicitly requests a face/expression change, keep the same person's identity and change only that requested attribute.";
 
 /**
- * Identity rule for Standard multi-image (GPT Image 2): image 1 is the base person/source.
+ * Identity rule for Standard multi-reference (Kontext max/multi): image 1 is the base person/source.
  */
 export const STANDARD_MULTI_IDENTITY_PRESERVATION =
   "Image 1 is the base/source person. Preserve the identity and face of every person in image 1 (same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair). References may influence the requested object, outfit, style, or other attributes only. Never copy a different person's face from a reference onto the base person unless the user explicitly asks for a face or identity replacement. Keep all unrequested subjects and scene details unchanged as much as possible.";
@@ -170,15 +169,20 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
 }
 
 /**
- * Multi: image_urls = [base, ref1, ref2, ...] in exact upload order.
- * GPT Image 2 quality hard-locked to low.
+ * Multi-reference: image_urls = [base, ref1, ref2, ...] in exact upload order.
+ * Provider: fal-ai/flux-pro/kontext/max/multi (Standard only — not GPT Image 2).
  * Prompt includes base-person identity protection so references cannot replace faces.
  */
 export function buildMultiImageStep(req: StandardValidationOk): StandardFalStep {
-  if (!req.imageUrl) {
-    throw new Error("Multiple Image requires a base image.");
+  if (!req.imageUrl || !req.imageUrl.startsWith("https://")) {
+    throw new Error("Multiple Image requires a valid HTTPS base image.");
   }
   const refs = req.referenceImageUrls;
+  for (const u of refs) {
+    if (!u.startsWith("https://")) {
+      throw new Error("Multiple Image requires HTTPS reference image URLs.");
+    }
+  }
   const image_urls = [req.imageUrl, ...refs];
   if (image_urls.length < 2 || image_urls.length > 5) {
     throw new Error("Multiple Image requires 2–5 total images.");
@@ -186,19 +190,21 @@ export function buildMultiImageStep(req: StandardValidationOk): StandardFalStep 
 
   const userPrompt = req.prompt.trim();
   const promptWithIdentity = `${userPrompt}\n\n${STANDARD_MULTI_IDENTITY_PRESERVATION}`;
-
-  const step = buildGptImage2MultiStep({
-    prompt: promptWithIdentity,
-    imageUrls: image_urls,
-    outputClass: req.imageQuality === "hd" ? "hd" : "sd",
-    aspectRatio: req.aspectRatio,
-    experience: "standard",
-  });
+  // Slightly higher guidance for multi so reference attributes are applied while identity holds.
+  const guidance_scale = 3.8;
 
   return {
-    label: step.label,
-    model: step.model,
-    body: step.body as Record<string, unknown>,
+    label: `standard multi-ref kontext-max (${image_urls.length} imgs) ${req.imageQuality === "hd" ? "HD" : "SD"}`,
+    model: STANDARD_MODELS.multiImageToImage,
+    body: {
+      prompt: promptWithIdentity,
+      image_urls,
+      guidance_scale,
+      num_images: 1,
+      output_format: "png",
+      safety_tolerance: "2",
+      enhance_prompt: false,
+    },
   };
 }
 
