@@ -22,6 +22,10 @@ import {
   type BillingConfig,
 } from "./types";
 import { providerCogsToCustomerCredits } from "./customer-pricing";
+import {
+  parseDeductCreditsResponse,
+  parseRefundCreditsResponse,
+} from "./image-debit-refund";
 
 const quoteStore = new Map<string, GenerationQuote>();
 const idempotencyIndex = new Map<string, string>();
@@ -161,8 +165,9 @@ export async function reserveCreditsForQuote(
     _user_id: quote.userId,
   });
 
-  if (error) {
-    if (error.message?.includes("INSUFFICIENT_CREDITS")) {
+  const parsed = parseDeductCreditsResponse(data, error);
+  if (!parsed.ok) {
+    if (error?.message?.includes("INSUFFICIENT_CREDITS") || parsed.reason.includes("INSUFFICIENT")) {
       const err = new Error("INSUFFICIENT_CREDITS") as Error & {
         details: InsufficientCreditsError;
       };
@@ -175,12 +180,15 @@ export async function reserveCreditsForQuote(
       };
       throw err;
     }
-    throw new Error(`RESERVE_FAILED:${error.message}`);
+    throw new Error(
+      parsed.untraceableDebit
+        ? `RESERVE_UNTRACEABLE:${parsed.reason}`
+        : `RESERVE_FAILED:${parsed.reason}`,
+    );
   }
 
-  const result = data as { transaction_id?: string; credits?: number } | null;
   quote.status = "reserved";
-  quote.reservationTxId = result?.transaction_id;
+  quote.reservationTxId = parsed.transactionId;
   quoteStore.set(quote.quoteId, quote);
   return quote;
 }
@@ -194,12 +202,21 @@ export async function releaseReservation(
     return quote;
   }
   if (quote.reservationTxId) {
-    const { error } = await admin.rpc("refund_credits", {
+    const { data, error } = await admin.rpc("refund_credits", {
       _transaction_id: quote.reservationTxId,
       _user_id: quote.userId,
     });
-    if (error) {
-      console.error("[billing] releaseReservation failed", quote.quoteId, error.message);
+    const refundParsed = parseRefundCreditsResponse(data, error);
+    if (!refundParsed.ok) {
+      console.error(
+        "[billing] releaseReservation refund unconfirmed",
+        quote.quoteId,
+        quote.reservationTxId,
+        refundParsed.reason,
+      );
+      throw new Error(
+        `REFUND_UNCONFIRMED:${refundParsed.reason}:tx=${quote.reservationTxId}`,
+      );
     }
   }
   quote.status = "released";
@@ -273,7 +290,7 @@ export function expireStaleQuotes(nowMs: number = Date.now()): GenerationQuote[]
     if (q.status === "quoted" || q.status === "reserved") {
       if (new Date(q.expiresAt).getTime() < nowMs) {
         q.status = "expired";
-        quoteStore.set(q.quoteId, q);
+        quoteStore.set(quoteId, q);
         expired.push(q);
       }
     }
