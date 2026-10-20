@@ -3,10 +3,9 @@
  * Never reorder multi-image URLs. Never drop the source image for I2I.
  * enhance_prompt is always false — do not silently rewrite user prompts.
  *
- * Multi (2+ images) → GPT Image 2 edit @ quality low only.
+ * Multi (2+ images) → fal-ai/flux-pro/kontext/max/multi (not GPT Image 2).
  */
 
-import { buildGptImage2MultiStep } from "@/lib/studio/image/gpt-image-2";
 import {
   classifyEdit,
   classifyEditSize,
@@ -27,7 +26,7 @@ export const STANDARD_I2I_IDENTITY_PRESERVATION =
   "Preserve the exact identity of every person in the source image: same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair. Do not replace, redesign, or invent faces. Only change the specific thing requested by the user. If the user explicitly requests a face/expression change, keep the same person's identity and change only that requested attribute.";
 
 /**
- * Identity rule for Standard multi-image (GPT Image 2): image 1 is the base person/source.
+ * Identity rule for Standard multi-reference (Kontext max/multi): image 1 is the base person/source.
  */
 export const STANDARD_MULTI_IDENTITY_PRESERVATION =
   "Image 1 is the base/source person. Preserve the identity and face of every person in image 1 (same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair). References may influence the requested object, outfit, style, or other attributes only. Never copy a different person's face from a reference onto the base person unless the user explicitly asks for a face or identity replacement. Keep all unrequested subjects and scene details unchanged as much as possible.";
@@ -67,13 +66,11 @@ export function isStandardEnhanceIntent(prompt: string): boolean {
   const editSize = classifyEditSize(p);
   const editType = classifyEdit(p);
 
-  // Never steal restore / outfit / removal / background as "enhance"
   if (editSize === "restore" || editType === "restore") return false;
   if (editSize === "outfit" || editType === "outfit") return false;
   if (editSize === "remove_people" || editType === "removal") return false;
   if (editSize === "background" || editType === "background") return false;
 
-  // Face-primary edits stay face unless user also asked to sharpen explicitly
   if ((editSize === "face_fix" || editType === "portrait") && !isExplicitSharpenIntent(p)) {
     return false;
   }
@@ -88,11 +85,9 @@ function buildStandardI2ICorePrompt(raw: string): string {
   const editType = classifyEdit(raw);
   const enhanceIntent = isStandardEnhanceIntent(raw);
 
-  // Restoration must be active — not a preserve-only no-op.
   if (editSize === "restore" || editType === "restore") {
     return `${raw}\n\n${STANDARD_RESTORE_INSTRUCTION}`;
   }
-  // Semantic edits first so enhance does not swallow outfit/bg/face/remove
   if (editSize === "outfit" || editType === "outfit") {
     return `${raw}\n\n${STANDARD_OUTFIT_INSTRUCTION}`;
   }
@@ -112,7 +107,6 @@ function buildStandardI2ICorePrompt(raw: string): string {
     return `${raw}\n\n${STANDARD_COLOR_INSTRUCTION}`;
   }
 
-  // Generic edit: keep mild framing if the user did not use an action verb.
   if (/\b(edit|enhance|sharpen|brighten|clear|fix|improve|make|change|remove|add|restore|repair)\b/i.test(raw)) {
     return raw;
   }
@@ -151,7 +145,6 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
   const core = buildStandardI2ICorePrompt(raw);
   const prompt = `${core}\n\n${STANDARD_I2I_IDENTITY_PRESERVATION}`;
   const enhanceIntent = isStandardEnhanceIntent(raw);
-  // Slightly higher guidance so sharpen/enhance instructions are followed more strongly.
   const guidance_scale = enhanceIntent ? 4.2 : 3.5;
 
   return {
@@ -171,14 +164,19 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
 
 /**
  * Multi: image_urls = [base, ref1, ref2, ...] in exact upload order.
- * GPT Image 2 quality hard-locked to low.
+ * Provider: fal-ai/flux-pro/kontext/max/multi.
  * Prompt includes base-person identity protection so references cannot replace faces.
  */
 export function buildMultiImageStep(req: StandardValidationOk): StandardFalStep {
-  if (!req.imageUrl) {
-    throw new Error("Multiple Image requires a base image.");
+  if (!req.imageUrl || !req.imageUrl.startsWith("https://")) {
+    throw new Error("Multiple Image requires a valid HTTPS base image.");
   }
   const refs = req.referenceImageUrls;
+  for (const u of refs) {
+    if (!u.startsWith("https://")) {
+      throw new Error("Multiple Image requires HTTPS reference image URLs.");
+    }
+  }
   const image_urls = [req.imageUrl, ...refs];
   if (image_urls.length < 2 || image_urls.length > 5) {
     throw new Error("Multiple Image requires 2–5 total images.");
@@ -186,19 +184,20 @@ export function buildMultiImageStep(req: StandardValidationOk): StandardFalStep 
 
   const userPrompt = req.prompt.trim();
   const promptWithIdentity = `${userPrompt}\n\n${STANDARD_MULTI_IDENTITY_PRESERVATION}`;
-
-  const step = buildGptImage2MultiStep({
-    prompt: promptWithIdentity,
-    imageUrls: image_urls,
-    outputClass: req.imageQuality === "hd" ? "hd" : "sd",
-    aspectRatio: req.aspectRatio,
-    experience: "standard",
-  });
+  const guidance_scale = 3.8;
 
   return {
-    label: step.label,
-    model: step.model,
-    body: step.body as Record<string, unknown>,
+    label: `standard multi-ref kontext-max (${image_urls.length} imgs) ${req.imageQuality === "hd" ? "HD" : "SD"}`,
+    model: STANDARD_MODELS.multiImageToImage,
+    body: {
+      prompt: promptWithIdentity,
+      image_urls,
+      guidance_scale,
+      num_images: 1,
+      output_format: "png",
+      safety_tolerance: "2",
+      enhance_prompt: false,
+    },
   };
 }
 
@@ -235,7 +234,6 @@ export function buildCircleAddStep(req: StandardValidationOk): StandardFalStep {
     throw new Error("Circle add requires original image and mask.");
   }
   const userPrompt = (req.prompt || "").trim();
-  // Keep prompt focused on WHAT to put in the white region; WHERE is the mask.
   const prompt = userPrompt
     ? userPrompt
     : "Fill the white masked region with exactly one realistic object that fits the scene. Leave every black pixel unchanged.";
