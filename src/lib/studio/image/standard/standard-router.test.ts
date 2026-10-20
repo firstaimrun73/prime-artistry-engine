@@ -20,7 +20,7 @@ import {
   STANDARD_FACE_EDIT_INSTRUCTION,
 } from "./request-builders";
 import { STANDARD_MODELS } from "./models";
-import { GPT_IMAGE_2_EDIT_MODEL, quoteGptImage2MultiCredits } from "@/lib/studio/image/gpt-image-2";
+import { quoteGptImage2MultiCredits } from "@/lib/studio/image/gpt-image-2";
 import type { StandardValidationOk } from "./types";
 
 describe("normalizeOrderedRefs", () => {
@@ -65,7 +65,7 @@ describe("validateStandardImageRequest", () => {
     }
   });
 
-  it("1 ref only stays image_to_image (never GPT Image 2)", () => {
+  it("1 ref only stays image_to_image (never multi model)", () => {
     const r = validateStandardImageRequest({
       prompt: "edit",
       imageUrl: "https://cdn.example/base.png",
@@ -153,7 +153,7 @@ describe("quoteStandardCredits", () => {
     );
   });
 
-  it("multi GPT Image 2 SD/HD table by total image count", () => {
+  it("multi Kontext SD/HD table by total image count", () => {
     assert.equal(
       quoteStandardCredits({ mode: "multi_image_to_image", referenceCount: 2, imageQuality: "sd" }).credits,
       30,
@@ -236,8 +236,9 @@ describe("buildStandardStep models", () => {
       ],
       imageQuality: "sd",
     } as StandardValidationOk);
-    assert.equal(multi.model, GPT_IMAGE_2_EDIT_MODEL);
-    assert.equal(multi.body.quality, "low");
+    assert.equal(multi.model, STANDARD_MODELS.multiImageToImage);
+    assert.equal(multi.body.enhance_prompt, false);
+    assert.ok(Array.isArray(multi.body.image_urls));
     assert.deepEqual(multi.body.image_urls, [
       "https://cdn.example/base.png",
       "https://cdn.example/r1.png",
@@ -410,8 +411,8 @@ describe("Standard multi-image identity + order", () => {
       "https://cdn.example/jacket.png",
       "https://cdn.example/style.png",
     ]);
-    assert.equal(step.body.quality, "low");
-    assert.equal(step.model, GPT_IMAGE_2_EDIT_MODEL);
+    assert.equal(step.body.enhance_prompt, false);
+    assert.equal(step.model, STANDARD_MODELS.multiImageToImage);
 
     const prompt = String(step.body.prompt);
     assert.ok(
