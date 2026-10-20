@@ -4,23 +4,22 @@
  * T2I SD  → fal-ai/flux-2/klein/4b
  * T2I HD  → fal-ai/flux-2/klein/9b
  * Single I2I → fal-ai/flux-pro/kontext (instruction edit; preserves scene)
- * Multi (2–5 total images) → openai/gpt-image-2/edit @ quality low only
+ * Multi (2–5 total images) → fal-ai/flux-pro/kontext/max/multi
  *
- * Never route Standard through Schnell, Seedream, or Ultra.
+ * Never route Standard through GPT Image 2, Schnell, Seedream, or Ultra.
  * Single I2I uses Kontext (not Flux Dev style-transfer).
+ * Multi uses Kontext max/multi only (distinct from Premium multi GPT path).
  */
 
-import { GPT_IMAGE_2_EDIT_MODEL } from "@/lib/studio/image/gpt-image-2";
-
 export const STANDARD_MODELS = {
-  /** T2I SD (\~0.25 MP target via image_size presets). */
+  /** T2I SD (~0.25 MP target via image_size presets). */
   textToImageSd: "fal-ai/flux-2/klein/4b",
-  /** T2I HD (\~1 MP target via image_size presets). */
+  /** T2I HD (~1 MP target via image_size presets). */
   textToImageHd: "fal-ai/flux-2/klein/9b",
   /** Single-image instruction edit only (never multi). FLUX.1 Kontext [pro]. */
   imageToImage: "fal-ai/flux-pro/kontext",
-  /** Multi-reference only (2–5 total images). Never for 0–1 image. */
-  multiImageToImage: GPT_IMAGE_2_EDIT_MODEL,
+  /** Multi-reference only (2–5 total images). FLUX.1 Kontext [max] multi. */
+  multiImageToImage: "fal-ai/flux-pro/kontext/max/multi",
   circleToRemove: "fal-ai/flux-pro/v1/erase",
   /** Circle Add — mask-native fill (WHITE=edit). Sibling of erase; not flux-general. */
   circleToAdd: "fal-ai/flux-pro/v1/fill",
@@ -39,7 +38,7 @@ export function standardTextToImageModel(
 
 /**
  * image_size presets for Flux 2 Klein T2I.
- * SD → smaller presets (\~0.25 MP class); HD → larger presets (\~1 MP class).
+ * SD → smaller presets (~0.25 MP class); HD → larger presets (~1 MP class).
  * Uses only documented fal image_size enum strings.
  */
 export function kleinImageSize(
