@@ -8,12 +8,9 @@
  * Circle to Add: 25 flat
  *
  * Aspect ratio = 0 additional credits.
+ * Amounts are product-locked; model change (Kontext multi) does not change quotes.
  */
 
-import {
-  quoteGptImage2MultiCredits,
-  type GptImage2OutputClass,
-} from "@/lib/studio/image/gpt-image-2";
 import type { StandardCreditQuote, StandardImageMode, StandardImageQuality } from "./types";
 
 export const STANDARD_CREDITS = {
@@ -29,6 +26,14 @@ export const STANDARD_CREDITS = {
   circleToRemove: 25,
   circleToAdd: 25,
 } as const;
+
+/** Total images (primary + refs) → SD base credits. HD = base + 5. */
+const MULTI_SD: Record<number, number> = {
+  2: 30,
+  3: 35,
+  4: 35,
+  5: 40,
+};
 
 export function quoteStandardCredits(opts: {
   mode: StandardImageMode;
@@ -74,16 +79,18 @@ export function quoteStandardCredits(opts: {
     };
   }
 
+  // multi_image_to_image
   const n = Math.max(0, opts.referenceCount ?? 0);
-  const outputClass: GptImage2OutputClass = opts.imageQuality === "hd" ? "hd" : "sd";
-  const q = quoteGptImage2MultiCredits({
-    experience: "standard",
-    referenceCount: n,
-    outputClass,
-  });
+  if (n < 2 || n > 5) {
+    throw new Error(`Standard multi-reference accepts 2–5 images (got ${n}).`);
+  }
+  const base = MULTI_SD[n];
+  if (base == null) throw new Error(`No Standard multi credit row for ${n} images.`);
+  const hd = opts.imageQuality === "hd";
+  const credits = hd ? base + 5 : base;
   return {
-    credits: q.credits,
+    credits,
     mode,
-    breakdown: q.breakdown,
+    breakdown: `Standard multi Kontext (${n} imgs, ${hd ? "HD" : "SD"}) ${credits}`,
   };
 }
