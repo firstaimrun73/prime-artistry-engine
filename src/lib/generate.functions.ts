@@ -229,22 +229,33 @@ export const generateMedia = createServerFn({ method: "POST" })
           throw new Error(`4K video is limited to ${MAX_4K_DURATION_SEC}s.`);
         }
 
-        const quote = await quoteVideoGeneration({
-          supabase,
+        const videoQuoteResult = quoteVideoGeneration({
           userId,
-          plan,
           mode: (data.videoMode as VideoGenMode) || "text-to-video",
           productMode: (data.videoProductMode as VideoProductMode) || "standard",
           resolution: (data.videoResolution as VideoResolution) || "720p",
           aspect: (data.videoAspect as VideoAspect) || "16:9",
           durationSec: duration,
-          generateAudio: !!data.videoGenerateAudio,
-        } as any);
-        cost = (quote as any).credits ?? (quote as any).displayCredits ?? 0;
+          audio: !!data.videoGenerateAudio,
+        });
+        if (!videoQuoteResult.ok) {
+          throw new Error(videoQuoteResult.message);
+        }
+        const videoQuote = videoQuoteResult.quote;
+        cost = videoQuote.customerCredits;
         if (!isAdmin) {
-          await reserveCreditsForQuote(supabase, quote as any);
-          reservedVideoQuote = quote as any;
-          markGenerating(quote as any);
+          if (credits < cost) {
+            throw new Error(`Not enough credits (need ${cost}, have ${credits}).`);
+          }
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const reserved = await reserveCreditsForQuote(supabaseAdmin, videoQuote, credits);
+          if (!reserved.reservationTxId) {
+            throw new Error("Video credit reservation missing transaction_id");
+          }
+          reservedVideoQuote = reserved;
+          markGenerating(reserved);
+        } else {
+          reservedVideoQuote = videoQuote;
         }
 
         const route = selectApprovedVideoRoute({
@@ -265,8 +276,10 @@ export const generateMedia = createServerFn({ method: "POST" })
         outputUrl = await runFal(step as any, falKey);
         providerSourceUrl = outputUrl;
 
-        if (reservedVideoQuote) {
-          await finalizeQuote(supabase, reservedVideoQuote, { outputUrl } as any);
+        if (reservedVideoQuote && !isAdmin) {
+          finalizeQuote(reservedVideoQuote, {
+            finalCredits: reservedVideoQuote.customerCredits,
+          });
         }
       } else {
         const multiUrls = (data.imageUrls || []).filter(Boolean) as string[];
@@ -315,9 +328,6 @@ export const generateMedia = createServerFn({ method: "POST" })
           throw new Error(`Not enough credits (need ${cost}, have ${credits}).`);
         }
 
-        // Reserve credits BEFORE provider call (atomic deduct). Refund on failure.
-        // Matches verified public.deduct_credits / refund_credits contract (service_role).
-        // A successful debit without a valid transaction_id is treated as failure (untraceable).
         if (!isAdmin && cost > 0) {
           const genType = data.studioTier
             ? `image_${data.studioTier}`
@@ -367,7 +377,6 @@ export const generateMedia = createServerFn({ method: "POST" })
             model: result.model,
             credits: result.credits,
           };
-          // Authoritative charge is pre-execution `cost` / standardCharge — do not override from result.
         } else if (data.studioTier === "pro") {
           const result = await executePremiumImage({
             falKey,
@@ -386,8 +395,6 @@ export const generateMedia = createServerFn({ method: "POST" })
           outputUrl = (result as any).outputUrl;
           providerSourceUrl = outputUrl;
         } else if (hasMask && data.imageUrl && data.maskUrl) {
-          // Legacy mask fallback (no studioTier). Route via Standard validation:
-          // circleInstant true (default) → erase; explicit false → fill.
           const maskRequest = buildLegacyMaskEditRequest({
             prompt: data.prompt,
             imageUrl: data.imageUrl,
@@ -415,14 +422,12 @@ export const generateMedia = createServerFn({ method: "POST" })
         }
       }
 
-      // Image credits already reserved. Require real output URL.
       if (data.type === "image") {
         if (!outputUrl || !String(outputUrl).startsWith("https://")) {
           throw new Error(
             "Generation produced no valid output URL. Reserved credits will be refunded.",
           );
         }
-        // Success: charge stands. Clear reservation so catch must not refund.
         imageReservationTxId = null;
       }
 
@@ -462,8 +467,11 @@ export const generateMedia = createServerFn({ method: "POST" })
                     : data.studioTier;
           }
         }
+        const { supabaseAdmin: historyAdmin } = await import(
+          "@/integrations/supabase/client.server"
+        );
         await persistGenerationHistory({
-          supabaseAdmin: supabase,
+          supabaseAdmin: historyAdmin,
           userId,
           type: data.type === "video" ? "video" : "image",
           prompt: data.prompt,
@@ -483,12 +491,23 @@ export const generateMedia = createServerFn({ method: "POST" })
         sourceMediaUrl: providerSourceUrl || null,
       };
     } catch (err) {
-      if (reservedVideoQuote) {
+      if (reservedVideoQuote && !isAdmin) {
         try {
-          await releaseReservation(supabase, reservedVideoQuote);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await releaseReservation(supabaseAdmin, reservedVideoQuote);
           markFailed(reservedVideoQuote);
-        } catch {
-          /* ignore */
+        } catch (releaseErr) {
+          console.error(
+            "[generate] CRITICAL video releaseReservation failed",
+            reservedVideoQuote.quoteId,
+            reservedVideoQuote.reservationTxId,
+            releaseErr,
+          );
+          const base = err instanceof Error ? err.message : String(err);
+          const tx = reservedVideoQuote.reservationTxId ?? "unknown";
+          throw new Error(
+            `${base} Additionally, video credit refund could not be confirmed (tx ${tx}). Contact support.`,
+          );
         }
       }
       if (
