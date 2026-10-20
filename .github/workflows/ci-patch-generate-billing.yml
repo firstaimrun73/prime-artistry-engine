@@ -1,6 +1,12 @@
 name: ci-patch-generate-billing
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/standard-kontext-multi-billing
+    paths:
+      - ".restore/TRIGGER_BILLING_PATCH"
+      - ".github/workflows/ci-patch-generate-billing.yml"
 jobs:
   patch:
     runs-on: ubuntu-latest
@@ -11,6 +17,7 @@ jobs:
         with:
           ref: fix/standard-kontext-multi-billing
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore main baseline and apply billing patches
         run: |
           set -euo pipefail
@@ -28,14 +35,12 @@ jobs:
           assert len(t.encode()) > 15000
           assert "export const generateMedia" in t
           assert "PLACEHOLDER" not in t
-
           old_vars = "    let cost = 0;\n    let reservedVideoQuote: GenerationQuote | null = null;"
           new_vars = old_vars + "\n    let imageReservationTxId: string | null = null;"
           if "let imageReservationTxId" not in t:
               if old_vars not in t:
                   raise SystemExit("PRECONDITION FAIL: vars block")
               t = t.replace(old_vars, new_vars, 1)
-
           old_debit = (
               "        if (!isAdmin && cost > 0) {\n"
               "          const { error: debitErr } = await supabase.rpc(\"debit_credits\", {\n"
@@ -67,7 +72,6 @@ jobs:
               if old_debit not in t:
                   raise SystemExit("PRECONDITION FAIL: debit block")
               t = t.replace(old_debit, new_debit, 1)
-
           old_catch = (
               "    } catch (err) {\n"
               "      if (reservedVideoQuote) {\n"
@@ -112,7 +116,6 @@ jobs:
               if old_catch not in t:
                   raise SystemExit("PRECONDITION FAIL: catch block")
               t = t.replace(old_catch, new_catch, 1)
-
           old_std = (
               "          const result = await executeStandardImage(standardRequest, { falKey });\n"
               "          outputUrl = result.outputUrl;\n"
@@ -130,7 +133,6 @@ jobs:
               if old_std not in t:
                   raise SystemExit("PRECONDITION FAIL: standard execute block")
               t = t.replace(old_std, new_std, 1)
-
           if "debit_credits" in t:
               raise SystemExit("POSTCONDITION FAIL: debit_credits remains")
           if "deduct_credits" not in t or "refund_credits" not in t:
