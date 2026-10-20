@@ -1,0 +1,46 @@
+name: Restore generate.functions on kontext-billing branch
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/standard-kontext-multi-billing
+    paths:
+      - ".restore/gf_fix.half0.txt"
+      - ".restore/gf_fix.half1.txt"
+      - ".github/workflows/restore-gf-kontext-billing.yml"
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/standard-kontext-multi-billing
+      - name: Decompress and restore generate.functions.ts
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import base64, zlib
+          from pathlib import Path
+          h0 = Path(".restore/gf_fix.half0.txt").read_text().strip()
+          h1 = Path(".restore/gf_fix.half1.txt").read_text().strip()
+          data = zlib.decompress(base64.b64decode(h0 + h1))
+          text = data.decode()
+          assert "deduct_credits" in text
+          assert "debit_credits" not in text
+          assert "export const generateMedia" in text
+          assert "export const getMyPlan" in text
+          assert "PLACEHOLDER" not in text
+          assert len(data) > 18000
+          Path("src/lib/generate.functions.ts").write_bytes(data)
+          print("restored", len(data))
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          git diff --cached --quiet && echo "no changes" && exit 0
+          git commit -m "fix(billing): restore complete generate.functions.ts (deduct_credits + refund)"
+          git push origin HEAD:fix/standard-kontext-multi-billing
