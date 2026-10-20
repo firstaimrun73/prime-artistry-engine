@@ -383,6 +383,7 @@ export const generateMedia = createServerFn({ method: "POST" })
             prompt: data.prompt,
             imageUrl: data.imageUrl,
             maskUrl: data.maskUrl,
+            mode: "remove",
           } as any);
           outputUrl = (result as any).outputUrl;
           providerSourceUrl = outputUrl;
