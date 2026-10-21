@@ -1,0 +1,34 @@
+name: ci-patch-refund-response
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/backend-generation-billing-safety
+    paths:
+      - ".restore/TRIGGER_REFUND_RESPONSE"
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/backend-generation-billing-safety
+          fetch-depth: 0
+      - name: Patch image refund response handling
+        run: |
+          set -euo pipefail
+          python3 scripts/patch-refund-response.py
+          test "$(wc -c < src/lib/generate.functions.ts)" -gt 18000
+          grep -q already_refunded_or_missing src/lib/generate.functions.ts
+          grep -q "image refund confirmed" src/lib/generate.functions.ts
+          ! grep -q PLACEHOLDER src/lib/generate.functions.ts
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "fix(billing): distinguish refunded true/false in image catch path"
+          git push origin HEAD:fix/backend-generation-billing-safety

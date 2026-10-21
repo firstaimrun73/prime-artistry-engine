@@ -1,0 +1,36 @@
+name: ci-patch-generation-billing-safety
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/backend-generation-billing-safety
+    paths:
+      - ".restore/TRIGGER_GENERATION_BILLING_SAFETY"
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/backend-generation-billing-safety
+          fetch-depth: 0
+      - name: Patch generate.functions.ts
+        run: |
+          set -euo pipefail
+          python3 scripts/patch-generation-billing-safety.py
+          test "$(wc -c < src/lib/generate.functions.ts)" -gt 18000
+          grep -q export src/lib/generate.functions.ts
+          grep -q quoteResult.ok src/lib/generate.functions.ts
+          grep -q "timed out waiting for provider" src/lib/generate.functions.ts
+          grep -q deduct_credits src/lib/generate.functions.ts
+          ! grep -q debit_credits src/lib/generate.functions.ts
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts
+          if git diff --cached --quiet; then echo no-changes; exit 0; fi
+          git commit -m "fix(billing): correct video quote contract and runFal timeout"
+          git push origin HEAD:fix/backend-generation-billing-safety

@@ -1,0 +1,9 @@
+name: disabled-recovery-helper
+on:
+  workflow_dispatch:
+jobs:
+  blocked:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail closed
+        run: echo "Recovery workflow disabled — protects generate.functions.ts" && exit 1

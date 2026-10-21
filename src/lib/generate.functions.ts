@@ -95,6 +95,7 @@ async function runFal(step: FalStep, falKey: string): Promise<string> {
   const responseUrl = submitJson.response_url;
   if (!statusUrl || !responseUrl) throw new Error(`${step.label}: missing status/response URL`);
 
+  let completed = false;
   for (let i = 0; i < 120; i++) {
     await sleep(i < 5 ? 1000 : 2000);
     const st = await fetch(statusUrl, {
@@ -108,10 +109,16 @@ async function runFal(step: FalStep, falKey: string): Promise<string> {
     } catch {
       continue;
     }
-    if (stJson.status === "COMPLETED") break;
+    if (stJson.status === "COMPLETED") {
+      completed = true;
+      break;
+    }
     if (stJson.status === "FAILED" || stJson.status === "CANCELLED") {
       throw new Error(`${step.label} ${stJson.status}`);
     }
+  }
+  if (!completed) {
+    throw new Error(`${step.label}: timed out waiting for provider (120 status polls)`);
   }
 
   const res = await fetch(responseUrl, {
@@ -188,6 +195,7 @@ export const generateMedia = createServerFn({ method: "POST" })
 
     let cost = 0;
     let reservedVideoQuote: GenerationQuote | null = null;
+    let imageReservationTxId: string | null = null;
     let standardCharge: number | null = null;
     let circleAddHistoryMeta: Record<string, unknown> | null = null;
     let imageStudioMeta: Record<string, unknown> | null =
@@ -209,22 +217,28 @@ export const generateMedia = createServerFn({ method: "POST" })
           throw new Error(`4K video is limited to ${MAX_4K_DURATION_SEC}s.`);
         }
 
-        const quote = await quoteVideoGeneration({
-          supabase,
+        const quoteResult = quoteVideoGeneration({
           userId,
-          plan,
           mode: (data.videoMode as VideoGenMode) || "text-to-video",
           productMode: (data.videoProductMode as VideoProductMode) || "standard",
           resolution: (data.videoResolution as VideoResolution) || "720p",
           aspect: (data.videoAspect as VideoAspect) || "16:9",
           durationSec: duration,
-          generateAudio: !!data.videoGenerateAudio,
-        } as any);
-        cost = (quote as any).credits ?? (quote as any).displayCredits ?? 0;
-        if (!isAdmin) {
-          await reserveCreditsForQuote(supabase, quote as any);
-          reservedVideoQuote = quote as any;
-          markGenerating(quote as any);
+          audio: !!data.videoGenerateAudio,
+        });
+        if (!quoteResult.ok) {
+          throw new Error(quoteResult.message);
+        }
+        const videoQuote = quoteResult.quote;
+        cost = quoteResult.displayCredits;
+        if (!isAdmin && cost > 0) {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          reservedVideoQuote = await reserveCreditsForQuote(
+            supabaseAdmin,
+            videoQuote,
+            credits,
+          );
+          markGenerating(reservedVideoQuote);
         }
 
         const route = selectApprovedVideoRoute({
@@ -246,7 +260,10 @@ export const generateMedia = createServerFn({ method: "POST" })
         providerSourceUrl = outputUrl;
 
         if (reservedVideoQuote) {
-          await finalizeQuote(supabase, reservedVideoQuote, { outputUrl } as any);
+          finalizeQuote(reservedVideoQuote, {
+            finalCredits: reservedVideoQuote.customerCredits,
+          });
+          reservedVideoQuote = null;
         }
       } else {
         const multiUrls = (data.imageUrls || []).filter(Boolean) as string[];
@@ -296,11 +313,20 @@ export const generateMedia = createServerFn({ method: "POST" })
         }
 
         if (!isAdmin && cost > 0) {
-          const { error: debitErr } = await supabase.rpc("debit_credits", {
-            p_user_id: userId,
-            p_amount: cost,
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const genType = data.type === "video" ? "video" : "image";
+          const { data: debitData, error: debitErr } = await supabaseAdmin.rpc("deduct_credits", {
+            _amount: cost,
+            _gen_type: genType,
+            _user_id: userId,
           });
           if (debitErr) throw new Error(debitErr.message || "Credit debit failed");
+          const txId =
+            debitData && typeof debitData === "object" && "transaction_id" in (debitData as object)
+              ? String((debitData as { transaction_id?: unknown }).transaction_id || "")
+              : "";
+          if (!txId) throw new Error("Credit debit did not return a transaction_id");
+          imageReservationTxId = txId;
         }
 
         if (isCircleAdd) {
@@ -315,6 +341,9 @@ export const generateMedia = createServerFn({ method: "POST" })
           const standardRequest = (data as any).__standardRequest as StandardImageRequest;
           const result = await executeStandardImage(standardRequest, { falKey });
           outputUrl = result.outputUrl;
+          if (data.imageUrl && outputUrl === data.imageUrl) {
+            throw new Error("Image edit returned the original image unchanged. Credits will be refunded.");
+          }
           providerSourceUrl = outputUrl;
           imageStudioMeta = {
             ...(imageStudioMeta || {}),
@@ -420,10 +449,49 @@ export const generateMedia = createServerFn({ method: "POST" })
     } catch (err) {
       if (reservedVideoQuote) {
         try {
-          await releaseReservation(supabase, reservedVideoQuote);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await releaseReservation(supabaseAdmin, reservedVideoQuote);
           markFailed(reservedVideoQuote);
         } catch {
           /* ignore */
+        }
+      }
+      if (imageReservationTxId) {
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: refundData, error: refundErr } = await supabaseAdmin.rpc("refund_credits", {
+            _transaction_id: imageReservationTxId,
+            _user_id: userId,
+          });
+          if (refundErr) {
+            console.error(
+              "[generate] CRITICAL image refund_credits RPC error",
+              { tx: imageReservationTxId, userId, message: refundErr.message },
+            );
+          } else {
+            const refunded =
+              refundData &&
+              typeof refundData === "object" &&
+              (refundData as { refunded?: unknown }).refunded === true;
+            if (refunded) {
+              console.info("[generate] image refund confirmed", { tx: imageReservationTxId });
+            } else {
+              console.error(
+                "[generate] CRITICAL image refund_credits not confirmed",
+                {
+                  tx: imageReservationTxId,
+                  userId,
+                  refundData,
+                  reason: "already_refunded_or_missing",
+                },
+              );
+            }
+          }
+        } catch (refundThrow) {
+          console.error("[generate] CRITICAL image refund_credits threw", {
+            tx: imageReservationTxId,
+            err: refundThrow,
+          });
         }
       }
       throw err;

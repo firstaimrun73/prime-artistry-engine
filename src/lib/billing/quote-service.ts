@@ -112,7 +112,7 @@ export function isInsufficientCredits(
     code: "INSUFFICIENT_CREDITS",
     requiredCredits: required,
     availableCredits: available,
-    shortfall: required - available,
+    shortfall: Math.max(0, required - available),
     quoteId,
   };
 }
@@ -194,12 +194,29 @@ export async function releaseReservation(
     return quote;
   }
   if (quote.reservationTxId) {
-    const { error } = await admin.rpc("refund_credits", {
+    const { data, error } = await admin.rpc("refund_credits", {
       _transaction_id: quote.reservationTxId,
       _user_id: quote.userId,
     });
     if (error) {
-      console.error("[billing] releaseReservation failed", quote.quoteId, error.message);
+      console.error("[billing] releaseReservation RPC error — not marking released", {
+        quoteId: quote.quoteId,
+        tx: quote.reservationTxId,
+        message: error.message,
+      });
+      // Do not mark released: caller may retry or escalate reconciliation.
+      throw new Error(`RELEASE_REFUND_FAILED:${error.message}`);
+    }
+    const refunded =
+      data && typeof data === "object" && (data as { refunded?: unknown }).refunded === true;
+    if (!refunded) {
+      // { refunded: false } = already refunded or no matching debit (idempotent OK).
+      console.warn("[billing] releaseReservation refund not newly applied", {
+        quoteId: quote.quoteId,
+        tx: quote.reservationTxId,
+        reason: "already_refunded_or_missing",
+        data,
+      });
     }
   }
   quote.status = "released";

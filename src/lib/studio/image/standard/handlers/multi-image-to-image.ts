@@ -1,10 +1,12 @@
 import { buildMultiImageStep } from "../request-builders";
 import type { StandardExecuteInput, StandardExecuteResult } from "../types";
 import { quoteStandardCredits } from "../credits";
+import { STANDARD_MODELS } from "../models";
 
 /**
  * Preserves reference order: [base, ref#1, ref#2, …].
- * Requires 2–5 total images (base + refs). GPT Image 2 LOW only.
+ * Requires 2–5 total images (base + refs).
+ * Provider: fal-ai/flux-pro/kontext/max/multi (Standard multi-reference only).
  */
 export async function handleMultiImageToImage(
   input: StandardExecuteInput,
@@ -21,6 +23,9 @@ export async function handleMultiImageToImage(
     throw new Error("Multiple Image requires a base image.");
   }
   const step = buildMultiImageStep(input);
+  if (step.model !== STANDARD_MODELS.multiImageToImage) {
+    throw new Error("Standard multi must use Kontext max/multi. Credits not charged.");
+  }
   const urls = step.body.image_urls as string[] | undefined;
   if (!urls || urls[0] !== input.imageUrl) {
     throw new Error("Multi-image request lost base image order.");
@@ -29,9 +34,6 @@ export async function handleMultiImageToImage(
     if (urls[i + 1] !== input.referenceImageUrls[i]) {
       throw new Error("Multi-image reference order was altered. Credits not charged.");
     }
-  }
-  if (step.body.quality !== "low") {
-    throw new Error("GPT Image 2 multi path must use quality low. Credits not charged.");
   }
   const outputUrl = await input.runStep(step);
   if (!outputUrl) throw new Error("Multiple Image returned no output.");
