@@ -95,6 +95,7 @@ async function runFal(step: FalStep, falKey: string): Promise<string> {
   const responseUrl = submitJson.response_url;
   if (!statusUrl || !responseUrl) throw new Error(`${step.label}: missing status/response URL`);
 
+  let completed = false;
   for (let i = 0; i < 120; i++) {
     await sleep(i < 5 ? 1000 : 2000);
     const st = await fetch(statusUrl, {
@@ -108,10 +109,16 @@ async function runFal(step: FalStep, falKey: string): Promise<string> {
     } catch {
       continue;
     }
-    if (stJson.status === "COMPLETED") break;
+    if (stJson.status === "COMPLETED") {
+      completed = true;
+      break;
+    }
     if (stJson.status === "FAILED" || stJson.status === "CANCELLED") {
       throw new Error(`${step.label} ${stJson.status}`);
     }
+  }
+  if (!completed) {
+    throw new Error(`${step.label}: timed out waiting for provider (120 status polls)`);
   }
 
   const res = await fetch(responseUrl, {
@@ -210,22 +217,28 @@ export const generateMedia = createServerFn({ method: "POST" })
           throw new Error(`4K video is limited to ${MAX_4K_DURATION_SEC}s.`);
         }
 
-        const quote = await quoteVideoGeneration({
-          supabase,
+        const quoteResult = quoteVideoGeneration({
           userId,
-          plan,
           mode: (data.videoMode as VideoGenMode) || "text-to-video",
           productMode: (data.videoProductMode as VideoProductMode) || "standard",
           resolution: (data.videoResolution as VideoResolution) || "720p",
           aspect: (data.videoAspect as VideoAspect) || "16:9",
           durationSec: duration,
-          generateAudio: !!data.videoGenerateAudio,
-        } as any);
-        cost = (quote as any).credits ?? (quote as any).displayCredits ?? 0;
-        if (!isAdmin) {
-          await reserveCreditsForQuote(supabase, quote as any);
-          reservedVideoQuote = quote as any;
-          markGenerating(quote as any);
+          audio: !!data.videoGenerateAudio,
+        });
+        if (!quoteResult.ok) {
+          throw new Error(quoteResult.message);
+        }
+        const videoQuote = quoteResult.quote;
+        cost = quoteResult.displayCredits;
+        if (!isAdmin && cost > 0) {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          reservedVideoQuote = await reserveCreditsForQuote(
+            supabaseAdmin,
+            videoQuote,
+            credits,
+          );
+          markGenerating(reservedVideoQuote);
         }
 
         const route = selectApprovedVideoRoute({
@@ -247,7 +260,10 @@ export const generateMedia = createServerFn({ method: "POST" })
         providerSourceUrl = outputUrl;
 
         if (reservedVideoQuote) {
-          await finalizeQuote(supabase, reservedVideoQuote, { outputUrl } as any);
+          finalizeQuote(reservedVideoQuote, {
+            finalCredits: reservedVideoQuote.customerCredits,
+          });
+          reservedVideoQuote = null;
         }
       } else {
         const multiUrls = (data.imageUrls || []).filter(Boolean) as string[];
@@ -433,7 +449,8 @@ export const generateMedia = createServerFn({ method: "POST" })
     } catch (err) {
       if (reservedVideoQuote) {
         try {
-          await releaseReservation(supabase, reservedVideoQuote);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          await releaseReservation(supabaseAdmin, reservedVideoQuote);
           markFailed(reservedVideoQuote);
         } catch {
           /* ignore */
