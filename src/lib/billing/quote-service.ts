@@ -1,28 +1,37 @@
 /**
- * Quote service — in-memory generation quotes with credit reservation.
- * Reservations use deduct_credits via service_role admin client.
- * releaseReservation refunds only when a reservationTxId exists and
- * does not mark released if the refund RPC errors.
+ * Generation quote + reservation lifecycle.
+ *
+ * Flow:
+ *   quote → check balance → reserve (atomic debit) → generate → finalize
+ *   OR on failure → release (refund)
+ *
+ * Uses existing deduct_credits / refund_credits RPCs (service_role).
+ * No schema migration required for Phase C scaffold.
+ *
+ * Idempotency: same idempotencyKey returns the same in-flight quote.
+ * Atomic concurrency: deduct_credits updates only when credits >= amount.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
-import type {
-  BillingConfig,
-  GenerationQuote,
-  InsufficientCreditsError,
-  QuoteRequest,
-  QuoteStatus,
+import { randomUUID } from "node:crypto";
+import {
+  DEFAULT_BILLING_CONFIG,
+  type GenerationQuote,
+  type QuoteRequest,
+  type QuoteStatus,
+  type InsufficientCreditsError,
+  type BillingConfig,
 } from "./types";
-import { DEFAULT_BILLING_CONFIG } from "./types";
-
-type SupabaseAdmin = SupabaseClient<Database>;
+import { providerCogsToCustomerCredits } from "./customer-pricing";
 
 const quoteStore = new Map<string, GenerationQuote>();
 const idempotencyIndex = new Map<string, string>();
 
-function newQuoteId(): string {
-  return `q_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function expiresAt(ttlSec: number) {
+  return new Date(Date.now() + ttlSec * 1000).toISOString();
 }
 
 export function createGenerationQuote(
@@ -33,19 +42,20 @@ export function createGenerationQuote(
     const existingId = idempotencyIndex.get(`${req.userId}:${req.idempotencyKey}`);
     if (existingId) {
       const existing = quoteStore.get(existingId);
-      if (existing && existing.status !== "expired" && existing.status !== "failed") {
+      if (existing && existing.status !== "expired" && existing.status !== "released") {
         return existing;
       }
     }
   }
 
-  const customerCredits =
-    req.customerCreditsOverride ??
-    Math.max(1, Math.ceil(req.providerCogsUsd * (config.markupMultiplier ?? 1)));
+  const pricing = providerCogsToCustomerCredits(
+    req.providerCogsUsd,
+    req.product,
+    config,
+  );
 
-  const now = Date.now();
   const quote: GenerationQuote = {
-    quoteId: newQuoteId(),
+    quoteId: randomUUID(),
     userId: req.userId,
     product: req.product,
     operation: req.operation,
@@ -57,13 +67,17 @@ export function createGenerationQuote(
     resolution: req.resolution,
     aspectRatio: req.aspectRatio,
     audio: req.audio,
-    providerCogsUsd: req.providerCogsUsd,
-    customerCredits,
+    providerCogsUsd: pricing.providerCogsUsd,
+    customerCredits: pricing.customerCredits,
+    pricingVersion: pricing.pricingVersion,
+    createdAt: nowIso(),
+    expiresAt: expiresAt(config.quoteTtlSeconds),
     status: "quoted",
-    createdAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + (config.quoteTtlMs ?? 120_000)).toISOString(),
     idempotencyKey: req.idempotencyKey,
-    metadata: req.metadata,
+    metadata: {
+      ...req.metadata,
+      pricingBreakdown: pricing.breakdown,
+    },
   };
 
   quoteStore.set(quote.quoteId, quote);
@@ -89,19 +103,26 @@ export function assertQuoteOwned(quote: GenerationQuote, userId: string): void {
 }
 
 export function isInsufficientCredits(
-  availableCredits: number,
-  requiredCredits: number,
+  available: number,
+  required: number,
   quoteId?: string,
 ): InsufficientCreditsError | null {
-  if (availableCredits >= requiredCredits) return null;
+  if (available >= required) return null;
   return {
     code: "INSUFFICIENT_CREDITS",
-    requiredCredits,
-    availableCredits,
-    shortfall: Math.max(0, requiredCredits - availableCredits),
+    requiredCredits: required,
+    availableCredits: available,
+    shortfall: Math.max(0, required - available),
     quoteId,
   };
 }
+
+type SupabaseAdmin = {
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+};
 
 export async function reserveCreditsForQuote(
   admin: SupabaseAdmin,
@@ -133,6 +154,7 @@ export async function reserveCreditsForQuote(
     return quote;
   }
 
+  // Atomic: only succeeds when profiles.credits >= amount (no negative balance).
   const { data, error } = await admin.rpc("deduct_credits", {
     _amount: quote.customerCredits,
     _gen_type: `${quote.product}_reservation`,
