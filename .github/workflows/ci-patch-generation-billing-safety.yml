@@ -1,0 +1,63 @@
+name: ci-patch-generation-billing-safety
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/backend-generation-billing-safety
+    paths:
+      - ".restore/TRIGGER_GENERATION_BILLING_SAFETY"
+      - "scripts/patch-generation-billing-safety.py"
+      - ".github/workflows/ci-patch-generation-billing-safety.yml"
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/backend-generation-billing-safety
+          fetch-depth: 0
+      - name: Apply surgical video + timeout patches
+        run: |
+          set -euo pipefail
+          python3 scripts/patch-generation-billing-safety.py
+          ! grep -q 'PLACEHOLDER\|LOADING_FROM_FILE' src/lib/generate.functions.ts
+          grep -q 'export const generateMedia' src/lib/generate.functions.ts
+          grep -q 'quoteResult.ok' src/lib/generate.functions.ts
+          grep -q 'timed out waiting for provider' src/lib/generate.functions.ts
+          grep -q 'deduct_credits' src/lib/generate.functions.ts
+          ! grep -q 'debit_credits' src/lib/generate.functions.ts
+          test "$(wc -c < src/lib/generate.functions.ts)" -gt 18000
+      - name: Disable destructive recovery workflows on this branch
+        run: |
+          set -euo pipefail
+          for f in \
+            .github/workflows/ci-patch-generate-billing.yml \
+            .github/workflows/restore-gf-kontext-billing.yml \
+            .github/workflows/restore-gf6.yml \
+            .github/workflows/restore-generate-feature.yml; do
+            if [ -f "$f" ]; then
+              cat > "$f" << 'EOF'
+name: disabled-recovery-helper
+on:
+  workflow_dispatch:
+jobs:
+  blocked:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail closed
+        run: |
+          echo "This recovery workflow is disabled to prevent overwriting generate.functions.ts."
+          exit 1
+EOF
+            fi
+          done
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts .github/workflows/ || true
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "fix(billing): correct video quote contract, runFal timeout, secure recovery workflows"
+          git push origin HEAD:fix/backend-generation-billing-safety
