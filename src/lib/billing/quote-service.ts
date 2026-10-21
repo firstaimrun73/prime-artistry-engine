@@ -1,37 +1,28 @@
 /**
- * Generation quote + reservation lifecycle.
- *
- * Flow:
- *   quote → check balance → reserve (atomic debit) → generate → finalize
- *   OR on failure → release (refund)
- *
- * Uses existing deduct_credits / refund_credits RPCs (service_role).
- * No schema migration required for Phase C scaffold.
- *
- * Idempotency: same idempotencyKey returns the same in-flight quote.
- * Atomic concurrency: deduct_credits updates only when credits >= amount.
+ * Quote service — in-memory generation quotes with credit reservation.
+ * Reservations use deduct_credits via service_role admin client.
+ * releaseReservation refunds only when a reservationTxId exists and
+ * does not mark released if the refund RPC errors.
  */
 
-import { randomUUID } from "node:crypto";
-import {
-  DEFAULT_BILLING_CONFIG,
-  type GenerationQuote,
-  type QuoteRequest,
-  type QuoteStatus,
-  type InsufficientCreditsError,
-  type BillingConfig,
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+import type {
+  BillingConfig,
+  GenerationQuote,
+  InsufficientCreditsError,
+  QuoteRequest,
+  QuoteStatus,
 } from "./types";
-import { providerCogsToCustomerCredits } from "./customer-pricing";
+import { DEFAULT_BILLING_CONFIG } from "./types";
+
+type SupabaseAdmin = SupabaseClient<Database>;
 
 const quoteStore = new Map<string, GenerationQuote>();
 const idempotencyIndex = new Map<string, string>();
 
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function expiresAt(ttlSec: number) {
-  return new Date(Date.now() + ttlSec * 1000).toISOString();
+function newQuoteId(): string {
+  return `q_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function createGenerationQuote(
@@ -42,20 +33,19 @@ export function createGenerationQuote(
     const existingId = idempotencyIndex.get(`${req.userId}:${req.idempotencyKey}`);
     if (existingId) {
       const existing = quoteStore.get(existingId);
-      if (existing && existing.status !== "expired" && existing.status !== "released") {
+      if (existing && existing.status !== "expired" && existing.status !== "failed") {
         return existing;
       }
     }
   }
 
-  const pricing = providerCogsToCustomerCredits(
-    req.providerCogsUsd,
-    req.product,
-    config,
-  );
+  const customerCredits =
+    req.customerCreditsOverride ??
+    Math.max(1, Math.ceil(req.providerCogsUsd * (config.markupMultiplier ?? 1)));
 
+  const now = Date.now();
   const quote: GenerationQuote = {
-    quoteId: randomUUID(),
+    quoteId: newQuoteId(),
     userId: req.userId,
     product: req.product,
     operation: req.operation,
@@ -67,17 +57,13 @@ export function createGenerationQuote(
     resolution: req.resolution,
     aspectRatio: req.aspectRatio,
     audio: req.audio,
-    providerCogsUsd: pricing.providerCogsUsd,
-    customerCredits: pricing.customerCredits,
-    pricingVersion: pricing.pricingVersion,
-    createdAt: nowIso(),
-    expiresAt: expiresAt(config.quoteTtlSeconds),
+    providerCogsUsd: req.providerCogsUsd,
+    customerCredits,
     status: "quoted",
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + (config.quoteTtlMs ?? 120_000)).toISOString(),
     idempotencyKey: req.idempotencyKey,
-    metadata: {
-      ...req.metadata,
-      pricingBreakdown: pricing.breakdown,
-    },
+    metadata: req.metadata,
   };
 
   quoteStore.set(quote.quoteId, quote);
@@ -103,26 +89,19 @@ export function assertQuoteOwned(quote: GenerationQuote, userId: string): void {
 }
 
 export function isInsufficientCredits(
-  available: number,
-  required: number,
+  availableCredits: number,
+  requiredCredits: number,
   quoteId?: string,
 ): InsufficientCreditsError | null {
-  if (available >= required) return null;
+  if (availableCredits >= requiredCredits) return null;
   return {
     code: "INSUFFICIENT_CREDITS",
-    requiredCredits: required,
-    availableCredits: available,
-    shortfall: required - available,
+    requiredCredits,
+    availableCredits,
+    shortfall: Math.max(0, requiredCredits - availableCredits),
     quoteId,
   };
 }
-
-type SupabaseAdmin = {
-  rpc: (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: { message: string } | null }>;
-};
 
 export async function reserveCreditsForQuote(
   admin: SupabaseAdmin,
@@ -154,7 +133,6 @@ export async function reserveCreditsForQuote(
     return quote;
   }
 
-  // Atomic: only succeeds when profiles.credits >= amount (no negative balance).
   const { data, error } = await admin.rpc("deduct_credits", {
     _amount: quote.customerCredits,
     _gen_type: `${quote.product}_reservation`,
@@ -194,12 +172,29 @@ export async function releaseReservation(
     return quote;
   }
   if (quote.reservationTxId) {
-    const { error } = await admin.rpc("refund_credits", {
+    const { data, error } = await admin.rpc("refund_credits", {
       _transaction_id: quote.reservationTxId,
       _user_id: quote.userId,
     });
     if (error) {
-      console.error("[billing] releaseReservation failed", quote.quoteId, error.message);
+      console.error("[billing] releaseReservation RPC error — not marking released", {
+        quoteId: quote.quoteId,
+        tx: quote.reservationTxId,
+        message: error.message,
+      });
+      // Do not mark released: caller may retry or escalate reconciliation.
+      throw new Error(`RELEASE_REFUND_FAILED:${error.message}`);
+    }
+    const refunded =
+      data && typeof data === "object" && (data as { refunded?: unknown }).refunded === true;
+    if (!refunded) {
+      // { refunded: false } = already refunded or no matching debit (idempotent OK).
+      console.warn("[billing] releaseReservation refund not newly applied", {
+        quoteId: quote.quoteId,
+        tx: quote.reservationTxId,
+        reason: "already_refunded_or_missing",
+        data,
+      });
     }
   }
   quote.status = "released";
