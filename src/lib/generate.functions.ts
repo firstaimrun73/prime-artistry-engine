@@ -459,15 +459,39 @@ export const generateMedia = createServerFn({ method: "POST" })
       if (imageReservationTxId) {
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          const { error: refundErr } = await supabaseAdmin.rpc("refund_credits", {
+          const { data: refundData, error: refundErr } = await supabaseAdmin.rpc("refund_credits", {
             _transaction_id: imageReservationTxId,
             _user_id: userId,
           });
           if (refundErr) {
-            console.error("[generate] CRITICAL image refund_credits failed", refundErr.message);
+            console.error(
+              "[generate] CRITICAL image refund_credits RPC error",
+              { tx: imageReservationTxId, userId, message: refundErr.message },
+            );
+          } else {
+            const refunded =
+              refundData &&
+              typeof refundData === "object" &&
+              (refundData as { refunded?: unknown }).refunded === true;
+            if (refunded) {
+              console.info("[generate] image refund confirmed", { tx: imageReservationTxId });
+            } else {
+              console.error(
+                "[generate] CRITICAL image refund_credits not confirmed",
+                {
+                  tx: imageReservationTxId,
+                  userId,
+                  refundData,
+                  reason: "already_refunded_or_missing",
+                },
+              );
+            }
           }
         } catch (refundThrow) {
-          console.error("[generate] CRITICAL image refund_credits threw", refundThrow);
+          console.error("[generate] CRITICAL image refund_credits threw", {
+            tx: imageReservationTxId,
+            err: refundThrow,
+          });
         }
       }
       throw err;
