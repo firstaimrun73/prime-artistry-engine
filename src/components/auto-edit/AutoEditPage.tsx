@@ -160,7 +160,7 @@ export function AutoEditPage() {
   const [showCost, setShowCost] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const costTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const costPanelRef = useRef<HTMLDivElement>(null);
 
   const plan = (profile as { plan?: string } | null)?.plan ?? "free";
   const qualityOptions = useMemo(() => autoEditQualitiesForPlan(plan), [plan]);
@@ -174,18 +174,31 @@ export function AutoEditPage() {
     void navigate({ to: "/", replace: true });
   }, [navigate]);
 
-  const revealCost = useCallback(() => {
-    setShowCost(true);
-    if (costTimer.current) clearTimeout(costTimer.current);
-    costTimer.current = setTimeout(() => setShowCost(false), 5000);
+  const toggleCost = useCallback(() => {
+    setShowCost((v) => !v);
   }, []);
 
+  // Close credit panel on outside click or Escape (no auto-open)
   useEffect(() => {
-    if (file) revealCost();
-    return () => {
-      if (costTimer.current) clearTimeout(costTimer.current);
+    if (!showCost) return;
+    const onPointer = (e: MouseEvent | TouchEvent) => {
+      const el = costPanelRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setShowCost(false);
+      }
     };
-  }, [quality, file, revealCost]);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowCost(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("touchstart", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("touchstart", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [showCost]);
 
   const onPick = useCallback((f: File | null) => {
     if (!f) return;
@@ -446,17 +459,22 @@ export function AutoEditPage() {
                 ))}
 
                 {!isAdmin && (
-                  <div className="relative ml-auto">
+                  <div className="relative ml-auto" ref={costPanelRef}>
                     <button
                       type="button"
-                      onClick={revealCost}
+                      onClick={toggleCost}
                       className="grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-white/40 text-violet-600 backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-violet-300"
-                      aria-label="Show credit costs"
+                      aria-label={showCost ? "Hide credit costs" : "Show credit costs"}
+                      aria-expanded={showCost}
                     >
                       <Info className="h-4 w-4" />
                     </button>
                     {showCost && (
-                      <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-2xl border border-violet-300/40 bg-white/95 p-2 shadow-xl backdrop-blur-xl dark:border-violet-500/30 dark:bg-violet-950/95">
+                      <div
+                        role="dialog"
+                        aria-label="Credit costs"
+                        className="absolute right-0 top-full z-30 mt-2 w-44 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-violet-300/40 bg-white/95 p-2 shadow-xl backdrop-blur-xl dark:border-violet-500/30 dark:bg-violet-950/95"
+                      >
                         <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
                           Credit costs
                         </p>
@@ -495,64 +513,71 @@ export function AutoEditPage() {
               )}
 
               <div className="space-y-2">
-                <Button
-                  type="button"
-                  onClick={() => void run()}
-                  disabled={busy || !file}
-                  className="h-12 w-full rounded-full bg-gradient-to-r from-violet-600 to-cyan-500 text-base font-semibold text-white shadow-md"
-                >
-                  {busy ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" /> Enhance
-                    </>
-                  )}
-                </Button>
-
-                {output && (
-                  <div className="flex flex-wrap gap-2">
+                {!output ? (
+                  <Button
+                    type="button"
+                    onClick={() => void run()}
+                    disabled={busy || !file}
+                    className="h-12 w-full rounded-2xl bg-gradient-to-r from-violet-600 to-cyan-500 text-base font-bold text-white shadow-lg shadow-violet-500/25 disabled:opacity-50"
+                  >
+                    {busy ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Working…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Generate · {creditCost} credits
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
                     <Button
                       type="button"
                       variant="outline"
-                      className="flex-1 rounded-full border-white/50 bg-white/40 backdrop-blur dark:bg-white/5"
-                      onClick={() => setViewerOpen(true)}
+                      onClick={clear}
+                      className="h-11 flex-1 rounded-2xl"
                     >
-                      <ImageIcon className="mr-2 h-4 w-4" /> View
+                      New photo
                     </Button>
                     <Button
                       type="button"
-                      variant="outline"
-                      className="flex-1 rounded-full border-white/50 bg-white/40 backdrop-blur dark:bg-white/5"
-                      disabled={dlBusy}
+                      onClick={() => setViewerOpen(true)}
+                      className="h-11 flex-1 rounded-2xl bg-violet-600 text-white"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      View full
+                    </Button>
+                    <Button
+                      type="button"
                       onClick={() => void downloadResult()}
+                      disabled={dlBusy}
+                      className="h-11 rounded-2xl bg-cyan-600 px-4 text-white"
                     >
                       {dlBusy ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Download className="mr-2 h-4 w-4" />
+                        <Download className="h-4 w-4" />
                       )}
-                      Download
                     </Button>
                   </div>
                 )}
               </div>
             </div>
           )}
-          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onInput} />
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,.heic,.heif"
+            className="hidden"
+            onChange={onInput}
+          />
         </div>
 
-        {output && (
-          <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-            <Check className="h-3.5 w-3.5" /> Ready
-          </p>
-        )}
-
-        {/* How it works — curved dotted flow */}
-        <section className="mt-10 space-y-4">
-          <h2 className="text-sm font-bold tracking-tight">How it works</h2>
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-bold tracking-tight">How it works</h2>
           <div className="relative">
             <FlowConnectors />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
