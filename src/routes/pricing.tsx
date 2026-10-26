@@ -126,7 +126,7 @@ function PricingPage() {
                 }
               }}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
                 currency === code
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border text-muted-foreground hover:border-primary",
@@ -137,90 +137,87 @@ function PricingPage() {
           ))}
         </div>
 
-        <div className="mt-8 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3 sm:snap-none">
-            {visiblePlans.map((plan) => {
-              const highlight = plan.id === PRICING_POPULAR_PLAN_ID;
-              const isCurrent = profile?.plan === plan.id;
-              const raw = DISPLAY_PRICES[plan.id]?.[currency];
-              const priceLabel =
-                typeof raw === "number" ? formatPlanPrice(raw, currency) : raw ?? "—";
-              const diff = PLAN_DIFFS[plan.id as Exclude<PlanId, "free">];
-              const features = cardFeatureLines(plan.features);
+        {/* Mobile: vertical full-width stack so every plan is readable without sideways swipe.
+            sm+: 2-col, lg+: 3-col grid. */}
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+          {visiblePlans.map((plan) => {
+            const highlight = plan.id === PRICING_POPULAR_PLAN_ID;
+            const isCurrent = profile?.plan === plan.id;
+            const raw = DISPLAY_PRICES[plan.id]?.[currency];
+            const priceLabel =
+              typeof raw === "number" ? formatPlanPrice(raw, currency) : raw ?? "—";
+            const diff = PLAN_DIFFS[plan.id as Exclude<PlanId, "free">];
+            const features = cardFeatureLines(plan.features);
 
-              return (
-                <div
-                  key={plan.id}
-                  className={cn(
-                    "relative flex w-[min(100%,300px)] shrink-0 snap-center flex-col rounded-2xl border bg-card p-5 sm:w-auto sm:min-w-0 sm:p-6",
-                    highlight
-                      ? "border-primary shadow-md shadow-primary/10 ring-1 ring-primary/20"
-                      : "border-border",
-                  )}
-                >
-                  {highlight && (
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-                      Popular · best fit
-                    </span>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <CrownBadge plan={plan.id} />
-                    <h2 className="text-base font-bold sm:text-lg">{plan.name}</h2>
-                  </div>
-                  <p className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">{priceLabel}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">per month</p>
-                  <div className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-                    <Coins className="h-4 w-4 shrink-0" />
-                    <span>{plan.credits.toLocaleString()} credits / month</span>
-                  </div>
-                  {diff && (
-                    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{diff.audience}</p>
-                  )}
-                  {diff && (
-                    <ul className="mt-3 flex flex-wrap gap-1.5">
-                      {diff.unlocks.map((u) => (
-                        <li
-                          key={u}
-                          className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary"
-                        >
-                          {u}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <ul className="mt-4 flex-1 space-y-1.5 sm:mt-5 sm:space-y-2">
-                    {features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <span className="min-w-0 break-words">{f}</span>
+            return (
+              <div
+                key={plan.id}
+                className={cn(
+                  "relative flex w-full flex-col rounded-2xl border bg-card p-5 sm:p-6",
+                  highlight
+                    ? "border-primary shadow-md shadow-primary/10 ring-1 ring-primary/20"
+                    : "border-border",
+                )}
+              >
+                {highlight && (
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                    Popular · best fit
+                  </span>
+                )}
+                <div className="flex items-center gap-2">
+                  <CrownBadge plan={plan.id} />
+                  <h2 className="text-base font-bold sm:text-lg">{plan.name}</h2>
+                </div>
+                <p className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">{priceLabel}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">per month</p>
+                <div className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+                  <Coins className="h-4 w-4 shrink-0" />
+                  <span>{plan.credits.toLocaleString()} credits / month</span>
+                </div>
+                {diff && (
+                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{diff.audience}</p>
+                )}
+                {diff && (
+                  <ul className="mt-3 flex flex-wrap gap-1.5">
+                    {diff.unlocks.map((u) => (
+                      <li
+                        key={u}
+                        className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary"
+                      >
+                        {u}
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
-                    <Check className="h-3.5 w-3.5 shrink-0" /> Watermark-free · No ads
-                  </p>
-                  {isCurrent ? (
-                    <Button className="mt-6 w-full sm:mt-8" variant="outline" disabled style={{ marginTop: "auto" }}>
-                      Activated
-                    </Button>
-                  ) : (
-                    <Button
-                      className={cn("mt-6 w-full sm:mt-8", highlight && "text-base font-semibold")}
-                      variant={highlight ? "default" : "outline"}
-                      size={highlight ? "lg" : "default"}
-                      onClick={() => selectPlan(plan.id)}
-                      style={{ marginTop: "auto" }}
-                    >
-                      {highlight ? `Upgrade to ${plan.name} — recommended` : `Upgrade to ${plan.name}`}
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p className="mt-1 text-center text-[11px] text-muted-foreground sm:hidden">
-            Swipe sideways to see all plans →
-          </p>
+                )}
+                <ul className="mt-4 flex-1 space-y-1.5 sm:mt-5 sm:space-y-2">
+                  {features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="min-w-0 break-words">{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
+                  <Check className="h-3.5 w-3.5 shrink-0" /> Watermark-free · No ads
+                </p>
+                {isCurrent ? (
+                  <Button className="mt-6 w-full sm:mt-8" variant="outline" disabled style={{ marginTop: "auto" }}>
+                    Activated
+                  </Button>
+                ) : (
+                  <Button
+                    className={cn("mt-6 w-full sm:mt-8", highlight && "text-base font-semibold")}
+                    variant={highlight ? "default" : "outline"}
+                    size={highlight ? "lg" : "default"}
+                    onClick={() => selectPlan(plan.id)}
+                    style={{ marginTop: "auto" }}
+                  >
+                    {highlight ? `Upgrade to ${plan.name} — recommended` : `Upgrade to ${plan.name}`}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="mx-auto mt-10 max-w-2xl space-y-2 rounded-2xl border border-border bg-muted/30 px-4 py-4 text-left sm:px-6 sm:py-5">

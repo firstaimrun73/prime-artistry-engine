@@ -1,6 +1,9 @@
 /**
- * Single controlled Direct Link ad configuration.
- * ONE destination only. No popups, vignettes, page-push, or notification ads.
+ * Controlled ad configuration.
+ * - Vignette: allowed (MonetagVignette) for free signed-in non-admin only
+ * - In-Page Push: disabled
+ * - Static Direct Link cards: limited placements only
+ * - No popups / notification ads
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 
@@ -12,6 +15,7 @@ export const ADS_CONFIG = {
    * Studios (except full /editor canvas), history, profile/dashboard may show
    * tasteful static Direct Link cards for free users only.
    * Includes auth, pricing, checkout, billing, settings, security, password-reset.
+   * Note: pricing is excluded from script ads; static FooterAd may still render.
    */
   excludedRoutes: [
     "/editor",
