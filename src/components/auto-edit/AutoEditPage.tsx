@@ -450,7 +450,12 @@ export function AutoEditPage() {
 
               <div className="space-y-2">
                 {!output ? (
-                  <Button className="w-full" size="lg" disabled={busy || !file} onClick={() => void run()}>
+                  <Button
+                    className="w-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 hover:from-violet-700 hover:via-fuchsia-600 hover:to-violet-700 text-white shadow-lg border-0"
+                    size="lg"
+                    disabled={busy || !file}
+                    onClick={() => void run()}
+                  >
                     {busy ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -459,7 +464,7 @@ export function AutoEditPage() {
                     ) : (
                       <>
                         <Sparkles className="mr-2 h-4 w-4" />
-                        Enhance · {creditCost} credits
+                        Enhance
                       </>
                     )}
                   </Button>
