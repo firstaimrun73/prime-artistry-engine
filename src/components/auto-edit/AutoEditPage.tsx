@@ -101,7 +101,7 @@ const FLOW_STEPS = [
 function isAcceptableImageFile(file: File): boolean {
   return (
     file.type.startsWith("image/") ||
-    /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)
+    /\\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)
   );
 }
 
@@ -147,6 +147,10 @@ export function AutoEditPage() {
   );
   const isAdmin = isAdminEmail(user?.email);
   const creditCost = autoEditCreditCost(quality);
+  const balance = typeof (profile as { credits?: number } | null)?.credits === "number"
+    ? (profile as { credits: number }).credits
+    : null;
+  const canAfford = isAdmin || balance == null || balance >= creditCost;
 
   const goHome = useCallback(() => {
     void navigate({ to: "/", replace: true });
@@ -217,12 +221,20 @@ export function AutoEditPage() {
   };
 
   const run = async () => {
+    if (busy) return;
     if (!user) {
       toast.error("Sign in required");
       return;
     }
     if (!file) {
       toast.error("Upload a photo first");
+      return;
+    }
+    // Frontend preflight only — server soft check + runWithBillingLifecycle remain authority.
+    if (!isAdmin && balance != null && balance < creditCost) {
+      toast.error(
+        `Not enough credits. You need ${creditCost} credits (you have ${balance}). Top up from $4.99 to continue.`,
+      );
       return;
     }
     setBusy(true);
@@ -256,8 +268,13 @@ export function AutoEditPage() {
       toast.success(AUTO_EDIT_PRODUCT_NAME + " complete");
       void refreshProfile?.();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Auto Edit failed");
+      const msg = err instanceof Error ? err.message : "Auto Edit failed";
+      toast.error(msg);
       setStep(0);
+      setProgress(0);
+      if (/INSUFFICIENT_CREDITS|Not enough credits/i.test(msg)) {
+        void refreshProfile?.();
+      }
     } finally {
       setBusy(false);
     }
@@ -450,19 +467,53 @@ export function AutoEditPage() {
 
               <div className="space-y-2">
                 {!output ? (
-                  <Button className="w-full" size="lg" disabled={busy || !file} onClick={() => void run()}>
-                    {busy ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Enhancing…
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Enhance · {creditCost} credits
-                      </>
+                  <>
+                    {!canAfford && !isAdmin && (
+                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-center">
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                          Not enough credits
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          You need {creditCost} credits
+                          {balance != null ? ` (you have ${balance})` : ""} to restore this photo.
+                          Top up from $4.99 to continue.
+                        </p>
+                        <Link
+                          to="/pricing"
+                          className="mt-2 inline-block text-xs font-semibold text-[#FF6A1A] underline-offset-2 hover:underline"
+                        >
+                          Get credits
+                        </Link>
+                      </div>
                     )}
-                  </Button>
+                    <Button
+                      className={cn(
+                        "w-full rounded-xl text-base font-semibold shadow-md",
+                        "bg-gradient-to-r from-[#FF6A1A] to-[#FF7A2E] text-white hover:opacity-95",
+                        "disabled:opacity-50",
+                      )}
+                      size="lg"
+                      disabled={busy || !file || (!canAfford && !isAdmin)}
+                      onClick={() => {
+                        if (busy || !file || (!canAfford && !isAdmin)) return;
+                        void run();
+                      }}
+                    >
+                      {busy ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Enhancing…
+                        </>
+                      ) : !canAfford && !isAdmin ? (
+                        "Not enough credits"
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Enhance · {creditCost} credits
+                        </>
+                      )}
+                    </Button>
+                  </>
                 ) : (
                   <div className="flex gap-2">
                     <Button className="flex-1" variant="outline" onClick={clear}>
