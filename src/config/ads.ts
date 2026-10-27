@@ -1,14 +1,14 @@
 /**
  * Controlled ad configuration.
- * - Vignette: Monetag zone (free signed-in non-admin only)
+ * - Vignette: Monetag zone 12136694 via vignette.min.js
  * - In-Page Push: disabled
  * - Static Direct Link: few high-quality sponsor cards only
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 
-/** Monetag Vignette zone — set to your dashboard Vignette zone ID. */
-export const MONETAG_VIGNETTE_ZONE = "12004581" as const;
-export const MONETAG_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
+/** Official Monetag Vignette tag (from publisher dashboard). */
+export const MONETAG_VIGNETTE_ZONE = "12136694" as const;
+export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" as const;
 
 export const ADS_CONFIG = {
   enabled: true,

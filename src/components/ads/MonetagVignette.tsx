@@ -5,7 +5,7 @@ import { shouldShowAds } from "@/lib/policy";
 import { useAdsMasterEnabled } from "@/lib/site-settings";
 import {
   isAdRouteAllowed,
-  MONETAG_SCRIPT_SRC,
+  MONETAG_VIGNETTE_SCRIPT_SRC,
   MONETAG_VIGNETTE_ZONE,
 } from "@/config/ads";
 import { useRouterState } from "@tanstack/react-router";
@@ -13,8 +13,10 @@ import { useRouterState } from "@tanstack/react-router";
 const SCRIPT_ID = "motio-monetag-vignette";
 
 /**
- * Monetag Vignette for free signed-in non-admin users only.
- * Loads once when eligible; AdPolicyGate keeps scripts with data-motio-allowed="1".
+ * Monetag Vignette — exact publisher tag pattern:
+ *   s.dataset.zone = '12136694'
+ *   s.src = 'https://n6wxm.com/vignette.min.js'
+ * Free signed-in non-admin only. AdPolicyGate keeps n6wxm scripts while eligible.
  */
 export function MonetagVignette() {
   const { user, profile, loading } = useAuth();
@@ -60,15 +62,15 @@ export function MonetagVignette() {
     if (loadedRef.current) return;
 
     try {
+      // Match Monetag's official snippet exactly
       const s = document.createElement("script");
       s.id = SCRIPT_ID;
-      s.setAttribute("data-zone", MONETAG_VIGNETTE_ZONE);
-      s.setAttribute("data-motio-allowed", "1");
-      // Help Monetag treat as vignette-style when supported by zone type
-      s.setAttribute("data-cfasync", "false");
-      s.src = MONETAG_SCRIPT_SRC;
+      s.dataset.zone = MONETAG_VIGNETTE_ZONE;
+      s.dataset.motioAllowed = "1";
+      s.src = MONETAG_VIGNETTE_SCRIPT_SRC;
       s.async = true;
-      (document.body || document.documentElement).appendChild(s);
+      const parent = [document.documentElement, document.body].filter(Boolean).pop();
+      parent?.appendChild(s);
       loadedRef.current = true;
     } catch {
       loadedRef.current = false;

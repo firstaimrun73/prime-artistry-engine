@@ -9,14 +9,12 @@ import { isAdRouteAllowed } from "@/config/ads";
 /**
  * Cleanup of disallowed ad-provider artifacts.
  * - Always strips AdSense / googlesyndication / doubleclick.
- * - Strips Monetag scripts that are NOT marked data-motio-allowed="1".
- * - When the user is ineligible (paid / admin / logged-out / master off /
- *   profile not loaded / auth loading / excluded route), also strips our
- *   authorized IPP script.
- * - Does NOT unregister service workers (blanket unregister was removed).
- * Static Direct Link ads are pure UI and require no scripts.
+ * - When ineligible: strips ALL Monetag scripts (n6wxm / nap5k / monetag).
+ * - When eligible: keeps Monetag network scripts (loader + vignette children).
+ *   (Previously we required data-motio-allowed on every child script, which
+ *   deleted Monetag's injected files and killed the vignette.)
  */
-function removeDisallowedAdScripts(stripAllowedMonetag: boolean) {
+function removeDisallowedAdScripts(stripMonetag: boolean) {
   if (typeof document === "undefined") return;
 
   const selectors = [
@@ -27,8 +25,6 @@ function removeDisallowedAdScripts(stripAllowedMonetag: boolean) {
     'iframe[src*="doubleclick"]',
     "#adsense-loader",
     "ins.adsbygoogle",
-    // Legacy Monetag markers without our allow flag
-    "#monetag-vignette",
     "#monetag-tag",
     "#monetag-loader",
   ];
@@ -36,17 +32,13 @@ function removeDisallowedAdScripts(stripAllowedMonetag: boolean) {
   document.querySelectorAll(selectors.join(", ")).forEach((el) => el.remove());
   document.querySelectorAll('meta[name="monetag"]').forEach((el) => el.remove());
 
-  // Monetag scripts: keep only those explicitly allowed by our loader
-  document
-    .querySelectorAll(
-      'script[src*="n6wxm.com"], script[src*="nap5k.com"], script[src*="monetag"]',
-    )
-    .forEach((el) => {
-      const allowed = el.getAttribute("data-motio-allowed") === "1";
-      if (!allowed || stripAllowedMonetag) {
-        el.remove();
-      }
-    });
+  if (stripMonetag) {
+    document
+      .querySelectorAll(
+        'script[src*="n6wxm.com"], script[src*="nap5k.com"], script[src*="monetag"], #motio-monetag-vignette, #monetag-vignette',
+      )
+      .forEach((el) => el.remove());
+  }
 
   try {
     if ((window as Window & { adsbygoogle?: unknown[] }).adsbygoogle) {
@@ -63,7 +55,6 @@ export function AdPolicyGate() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    // Fail closed until auth + profile are known for a signed-in user
     const admin = isAdminEmail(profile?.email);
     const routeOk = isAdRouteAllowed(pathname);
     const eligible =
@@ -78,11 +69,11 @@ export function AdPolicyGate() {
         isAdmin: admin,
       });
 
-    const stripAllowed = !eligible;
-    removeDisallowedAdScripts(stripAllowed);
+    const stripMonetag = !eligible;
+    removeDisallowedAdScripts(stripMonetag);
 
     const observer = new MutationObserver(() => {
-      removeDisallowedAdScripts(stripAllowed);
+      removeDisallowedAdScripts(stripMonetag);
     });
     observer.observe(document.documentElement, {
       childList: true,
