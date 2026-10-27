@@ -1,22 +1,17 @@
 /**
  * Controlled ad configuration.
- * - Vignette: allowed (MonetagVignette) for free signed-in non-admin only
+ * - Vignette: Monetag zone (free signed-in non-admin only)
  * - In-Page Push: disabled
- * - Static Direct Link cards: limited placements only
- * - No popups / notification ads
+ * - Static Direct Link: few high-quality sponsor cards only
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 
+/** Monetag Vignette zone — set to your dashboard Vignette zone ID. */
+export const MONETAG_VIGNETTE_ZONE = "12004581" as const;
+export const MONETAG_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
+
 export const ADS_CONFIG = {
-  /** Compile-time kill switch. When false, no ad UI or scripts. */
   enabled: true,
-  /**
-   * Routes where ads must never appear.
-   * Studios (except full /editor canvas), history, profile/dashboard may show
-   * tasteful static Direct Link cards for free users only.
-   * Includes auth, pricing, checkout, billing, settings, security, password-reset.
-   * Note: pricing is excluded from script ads; static FooterAd may still render.
-   */
   excludedRoutes: [
     "/editor",
     "/login",
@@ -40,10 +35,17 @@ export function isAdRouteAllowed(pathname: string): boolean {
   return !ADS_CONFIG.excludedRoutes.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 }
 
-/** Map UI placement ids to admin placement keys (home | history | features | pricing). */
-export function adPlacementCategory(placement: string): "home" | "history" | "features" | "pricing" | null {
+export function adPlacementCategory(
+  placement: string,
+): "home" | "history" | "features" | "pricing" | null {
   const p = placement.toLowerCase();
-  if (p.startsWith("home") || p.startsWith("workspace") || p.startsWith("studio") || p.startsWith("profile") || p.startsWith("dashboard")) {
+  if (
+    p.startsWith("home") ||
+    p.startsWith("workspace") ||
+    p.startsWith("studio") ||
+    p.startsWith("profile") ||
+    p.startsWith("dashboard")
+  ) {
     return "home";
   }
   if (p.startsWith("history")) return "history";

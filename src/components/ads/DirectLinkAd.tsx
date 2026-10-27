@@ -4,15 +4,11 @@ import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
+import { ExternalLink, Sparkles } from "lucide-react";
 
 /**
- * Static in-page Direct Link ad card.
- * - ONE clickable target only → DIRECT_LINK_URL
- * - Visible "Ad" label
- * - No auto-open, popup, vignette, page-push, or notification behavior
- * - Free signed-in non-admin only (useAdsVisible + shouldShowAds)
- * - Fail closed when profile/plan not yet loaded
- * - Never on excluded routes
+ * Sponsored Direct Link card — one clear clickable offer (not a tag).
+ * Free signed-in non-admin only. Fail closed while loading.
  */
 export function DirectLinkAd({
   placement = "in-content",
@@ -21,7 +17,6 @@ export function DirectLinkAd({
 }: {
   placement?: string;
   className?: string;
-  /** compact = tighter vertical rhythm for dense studio UIs */
   variant?: "default" | "compact";
 }) {
   const category = adPlacementCategory(placement);
@@ -29,7 +24,6 @@ export function DirectLinkAd({
   const { profile, user, loading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  // Fail closed: no user, still loading, or profile/plan unknown
   if (loading) return null;
   if (!user) return null;
   if (!profile) return null;
@@ -45,30 +39,46 @@ export function DirectLinkAd({
   if (!audienceOk) return null;
   if (!isAdRouteAllowed(pathname)) return null;
 
-  const pad = variant === "compact" ? "px-3 py-2.5" : "px-4 py-3";
-  const my = variant === "compact" ? "my-4" : "my-6";
+  const compact = variant === "compact";
 
   return (
     <div
-      className={`${my} flex justify-center ${className}`}
+      className={`${compact ? "my-5" : "my-7"} flex justify-center ${className}`}
       data-ad-placement={placement}
       role="complementary"
-      aria-label="Advertisement"
+      aria-label="Sponsored"
     >
       <a
         href={DIRECT_LINK_URL}
         target="_blank"
         rel="sponsored noopener noreferrer"
-        className={`group relative block w-full max-w-md overflow-hidden rounded-xl border border-border/80 bg-card/70 ${pad} text-left shadow-sm backdrop-blur-md transition hover:border-orange-400/60 hover:bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500`}
+        className="group relative block w-full max-w-lg overflow-hidden rounded-2xl border border-orange-500/25 bg-gradient-to-br from-card via-card to-orange-500/5 shadow-md transition hover:border-orange-500/50 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
       >
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-purple-500/5" />
-        <span className="absolute right-2 top-2 rounded-md bg-muted/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Ad
-        </span>
-        <p className="relative pr-10 text-sm font-medium text-foreground">Sponsored offer</p>
-        <p className="relative mt-0.5 text-xs text-muted-foreground">
-          Explore this partner offer · Opens in a new tab
-        </p>
+        <span className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-500/10 blur-2xl" />
+        <span className="pointer-events-none absolute -bottom-8 -left-4 h-20 w-20 rounded-full bg-violet-500/10 blur-2xl" />
+
+        <div className={`relative flex items-center gap-3 ${compact ? "p-3.5" : "p-4 sm:p-5"}`}>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-violet-600 text-white shadow-sm">
+            <Sparkles className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded-md bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
+                Sponsored
+              </span>
+            </div>
+            <p className="mt-1 text-sm font-bold leading-snug text-foreground sm:text-[15px]">
+              Exclusive partner offer for Motio2edit users
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Tap to open · trusted partner link
+            </p>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm transition group-hover:bg-primary/90">
+            View
+            <ExternalLink className="h-3.5 w-3.5" />
+          </span>
+        </div>
       </a>
     </div>
   );

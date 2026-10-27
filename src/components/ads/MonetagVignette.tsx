@@ -3,26 +3,18 @@ import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
 import { useAdsMasterEnabled } from "@/lib/site-settings";
-import { isAdRouteAllowed } from "@/config/ads";
+import {
+  isAdRouteAllowed,
+  MONETAG_SCRIPT_SRC,
+  MONETAG_VIGNETTE_ZONE,
+} from "@/config/ads";
 import { useRouterState } from "@tanstack/react-router";
 
-/**
- * Monetag Vignette zone.
- * Replace with your Monetag Vignette zone ID from the Monetag dashboard if different.
- * Same loader domain as other Monetag tags; format is controlled by the zone type.
- */
-const ZONE = "12004581";
-const SCRIPT_SRC = "https://nap5k.com/tag.min.js";
 const SCRIPT_ID = "motio-monetag-vignette";
 
 /**
- * Monetag Vignette (overlay interstitial) for free signed-in non-admin users only.
- * In-Page Push is intentionally disabled — use this format only.
- *
- * Fail closed:
- * - auth still loading
- * - signed-in but profile not yet loaded (plan unknown)
- * - master switch off, paid, admin, logged-out, excluded route
+ * Monetag Vignette for free signed-in non-admin users only.
+ * Loads once when eligible; AdPolicyGate keeps scripts with data-motio-allowed="1".
  */
 export function MonetagVignette() {
   const { user, profile, loading } = useAuth();
@@ -31,21 +23,21 @@ export function MonetagVignette() {
   const loadedRef = useRef(false);
 
   useEffect(() => {
+    const cleanup = () => {
+      removeOurScript();
+      loadedRef.current = false;
+    };
+
     if (loading) {
-      removeOurScript();
-      loadedRef.current = false;
+      cleanup();
       return;
     }
-
     if (user && !profile) {
-      removeOurScript();
-      loadedRef.current = false;
+      cleanup();
       return;
     }
-
     if (!masterOn || !user || !profile) {
-      removeOurScript();
-      loadedRef.current = false;
+      cleanup();
       return;
     }
 
@@ -57,8 +49,7 @@ export function MonetagVignette() {
     });
 
     if (!eligible || !isAdRouteAllowed(pathname)) {
-      removeOurScript();
-      loadedRef.current = false;
+      cleanup();
       return;
     }
 
@@ -71,12 +62,13 @@ export function MonetagVignette() {
     try {
       const s = document.createElement("script");
       s.id = SCRIPT_ID;
-      s.dataset.zone = ZONE;
-      s.dataset.motioAllowed = "1";
-      s.src = SCRIPT_SRC;
+      s.setAttribute("data-zone", MONETAG_VIGNETTE_ZONE);
+      s.setAttribute("data-motio-allowed", "1");
+      // Help Monetag treat as vignette-style when supported by zone type
+      s.setAttribute("data-cfasync", "false");
+      s.src = MONETAG_SCRIPT_SRC;
       s.async = true;
-      const parent = document.body || document.documentElement;
-      parent.appendChild(s);
+      (document.body || document.documentElement).appendChild(s);
       loadedRef.current = true;
     } catch {
       loadedRef.current = false;
