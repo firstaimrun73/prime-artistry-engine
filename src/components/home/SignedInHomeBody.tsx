@@ -25,9 +25,9 @@ import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
+import { MalutoGuideTour } from "@/components/home/MalutoGuideTour";
 import { DirectLinkAd } from "@/components/ads";
 
-/** Only 3–4 creative tags — open Image Studio with style prompt (no forced 1:1). */
 const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] = [
   {
     label: "Portrait",
@@ -51,13 +51,13 @@ const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] =
   },
 ];
 
-/** Rotating slogan carousel for the promo strip. */
 const HOME_SLOGANS = [
   { title: "Try a plan that fits you", sub: "Lite · Plus · Pro · AI Studio · Master" },
   { title: "Use Motio2edit AI for best edits", sub: "Image · Video · Music in one place" },
   { title: "Circle 2edit · Cropmix · Remove BG", sub: "Pro tools, simple credits" },
   { title: "From idea to download in seconds", sub: "Standard · Premium · Ultra AI modes" },
   { title: "More credits. More modes. No watermark.", sub: "Upgrade anytime — cancel anytime" },
+  { title: "Maluto AI — restore photos for $4.99", sub: "Lite · just upload · automatic restore" },
 ] as const;
 
 const QUICK_CREATE = [
@@ -67,7 +67,7 @@ const QUICK_CREATE = [
   { to: "/studio/video" as const, label: "Video", icon: Video },
   { to: "/studio/music" as const, label: "Music", icon: Music },
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
-  { to: "/studio/image/auto-edit" as const, label: "Auto Edit", icon: Sparkles },
+  { to: "/studio/image/auto-edit" as const, label: "Maluto AI", icon: Sparkles },
   { to: "/studio/image/filters" as const, label: "Filters", icon: Filter },
 ] as const;
 
@@ -133,14 +133,6 @@ export function SignedInHomeBody() {
             className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.25),transparent_55%)]"
             aria-hidden
           />
-          <div
-            className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/20 blur-2xl"
-            aria-hidden
-          />
-          <div
-            className="absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-cyan-300/30 blur-2xl"
-            aria-hidden
-          />
           <div className="relative flex items-center justify-between gap-3 px-4 py-4 sm:px-5">
             <div className="min-w-0 flex-1">
               <p
@@ -187,6 +179,7 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
+      {/* Ad near primary create actions */}
       <DirectLinkAd placement="home-upper" variant="compact" />
 
       <section className="mt-5">
@@ -237,23 +230,22 @@ export function SignedInHomeBody() {
 
       <RemoveBgHomeCard />
 
+      {/* Ad after tool CTAs */}
       <DirectLinkAd placement="home-mid" />
 
       <div className="mt-12">
         <VisualDiscoveryGallery />
       </div>
 
-      <DirectLinkAd placement="home-mid-2" />
-
       <ObserveBuildProtect />
-
-      <DirectLinkAd placement="home-lower" />
 
       <HomePromptBar />
 
       <DirectLinkAd placement="home-footer" variant="compact" />
 
       <AutoEditHomeCard />
+
+      <MalutoGuideTour />
     </main>
   );
 }
