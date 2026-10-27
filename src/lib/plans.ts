@@ -1,5 +1,5 @@
 // Checkout-side currency (what the payment backends actually charge in).
-// Razorpay handles INR; PayPal handles USD card.
+// Razorpay = India (INR) only. PayPal = international (USD / EUR).
 // Crypto / NOWPayments removed from product — do not re-add.
 export type Currency = "USD" | "EUR" | "INR";
 export type PaymentMethod = "card" | "paypal";
@@ -15,10 +15,26 @@ export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
 };
 
 export type CardProvider = "paypal" | "razorpay";
+
 export const CARD_PROVIDERS: { id: CardProvider; label: string; note: string }[] = [
   { id: "paypal", label: "PayPal", note: "Pay with PayPal or any card via PayPal (USD)" },
-  { id: "razorpay", label: "Razorpay", note: "Credit / Debit card via Razorpay (INR)" },
+  { id: "razorpay", label: "Razorpay", note: "UPI / cards via Razorpay — India (INR) only" },
 ];
+
+/**
+ * Card providers allowed for a checkout currency.
+ * Razorpay is India-only (INR). International users only see PayPal.
+ */
+export function cardProvidersForCurrency(currency: Currency): typeof CARD_PROVIDERS {
+  if (currency === "INR") {
+    return CARD_PROVIDERS.filter((p) => p.id === "razorpay");
+  }
+  return CARD_PROVIDERS.filter((p) => p.id === "paypal");
+}
+
+export function defaultCardProvider(currency: Currency): CardProvider {
+  return currency === "INR" ? "razorpay" : "paypal";
+}
 
 export const CURRENCY_SYMBOL: Record<Currency, string> = {
   USD: "$",
@@ -26,13 +42,6 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
   INR: "₹",
 };
 
-/**
- * Internal plan ids stored in profiles.plan / payments.
- * User-facing names may differ (e.g. id "business" displays as "Master Studio",
- * id "studio" displays as "AI Studio").
- * Do not rename the "business" id without a data migration for existing subscribers.
- * "free" remains for signup / profiles.plan only — never shown on the pricing page.
- */
 export type PlanId = "free" | "lite" | "plus" | "pro" | "studio" | "business";
 
 export const TRANSACTION_FEE: Record<Currency, number> = {
@@ -41,7 +50,6 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
   INR: 85,
 };
 
-// ── Display / marketing credit hints only (NOT server debit authority) ───
 /** @deprecated Prefer @/lib/billing quote lifecycle for server debits. */
 export const CREDIT_COST = {
   image: 25,
@@ -51,16 +59,10 @@ export const CREDIT_COST = {
   video_enhance: 200,
 } as const;
 
-/** High-balance sentinel used only for display helpers (not an unlimited product promise). */
 export const UNLIMITED_CREDITS = 9_999_999;
 
-/** Free signup bonus — MUST match public.handle_new_user() in Supabase. Not a priced plan. */
 export const FREE_SIGNUP_CREDITS = 40;
 
-/**
- * Legacy single-pack marketing object for old checkout links.
- * Authoritative pack math lives in @/lib/credit-topups (1 credit = $0.0178).
- */
 export const CREDIT_TOPUP = {
   id: "credit-topup-499",
   name: "Credit Top-up",
@@ -101,14 +103,6 @@ export type Plan = {
   features: string[];
 };
 
-/**
- * Paid plans (pricing page):
- *   Lite $4.99 / 350 · Plus $9.99 / 800 · Pro $29.99 / 2,500
- *   AI Studio $55 / 5,000 · Master Studio $110 / 10,000
- * Free stays in the array for profile.plan === "free" only — not sold.
- *
- * Maluto AI Restore starts on Lite ($4.99) — not free.
- */
 export const PLANS: Plan[] = [
   {
     id: "free",
@@ -230,10 +224,7 @@ export const PLANS: Plan[] = [
   },
 ];
 
-/** Public pricing page — paid plans only (no Free card). */
 export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["lite", "plus", "pro", "studio", "business"];
-
-/** Single plan highlighted as Popular on the pricing page. */
 export const PRICING_POPULAR_PLAN_ID: PlanId = "pro";
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
@@ -254,9 +245,7 @@ export function findPlan(id: string | undefined | null): Plan | undefined {
   return PLANS.find((p) => p.id === id);
 }
 
-/** Display currency for pricing UI (same set as checkout Currency). */
 export type DisplayCurrency = "USD" | "EUR" | "INR";
-
 export const DISPLAY_CURRENCIES: DisplayCurrency[] = ["USD", "EUR", "INR"];
 
 export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
@@ -268,7 +257,6 @@ export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
   business: { USD: 110, EUR: 101.99, INR: 9999 },
 };
 
-/** Map display currency → payment backend currency. */
 export function toCheckoutCurrency(c: DisplayCurrency): Currency {
   return c;
 }
