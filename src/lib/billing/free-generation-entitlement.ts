@@ -11,7 +11,7 @@
  * FINAL ECONOMICS / WELCOME POLICY PENDING PRODUCT REVIEW.
  */
 
-export type FreeGenerationProduct = "video" | "image" | "music" | "lens";
+export type FreeGenerationProduct = "video" | "image" | "music" | "lens" | "auto_edit";
 
 export type FreeGenerationPolicy = {
   product: FreeGenerationProduct;
@@ -44,6 +44,14 @@ export const WELCOME_FREE_VIDEO: FreeGenerationPolicy = {
     audio: false,
     productMode: "standard",
   },
+};
+
+/** One complimentary Maluto AI Auto Edit generation per free account. */
+export const COMPLIMENTARY_MALUTO_AI: FreeGenerationPolicy = {
+  product: "auto_edit",
+  entitlementKey: "complimentary_maluto_ai_v1",
+  label: "1 free Maluto AI generation",
+  allowed: {},
 };
 
 const RES_RANK: Record<string, number> = {
@@ -129,6 +137,75 @@ export async function evaluateWelcomeFreeVideo(
         return { eligible: false, policy: null, reason: "already_used" };
       }
     } else if (data && data.length > 0) {
+      return { eligible: false, policy: null, reason: "already_used" };
+    }
+  } catch {
+    return { eligible: false, policy: null, reason: "lookup_error" };
+  }
+
+  return { eligible: true, policy };
+}
+
+export type EvaluateComplimentaryMalutoInput = {
+  userId: string;
+  isAdmin?: boolean;
+  plan?: string | null;
+};
+
+export type EvaluateComplimentaryMalutoResult = {
+  eligible: boolean;
+  policy: FreeGenerationPolicy | null;
+  reason?: string;
+};
+
+/**
+ * Server-only eligibility for one complimentary Maluto AI Auto Edit generation.
+ * Free-tier only. One-time per account. Admins and paid plans use normal billing.
+ * Claim is recorded via generation_history metadata when the generation succeeds.
+ */
+export async function evaluateComplimentaryMaluto(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
+  input: EvaluateComplimentaryMalutoInput,
+): Promise<EvaluateComplimentaryMalutoResult> {
+  const policy = COMPLIMENTARY_MALUTO_AI;
+
+  if (input.isAdmin) {
+    return { eligible: false, policy: null, reason: "admin" };
+  }
+
+  const plan = (input.plan ?? "free").toLowerCase();
+  if (plan !== "free") {
+    return { eligible: false, policy: null, reason: "not_free_plan" };
+  }
+
+  try {
+    // Prefer exact entitlement key match
+    const { data, error } = await supabaseAdmin
+      .from("generation_history")
+      .select("id")
+      .eq("user_id", input.userId)
+      .eq("type", "image")
+      .contains("metadata", {
+        free_generation: true,
+        entitlement_key: policy.entitlementKey,
+      })
+      .limit(1);
+
+    if (!error && data && data.length > 0) {
+      return { eligible: false, policy: null, reason: "already_used" };
+    }
+
+    // Fallback: any successful auto-edit free generation for this user
+    const { data: data2 } = await supabaseAdmin
+      .from("generation_history")
+      .select("id")
+      .eq("user_id", input.userId)
+      .eq("type", "image")
+      .contains("metadata", { free_generation: true, experience: "auto-edit" })
+      .limit(1);
+
+    if (data2 && data2.length > 0) {
       return { eligible: false, policy: null, reason: "already_used" };
     }
   } catch {
