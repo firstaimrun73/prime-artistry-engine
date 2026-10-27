@@ -67,6 +67,19 @@ export function canAccessMusic(opts: {
 }
 
 /**
+ * Maluto AI (photo restore / Auto Edit): Lite+ only. Never free.
+ * Server re-checks via auto-edit entitlements.
+ */
+export function canAccessMalutoAI(opts: {
+  plan: string | null | undefined;
+  email?: string | null | undefined;
+  isAdmin?: boolean;
+}): boolean {
+  if (opts.isAdmin === true || isAdminEmail(opts.email)) return true;
+  return isPaidPlan(opts.plan);
+}
+
+/**
  * Ads only for the explicit free plan. Fail closed for paid, admin,
  * missing, null, or any unrecognized plan id.
  */
