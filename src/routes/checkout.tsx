@@ -7,7 +7,8 @@ import {
   CURRENCY_SYMBOL,
   CURRENCY_METHODS,
   ALL_METHODS,
-  CARD_PROVIDERS,
+  cardProvidersForCurrency,
+  defaultCardProvider,
   creditsLabel,
   type Currency,
   type PlanId,
@@ -64,7 +65,6 @@ type CryptoInvoice = {
 function Checkout() {
   const { plan: planId, currency } = useSearch({ from: "/checkout" });
   const navigate = useNavigate();
-  // Guard: free is not checkoutable; unknown plans go to pricing.
   const plan = findPlan(planId as string);
   useEffect(() => {
     if (!plan || planId === "free") navigate({ to: "/pricing" });
@@ -79,8 +79,9 @@ function Checkout() {
   const capturePp = useServerFn(capturePaypalOrder);
 
   const methods = CURRENCY_METHODS[currency as Currency];
+  const providers = cardProvidersForCurrency(currency as Currency);
   const [method, setMethod] = useState<PaymentMethod>(methods[0]);
-  const [cardProvider, setCardProvider] = useState<CardProvider>("paypal");
+  const [cardProvider, setCardProvider] = useState<CardProvider>(() => defaultCardProvider(currency as Currency));
   const [processing, setProcessing] = useState(false);
   const [coin, setCoin] = useState<(typeof COINS)[number]["id"]>("usdttrc20");
   const [invoice, setInvoice] = useState<CryptoInvoice | null>(null);
@@ -102,6 +103,12 @@ function Checkout() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  // Razorpay = INR only; PayPal = USD/EUR. Never show wrong provider.
+  useEffect(() => {
+    const next = defaultCardProvider(currency as Currency);
+    setCardProvider(next);
+  }, [currency]);
 
   useEffect(() => {
     if (planId === "free" || method !== "card" || cardProvider !== "paypal" || !user) return;
@@ -206,6 +213,10 @@ function Checkout() {
 
   const handleCard = async () => {
     if (!requireAuth()) return;
+    if (currency !== "INR") {
+      toast.error("Razorpay is only available for INR (India).");
+      return;
+    }
     if (typeof window === "undefined" || !window.Razorpay) {
       toast.error("Payment library is still loading. Please try again in a moment.");
       return;
@@ -393,10 +404,10 @@ function Checkout() {
               {method === "card" && (
                 <div className="mt-6">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Choose card provider
+                    {currency === "INR" ? "India payment" : "International payment"}
                   </h3>
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    {CARD_PROVIDERS.map((p) => (
+                  <div className={`mt-3 grid gap-3 ${providers.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                    {providers.map((p) => (
                       <button
                         key={p.id}
                         onClick={() => {
@@ -440,7 +451,7 @@ function Checkout() {
 
           <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5" />
-            Secured payments via Razorpay and PayPal.
+            Secured payments via PayPal (international) and Razorpay (India).
           </p>
         </div>
 
@@ -466,9 +477,9 @@ function Checkout() {
           {method === "card" && cardProvider === "razorpay" ? (
             <>
               <Button className="mt-6 w-full" onClick={handleCard} disabled={processing}>
-                {processing ? "Processing…" : "💳 Pay with Credit / Debit Card"}
+                {processing ? "Processing…" : "💳 Pay with Razorpay (India)"}
               </Button>
-              <p className="mt-2 text-center text-xs text-muted-foreground">Secured by Razorpay</p>
+              <p className="mt-2 text-center text-xs text-muted-foreground">Secured by Razorpay · INR only</p>
             </>
           ) : method === "card" && cardProvider === "paypal" ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">
