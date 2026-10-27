@@ -107,11 +107,7 @@ export type Plan = {
  *   AI Studio $55 / 5,000 · Master Studio $110 / 10,000
  * Free stays in the array for profile.plan === "free" only — not sold.
  *
- * Modes:
- *   Image: Standard · Premium · Ultra AI
- *   Video: Standard · Premium
- *   Music: Standard · Premium + 6 generation categories (Song, Instrumental, Voiceover, SFX, BGM, AI Voice)
- *   + Circle 2edit, Cropmix, Remove BG, Auto Edit, Filters, multi-image
+ * Maluto AI Restore starts on Lite ($4.99) — not free.
  */
 export const PLANS: Plan[] = [
   {
@@ -139,6 +135,7 @@ export const PLANS: Plan[] = [
     price: { USD: 4.99, EUR: 4.59, INR: 449 },
     features: [
       "350 credits / month",
+      "Maluto AI Restore — just upload",
       "Image Studio — Standard mode",
       "Video Studio — Standard mode",
       "Music Studio — Standard · Song & Instrumental",
@@ -158,11 +155,12 @@ export const PLANS: Plan[] = [
     price: { USD: 9.99, EUR: 9.19, INR: 899 },
     features: [
       "800 credits / month",
+      "Maluto AI Restore + 2K",
       "Image Studio — Standard mode",
       "Video Studio — Standard mode",
       "Music — Standard · all 6 modes (Song, Instrumental, Voiceover, SFX, BGM, AI Voice)",
       "Longer tracks (up to 90s)",
-      "Circle 2edit · Cropmix · Auto Edit · Filters",
+      "Circle 2edit · Cropmix · Filters",
       "Multi-image (up to 10 references)",
       "Watermark-free downloads",
       "No ads",
@@ -178,6 +176,7 @@ export const PLANS: Plan[] = [
     price: { USD: 29.99, EUR: 27.49, INR: 2699 },
     features: [
       "2,500 credits / month",
+      "Maluto AI Restore + 4K",
       "Image Studio — Standard + Premium",
       "Video Studio — Standard + Premium",
       "Music — Premium quality · all 6 generation modes",
@@ -198,6 +197,7 @@ export const PLANS: Plan[] = [
     price: { USD: 55, EUR: 50.99, INR: 4999 },
     features: [
       "5,000 credits / month",
+      "Maluto AI Restore + 8K",
       "Image Studio — Standard + Premium + Ultra AI",
       "Video Studio — Standard + Premium",
       "Music — Premium · all 6 modes · 120s tracks",
@@ -217,6 +217,7 @@ export const PLANS: Plan[] = [
     price: { USD: 110, EUR: 101.99, INR: 9999 },
     features: [
       "10,000 credits / month",
+      "Maluto AI Restore + 8K Max",
       "Image — Standard + Premium + full Ultra AI",
       "Video — Standard + Premium",
       "Music — Premium · all 6 modes · longest tracks",
