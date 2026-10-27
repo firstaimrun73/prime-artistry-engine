@@ -175,7 +175,6 @@ export function BottomTabBar() {
     { to: "/" as const, label: t("nav.home") || "Home", icon: Home },
     { to: "/studio" as const, label: t("nav.studio") || "Studio", icon: LayoutGrid },
   ];
-  // Free: History slot → Pricing (Plans). Paid: History.
   const right = paid
     ? [
         { to: "/history" as const, label: t("nav.history") || "History", icon: History },
@@ -186,7 +185,6 @@ export function BottomTabBar() {
         { to: "/profile" as const, label: t("nav.profile") || "Profile", icon: User },
       ];
 
-  // iPhone / iOS: floating curved glass bar (Android keeps full-width bar).
   const isIOS =
     typeof navigator !== "undefined" &&
     (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
@@ -223,6 +221,7 @@ export function BottomTabBar() {
           <Link
             to="/studio/image/auto-edit"
             aria-label="Maluto AI"
+            data-maluto-tab="1"
             className={cn(
               "flex flex-col items-center justify-end pb-1",
               autoActive ? "text-primary" : "text-muted-foreground",
