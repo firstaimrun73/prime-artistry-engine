@@ -7,6 +7,8 @@
  *   3) watermark / finalize → charge once
  *
  * Product: Maluto AI 1.8
+ * Free-tier users receive one complimentary generation per account (server-enforced).
+ * Subsequent generations: 40 credits (product policy).
  */
 
 /** Auto Edit quality tiers (includes backend-only 8k_max). */
@@ -23,16 +25,17 @@ export const AUTO_EDIT_TARGET_MP: Record<AutoEditQuality, number> = {
 };
 
 /**
- * Total Auto Edit credits by quality (legacy product table / bridge).
- * Debit flows through @/lib/billing lifecycle; amounts remain until final economics review.
+ * Total Auto Edit credits by quality.
+ * Product policy: 40 credits for subsequent Maluto AI generations (all tiers aligned).
+ * Debit flows through @/lib/billing lifecycle.
  */
 export const AUTO_EDIT_CREDITS_BY_QUALITY: Record<AutoEditQuality, number> = {
-  sd: 45,
-  hd: 45,
-  "2k": 50,
-  "4k": 60,
-  "8k": 60,
-  "8k_max": 65,
+  sd: 40,
+  hd: 40,
+  "2k": 40,
+  "4k": 40,
+  "8k": 40,
+  "8k_max": 40,
 };
 
 /** @deprecated Prefer autoEditCreditCost(quality). HD default. */
