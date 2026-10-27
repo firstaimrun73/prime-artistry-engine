@@ -25,6 +25,7 @@ import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
+import { SupportMemoriesCard } from "@/components/home/SupportMemoriesCard";
 import { DirectLinkAd } from "@/components/ads";
 
 /** Only 3–4 creative tags — open Image Studio with style prompt (no forced 1:1). */
@@ -254,6 +255,8 @@ export function SignedInHomeBody() {
       <DirectLinkAd placement="home-footer" variant="compact" />
 
       <AutoEditHomeCard />
+
+      <SupportMemoriesCard />
     </main>
   );
 }
