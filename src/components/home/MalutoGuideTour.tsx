@@ -1,8 +1,8 @@
 /**
- * One-time guided animation showing where Maluto AI lives
- * (center bottom tab + home Ace card). Free users see upgrade path.
+ * One-time guided tour: measures the real Maluto AI bottom-tab button
+ * and pins spotlight + card above it (works across iOS/Android safe areas).
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Sparkles, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -11,11 +11,38 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "motio2edit-maluto-tour-v1";
+/** Must match data-maluto-tab on BottomTabBar center link. */
+export const MALUTO_TAB_SELECTOR = '[data-maluto-tab="1"]';
+
+type TargetBox = { top: number; left: number; width: number; height: number; cx: number; cy: number };
+
+function measureMalutoTab(): TargetBox | null {
+  if (typeof document === "undefined") return null;
+  const el = document.querySelector(MALUTO_TAB_SELECTOR) as HTMLElement | null;
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  if (r.width < 8 || r.height < 8) return null;
+  // If tab is scrolled off / translated away, treat as missing
+  if (r.bottom < 40 || r.top > window.innerHeight - 8) return null;
+  return {
+    top: r.top,
+    left: r.left,
+    width: r.width,
+    height: r.height,
+    cx: r.left + r.width / 2,
+    cy: r.top + r.height / 2,
+  };
+}
 
 export function MalutoGuideTour() {
   const { user, profile } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState<TargetBox | null>(null);
+
+  const refreshTarget = useCallback(() => {
+    setTarget(measureMalutoTab());
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -25,9 +52,42 @@ export function MalutoGuideTour() {
     } catch {
       /* ignore */
     }
-    const t = window.setTimeout(() => setOpen(true), 900);
+    // Scroll to top so BottomTabBar is not scroll-hidden, then open
+    const t = window.setTimeout(() => {
+      try {
+        window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+      } catch {
+        window.scrollTo(0, 0);
+      }
+      setOpen(true);
+    }, 700);
     return () => window.clearTimeout(t);
   }, [user, pathname]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    refreshTarget();
+    // Retry a few times — tab mounts / layout settles differently per device
+    const timers = [50, 150, 350, 700].map((ms) =>
+      window.setTimeout(refreshTarget, ms),
+    );
+    const onResize = () => refreshTarget();
+    const onScroll = () => refreshTarget();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", onResize);
+    vv?.addEventListener("scroll", onScroll);
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+      window.removeEventListener("scroll", onScroll);
+      vv?.removeEventListener("resize", onResize);
+      vv?.removeEventListener("scroll", onScroll);
+    };
+  }, [open, refreshTarget]);
 
   const dismiss = () => {
     setOpen(false);
@@ -40,8 +100,26 @@ export function MalutoGuideTour() {
 
   if (!open || !user || pathname !== "/") return null;
 
-  const paid =
-    isAdminEmail(profile?.email) || isPaidPlan(profile?.plan);
+  const paid = isAdminEmail(profile?.email) || isPaidPlan(profile?.plan);
+
+  // Spotlight size slightly larger than the measured button
+  const hole = target
+    ? {
+        size: Math.max(target.width, target.height) + 28,
+        left: target.cx,
+        top: target.cy,
+      }
+    : null;
+
+  // Card sits above the tab with gap; clamp to viewport
+  const cardMaxW = Math.min(window.innerWidth - 24, 352);
+  let cardBottom = 120;
+  let cardLeft = 12;
+  if (target) {
+    const gap = 16;
+    cardBottom = Math.max(12, window.innerHeight - target.top + gap);
+    cardLeft = Math.max(12, Math.min(target.cx - cardMaxW / 2, window.innerWidth - cardMaxW - 12));
+  }
 
   return (
     <div
@@ -49,20 +127,41 @@ export function MalutoGuideTour() {
       role="dialog"
       aria-label="Where is Maluto AI"
     >
+      {/* Dim layer — click dismisses */}
       <button
         type="button"
-        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/60"
         aria-label="Dismiss tour"
         onClick={dismiss}
       />
 
-      <div className="pointer-events-none absolute bottom-[4.5rem] left-1/2 z-[61] h-20 w-20 -translate-x-1/2 rounded-full bg-orange-500/30 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] ring-4 ring-orange-400/80 animate-pulse" />
+      {/* Measured spotlight hole over real Maluto button */}
+      {hole && (
+        <div
+          className="pointer-events-none absolute z-[61] -translate-x-1/2 -translate-y-1/2 rounded-full ring-4 ring-orange-400 animate-pulse"
+          style={{
+            left: hole.left,
+            top: hole.top,
+            width: hole.size,
+            height: hole.size,
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.62)",
+            background: "rgba(249, 115, 22, 0.22)",
+          }}
+          aria-hidden
+        />
+      )}
 
+      {/* Coach card anchored above the measured button */}
       <div
         className={cn(
-          "absolute bottom-[9.5rem] left-1/2 z-[62] w-[min(92vw,22rem)] -translate-x-1/2",
-          "rounded-2xl border border-orange-400/40 bg-card p-4 shadow-2xl",
+          "absolute z-[62] rounded-2xl border border-orange-400/40 bg-card p-4 shadow-2xl",
         )}
+        style={{
+          left: cardLeft,
+          bottom: cardBottom,
+          width: cardMaxW,
+          maxWidth: "calc(100vw - 24px)",
+        }}
       >
         <button
           type="button"
@@ -117,13 +216,21 @@ export function MalutoGuideTour() {
           )}
         </div>
 
-        <div className="mt-3 flex flex-col items-center text-orange-500" aria-hidden>
+        {/* Arrow points down toward measured tab */}
+        <div className="mt-2 flex flex-col items-center text-orange-500" aria-hidden>
           <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-            Center tab
+            {target ? "This button" : "Center tab below"}
           </span>
-          <span className="mt-1 animate-bounce text-lg leading-none">↓</span>
+          <span className="mt-0.5 animate-bounce text-xl leading-none">↓</span>
         </div>
       </div>
+
+      {/* If tab not found yet, still allow open via CTA; no wrong fixed hole */}
+      {!hole && (
+        <p className="pointer-events-none absolute bottom-24 left-1/2 z-[61] w-[90%] -translate-x-1/2 text-center text-xs font-medium text-white/90">
+          Look for the center <strong>Maluto AI</strong> button on the bottom bar
+        </p>
+      )}
     </div>
   );
 }
