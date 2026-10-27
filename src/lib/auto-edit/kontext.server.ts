@@ -6,7 +6,8 @@
  * ONE image_url + Gemini final_edit_prompt.
  *
  * Billing: shared @/lib/billing lifecycle (quote → reserve → generate → finalize/release).
- * Legacy credit amounts used as bridge until final economics review.
+ * Free-tier users receive one complimentary Maluto AI generation (server-enforced).
+ * Subsequent: 40 credits via autoEditCreditCost.
  * History: fal provider URL via persistGenerationHistory (no permanent Motio2edit media copy).
  */
 
@@ -20,7 +21,13 @@ import {
   autoEditTargetMegapixels,
   type AutoEditQuality,
 } from "./constants";
-import { quoteForProduct, runWithBillingLifecycle } from "@/lib/billing";
+import {
+  quoteForProduct,
+  runWithBillingLifecycle,
+  createFreeGenerationQuote,
+  evaluateComplimentaryMaluto,
+  COMPLIMENTARY_MALUTO_AI,
+} from "@/lib/billing";
 import { persistGenerationHistory } from "@/lib/history-persist.server";
 
 const FAL_QUEUE = "https://queue.fal.run/";
@@ -156,6 +163,7 @@ export type RunAutoKontextEditResult = {
   primaryModel: typeof AUTO_EDIT_FAL_MODEL;
   targetMegapixels: number;
   actualMegapixels?: number;
+  usedComplimentary?: boolean;
 };
 
 export async function runAutoKontextEdit(
@@ -175,19 +183,41 @@ export async function runAutoKontextEdit(
   const cost = autoEditCreditCost(quality);
   const targetMp = autoEditTargetMegapixels(quality);
 
-  const quote = quoteForProduct({
+  // Server-side complimentary entitlement check (one per free account)
+  const freeEval = await evaluateComplimentaryMaluto(args.supabaseAdmin, {
     userId: args.userId,
-    product: "auto_edit",
+    isAdmin: args.isAdmin,
+    plan: args.profile.plan,
+  });
+  const useComplimentary = freeEval.eligible === true;
+
+  const baseQuoteArgs = {
+    userId: args.userId,
+    product: "auto_edit" as const,
     operation: "kontext_edit",
     provider: "fal",
     modelId: AUTO_EDIT_FAL_MODEL,
     endpoint: AUTO_EDIT_FAL_MODEL,
     providerCogsUsd: 0,
-    legacyCustomerCredits: cost,
+    legacyCustomerCredits: useComplimentary ? 0 : cost,
     idempotencyKey: `auto_edit:${args.userId}:${quality}:${args.imageUrl.slice(-48)}:${args.editPrompt.slice(0, 64)}`,
     resolution: quality,
-    metadata: { quality, targetMegapixels: targetMp },
-  });
+    metadata: {
+      quality,
+      targetMegapixels: targetMp,
+      ...(useComplimentary
+        ? {
+            free_generation: true,
+            entitlement_key: COMPLIMENTARY_MALUTO_AI.entitlementKey,
+            experience: "auto-edit",
+          }
+        : {}),
+    },
+  };
+
+  const quote = useComplimentary
+    ? createFreeGenerationQuote(baseQuoteArgs)
+    : quoteForProduct(baseQuoteArgs);
 
   const qp = qualityParams(quality);
   const body: Record<string, unknown> = {
@@ -264,6 +294,8 @@ export async function runAutoKontextEdit(
     const { data: bal } = await args.supabase.from("profiles").select("credits").eq("id", args.userId).single();
     newCredits = bal?.credits ?? Math.max(0, args.profile.credits - creditsCharged);
     console.log("[auto-edit/kontext] lifecycle charged", creditsCharged, "credits → remaining", newCredits);
+  } else if (useComplimentary) {
+    console.log("[auto-edit/kontext] complimentary Maluto AI used for user", args.userId);
   }
 
   // Prefer clean fal URL for History reference; display may use watermarked outputUrl
@@ -294,6 +326,12 @@ export async function runAutoKontextEdit(
         single_image: true,
         analysis_completed: true,
         edit_completed: true,
+        ...(useComplimentary
+          ? {
+              free_generation: true,
+              entitlement_key: COMPLIMENTARY_MALUTO_AI.entitlementKey,
+            }
+          : {}),
       },
     });
     if (persist.error) {
@@ -312,5 +350,6 @@ export async function runAutoKontextEdit(
     primaryModel: AUTO_EDIT_FAL_MODEL,
     targetMegapixels: targetMp,
     actualMegapixels: kontext.actualMegapixels,
+    usedComplimentary: useComplimentary,
   };
 }
