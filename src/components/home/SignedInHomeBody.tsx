@@ -179,7 +179,7 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* Ad near primary create actions */}
+      {/* Sponsor #1 — near primary actions */}
       <DirectLinkAd placement="home-upper" variant="compact" />
 
       <section className="mt-5">
@@ -230,7 +230,7 @@ export function SignedInHomeBody() {
 
       <RemoveBgHomeCard />
 
-      {/* Ad after tool CTAs */}
+      {/* Sponsor #2 — after tool CTAs */}
       <DirectLinkAd placement="home-mid" />
 
       <div className="mt-12">
@@ -240,8 +240,6 @@ export function SignedInHomeBody() {
       <ObserveBuildProtect />
 
       <HomePromptBar />
-
-      <DirectLinkAd placement="home-footer" variant="compact" />
 
       <AutoEditHomeCard />
 
