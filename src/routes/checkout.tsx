@@ -23,6 +23,8 @@ import {
   getPaypalClientId,
   createPaypalOrder,
   capturePaypalOrder,
+  getPaypalSubscriptionMode,
+  createPaypalSubscription,
 } from "@/lib/payments.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -62,6 +64,8 @@ type CryptoInvoice = {
   credits: number;
 };
 
+type PaypalMode = "subscription" | "order" | "loading" | "unknown";
+
 function Checkout() {
   const { plan: planId, currency } = useSearch({ from: "/checkout" });
   const navigate = useNavigate();
@@ -77,6 +81,8 @@ function Checkout() {
   const paypalClientId = useServerFn(getPaypalClientId);
   const createPp = useServerFn(createPaypalOrder);
   const capturePp = useServerFn(capturePaypalOrder);
+  const getPpMode = useServerFn(getPaypalSubscriptionMode);
+  const createPpSub = useServerFn(createPaypalSubscription);
 
   const methods = CURRENCY_METHODS[currency as Currency];
   const providers = cardProvidersForCurrency(currency as Currency);
@@ -92,11 +98,16 @@ function Checkout() {
   const [cryptoCancelled, setCryptoCancelled] = useState(false);
   const [paypalReady, setPaypalReady] = useState(false);
   const [paypalError, setPaypalError] = useState<string | null>(null);
+  const [paypalMode, setPaypalMode] = useState<PaypalMode>("loading");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const paypalContainerRef = useRef<HTMLDivElement | null>(null);
   const paypalRenderedRef = useRef(false);
 
   const symbol = CURRENCY_SYMBOL[currency as Currency];
+  const monthlyPriceLabel =
+    plan && currency
+      ? `${symbol}${plan.price[currency as Currency]}${currency === "USD" || currency === "EUR" ? "/mo" : " / month"}`
+      : "";
 
   useEffect(() => {
     return () => {
@@ -110,8 +121,29 @@ function Checkout() {
     setCardProvider(next);
   }, [currency]);
 
+  // Detect whether this plan has a real PayPal Billing Plan configured.
+  useEffect(() => {
+    if (planId === "free") return;
+    let cancelled = false;
+    setPaypalMode("loading");
+    getPpMode({ data: { plan: planId } })
+      .then((r) => {
+        if (cancelled) return;
+        setPaypalMode(r.mode === "subscription" ? "subscription" : "order");
+      })
+      .catch(() => {
+        if (!cancelled) setPaypalMode("order"); // safe fallback: legacy one-time
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [planId, getPpMode]);
+
+  // One-time Orders Buttons only when mode is "order" (no PAYPAL_PLAN_* or fallback).
   useEffect(() => {
     if (planId === "free" || method !== "card" || cardProvider !== "paypal" || !user) return;
+    if (paypalMode !== "order") return;
+
     let cancelled = false;
     paypalRenderedRef.current = false;
     setPaypalReady(false);
@@ -194,7 +226,7 @@ function Checkout() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, cardProvider, user, planId]);
+  }, [method, cardProvider, user, planId, paypalMode]);
 
   useEffect(() => {
     if (!invoice) return;
@@ -209,6 +241,26 @@ function Checkout() {
       return false;
     }
     return true;
+  };
+
+  /** True recurring: create subscription server-side → redirect to PayPal approve URL. */
+  const handleSubscribePaypal = async () => {
+    if (!requireAuth()) return;
+    setProcessing(true);
+    setPaypalError(null);
+    try {
+      const res = await createPpSub({ data: { plan: planId } });
+      if (!res.approveUrl) {
+        throw new Error("PayPal did not return an approval link. Please try again.");
+      }
+      // Never treat redirect as paid — activation is webhook / server verified only.
+      window.location.href = res.approveUrl;
+    } catch (err) {
+      setProcessing(false);
+      const msg = err instanceof Error ? err.message : "Could not start subscription.";
+      setPaypalError(msg);
+      toast.error(msg);
+    }
   };
 
   const handleCard = async () => {
@@ -371,7 +423,11 @@ function Checkout() {
       <div className="mx-auto grid max-w-4xl gap-8 px-4 py-16 md:grid-cols-[1fr_320px]">
         <div>
           <h1 className="text-2xl font-bold">Checkout</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Complete your {plan.name} plan purchase.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {paypalMode === "subscription"
+              ? `Subscribe to ${plan.name} — billed monthly via PayPal.`
+              : `Complete your ${plan.name} plan purchase.`}
+          </p>
 
           {planId !== "free" && (
             <>
@@ -429,17 +485,50 @@ function Checkout() {
               )}
 
               {method === "card" && cardProvider === "paypal" && (
-                <div className="mt-6">
-                  {paypalError && (
-                    <p className="mb-3 text-sm text-destructive">{paypalError}</p>
+                <div className="mt-6 space-y-3">
+                  {paypalError && <p className="text-sm text-destructive">{paypalError}</p>}
+
+                  {paypalMode === "loading" && (
+                    <p className="text-sm text-muted-foreground">Checking PayPal billing options…</p>
                   )}
-                  <div ref={paypalContainerRef} className="min-h-[48px]" />
-                  {!paypalReady && !paypalError && (
-                    <p className="text-sm text-muted-foreground">Loading PayPal…</p>
+
+                  {paypalMode === "subscription" && (
+                    <>
+                      <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+                        <p className="font-semibold text-foreground">Monthly subscription</p>
+                        <p className="mt-1 text-muted-foreground">
+                          You will be charged <span className="font-medium text-foreground">{monthlyPriceLabel}</span>{" "}
+                          every month via PayPal until you cancel. First charge happens when you approve on PayPal.
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Activation is confirmed server-side after PayPal notifies us — not by this page alone.
+                        </p>
+                      </div>
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        disabled={processing}
+                        onClick={handleSubscribePaypal}
+                      >
+                        {processing ? "Redirecting to PayPal…" : `Subscribe with PayPal · ${monthlyPriceLabel}`}
+                      </Button>
+                      <p className="text-center text-xs text-muted-foreground">
+                        You will approve the subscription on PayPal. Cancel anytime from your profile.
+                      </p>
+                    </>
                   )}
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    You will be charged in USD via PayPal. Credits are added after payment.
-                  </p>
+
+                  {paypalMode === "order" && (
+                    <>
+                      <div ref={paypalContainerRef} className="min-h-[48px]" />
+                      {!paypalReady && !paypalError && (
+                        <p className="text-sm text-muted-foreground">Loading PayPal…</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        One-time payment in USD via PayPal. Credits are added after payment is verified.
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -459,18 +548,26 @@ function Checkout() {
           <h3 className="font-semibold">Order summary</h3>
           <div className="mt-4 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{plan.name} plan</span>
-            <span className="font-medium">{symbol}{plan.price[currency as Currency]}</span>
+            <span className="font-medium">
+              {symbol}
+              {plan.price[currency as Currency]}
+              {paypalMode === "subscription" ? "/mo" : ""}
+            </span>
           </div>
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Credits</span>
             <span className="font-medium">{creditsLabel(plan.credits)}</span>
           </div>
+          {paypalMode === "subscription" && (
+            <p className="mt-2 text-xs text-muted-foreground">Billed monthly · cancel anytime</p>
+          )}
           <div className="my-4 h-px bg-border" />
           <div className="flex items-center justify-between font-semibold">
             <span>Total</span>
             <span>
               {symbol}
               {plan.price[currency as Currency]}
+              {paypalMode === "subscription" ? "/mo" : ""}
             </span>
           </div>
 
@@ -482,9 +579,15 @@ function Checkout() {
               <p className="mt-2 text-center text-xs text-muted-foreground">Secured by Razorpay · INR only</p>
             </>
           ) : method === "card" && cardProvider === "paypal" ? (
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              Use the PayPal button to complete your purchase.
-            </p>
+            paypalMode === "subscription" ? (
+              <p className="mt-6 text-center text-xs text-muted-foreground">
+                Use Subscribe with PayPal above to approve monthly billing.
+              </p>
+            ) : (
+              <p className="mt-6 text-center text-xs text-muted-foreground">
+                Use the PayPal button to complete your purchase.
+              </p>
+            )
           ) : invoice ? (
             <p className="mt-6 text-center text-xs text-muted-foreground">Waiting for your crypto payment…</p>
           ) : (
@@ -497,7 +600,7 @@ function Checkout() {
           )}
 
           <Link to="/pricing" className="mt-4 block text-center text-xs text-muted-foreground hover:text-foreground">
-            ← Back to pricing
+            Change plan
           </Link>
         </aside>
       </div>
