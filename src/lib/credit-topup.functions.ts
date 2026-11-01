@@ -2,6 +2,7 @@
  * Credit top-up server functions.
  * Face: 1 purchased credit = $0.0178.
  * Credits always server-computed. PayPal capture + apply_payment_credits only.
+ * Halloween Special ($1.99 / 150 fixed) is available to free users as limited offer.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -11,6 +12,8 @@ import {
   CUSTOM_TOPUP_MAX_USD,
   CUSTOM_TOPUP_MIN_USD,
   CREDIT_TOPUP_PACKS,
+  ALL_TOPUP_PACKS,
+  HALLOWEEN_SPECIAL_PACK,
   creditsFromUsd,
   customTopUpCredits,
   getTopUpPack,
@@ -18,8 +21,13 @@ import {
 import type { PlanId } from "@/lib/plans";
 
 const PAID_PLANS: PlanId[] = ["lite", "plus", "pro", "studio", "business"];
+const HALLOWEEN_PACK_ID = HALLOWEEN_SPECIAL_PACK.id;
 
-async function assertSubscribed(supabase: any, userId: string): Promise<PlanId> {
+async function assertSubscribedOrHalloween(
+  supabase: any,
+  userId: string,
+  packId?: string,
+): Promise<PlanId> {
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("plan")
@@ -27,17 +35,17 @@ async function assertSubscribed(supabase: any, userId: string): Promise<PlanId> 
     .single();
   if (error || !profile) throw new Error("Could not load your account.");
   const plan = (profile.plan ?? "free") as PlanId;
-  if (!PAID_PLANS.includes(plan)) {
-    throw new Error("Credit top-up is available only for active subscribed plans.");
-  }
-  return plan;
+  if (PAID_PLANS.includes(plan)) return plan;
+  // Free users may buy only the limited Halloween Special pack
+  if (packId === HALLOWEEN_PACK_ID) return plan;
+  throw new Error("Credit top-up is available only for active subscribed plans (or the limited Halloween Special).");
 }
 
 export const listCreditTopUpPacks = createServerFn({ method: "GET" }).handler(async () => {
   return {
-    packs: CREDIT_TOPUP_PACKS.map((p) => ({
+    packs: ALL_TOPUP_PACKS.map((p) => ({
       ...p,
-      credits: creditsFromUsd(p.priceUsd),
+      credits: p.fixedCredits ? p.credits : creditsFromUsd(p.priceUsd),
     })),
     custom: {
       minUsd: CUSTOM_TOPUP_MIN_USD,
@@ -58,7 +66,10 @@ export const quoteCustomTopUp = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const plan = await assertSubscribed(context.supabase, context.userId);
+    const plan = await assertSubscribedOrHalloween(context.supabase, context.userId);
+    if (!PAID_PLANS.includes(plan)) {
+      throw new Error("Custom top-up is for subscribed plans only.");
+    }
     const credits = customTopUpCredits(data.usd);
     return {
       ok: true as const,
@@ -86,7 +97,11 @@ export const createTopUpPaypalOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { createPaypalOrder } = await import("@/lib/payments.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const plan = await assertSubscribed(context.supabase, context.userId);
+    const plan = await assertSubscribedOrHalloween(
+      context.supabase,
+      context.userId,
+      data.packId,
+    );
 
     let priceUsd: number;
     let credits: number;
@@ -95,9 +110,12 @@ export const createTopUpPaypalOrder = createServerFn({ method: "POST" })
       const pack = getTopUpPack(data.packId);
       if (!pack) throw new Error("Unknown top-up pack.");
       priceUsd = pack.priceUsd;
-      credits = creditsFromUsd(priceUsd);
+      credits = pack.fixedCredits ? pack.credits : creditsFromUsd(priceUsd);
       label = pack.name;
     } else {
+      if (!PAID_PLANS.includes(plan)) {
+        throw new Error("Custom top-up is for subscribed plans only.");
+      }
       priceUsd = Number(data.customUsd);
       credits = creditsFromUsd(priceUsd);
       label = "Custom";
@@ -126,6 +144,7 @@ export const createTopUpPaypalOrder = createServerFn({ method: "POST" })
         customUsd: data.customUsd ?? null,
         faceUsd: CUSTOM_TOPUP_CREDIT_FACE_USD,
         plan,
+        halloween: data.packId === HALLOWEEN_PACK_ID,
       },
     });
     if (error) throw new Error(error.message);
