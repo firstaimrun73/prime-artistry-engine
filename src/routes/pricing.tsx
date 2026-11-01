@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { FooterAd } from "@/components/ads";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
@@ -17,7 +17,7 @@ import {
   type PlanId,
 } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
-import { Check, Coins, Crown } from "lucide-react";
+import { Check, Coins, Crown, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pricing")({
@@ -110,6 +110,58 @@ function PricingPage() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">{t("pricing.title")}</h1>
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">{t("pricing.lead")}</p>
+        </div>
+
+        {/* Halloween Special — one-time top-up (surgical addition) */}
+        <div className="mx-auto mt-8 max-w-xl">
+          <div className="relative overflow-hidden rounded-2xl border border-orange-500/40 bg-gradient-to-b from-orange-500/10 to-card p-5 shadow-lg shadow-orange-500/10 sm:p-6">
+            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-500/20 blur-2xl" />
+            <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-orange-500/50 bg-orange-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-400">
+                  <Sparkles className="h-3 w-3" />
+                  Halloween Special · Limited
+                </div>
+                <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
+                  150 Credits · $1.99
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  One-time top-up · Try everything except Video Studio · Ads removed
+                </p>
+                <ul className="mt-3 space-y-1 text-xs text-muted-foreground sm:text-sm">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
+                    Image Studio + all tools unlocked
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
+                    Music Studio unlocked
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
+                    Circle 2edit · Cropmix · Remove BG · Auto Edit · Filters
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
+                    Multi-reference generation · Ads completely removed
+                  </li>
+                </ul>
+              </div>
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                <div className="text-right">
+                  <p className="text-3xl font-black tracking-tight text-orange-400">$1.99</p>
+                  <p className="text-xs text-muted-foreground">one-time</p>
+                </div>
+                <Button
+                  asChild
+                  size="lg"
+                  className="bg-orange-500 font-semibold text-white hover:bg-orange-600"
+                >
+                  <Link to="/profile/top-up">Get 150 Credits</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2 sm:mt-6">
