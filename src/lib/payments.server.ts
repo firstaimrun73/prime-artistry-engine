@@ -62,6 +62,28 @@ export function isPurchasablePlan(id: string | null | undefined): id is Purchasa
   return !!id && id in PLAN_PURCHASE;
 }
 
+/**
+ * PayPal Billing Plan IDs (created once in PayPal dashboard / Catalog).
+ * When set, monthly plan checkout uses Subscriptions API (true recurring).
+ * When missing, checkout falls back to one-time Orders API (legacy behaviour).
+ */
+export const PAYPAL_BILLING_PLAN_IDS: Record<PurchasablePlan, string | undefined> = {
+  lite: process.env.PAYPAL_PLAN_LITE,
+  plus: process.env.PAYPAL_PLAN_PLUS,
+  pro: process.env.PAYPAL_PLAN_PRO,
+  studio: process.env.PAYPAL_PLAN_STUDIO,
+  business: process.env.PAYPAL_PLAN_BUSINESS,
+};
+
+export function paypalBillingPlanId(plan: PurchasablePlan): string | null {
+  const id = PAYPAL_BILLING_PLAN_IDS[plan];
+  return id && id.trim().length > 0 ? id.trim() : null;
+}
+
+export function subscriptionsConfigured(): boolean {
+  return (Object.keys(PLAN_PURCHASE) as PurchasablePlan[]).some((p) => !!paypalBillingPlanId(p));
+}
+
 export const ACCEPTED_COINS = ["usdtbsc", "btc", "eth"] as const;
 export type AcceptedCoin = (typeof ACCEPTED_COINS)[number];
 
@@ -224,6 +246,7 @@ async function paypalAccessToken(): Promise<string> {
   return json.access_token as string;
 }
 
+/** ONE-TIME only — used for credit top-ups. Do not use for monthly plans when billing plans are configured. */
 export async function createPaypalOrder(args: {
   amountUSD: number;
   referenceId: string;
@@ -263,6 +286,85 @@ export async function capturePaypalOrder(orderId: string): Promise<any> {
     throw new Error(`PayPal capture failed (${res.status}): ${text}`);
   }
   return res.json();
+}
+
+/**
+ * Create a PayPal Subscription (recurring monthly).
+ * Requires a pre-created Billing Plan ID in PayPal Catalog (PAYPAL_PLAN_* env).
+ * Returns subscription id + approval links.
+ */
+export async function createPaypalSubscription(args: {
+  planId: PurchasablePlan;
+  paypalPlanId: string;
+  customId: string;
+  returnUrl: string;
+  cancelUrl: string;
+}): Promise<{ id: string; status: string; links: { rel: string; href: string }[] }> {
+  const token = await paypalAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v1/billing/subscriptions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      plan_id: args.paypalPlanId,
+      custom_id: args.customId,
+      application_context: {
+        brand_name: "Motio2edit",
+        locale: "en-US",
+        shipping_preference: "NO_SHIPPING",
+        user_action: "SUBSCRIBE_NOW",
+        return_url: args.returnUrl,
+        cancel_url: args.cancelUrl,
+      },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`PayPal subscription create failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
+export async function getPaypalSubscription(subscriptionId: string): Promise<any> {
+  const token = await paypalAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v1/billing/subscriptions/${subscriptionId}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`PayPal get subscription failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
+export async function suspendPaypalSubscription(subscriptionId: string, reason: string): Promise<void> {
+  const token = await paypalAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v1/billing/subscriptions/${subscriptionId}/suspend`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ reason: reason.slice(0, 120) }),
+  });
+  if (!res.ok && res.status !== 422) {
+    const text = await res.text();
+    throw new Error(`PayPal subscription suspend failed (${res.status}): ${text}`);
+  }
+}
+
+export async function activatePaypalSubscription(subscriptionId: string, reason: string): Promise<void> {
+  const token = await paypalAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v1/billing/subscriptions/${subscriptionId}/activate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ reason: reason.slice(0, 120) }),
+  });
+  if (!res.ok && res.status !== 422) {
+    const text = await res.text();
+    throw new Error(`PayPal subscription activate failed (${res.status}): ${text}`);
+  }
 }
 
 export async function verifyPaypalWebhook(
