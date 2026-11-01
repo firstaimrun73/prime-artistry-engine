@@ -5,6 +5,8 @@
  * Fixed pack prices (authoritative):
  *   $4.99 → 280 · $10 → 561 · $29.99 → 1,684 · $55 → 3,089 · $110 → 6,179
  *
+ * Halloween Special (limited): $1.99 → 150 credits (fixed, better rate)
+ *
  * Custom top-up (subscribers only): $2–$1,000, same rate.
  *
  * Video generation SPEND is separate: COGS staircase + $0.01 face.
@@ -27,6 +29,8 @@ export type CreditTopUpPack = {
   effectiveRate: number;
   discountLabel?: string;
   description: string;
+  /** When true, credits are fixed (not recomputed from face rate). */
+  fixedCredits?: boolean;
 };
 
 /** Server-authoritative: never trust client-supplied credit counts. */
@@ -63,10 +67,27 @@ export const CREDIT_TOPUP_PACKS: CreditTopUpPack[] = PACK_PRICES_USD.map((priceU
   };
 });
 
-/** Lookup pack by id; credits always recomputed from price. */
+/** Limited Halloween Special — fixed 150 credits at $1.99 (better rate). */
+export const HALLOWEEN_SPECIAL_PACK: CreditTopUpPack = {
+  id: "topup-halloween-150",
+  name: "Halloween Special",
+  credits: 150,
+  priceUsd: 1.99,
+  priceInr: 179,
+  effectiveRate: 1.99 / 150,
+  discountLabel: "Halloween · Limited",
+  description: "150 credits · $1.99 · try everything except Video Studio · ads removed",
+  fixedCredits: true,
+};
+
+/** All packs including special (special first for display). */
+export const ALL_TOPUP_PACKS: CreditTopUpPack[] = [HALLOWEEN_SPECIAL_PACK, ...CREDIT_TOPUP_PACKS];
+
+/** Lookup pack by id; credits always recomputed from price unless fixedCredits. */
 export function getTopUpPack(packId: string): CreditTopUpPack | null {
-  const pack = CREDIT_TOPUP_PACKS.find((p) => p.id === packId);
+  const pack = ALL_TOPUP_PACKS.find((p) => p.id === packId);
   if (!pack) return null;
+  if (pack.fixedCredits) return { ...pack };
   // Re-assert credits from face rate (authoritative)
   return { ...pack, credits: creditsFromUsd(pack.priceUsd) };
 }
