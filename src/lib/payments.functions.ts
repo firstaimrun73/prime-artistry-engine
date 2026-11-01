@@ -296,6 +296,118 @@ export const getPaypalClientId = createServerFn({ method: "GET" }).handler(async
   return { clientId: process.env.PAYPAL_CLIENT_ID || "" };
 });
 
+/**
+ * Whether true PayPal Subscriptions are configured for this plan.
+ * Used by checkout to choose Buttons mode (subscription vs one-time).
+ */
+export const getPaypalSubscriptionMode = createServerFn({ method: "POST" })
+  .inputValidator((d: { plan: string }) => z.object({ plan: planSchema }).parse(d))
+  .handler(async ({ data }) => {
+    const { paypalBillingPlanId } = await import("@/lib/payments.server");
+    const billingPlanId = paypalBillingPlanId(data.plan as any);
+    return {
+      mode: billingPlanId ? ("subscription" as const) : ("order" as const),
+      configured: !!billingPlanId,
+    };
+  });
+
+/**
+ * Create a PayPal Subscription for a monthly plan (true recurring).
+ * Requires PAYPAL_PLAN_* env vars. Falls back is handled by client via mode check.
+ */
+export const createPaypalSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { plan: string }) => z.object({ plan: planSchema }).parse(d))
+  .handler(async ({ data, context }) => {
+    const {
+      PLAN_PURCHASE,
+      paypalBillingPlanId,
+      createPaypalSubscription: createSub,
+    } = await import("@/lib/payments.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "paypal");
+
+    const planId = data.plan as keyof typeof PLAN_PURCHASE;
+    const pkg = PLAN_PURCHASE[planId];
+    if (!pkg) throw new Error("Selected plan is not available for purchase.");
+
+    const paypalPlanId = paypalBillingPlanId(planId);
+    if (!paypalPlanId) {
+      throw new Error(
+        "PayPal Subscriptions are not configured for this plan yet. Use one-time checkout or contact support.",
+      );
+    }
+
+    const internalOrderId = `M2E-PPSUB-${crypto.randomUUID()}`;
+    const base = (process.env.FRONTEND_URL || process.env.BACKEND_URL || "https://motio2edit.com").replace(
+      /\/+$/,
+      "",
+    );
+
+    const sub = await createSub({
+      planId,
+      paypalPlanId,
+      customId: internalOrderId,
+      returnUrl: `${base}/payment-success?sub=1`,
+      cancelUrl: `${base}/payment-failed?sub=1`,
+    });
+
+    const approveLink = (sub.links || []).find((l: any) => l.rel === "approve")?.href;
+
+    const { error } = await (supabaseAdmin as any).from("payment_transactions").insert({
+      user_id: context.userId,
+      payment_method: "paypal",
+      amount: pkg.amountUSD,
+      currency: "USD",
+      credits_purchased: pkg.credits,
+      transaction_id: internalOrderId,
+      gateway_order_id: sub.id,
+      payment_status: "pending",
+      gateway_response: { kind: "subscription_create", subscription: sub },
+      metadata: {
+        kind: "paypal_subscription",
+        plan: planId,
+        paypal_plan_id: paypalPlanId,
+        paypal_subscription_id: sub.id,
+      },
+    });
+    if (error) throw new Error(error.message);
+
+    // Pending subscription row (activated by webhook)
+    await (supabaseAdmin as any).from("subscriptions").upsert(
+      {
+        user_id: context.userId,
+        plan: planId,
+        status: "pending",
+        provider: "paypal",
+        provider_subscription_id: sub.id,
+        auto_renew: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    ).catch(() => {
+      // upsert may fail if no unique on user_id — insert instead
+      return (supabaseAdmin as any).from("subscriptions").insert({
+        user_id: context.userId,
+        plan: planId,
+        status: "pending",
+        provider: "paypal",
+        provider_subscription_id: sub.id,
+        auto_renew: true,
+      });
+    });
+
+    return {
+      subscriptionId: sub.id,
+      internalOrderId,
+      approveUrl: approveLink || null,
+      status: sub.status,
+      credits: pkg.credits,
+      mode: "subscription" as const,
+    };
+  });
+
+/** Legacy one-time order for monthly plans (fallback when PAYPAL_PLAN_* not set) + used by top-ups. */
 export const createPaypalOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { plan: string }) => z.object({ plan: planSchema }).parse(d))
@@ -322,10 +434,11 @@ export const createPaypalOrder = createServerFn({ method: "POST" })
       transaction_id: internalOrderId,
       gateway_order_id: order.id,
       payment_status: "pending",
+      metadata: { kind: "paypal_order_legacy", plan: data.plan },
     });
     if (error) throw new Error(error.message);
 
-    return { orderId: order.id, internalOrderId, credits: pkg.credits };
+    return { orderId: order.id, internalOrderId, credits: pkg.credits, mode: "order" as const };
   });
 
 export const capturePaypalOrder = createServerFn({ method: "POST" })
