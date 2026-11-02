@@ -8,6 +8,7 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { PlanId } from "@/lib/plans";
+import { isPresetAvatar } from "@/lib/avatar-presets";
 
 export type Profile = {
   id: string;
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       if (data) {
         const p = data as Profile;
-        if (p.avatar_url) {
+        if (p.avatar_url && !isPresetAvatar(p.avatar_url)) {
           const { data: signed } = await supabase.storage
             .from("avatars")
             .createSignedUrl(p.avatar_url, 60 * 60);
@@ -75,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!cancelled) setLoading(false);
     };
 
-    // Safety: never leave the whole app on a white spinner if auth hangs (mobile networks, blocked storage, etc.).
     const timeoutId = window.setTimeout(clearLoading, AUTH_LOADING_TIMEOUT_MS);
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
@@ -86,7 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfile(null);
       }
-      // Auth state known — drop spinner even if getSession is slow.
       clearLoading();
     });
 
