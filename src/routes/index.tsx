@@ -67,9 +67,6 @@ function SignedOutHome() {
 
       <WatchDemoSection variant="prominent" />
 
-      <div className="mx-auto w-full max-w-6xl px-4">
-      </div>
-
       <ArchitectureFlowSection />
 
       <StudioShowcase />
@@ -90,7 +87,7 @@ function HomeTestimonials() {
   });
   if (!data || data.length === 0) return null;
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
+    <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <h2 className="text-center text-2xl font-bold sm:text-3xl">Loved by creators worldwide</h2>
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {data.slice(0, 6).map((f) => (
@@ -146,7 +143,7 @@ function StudioShowcase() {
   const navigate = useNavigate();
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
+    <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8">
       <div className="mb-8 text-center">
         <h2 className="text-2xl font-bold sm:text-3xl">Three studios, one workspace</h2>
         <p className="mt-2 text-sm text-muted-foreground">Sign in to open any studio.</p>
