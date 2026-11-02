@@ -1,0 +1,38 @@
+# STAGING config: deploys to https://motio2edit-assets2-proxy.<your-subdomain>.workers.dev
+# No custom domain, no DNS change. Use this first.
+#
+# Run this in Cloudflare ACCOUNT 1 only (`npx wrangler whoami` must show Account 1).
+# There is intentionally NO [[r2_buckets]] binding: this Worker cannot read Account 1 buckets.
+
+name = "motio2edit-assets2-proxy"
+main = "src/index.js"
+compatibility_date = "2026-11-03"
+workers_dev = true
+
+# Workers Caching: Cloudflare checks the cache BEFORE running the Worker.
+# Needs Wrangler >= 4.69.0. Hits do not run the Worker and do not read R2.
+[cache]
+enabled = true
+# Optional: keep the cache warm across deploys (needs Wrangler >= 4.107.0).
+# By default every deploy starts with a cold cache. If you enable this, a deploy
+# no longer invalidates the cache; purge manually after content-affecting changes.
+# cross_version_cache = true
+
+[vars]
+# Non-secret settings (safe to commit)
+R2_SECOND_BUCKET_NAME = "motio2edit-assets-2"
+R2_SECOND_JURISDICTION = ""            # "" (default), "eu" or "fedramp" - must match the bucket
+ALLOWED_PREFIXES = ""                  # comma-separated key prefixes; "" = whole bucket
+ALLOWED_QUERY_PARAMS = "v"             # other query params get a 400 (prevents cache-busting reads)
+CACHE_CONTROL_OK = "public, max-age=31536000, immutable"
+NOT_FOUND_TTL = "60"                   # seconds to cache 404s
+CORS_ORIGIN = "*"
+
+# Secrets (NOT stored here). Set with scripts/set-secrets.sh:
+#   R2_SECOND_ACCOUNT_ID
+#   R2_SECOND_ACCESS_KEY_ID
+#   R2_SECOND_SECRET_ACCESS_KEY
+
+[observability]
+enabled = true
+head_sampling_rate = 0.1

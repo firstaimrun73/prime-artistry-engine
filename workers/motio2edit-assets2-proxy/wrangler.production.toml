@@ -1,0 +1,32 @@
+# PRODUCTION config: same Worker + attaches the custom domain assets2.motio2edit.com.
+# Do NOT deploy until staging tests pass and you approve.
+#
+# Deploying this creates a proxied DNS record for "assets2" automatically (owned by the Worker).
+# If a DNS record named assets2 already exists, Wrangler refuses and changes nothing.
+# It never touches the existing "assets" record or the motio2edit-media bucket.
+
+name = "motio2edit-assets2-proxy"
+main = "src/index.js"
+compatibility_date = "2026-11-03"
+workers_dev = false
+
+[[routes]]
+pattern = "assets2.motio2edit.com"
+custom_domain = true
+
+[cache]
+enabled = true
+# cross_version_cache = true
+
+[vars]
+R2_SECOND_BUCKET_NAME = "motio2edit-assets-2"
+R2_SECOND_JURISDICTION = ""
+ALLOWED_PREFIXES = ""
+ALLOWED_QUERY_PARAMS = "v"
+CACHE_CONTROL_OK = "public, max-age=31536000, immutable"
+NOT_FOUND_TTL = "60"
+CORS_ORIGIN = "*"
+
+[observability]
+enabled = true
+head_sampling_rate = 0.1
