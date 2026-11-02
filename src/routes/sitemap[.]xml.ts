@@ -1,34 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
-
-const BASE_URL = "";
-
-interface SitemapEntry {
-  path: string;
-  changefreq?: "weekly" | "monthly";
-  priority?: string;
-}
+import { SITE_URL, SITEMAP_PATHS } from "@/lib/seo";
 
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const entries: SitemapEntry[] = [
-          { path: "/", changefreq: "weekly", priority: "1.0" },
-          { path: "/pricing", changefreq: "weekly", priority: "0.9" },
-          { path: "/auth", changefreq: "monthly", priority: "0.5" },
-        ];
-
-        const urls = entries.map((e) =>
+        const lastmod = new Date().toISOString().slice(0, 10);
+        const urls = SITEMAP_PATHS.map((e) =>
           [
             `  <url>`,
-            `    <loc>${BASE_URL}${e.path}</loc>`,
-            e.changefreq ? `    <changefreq>${e.changefreq}</changefreq>` : null,
-            e.priority ? `    <priority>${e.priority}</priority>` : null,
+            `    <loc>${SITE_URL}${e.path === "/" ? "/" : e.path}</loc>`,
+            `    <lastmod>${lastmod}</lastmod>`,
+            `    <changefreq>${e.changefreq}</changefreq>`,
+            `    <priority>${e.priority}</priority>`,
             `  </url>`,
-          ]
-            .filter(Boolean)
-            .join("\n"),
+          ].join("\n"),
         );
 
         const xml = [
@@ -40,7 +27,7 @@ export const Route = createFileRoute("/sitemap.xml")({
 
         return new Response(xml, {
           headers: {
-            "Content-Type": "application/xml",
+            "Content-Type": "application/xml; charset=utf-8",
             "Cache-Control": "public, max-age=3600",
           },
         });
