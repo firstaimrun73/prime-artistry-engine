@@ -10,12 +10,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
-      { title: "Studio — Motio2edit by Motion2AI" },
+      { title: "Studio — Motio2edit AI Image, Video & Music" },
       {
         name: "description",
-        content: "Image, Circle 2edit, Video, Frames, and Music studios in one hub.",
+        content: "Image, Circle 2edit, Video, Frames, and Music studios in one Motio2edit hub.",
       },
-      { property: "og:title", content: "Studio — Motio2edit by Motion2AI" },
+      { property: "og:title", content: "Studio — Motio2edit" },
+      { name: "robots", content: "noindex, follow" },
     ],
   }),
   component: StudioLayout,
@@ -173,7 +174,6 @@ function StudioTile({
   );
 }
 
-/** Polished Circle 2edit mark — dual-ring draw + soft pulse (matches header). */
 function CircleMetaRing() {
   return (
     <span
