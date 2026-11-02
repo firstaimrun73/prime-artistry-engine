@@ -2,12 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
 /**
- * Public robots.txt — Motio2edit
- * Allows major search + AI search crawlers. Blocks private app surfaces.
- * Does not invent verification tokens.
+ * App-level robots.txt (served when not overridden by CDN/Cloudflare managed robots).
+ * Primary host: https://www.motio2edit.com
  */
 const BODY = `# Motio2edit robots.txt
-# https://motio2edit.com
+# Canonical host: https://www.motio2edit.com
 
 User-agent: *
 Allow: /
@@ -35,7 +34,6 @@ Disallow: /payment-failed
 Disallow: /reset-password
 Disallow: /lovable/
 
-# Explicit allow for major search / AI crawlers (same rules as * above)
 User-agent: Googlebot
 Allow: /
 
@@ -48,22 +46,7 @@ Allow: /
 User-agent: ChatGPT-User
 Allow: /
 
-User-agent: GPTBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: anthropic-ai
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-Sitemap: https://motio2edit.com/sitemap.xml
+Sitemap: https://www.motio2edit.com/sitemap.xml
 `;
 
 export const Route = createFileRoute("/robots.txt")({
