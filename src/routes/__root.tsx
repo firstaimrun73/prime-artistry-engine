@@ -23,6 +23,15 @@ import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
 import { MonetagVignette } from "../components/ads/MonetagVignette";
+import {
+  SITE_NAME,
+  SITE_URL,
+  SITE_BRAND_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+  organizationJsonLd,
+  websiteJsonLd,
+  softwareApplicationJsonLd,
+} from "../lib/seo";
 
 function NotFoundComponent() {
   return (
@@ -117,7 +126,6 @@ const BOOT_GUARD_SCRIPT = `
 
     var href = ${JSON.stringify(appCss)};
     function cssLoaded(){
-      // Detect Tailwind token presence without forcing layout rules
       try {
         var probe = document.createElement('div');
         probe.className = 'bg-background';
@@ -125,7 +133,6 @@ const BOOT_GUARD_SCRIPT = `
         document.body.appendChild(probe);
         var bg = window.getComputedStyle(probe).backgroundColor;
         document.body.removeChild(probe);
-        // Unstyled default is typically transparent/rgba(0,0,0,0)
         return bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
       } catch (e) { return true; }
     }
@@ -151,6 +158,12 @@ const BOOT_GUARD_SCRIPT = `
 })();
 `;
 
+const STRUCTURED_DATA_SCRIPT = JSON.stringify([
+  organizationJsonLd(),
+  websiteJsonLd(),
+  softwareApplicationJsonLd(),
+]);
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -160,37 +173,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
       },
-      { title: "Motio2edit — AI Image, Video & Music Studio by Motion2AI" },
-      {
-        name: "description",
-        content:
-          "Motio2edit, powered by Motion2AI. Edit images, generate videos, and create music with AI — one workspace, three studios.",
-      },
-      { name: "author", content: "Motion2AI" },
-      { property: "og:title", content: "Motio2edit — AI Image, Video & Music Studio by Motion2AI" },
-      {
-        property: "og:description",
-        content: "Edit images, generate videos, and create music with AI — one workspace, three studios.",
-      },
+      { title: `${SITE_NAME} — AI Photo & Video Editor` },
+      { name: "description", content: SITE_BRAND_DESCRIPTION },
+      { name: "author", content: SITE_NAME },
+      { name: "robots", content: "index, follow, max-image-preview:large" },
+      { property: "og:title", content: `${SITE_NAME} — AI Photo & Video Editor` },
+      { property: "og:description", content: SITE_BRAND_DESCRIPTION },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Motio2edit — AI Image, Video & Music Studio by Motion2AI" },
-      {
-        name: "twitter:description",
-        content: "Edit images, generate videos, and create music with AI — one workspace, three studios.",
-      },
-      {
-        property: "og:image",
-        content:
-          "https://storage.googleapis.com/gpt-engineer-file-uploads/1IssfTbY1iUB1etzG4012PVyW3P2/social-images/social-1781815143053-file_0000000030e0720789c4ed52cd0751aa.webp",
-      },
-      {
-        name: "twitter:image",
-        content:
-          "https://storage.googleapis.com/gpt-engineer-file-uploads/1IssfTbY1iUB1etzG4012PVyW3P2/social-images/social-1781815143053-file_0000000030e0720789c4ed52cd0751aa.webp",
-      },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:image", content: DEFAULT_OG_IMAGE },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: `${SITE_NAME} — AI Photo & Video Editor` },
+      { name: "twitter:description", content: SITE_BRAND_DESCRIPTION },
+      { name: "twitter:image", content: DEFAULT_OG_IMAGE },
     ],
     links: [
+      { rel: "canonical", href: SITE_URL },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "preload", href: appCss, as: "style" },
@@ -211,6 +210,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-3NCVLG63JR');",
       },
       { children: BOOT_GUARD_SCRIPT },
+      {
+        type: "application/ld+json",
+        children: STRUCTURED_DATA_SCRIPT,
+      },
     ],
   }),
   shellComponent: RootShell,
