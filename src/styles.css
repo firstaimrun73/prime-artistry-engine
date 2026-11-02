@@ -58,9 +58,13 @@
 @utility gradient-hero  { background-image: var(--gradient-hero); }
 
 @utility glass-panel {
-  background-color: color-mix(in oklab, var(--card) 72%, transparent);
-  backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+  background-color: color-mix(in oklab, var(--card) 68%, transparent);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  box-shadow:
+    0 4px 24px color-mix(in oklab, black 8%, transparent),
+    inset 0 1px 0 color-mix(in oklab, white 8%, transparent);
 }
 
 :root {
