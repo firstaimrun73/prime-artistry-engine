@@ -26,7 +26,7 @@ browser ──► assets2.motio2edit.com (Worker Custom Domain, Account 1)
 ## 0. Before anything: be logged in to Account 1
 
 ```bash
-cd motio2edit-assets2-proxy
+cd workers/motio2edit-assets2-proxy
 npm install
 npx wrangler login
 npx wrangler whoami          # must show ACCOUNT 1 (the one with motio2edit.com). If not: npx wrangler logout, log in again.
@@ -47,9 +47,15 @@ Type `account1` when asked, then enter Account 2 credentials into Wrangler's hid
 
 ## 3. Staging deploy (no DNS)
 
+Working directory: `workers/motio2edit-assets2-proxy`
+
 ```bash
 npm run deploy:staging
 ```
+
+(`deploy:staging` runs `wrangler deploy` against `wrangler.toml` only — workers.dev staging, no custom domain.)
+
+Cloudflare Workers Builds can also deploy this directory when connected to the repository; the first build may be triggered by a documentation-only commit.
 
 ## 4. Verify
 
