@@ -16,33 +16,21 @@ import { TrustSection } from "@/components/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
 import { FooterAd } from "@/components/ads";
+import { pageHead, SITE_BRAND_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Motio2edit — AI Image & Video Editing, Made Simple" },
-      {
-        name: "description",
-        content:
-          "Edit images and videos with AI. Circle to Remove, background replace, portrait enhance, and more — powered by Motion2AI.",
-      },
-      { property: "og:title", content: "Motio2edit — AI Image & Video Editing, Made Simple" },
-      {
-        property: "og:description",
-        content:
-          "Edit images and videos with AI. Circle to Remove, background replace, portrait enhance, and more — powered by Motion2AI.",
-      },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      title: `${SITE_NAME} — AI Photo & Video Editor`,
+      description: SITE_BRAND_DESCRIPTION,
+      path: "/",
+    }),
   component: HomePage,
 });
 
 function HomePage() {
   const { user, loading } = useAuth();
 
-  // While auth is resolving: show a neutral spinner so signed-in users never
-  // flash the pre-login marketing homepage. After logout, loading becomes false
-  // with user=null → pre-login is shown correctly.
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -155,7 +143,6 @@ const STUDIO_CARDS: StudioCardSpec[] = [
 ];
 
 function StudioShowcase() {
-  /* Pre-login marketing only — cards are showcases; click → login only. */
   const navigate = useNavigate();
 
   return (
@@ -168,7 +155,6 @@ function StudioShowcase() {
         {STUDIO_CARDS.map((c) => {
           const Icon = c.icon;
           const onClick = () => {
-            // Never open editors pre-login — always auth.
             navigate({ to: "/auth", search: { redirect: c.href } });
           };
           return (
