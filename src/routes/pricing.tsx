@@ -9,12 +9,16 @@ import { useAuth } from "@/lib/auth";
 import {
   PLANS,
   DISPLAY_PRICES,
+  DISPLAY_ANNUAL_PRICES_USD,
   DISPLAY_CURRENCIES,
   toCheckoutCurrency,
   PRICING_SHOW_PLAN_IDS,
   PRICING_POPULAR_PLAN_ID,
+  annualSavingsMonths,
   type DisplayCurrency,
   type PlanId,
+  type PurchasablePlanId,
+  type BillingInterval,
 } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
 import { Check, Coins, Crown, Sparkles } from "lucide-react";
@@ -33,47 +37,18 @@ function formatPlanPrice(amount: number, currency: DisplayCurrency): string {
   return `${sym}${amount.toFixed(2)}`;
 }
 
-const PLAN_DIFFS: Record<
-  Exclude<PlanId, "free">,
-  { audience: string; unlocks: string[] }
-> = {
-  lite: {
-    audience: "Best for trying paid tools — Standard image & video, Song & Instrumental.",
-    unlocks: ["Video Studio (Standard)", "Circle · Cropmix · Remove BG", "Multi-image (5)"],
-  },
-  plus: {
-    audience: "Daily creators — Maluto AI Auto Edit, Filters, and all 6 music modes.",
-    unlocks: ["Maluto AI Auto Edit", "Filters · Cropmix", "All music modes · 90s"],
-  },
-  pro: {
-    audience: "Premium image & video with priority queue — most popular upgrade.",
-    unlocks: ["Image Premium", "Video Premium", "Priority · 120s music"],
-  },
-  studio: {
-    audience: "Power users who need Ultra AI image and higher concurrency.",
-    unlocks: ["Image Ultra AI", "Higher concurrency", "Full toolset"],
-  },
-  business: {
-    audience: "Maximum capacity — top credits, IMAX/8K Max, Master Studio chat.",
-    unlocks: ["10k credits / mo", "IMAX · 8K Max", "Master Studio chat"],
-  },
+const MODEL_TIER_LABEL: Record<string, string> = {
+  standard: "Standard AI Models",
+  premium: "Premium AI Models",
+  ultra: "Ultra AI Models",
 };
-
-function cardFeatureLines(features: string[]): string[] {
-  return features.filter((f) => {
-    const lower = f.toLowerCase();
-    if (lower.includes("credits / month")) return false;
-    if (lower === "watermark-free downloads") return false;
-    if (lower === "no ads") return false;
-    return true;
-  });
-}
 
 function PricingPage() {
   const { profile } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [currency, setCurrency] = useState<DisplayCurrency>("USD");
+  const [interval, setInterval] = useState<BillingInterval>("month");
 
   useEffect(() => {
     try {
@@ -94,80 +69,64 @@ function PricingPage() {
         plan: planId,
         currency: toCheckoutCurrency(currency),
         method: undefined,
+        interval,
       },
     });
   };
 
   const visiblePlans = PLANS.filter((p) => PRICING_SHOW_PLAN_IDS.includes(p.id));
+  const savingsMonths = annualSavingsMonths();
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:py-12 md:pb-12">
+      <div className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:py-12 md:pb-12">
         <div className="text-center">
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 sm:h-12 sm:w-12">
             <Crown className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">{t("pricing.title")}</h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">{t("pricing.lead")}</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
+            {t("pricing.title") || "Pricing"}
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
+            Simple plans. Clear model access. Credits deposited every month.
+          </p>
         </div>
 
-        {/* Halloween Special — one-time top-up */}
-        <div className="mx-auto mt-8 max-w-xl">
-          <div className="relative overflow-hidden rounded-2xl border border-orange-500/40 bg-gradient-to-b from-orange-500/10 to-card p-5 shadow-lg shadow-orange-500/10 sm:p-6">
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-500/20 blur-2xl" />
-            <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-orange-500/50 bg-orange-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-400">
-                  <Sparkles className="h-3 w-3" />
-                  Halloween Special · Limited
-                </div>
-                <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
-                  150 Credits · $1.99
-                </h2>
-                <p className="mt-1 text-sm font-medium text-foreground">
-                  Unlock AI Image Editing, Music Studio & Creative Tools. Enjoy an uninterrupted, ad-free experience!
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  One-time top-up · Video Studio requires a paid plan (Lite+).
-                </p>
-                <ul className="mt-3 space-y-1 text-xs text-muted-foreground sm:text-sm">
-                  <li className="flex items-center gap-2">
-                    <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
-                    Image Studio + all creative tools unlocked
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
-                    Music Studio unlocked
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
-                    Circle 2edit · Cropmix · Remove BG · Auto Edit · Filters
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
-                    Multi-reference generation · Ads completely removed
-                  </li>
-                </ul>
-              </div>
-              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
-                <div className="text-right">
-                  <p className="text-3xl font-black tracking-tight text-orange-400">$1.99</p>
-                  <p className="text-xs text-muted-foreground">one-time</p>
-                </div>
-                <Button
-                  asChild
-                  size="lg"
-                  className="bg-orange-500 font-semibold text-white hover:bg-orange-600"
-                >
-                  <Link to="/profile/top-up">Get 150 Credits</Link>
-                </Button>
-              </div>
-            </div>
+        {/* Monthly / Yearly toggle */}
+        <div className="mt-8 flex justify-center">
+          <div className="inline-flex items-center rounded-full border border-border bg-muted/40 p-1">
+            <button
+              type="button"
+              onClick={() => setInterval("month")}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors",
+                interval === "month"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setInterval("year")}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors",
+                interval === "year"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Yearly
+              <span className="ml-1.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600">
+                {savingsMonths} months free
+              </span>
+            </button>
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2 sm:mt-6">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           {DISPLAY_CURRENCIES.map((code) => (
             <button
               key={code}
@@ -192,82 +151,127 @@ function PricingPage() {
           ))}
         </div>
 
-        {/* Mobile: vertical full-width stack so every plan is readable without sideways swipe.
-            sm+: 2-col, lg+: 3-col grid. */}
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {visiblePlans.map((plan) => {
             const highlight = plan.id === PRICING_POPULAR_PLAN_ID;
             const isCurrent = profile?.plan === plan.id;
-            const raw = DISPLAY_PRICES[plan.id]?.[currency];
-            const priceLabel =
-              typeof raw === "number" ? formatPlanPrice(raw, currency) : raw ?? "—";
-            const diff = PLAN_DIFFS[plan.id as Exclude<PlanId, "free">];
-            const features = cardFeatureLines(plan.features);
+            const isUltra = plan.id === "ultra";
+            const monthlyUsd = DISPLAY_PRICES[plan.id]?.USD ?? 0;
+            const annualUsd =
+              DISPLAY_ANNUAL_PRICES_USD[plan.id as PurchasablePlanId] ?? monthlyUsd * 10;
+
+            let priceLabel: string;
+            let periodLabel: string;
+            if (interval === "year") {
+              // Show annual total; for non-USD approximate from USD face
+              if (currency === "USD") {
+                priceLabel = formatPlanPrice(annualUsd, "USD");
+              } else if (currency === "EUR") {
+                priceLabel = formatPlanPrice(Math.round(annualUsd * 0.92), "EUR");
+              } else {
+                priceLabel = formatPlanPrice(Math.round(annualUsd * 83.5), "INR");
+              }
+              periodLabel = "per year";
+            } else {
+              const raw = DISPLAY_PRICES[plan.id]?.[currency];
+              priceLabel =
+                typeof raw === "number" ? formatPlanPrice(raw, currency) : raw ?? "—";
+              periodLabel = "per month";
+            }
 
             return (
               <div
                 key={plan.id}
                 className={cn(
                   "relative flex w-full flex-col rounded-2xl border bg-card p-5 sm:p-6",
-                  highlight
-                    ? "border-primary shadow-md shadow-primary/10 ring-1 ring-primary/20"
-                    : "border-border",
+                  highlight &&
+                    "border-primary shadow-md shadow-primary/10 ring-1 ring-primary/20",
+                  isUltra &&
+                    !highlight &&
+                    "border-amber-500/40 bg-gradient-to-b from-amber-500/5 to-card",
                 )}
               >
                 {highlight && (
                   <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-                    Popular · best fit
+                    Most popular
+                  </span>
+                )}
+                {isUltra && (
+                  <span className="absolute -top-2.5 right-4 rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                    Flagship
                   </span>
                 )}
                 <div className="flex items-center gap-2">
                   <CrownBadge plan={plan.id} />
                   <h2 className="text-base font-bold sm:text-lg">{plan.name}</h2>
                 </div>
-                <p className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">{priceLabel}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">per month</p>
-                <div className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+
+                <p className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">
+                  {priceLabel}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{periodLabel}</p>
+                {interval === "year" && (
+                  <p className="mt-1 text-xs font-medium text-emerald-600">
+                    Billed annually · credits still added every month
+                  </p>
+                )}
+
+                <div className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
                   <Coins className="h-4 w-4 shrink-0" />
                   <span>{plan.credits.toLocaleString()} credits / month</span>
                 </div>
-                {diff && (
-                  <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{diff.audience}</p>
-                )}
-                {diff && (
-                  <ul className="mt-3 flex flex-wrap gap-1.5">
-                    {diff.unlocks.map((u) => (
+
+                <div className="mt-3 rounded-lg bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
+                  {MODEL_TIER_LABEL[plan.modelTier] ?? plan.modelTier}
+                </div>
+
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {plan.positioning}
+                </p>
+
+                <ul className="mt-4 flex-1 space-y-1.5 sm:mt-5 sm:space-y-2">
+                  {plan.features
+                    .filter((f) => !f.toLowerCase().includes("credits / month"))
+                    .slice(0, 8)
+                    .map((f) => (
                       <li
-                        key={u}
-                        className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary"
+                        key={f}
+                        className="flex items-start gap-2 text-sm text-muted-foreground"
                       >
-                        {u}
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <span className="min-w-0 break-words">{f}</span>
                       </li>
                     ))}
-                  </ul>
-                )}
-                <ul className="mt-4 flex-1 space-y-1.5 sm:mt-5 sm:space-y-2">
-                  {features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span className="min-w-0 break-words">{f}</span>
-                    </li>
-                  ))}
                 </ul>
+
                 <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
-                  <Check className="h-3.5 w-3.5 shrink-0" /> Watermark-free · No ads
+                  <Check className="h-3.5 w-3.5 shrink-0" /> Watermark-free · No disruptive ads
                 </p>
+
                 {isCurrent ? (
-                  <Button className="mt-6 w-full sm:mt-8" variant="outline" disabled style={{ marginTop: "auto" }}>
-                    Activated
+                  <Button
+                    className="mt-6 w-full sm:mt-8"
+                    variant="outline"
+                    disabled
+                    style={{ marginTop: "auto" }}
+                  >
+                    Current plan
                   </Button>
                 ) : (
                   <Button
-                    className={cn("mt-6 w-full sm:mt-8", highlight && "text-base font-semibold")}
-                    variant={highlight ? "default" : "outline"}
+                    className={cn(
+                      "mt-6 w-full sm:mt-8",
+                      highlight && "text-base font-semibold",
+                      isUltra && "bg-amber-500 text-white hover:bg-amber-600",
+                    )}
+                    variant={highlight || isUltra ? "default" : "outline"}
                     size={highlight ? "lg" : "default"}
                     onClick={() => selectPlan(plan.id)}
                     style={{ marginTop: "auto" }}
                   >
-                    {highlight ? `Upgrade to ${plan.name} — recommended` : `Upgrade to ${plan.name}`}
+                    {interval === "year"
+                      ? `Get ${plan.name} yearly`
+                      : `Get ${plan.name}`}
                   </Button>
                 )}
               </div>
@@ -279,22 +283,30 @@ function PricingPage() {
           <p className="text-sm font-semibold text-foreground">How credits & billing work</p>
           <ul className="space-y-1.5 text-xs text-muted-foreground sm:text-sm">
             <li>
-              <span className="font-medium text-foreground">Credits:</span> each paid plan adds its monthly
-              allocation at the start of the billing period. Use them for Image, Video, Music, and Maluto AI at
-              the cost shown in each studio.
+              <span className="font-medium text-foreground">Credits:</span> each paid plan adds its
+              monthly allocation at the start of each month. Annual plans are billed once per year;
+              credits are still deposited monthly (never all at once).
             </li>
             <li>
-              <span className="font-medium text-foreground">Renewal & cancel:</span> plans renew about every 30
-              days until you turn off auto-renew. You keep plan benefits and remaining credits until the period
-              ends.
+              <span className="font-medium text-foreground">Model access:</span> Starter = Standard
+              models · Pro = Premium models · Ultra AI = Ultra models. Higher tiers include lower
+              tiers. Access is enforced server-side.
             </li>
             <li>
-              <span className="font-medium text-foreground">Out of credits:</span> generation pauses until the next
-              allocation, an upgrade, or a top-up (where available). Plan features stay active for the paid period.
+              <span className="font-medium text-foreground">Video Studio:</span> available with paid
+              plans subject to separate cost and quota rules. Private videos remain private.
+            </li>
+            <li>
+              <span className="font-medium text-foreground">Cancel anytime:</span> turn off auto-renew;
+              you keep benefits and remaining credits until the period ends.
             </li>
           </ul>
-          <p className="pt-1 text-[11px] text-muted-foreground">
-            Checkout: Razorpay (INR) and PayPal (USD). Prices match server billing configuration.
+          <p className="pt-2 text-xs text-muted-foreground">
+            Need more credits?{" "}
+            <Link to="/profile/top-up" className="font-medium text-primary underline-offset-2 hover:underline">
+              One-time top-ups
+            </Link>{" "}
+            are always available.
           </p>
         </div>
       </div>
