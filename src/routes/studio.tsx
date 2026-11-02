@@ -10,12 +10,12 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
-      { title: "Studio — Motio2edit AI Image, Video & Music" },
+      { title: "AI+ Tools — Motio2edit" },
       {
         name: "description",
-        content: "Image, Circle 2edit, Video, Frames, and Music studios in one Motio2edit hub.",
+        content: "Image, Circle 2edit, Video, Frames, and Music tools in one Motio2edit hub.",
       },
-      { property: "og:title", content: "Studio — Motio2edit" },
+      { property: "og:title", content: "AI+ Tools — Motio2edit" },
       { name: "robots", content: "noindex, follow" },
     ],
   }),
@@ -28,7 +28,7 @@ function StudioLayout() {
   return <StudioHub />;
 }
 
-/** Fixed viewport studio picker — no page scroll. */
+/** Fixed viewport tool picker — no page scroll. */
 function StudioHub() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
@@ -42,9 +42,9 @@ function StudioHub() {
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6">
         <div className="mb-2 shrink-0 text-center sm:mb-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Studio
+            AI+ Tools
           </p>
-          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a studio</h1>
+          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a tool</h1>
         </div>
 
         <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[1.1fr_1fr_0.85fr] gap-2.5 sm:gap-3">
@@ -78,7 +78,7 @@ function StudioHub() {
           <StudioTile
             to={videoOk ? "/studio/video" : "/pricing"}
             title="Video"
-            subtitle={videoOk ? "Cinematic motion" : "Upgrade to unlock"}
+            subtitle={videoOk ? "Cinematic motion" : "Requires a paid plan"}
             gradient="from-rose-500/30 via-transparent to-transparent"
             locked={!videoOk}
             icon={
@@ -103,7 +103,7 @@ function StudioHub() {
           <StudioTile
             to={musicOk ? "/studio/music" : "/pricing"}
             title="Music"
-            subtitle={musicOk ? "Prompt-to-music" : "Upgrade to unlock"}
+            subtitle={musicOk ? "Prompt-to-music" : "Requires a paid plan"}
             gradient="from-fuchsia-500/30 via-transparent to-transparent"
             locked={!musicOk}
             className="col-span-2"
@@ -167,7 +167,7 @@ function StudioTile({
       {locked ? (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-2xl bg-background/55 backdrop-blur-[2px] sm:rounded-3xl">
           <Lock className="h-5 w-5 text-primary" />
-          <span className="text-[11px] font-semibold text-muted-foreground">Locked on Free</span>
+          <span className="text-[11px] font-semibold text-muted-foreground">Requires paid plan</span>
         </div>
       ) : null}
     </Link>

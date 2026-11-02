@@ -9,6 +9,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
+import { resolveAvatarSrc } from "@/lib/avatar-presets";
 
 import { Coins, ShieldCheck, Menu } from "lucide-react";
 
@@ -36,27 +37,25 @@ export function Header() {
   const paid = admin || isPaidPlan(profile?.plan);
   const showChat = paid;
 
-  // Free: History slot → Pricing/Plans (discoverability). Paid: History stays.
-  // Avoid flashing History for free users: until profile.plan is known, treat as free if signed in.
   const historyOrPlans: NavItem = paid
     ? { to: "/history", label: "History" }
     : { to: "/pricing", label: "Plans" };
 
   const authLinksBase: NavItem[] = [
     { to: "/", label: "Home" },
-    { to: "/studio", label: "Studio" },
+    { to: "/studio", label: "AI+ Tools" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
     historyOrPlans,
     { to: "/dashboard", label: "Dashboard" },
   ];
-  // Paid already has History in the slot; keep a Plans link only for free (already in slot).
-  // Paid users can still reach pricing via dashboard/settings; free gets Plans in the History slot.
   if (paid) {
     authLinksBase.push({ to: "/pricing", label: "Plans" });
   }
 
   const authLinks: NavItem[] = showChat ? [...authLinksBase, CHAT_LINK] : authLinksBase;
   const links: NavItem[] = user ? authLinks : PUBLIC_LINKS;
+
+  const avatarSrc = resolveAvatarSrc(profile?.avatar_url, profile?.avatar_signed_url);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
@@ -112,7 +111,7 @@ export function Header() {
                 aria-label="Profile"
               >
                 <Avatar className="h-9 w-9 border border-border">
-                  <AvatarImage src={profile?.avatar_url ?? undefined} alt="" />
+                  <AvatarImage src={avatarSrc} alt="" />
                   <AvatarFallback>
                     {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
                   </AvatarFallback>
@@ -139,39 +138,31 @@ export function Header() {
             </div>
           )}
 
-          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 lg:hidden">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
-              <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-                <BrandMark />
-              </div>
-              <nav className="flex flex-col p-2">
-                {links.map((l) => (
-                  <Link
-                    key={`${l.to}-${l.label}`}
-                    to={l.to}
-                    onClick={() => setMenuOpen(false)}
-                    activeProps={{ className: "bg-secondary text-foreground" }}
-                    activeOptions={l.to === "/" ? { exact: true } : undefined}
-                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  >
-                    {l.label}
-                  </Link>
-                ))}
-                {user && admin && (
-                  <Link
-                    to="/admin"
-                    onClick={() => setMenuOpen(false)}
-                    className="mt-1 inline-flex items-center gap-2 rounded-lg px-4 py-3 text-base font-medium text-primary hover:bg-secondary"
-                  >
-                    <ShieldCheck className="h-4 w-4" /> Admin
-                  </Link>
-                )}
-                {!user && (
+          {/* Hamburger: public / pre-login only — signed-in users use desktop nav + bottom tabs */}
+          {!user && (
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 lg:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
+                <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+                  <BrandMark />
+                </div>
+                <nav className="flex flex-col p-2">
+                  {PUBLIC_LINKS.map((l) => (
+                    <Link
+                      key={`${l.to}-${l.label}`}
+                      to={l.to}
+                      onClick={() => setMenuOpen(false)}
+                      activeProps={{ className: "bg-secondary text-foreground" }}
+                      activeOptions={l.to === "/" ? { exact: true } : undefined}
+                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                      {l.label}
+                    </Link>
+                  ))}
                   <div className="mt-3 flex flex-col gap-2 border-t border-border px-2 pt-4">
                     <Button
                       variant="outline"
@@ -191,10 +182,10 @@ export function Header() {
                       Get started
                     </Button>
                   </div>
-                )}
-              </nav>
-            </SheetContent>
-          </Sheet>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       </div>
     </header>
