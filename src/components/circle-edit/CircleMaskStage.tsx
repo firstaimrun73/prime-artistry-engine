@@ -162,7 +162,6 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
-    // Tint mask overlay with active ink colour (persists across tools/undo)
     const tint = document.createElement("canvas");
     tint.width = w;
     tint.height = h;
@@ -187,8 +186,6 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     const nw = img.naturalWidth || 1;
     const nh = img.naturalHeight || 1;
     const rect = shell.getBoundingClientRect();
-    // Full stage bounds — no inset pad so 9:16 maximizes vertical space.
-    // Add and Remove share this geometry for identical size on the same image.
     const boxW = Math.max(1, rect.width);
     const boxH = Math.max(1, rect.height);
     const { w: baseW, h: baseH, scale: baseScale } = containSize(nw, nh, boxW, boxH);
@@ -244,7 +241,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     return () => {
       cancelled = true;
     };
-  }, [imageUrl]); // zoom-safe: do not re-run load on layoutCanvas
+  }, [imageUrl]);
 
   useEffect(() => {
     if (!ready) return;
@@ -281,7 +278,6 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (disabled || !maskRef.current) return;
-    // Single-finger / single-pointer only — ignore additional simultaneous touches
     if (activePointerRef.current != null && e.pointerId !== activePointerRef.current) return;
     if (e.pointerType === "touch" && (e as unknown as { isPrimary?: boolean }).isPrimary === false) return;
     activePointerRef.current = e.pointerId;
@@ -291,7 +287,6 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
     drawingRef.current = true;
     pushHistory();
     const kind = toolKind(tool);
-    // Glass ripple at touch point (display coords)
     const canvas = canvasRef.current;
     if (canvas) {
       const rect = canvas.getBoundingClientRect();
@@ -422,7 +417,6 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const showOverlay =
     !!natural && displaySize.w > 0 && (livePath.length > 0 || flashOrigin != null);
 
-  // Overlay is in display pixels; path points are natural — scale for SVG
   const toDisp = (p: Point): Point => {
     const img = imgRef.current;
     if (!img || !displaySize.w) return p;
@@ -435,7 +429,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
   const dispA = termA ? toDisp(termA) : null;
   const dispB = termB ? toDisp(termB) : null;
   const dispFlash = flashOrigin ? toDisp(flashOrigin) : null;
-  const RING_SW = 3.25; // thicker premium ring (was ~2)
+  const RING_SW = 3.25;
 
   return (
     <div
@@ -445,10 +439,12 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       data-circle-canvas-fill="max"
       style={aspect ? { ["--circle-img-aspect" as string]: String(aspect) } : undefined}
     >
+      {!disabled ? (
       <div className="pointer-events-none absolute bottom-3 right-3 z-30 flex flex-col gap-1.5" data-circle-zoom-controls="true" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         <button type="button" aria-label="Zoom in" onClick={() => { setUserZoom((z) => { const n = Math.min(3, Math.round((z + 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">+</button>
         <button type="button" aria-label="Zoom out" onClick={() => { setUserZoom((z) => { const n = Math.max(0.5, Math.round((z - 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">−</button>
       </div>
+      ) : null}
       <div className="relative" style={{ width: displaySize.w || undefined, height: displaySize.h || undefined }}>
         <canvas
           ref={canvasRef}
@@ -466,7 +462,6 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
           onPointerUp={(e) => onPointerUp(e)}
           onPointerCancel={(e) => onPointerUp(e)}
         />
-        {/* Glass touch ripple */}
         {touchRipple ? (
           <span
             key={touchRipple.id}
@@ -512,52 +507,28 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
               <path
                 d={smoothPathD(dispPath)}
                 fill="none"
-                stroke="url(#c2e-ab-flash)"
+                stroke={inkStroke}
                 strokeWidth={RING_SW}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                filter="url(#c2e-ab-glow)"
-                opacity={nearClose ? 1 : 0.85}
+                opacity={0.95}
               />
             ) : null}
-            {dispA ? (
-              <g>
-                <circle cx={dispA.x} cy={dispA.y} r={14} fill="none" stroke={inkStroke} strokeWidth={RING_SW} opacity={0.9} />
-                <circle cx={dispA.x} cy={dispA.y} r={5} fill={inkStroke} />
-              </g>
-            ) : null}
-            {dispB ? (
-              <g>
-                <circle
-                  cx={dispB.x}
-                  cy={dispB.y}
-                  r={nearClose ? 16 : 12}
-                  fill="none"
-                  stroke={nearClose ? "#A89BFF" : inkStroke}
-                  strokeWidth={nearClose ? RING_SW + 0.5 : RING_SW}
-                  opacity={0.95}
-                >
-                  {nearClose ? (
-                    <animate attributeName="r" values="12;18;12" dur="0.6s" repeatCount="indefinite" />
-                  ) : null}
-                </circle>
-                <circle cx={dispB.x} cy={dispB.y} r={5} fill={nearClose ? "#A89BFF" : inkStroke} />
-              </g>
-            ) : null}
+            {dispA ? <circle cx={dispA.x} cy={dispA.y} r={5} fill={inkStroke} /> : null}
+            {dispB ? <circle cx={dispB.x} cy={dispB.y} r={5} fill={inkStroke} opacity={nearClose ? 1 : 0.75} /> : null}
             {dispFlash ? (
-              <circle cx={dispFlash.x} cy={dispFlash.y} r={8} fill="none" stroke="#A89BFF" strokeWidth={3} opacity={0.9}>
-                <animate attributeName="r" from="8" to="48" dur="0.4s" fill="freeze" />
-                <animate attributeName="opacity" from="0.9" to="0" dur="0.4s" fill="freeze" />
-              </circle>
+              <circle
+                cx={dispFlash.x}
+                cy={dispFlash.y}
+                r={18}
+                fill="url(#c2e-ab-flash)"
+                filter="url(#c2e-ab-glow)"
+                opacity={0.85}
+              />
             ) : null}
           </svg>
         ) : null}
       </div>
-      {!ready && (
-        <div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">Loading…</div>
-      )}
     </div>
   );
 });
-
-export default CircleMaskStage;
