@@ -88,7 +88,6 @@ function DragCompare({ sample }: { sample: Sample }) {
       onTouchMove={(e) => dragging.current && update(e.touches[0].clientX)}
       onTouchEnd={() => (dragging.current = false)}
     >
-      {/* object-contain + centered so heads/faces are not clipped by cover crop */}
       <img
         src={sample.after}
         alt={`${sample.label} after`}
@@ -150,19 +149,24 @@ export function BeforeAfterShowcase() {
   };
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
+    <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <div className="text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-1.5 text-xs font-semibold text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-primary" /> Before &amp; After
+        <span className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-secondary/80 px-4 py-1.5 text-xs font-semibold text-muted-foreground backdrop-blur-sm">
+          <Sparkles className="h-3.5 w-3.5 text-primary" /> Before & After
         </span>
-        <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">Drag to see the difference</h2>
+        <h2 className="mt-4 text-xl font-extrabold tracking-tight sm:text-3xl">
+          Drag to see the full restore difference
+        </h2>
+        <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+          Real results from Motio2edit — not mockups.
+        </p>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:mt-8 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
         {SAMPLES.map((s, i) => (
           <article
             key={s.label}
-            className="reveal-up flex h-full min-w-0 flex-col rounded-2xl border border-border bg-card p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-2xl"
+            className="reveal-up flex h-full min-w-0 flex-col rounded-2xl border border-border/80 bg-card/90 p-3 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl"
             style={{ animationDelay: `${i * 70}ms` }}
           >
             <DragCompare sample={s} />
