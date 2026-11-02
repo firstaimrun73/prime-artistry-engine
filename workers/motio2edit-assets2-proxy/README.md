@@ -34,26 +34,21 @@ npx wrangler whoami          # must show ACCOUNT 1 (the one with motio2edit.com)
 
 ## 1. Prepare Account 2 (manual, in the Account 2 dashboard)
 
-1. Open the Account 2 Cloudflare dashboard → R2 → bucket `motio2edit-assets-2`.
-2. Create an API token with **Object Read** only for that bucket.
-3. Note: Account ID, Access Key ID, Secret Access Key.
-4. Upload at least one test object that exists **only** in Account 2, e.g. `_healthcheck/t1-<timestamp>.png`.
+Create a read-only R2 API token for bucket `motio2edit-assets-2` (Object Read only).
+Upload a test object that exists **only** in Account 2, e.g. `_healthcheck/t1-<timestamp>.png`.
 
-## 2. Secrets (Account 1 Worker)
+## 2. Secrets
 
 ```bash
 npm run secrets
-# or: bash scripts/set-secrets.sh
 ```
 
-You will be asked to type `account1` to confirm, then paste the three Account 2 values into Wrangler's
-hidden prompts. Values are never echoed or written to disk.
+Type `account1` when asked, then enter Account 2 credentials into Wrangler's hidden prompts.
 
 ## 3. Staging deploy (no DNS)
 
 ```bash
 npm run deploy:staging
-# → https://motio2edit-assets2-proxy.<subdomain>.workers.dev
 ```
 
 ## 4. Verify
@@ -64,23 +59,29 @@ KEY=_healthcheck/t1-<timestamp>.png \
 node test/verify.mjs
 ```
 
-Optional: `VIDEO_KEY=...` for seek tests, `KEY2=...` for HEAD-then-GET, and
-`CF_ACCOUNT2_ID` + `CF_ACCOUNT2_ANALYTICS_TOKEN` for Class B counter checks.
-
 ## 5. Production (only after staging is green)
 
 ```bash
 npm run deploy:production
-# attaches custom domain assets2.motio2edit.com; does not touch assets.motio2edit.com
 ```
+
+Attaches `assets2.motio2edit.com`. Does not touch `assets.motio2edit.com`.
 
 ## Files
 
 ```
-wrangler.toml              staging config (workers.dev only, no DNS)
-wrangler.production.toml   adds Custom Domain assets2.motio2edit.com
-src/index.js               the Worker
-scripts/set-secrets.sh     hidden-prompt secret setup, with an Account 1 safety check
+wrangler.toml              staging (workers.dev only)
+wrangler.production.toml   custom domain assets2.motio2edit.com
+src/index.js               Worker
+scripts/set-secrets.sh     secret setup with Account 1 safety check
 test/verify.mjs            end-to-end verification
-.dev.vars.example          names only, no values
+.dev.vars.example          names only
+INTEGRATION.md             app integration notes
 ```
+
+## Honest trade-off
+
+Workers requests bill to Account 1 (including cache hits). R2 Class B reads on misses bill to Account 2.
+Caching is what reduces Class B volume. At homepage scale most traffic should be HITs.
+
+See full costs table and caching notes in the original Claude package README if needed for pricing figures.
