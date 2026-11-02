@@ -7,3 +7,4 @@ export { DirectLinkAd } from "./DirectLinkAd";
 export { AdPolicyGate } from "./AdPolicyGate";
 export { MonetagInPagePush } from "./MonetagInPagePush";
 export { MonetagVignette } from "./MonetagVignette";
+export { AdDebugPanel } from "./AdDebugPanel";
