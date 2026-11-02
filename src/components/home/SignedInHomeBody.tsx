@@ -51,13 +51,20 @@ const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] =
   },
 ];
 
+/** Soft, non-aggressive slogans — no hard $ price push */
 const HOME_SLOGANS = [
-  { title: "Try a plan that fits you", sub: "Lite · Plus · Pro · AI Studio · Master" },
-  { title: "Use Motio2edit AI for best edits", sub: "Image · Video · Music in one place" },
-  { title: "Circle 2edit · Cropmix · Remove BG", sub: "Pro tools, simple credits" },
-  { title: "From idea to download in seconds", sub: "Standard · Premium · Ultra AI modes" },
-  { title: "More credits. More modes. No watermark.", sub: "Upgrade anytime — cancel anytime" },
-  { title: "Maluto AI — restore photos for $4.99", sub: "Lite · just upload · automatic restore" },
+  { title: "Your photo, fully restored",
+    sub: "Upload once · Maluto AI handles the rest" },
+  { title: "Motio2edit — one workspace",
+    sub: "Image · Video · Music in a single studio" },
+  { title: "Circle · Cropmix · Remove BG",
+    sub: "Pro tools with simple credits" },
+  { title: "From idea to download in seconds",
+    sub: "Standard · Premium · Ultra modes" },
+  { title: "Support the public AI",
+    sub: "Free restores available · contribute when you can" },
+  { title: "More credits. More modes.",
+    sub: "Upgrade anytime — cancel anytime" },
 ] as const;
 
 const QUICK_CREATE = [
@@ -93,7 +100,7 @@ export function SignedInHomeBody() {
   const slogan = HOME_SLOGANS[sloganIdx];
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:pb-12">
+    <main className="mx-auto w-full max-w-7xl px-4 pt-5 pb-24 sm:px-6 sm:pt-8 md:pb-12 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -154,7 +161,7 @@ export function SignedInHomeBody() {
               </div>
             </div>
             <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-orange-600 shadow-sm transition group-hover:bg-white">
-              View plans
+              Plans
               <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </div>
@@ -179,7 +186,7 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* Sponsor #1 — near primary actions */}
+      {/* Soft sponsor — compact, non-aggressive */}
       <DirectLinkAd placement="home-upper" variant="compact" />
 
       <section className="mt-5">
@@ -230,7 +237,6 @@ export function SignedInHomeBody() {
 
       <RemoveBgHomeCard />
 
-      {/* Sponsor #2 — after tool CTAs */}
       <DirectLinkAd placement="home-mid" />
 
       <div className="mt-12">
