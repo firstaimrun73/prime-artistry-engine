@@ -112,7 +112,7 @@ function PricingPage() {
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">{t("pricing.lead")}</p>
         </div>
 
-        {/* Halloween Special — one-time top-up (surgical addition) */}
+        {/* Halloween Special — one-time top-up */}
         <div className="mx-auto mt-8 max-w-xl">
           <div className="relative overflow-hidden rounded-2xl border border-orange-500/40 bg-gradient-to-b from-orange-500/10 to-card p-5 shadow-lg shadow-orange-500/10 sm:p-6">
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-500/20 blur-2xl" />
@@ -125,13 +125,16 @@ function PricingPage() {
                 <h2 className="text-xl font-extrabold tracking-tight sm:text-2xl">
                   150 Credits · $1.99
                 </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  One-time top-up · Try everything except Video Studio · Ads removed
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  Unlock AI Image Editing, Music Studio & Creative Tools. Enjoy an uninterrupted, ad-free experience!
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  One-time top-up · Video Studio requires a paid plan (Lite+).
                 </p>
                 <ul className="mt-3 space-y-1 text-xs text-muted-foreground sm:text-sm">
                   <li className="flex items-center gap-2">
                     <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
-                    Image Studio + all tools unlocked
+                    Image Studio + all creative tools unlocked
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-3.5 w-3.5 shrink-0 text-orange-400" />
