@@ -23,6 +23,7 @@ import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
 import { MonetagVignette } from "../components/ads/MonetagVignette";
+import { AdDebugPanel } from "../components/ads/AdDebugPanel";
 import {
   SITE_NAME,
   SITE_URL,
@@ -265,6 +266,7 @@ function RootComponent() {
           <PageViewTracker />
           <AdPolicyGate />
           <MonetagVignette />
+          <AdDebugPanel />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />
