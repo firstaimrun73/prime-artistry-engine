@@ -1,6 +1,12 @@
 // Server-only payment helpers. Never imported by client/route files directly.
 import { createHmac, timingSafeEqual } from "crypto";
-import { DISPLAY_PRICES, PLAN_CREDITS, type PlanId } from "@/lib/plans";
+import {
+  DISPLAY_PRICES,
+  DISPLAY_ANNUAL_PRICES_USD,
+  PLAN_CREDITS,
+  type PlanId,
+  type PurchasablePlanId,
+} from "@/lib/plans";
 
 /**
  * One-time credit top-up packs.
@@ -26,21 +32,40 @@ export type PackageId = keyof typeof RAZORPAY_PACKAGES;
 
 /**
  * Plan-based purchases — MUST match src/lib/plans.ts PLAN_CREDITS + DISPLAY_PRICES.
- * Derived at module load so public pricing page and PayPal/Razorpay never diverge.
- * Internal id "business" is the Master Studio tier (user-facing name only).
+ * Public commercial: starter, pro, ultra (monthly + annual).
+ * Legacy IDs kept so historical transactions and admin tools still resolve.
  */
-export type PurchasablePlan = Exclude<PlanId, "free">;
+export type PurchasablePlan =
+  | PurchasablePlanId
+  | "lite"
+  | "plus"
+  | "studio"
+  | "business";
 
 function buildPlanPurchase(): Record<
   PurchasablePlan,
-  { credits: number; amountINR: number; amountUSD: number }
+  { credits: number; amountINR: number; amountUSD: number; amountAnnualUSD?: number }
 > {
-  const ids: PurchasablePlan[] = ["lite", "plus", "pro", "studio", "business"];
+  const publicIds: PurchasablePlanId[] = ["starter", "pro", "ultra"];
+  const legacyIds: Array<Exclude<PurchasablePlan, PurchasablePlanId>> = [
+    "lite",
+    "plus",
+    "studio",
+    "business",
+  ];
   const out = {} as Record<
     PurchasablePlan,
-    { credits: number; amountINR: number; amountUSD: number }
+    { credits: number; amountINR: number; amountUSD: number; amountAnnualUSD?: number }
   >;
-  for (const id of ids) {
+  for (const id of publicIds) {
+    out[id] = {
+      credits: PLAN_CREDITS[id],
+      amountUSD: DISPLAY_PRICES[id].USD,
+      amountINR: DISPLAY_PRICES[id].INR,
+      amountAnnualUSD: DISPLAY_ANNUAL_PRICES_USD[id],
+    };
+  }
+  for (const id of legacyIds) {
     out[id] = {
       credits: PLAN_CREDITS[id],
       amountUSD: DISPLAY_PRICES[id].USD,
@@ -62,26 +87,74 @@ export function isPurchasablePlan(id: string | null | undefined): id is Purchasa
   return !!id && id in PLAN_PURCHASE;
 }
 
+export function isPublicPurchasablePlan(id: string | null | undefined): id is PurchasablePlanId {
+  return id === "starter" || id === "pro" || id === "ultra";
+}
+
 /**
  * PayPal Billing Plan IDs (created once in PayPal dashboard / Catalog).
- * When set, monthly plan checkout uses Subscriptions API (true recurring).
- * When missing, checkout falls back to one-time Orders API (legacy behaviour).
+ * Monthly + annual for the three public plans.
+ * Legacy keys kept for any remaining sandbox plans.
+ *
+ * When a required plan ID is missing for a public plan, checkout MUST fail
+ * with a clear error — do not silently fall back to one-time Orders API.
  */
-export const PAYPAL_BILLING_PLAN_IDS: Record<PurchasablePlan, string | undefined> = {
+export const PAYPAL_BILLING_PLAN_IDS: Record<string, string | undefined> = {
+  // New public monthly
+  starter: process.env.PAYPAL_PLAN_STARTER,
+  pro: process.env.PAYPAL_PLAN_PRO,
+  ultra: process.env.PAYPAL_PLAN_ULTRA,
+  // New public annual
+  starter_annual: process.env.PAYPAL_PLAN_STARTER_ANNUAL,
+  pro_annual: process.env.PAYPAL_PLAN_PRO_ANNUAL,
+  ultra_annual: process.env.PAYPAL_PLAN_ULTRA_ANNUAL,
+  // Legacy (do not remove — existing env may still reference)
   lite: process.env.PAYPAL_PLAN_LITE,
   plus: process.env.PAYPAL_PLAN_PLUS,
-  pro: process.env.PAYPAL_PLAN_PRO,
   studio: process.env.PAYPAL_PLAN_STUDIO,
   business: process.env.PAYPAL_PLAN_BUSINESS,
 };
 
-export function paypalBillingPlanId(plan: PurchasablePlan): string | null {
-  const id = PAYPAL_BILLING_PLAN_IDS[plan];
+export function paypalBillingPlanKey(
+  plan: PurchasablePlan,
+  interval: "month" | "year" = "month",
+): string {
+  if (interval === "year" && isPublicPurchasablePlan(plan)) {
+    return `${plan}_annual`;
+  }
+  return plan;
+}
+
+export function paypalBillingPlanId(
+  plan: PurchasablePlan,
+  interval: "month" | "year" = "month",
+): string | null {
+  const key = paypalBillingPlanKey(plan, interval);
+  const id = PAYPAL_BILLING_PLAN_IDS[key];
   return id && id.trim().length > 0 ? id.trim() : null;
 }
 
+/** Public plans require configured billing plan IDs — no silent one-time fallback. */
+export function requirePaypalBillingPlanId(
+  plan: PurchasablePlan,
+  interval: "month" | "year" = "month",
+): string {
+  const id = paypalBillingPlanId(plan, interval);
+  if (!id) {
+    const key = paypalBillingPlanKey(plan, interval);
+    throw new Error(
+      `PayPal recurring billing is not configured for ${key}. ` +
+        `Set the corresponding PAYPAL_PLAN_* environment variable and create the Billing Plan in the PayPal Catalog. ` +
+        `One-time Orders API is not used for public subscription plans.`,
+    );
+  }
+  return id;
+}
+
 export function subscriptionsConfigured(): boolean {
-  return (Object.keys(PLAN_PURCHASE) as PurchasablePlan[]).some((p) => !!paypalBillingPlanId(p));
+  return (["starter", "pro", "ultra"] as PurchasablePlanId[]).every(
+    (p) => !!paypalBillingPlanId(p, "month"),
+  );
 }
 
 export const ACCEPTED_COINS = ["usdtbsc", "btc", "eth"] as const;
@@ -246,7 +319,7 @@ async function paypalAccessToken(): Promise<string> {
   return json.access_token as string;
 }
 
-/** ONE-TIME only — used for credit top-ups. Do not use for monthly plans when billing plans are configured. */
+/** ONE-TIME only — used for credit top-ups. Do not use for subscription plans. */
 export async function createPaypalOrder(args: {
   amountUSD: number;
   referenceId: string;
@@ -289,7 +362,7 @@ export async function capturePaypalOrder(orderId: string): Promise<any> {
 }
 
 /**
- * Create a PayPal Subscription (recurring monthly).
+ * Create a PayPal Subscription (recurring monthly or annual).
  * Requires a pre-created Billing Plan ID in PayPal Catalog (PAYPAL_PLAN_* env).
  * Returns subscription id + approval links.
  */
