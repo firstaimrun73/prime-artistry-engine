@@ -1,6 +1,7 @@
 /** Shared SEO helpers — brand is always Motio2edit (never Motion2Edit / Motion2Ai). */
 
-export const SITE_URL = "https://motio2edit.com";
+/** Primary production host — apex motio2edit.com 308-redirects here in Vercel. */
+export const SITE_URL = "https://www.motio2edit.com";
 export const SITE_NAME = "Motio2edit";
 export const SITE_BRAND_DESCRIPTION =
   "Motio2edit.com is an AI-powered photo and video editing platform offering image enhancement, photo restoration, image upscaling, object removal, creative photo effects, AI editing tools, and video creation features.";
