@@ -36,8 +36,6 @@ export function Header() {
   const paid = admin || isPaidPlan(profile?.plan);
   const showChat = paid;
 
-  // Free: History slot → Pricing/Plans (discoverability). Paid: History stays.
-  // Avoid flashing History for free users: until profile.plan is known, treat as free if signed in.
   const historyOrPlans: NavItem = paid
     ? { to: "/history", label: "History" }
     : { to: "/pricing", label: "Plans" };
@@ -49,8 +47,6 @@ export function Header() {
     historyOrPlans,
     { to: "/dashboard", label: "Dashboard" },
   ];
-  // Paid already has History in the slot; keep a Plans link only for free (already in slot).
-  // Paid users can still reach pricing via dashboard/settings; free gets Plans in the History slot.
   if (paid) {
     authLinksBase.push({ to: "/pricing", label: "Plans" });
   }
@@ -59,8 +55,8 @@ export function Header() {
   const links: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-      <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-3 sm:gap-4 sm:px-4">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+      <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
         <Link
           to="/"
           className="notranslate flex shrink-0 items-center gap-1.5 sm:gap-2"
@@ -68,10 +64,9 @@ export function Header() {
           aria-label="Motio2edit home"
         >
           <BrandMark />
-          <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 lg:flex">
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 lg:flex">
           {links.map((l) => (
             <Link
               key={`${l.to}-${l.label}`}
