@@ -1,0 +1,4 @@
+# Copy to .dev.vars (git-ignored) ONLY for `wrangler dev`. Fill in locally; never commit or paste in chat.
+R2_SECOND_ACCOUNT_ID=
+R2_SECOND_ACCESS_KEY_ID=
+R2_SECOND_SECRET_ACCESS_KEY=

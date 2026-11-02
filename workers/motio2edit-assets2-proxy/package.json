@@ -1,0 +1,21 @@
+{
+  "name": "motio2edit-assets2-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Public read-only Worker serving the Account 2 R2 bucket (motio2edit-assets-2) from assets2.motio2edit.com",
+  "type": "module",
+  "scripts": {
+    "whoami": "wrangler whoami",
+    "dev": "wrangler dev",
+    "secrets": "bash scripts/set-secrets.sh",
+    "deploy:staging": "wrangler deploy",
+    "deploy:production": "wrangler deploy -c wrangler.production.toml",
+    "verify": "node test/verify.mjs"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  },
+  "devDependencies": {
+    "wrangler": "^4.107.0"
+  }
+}
