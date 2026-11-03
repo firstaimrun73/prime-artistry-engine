@@ -76,8 +76,6 @@ export function CheckoutPage() {
   const priceLabel = isAnnual
     ? `${symbol}${currency === "USD" ? (plan as { priceAnnualUSD?: number })?.priceAnnualUSD ?? priceNum * 10 : Math.round(priceNum * 10)}`
     : `${symbol}${priceNum}`;
-  const durationLabel = isAnnual ? "365 days" : "30 days";
-  const chargeLine = `${priceLabel} · ${durationLabel}`;
 
   useEffect(() => {
     setCardProvider(defaultCardProvider(currency as Currency));
@@ -207,7 +205,7 @@ export function CheckoutPage() {
         amount: order.amount,
         currency: order.currency,
         name: "Motio2edit",
-        description: `${plan?.name ?? "Plan"} — one-time (${isAnnual ? "annual" : "monthly"})`,
+        description: `${plan?.name ?? "Plan"} (${isAnnual ? "yearly" : "monthly"})`,
         order_id: order.orderId,
         theme: { color: "#FF6A1A" },
         handler: async (response: {
@@ -253,24 +251,6 @@ export function CheckoutPage() {
 
   if (!plan) return null;
 
-  const oneTimeNotice = (
-    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-      <p className="font-semibold text-foreground">One-time payment</p>
-      <p className="mt-1 text-muted-foreground">
-        You will be charged{" "}
-        <span className="font-medium text-foreground">{chargeLine}</span> once. There is{" "}
-        <strong>no automatic renewal</strong>. When your plan expires we will email you so you can
-        renew from the pricing page if you want.
-      </p>
-      {isAnnual && (
-        <p className="mt-2 text-muted-foreground">
-          Annual plans receive <strong>{creditsLabel(plan.credits)} credits each month</strong>{" "}
-          during the 365-day period (not all at once).
-        </p>
-      )}
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-background/90 backdrop-blur-sm">
@@ -288,14 +268,12 @@ export function CheckoutPage() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-4xl gap-8 px-4 py-10 md:grid-cols-[1fr_320px] md:py-14">
+      <div className="mx-auto grid max-w-4xl gap-8 px-4 py-10 md:grid-cols-[1fr_300px] md:py-14">
         <div>
           <h1 className="text-2xl font-bold">Checkout</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {plan.name} · {isAnnual ? "Annual" : "Monthly"} · Motio2edit one-time purchase
+            {plan.name} · {isAnnual ? "Yearly" : "Monthly"}
           </p>
-
-          <div className="mt-6">{oneTimeNotice}</div>
 
           <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Payment method
@@ -327,7 +305,7 @@ export function CheckoutPage() {
           {method === "card" && (
             <div className="mt-6">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {currency === "INR" ? "India payment" : "International payment"}
+                {currency === "INR" ? "India" : "International"}
               </h3>
               <div
                 className={`mt-3 grid gap-3 ${providers.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
@@ -358,7 +336,7 @@ export function CheckoutPage() {
             <div className="mt-6 space-y-3">
               {paypalError && <p className="text-sm text-destructive">{paypalError}</p>}
               {paypalMode === "loading" && (
-                <p className="text-sm text-muted-foreground">Preparing PayPal checkout…</p>
+                <p className="text-sm text-muted-foreground">Preparing PayPal…</p>
               )}
               {paypalMode === "order" && (
                 <>
@@ -377,16 +355,15 @@ export function CheckoutPage() {
 
           <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5" />
-            Secured via PayPal (international) and Razorpay (India). Manual renewal only — no
-            AutoPay.
+            Secure checkout · PayPal or Razorpay
           </p>
         </div>
 
-        <aside className="h-fit rounded-2xl border border-border bg-card p-6">
+        <aside className="h-fit rounded-2xl border border-border bg-card p-5">
           <h3 className="font-semibold">Order summary</h3>
           <div className="mt-4 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              {plan.name} · {isAnnual ? "Annual (365 days)" : "Monthly (30 days)"}
+              {plan.name} · {isAnnual ? "Yearly" : "Monthly"}
             </span>
             <span className="font-medium">{priceLabel}</span>
           </div>
@@ -394,20 +371,15 @@ export function CheckoutPage() {
             <span className="text-muted-foreground">Credits / month</span>
             <span className="font-medium">{creditsLabel(plan.credits)}</span>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {isAnnual
-              ? "Paid once · credits monthly · no auto-renew"
-              : "Paid once · valid 30 days · no auto-renew"}
-          </p>
           <div className="my-4 h-px bg-border" />
           <div className="flex items-center justify-between font-semibold">
-            <span>Total due now</span>
+            <span>Total</span>
             <span>{priceLabel}</span>
           </div>
 
           {method === "card" && cardProvider === "razorpay" ? (
             <Button className="mt-6 w-full" onClick={handleCard} disabled={processing}>
-              {processing ? "Processing…" : "Pay with Razorpay (India)"}
+              {processing ? "Processing…" : "Pay with Razorpay"}
             </Button>
           ) : null}
         </aside>

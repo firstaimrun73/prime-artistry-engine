@@ -1,6 +1,4 @@
-// Checkout-side currency (what the payment backends actually charge in).
-// Razorpay = India (INR) only. PayPal = international (USD / EUR).
-// Crypto / NOWPayments removed from product — do not re-add.
+// Checkout currency helpers + plan definitions for Motio2edit public pricing.
 export type Currency = "USD" | "EUR" | "INR";
 export type PaymentMethod = "card" | "paypal";
 
@@ -17,14 +15,12 @@ export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
 export type CardProvider = "paypal" | "razorpay";
 
 export const CARD_PROVIDERS: { id: CardProvider; label: string; note: string }[] = [
-  { id: "paypal", label: "PayPal", note: "Pay with PayPal or any card via PayPal (USD)" },
-  { id: "razorpay", label: "Razorpay", note: "UPI / cards via Razorpay — India (INR) only" },
+  { id: "paypal", label: "PayPal", note: "PayPal or card (USD)" },
+  { id: "razorpay", label: "Razorpay", note: "UPI / cards — India (INR)" },
 ];
 
 export function cardProvidersForCurrency(currency: Currency): typeof CARD_PROVIDERS {
-  if (currency === "INR") {
-    return CARD_PROVIDERS.filter((p) => p.id === "razorpay");
-  }
+  if (currency === "INR") return CARD_PROVIDERS.filter((p) => p.id === "razorpay");
   return CARD_PROVIDERS.filter((p) => p.id === "paypal");
 }
 
@@ -49,7 +45,6 @@ export type PlanId =
   | "ultra";
 
 export type ModelTier = "standard" | "premium" | "ultra";
-
 export type BillingInterval = "month" | "year";
 
 export const TRANSACTION_FEE: Record<Currency, number> = {
@@ -58,7 +53,6 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
   INR: 85,
 };
 
-/** @deprecated Prefer @/lib/billing quote lifecycle for server debits. */
 export const CREDIT_COST = {
   image: 25,
   video: 125,
@@ -67,11 +61,8 @@ export const CREDIT_COST = {
   video_enhance: 200,
 } as const;
 
-/** Standard text-to-image face cost used for pricing estimates (25 credits). */
 export const STANDARD_IMAGE_CREDIT_COST = 25;
-
 export const UNLIMITED_CREDITS = 9_999_999;
-
 export const FREE_SIGNUP_CREDITS = 40;
 
 export const CREDIT_TOPUP = {
@@ -80,13 +71,8 @@ export const CREDIT_TOPUP = {
   price: 4.99,
   credits: 280,
   type: "one_time" as const,
-  description: "280 AI credits, valid forever, works with any plan.",
-  bullets: [
-    "280 AI credits",
-    "Valid forever (no expiry)",
-    "Works with any plan",
-    "Can be purchased multiple times",
-  ],
+  description: "280 AI credits",
+  bullets: ["280 AI credits", "Works with any plan"],
 } as const;
 
 export function creditsLabel(credits: number): string {
@@ -122,7 +108,6 @@ export type Plan = {
   publicOffer: boolean;
 };
 
-/** Six Music Studio modes (authoritative from music.functions). */
 export const MUSIC_STUDIO_MODE_LABELS = [
   "Song",
   "Instrumental",
@@ -144,12 +129,8 @@ export const PLANS: Plan[] = [
     price: { USD: 0, EUR: 0, INR: 0 },
     priceAnnualUSD: 0,
     publicOffer: false,
-    positioning: "Start creating with Standard AI models.",
-    features: [
-      `${FREE_SIGNUP_CREDITS} starter credits`,
-      "Image — Standard mode",
-      "Music Studio limited",
-    ],
+    positioning: "Start with Standard AI.",
+    features: [`${FREE_SIGNUP_CREDITS} starter credits`, "Standard image tools"],
   },
   {
     id: "starter",
@@ -162,20 +143,15 @@ export const PLANS: Plan[] = [
     price: { USD: 12, EUR: 11, INR: 999 },
     priceAnnualUSD: 120,
     publicOffer: true,
-    positioning:
-      "Create, edit and enhance images with Standard AI — plus limited Video Studio and full Music Studio modes.",
+    positioning: "Standard AI image tools, limited video, and full Music Studio.",
     features: [
-      "1,000 credits every month",
-      "~40 estimated standard image generations / month",
-      "Standard AI image generation",
-      "Standard image-to-image editing",
-      "Standard AI image enhancement",
+      "1,000 credits / month",
+      "Standard image generation & editing",
       "AI+ Filters and Styles",
-      "Circle 2edit — Remove and Add",
-      "Video Studio — Standard SD, up to 5 seconds",
-      "Music Studio — all 6 modes (Song, Instrumental, BGM, Voiceover, SFX, Video music)",
-      "Watermark-free paid exports",
-      "Access to eligible AI tools",
+      "Circle 2edit — Remove & Add",
+      "Video Studio — SD, up to 5 seconds",
+      "Music Studio — all 6 modes",
+      "Watermark-free exports",
     ],
   },
   {
@@ -189,21 +165,17 @@ export const PLANS: Plan[] = [
     price: { USD: 25, EUR: 23, INR: 2099 },
     priceAnnualUSD: 250,
     publicOffer: true,
-    positioning:
-      "Premium models, Maluto AI restoration, and longer video options for serious creative work.",
+    positioning: "Premium models, Maluto AI, and longer video options.",
     features: [
-      "2,500 credits every month",
-      "~100 estimated standard image generations / month",
-      "Premium image generation models",
-      "Advanced image-to-image editing",
-      "Advanced enhancement and restoration",
+      "2,500 credits / month",
+      "Premium image generation & editing",
       "Maluto AI photo restoration",
-      "Circle 2edit — Remove and Add",
-      "Video Studio — Standard & Premium (5s and 10s)",
+      "Circle 2edit — Remove & Add",
+      "Video Studio — 5s and 10s",
       "Music Studio — all 6 modes",
       "AI+ Filters and Styles",
-      "Priority processing where supported",
-      "Watermark-free paid exports",
+      "Priority processing",
+      "Watermark-free exports",
     ],
   },
   {
@@ -217,22 +189,17 @@ export const PLANS: Plan[] = [
     price: { USD: 79, EUR: 73, INR: 6599 },
     priceAnnualUSD: 790,
     publicOffer: true,
-    positioning:
-      "Highest-tier models, longest video options, and the full Motio2edit creative toolkit.",
+    positioning: "Highest-tier models and the full Motio2edit toolkit.",
     features: [
-      "8,000 credits every month",
-      "~320 estimated standard image generations / month",
-      "Ultra AI generation models",
-      "Highest eligible image quality",
+      "8,000 credits / month",
+      "Ultra AI image models",
       "Premium AI+ Filters and Styles",
-      "Advanced image editing and restoration",
       "Maluto AI photo restoration",
-      "Circle 2edit — Remove and Add",
-      "Video Studio — Standard & Premium (5s, 10s, 15s where supported)",
+      "Circle 2edit — Remove & Add",
+      "Video Studio — 5s, 10s, 15s",
       "Music Studio — all 6 modes",
-      "Full eligible AI+ Tools access",
-      "Priority processing where supported",
-      "Watermark-free paid exports",
+      "Priority processing",
+      "Watermark-free exports",
     ],
   },
   {
@@ -295,7 +262,6 @@ export const PLANS: Plan[] = [
 
 export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["starter", "pro", "ultra"];
 export const PRICING_POPULAR_PLAN_ID: PlanId = "pro";
-
 export type PurchasablePlanId = "starter" | "pro" | "ultra";
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
@@ -330,9 +296,7 @@ export function canAccessModelTier(
   required: ModelTier,
 ): boolean {
   const rank: Record<ModelTier, number> = { standard: 0, premium: 1, ultra: 2 };
-  const have = rank[getModelTier(userPlan)];
-  const need = rank[required];
-  return have >= need;
+  return rank[getModelTier(userPlan)] >= rank[required];
 }
 
 export function getPlan(id: PlanId): Plan {
