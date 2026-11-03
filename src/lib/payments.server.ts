@@ -4,14 +4,9 @@ import {
   DISPLAY_PRICES,
   DISPLAY_ANNUAL_PRICES_USD,
   PLAN_CREDITS,
-  type PlanId,
   type PurchasablePlanId,
 } from "@/lib/plans";
 
-/**
- * One-time credit top-up packs.
- * credits = floor(USD / 0.0178) — purchase face, not Video spend face.
- */
 export const RAZORPAY_PACKAGES = {
   starter: { credits: 280, amountINR: 449 },
   basic: { credits: 561, amountINR: 899 },
@@ -30,11 +25,6 @@ export const CRYPTO_PACKAGES = {
 
 export type PackageId = keyof typeof RAZORPAY_PACKAGES;
 
-/**
- * Plan-based purchases — MUST match src/lib/plans.ts PLAN_CREDITS + DISPLAY_PRICES.
- * Public commercial: starter, pro, ultra (monthly + annual) — ONE-TIME only.
- * Legacy IDs kept so historical transactions and admin tools still resolve.
- */
 export type PurchasablePlan =
   | PurchasablePlanId
   | "lite"
@@ -77,7 +67,6 @@ function buildPlanPurchase(): Record<
 
 export const PLAN_PURCHASE = buildPlanPurchase();
 
-/** Resolve plan id from a completed purchase (prefer unique credits matching PLAN_CREDITS). */
 export function planFromCredits(credits: number): PurchasablePlan | null {
   const entry = Object.entries(PLAN_PURCHASE).find(([, p]) => p.credits === credits);
   return (entry?.[0] as PurchasablePlan) ?? null;
@@ -91,11 +80,7 @@ export function isPublicPurchasablePlan(id: string | null | undefined): id is Pu
   return id === "starter" || id === "pro" || id === "ultra";
 }
 
-/**
- * Legacy PayPal Billing Plan IDs — ONLY for existing recurring subscribers / admin tools.
- * New public Starter/Pro/Ultra purchases MUST use createPaypalOrder (Orders API),
- * not createPaypalSubscription. Do not require these env vars for public checkout.
- */
+/** Legacy Billing Plan IDs only — not required for new public one-time checkout. */
 export const PAYPAL_BILLING_PLAN_IDS: Record<string, string | undefined> = {
   starter: process.env.PAYPAL_PLAN_STARTER,
   pro: process.env.PAYPAL_PLAN_PRO,
@@ -113,9 +98,7 @@ export function paypalBillingPlanKey(
   plan: PurchasablePlan,
   interval: "month" | "year" = "month",
 ): string {
-  if (interval === "year" && isPublicPurchasablePlan(plan)) {
-    return `${plan}_annual`;
-  }
+  if (interval === "year" && isPublicPurchasablePlan(plan)) return `${plan}_annual`;
   return plan;
 }
 
@@ -123,15 +106,11 @@ export function paypalBillingPlanId(
   plan: PurchasablePlan,
   interval: "month" | "year" = "month",
 ): string | null {
-  const key = paypalBillingPlanKey(plan, interval);
-  const id = PAYPAL_BILLING_PLAN_IDS[key];
+  const id = PAYPAL_BILLING_PLAN_IDS[paypalBillingPlanKey(plan, interval)];
   return id && id.trim().length > 0 ? id.trim() : null;
 }
 
-/**
- * @deprecated New public checkouts must not call this.
- * Kept only so legacy tooling that still references billing plans does not break imports.
- */
+/** @deprecated New public checkouts must not call this. */
 export function requirePaypalBillingPlanId(
   plan: PurchasablePlan,
   interval: "month" | "year" = "month",
@@ -146,7 +125,6 @@ export function requirePaypalBillingPlanId(
   return id;
 }
 
-/** True if legacy billing plan IDs exist (not required for public one-time checkout). */
 export function subscriptionsConfigured(): boolean {
   return (["starter", "pro", "ultra"] as PurchasablePlanId[]).every(
     (p) => !!paypalBillingPlanId(p, "month"),
@@ -155,7 +133,6 @@ export function subscriptionsConfigured(): boolean {
 
 export const ACCEPTED_COINS = ["usdtbsc", "btc", "eth"] as const;
 export type AcceptedCoin = (typeof ACCEPTED_COINS)[number];
-
 export const NP_API = process.env.NOWPAYMENTS_API_URL || "https://api.nowpayments.io/v1";
 
 function razorpayAuthHeader() {
@@ -315,7 +292,7 @@ async function paypalAccessToken(): Promise<string> {
   return json.access_token as string;
 }
 
-/** ONE-TIME plan purchases and top-ups — primary path for new customers. */
+/** ONE-TIME plan purchases — primary path for new customers. */
 export async function createPaypalOrder(args: {
   amountUSD: number;
   referenceId: string;
@@ -357,11 +334,7 @@ export async function capturePaypalOrder(orderId: string): Promise<any> {
   return res.json();
 }
 
-/**
- * Legacy: create PayPal Subscription (recurring).
- * Do NOT call for new public Starter/Pro/Ultra purchases.
- * Retained so existing subscriber admin/webhook flows still compile.
- */
+/** Legacy recurring — do not use for new public Starter/Pro/Ultra. */
 export async function createPaypalSubscription(args: {
   planId: PurchasablePlan;
   paypalPlanId: string;
@@ -425,11 +398,14 @@ export async function suspendPaypalSubscription(subscriptionId: string, reason: 
 
 export async function activatePaypalSubscription(subscriptionId: string, reason: string): Promise<void> {
   const token = await paypalAccessToken();
-  const res = await fetch(`${paypalApiBase()}/v1/billing"/v1/billing/subscriptions/${subscriptionId}/activate`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ reason: reason.slice(0, 120) }),
-  });
+  const res = await fetch(
+    `${paypalApiBase()}/v1/billing/subscriptions/${subscriptionId}/activate`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason.slice(0, 120) }),
+    },
+  );
   if (!res.ok && res.status !== 422) {
     const text = await res.text();
     throw new Error(`PayPal subscription activate failed (${res.status}): ${text}`);
