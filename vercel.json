@@ -9,7 +9,7 @@
     },
     {
       "path": "/api/cron/plan-lifecycle",
-      "schedule": "0 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
