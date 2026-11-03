@@ -5,6 +5,7 @@ import { planPurchasedEmail, welcomeEmail } from "@/emails/templates";
 import { sendTemplateEmail } from "@/emails/send";
 
 const RESEND_URL = "https://api.resend.com/emails";
+const PRICING_URL = "https://motio2edit.com/pricing";
 
 export type EmailSendResult = { ok: boolean; error?: string; id?: string };
 
@@ -192,21 +193,15 @@ export async function sendPlanExpiredEmail(args: {
   idempotencyKey?: string;
 }): Promise<EmailSendResult> {
   if (!args.to) return { ok: false, error: "no_recipient" };
-  const site = (
-    process.env.PUBLIC_APP_URL ||
-    process.env.VITE_PUBLIC_APP_URL ||
-    "https://motio2edit.com"
-  ).replace(/\/$/, "");
-  const renewUrl = `${site}/pricing`;
   const subject = "Your Motio2edit plan has expired — Renew anytime!";
   const bodyHtml = `
     <p>Hi ${args.name || "there"},</p>
     <p>Your Motio2edit <strong>${args.planName}</strong> plan has expired.</p>
     <p>We hope you enjoyed creating with Motio2edit!</p>
-    <p>Would you like to continue enjoying premium AI image and video creation?</p>
-    <p>You can renew your plan anytime by visiting our pricing page.</p>
+    <p>There is <strong>no automatic renewal</strong>. We never charge you again without your approval.</p>
+    <p>You can renew anytime with a new one-time payment:</p>
     <p style="margin:28px 0">
-      <a href="${renewUrl}" style="background:#F97316;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Renew My Plan</a>
+      <a href="${PRICING_URL}" style="background:#F97316;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Renew My Plan</a>
     </p>
     <p>Thank you for choosing Motio2edit!</p>
   `;
@@ -232,16 +227,7 @@ export async function sendPlanRenewalReminderEmail(args: {
   idempotencyKey?: string;
 }): Promise<EmailSendResult> {
   if (!args.to) return { ok: false, error: "no_recipient" };
-  const site = (
-    process.env.PUBLIC_APP_URL ||
-    process.env.VITE_PUBLIC_APP_URL ||
-    "https://motio2edit.com"
-  ).replace(/\/$/, "");
-  const renewUrl = `${site}/pricing`;
-  const when =
-    args.daysLeft === 1
-      ? "tomorrow"
-      : `in ${args.daysLeft} days`;
+  const when = args.daysLeft === 1 ? "tomorrow" : `in ${args.daysLeft} days`;
   const expiryLabel = (() => {
     try {
       return new Date(args.expiresAt).toUTCString();
@@ -260,9 +246,9 @@ export async function sendPlanRenewalReminderEmail(args: {
     <p>There is <strong>no automatic renewal</strong> and we will <strong>never charge you again</strong> without your approval.</p>
     <p>To keep your plan and credits, renew with a new one-time payment on the pricing page:</p>
     <p style="margin:28px 0">
-      <a href="${renewUrl}" style="background:#F97316;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Renew my plan</a>
+      <a href="${PRICING_URL}" style="background:#F97316;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Renew my plan</a>
     </p>
-    <p style="font-size:13px;color:#555">Steps: open Pricing → choose the same plan (monthly or yearly) → complete PayPal or Razorpay checkout once.</p>
+    <p style="font-size:13px;color:#555">Steps: open <a href="${PRICING_URL}">https://motio2edit.com/pricing</a> → choose the same plan (monthly or yearly) → complete PayPal or Razorpay checkout once. No AutoPay.</p>
   `;
   return sendBrandedEmail({
     to: args.to,

@@ -1,6 +1,10 @@
 /**
  * One-time plan activation, monthly annual credit grants, expiration, renewal reminders.
  * Server-only. Does not create PayPal recurring subscriptions or charge customers again.
+ *
+ * Expiration source of truth for one-time plans: profiles.plan_expires_at
+ * Mirror (audit / legacy): subscriptions.current_period_end (billing_model = one_time)
+ * Reminder flags live on profiles (email is on profiles).
  */
 import { PLAN_CREDITS, type PlanId, getPlan } from "@/lib/plans";
 
@@ -19,6 +23,46 @@ export function computePlanExpiry(from: Date, interval: BillingInterval): Date {
 
 export function computeNextCreditGrant(from: Date): Date {
   return new Date(from.getTime() + 30 * MS_DAY);
+}
+
+/**
+ * Backfill profiles.plan_expires_at from active one_time subscriptions when missing.
+ * Does not touch recurring (legacy AutoPay) rows.
+ */
+export async function syncPlanExpiryFromSubscriptions(db: any): Promise<{ backfilled: number }> {
+  const { data: subs, error } = await db
+    .from("subscriptions")
+    .select("user_id, current_period_end, plan, status, billing_model")
+    .eq("status", "active")
+    .eq("billing_model", "one_time")
+    .not("current_period_end", "is", null)
+    .limit(500);
+
+  if (error) {
+    console.warn("[plan-lifecycle] sync from subscriptions:", error.message);
+    return { backfilled: 0 };
+  }
+
+  let backfilled = 0;
+  for (const sub of subs || []) {
+    if (!sub.user_id || !sub.current_period_end) continue;
+    const { data: updated, error: upErr } = await db
+      .from("profiles")
+      .update({
+        plan_expires_at: sub.current_period_end,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sub.user_id)
+      .is("plan_expires_at", null)
+      .neq("plan", "free")
+      .select("id");
+    if (upErr) {
+      console.warn("[plan-lifecycle] backfill plan_expires_at:", sub.user_id, upErr.message);
+      continue;
+    }
+    if (updated && updated.length > 0) backfilled++;
+  }
+  return { backfilled };
 }
 
 export async function activateOneTimePlan(
@@ -133,10 +177,6 @@ export async function demoteExpiredPlans(db: any): Promise<{ expired: number }> 
   return { expired };
 }
 
-/**
- * Send expiration emails for rows that still need them — including users
- * already demoted to free. Uses claim lock for concurrency.
- */
 export async function sendPendingExpirationEmails(db: any): Promise<{
   emailsSent: number;
   emailFailures: number;
@@ -184,9 +224,7 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
     }
 
     const { data: claimed, error: claimErr } = await claimQuery.select("id");
-    if (claimErr || !claimed || claimed.length === 0) {
-      continue;
-    }
+    if (claimErr || !claimed || claimed.length === 0) continue;
 
     const planName =
       row.plan && row.plan !== "free" ? getPlan(row.plan as PlanId).name : "paid";
@@ -207,20 +245,18 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
         continue;
       }
 
-      const { error: markErr, data: marked } = await db
+      const { error: markErr } = await db
         .from("profiles")
         .update({ expiration_email_sent_at: nowIso })
         .eq("id", row.id)
-        .is("expiration_email_sent_at", null)
-        .select("id");
+        .is("expiration_email_sent_at", null);
 
       if (markErr) {
         console.error("[plan-lifecycle] mark email sent failed:", row.id, markErr);
         emailFailures++;
         continue;
       }
-      if (marked && marked.length > 0) emailsSent++;
-      else emailsSent++;
+      emailsSent++;
     } catch (e) {
       console.error("[plan-lifecycle] expiration email failed:", row.id, e);
       emailFailures++;
@@ -238,7 +274,7 @@ const REMINDER_WINDOWS: Array<{ days: 7 | 3 | 1; column: string }> = [
 
 /**
  * Pre-expiry renewal reminders (7 / 3 / 1 days). Manual repurchase only — never charges.
- * Window: ~24h around each target day so daily cron still hits even if slightly delayed.
+ * Reads profiles.plan_expires_at (source of truth after activate + backfill).
  */
 export async function sendPendingRenewalReminders(db: any): Promise<{
   remindersSent: number;
@@ -265,7 +301,6 @@ export async function sendPendingRenewalReminders(db: any): Promise<{
       .limit(200);
 
     if (error) {
-      // Column may not exist until migration is applied — skip gracefully
       console.warn("[plan-lifecycle] renewal reminder query:", days, error.message);
       continue;
     }
@@ -301,7 +336,6 @@ export async function sendPendingRenewalReminders(db: any): Promise<{
 
         if (markErr) {
           console.error("[plan-lifecycle] mark reminder failed:", days, row.id, markErr);
-          // Resend idempotency still protects duplicates
         }
         remindersSent++;
       } catch (e) {
@@ -314,7 +348,6 @@ export async function sendPendingRenewalReminders(db: any): Promise<{
   return { remindersSent, reminderFailures };
 }
 
-/** Full lifecycle: demote then email (email retries independent of plan). */
 export async function expireDuePlans(db: any): Promise<{
   expired: number;
   emailsSent: number;
@@ -431,7 +464,6 @@ export function buildAnnualGrantTxId(userId: string, grantForIso: string): strin
   return `annual_grant_${userId}_${grantForIso}`;
 }
 
-/** Test helper: eligibility for email after demotion */
 export function isExpirationEmailEligible(row: {
   plan_expires_at: string | null;
   expiration_email_sent_at: string | null;

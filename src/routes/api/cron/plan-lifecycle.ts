@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 /**
- * Secure cron: annual monthly grants + pre-expiry reminders + expire one-time plans.
+ * Secure cron: backfill expiry → annual grants → pre-expiry reminders → expire one-time plans.
  * Auth: Authorization: Bearer $CRON_SECRET  (or x-cron-secret header)
  * Vercel schedule: daily (0 3 * * *) — Hobby plan limit
  */
@@ -36,16 +36,21 @@ async function handle(request: Request): Promise<Response> {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
     const {
+      syncPlanExpiryFromSubscriptions,
       expireDuePlans,
       grantDueAnnualMonthlyCredits,
       sendPendingRenewalReminders,
     } = await import("@/lib/plan-lifecycle.server");
+
+    const sync = await syncPlanExpiryFromSubscriptions(db);
     const grants = await grantDueAnnualMonthlyCredits(db);
     const reminders = await sendPendingRenewalReminders(db);
     const expiry = await expireDuePlans(db);
+
     return new Response(
       JSON.stringify({
         ok: true,
+        expiryBackfilled: sync.backfilled,
         annualGrants: grants.granted,
         annualGrantFailures: grants.failures,
         renewalRemindersSent: reminders.remindersSent,
