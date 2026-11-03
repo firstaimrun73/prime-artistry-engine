@@ -1,5 +1,5 @@
 /**
- * Shared server-side payment verification helpers (no network side effects except optional fetches).
+ * Shared server-side payment verification helpers.
  * Used by payments.handlers and unit tests.
  */
 
@@ -9,8 +9,6 @@ export function amountsMatch(
   currency: string,
 ): boolean {
   if (!Number.isFinite(expected) || !Number.isFinite(actual)) return false;
-  if (expected <= 0 && currency !== "USD" && currency !== "INR") return false;
-  // Major units: allow 1 cent / 1 paise tolerance only for float noise
   const tol = currency === "INR" || currency === "USD" ? 0.009 : 0.01;
   return Math.abs(expected - actual) <= tol;
 }
@@ -47,7 +45,9 @@ export function paypalCaptureChecks(args: {
   const paid = Number(paidRaw);
   if (!Number.isFinite(paid) || paid <= 0) return { ok: false, reason: "amount_invalid" };
 
-  const currency = String(cap?.amount?.currency_code || pu?.amount?.currency_code || "toUpperCase();
+  const currency = String(
+    cap?.amount?.currency_code || pu?.amount?.currency_code || "",
+  ).toUpperCase();
   const expectedCurrency = String(tx.currency || "USD").toUpperCase();
   if (currency && currency !== expectedCurrency) return { ok: false, reason: "currency_mismatch" };
 
@@ -73,9 +73,7 @@ export function razorpayVerifyChecks(args: {
   };
   userId: string;
   razorpayOrderId: string;
-  /** Amount in major units (INR rupees) from gateway if available */
   paidMajor?: number | null;
-  /** Payment status from Razorpay API if fetched */
   paymentStatus?: string | null;
 }): { ok: true } | { ok: false; reason: string } {
   const { tx, userId, razorpayOrderId, paidMajor, paymentStatus } = args;
@@ -87,10 +85,6 @@ export function razorpayVerifyChecks(args: {
   }
   if (paymentStatus) {
     const st = paymentStatus.toLowerCase();
-    if (st !== "captured" && st !== "authorized") {
-      // Require captured for plan activation
-      if (st !== "captured") return { ok: false, reason: `status_${st}` };
-    }
     if (st !== "captured") return { ok: false, reason: "not_captured" };
   }
   if (paidMajor !== undefined && paidMajor !== null) {
@@ -103,7 +97,6 @@ export function razorpayVerifyChecks(args: {
   return { ok: true };
 }
 
-/** Inspect Supabase rpc result shape */
 export function rpcSucceeded(
   result: { data?: any; error?: { message?: string } | null } | null | undefined,
 ): { ok: true; data: any } | { ok: false; reason: string } {

@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/** Public commercial + legacy (existing subscribers / admin). */
 const planSchema = z.enum([
   "starter",
   "pro",
@@ -36,7 +35,6 @@ function amountForPlan(
 ): number {
   if (interval === "year") {
     if (currency === "USD") return pkg.amountAnnualUSD ?? pkg.amountUSD * 10;
-    // INR annual: 10x monthly face (matches pricing display convention)
     return Math.round(pkg.amountINR * 10);
   }
   return currency === "INR" ? pkg.amountINR : pkg.amountUSD;
@@ -83,6 +81,18 @@ async function notifyPlanPurchased(args: {
   }
 }
 
+async function fetchRazorpayPayment(paymentId: string): Promise<any | null> {
+  const id = process.env.RAZORPAY_KEY_ID;
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!id || !secret) return null;
+  const auth = "Basic " + Buffer.from(`${id}:${secret}`).toString("base64");
+  const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+    headers: { Authorization: auth },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { plan: string; interval?: string }) =>
@@ -97,7 +107,6 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
     if (!pkg) throw new Error("Selected plan is not available for purchase.");
     const interval = data.interval === "year" ? "year" : "month";
-    // Annual only for public plans
     if (interval === "year" && !isPublicPurchasablePlan(data.plan)) {
       throw new Error("Annual billing is only available for Starter, Pro, and Ultra.");
     }
@@ -163,8 +172,10 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     const { verifyRazorpaySignature, planFromCredits, isPublicPurchasablePlan } = await import(
       "@/lib/payments.server"
     );
+    const { razorpayVerifyChecks, rpcSucceeded } = await import("@/lib/payment-verify.server");
     const { activateOneTimePlan } = await import("@/lib/plan-lifecycle.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     if (
       !verifyRazorpaySignature(
         data.razorpay_order_id,
@@ -174,6 +185,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     ) {
       throw new Error("Payment signature verification failed");
     }
+
     const db = supabaseAdmin as any;
     const { data: tx } = await db
       .from("payment_transactions")
@@ -182,24 +194,57 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .eq("payment_method", "razorpay")
       .maybeSingle();
+
     if (!tx) throw new Error("Transaction not found");
     if (tx.payment_status === "completed") {
       return { success: true, credits: tx.credits_purchased, alreadyCompleted: true };
     }
-    await db.rpc("apply_payment_credits", {
+
+    const gatewayPayment = await fetchRazorpayPayment(data.razorpay_payment_id);
+    const paidMajor =
+      gatewayPayment && typeof gatewayPayment.amount === "number"
+        ? gatewayPayment.amount / 100
+        : null;
+    const paymentStatus = gatewayPayment?.status ?? null;
+
+    const checks = razorpayVerifyChecks({
+      tx,
+      userId: context.userId,
+      razorpayOrderId: data.razorpay_order_id,
+      paidMajor,
+      paymentStatus,
+    });
+    if (!checks.ok) {
+      console.error("[razorpay] verify failed:", checks.reason, data.internalOrderId);
+      throw new Error("Payment verification failed");
+    }
+
+    // Prefer API order_id match when available
+    if (gatewayPayment?.order_id && gatewayPayment.order_id !== tx.gateway_order_id) {
+      throw new Error("Payment verification failed");
+    }
+
+    const rpc = await db.rpc("apply_payment_credits", {
       _user_id: context.userId,
       _transaction_id: tx.transaction_id,
       _credits: tx.credits_purchased,
       _reason: "razorpay_capture",
     });
+    const rpcCheck = rpcSucceeded(rpc);
+    if (!rpcCheck.ok) {
+      console.error("[razorpay] apply_payment_credits failed:", rpcCheck.reason);
+      throw new Error("Could not apply credits");
+    }
+
     await db
       .from("payment_transactions")
       .update({
         payment_status: "completed",
         gateway_payment_id: data.razorpay_payment_id,
-        gateway_response: data,
+        gateway_response: { client: data, gateway: gatewayPayment },
       })
-      .eq("transaction_id", data.internalOrderId);
+      .eq("transaction_id", data.internalOrderId)
+      .eq("user_id", context.userId);
 
     const meta = (tx.metadata || {}) as { plan?: string; interval?: string };
     const plan =
@@ -233,7 +278,6 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     return { success: true, credits: tx.credits_purchased };
   });
 
-/** Crypto removed from product — stubs so old imports do not crash. */
 export const createCryptoInvoice = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
@@ -248,32 +292,18 @@ export const getPaypalClientId = createServerFn({ method: "GET" }).handler(async
   return { clientId: process.env.PAYPAL_CLIENT_ID || process.env.VITE_PAYPAL_CLIENT_ID || "" };
 });
 
-/**
- * Public plans always use one-time Orders API (manual renewal).
- * Legacy non-public plans may still report subscription if PAYPAL_PLAN_* is set
- * (should not be offered on public pricing).
- */
 export const getPaypalSubscriptionMode = createServerFn({ method: "POST" })
   .inputValidator((d: { plan: string; interval?: string }) =>
     z.object({ plan: z.string(), interval: intervalSchema.optional() }).parse(d),
   )
-  .handler(async ({ data }) => {
-    const { isPublicPurchasablePlan } = await import("@/lib/payments.server");
-    if (isPublicPurchasablePlan(data.plan)) {
-      return {
-        mode: "order" as const,
-        billingModel: "one_time" as const,
-        message: "One-time payment · plan valid until expiry · renew manually",
-      };
-    }
-    // Legacy: do not open public recurring for lite/plus/etc. from new UI
-    return { mode: "order" as const, billingModel: "one_time" as const };
+  .handler(async () => {
+    return {
+      mode: "order" as const,
+      billingModel: "one_time" as const,
+      message: "One-time payment · plan valid until expiry · renew manually",
+    };
   });
 
-/**
- * Block new PayPal Billing Subscriptions for public plans.
- * Kept export so old clients get a clear error instead of missing handler.
- */
 export const createPaypalSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { plan: string; interval?: string }) =>
@@ -298,11 +328,9 @@ export const createPaypalOrder = createServerFn({ method: "POST" })
     z.object({ plan: planSchema, interval: intervalSchema.optional() }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const {
-      PLAN_PURCHASE,
-      createPaypalOrder: createOrder,
-      isPublicPurchasablePlan,
-    } = await import("@/lib/payments.server");
+    const { PLAN_PURCHASE, createPaypalOrder: createOrder, isPublicPurchasablePlan } = await import(
+      "@/lib/payments.server"
+    );
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await enforcePaymentRateLimit(supabaseAdmin as any, context.userId, "paypal");
     const pkg = PLAN_PURCHASE[data.plan as keyof typeof PLAN_PURCHASE];
@@ -361,6 +389,7 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
       isPublicPurchasablePlan,
       extractPaypalCaptureId,
     } = await import("@/lib/payments.server");
+    const { paypalCaptureChecks, rpcSucceeded } = await import("@/lib/payment-verify.server");
     const { activateOneTimePlan } = await import("@/lib/plan-lifecycle.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
@@ -377,37 +406,37 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
       return { success: true, credits: tx.credits_purchased, alreadyCompleted: true };
     }
 
-    // Server-side capture + status verification — never trust client alone
     const captured = await captureOrder(data.orderId);
-    const status = (captured?.status || "").toUpperCase();
-    if (status !== "COMPLETED") {
-      await db
-        .from("payment_transactions")
-        .update({ payment_status: "failed", gateway_response: captured })
-        .eq("transaction_id", data.internalOrderId);
-      throw new Error(`PayPal payment not completed (status: ${status || "unknown"})`);
-    }
-
-    // Verify amount matches server-recorded amount (anti-tamper)
-    try {
-      const paid = Number(
-        captured?.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value ?? 0,
-      );
-      if (paid > 0 && Math.abs(paid - Number(tx.amount)) > 0.02) {
-        throw new Error("Paid amount does not match order.");
+    const checks = paypalCaptureChecks({
+      tx,
+      orderId: data.orderId,
+      userId: context.userId,
+      captured,
+    });
+    if (!checks.ok) {
+      console.error("[paypal] capture checks failed:", checks.reason, data.internalOrderId);
+      if (checks.reason.startsWith("status_")) {
+        await db
+          .from("payment_transactions")
+          .update({ payment_status: "failed", gateway_response: captured })
+          .eq("transaction_id", data.internalOrderId);
       }
-    } catch (e) {
-      if (e instanceof Error && e.message.includes("match")) throw e;
+      throw new Error("Payment verification failed");
     }
 
     const captureId = extractPaypalCaptureId(captured);
 
-    await db.rpc("apply_payment_credits", {
+    const rpc = await db.rpc("apply_payment_credits", {
       _user_id: context.userId,
       _transaction_id: tx.transaction_id,
       _credits: tx.credits_purchased,
       _reason: "paypal_capture",
     });
+    const rpcCheck = rpcSucceeded(rpc);
+    if (!rpcCheck.ok) {
+      console.error("[paypal] apply_payment_credits failed:", rpcCheck.reason);
+      throw new Error("Could not apply credits");
+    }
 
     await db
       .from("payment_transactions")
@@ -416,7 +445,8 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
         gateway_payment_id: captureId,
         gateway_response: captured,
       })
-      .eq("transaction_id", data.internalOrderId);
+      .eq("transaction_id", data.internalOrderId)
+      .eq("user_id", context.userId);
 
     const meta = (tx.metadata || {}) as { plan?: string; interval?: string };
     const plan =
