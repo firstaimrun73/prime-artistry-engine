@@ -13,7 +13,6 @@ function resolveFromAddress(): { from: string; replyTo: string } | null {
   const emailFrom = (process.env.EMAIL_FROM || "").trim();
   const address = emailFrom || support || "support@motio2edit.com";
   const replyTo = support || address;
-  // If EMAIL_FROM is a bare email, brand it; if it already has a display name, keep it.
   const from = address.includes("<") ? address : `Motio2edit <${address}>`;
   return { from, replyTo };
 }
@@ -190,7 +189,6 @@ export async function sendPlanExpiredEmail(args: {
   to: string;
   name?: string;
   planName: string;
-  /** Stable key so concurrent cron retries do not double-send via Resend */
   idempotencyKey?: string;
 }): Promise<EmailSendResult> {
   if (!args.to) return { ok: false, error: "no_recipient" };
@@ -216,6 +214,60 @@ export async function sendPlanExpiredEmail(args: {
     to: args.to,
     subject,
     heading: "Your plan has expired",
+    bodyHtml,
+    idempotencyKey: args.idempotencyKey,
+  });
+}
+
+/**
+ * Pre-expiry renewal reminder — NO automatic charge.
+ * Customer must open Pricing and complete a new one-time payment.
+ */
+export async function sendPlanRenewalReminderEmail(args: {
+  to: string;
+  name?: string;
+  planName: string;
+  expiresAt: string;
+  daysLeft: 7 | 3 | 1;
+  idempotencyKey?: string;
+}): Promise<EmailSendResult> {
+  if (!args.to) return { ok: false, error: "no_recipient" };
+  const site = (
+    process.env.PUBLIC_APP_URL ||
+    process.env.VITE_PUBLIC_APP_URL ||
+    "https://motio2edit.com"
+  ).replace(/\/$/, "");
+  const renewUrl = `${site}/pricing`;
+  const when =
+    args.daysLeft === 1
+      ? "tomorrow"
+      : `in ${args.daysLeft} days`;
+  const expiryLabel = (() => {
+    try {
+      return new Date(args.expiresAt).toUTCString();
+    } catch {
+      return args.expiresAt;
+    }
+  })();
+  const subject =
+    args.daysLeft === 1
+      ? `Your Motio2edit ${args.planName} plan expires tomorrow`
+      : `Your Motio2edit ${args.planName} plan expires ${when}`;
+  const bodyHtml = `
+    <p>Hi ${args.name || "there"},</p>
+    <p>Your Motio2edit <strong>${args.planName}</strong> plan is about to expire <strong>${when}</strong>.</p>
+    <p><strong>Expiration date:</strong> ${expiryLabel}</p>
+    <p>There is <strong>no automatic renewal</strong> and we will <strong>never charge you again</strong> without your approval.</p>
+    <p>To keep your plan and credits, renew with a new one-time payment on the pricing page:</p>
+    <p style="margin:28px 0">
+      <a href="${renewUrl}" style="background:#F97316;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Renew my plan</a>
+    </p>
+    <p style="font-size:13px;color:#555">Steps: open Pricing → choose the same plan (monthly or yearly) → complete PayPal or Razorpay checkout once.</p>
+  `;
+  return sendBrandedEmail({
+    to: args.to,
+    subject,
+    heading: "Plan renewal reminder",
     bodyHtml,
     idempotencyKey: args.idempotencyKey,
   });
