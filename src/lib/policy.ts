@@ -13,9 +13,12 @@ export type WatermarkMode = "none" | "primary" | "primary+secondary";
 
 /** Plans that are considered paid (no free-tier restrictions). */
 export const PAID_PLANS: readonly PlanId[] = [
+  "starter",
+  "pro",
+  "ultra",
+  // Legacy paid plans — existing subscribers must keep paid status
   "lite",
   "plus",
-  "pro",
   "studio",
   "business",
 ] as const;
@@ -40,8 +43,8 @@ export function canAccessChat(opts: {
 }
 
 /**
- * Video: all paid plans including Lite. Free never.
- * Aligns product matrix; keep plans.ts lite.video in sync so editor plan.video gate matches.
+ * Video: all paid plans including Starter and legacy Lite. Free never.
+ * Aligns product matrix; keep plans.ts video flags in sync.
  */
 export function canAccessVideo(opts: {
   plan: string | null | undefined;
@@ -67,7 +70,7 @@ export function canAccessMusic(opts: {
 }
 
 /**
- * Maluto AI (photo restore / Auto Edit): Lite+ only. Never free.
+ * Maluto AI (photo restore / Auto Edit): paid plans only. Never free.
  * Server re-checks via auto-edit entitlements.
  */
 export function canAccessMalutoAI(opts: {
