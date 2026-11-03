@@ -21,10 +21,6 @@ export const CARD_PROVIDERS: { id: CardProvider; label: string; note: string }[]
   { id: "razorpay", label: "Razorpay", note: "UPI / cards via Razorpay — India (INR) only" },
 ];
 
-/**
- * Card providers allowed for a checkout currency.
- * Razorpay is India-only (INR). International users only see PayPal.
- */
 export function cardProvidersForCurrency(currency: Currency): typeof CARD_PROVIDERS {
   if (currency === "INR") {
     return CARD_PROVIDERS.filter((p) => p.id === "razorpay");
@@ -42,13 +38,6 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
   INR: "₹",
 };
 
-/**
- * Plan IDs.
- * - Public commercial plans (Nov 2026): starter, pro, ultra
- * - Legacy IDs kept so existing profile.plan / subscription rows continue to resolve
- *   without forced migration or re-billing: free, lite, plus, studio, business
- * - "pro" is both legacy and current public plan (price/credits updated for NEW purchases only)
- */
 export type PlanId =
   | "free"
   | "lite"
@@ -59,7 +48,6 @@ export type PlanId =
   | "starter"
   | "ultra";
 
-/** Model access tier enforced server-side for generation routing. */
 export type ModelTier = "standard" | "premium" | "ultra";
 
 export type BillingInterval = "month" | "year";
@@ -78,6 +66,9 @@ export const CREDIT_COST = {
   music_lite: 50,
   video_enhance: 200,
 } as const;
+
+/** Standard text-to-image face cost used for pricing estimates (25 credits). */
+export const STANDARD_IMAGE_CREDIT_COST = 25;
 
 export const UNLIMITED_CREDITS = 9_999_999;
 
@@ -102,6 +93,10 @@ export function creditsLabel(credits: number): string {
   return credits >= UNLIMITED_CREDITS ? "Unlimited" : String(credits);
 }
 
+export function estimatedStandardImages(credits: number): number {
+  return Math.floor(credits / STANDARD_IMAGE_CREDIT_COST);
+}
+
 export function estimatedGenerations(credits: number) {
   return {
     images: Math.floor(credits / CREDIT_COST.image),
@@ -119,23 +114,24 @@ export type Plan = {
   video: boolean;
   priority: boolean;
   bestQuality: boolean;
-  /** Model access tier — enforced server-side */
   modelTier: ModelTier;
   price: Record<Currency, number>;
-  /** Annual price (USD face). Credits still granted monthly. */
   priceAnnualUSD: number;
   features: string[];
-  /** Short positioning line for pricing cards */
   positioning: string;
-  /** Whether this plan is offered on the public pricing page for NEW purchases */
   publicOffer: boolean;
 };
 
-/**
- * Canonical plan definitions.
- * Public offers (publicOffer: true): starter, pro, ultra only.
- * Legacy plans remain for existing subscribers and admin resolution.
- */
+/** Six Music Studio modes (authoritative from music.functions). */
+export const MUSIC_STUDIO_MODE_LABELS = [
+  "Song",
+  "Instrumental",
+  "BGM",
+  "Voiceover",
+  "SFX",
+  "Video music",
+] as const;
+
 export const PLANS: Plan[] = [
   {
     id: "free",
@@ -152,11 +148,9 @@ export const PLANS: Plan[] = [
     features: [
       `${FREE_SIGNUP_CREDITS} starter credits`,
       "Image — Standard mode",
-      "Watermark-free downloads",
       "Music Studio limited",
     ],
   },
-  // —— NEW PUBLIC PLANS (Nov 2026) ——
   {
     id: "starter",
     name: "Starter",
@@ -169,18 +163,19 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 120,
     publicOffer: true,
     positioning:
-      "Everything you need to create, edit and enhance images with powerful Standard AI models.",
+      "Create, edit and enhance images with Standard AI — plus limited Video Studio and full Music Studio modes.",
     features: [
-      "1,000 credits / month",
-      "Standard Text-to-Image generation",
-      "Standard Image-to-Image editing",
-      "Standard image enhancement & restoration",
-      "Maluto AI",
-      "Circle 2edit",
-      "Eligible Music Studio tools",
-      "Access to AI + Tools",
-      "Watermark-free downloads",
-      "No disruptive ads",
+      "1,000 credits every month",
+      "~40 estimated standard image generations / month",
+      "Standard AI image generation",
+      "Standard image-to-image editing",
+      "Standard AI image enhancement",
+      "AI+ Filters and Styles",
+      "Circle 2edit — Remove and Add",
+      "Video Studio — Standard SD, up to 5 seconds",
+      "Music Studio — all 6 modes (Song, Instrumental, BGM, Voiceover, SFX, Video music)",
+      "Watermark-free paid exports",
+      "Access to eligible AI tools",
     ],
   },
   {
@@ -191,26 +186,24 @@ export const PLANS: Plan[] = [
     priority: true,
     bestQuality: true,
     modelTier: "premium",
-    // New public price for NEW purchases. Existing pro subscribers keep their prior terms.
     price: { USD: 25, EUR: 23, INR: 2099 },
     priceAnnualUSD: 250,
     publicOffer: true,
     positioning:
-      "More creative freedom with advanced Premium AI models and higher-quality generation options.",
+      "Premium models, Maluto AI restoration, and longer video options for serious creative work.",
     features: [
-      "2,500 credits / month",
-      "Premium Text-to-Image generation",
-      "Premium Image-to-Image editing",
-      "Advanced image enhancement",
-      "Premium restoration options",
-      "Maluto AI",
-      "Circle 2edit",
-      "Eligible Music Studio tools",
-      "Access to premium model options",
-      "Access to AI + Tools",
-      "Priority queue where supported",
-      "Watermark-free downloads",
-      "No disruptive ads",
+      "2,500 credits every month",
+      "~100 estimated standard image generations / month",
+      "Premium image generation models",
+      "Advanced image-to-image editing",
+      "Advanced enhancement and restoration",
+      "Maluto AI photo restoration",
+      "Circle 2edit — Remove and Add",
+      "Video Studio — Standard & Premium (5s and 10s)",
+      "Music Studio — all 6 modes",
+      "AI+ Filters and Styles",
+      "Priority processing where supported",
+      "Watermark-free paid exports",
     ],
   },
   {
@@ -225,23 +218,23 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 790,
     publicOffer: true,
     positioning:
-      "Experience our highest-tier AI models for advanced creative work and demanding image-generation tasks.",
+      "Highest-tier models, longest video options, and the full Motio2edit creative toolkit.",
     features: [
-      "8,000 credits / month",
-      "Ultra AI model access",
-      "Highest-quality eligible generation options",
-      "Advanced editing and restoration",
-      "Premium enhancement features",
-      "Maluto AI",
-      "Circle 2edit",
-      "Eligible Music Studio tools",
-      "Priority processing where technically supported",
-      "Access to AI + Tools",
-      "Watermark-free downloads",
-      "No disruptive ads",
+      "8,000 credits every month",
+      "~320 estimated standard image generations / month",
+      "Ultra AI generation models",
+      "Highest eligible image quality",
+      "Premium AI+ Filters and Styles",
+      "Advanced image editing and restoration",
+      "Maluto AI photo restoration",
+      "Circle 2edit — Remove and Add",
+      "Video Studio — Standard & Premium (5s, 10s, 15s where supported)",
+      "Music Studio — all 6 modes",
+      "Full eligible AI+ Tools access",
+      "Priority processing where supported",
+      "Watermark-free paid exports",
     ],
   },
-  // —— LEGACY (kept for existing subscribers; not shown on public pricing) ——
   {
     id: "lite",
     name: "Lite",
@@ -254,17 +247,7 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 0,
     publicOffer: false,
     positioning: "Legacy Lite plan.",
-    features: [
-      "350 credits / month",
-      "Maluto AI Restore — just upload",
-      "Image Studio — Standard mode",
-      "Video Studio — Standard mode",
-      "Music Studio — Standard · Song & Instrumental",
-      "Circle 2edit · Cropmix · Remove BG",
-      "Multi-image (up to 5 references)",
-      "Watermark-free downloads",
-      "No ads",
-    ],
+    features: ["350 credits / month"],
   },
   {
     id: "plus",
@@ -278,18 +261,7 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 0,
     publicOffer: false,
     positioning: "Legacy Plus plan.",
-    features: [
-      "800 credits / month",
-      "Maluto AI Restore + 2K",
-      "Image Studio — Standard mode",
-      "Video Studio — Standard mode",
-      "Music — Standard · all 6 modes",
-      "Longer tracks (up to 90s)",
-      "Circle 2edit · Cropmix · Filters",
-      "Multi-image (up to 10 references)",
-      "Watermark-free downloads",
-      "No ads",
-    ],
+    features: ["800 credits / month"],
   },
   {
     id: "studio",
@@ -303,17 +275,7 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 0,
     publicOffer: false,
     positioning: "Legacy AI Studio plan.",
-    features: [
-      "5,000 credits / month",
-      "Maluto AI Restore + 8K",
-      "Image Studio — Standard + Premium + Ultra AI",
-      "Video Studio — Standard + Premium",
-      "Music — Premium · all 6 modes · 120s tracks",
-      "Higher concurrency · priority queue",
-      "Circle 2edit · full toolset · multi-image (10)",
-      "Watermark-free downloads",
-      "No ads",
-    ],
+    features: ["5,000 credits / month"],
   },
   {
     id: "business",
@@ -327,26 +289,13 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 0,
     publicOffer: false,
     positioning: "Legacy Master Studio plan.",
-    features: [
-      "10,000 credits / month",
-      "Maluto AI Restore + 8K Max",
-      "Image — Standard + Premium + full Ultra AI",
-      "Video — Standard + Premium",
-      "Music — Premium · all 6 modes · longest tracks",
-      "IMAX + 8K Max + custom aspect",
-      "Highest concurrency & priority",
-      "Circle 2edit · every studio tool · multi-image (10)",
-      "Master Studio tools · watermark-free",
-      "No ads",
-    ],
+    features: ["10,000 credits / month"],
   },
 ];
 
-/** Only these three appear on the public pricing page. */
 export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["starter", "pro", "ultra"];
 export const PRICING_POPULAR_PLAN_ID: PlanId = "pro";
 
-/** Purchasable plan IDs for new checkouts (monthly + annual). */
 export type PurchasablePlanId = "starter" | "pro" | "ultra";
 
 export const PLAN_CREDITS: Record<PlanId, number> = {
@@ -354,14 +303,12 @@ export const PLAN_CREDITS: Record<PlanId, number> = {
   starter: 1000,
   pro: 2500,
   ultra: 8000,
-  // Legacy allocations (existing subscribers keep these)
   lite: 350,
   plus: 800,
   studio: 5000,
   business: 10000,
 };
 
-/** Model tier by plan — used for server-side generation guards. */
 export const PLAN_MODEL_TIER: Record<PlanId, ModelTier> = {
   free: "standard",
   starter: "standard",
@@ -378,7 +325,6 @@ export function getModelTier(plan: PlanId | null | undefined): ModelTier {
   return PLAN_MODEL_TIER[plan] ?? "standard";
 }
 
-/** True if the user's plan may use the requested model tier. */
 export function canAccessModelTier(
   userPlan: PlanId | null | undefined,
   required: ModelTier,
@@ -406,14 +352,12 @@ export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
   starter: { USD: 12, EUR: 11, INR: 999 },
   pro: { USD: 25, EUR: 23, INR: 2099 },
   ultra: { USD: 79, EUR: 73, INR: 6599 },
-  // Legacy display (admin / existing account views)
   lite: { USD: 4.99, EUR: 4.59, INR: 449 },
   plus: { USD: 9.99, EUR: 9.19, INR: 899 },
   studio: { USD: 55, EUR: 50.99, INR: 4999 },
   business: { USD: 110, EUR: 101.99, INR: 9999 },
 };
 
-/** Annual USD prices for public plans (2 months free vs monthly). */
 export const DISPLAY_ANNUAL_PRICES_USD: Record<PurchasablePlanId, number> = {
   starter: 120,
   pro: 250,
@@ -428,7 +372,6 @@ export function toCheckoutCurrency(c: DisplayCurrency): Currency {
   return c;
 }
 
-/** Resolve credits granted per billing period (always monthly allocation). */
 export function monthlyCreditsForPlan(planId: PlanId): number {
   return PLAN_CREDITS[planId] ?? 0;
 }
