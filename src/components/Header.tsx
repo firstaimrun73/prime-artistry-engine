@@ -55,7 +55,10 @@ export function Header() {
   const authLinks: NavItem[] = showChat ? [...authLinksBase, CHAT_LINK] : authLinksBase;
   const links: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 
-  const avatarSrc = resolveAvatarSrc(profile?.avatar_url, profile?.avatar_signed_url);
+  const avatarSrc = resolveAvatarSrc(profile?.avatar_url, profile?.avatar_signed_url, {
+    nameOrEmail: profile?.display_name || profile?.email,
+    userId: profile?.id || user?.id,
+  });
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">

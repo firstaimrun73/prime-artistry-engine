@@ -95,7 +95,10 @@ export function Dashboard() {
   const used = Math.max(0, allocation - profile.credits);
   const name = (profile.display_name || "creator").trim() || "creator";
   const initial = (profile.display_name || profile.email || "U").slice(0, 1).toUpperCase();
-  const avatarSrc = resolveAvatarSrc(profile.avatar_url, profile.avatar_signed_url);
+  const avatarSrc = resolveAvatarSrc(profile.avatar_url, profile.avatar_signed_url, {
+    nameOrEmail: profile.display_name || profile.email,
+    userId: profile.id,
+  });
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 pb-24 md:py-10 md:pb-12">
