@@ -16,14 +16,13 @@ import {
   PRICING_POPULAR_PLAN_ID,
   annualSavingsMonths,
   estimatedStandardImages,
-  STANDARD_IMAGE_CREDIT_COST,
   type DisplayCurrency,
   type PlanId,
   type PurchasablePlanId,
   type BillingInterval,
 } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
-import { Check, Coins, Crown, ImageIcon } from "lucide-react";
+import { Check, Coins, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pricing")({
@@ -76,16 +75,16 @@ function PricingPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:py-12 md:pb-12">
+      <div className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:py-12 md:pb-12">
         <div className="text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 sm:h-12 sm:w-12">
-            <Crown className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+            <Crown className="h-5 w-5 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             {t("pricing.title") || "Pricing"}
           </h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
-            Clear plans. One-time payment. Credits every month. No automatic renewal.
+          <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
+            Simple plans. Pay once. Credits every month.
           </p>
         </div>
 
@@ -114,14 +113,14 @@ function PricingPage() {
               )}
             >
               Yearly
-              <span className="ml-1.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600">
+              <span className="ml-1.5 text-[10px] font-bold text-emerald-600">
                 {savingsMonths} mo free
               </span>
             </button>
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
           {DISPLAY_CURRENCIES.map((code) => (
             <button
               key={code}
@@ -146,95 +145,79 @@ function PricingPage() {
           ))}
         </div>
 
-        <div className="mt-8 grid grid-cols-1 items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Mobile: 1 col · Desktop: 3 equal cols side by side */}
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5 md:items-stretch">
           {visiblePlans.map((plan) => {
             const isRecommended = plan.id === PRICING_POPULAR_PLAN_ID;
             const isCurrent = profile?.plan === plan.id;
             const monthlyUsd = DISPLAY_PRICES[plan.id]?.USD ?? 0;
             const annualUsd =
               DISPLAY_ANNUAL_PRICES_USD[plan.id as PurchasablePlanId] ?? monthlyUsd * 10;
-            const imgEstimate = estimatedStandardImages(plan.credits);
+            const imgPerMonth = estimatedStandardImages(plan.credits);
+            const imgPerYear = imgPerMonth * 12;
 
             let priceLabel: string;
             let periodLabel: string;
             if (interval === "year") {
-              if (currency === "USD") {
-                priceLabel = formatPlanPrice(annualUsd, "USD");
-              } else if (currency === "EUR") {
+              if (currency === "USD") priceLabel = formatPlanPrice(annualUsd, "USD");
+              else if (currency === "EUR")
                 priceLabel = formatPlanPrice(Math.round(annualUsd * 0.92), "EUR");
-              } else {
-                priceLabel = formatPlanPrice(Math.round(annualUsd * 83.5), "INR");
-              }
-              periodLabel = "per year · one-time";
+              else priceLabel = formatPlanPrice(Math.round(annualUsd * 83.5), "INR");
+              periodLabel = "per year";
             } else {
               const raw = DISPLAY_PRICES[plan.id]?.[currency];
               priceLabel =
                 typeof raw === "number" ? formatPlanPrice(raw, currency) : raw ?? "—";
-              periodLabel = "per month · one-time";
+              periodLabel = "per month";
             }
 
             return (
               <div
                 key={plan.id}
-                className={cn(
-                  "relative flex h-full w-full flex-col rounded-2xl border border-border bg-card p-5 sm:p-6",
-                )}
+                className="relative flex w-full flex-col rounded-2xl border border-border bg-card p-5"
               >
                 {isRecommended && (
-                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full border border-primary/30 bg-background px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                     Recommended
                   </span>
                 )}
 
                 <div className="flex items-center gap-2">
                   <CrownBadge plan={plan.id} />
-                  <h2 className="text-base font-bold sm:text-lg">{plan.name}</h2>
+                  <h2 className="text-lg font-bold">{plan.name}</h2>
                 </div>
 
-                <p className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">
-                  {priceLabel}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{periodLabel}</p>
-                {interval === "year" && (
-                  <p className="mt-1 text-xs font-medium text-emerald-600">
-                    Credits still added every month
-                  </p>
-                )}
+                <p className="mt-3 text-3xl font-extrabold tracking-tight">{priceLabel}</p>
+                <p className="text-xs text-muted-foreground">{periodLabel}</p>
 
-                <div className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+                <div className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-primary">
                   <Coins className="h-4 w-4 shrink-0" />
-                  <span>{plan.credits.toLocaleString()} credits / month</span>
+                  {plan.credits.toLocaleString()} credits / month
                 </div>
 
-                <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-border/80 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  <ImageIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                  <span>
-                    <span className="font-semibold text-foreground">
-                      ~{imgEstimate} estimated standard images
-                    </span>{" "}
-                    / month ({STANDARD_IMAGE_CREDIT_COST} credits each). Actual count depends on
-                    model, quality and extras.
-                  </span>
-                </div>
-
-                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                  {plan.positioning}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {interval === "year" ? (
+                    <>
+                      ~{imgPerMonth.toLocaleString()} standard images / month
+                      <span className="text-foreground/80">
+                        {" "}
+                        · ~{imgPerYear.toLocaleString()} / year
+                      </span>
+                    </>
+                  ) : (
+                    <>~{imgPerMonth.toLocaleString()} standard images / month</>
+                  )}
                 </p>
 
-                <ul className="mt-4 flex-1 space-y-1.5 sm:mt-5 sm:space-y-2">
+                <p className="mt-3 text-xs leading-snug text-muted-foreground">{plan.positioning}</p>
+
+                <ul className="mt-4 flex-1 space-y-2">
                   {plan.features
-                    .filter(
-                      (f) =>
-                        !f.toLowerCase().includes("credits every month") &&
-                        !f.toLowerCase().includes("estimated standard image"),
-                    )
+                    .filter((f) => !f.toLowerCase().includes("credits / month"))
                     .map((f) => (
-                      <li
-                        key={f}
-                        className="flex items-start gap-2 text-sm text-muted-foreground"
-                      >
+                      <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
                         <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <span className="min-w-0 break-words">{f}</span>
+                        <span className="min-w-0">{f}</span>
                       </li>
                     ))}
                 </ul>
@@ -253,49 +236,32 @@ function PricingPage() {
           })}
         </div>
 
-        <div className="mx-auto mt-10 max-w-2xl space-y-3 rounded-2xl border border-border bg-muted/30 px-4 py-4 text-left sm:px-6 sm:py-5">
-          <p className="text-sm font-semibold text-foreground">Billing & credits</p>
-          <ul className="space-y-1.5 text-xs text-muted-foreground sm:text-sm">
+        <div className="mx-auto mt-10 max-w-2xl space-y-3 rounded-2xl border border-border bg-muted/30 px-4 py-4 text-sm sm:px-6">
+          <p className="font-semibold text-foreground">Good to know</p>
+          <ul className="space-y-2 text-xs text-muted-foreground sm:text-sm">
             <li>
-              <span className="font-medium text-foreground">One-time only:</span> pay once for 30 or
-              365 days. No AutoPay. We email you before expiry so you can renew from Pricing if you
-              want.
+              <span className="font-medium text-foreground">Images:</span> estimates assume 25
+              credits per standard image. Other modes may use more.
             </li>
             <li>
-              <span className="font-medium text-foreground">Credits:</span> monthly allocation each
-              month. Annual plans are billed once; credits still deposit monthly.
+              <span className="font-medium text-foreground">Yearly plans:</span> pay once; credits
+              still arrive each month.
             </li>
             <li>
-              <span className="font-medium text-foreground">Video Studio:</span> Starter = Standard SD
-              up to 5s. Pro = 5s & 10s. Ultra AI = 5s, 10s & 15s where supported.
+              <span className="font-medium text-foreground">Sponsored ads:</span> only labeled
+              Sponsored placements. Free users can earn free credits by watching or clicking
+              Sponsored offers where available.
             </li>
             <li>
-              <span className="font-medium text-foreground">Sponsored:</span> occasional labeled
-              Sponsored placements may appear; they are separate from Motio2edit tools.
+              <span className="font-medium text-foreground">Credits:</span> valid up to one year from
+              grant or purchase date.
             </li>
           </ul>
-
-          <div className="border-t border-border/60 pt-3">
-            <p className="text-sm font-semibold text-foreground">FAQ</p>
-            <p className="mt-2 text-xs font-medium text-foreground sm:text-sm">
-              How long are purchased credits valid?
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              Credits purchased or granted through a plan are valid for up to one year from their
-              applicable purchase or grant date. Expiry is applied to the relevant credit
-              allocation.
-            </p>
-          </div>
-
-          <p className="pt-1 text-xs text-muted-foreground">
-            Need more credits?{" "}
-            <Link
-              to="/profile/top-up"
-              className="font-medium text-primary underline-offset-2 hover:underline"
-            >
-              One-time top-ups
-            </Link>{" "}
-            are available.
+          <p className="text-xs text-muted-foreground">
+            Need more?{" "}
+            <Link to="/profile/top-up" className="font-medium text-primary hover:underline">
+              Buy a credit top-up
+            </Link>
           </p>
         </div>
       </div>
