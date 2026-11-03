@@ -1,12 +1,8 @@
 /**
  * Motio2edit Video Studio — customer-facing credit estimates.
  *
- * Authoritative spend rule (server via billing/customer-pricing):
- *   TOTAL provider COGS (video + audio) → Video COGS staircase → customer credits
- *
+ * Authoritative spend: provider COGS → Video COGS staircase (+100) → optional sound +25.
  * Face value: 1 Motio2edit credit = $0.01
- * Do NOT add Premium/Image flat surcharges on top of the staircase.
- * Do NOT use COGS×100 or 1.86¢ face for Video.
  */
 
 import {
@@ -27,12 +23,11 @@ export type MotioVideoTier = "standard" | "premium";
 export type MotioVideoQuality = "SD" | "HD";
 export type MotioVideoMode = "text" | "image" | "video" | "audio";
 
-export const CREDIT_PRICING_VERSION = "2026-10-video-staircase-v1";
-/** @deprecated Flat surcharges removed — staircase is the only customer charge. */
+export const CREDIT_PRICING_VERSION = "2026-11-video-staircase-v2-plus100";
 export const PREMIUM_TIER_SURCHARGE_CREDITS = 0;
-/** @deprecated Flat surcharges removed — staircase is the only customer charge. */
 export const IMAGE_MODE_SURCHARGE_CREDITS = 0;
-/** Spend face value: 1 Motio2edit credit = $0.01 in Video Studio */
+/** Sound / audio generation add-on on top of staircase */
+export const SOUND_ADDON_CREDITS = 25;
 export const CREDIT_RETAIL_USD = VIDEO_CREDIT_FACE_CENTS / 100;
 export const VIDEO_CREDIT_FACE_CENTS_PUBLIC = VIDEO_CREDIT_FACE_CENTS;
 
@@ -57,7 +52,6 @@ export type MotioVideoPriceInput = {
 
 export type MotioVideoPriceResult = {
   credits: number;
-  /** Alias used by some UI callers */
   total: number;
   usd: number;
   supported: boolean;
@@ -86,10 +80,6 @@ function toGenMode(mode?: MotioVideoMode): VideoGenMode {
   return "text";
 }
 
-/**
- * Estimate Motio2edit credits for Video Studio UI.
- * Server re-computes from live COGS + staircase and is authoritative.
- */
 export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVideoPriceResult {
   const { tier, durationSec, quality, soundOn, mode } = input;
   const productMode: VideoProductMode = tier === "premium" ? "premium" : "standard";
@@ -191,7 +181,9 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
   }
 
   try {
-    const credits = videoCogsToCredits(cogs);
+    const baseCredits = videoCogsToCredits(cogs);
+    const soundSurcharge = effectiveSound ? SOUND_ADDON_CREDITS : 0;
+    const credits = baseCredits + soundSurcharge;
     return {
       credits,
       total: credits,
@@ -204,9 +196,9 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
         durationSec,
         quality,
         soundOn: effectiveSound,
-        baseCredits: credits,
-        soundSurcharge: 0,
-        formula: `video staircase on total COGS $${cogs.toFixed(4)} → ${credits} credits`,
+        baseCredits,
+        soundSurcharge,
+        formula: `staircase $${cogs.toFixed(4)} → ${baseCredits} + sound ${soundSurcharge} = ${credits}`,
       },
     };
   } catch (e) {
@@ -217,7 +209,8 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
         total: 0,
         usd: 0,
         supported: false,
-        reason: "This video setting exceeds the current pricing range. Try a shorter duration or lower quality.",
+        reason:
+          "This video setting exceeds the current pricing range. Try a shorter duration or lower quality.",
         providerCogsUsd: cogs,
         breakdown: {
           tier,
@@ -260,11 +253,11 @@ export const TIER_COPY = {
   standard: {
     title: "Standard",
     headline: "Fast, dependable generations for everyday ideas.",
-    supporting: "Fast clips · SD/HD · staircase credits from 50",
+    supporting: "Fast clips · SD/HD · staircase credits from 150",
   },
   premium: {
     title: "Premium",
     headline: "More detail, stronger image preservation and better prompt adherence.",
-    supporting: "Higher quality · longer clips · staircase credits from 50",
+    supporting: "Higher quality · longer clips · staircase credits from 150",
   },
 } as const;

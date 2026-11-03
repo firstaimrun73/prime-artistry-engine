@@ -1,13 +1,11 @@
 /**
  * MotioCreditPricingEngine — provider COGS → Motio2edit credits (spend only).
  *
- * Universal Motio2edit credits wallet. Purchase pack pricing is separate.
- *
  * Image Studio spend: 1 credit face = 1.45¢
- * Video Studio spend: 1 credit = $0.01 (1¢) — staircase tiers below (NOT COGS×100)
+ * Video Studio spend: 1 credit = $0.01 (1¢) — staircase tiers (NOT COGS×100)
  *
- * Video customer pricing is an exact COGS staircase (owner-defined).
- * Do NOT use percentage margin, COGS×4, or COGS×100 for Video.
+ * 2026-11 profitability bump: +100 credits on every video staircase tier
+ * (Minimax text-to-video and other high-COGS routes need healthier margin).
  */
 
 import {
@@ -35,38 +33,42 @@ export type CustomerCreditQuote = {
   };
 };
 
-/** Thrown / returned when Video total provider COGS is $2.00 or higher. */
 export const VIDEO_COGS_TIER_UNDEFINED = "VIDEO_COGS_TIER_UNDEFINED";
 
 /**
- * Authoritative Video customer-credit staircase.
- * Boundaries are exact; no gaps, no overlaps, no fallback tier.
- *
+ * Video customer-credit staircase (+100 vs prior table for margin).
  * TOTAL PROVIDER COGS (video + audio) → customer credits
+ *
+ * Before → After:
+ *  <0.35 → 50 → 150
+ *  <0.50 → 80 → 180
+ *  <0.65 → 100 → 200
+ *  <1.00 → 125 → 225
+ *  <1.25 → 180 → 280
+ *  <2.00 → 250 → 350
  */
 export function videoCogsStaircaseCredits(totalProviderCogsUsd: number): number {
   const cogs = Math.max(0, totalProviderCogsUsd);
   if (cogs >= 2.0) {
     throw new Error(VIDEO_COGS_TIER_UNDEFINED);
   }
-  if (cogs < 0.35) return 50;
-  if (cogs < 0.5) return 80;
-  if (cogs < 0.65) return 100;
-  if (cogs < 1.0) return 125;
-  if (cogs < 1.25) return 180;
-  // 1.25 ≤ cogs < 2.00
-  return 250;
+  if (cogs < 0.35) return 150;
+  if (cogs < 0.5) return 180;
+  if (cogs < 0.65) return 200;
+  if (cogs < 1.0) return 225;
+  if (cogs < 1.25) return 280;
+  return 350;
 }
 
 export function videoCogsStaircaseLabel(totalProviderCogsUsd: number): string {
   const cogs = Math.max(0, totalProviderCogsUsd);
   if (cogs >= 2.0) return VIDEO_COGS_TIER_UNDEFINED;
-  if (cogs < 0.35) return "50cr (<$0.35)";
-  if (cogs < 0.5) return "80cr ($0.35–$0.50)";
-  if (cogs < 0.65) return "100cr ($0.50–$0.65)";
-  if (cogs < 1.0) return "125cr ($0.65–$1.00)";
-  if (cogs < 1.25) return "180cr ($1.00–$1.25)";
-  return "250cr ($1.25–$2.00)";
+  if (cogs < 0.35) return "150cr (<$0.35)";
+  if (cogs < 0.5) return "180cr ($0.35–$0.50)";
+  if (cogs < 0.65) return "200cr ($0.50–$0.65)";
+  if (cogs < 1.0) return "225cr ($0.65–$1.00)";
+  if (cogs < 1.25) return "280cr ($1.00–$1.25)";
+  return "350cr ($1.25–$2.00)";
 }
 
 function isImageProduct(product: BillingProduct): boolean {
@@ -79,10 +81,6 @@ function isImageProduct(product: BillingProduct): boolean {
   );
 }
 
-/**
- * Convert fal/provider COGS (USD) → Motio2edit credits to deduct on spend.
- * Video uses the owner staircase. Image retains its own face value.
- */
 export function providerCogsToCustomerCredits(
   providerCogsUsd: number,
   product: BillingProduct,
@@ -98,8 +96,6 @@ export function providerCogsToCustomerCredits(
   let videoTierLabel: string | undefined;
 
   if (product === "video") {
-    // Video: exact staircase on TOTAL provider COGS (includes audio when present).
-    // Face value for display/accounting: 1 credit = $0.01
     creditFaceCents = (config.videoCreditFaceUsd ?? 0.01) * 100;
     try {
       rawCredits = videoCogsStaircaseCredits(cogs);
@@ -125,7 +121,6 @@ export function providerCogsToCustomerCredits(
   const step = Math.max(1, config.roundingStep ?? 1);
   let roundedCredits: number;
   if (product === "video") {
-    // Staircase already returns exact tier credits — do not re-round or apply old minimums.
     roundedCredits = rawCredits;
   } else {
     roundedCredits = Math.max(step, Math.ceil(rawCredits / step) * step);
@@ -154,12 +149,10 @@ export function providerCogsToCustomerCredits(
   };
 }
 
-/** Convenience: video-only COGS → credits (staircase). Throws VIDEO_COGS_TIER_UNDEFINED at $2+. */
 export function videoCogsToCredits(providerCogsUsd: number): number {
   return providerCogsToCustomerCredits(providerCogsUsd, "video").customerCredits;
 }
 
-/** Convenience: image-only COGS → credits. */
 export function imageCogsToCredits(
   providerCogsUsd: number,
   product: BillingProduct = "image_standard",
