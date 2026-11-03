@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/marketing-emails",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/plan-lifecycle",
+      "schedule": "0 * * * *"
     }
   ]
 }
