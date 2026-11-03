@@ -297,8 +297,9 @@ function PricingPage() {
               plans subject to separate cost and quota rules. Private videos remain private.
             </li>
             <li>
-              <span className="font-medium text-foreground">Cancel anytime:</span> turn off auto-renew;
-              you keep benefits and remaining credits until the period ends.
+              <span className="font-medium text-foreground">One-time only · no autopay:</span> you pay
+              once for the period (30 days or 365 days). When it ends we email you so you can renew
+              from Pricing if you want — nothing is charged automatically.
             </li>
           </ul>
           <p className="pt-2 text-xs text-muted-foreground">

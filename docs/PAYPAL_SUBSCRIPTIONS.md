@@ -1,98 +1,68 @@
-# PayPal Subscriptions — Motio2edit
+# PayPal billing — Motio2edit (current)
 
-## Root cause (fixed in code)
+## Product decision (Nov 2026)
 
-Monthly plans previously used **PayPal Orders API** (`intent: CAPTURE`) which is **one-time only**.
-True recurring billing requires the **PayPal Subscriptions / Billing Plans API**.
+**Public plans (Starter / Pro / Ultra) are one-time only.**  
+No PayPal Billing Plans / Subscriptions API for new customers. No autopay.
 
-Credit top-ups remain **one-time** (Orders API). Monthly plans use Subscriptions when configured.
+| Product | API | Notes |
+|---------|-----|--------|
+| Starter / Pro / Ultra (monthly or yearly) | **Orders API** (`intent: CAPTURE`) | One-time charge. Plan valid 30 or 365 days. Manual renew from Pricing. |
+| Credit top-ups | Orders API | Unchanged |
+| Legacy Lite / Plus / Studio / Business | Orders API for new; old recurring rows left alone | Not offered on public pricing |
 
-## What the code does now
+`PAYPAL_PLAN_*` environment variables are **not required** for public checkout.  
+If they are missing, checkout still works (one-time Orders path).
 
-| Product | API |
-|---------|-----|
-| Lite / Plus / Pro / AI Studio / Master Studio monthly | Subscriptions API (when `PAYPAL_PLAN_*` set) |
-| Credit top-ups (incl. Halloween) | Orders API (one-time) |
-| Legacy plan purchase if plan IDs missing | Orders API fallback (no live break) |
+## What the user gets
 
-### Files changed
-- `src/lib/payments.server.ts` — `createPaypalSubscription`, get/suspend/activate, plan ID map
-- `src/lib/payments.functions.ts` — `createPaypalSubscription`, `getPaypalSubscriptionMode`
-- `src/routes/api/public/webhooks/paypal.ts` — subscription lifecycle + `PAYMENT.SALE.COMPLETED` renewals
-- `supabase/migrations/20261101170000_paypal_subscriptions_support.sql`
+- Pay once → credits + plan activated with `plan_expires_at`
+- **Renewal time kept** (30 days monthly / 365 days annual)
+- Annual: credits still granted every ~30 days via cron (not all upfront)
+- **Email on purchase** (`sendPlanPurchasedEmail`)
+- **Email when plan expires** (`sendPlanExpiredEmail` via `/api/cron/plan-lifecycle`)
+- **No automatic re-charge** (`auto_renew: false`, `billing_model: "one_time"`)
 
-### Existing customers
-**Not auto-converted.** Historical one-time purchases stay as-is. No re-charge without a new PayPal approval.
+## Code map
 
----
+| File | Role |
+|------|------|
+| `src/lib/payments.handlers.ts` | `getPaypalSubscriptionMode` always returns `mode: "order"`; `createPaypalSubscription` rejects public plans |
+| `src/lib/payments.server.ts` | `createPaypalOrder` / capture; legacy `PAYPAL_BILLING_PLAN_IDS` kept but unused for public |
+| `src/components/CheckoutPage.tsx` | Always one-time PayPal Buttons + clear "no automatic renewal" copy |
+| `src/lib/plan-lifecycle.server.ts` | `activateOneTimePlan`, expire + expiration email, annual monthly credit grants |
+| `src/routes/api/cron/plan-lifecycle.ts` | Hourly cron: grants + expire + emails |
+| `src/routes/api/public/webhooks/paypal.ts` | `PAYMENT.CAPTURE.COMPLETED` activates one-time plan |
 
-## Required PayPal dashboard setup (you must do this)
+## Environment variables (required for live PayPal)
 
-### 1. Create a Product (Catalog)
-PayPal Developer → Products → Create product  
-Type: Service · Name: Motio2edit Subscription
-
-### 2. Create Billing Plans (one per Motio plan)
-For each plan create a **monthly** billing plan with fixed price matching `DISPLAY_PRICES`:
-
-| Motio plan | USD | Credits |
-|------------|-----|--------|
-| Lite | 4.99 | 350 |
-| Plus | 9.99 | 800 |
-| Pro | 29.99 | 2500 |
-| AI Studio | 55.00 | 5000 |
-| Master Studio (business) | 110.00 | 10000 |
-
-Copy each Billing Plan ID (`P-...`).
-
-### 3. Environment variables (Vercel)
 ```
 PAYPAL_CLIENT_ID=...
 PAYPAL_CLIENT_SECRET=...
 PAYPAL_API_URL=https://api-m.paypal.com   # or api-m.sandbox.paypal.com
-PAYPAL_WEBHOOK_ID=...
-
-PAYPAL_PLAN_LITE=P-...
-PAYPAL_PLAN_PLUS=P-...
-PAYPAL_PLAN_PRO=P-...
-PAYPAL_PLAN_STUDIO=P-...
-PAYPAL_PLAN_BUSINESS=P-...
+PAYPAL_WEBHOOK_ID=...   # optional but recommended for capture webhook
 FRONTEND_URL=https://motio2edit.com
+CRON_SECRET=...         # for /api/cron/plan-lifecycle
 ```
 
-Until `PAYPAL_PLAN_*` are set, checkout keeps the **legacy one-time** path (safe for live users).
+**Do not set** `PAYPAL_PLAN_STARTER` / `_PRO` / `_ULTRA` / `_*_ANNUAL` unless you intentionally revive recurring for a non-public path. Public checkout ignores them.
 
-### 4. Webhook events to subscribe
+## Webhook events (minimum)
+
 URL: `https://<your-domain>/api/public/webhooks/paypal`
 
-Subscribe at minimum:
-- `BILLING.SUBSCRIPTION.CREATED`
-- `BILLING.SUBSCRIPTION.ACTIVATED`
-- `BILLING.SUBSCRIPTION.CANCELLED`
-- `BILLING.SUBSCRIPTION.SUSPENDED`
-- `BILLING.SUBSCRIPTION.EXPIRED`
-- `BILLING.SUBSCRIPTION.PAYMENT.FAILED`
-- `PAYMENT.SALE.COMPLETED`
-- `PAYMENT.CAPTURE.COMPLETED` (keep for one-time top-ups)
+- `PAYMENT.CAPTURE.COMPLETED` — one-time plan purchases + top-ups
+- Keep legacy subscription events only if you still support old recurring rows:
+  - `BILLING.SUBSCRIPTION.*`
+  - `PAYMENT.SALE.COMPLETED`
 
-### 5. Run migration
-Apply `20261101170000_paypal_subscriptions_support.sql` on Supabase.
+## Ops checklist after deploy
 
----
+1. Redeploy latest `main` on Vercel (the error "Billing plan IDs … missing" only appears on older intermediate commits).
+2. Confirm `CRON_SECRET` is set and cron hits `/api/cron/plan-lifecycle` hourly.
+3. Sandbox: complete one monthly + one yearly PayPal order → profile has `plan_expires_at`, purchase email arrives.
+4. Do **not** create PayPal Billing Plans for Starter/Pro/Ultra unless product direction changes back to autopay.
 
-## Checkout UI (remaining)
+## Why the error appeared
 
-Backend can create subscriptions. Checkout still defaults to one-time Buttons until you:
-1. Set `PAYPAL_PLAN_*`
-2. Switch the PayPal Buttons `createOrder` path to `createPaypalSubscription` + `approve` redirect (or SDK `createSubscription`)
-
-Recommended next step: when `getPaypalSubscriptionMode({ plan }).mode === "subscription"`, call `createPaypalSubscription` and redirect the user to `approveUrl`.
-
-## Sandbox test checklist
-1. New subscription approve → ACTIVATED → credits + plan
-2. Wait for / simulate renewal → SALE.COMPLETED → credits again (idempotent sale id)
-3. Cancel in app → CANCELLED webhook → auto_renew false
-4. Top-up still one-time capture
-5. Duplicate webhook → no double credits
-
-**Do not claim recurring works in production until a real sandbox renewal has been observed.**
+Earlier the same day, intermediate commits forced Subscriptions API for public plans and **failed closed** when `PAYPAL_PLAN_*` were unset ("We will not charge a different plan"). That path was removed: public plans always use one-time Orders.
