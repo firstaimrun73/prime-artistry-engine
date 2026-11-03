@@ -7,6 +7,7 @@ import { PLAN_CREDITS, type PlanId, getPlan } from "@/lib/plans";
 export type BillingInterval = "month" | "year";
 
 const MS_DAY = 24 * 60 * 60 * 1000;
+const EMAIL_CLAIM_STALE_MS = 15 * 60 * 1000;
 
 export function validityDays(interval: BillingInterval): number {
   return interval === "year" ? 365 : 30;
@@ -20,7 +21,6 @@ export function computeNextCreditGrant(from: Date): Date {
   return new Date(from.getTime() + 30 * MS_DAY);
 }
 
-/** Activate paid plan after verified payment. Credits granted separately via apply_payment_credits. */
 export async function activateOneTimePlan(
   db: any,
   args: {
@@ -35,7 +35,7 @@ export async function activateOneTimePlan(
   const expiresAt = computePlanExpiry(now, args.interval);
   const nextGrant = args.interval === "year" ? computeNextCreditGrant(now) : null;
 
-  const { error } = await db
+  const { error, data } = await db
     .from("profiles")
     .update({
       plan: args.plan,
@@ -45,14 +45,19 @@ export async function activateOneTimePlan(
       plan_activated_at: now.toISOString(),
       next_credit_grant_at: nextGrant ? nextGrant.toISOString() : null,
       expiration_email_sent_at: null,
+      expiration_email_claimed_at: null,
       last_payment_transaction_id: args.transactionId,
       updated_at: now.toISOString(),
     })
-    .eq("id", args.userId);
+    .eq("id", args.userId)
+    .select("id");
 
   if (error) {
     console.error("[plan-lifecycle] activate profile update failed:", error);
     throw new Error(error.message || "Failed to activate plan");
+  }
+  if (!data || data.length === 0) {
+    throw new Error("Failed to activate plan (no profile row updated)");
   }
 
   try {
@@ -74,35 +79,22 @@ export async function activateOneTimePlan(
   return { expiresAt: expiresAt.toISOString() };
 }
 
-export async function expireDuePlans(db: any): Promise<{
-  expired: number;
-  emailsSent: number;
-  emailFailures: number;
-}> {
+/** Demote expired paid plans to free (does not send email). */
+export async function demoteExpiredPlans(db: any): Promise<{ expired: number }> {
   const nowIso = new Date().toISOString();
   const { data: due, error } = await db
     .from("profiles")
-    .select(
-      "id, email, display_name, plan, plan_expires_at, expiration_email_sent_at, billing_provider",
-    )
+    .select("id, plan")
     .neq("plan", "free")
     .not("plan_expires_at", "is", null)
     .lte("plan_expires_at", nowIso)
     .limit(200);
 
-  if (error) {
-    console.error("[plan-lifecycle] expire query failed:", error);
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   let expired = 0;
-  let emailsSent = 0;
-  let emailFailures = 0;
-
   for (const row of due || []) {
-    const planName = getPlan((row.plan as PlanId) || "free").name;
-
-    const { error: upErr } = await db
+    const { error: upErr, data: updated } = await db
       .from("profiles")
       .update({
         plan: "free",
@@ -110,72 +102,149 @@ export async function expireDuePlans(db: any): Promise<{
         next_credit_grant_at: null,
       })
       .eq("id", row.id)
-      .eq("plan", row.plan);
+      .eq("plan", row.plan)
+      .select("id");
 
     if (upErr) {
-      console.error("[plan-lifecycle] expire update failed:", row.id, upErr);
+      console.error("[plan-lifecycle] demote failed:", row.id, upErr);
       continue;
     }
-    expired++;
+    if (updated && updated.length > 0) {
+      expired++;
+      try {
+        await db
+          .from("subscriptions")
+          .update({
+            status: "expired",
+            auto_renew: false,
+            updated_at: nowIso,
+          })
+          .eq("user_id", row.id)
+          .eq("billing_model", "one_time")
+          .eq("status", "active");
+      } catch {
+        /* optional */
+      }
+    }
+  }
+  return { expired };
+}
 
-    try {
-      await db
-        .from("subscriptions")
-        .update({
-          status: "expired",
-          auto_renew: false,
-          updated_at: nowIso,
-        })
-        .eq("user_id", row.id)
-        .eq("billing_model", "one_time")
-        .eq("status", "active");
-    } catch {
-      /* optional */
+/**
+ * Send expiration emails for rows that still need them — including users
+ * already demoted to free. Uses claim lock for concurrency.
+ */
+export async function sendPendingExpirationEmails(db: any): Promise<{
+  emailsSent: number;
+  emailFailures: number;
+}> {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const staleBefore = new Date(now.getTime() - EMAIL_CLAIM_STALE_MS).toISOString();
+
+  // Eligible regardless of current plan (so demotion does not drop retries)
+  const { data: due, error } = await db
+    .from("profiles")
+    .select(
+      "id, email, display_name, plan, plan_expires_at, expiration_email_sent_at, expiration_email_claimed_at",
+    )
+    .not("plan_expires_at", "is", null)
+    .lte("plan_expires_at", nowIso)
+    .is("expiration_email_sent_at", null)
+    .not("email", "is", null)
+    .limit(200);
+
+  if (error) throw new Error(error.message);
+
+  let emailsSent = 0;
+  let emailFailures = 0;
+
+  for (const row of due || []) {
+    if (!row.email) continue;
+
+    // Skip fresh claims held by another worker
+    if (
+      row.expiration_email_claimed_at &&
+      new Date(row.expiration_email_claimed_at) > new Date(staleBefore)
+    ) {
+      continue;
     }
 
-    if (row.expiration_email_sent_at) continue;
-    if (!row.email) continue;
+    // Claim (CAS): only if still unsent and claim is null or stale
+    let claimQuery = db
+      .from("profiles")
+      .update({ expiration_email_claimed_at: nowIso })
+      .eq("id", row.id)
+      .is("expiration_email_sent_at", null);
+
+    if (row.expiration_email_claimed_at) {
+      claimQuery = claimQuery.eq("expiration_email_claimed_at", row.expiration_email_claimed_at);
+    } else {
+      claimQuery = claimQuery.is("expiration_email_claimed_at", null);
+    }
+
+    const { data: claimed, error: claimErr } = await claimQuery.select("id");
+    if (claimErr || !claimed || claimed.length === 0) {
+      continue; // lost race
+    }
+
+    // Prefer plan name from last paid period; profile.plan may already be free
+    const planName =
+      row.plan && row.plan !== "free"
+        ? getPlan(row.plan as PlanId).name
+        : "paid";
 
     try {
       const { sendPlanExpiredEmail } = await import("@/lib/email.server");
-      const idempotencyKey = `plan-expired-${row.id}-${row.plan_expires_at || nowIso}`;
+      const idempotencyKey = `plan-expired-${row.id}-${row.plan_expires_at}`;
       const send = await sendPlanExpiredEmail({
         to: row.email,
         name: row.display_name?.split(" ")[0] || "there",
         planName,
         idempotencyKey,
       });
+
       if (!send.ok) {
         emailFailures++;
         console.error("[plan-lifecycle] expiration email not delivered:", row.id, send.error);
+        // Leave claimed_at set briefly; stale claim allows retry after 15m
         continue;
       }
-      // Only mark sent after confirmed delivery; CAS so concurrent cron does not double-mark incorrectly
+
       const { error: markErr, data: marked } = await db
         .from("profiles")
         .update({ expiration_email_sent_at: nowIso })
         .eq("id", row.id)
         .is("expiration_email_sent_at", null)
         .select("id");
+
       if (markErr) {
         console.error("[plan-lifecycle] mark email sent failed:", row.id, markErr);
+        emailFailures++;
+        continue;
       }
       if (marked && marked.length > 0) emailsSent++;
-      else emailsSent++; // Resend idempotency may have delivered; count as sent
+      else emailsSent++; // concurrent mark — Resend idempotency protects duplicates
     } catch (e) {
       console.error("[plan-lifecycle] expiration email failed:", row.id, e);
       emailFailures++;
     }
   }
 
+  return { emailsSent, emailFailures };
+}
+
+/** Full lifecycle: demote then email (email retries independent of plan). */
+export async function expireDuePlans(db: any): Promise<{
+  expired: number;
+  emailsSent: number;
+  emailFailures: number;
+}> {
+  const { expired } = await demoteExpiredPlans(db);
+  const { emailsSent, emailFailures } = await sendPendingExpirationEmails(db);
   return { expired, emailsSent, emailFailures };
 }
 
-/**
- * Monthly credit deposits for annual one-time plans still within validity.
- * Inserts a payment_transactions row so apply_payment_credits can run,
- * checks RPC error, and only advances next_credit_grant_at on success (CAS).
- */
 export async function grantDueAnnualMonthlyCredits(db: any): Promise<{
   granted: number;
   failures: number;
@@ -205,7 +274,6 @@ export async function grantDueAnnualMonthlyCredits(db: any): Promise<{
     const grantKey = row.next_credit_grant_at;
     const txId = `annual_grant_${row.id}_${grantKey}`;
 
-    // Ensure payment_transactions row exists (required by apply_payment_credits)
     const { data: existingTx } = await db
       .from("payment_transactions")
       .select("transaction_id, payment_status")
@@ -248,11 +316,9 @@ export async function grantDueAnnualMonthlyCredits(db: any): Promise<{
       continue;
     }
 
-    // rpcData may indicate alreadyDone — still advance schedule if ledger has the grant
     const alreadyDone = rpcData?.alreadyDone === true;
     const credited = rpcData?.credited === true;
     if (!credited && !alreadyDone) {
-      console.error("[plan-lifecycle] annual grant unexpected result:", row.id, rpcData);
       failures++;
       continue;
     }
@@ -261,7 +327,6 @@ export async function grantDueAnnualMonthlyCredits(db: any): Promise<{
     const expires = row.plan_expires_at ? new Date(row.plan_expires_at) : null;
     const nextIso = expires && next > expires ? null : next.toISOString();
 
-    // CAS: only advance if next_credit_grant_at still equals the grant we processed
     const { error: casErr, data: updated } = await db
       .from("profiles")
       .update({
@@ -273,17 +338,28 @@ export async function grantDueAnnualMonthlyCredits(db: any): Promise<{
       .select("id");
 
     if (casErr) {
-      console.error("[plan-lifecycle] CAS next_credit_grant failed:", row.id, casErr);
       failures++;
       continue;
     }
     if (updated && updated.length > 0) granted++;
-    else if (alreadyDone || credited) granted++; // concurrent worker already advanced
+    else if (alreadyDone || credited) granted++;
   }
   return { granted, failures };
 }
 
-/** Pure helpers exported for unit tests */
 export function buildAnnualGrantTxId(userId: string, grantForIso: string): string {
   return `annual_grant_${userId}_${grantForIso}`;
+}
+
+/** Test helper: eligibility for email after demotion */
+export function isExpirationEmailEligible(row: {
+  plan_expires_at: string | null;
+  expiration_email_sent_at: string | null;
+  email?: string | null;
+  now?: Date;
+}): boolean {
+  if (!row.plan_expires_at || row.expiration_email_sent_at) return false;
+  if (!row.email) return false;
+  const now = row.now || new Date();
+  return new Date(row.plan_expires_at) <= now;
 }
