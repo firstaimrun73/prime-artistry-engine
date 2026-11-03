@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 /**
  * Secure cron: expire one-time plans + monthly credits for annual one-time plans.
  * Auth: Authorization: Bearer $CRON_SECRET  (or x-cron-secret header)
- * Schedule: hourly recommended (Vercel Cron / external).
+ * Vercel schedule: hourly (0 * * * *) via vercel.json
  */
 export const Route = createFileRoute("/api/cron/plan-lifecycle")({
   server: {
@@ -25,7 +25,7 @@ async function handle(request: Request): Promise<Response> {
   const auth = request.headers.get("authorization") || "";
   const headerSecret = request.headers.get("x-cron-secret") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : headerSecret;
-  if (token !== secret) {
+  if (!token || token !== secret) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
@@ -44,6 +44,7 @@ async function handle(request: Request): Promise<Response> {
       JSON.stringify({
         ok: true,
         annualGrants: grants.granted,
+        annualGrantFailures: grants.failures,
         expired: expiry.expired,
         emailsSent: expiry.emailsSent,
         emailFailures: expiry.emailFailures,
