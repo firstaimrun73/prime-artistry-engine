@@ -1,6 +1,6 @@
 /**
- * One-time plan activation, monthly annual credit grants, and expiration.
- * Server-only. Does not cancel PayPal recurring subscriptions.
+ * One-time plan activation, monthly annual credit grants, expiration, renewal reminders.
+ * Server-only. Does not create PayPal recurring subscriptions or charge customers again.
  */
 import { PLAN_CREDITS, type PlanId, getPlan } from "@/lib/plans";
 
@@ -46,6 +46,9 @@ export async function activateOneTimePlan(
       next_credit_grant_at: nextGrant ? nextGrant.toISOString() : null,
       expiration_email_sent_at: null,
       expiration_email_claimed_at: null,
+      renewal_reminder_7d_sent_at: null,
+      renewal_reminder_3d_sent_at: null,
+      renewal_reminder_1d_sent_at: null,
       last_payment_transaction_id: args.transactionId,
       updated_at: now.toISOString(),
     })
@@ -142,7 +145,6 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
   const nowIso = now.toISOString();
   const staleBefore = new Date(now.getTime() - EMAIL_CLAIM_STALE_MS).toISOString();
 
-  // Eligible regardless of current plan (so demotion does not drop retries)
   const { data: due, error } = await db
     .from("profiles")
     .select(
@@ -162,7 +164,6 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
   for (const row of due || []) {
     if (!row.email) continue;
 
-    // Skip fresh claims held by another worker
     if (
       row.expiration_email_claimed_at &&
       new Date(row.expiration_email_claimed_at) > new Date(staleBefore)
@@ -170,7 +171,6 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
       continue;
     }
 
-    // Claim (CAS): only if still unsent and claim is null or stale
     let claimQuery = db
       .from("profiles")
       .update({ expiration_email_claimed_at: nowIso })
@@ -185,14 +185,11 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
 
     const { data: claimed, error: claimErr } = await claimQuery.select("id");
     if (claimErr || !claimed || claimed.length === 0) {
-      continue; // lost race
+      continue;
     }
 
-    // Prefer plan name from last paid period; profile.plan may already be free
     const planName =
-      row.plan && row.plan !== "free"
-        ? getPlan(row.plan as PlanId).name
-        : "paid";
+      row.plan && row.plan !== "free" ? getPlan(row.plan as PlanId).name : "paid";
 
     try {
       const { sendPlanExpiredEmail } = await import("@/lib/email.server");
@@ -207,7 +204,6 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
       if (!send.ok) {
         emailFailures++;
         console.error("[plan-lifecycle] expiration email not delivered:", row.id, send.error);
-        // Leave claimed_at set briefly; stale claim allows retry after 15m
         continue;
       }
 
@@ -224,7 +220,7 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
         continue;
       }
       if (marked && marked.length > 0) emailsSent++;
-      else emailsSent++; // concurrent mark — Resend idempotency protects duplicates
+      else emailsSent++;
     } catch (e) {
       console.error("[plan-lifecycle] expiration email failed:", row.id, e);
       emailFailures++;
@@ -232,6 +228,90 @@ export async function sendPendingExpirationEmails(db: any): Promise<{
   }
 
   return { emailsSent, emailFailures };
+}
+
+const REMINDER_WINDOWS: Array<{ days: 7 | 3 | 1; column: string }> = [
+  { days: 7, column: "renewal_reminder_7d_sent_at" },
+  { days: 3, column: "renewal_reminder_3d_sent_at" },
+  { days: 1, column: "renewal_reminder_1d_sent_at" },
+];
+
+/**
+ * Pre-expiry renewal reminders (7 / 3 / 1 days). Manual repurchase only — never charges.
+ * Window: ~24h around each target day so daily cron still hits even if slightly delayed.
+ */
+export async function sendPendingRenewalReminders(db: any): Promise<{
+  remindersSent: number;
+  reminderFailures: number;
+}> {
+  const now = new Date();
+  let remindersSent = 0;
+  let reminderFailures = 0;
+
+  for (const { days, column } of REMINDER_WINDOWS) {
+    const center = new Date(now.getTime() + days * MS_DAY);
+    const windowStart = new Date(center.getTime() - 12 * 60 * 60 * 1000).toISOString();
+    const windowEnd = new Date(center.getTime() + 12 * 60 * 60 * 1000).toISOString();
+
+    const { data: due, error } = await db
+      .from("profiles")
+      .select(`id, email, display_name, plan, plan_expires_at, ${column}`)
+      .neq("plan", "free")
+      .not("plan_expires_at", "is", null)
+      .gte("plan_expires_at", windowStart)
+      .lte("plan_expires_at", windowEnd)
+      .is(column, null)
+      .not("email", "is", null)
+      .limit(200);
+
+    if (error) {
+      // Column may not exist until migration is applied — skip gracefully
+      console.warn("[plan-lifecycle] renewal reminder query:", days, error.message);
+      continue;
+    }
+
+    for (const row of due || []) {
+      if (!row.email || !row.plan_expires_at) continue;
+      const planName =
+        row.plan && row.plan !== "free" ? getPlan(row.plan as PlanId).name : "paid";
+
+      try {
+        const { sendPlanRenewalReminderEmail } = await import("@/lib/email.server");
+        const idempotencyKey = `plan-renewal-${days}d-${row.id}-${row.plan_expires_at}`;
+        const send = await sendPlanRenewalReminderEmail({
+          to: row.email,
+          name: row.display_name?.split(" ")[0] || "there",
+          planName,
+          expiresAt: row.plan_expires_at,
+          daysLeft: days,
+          idempotencyKey,
+        });
+
+        if (!send.ok) {
+          reminderFailures++;
+          console.error("[plan-lifecycle] renewal reminder failed:", days, row.id, send.error);
+          continue;
+        }
+
+        const { error: markErr } = await db
+          .from("profiles")
+          .update({ [column]: now.toISOString() })
+          .eq("id", row.id)
+          .is(column, null);
+
+        if (markErr) {
+          console.error("[plan-lifecycle] mark reminder failed:", days, row.id, markErr);
+          // Resend idempotency still protects duplicates
+        }
+        remindersSent++;
+      } catch (e) {
+        reminderFailures++;
+        console.error("[plan-lifecycle] renewal reminder error:", days, row.id, e);
+      }
+    }
+  }
+
+  return { remindersSent, reminderFailures };
 }
 
 /** Full lifecycle: demote then email (email retries independent of plan). */
