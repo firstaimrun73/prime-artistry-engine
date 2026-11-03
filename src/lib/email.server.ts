@@ -1,6 +1,5 @@
 // Server-only email helpers via Resend HTTP API.
 // Production path: RESEND_API_KEY + EMAIL_FROM / SUPPORT_EMAIL.
-// Lovable email queue is not required for these transactional sends.
 
 import { planPurchasedEmail, welcomeEmail } from "@/emails/templates";
 import { sendTemplateEmail } from "@/emails/send";
@@ -139,4 +138,40 @@ export async function sendWelcomeEmail(args: {
   });
   const send = await sendTemplateEmail(args.to, result);
   if (!send.ok) console.error("[email] welcome failed:", send.error);
+}
+
+/**
+ * Plan expiration — manual renewal only. No automatic charge language.
+ * Idempotency: callers must set expiration_email_sent_at after success.
+ */
+export async function sendPlanExpiredEmail(args: {
+  to: string;
+  name?: string;
+  planName: string;
+}): Promise<void> {
+  if (!args.to) return;
+  const site =
+    (process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL || "https://motio2edit.com").replace(
+      /\/$/,
+      "",
+    );
+  const renewUrl = `${site}/pricing`;
+  const subject = "Your Motio2edit plan has expired — Renew anytime!";
+  const bodyHtml = `
+    <p>Hi ${args.name || "there"},</p>
+    <p>Your Motio2edit <strong>${args.planName}</strong> plan has expired.</p>
+    <p>We hope you enjoyed creating with Motio2edit!</p>
+    <p>Would you like to continue enjoying premium AI image and video creation?</p>
+    <p>You can renew your plan anytime by visiting our pricing page.</p>
+    <p style="margin:28px 0">
+      <a href="${renewUrl}" style="background:#F97316;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Renew My Plan</a>
+    </p>
+    <p>Thank you for choosing Motio2edit!</p>
+  `;
+  await sendBrandedEmail({
+    to: args.to,
+    subject,
+    heading: "Your plan has expired",
+    bodyHtml,
+  });
 }
