@@ -81,16 +81,74 @@ async function notifyPlanPurchased(args: {
   }
 }
 
-async function fetchRazorpayPayment(paymentId: string): Promise<any | null> {
+async function fetchRazorpayPayment(
+  paymentId: string,
+): Promise<{ ok: true; payment: any } | { ok: false; reason: string }> {
   const id = process.env.RAZORPAY_KEY_ID;
   const secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!id || !secret) return null;
-  const auth = "Basic " + Buffer.from(`${id}:${secret}`).toString("base64");
-  const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
-    headers: { Authorization: auth },
-  });
-  if (!res.ok) return null;
-  return res.json();
+  if (!id || !secret) return { ok: false, reason: "credentials_missing" };
+  try {
+    const auth = "Basic " + Buffer.from(`${id}:${secret}`).toString("base64");
+    const res = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: auth },
+    });
+    if (!res.ok) return { ok: false, reason: `api_http_${res.status}` };
+    const payment = await res.json();
+    return { ok: true, payment };
+  } catch {
+    return { ok: false, reason: "api_fetch_error" };
+  }
+}
+
+/** Atomic claim when RPC exists; otherwise CAS update pending/failed -> processing */
+async function claimTransaction(
+  db: any,
+  transactionId: string,
+  userId: string,
+): Promise<{ ok: true; tx: any } | { ok: false; reason: string; tx?: any }> {
+  try {
+    const { data, error } = await db.rpc("claim_payment_transaction", {
+      _transaction_id: transactionId,
+      _user_id: userId,
+    });
+    if (!error && data) {
+      if (data.ok === true && data.tx) return { ok: true, tx: data.tx };
+      if (data.reason === "already_completed") {
+        return { ok: false, reason: "already_completed", tx: data.tx };
+      }
+      return { ok: false, reason: data.reason || "claim_failed", tx: data.tx };
+    }
+  } catch {
+    /* RPC not migrated yet — fall through */
+  }
+
+  const { data: tx } = await db
+    .from("payment_transactions")
+    .select("*")
+    .eq("transaction_id", transactionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!tx) return { ok: false, reason: "not_found" };
+  if (tx.payment_status === "completed") {
+    return { ok: false, reason: "already_completed", tx };
+  }
+  if (tx.payment_status === "processing") {
+    return { ok: false, reason: "in_progress", tx };
+  }
+
+  const { data: claimed, error: claimErr } = await db
+    .from("payment_transactions")
+    .update({ payment_status: "processing", updated_at: new Date().toISOString() })
+    .eq("transaction_id", transactionId)
+    .eq("user_id", userId)
+    .in("payment_status", ["pending", "failed"])
+    .select("*");
+
+  if (claimErr || !claimed || claimed.length === 0) {
+    return { ok: false, reason: "claim_lost", tx };
+  }
+  return { ok: true, tx: claimed[0] };
 }
 
 export const createRazorpayOrder = createServerFn({ method: "POST" })
@@ -172,7 +230,9 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     const { verifyRazorpaySignature, planFromCredits, isPublicPurchasablePlan } = await import(
       "@/lib/payments.server"
     );
-    const { razorpayVerifyChecks, rpcSucceeded } = await import("@/lib/payment-verify.server");
+    const { razorpayVerifyChecks, rpcSucceeded, updateSucceeded } = await import(
+      "@/lib/payment-verify.server"
+    );
     const { activateOneTimePlan } = await import("@/lib/plan-lifecycle.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -187,40 +247,49 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     }
 
     const db = supabaseAdmin as any;
-    const { data: tx } = await db
-      .from("payment_transactions")
-      .select("*")
-      .eq("transaction_id", data.internalOrderId)
-      .eq("user_id", context.userId)
-      .eq("payment_method", "razorpay")
-      .maybeSingle();
 
-    if (!tx) throw new Error("Transaction not found");
-    if (tx.payment_status === "completed") {
-      return { success: true, credits: tx.credits_purchased, alreadyCompleted: true };
+    const claim = await claimTransaction(db, data.internalOrderId, context.userId);
+    if (!claim.ok) {
+      if (claim.reason === "already_completed" && claim.tx) {
+        return {
+          success: true,
+          credits: claim.tx.credits_purchased,
+          alreadyCompleted: true,
+        };
+      }
+      throw new Error(
+        claim.reason === "in_progress"
+          ? "Payment is already being processed"
+          : "Payment verification failed",
+      );
+    }
+    const tx = claim.tx;
+    if (tx.payment_method && tx.payment_method !== "razorpay") {
+      throw new Error("Payment verification failed");
     }
 
-    const gatewayPayment = await fetchRazorpayPayment(data.razorpay_payment_id);
+    const api = await fetchRazorpayPayment(data.razorpay_payment_id);
     const paidMajor =
-      gatewayPayment && typeof gatewayPayment.amount === "number"
-        ? gatewayPayment.amount / 100
-        : null;
-    const paymentStatus = gatewayPayment?.status ?? null;
+      api.ok && typeof api.payment.amount === "number" ? api.payment.amount / 100 : null;
 
     const checks = razorpayVerifyChecks({
       tx,
       userId: context.userId,
       razorpayOrderId: data.razorpay_order_id,
+      razorpayPaymentId: data.razorpay_payment_id,
       paidMajor,
-      paymentStatus,
+      paymentStatus: api.ok ? api.payment.status : null,
+      apiOrderId: api.ok ? api.payment.order_id : null,
+      apiPaymentId: api.ok ? api.payment.id : null,
+      apiFetchOk: api.ok,
     });
     if (!checks.ok) {
       console.error("[razorpay] verify failed:", checks.reason, data.internalOrderId);
-      throw new Error("Payment verification failed");
-    }
-
-    // Prefer API order_id match when available
-    if (gatewayPayment?.order_id && gatewayPayment.order_id !== tx.gateway_order_id) {
+      await db
+        .from("payment_transactions")
+        .update({ payment_status: "pending", updated_at: new Date().toISOString() })
+        .eq("transaction_id", data.internalOrderId)
+        .eq("payment_status", "processing");
       throw new Error("Payment verification failed");
     }
 
@@ -233,18 +302,32 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     const rpcCheck = rpcSucceeded(rpc);
     if (!rpcCheck.ok) {
       console.error("[razorpay] apply_payment_credits failed:", rpcCheck.reason);
+      await db
+        .from("payment_transactions")
+        .update({ payment_status: "pending", updated_at: new Date().toISOString() })
+        .eq("transaction_id", data.internalOrderId)
+        .eq("payment_status", "processing");
       throw new Error("Could not apply credits");
     }
 
-    await db
+    const complete = await db
       .from("payment_transactions")
       .update({
         payment_status: "completed",
         gateway_payment_id: data.razorpay_payment_id,
-        gateway_response: { client: data, gateway: gatewayPayment },
+        gateway_response: { client: data, gateway: api.ok ? api.payment : null },
+        updated_at: new Date().toISOString(),
       })
       .eq("transaction_id", data.internalOrderId)
-      .eq("user_id", context.userId);
+      .eq("user_id", context.userId)
+      .select("id");
+
+    const done = updateSucceeded(complete);
+    if (!done.ok) {
+      console.error("[razorpay] completion update failed:", done.reason);
+      // Credits may already be applied (ledger unique) — do not claim full success if we cannot record
+      throw new Error("Payment recorded incompletely; contact support with your order id");
+    }
 
     const meta = (tx.metadata || {}) as { plan?: string; interval?: string };
     const plan =
@@ -389,22 +472,29 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
       isPublicPurchasablePlan,
       extractPaypalCaptureId,
     } = await import("@/lib/payments.server");
-    const { paypalCaptureChecks, rpcSucceeded } = await import("@/lib/payment-verify.server");
+    const { paypalCaptureChecks, rpcSucceeded, updateSucceeded } = await import(
+      "@/lib/payment-verify.server"
+    );
     const { activateOneTimePlan } = await import("@/lib/plan-lifecycle.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
 
-    const { data: tx } = await db
-      .from("payment_transactions")
-      .select("*")
-      .eq("transaction_id", data.internalOrderId)
-      .eq("user_id", context.userId)
-      .eq("payment_method", "paypal")
-      .maybeSingle();
-    if (!tx) throw new Error("Transaction not found");
-    if (tx.payment_status === "completed") {
-      return { success: true, credits: tx.credits_purchased, alreadyCompleted: true };
+    const claim = await claimTransaction(db, data.internalOrderId, context.userId);
+    if (!claim.ok) {
+      if (claim.reason === "already_completed" && claim.tx) {
+        return {
+          success: true,
+          credits: claim.tx.credits_purchased,
+          alreadyCompleted: true,
+        };
+      }
+      throw new Error(
+        claim.reason === "in_progress"
+          ? "Payment is already being processed"
+          : "Payment verification failed",
+      );
     }
+    const tx = claim.tx;
 
     const captured = await captureOrder(data.orderId);
     const checks = paypalCaptureChecks({
@@ -415,12 +505,15 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
     });
     if (!checks.ok) {
       console.error("[paypal] capture checks failed:", checks.reason, data.internalOrderId);
-      if (checks.reason.startsWith("status_")) {
-        await db
-          .from("payment_transactions")
-          .update({ payment_status: "failed", gateway_response: captured })
-          .eq("transaction_id", data.internalOrderId);
-      }
+      await db
+        .from("payment_transactions")
+        .update({
+          payment_status: checks.reason.startsWith("status_") ? "failed" : "pending",
+          gateway_response: captured,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("transaction_id", data.internalOrderId)
+        .eq("payment_status", "processing");
       throw new Error("Payment verification failed");
     }
 
@@ -435,18 +528,31 @@ export const capturePaypalOrder = createServerFn({ method: "POST" })
     const rpcCheck = rpcSucceeded(rpc);
     if (!rpcCheck.ok) {
       console.error("[paypal] apply_payment_credits failed:", rpcCheck.reason);
+      await db
+        .from("payment_transactions")
+        .update({ payment_status: "pending", updated_at: new Date().toISOString() })
+        .eq("transaction_id", data.internalOrderId)
+        .eq("payment_status", "processing");
       throw new Error("Could not apply credits");
     }
 
-    await db
+    const complete = await db
       .from("payment_transactions")
       .update({
         payment_status: "completed",
         gateway_payment_id: captureId,
         gateway_response: captured,
+        updated_at: new Date().toISOString(),
       })
       .eq("transaction_id", data.internalOrderId)
-      .eq("user_id", context.userId);
+      .eq("user_id", context.userId)
+      .select("id");
+
+    const done = updateSucceeded(complete);
+    if (!done.ok) {
+      console.error("[paypal] completion update failed:", done.reason);
+      throw new Error("Payment recorded incompletely; contact support with your order id");
+    }
 
     const meta = (tx.metadata || {}) as { plan?: string; interval?: string };
     const plan =
