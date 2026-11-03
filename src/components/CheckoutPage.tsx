@@ -2,6 +2,7 @@ import { useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/BrandMark";
 import {
   findPlan,
   CURRENCY_SYMBOL,
@@ -75,7 +76,8 @@ export function CheckoutPage() {
   const priceLabel = isAnnual
     ? `${symbol}${currency === "USD" ? (plan as { priceAnnualUSD?: number })?.priceAnnualUSD ?? priceNum * 10 : Math.round(priceNum * 10)}`
     : `${symbol}${priceNum}`;
-  const periodLabel = isAnnual ? " · 365 days" : " · 30 days";
+  const durationLabel = isAnnual ? "365 days" : "30 days";
+  const chargeLine = `${priceLabel} · ${durationLabel}`;
 
   useEffect(() => {
     setCardProvider(defaultCardProvider(currency as Currency));
@@ -88,7 +90,6 @@ export function CheckoutPage() {
     getPpMode({ data: { plan: planId, interval } })
       .then((r) => {
         if (cancelled) return;
-        // Public plans always one-time order
         setPaypalMode(r.mode === "order" ? "order" : "order");
       })
       .catch(() => {
@@ -205,7 +206,7 @@ export function CheckoutPage() {
         key: order.keyId,
         amount: order.amount,
         currency: order.currency,
-        name: "Motio2Edit",
+        name: "Motio2edit",
         description: `${plan?.name ?? "Plan"} — one-time (${isAnnual ? "annual" : "monthly"})`,
         order_id: order.orderId,
         theme: { color: "#FF6A1A" },
@@ -252,30 +253,49 @@ export function CheckoutPage() {
 
   if (!plan) return null;
 
+  const oneTimeNotice = (
+    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+      <p className="font-semibold text-foreground">One-time payment</p>
+      <p className="mt-1 text-muted-foreground">
+        You will be charged{" "}
+        <span className="font-medium text-foreground">{chargeLine}</span> once. There is{" "}
+        <strong>no automatic renewal</strong>. When your plan expires we will email you so you can
+        renew from the pricing page if you want.
+      </p>
+      {isAnnual && (
+        <p className="mt-2 text-muted-foreground">
+          Annual plans receive <strong>{creditsLabel(plan.credits)} credits each month</strong>{" "}
+          during the 365-day period (not all at once).
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b border-border bg-background/80 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
+      <header className="border-b border-border bg-background/90 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3">
+          <Link to="/" className="inline-flex min-w-0 items-center">
+            <BrandMark size="md" />
+          </Link>
           <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+            to="/pricing"
+            className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Home
-          </Link>
-          <span className="text-muted-foreground/40">/</span>
-          <Link to="/pricing" className="text-sm text-muted-foreground hover:text-foreground">
-            Pricing
+            Back to pricing
           </Link>
         </div>
-      </div>
-      <div className="mx-auto grid max-w-4xl gap-8 px-4 py-16 md:grid-cols-[1fr_320px]">
+      </header>
+
+      <div className="mx-auto grid max-w-4xl gap-8 px-4 py-10 md:grid-cols-[1fr_320px] md:py-14">
         <div>
           <h1 className="text-2xl font-bold">Checkout</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            One-time payment for {plan.name}. No automatic renewal — renew anytime from Pricing when
-            your plan ends.
+            {plan.name} · {isAnnual ? "Annual" : "Monthly"} · Motio2edit one-time purchase
           </p>
+
+          <div className="mt-6">{oneTimeNotice}</div>
 
           <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Payment method
@@ -342,24 +362,6 @@ export function CheckoutPage() {
               )}
               {paypalMode === "order" && (
                 <>
-                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-                    <p className="font-semibold text-foreground">One-time payment</p>
-                    <p className="mt-1 text-muted-foreground">
-                      You will be charged{" "}
-                      <span className="font-medium text-foreground">
-                        {priceLabel}
-                        {periodLabel}
-                      </span>{" "}
-                      once. There is <strong>no automatic renewal</strong>. When your plan expires we
-                      will email you so you can renew from the pricing page if you want.
-                    </p>
-                    {isAnnual && (
-                      <p className="mt-2 text-muted-foreground">
-                        Annual plans receive <strong>{creditsLabel(plan.credits)} credits each
-                        month</strong> during the 365-day period (not all at once).
-                      </p>
-                    )}
-                  </div>
                   <div ref={paypalContainerRef} className="min-h-[48px]" />
                   {!paypalReady && !paypalError && (
                     <p className="text-sm text-muted-foreground">Loading PayPal…</p>
@@ -375,7 +377,8 @@ export function CheckoutPage() {
 
           <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5" />
-            Secured payments via PayPal (international) and Razorpay (India). Manual renewal only.
+            Secured via PayPal (international) and Razorpay (India). Manual renewal only — no
+            AutoPay.
           </p>
         </div>
 
@@ -391,14 +394,11 @@ export function CheckoutPage() {
             <span className="text-muted-foreground">Credits / month</span>
             <span className="font-medium">{creditsLabel(plan.credits)}</span>
           </div>
-          {isAnnual && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Paid once · credits deposited monthly · no auto-renew
-            </p>
-          )}
-          {!isAnnual && (
-            <p className="mt-2 text-xs text-muted-foreground">Paid once · valid 30 days · no auto-renew</p>
-          )}
+          <p className="mt-2 text-xs text-muted-foreground">
+            {isAnnual
+              ? "Paid once · credits monthly · no auto-renew"
+              : "Paid once · valid 30 days · no auto-renew"}
+          </p>
           <div className="my-4 h-px bg-border" />
           <div className="flex items-center justify-between font-semibold">
             <span>Total due now</span>
