@@ -21,7 +21,6 @@ import {
   createPaypalOrder,
   capturePaypalOrder,
   getPaypalSubscriptionMode,
-  createPaypalSubscription,
 } from "@/lib/payments.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -34,7 +33,7 @@ declare global {
   }
 }
 
-type PaypalMode = "subscription" | "order" | "loading" | "unknown" | "missing_config";
+type PaypalMode = "order" | "loading" | "unknown";
 
 const METHOD_ICON: Record<PaymentMethod, typeof CreditCard> = {
   card: CreditCard,
@@ -55,7 +54,6 @@ export function CheckoutPage() {
   const createPp = useServerFn(createPaypalOrder);
   const capturePp = useServerFn(capturePaypalOrder);
   const getPpMode = useServerFn(getPaypalSubscriptionMode);
-  const createPpSub = useServerFn(createPaypalSubscription);
 
   const methods = CURRENCY_METHODS[currency as Currency];
   const providers = cardProvidersForCurrency(currency as Currency);
@@ -77,7 +75,7 @@ export function CheckoutPage() {
   const priceLabel = isAnnual
     ? `${symbol}${currency === "USD" ? (plan as { priceAnnualUSD?: number })?.priceAnnualUSD ?? priceNum * 10 : Math.round(priceNum * 10)}`
     : `${symbol}${priceNum}`;
-  const periodLabel = isAnnual ? "/year" : currency === "INR" ? " / month" : "/mo";
+  const periodLabel = isAnnual ? " · 365 days" : " · 30 days";
 
   useEffect(() => {
     setCardProvider(defaultCardProvider(currency as Currency));
@@ -90,13 +88,11 @@ export function CheckoutPage() {
     getPpMode({ data: { plan: planId, interval } })
       .then((r) => {
         if (cancelled) return;
-        if (r.mode === "subscription") setPaypalMode("subscription");
-        else if ((r as { mode?: string }).mode === "missing_config") setPaypalMode("missing_config");
-        else setPaypalMode("order");
+        // Public plans always one-time order
+        setPaypalMode(r.mode === "order" ? "order" : "order");
       })
       .catch(() => {
-        const isPublic = planId === "starter" || planId === "pro" || planId === "ultra";
-        if (!cancelled) setPaypalMode(isPublic ? "missing_config" : "order");
+        if (!cancelled) setPaypalMode("order");
       });
     return () => {
       cancelled = true;
@@ -122,14 +118,16 @@ export function CheckoutPage() {
           .Buttons({
             style: { layout: "vertical", color: "gold", shape: "rect", label: "paypal" },
             createOrder: async () => {
-              const res = await createPp({ data: { plan: planId } });
+              const res = await createPp({ data: { plan: planId, interval } });
               internalOrderId = res.internalOrderId;
               return res.orderId;
             },
             onApprove: async (data: { orderID: string }) => {
               setProcessing(true);
               try {
-                await capturePp({ data: { orderId: data.orderID, internalOrderId: internalOrderId! } });
+                await capturePp({
+                  data: { orderId: data.orderID, internalOrderId: internalOrderId! },
+                });
                 await refreshProfile();
                 navigate({ to: "/payment-success" });
               } catch (err) {
@@ -179,7 +177,7 @@ export function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [method, cardProvider, user, planId, paypalMode]);
+  }, [method, cardProvider, user, planId, interval, paypalMode]);
 
   const requireAuth = () => {
     if (!user) {
@@ -187,22 +185,6 @@ export function CheckoutPage() {
       return false;
     }
     return true;
-  };
-
-  const handleSubscribePaypal = async () => {
-    if (!requireAuth()) return;
-    setProcessing(true);
-    setPaypalError(null);
-    try {
-      const res = await createPpSub({ data: { plan: planId, interval } });
-      if (!res.approveUrl) throw new Error("PayPal did not return an approval link.");
-      window.location.href = res.approveUrl;
-    } catch (err) {
-      setProcessing(false);
-      const msg = err instanceof Error ? err.message : "Could not start subscription.";
-      setPaypalError(msg);
-      toast.error(msg);
-    }
   };
 
   const handleCard = async () => {
@@ -218,13 +200,13 @@ export function CheckoutPage() {
     setProcessing(true);
     setCardRetry(null);
     try {
-      const order = await createOrder({ data: { plan: planId } });
+      const order = await createOrder({ data: { plan: planId, interval } });
       const rzp = new window.Razorpay({
         key: order.keyId,
         amount: order.amount,
         currency: order.currency,
         name: "Motio2Edit",
-        description: `${plan?.name ?? "Plan"} subscription`,
+        description: `${plan?.name ?? "Plan"} — one-time (${isAnnual ? "annual" : "monthly"})`,
         order_id: order.orderId,
         theme: { color: "#FF6A1A" },
         handler: async (response: {
@@ -274,7 +256,10 @@ export function CheckoutPage() {
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
-          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
             Home
           </Link>
@@ -288,9 +273,8 @@ export function CheckoutPage() {
         <div>
           <h1 className="text-2xl font-bold">Checkout</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {paypalMode === "subscription"
-              ? `Subscribe to ${plan.name} — billed ${isAnnual ? "yearly" : "monthly"} via PayPal.`
-              : `Complete your ${plan.name} plan purchase.`}
+            One-time payment for {plan.name}. No automatic renewal — renew anytime from Pricing when
+            your plan ends.
           </p>
 
           <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -308,7 +292,9 @@ export function CheckoutPage() {
                     setCardRetry(null);
                   }}
                   className={`flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors ${
-                    method === m.id ? "border-primary bg-accent" : "border-border bg-card hover:border-muted-foreground"
+                    method === m.id
+                      ? "border-primary bg-accent"
+                      : "border-border bg-card hover:border-muted-foreground"
                   }`}
                 >
                   <Icon className="h-5 w-5 text-primary" />
@@ -323,7 +309,9 @@ export function CheckoutPage() {
               <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 {currency === "INR" ? "India payment" : "International payment"}
               </h3>
-              <div className={`mt-3 grid gap-3 ${providers.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+              <div
+                className={`mt-3 grid gap-3 ${providers.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+              >
                 {providers.map((p) => (
                   <button
                     key={p.id}
@@ -350,46 +338,32 @@ export function CheckoutPage() {
             <div className="mt-6 space-y-3">
               {paypalError && <p className="text-sm text-destructive">{paypalError}</p>}
               {paypalMode === "loading" && (
-                <p className="text-sm text-muted-foreground">Checking PayPal billing options…</p>
+                <p className="text-sm text-muted-foreground">Preparing PayPal checkout…</p>
               )}
-              {paypalMode === "missing_config" && (
-                <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
-                  <p className="font-semibold text-destructive">PayPal subscription not configured</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Billing plan IDs for this plan/interval are missing. Set PAYPAL_PLAN_* environment
-                    variables. We will not charge a different plan.
-                  </p>
-                </div>
-              )}
-              {paypalMode === "subscription" && (
+              {paypalMode === "order" && (
                 <>
                   <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-                    <p className="font-semibold text-foreground">
-                      {isAnnual ? "Annual" : "Monthly"} subscription
-                    </p>
+                    <p className="font-semibold text-foreground">One-time payment</p>
                     <p className="mt-1 text-muted-foreground">
                       You will be charged{" "}
                       <span className="font-medium text-foreground">
                         {priceLabel}
                         {periodLabel}
                       </span>{" "}
-                      via PayPal. Credits are added monthly even on annual billing.
+                      once. There is <strong>no automatic renewal</strong>. When your plan expires we
+                      will email you so you can renew from the pricing page if you want.
                     </p>
+                    {isAnnual && (
+                      <p className="mt-2 text-muted-foreground">
+                        Annual plans receive <strong>{creditsLabel(plan.credits)} credits each
+                        month</strong> during the 365-day period (not all at once).
+                      </p>
+                    )}
                   </div>
-                  <Button className="w-full" size="lg" disabled={processing} onClick={handleSubscribePaypal}>
-                    {processing ? "Redirecting to PayPal…" : `Subscribe with PayPal · ${priceLabel}${periodLabel}`}
-                  </Button>
-                </>
-              )}
-              {paypalMode === "order" && (
-                <>
                   <div ref={paypalContainerRef} className="min-h-[48px]" />
                   {!paypalReady && !paypalError && (
                     <p className="text-sm text-muted-foreground">Loading PayPal…</p>
                   )}
-                  <p className="text-xs text-muted-foreground">
-                    One-time payment (legacy plans only). Public plans use subscriptions.
-                  </p>
                 </>
               )}
             </div>
@@ -401,7 +375,7 @@ export function CheckoutPage() {
 
           <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5" />
-            Secured payments via PayPal (international) and Razorpay (India).
+            Secured payments via PayPal (international) and Razorpay (India). Manual renewal only.
           </p>
         </div>
 
@@ -409,12 +383,9 @@ export function CheckoutPage() {
           <h3 className="font-semibold">Order summary</h3>
           <div className="mt-4 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              {plan.name} · {isAnnual ? "Annual" : "Monthly"}
+              {plan.name} · {isAnnual ? "Annual (365 days)" : "Monthly (30 days)"}
             </span>
-            <span className="font-medium">
-              {priceLabel}
-              {periodLabel}
-            </span>
+            <span className="font-medium">{priceLabel}</span>
           </div>
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Credits / month</span>
@@ -422,26 +393,22 @@ export function CheckoutPage() {
           </div>
           {isAnnual && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Billed once per year · credits still deposited monthly
+              Paid once · credits deposited monthly · no auto-renew
             </p>
+          )}
+          {!isAnnual && (
+            <p className="mt-2 text-xs text-muted-foreground">Paid once · valid 30 days · no auto-renew</p>
           )}
           <div className="my-4 h-px bg-border" />
           <div className="flex items-center justify-between font-semibold">
-            <span>Total</span>
-            <span>
-              {priceLabel}
-              {periodLabel}
-            </span>
+            <span>Total due now</span>
+            <span>{priceLabel}</span>
           </div>
 
           {method === "card" && cardProvider === "razorpay" ? (
             <Button className="mt-6 w-full" onClick={handleCard} disabled={processing}>
               {processing ? "Processing…" : "Pay with Razorpay (India)"}
             </Button>
-          ) : method === "card" && cardProvider === "paypal" && paypalMode === "subscription" ? (
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              Use Subscribe with PayPal above to approve billing.
-            </p>
           ) : null}
         </aside>
       </div>
