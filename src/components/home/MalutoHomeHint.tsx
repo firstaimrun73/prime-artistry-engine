@@ -1,16 +1,19 @@
 /**
  * Compact discovery hint on Home — points users to Maluto AI.
  * Mobile: near bottom center (+ entry). Desktop: near header Maluto path.
- * Dismissible once per session; not a blocking modal.
+ * Dismissible once per session; hides automatically when user scrolls
+ * (same behavior as a collapsing nav bar).
  */
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { X } from "lucide-react";
 
 const SESSION_KEY = "motio2edit-maluto-home-hint-dismissed";
+const SCROLL_HIDE_PX = 48;
 
 export function MalutoHomeHint() {
   const [visible, setVisible] = useState(false);
+  const [scrolledAway, setScrolledAway] = useState(false);
 
   useEffect(() => {
     try {
@@ -22,6 +25,16 @@ export function MalutoHomeHint() {
     return () => window.clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    if (!visible) return;
+    const onScroll = () => {
+      setScrolledAway(window.scrollY > SCROLL_HIDE_PX);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [visible]);
+
   const dismiss = () => {
     setVisible(false);
     try {
@@ -31,7 +44,7 @@ export function MalutoHomeHint() {
     }
   };
 
-  if (!visible) return null;
+  if (!visible || scrolledAway) return null;
 
   return (
     <>
