@@ -28,7 +28,7 @@ function StudioLayout() {
   return <StudioHub />;
 }
 
-/** Fixed viewport tool picker — no page scroll. */
+/** Fixed viewport tool picker — mobile layout preserved; desktop uses wider balanced grid. */
 function StudioHub() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
@@ -39,7 +39,7 @@ function StudioHub() {
   return (
     <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background">
       <Header />
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6">
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 md:max-w-6xl lg:max-w-7xl">
         <div className="mb-2 shrink-0 text-center sm:mb-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             AI+ Tools
@@ -47,7 +47,14 @@ function StudioHub() {
           <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a tool</h1>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-[1.1fr_1fr_0.85fr] gap-2.5 sm:gap-3">
+        {/* Mobile: 2-col + wide Music. Desktop (md+): 4-col top row, Music full width below. */}
+        <div
+          className={cn(
+            "grid min-h-0 flex-1 gap-2.5 sm:gap-3",
+            "grid-cols-2 grid-rows-[1.1fr_1fr_0.85fr]",
+            "md:grid-cols-4 md:grid-rows-[1.15fr_0.9fr] md:gap-4",
+          )}
+        >
           <StudioTile
             to="/editor"
             title="Image"
@@ -106,7 +113,7 @@ function StudioHub() {
             subtitle={musicOk ? "Prompt-to-music" : "Requires a paid plan"}
             gradient="from-fuchsia-500/30 via-transparent to-transparent"
             locked={!musicOk}
-            className="col-span-2"
+            className="col-span-2 md:col-span-4"
             icon={
               <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
                 <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.4s_ease-in-out_infinite]" />
@@ -165,7 +172,7 @@ function StudioTile({
         <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{subtitle}</p>
       </div>
       {locked ? (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-2xl bg-background/55 backdrop-blur-[2px] sm:rounded-3xl">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-centercenter gap-1 rounded-2xl bg-background/55 backdrop-blur-[2px] sm:rounded-3xl">
           <Lock className="h-5 w-5 text-primary" />
           <span className="text-[11px] font-semibold text-muted-foreground">Requires paid plan</span>
         </div>
