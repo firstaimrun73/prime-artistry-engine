@@ -15,13 +15,14 @@ import {
   PRICING_SHOW_PLAN_IDS,
   PRICING_POPULAR_PLAN_ID,
   annualSavingsMonths,
+  estimatedGenerations,
   type DisplayCurrency,
   type PlanId,
   type PurchasablePlanId,
   type BillingInterval,
 } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
-import { Check, Crown, Sparkles } from "lucide-react";
+import { Check, Crown, Sparkles, Image as ImageIcon, Video, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pricing")({
@@ -83,7 +84,7 @@ function PricingPage() {
             {t("pricing.title") || "Pricing"}
           </h1>
           <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-            Simple plans. Monthly or yearly. Unlock Standard, Premium, or Ultra AI modes across Image, Video, and Music.
+            Simple plans. Monthly or yearly. Unlock Standard, Premium, or Ultra AI modes.
           </p>
         </div>
 
@@ -151,6 +152,7 @@ function PricingPage() {
             const monthlyUsd = DISPLAY_PRICES[plan.id]?.USD ?? 0;
             const annualUsd =
               DISPLAY_ANNUAL_PRICES_USD[plan.id as PurchasablePlanId] ?? monthlyUsd * 10;
+            const estimates = estimatedGenerations(plan.credits);
 
             let priceLabel: string;
             let periodLabel: string;
@@ -215,6 +217,41 @@ function PricingPage() {
                   {modeLabel}
                 </div>
 
+                {/* Generation counts — numbers only, no per-credit cost text */}
+                <div className="mt-3 space-y-1.5 rounded-xl border border-border/70 bg-muted/30 p-3 text-xs">
+                  <p className="font-semibold text-foreground">About this plan</p>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <ImageIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>
+                      <span className="font-semibold text-foreground">
+                        ~{estimates.images.toLocaleString()}
+                      </span>{" "}
+                      images
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Video className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>
+                      <span className="font-semibold text-foreground">
+                        ~{estimates.videos.toLocaleString()}
+                      </span>{" "}
+                      videos
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Music className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>
+                      <span className="font-semibold text-foreground">
+                        ~{estimates.music.toLocaleString()}
+                      </span>{" "}
+                      music tracks
+                    </span>
+                  </div>
+                  <p className="pt-0.5 text-[10px] leading-snug text-muted-foreground">
+                    Shared monthly allowance — not all at once.
+                  </p>
+                </div>
+
                 <p className="mt-3 text-sm leading-snug text-muted-foreground">{plan.positioning}</p>
 
                 <ul className="mt-4 flex-1 space-y-2">
@@ -244,21 +281,20 @@ function PricingPage() {
           <p className="font-semibold text-foreground">Good to know</p>
           <ul className="space-y-2 text-xs text-muted-foreground sm:text-sm">
             <li>
-              <span className="font-medium text-foreground">Modes:</span> Starter unlocks Standard tools;
-              Pro unlocks Premium models + Maluto AI; Ultra AI unlocks the highest models and full
-              toolkit.
+              <span className="font-medium text-foreground">Starter:</span> Standard image edit,
+              Circle Remove, short SD video, instrumental music.
             </li>
             <li>
-              <span className="font-medium text-foreground">Yearly plans:</span> pay once for the year;
-              access renews monthly (not all at once).
+              <span className="font-medium text-foreground">Pro:</span> Premium models, Maluto AI,
+              Circle Remove & Add, HD video up to 10s.
             </li>
             <li>
-              <span className="font-medium text-foreground">Payments:</span> one-time checkout with manual
-              renewal — no silent auto-renew.
+              <span className="font-medium text-foreground">Ultra AI:</span> Top image models,
+              premium music (Song · SFX · Video music), video up to 15s.
             </li>
             <li>
-              <span className="font-medium text-foreground">Need more later?</span> After you subscribe,
-              custom top-ups are available under{" "}
+              <span className="font-medium text-foreground">Need more later?</span> After you
+              subscribe, custom top-ups are under{" "}
               <Link to="/profile/top-up" className="font-medium text-primary hover:underline">
                 Profile → Credits
               </Link>
