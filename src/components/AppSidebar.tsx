@@ -1,5 +1,17 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Image as ImageIcon, Video, Music, History, MessageSquare, User, Settings, Crown, Sparkles } from "lucide-react";
+import {
+  Home,
+  Image as ImageIcon,
+  Video,
+  Music,
+  History,
+  MessageSquare,
+  User,
+  Settings,
+  Crown,
+  Sparkles,
+  LayoutGrid,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -9,8 +21,8 @@ import { useI18n } from "@/lib/i18n";
 
 /**
  * Desktop vertical sidebar for authenticated routes.
- * Free: Home, Image, Maluto AI, Plans (+ Profile/Settings) — History slot becomes Pricing.
- * Paid Lite+: Image + Video + Music + History + Chat per canAccess* helpers.
+ * Always shows Home, Image, Maluto, Pricing + Profile/Settings.
+ * Video / Music / History / Chat when policy allows.
  */
 export function AppSidebar() {
   const { user, profile } = useAuth();
@@ -26,19 +38,19 @@ export function AppSidebar() {
 
   type NavItem = { to: string; label: string; icon: typeof Home; exact?: boolean };
   const items: NavItem[] = [
-    { to: "/", label: t("nav.home"), icon: Home, exact: true },
-    { to: "/studio/image", label: t("nav.image"), icon: ImageIcon },
+    { to: "/", label: t("nav.home") || "Home", icon: Home, exact: true },
+    { to: "/studio", label: "AI Studio", icon: LayoutGrid },
+    { to: "/studio/image", label: t("nav.image") || "Image", icon: ImageIcon },
     { to: "/studio/image/auto-edit", label: "Maluto AI", icon: Sparkles },
   ];
-  if (showVideo) items.push({ to: "/studio/video", label: t("nav.video"), icon: Video });
-  if (showMusic) items.push({ to: "/studio/music", label: t("nav.music"), icon: Music });
-  // Free: History slot → Pricing/Plans. Paid: History.
+  if (showVideo) items.push({ to: "/studio/video", label: t("nav.video") || "Video", icon: Video });
+  if (showMusic) items.push({ to: "/studio/music", label: t("nav.music") || "Music", icon: Music });
   if (paid) {
-    items.push({ to: "/history", label: t("nav.history"), icon: History });
-  } else {
-    items.push({ to: "/pricing", label: "Plans", icon: Crown });
+    items.push({ to: "/history", label: t("nav.history") || "History", icon: History });
   }
-  if (showChat) items.push({ to: "/chat", label: t("nav.chat"), icon: MessageSquare });
+  // Pricing always available
+  items.push({ to: "/pricing", label: "Pricing", icon: Crown });
+  if (showChat) items.push({ to: "/chat", label: t("nav.chat") || "Chat", icon: MessageSquare });
 
   return (
     <aside
@@ -48,19 +60,23 @@ export function AppSidebar() {
       <Link to="/" className="flex items-center gap-2 px-5 py-4">
         <BrandMark />
       </Link>
-      <nav className="flex-1 space-y-0.5 px-3">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
         {items.map(({ to, label, icon: Icon, exact }) => {
-          const active = exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
+          const active = exact
+            ? pathname === to
+            : pathname === to || pathname.startsWith(to + "/");
           return (
             <Link
               key={to + label}
               to={to}
               activeOptions={exact ? { exact: true } : undefined}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                active
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-4 w-4 shrink-0" />
               {label}
             </Link>
           );
@@ -71,16 +87,16 @@ export function AppSidebar() {
           to={user ? "/dashboard" : "/auth"}
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <User className="h-4 w-4" /> {t("nav.profile")}
+          <User className="h-4 w-4" /> {t("nav.profile") || "Profile"}
         </Link>
         <Link
           to="/settings"
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          <Settings className="h-4 w-4" /> {t("nav.settings")}
+          <Settings className="h-4 w-4" /> {t("nav.settings") || "Settings"}
         </Link>
         <div className="flex items-center justify-between px-3 pt-2">
-          <span className="text-xs text-muted-foreground">{t("settings.theme")}</span>
+          <span className="text-xs text-muted-foreground">{t("settings.theme") || "Theme"}</span>
           <ThemeToggle />
         </div>
       </div>
