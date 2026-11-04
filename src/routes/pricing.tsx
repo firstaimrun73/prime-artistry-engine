@@ -15,14 +15,16 @@ import {
   PRICING_SHOW_PLAN_IDS,
   PRICING_POPULAR_PLAN_ID,
   annualSavingsMonths,
-  estimatedStandardImages,
+  estimatedGenerations,
+  ESTIMATE_ASSUMPTIONS,
+  CREDIT_ADDON_PACKS,
   type DisplayCurrency,
   type PlanId,
   type PurchasablePlanId,
   type BillingInterval,
 } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
-import { Check, Coins, Crown } from "lucide-react";
+import { Check, Coins, Crown, Image as ImageIcon, Video, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pricing")({
@@ -84,7 +86,7 @@ function PricingPage() {
             {t("pricing.title") || "Pricing"}
           </h1>
           <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-            Simple plans. Pay once. Credits every month.
+            Simple plans. Pay once. Credits every month. Shared across Image, Video, and Music.
           </p>
         </div>
 
@@ -145,31 +147,41 @@ function PricingPage() {
           ))}
         </div>
 
-        {/* Mobile: 1 col · Desktop: 3 equal cols side by side */}
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5 md:items-stretch">
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3 md:items-stretch md:gap-5">
           {visiblePlans.map((plan) => {
             const isRecommended = plan.id === PRICING_POPULAR_PLAN_ID;
             const isCurrent = profile?.plan === plan.id;
             const monthlyUsd = DISPLAY_PRICES[plan.id]?.USD ?? 0;
             const annualUsd =
               DISPLAY_ANNUAL_PRICES_USD[plan.id as PurchasablePlanId] ?? monthlyUsd * 10;
-            const imgPerMonth = estimatedStandardImages(plan.credits);
-            const imgPerYear = imgPerMonth * 12;
+            const estimates = estimatedGenerations(plan.credits);
 
             let priceLabel: string;
             let periodLabel: string;
+            let yearlyMonthlyEquiv: string | null = null;
             if (interval === "year") {
               if (currency === "USD") priceLabel = formatPlanPrice(annualUsd, "USD");
               else if (currency === "EUR")
-                priceLabel = formatPlanPrice(Math.round(annualUsd * 0.92), "EUR");
+                priceLabel = formatPlanPrice(Math.round(annualUsd * 0.92 * 100) / 100, "EUR");
               else priceLabel = formatPlanPrice(Math.round(annualUsd * 83.5), "INR");
               periodLabel = "per year";
+              yearlyMonthlyEquiv = formatPlanPrice(
+                currency === "USD"
+                  ? annualUsd / 12
+                  : currency === "EUR"
+                    ? (annualUsd * 0.92) / 12
+                    : (annualUsd * 83.5) / 12,
+                currency,
+              );
             } else {
               const raw = DISPLAY_PRICES[plan.id]?.[currency];
               priceLabel =
                 typeof raw === "number" ? formatPlanPrice(raw, currency) : raw ?? "—";
               periodLabel = "per month";
             }
+
+            const maxVideo =
+              plan.id === "starter" ? "Up to 5s · SD" : plan.id === "pro" ? "Up to 10s · HD" : "Up to 15s";
 
             return (
               <div
@@ -189,25 +201,51 @@ function PricingPage() {
 
                 <p className="mt-3 text-3xl font-extrabold tracking-tight">{priceLabel}</p>
                 <p className="text-xs text-muted-foreground">{periodLabel}</p>
+                {interval === "year" && yearlyMonthlyEquiv ? (
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    ≈ {yearlyMonthlyEquiv}/mo · {savingsMonths} months free
+                  </p>
+                ) : null}
 
                 <div className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-primary">
                   <Coins className="h-4 w-4 shrink-0" />
                   {plan.credits.toLocaleString()} credits / month
                 </div>
 
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {interval === "year" ? (
-                    <>
-                      ~{imgPerMonth.toLocaleString()} standard images / month
-                      <span className="text-foreground/80">
-                        {" "}
-                        · ~{imgPerYear.toLocaleString()} / year
-                      </span>
-                    </>
-                  ) : (
-                    <>~{imgPerMonth.toLocaleString()} standard images / month</>
-                  )}
-                </p>
+                <div className="mt-3 space-y-1.5 rounded-xl border border-border/70 bg-muted/30 p-3 text-xs">
+                  <p className="font-semibold text-foreground">Estimated if used only for…</p>
+                  <div className="flex items-start gap-2 text-muted-foreground">
+                    <ImageIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>
+                      <span className="font-semibold text-foreground">
+                        ~{estimates.images.toLocaleString()} images
+                      </span>{" "}
+                      · standard ({ESTIMATE_ASSUMPTIONS.imageCredits} cr each)
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2 text-muted-foreground">
+                    <Video className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>
+                      <span className="font-semibold text-foreground">
+                        ~{estimates.videos.toLocaleString()} videos
+                      </span>{" "}
+                      · {ESTIMATE_ASSUMPTIONS.videoLabel.split("(")[0].trim()} ({ESTIMATE_ASSUMPTIONS.videoCredits}{" "}
+                      cr)
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2 text-muted-foreground">
+                    <Music className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>
+                      <span className="font-semibold text-foreground">
+                        ~{estimates.music.toLocaleString()} instrumentals
+                      </span>{" "}
+                      · {ESTIMATE_ASSUMPTIONS.musicCredits} cr each
+                    </span>
+                  </div>
+                  <p className="pt-0.5 text-[10px] leading-snug text-muted-foreground">
+                    One shared credit balance — not all maxima at once. {maxVideo}.
+                  </p>
+                </div>
 
                 <p className="mt-3 text-xs leading-snug text-muted-foreground">{plan.positioning}</p>
 
@@ -236,21 +274,45 @@ function PricingPage() {
           })}
         </div>
 
+        <div className="mx-auto mt-10 max-w-3xl">
+          <h2 className="text-center text-lg font-bold">Need more credits?</h2>
+          <p className="mt-1 text-center text-xs text-muted-foreground">
+            One-time packs. Credits never expire. Works with any plan.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {CREDIT_ADDON_PACKS.map((pack) => {
+              const videos = Math.floor(pack.credits / ESTIMATE_ASSUMPTIONS.videoCredits);
+              return (
+                <Link
+                  key={pack.id}
+                  to="/profile/top-up"
+                  className="rounded-2xl border border-border bg-card p-3 text-center transition hover:border-primary/40"
+                >
+                  <p className="text-sm font-bold">{pack.name}</p>
+                  <p className="mt-1 text-lg font-extrabold text-primary">${pack.priceUsd}</p>
+                  <p className="mt-1 text-xs font-semibold">{pack.credits.toLocaleString()} credits</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">~{videos}× 5s videos</p>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="mx-auto mt-10 max-w-2xl space-y-3 rounded-2xl border border-border bg-muted/30 px-4 py-4 text-sm sm:px-6">
           <p className="font-semibold text-foreground">Good to know</p>
           <ul className="space-y-2 text-xs text-muted-foreground sm:text-sm">
             <li>
-              <span className="font-medium text-foreground">Images:</span> estimates assume 25
-              credits per standard image. Other modes may use more.
+              <span className="font-medium text-foreground">Estimates:</span> image {ESTIMATE_ASSUMPTIONS.imageCredits}{" "}
+              cr · video from {ESTIMATE_ASSUMPTIONS.videoCredits} cr (5s Standard) · instrumental{" "}
+              {ESTIMATE_ASSUMPTIONS.musicCredits} cr. Longer or Premium video costs more.
             </li>
             <li>
-              <span className="font-medium text-foreground">Yearly plans:</span> pay once; credits
-              still arrive each month.
+              <span className="font-medium text-foreground">Yearly plans:</span> pay once for the year;
+              credits still arrive each month (not all at once).
             </li>
             <li>
-              <span className="font-medium text-foreground">Sponsored ads:</span> only labeled
-              Sponsored placements. Free users can earn free credits by watching or clicking
-              Sponsored offers where available.
+              <span className="font-medium text-foreground">Payments:</span> one-time checkout with manual
+              renewal — no silent auto-renew subscription conversion.
             </li>
             <li>
               <span className="font-medium text-foreground">Credits:</span> valid up to one year from
@@ -258,10 +320,11 @@ function PricingPage() {
             </li>
           </ul>
           <p className="text-xs text-muted-foreground">
-            Need more?{" "}
+            Top-ups also live under{" "}
             <Link to="/profile/top-up" className="font-medium text-primary hover:underline">
-              Buy a credit top-up
+              Profile → Credits
             </Link>
+            .
           </p>
         </div>
       </div>
