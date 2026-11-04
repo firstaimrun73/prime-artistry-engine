@@ -41,9 +41,10 @@ export function Header() {
     ? { to: "/history", label: "History" }
     : { to: "/pricing", label: "Plans" };
 
+  /** Desktop signed-in: Home · AI Studio · Maluto AI · Plans/History · Dashboard */
   const authLinksBase: NavItem[] = [
     { to: "/", label: "Home" },
-    { to: "/studio", label: "AI+ Tools" },
+    { to: "/studio", label: "AI Studio" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
     historyOrPlans,
     { to: "/dashboard", label: "Dashboard" },
@@ -62,7 +63,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-      <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-3 sm:gap-4 sm:px-4">
+      <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-3 sm:gap-4 sm:px-4 lg:max-w-7xl">
         <Link
           to="/"
           className="notranslate flex shrink-0 items-center gap-1.5 sm:gap-2"
@@ -73,14 +74,14 @@ export function Header() {
           <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 lg:flex">
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 lg:flex">
           {links.map((l) => (
             <Link
               key={`${l.to}-${l.label}`}
               to={l.to}
-              activeProps={{ className: "text-foreground" }}
+              activeProps={{ className: "bg-secondary/80 text-foreground" }}
               activeOptions={l.to === "/" ? { exact: true } : undefined}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground xl:px-3"
             >
               {l.label}
             </Link>
@@ -141,7 +142,6 @@ export function Header() {
             </div>
           )}
 
-          {/* Hamburger: public / pre-login only — signed-in users use desktop nav + bottom tabs */}
           {!user && (
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
