@@ -41,17 +41,15 @@ export function Header() {
     ? { to: "/history", label: "History" }
     : { to: "/pricing", label: "Plans" };
 
-  /** Desktop signed-in: Home · AI Studio · Maluto AI · Plans/History · Dashboard */
+  /** Desktop signed-in top nav */
   const authLinksBase: NavItem[] = [
     { to: "/", label: "Home" },
     { to: "/studio", label: "AI Studio" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
     historyOrPlans,
     { to: "/dashboard", label: "Dashboard" },
+    { to: "/pricing", label: "Pricing" },
   ];
-  if (paid) {
-    authLinksBase.push({ to: "/pricing", label: "Plans" });
-  }
 
   const authLinks: NavItem[] = showChat ? [...authLinksBase, CHAT_LINK] : authLinksBase;
   const links: NavItem[] = user ? authLinks : PUBLIC_LINKS;
@@ -74,14 +72,15 @@ export function Header() {
           <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 lg:flex">
+        {/* Desktop / tablet nav — visible from md up */}
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
           {links.map((l) => (
             <Link
               key={`${l.to}-${l.label}`}
               to={l.to}
               activeProps={{ className: "bg-secondary/80 text-foreground" }}
               activeOptions={l.to === "/" ? { exact: true } : undefined}
-              className="rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground xl:px-3"
+              className="rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:px-2.5 xl:px-3"
             >
               {l.label}
             </Link>
@@ -142,30 +141,31 @@ export function Header() {
             </div>
           )}
 
-          {!user && (
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 lg:hidden">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
-                <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-                  <BrandMark />
-                </div>
-                <nav className="flex flex-col p-2">
-                  {PUBLIC_LINKS.map((l) => (
-                    <Link
-                      key={`${l.to}-${l.label}`}
-                      to={l.to}
-                      onClick={() => setMenuOpen(false)}
-                      activeProps={{ className: "bg-secondary text-foreground" }}
-                      activeOptions={l.to === "/" ? { exact: true } : undefined}
-                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      {l.label}
-                    </Link>
-                  ))}
+          {/* Mobile menu for everyone — includes Home + remaining links */}
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 md:hidden">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
+              <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+                <BrandMark />
+              </div>
+              <nav className="flex flex-col p-2">
+                {links.map((l) => (
+                  <Link
+                    key={`${l.to}-${l.label}`}
+                    to={l.to}
+                    onClick={() => setMenuOpen(false)}
+                    activeProps={{ className: "bg-secondary text-foreground" }}
+                    activeOptions={l.to === "/" ? { exact: true } : undefined}
+                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    {l.label}
+                  </Link>
+                ))}
+                {!user && (
                   <div className="mt-3 flex flex-col gap-2 border-t border-border px-2 pt-4">
                     <Button
                       variant="outline"
@@ -185,10 +185,10 @@ export function Header() {
                       Get started
                     </Button>
                   </div>
-                </nav>
-              </SheetContent>
-            </Sheet>
-          )}
+                )}
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>
