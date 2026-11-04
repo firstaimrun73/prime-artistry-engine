@@ -1,6 +1,7 @@
 /**
  * Media-first discovery card.
- * Always sizes to the sample's declared aspect ratio so media is never stretched into the wrong frame.
+ * Sizes to the sample's declared aspect ratio, then corrects from real media
+ * metadata so 9:16 content is never forced into a 16:9 frame (and vice versa).
  * Badge top-left · like/info top-right.
  */
 import { useCallback, useState } from "react";
@@ -91,7 +92,13 @@ export function GalleryMediaCard({
   const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
   const large = size === "large" || stripMode;
   const [failed, setFailed] = useState(false);
-  const ratio = parseRatio(sample.aspectRatio);
+  const catalogRatio = parseRatio(sample.aspectRatio);
+  const [liveRatio, setLiveRatio] = useState<number | null>(null);
+  const ratio = liveRatio ?? catalogRatio;
+
+  const applyNaturalSize = useCallback((w: number, h: number) => {
+    if (w > 0 && h > 0) setLiveRatio(w / h);
+  }, []);
 
   const openMedia = useCallback(
     (e?: React.MouseEvent | React.TouchEvent) => {
@@ -123,9 +130,11 @@ export function GalleryMediaCard({
         "group relative w-full overflow-hidden rounded-[14px]",
         "bg-muted/15 ring-1 ring-border/25 transition duration-300",
         "hover:ring-primary/30 hover:shadow-md",
+        // Portrait cards stay narrower in multi-column grids
+        ratio < 0.85 && "max-w-[280px] justify-self-center",
         className,
       )}
-      style={stripMode ? stripCardStyle(sample) : { aspectRatio: String(ratio) }}
+      style={stripMode ? { ...stripCardStyle(sample), aspectRatio: String(ratio) } : { aspectRatio: String(ratio) }}
       data-sample-id={sample.id}
       data-aspect={sample.aspectRatio}
       data-ratio={sample.aspectRatio}
@@ -169,6 +178,10 @@ export function GalleryMediaCard({
             loop
             preload="metadata"
             className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+            onLoadedMetadata={(e) => {
+              const v = e.currentTarget;
+              applyNaturalSize(v.videoWidth, v.videoHeight);
+            }}
             onError={() => setFailed(true)}
           />
         ) : (
@@ -178,6 +191,10 @@ export function GalleryMediaCard({
             className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
             decoding="async"
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              applyNaturalSize(img.naturalWidth, img.naturalHeight);
+            }}
             onError={() => setFailed(true)}
           />
         )}
