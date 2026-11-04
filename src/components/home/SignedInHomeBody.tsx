@@ -27,6 +27,7 @@ import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 import { MalutoGuideTour } from "@/components/home/MalutoGuideTour";
 import { DirectLinkAd } from "@/components/ads";
+import { MalutoHomeHint } from "@/components/home/MalutoHomeHint";
 
 const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] = [
   {
@@ -51,23 +52,42 @@ const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] =
   },
 ];
 
+/** Public promo slides — no discontinued Lite/$4.99 marketing */
 const HOME_SLOGANS = [
-  { title: "Try a plan that fits you", sub: "Lite · Plus · Pro · AI Studio · Master" },
-  { title: "Use Motio2edit AI for best edits", sub: "Image · Video · Music in one place" },
-  { title: "Circle 2edit · Cropmix · Remove BG", sub: "Pro tools, simple credits" },
-  { title: "From idea to download in seconds", sub: "Standard · Premium · Ultra AI modes" },
-  { title: "More credits. More modes. No watermark.", sub: "Upgrade anytime — cancel anytime" },
-  { title: "Maluto AI — restore photos for $4.99", sub: "Lite · just upload · automatic restore" },
+  {
+    title: "Bring Your Old Photos Back to Life",
+    sub: "Restore faded memories with Maluto AI",
+    to: "/studio/image/auto-edit" as const,
+    cta: "Explore Maluto AI →",
+  },
+  {
+    title: "Circle 2edit · Cropmix · Remove BG",
+    sub: "Powerful creative tools. Simple workflows.",
+    to: "/studio" as const,
+    cta: "Explore AI Tools →",
+  },
+  {
+    title: "From idea to download in seconds",
+    sub: "Standard · Premium · Ultra AI modes",
+    to: "/editor" as const,
+    cta: "Open Image Studio →",
+  },
+  {
+    title: "More credits. More modes. No watermark.",
+    sub: "Upgrade anytime — cancel anytime",
+    to: "/pricing" as const,
+    cta: "View plans →",
+  },
 ] as const;
 
 const QUICK_CREATE = [
-  { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
-  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
+  { to: "/studio/image/auto-edit" as const, label: "Maluto AI", icon: Sparkles },
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
+  { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
+  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
+  { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
   { to: "/studio/video" as const, label: "Video", icon: Video },
   { to: "/studio/music" as const, label: "Music", icon: Music },
-  { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
-  { to: "/studio/image/auto-edit" as const, label: "Maluto AI", icon: Sparkles },
   { to: "/studio/image/filters" as const, label: "Filters", icon: Filter },
 ] as const;
 
@@ -86,21 +106,24 @@ export function SignedInHomeBody() {
   useEffect(() => {
     const id = window.setInterval(() => {
       setSloganIdx((i) => (i + 1) % HOME_SLOGANS.length);
-    }, 3800);
+    }, 4200);
     return () => window.clearInterval(id);
   }, []);
 
   const slogan = HOME_SLOGANS[sloganIdx];
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:pb-12">
+    <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:max-w-7xl md:pb-12">
+      <MalutoHomeHint />
+
+      {/* 1. Welcome + credits */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {t("home.welcome")}
             {firstName ? `, ${firstName}` : ""}
           </p>
-          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">
+          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl md:text-3xl">
             What will you create?
           </h1>
         </div>
@@ -120,9 +143,10 @@ export function SignedInHomeBody() {
         </div>
       </div>
 
+      {/* 2. Capability carousel (no discontinued pricing) */}
       <section className="mt-4" aria-label="Promo">
         <Link
-          to="/pricing"
+          to={slogan.to}
           className="group relative block overflow-hidden rounded-2xl border border-white/10 shadow-lg shadow-orange-500/10"
         >
           <div
@@ -133,15 +157,15 @@ export function SignedInHomeBody() {
             className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.25),transparent_55%)]"
             aria-hidden
           />
-          <div className="relative flex items-center justify-between gap-3 px-4 py-4 sm:px-5">
+          <div className="relative flex items-center justify-between gap-3 px-4 py-4 sm:px-5 md:py-5">
             <div className="min-w-0 flex-1">
               <p
                 key={sloganIdx}
-                className="text-sm font-bold leading-snug text-white drop-shadow-sm sm:text-base"
+                className="text-sm font-bold leading-snug text-white drop-shadow-sm sm:text-base md:text-lg"
               >
                 {slogan.title}
               </p>
-              <p className="mt-0.5 truncate text-xs text-white/85">{slogan.sub}</p>
+              <p className="mt-0.5 truncate text-xs text-white/85 sm:text-sm">{slogan.sub}</p>
               <div className="mt-2 flex gap-1.5" aria-hidden>
                 {HOME_SLOGANS.map((_, i) => (
                   <span
@@ -153,40 +177,38 @@ export function SignedInHomeBody() {
                 ))}
               </div>
             </div>
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-orange-600 shadow-sm transition group-hover:bg-white">
-              View plans
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-orange-600 shadow-sm transition group-hover:bg-white md:text-sm">
+              {slogan.cta}
               <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </div>
         </Link>
       </section>
 
-      <section className="mt-5" aria-label="Creative tags">
-        <p className="mb-2 text-xs font-medium text-muted-foreground">
-          Use tags to create your photo in seconds
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {HOME_CREATE_TAGS.map((tag) => (
-            <Link
-              key={tag.label}
-              to="/editor"
-              search={{ prompt: tag.prompt } as never}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition hover:opacity-90 ${tag.className}`}
-            >
-              {tag.label}
-            </Link>
-          ))}
-        </div>
-      </section>
+      {/* 3. Ace · Maluto AI — high on page */}
+      <AutoEditHomeCard />
 
-      {/* Sponsor #1 — near primary actions */}
+      {/* 4. Sample discovery — primary proof of capability */}
+      <div className="mt-8 md:mt-10">
+        <div className="mb-3 flex items-end justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-primary">Trending</p>
+            <h2 className="text-base font-extrabold tracking-tight sm:text-lg md:text-xl">
+              See what Motio2edit can do
+            </h2>
+          </div>
+        </div>
+        <VisualDiscoveryGallery />
+      </div>
+
       <DirectLinkAd placement="home-upper" variant="compact" />
 
-      <section className="mt-5">
+      {/* 5. Quick create */}
+      <section className="mt-6">
         <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
           Quick create
         </h2>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
           {QUICK_CREATE.map((q) => {
             const Icon = q.icon;
             const locked =
@@ -211,7 +233,7 @@ export function SignedInHomeBody() {
                   : !locked && q.label === "Remove BG"
                     ? { search: { from: "home" as const } }
                     : {})}
-                className="flex h-auto w-[72px] min-w-[72px] max-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-1.5 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40"
+                className="flex h-auto w-[72px] min-w-[72px] max-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-1.5 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40 md:w-[88px] md:min-w-[88px] md:max-w-[88px]"
               >
                 <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
@@ -226,22 +248,35 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      <CircleSampleGallery />
+      <section className="mt-5" aria-label="Creative tags">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">
+          Use tags to create your photo in seconds
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {HOME_CREATE_TAGS.map((tag) => (
+            <Link
+              key={tag.label}
+              to="/editor"
+              search={{ prompt: tag.prompt } as never}
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-sm backdrop-blur transition hover:opacity-90 ${tag.className}`}
+            >
+              {tag.label}
+            </Link>
+          ))}
+        </div>
+      </section>
 
-      <RemoveBgHomeCard />
-
-      {/* Sponsor #2 — after tool CTAs */}
-      <DirectLinkAd placement="home-mid" />
-
-      <div className="mt-12">
-        <VisualDiscoveryGallery />
+      {/* 6. Tool samples lower on page */}
+      <div className="mt-10 space-y-8 md:mt-12">
+        <CircleSampleGallery />
+        <RemoveBgHomeCard />
       </div>
+
+      <DirectLinkAd placement="home-mid" />
 
       <ObserveBuildProtect />
 
       <HomePromptBar />
-
-      <AutoEditHomeCard />
 
       <MalutoGuideTour />
     </main>
