@@ -14,9 +14,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
-import { useI18n } from "@/lib/i18n";
 import type { PlanId } from "@/lib/plans";
-import { canAccessMusic, canAccessVideo } from "@/lib/policy";
+import { canAccessMusic, canAccessVideo, isPaidPlan } from "@/lib/policy";
 import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
@@ -52,7 +51,6 @@ const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] =
   },
 ];
 
-/** Public promo slides — no discontinued Lite/$4.99 marketing */
 const HOME_SLOGANS = [
   {
     title: "Bring Your Old Photos Back to Life",
@@ -93,12 +91,11 @@ const QUICK_CREATE = [
 
 export function SignedInHomeBody() {
   const { profile } = useAuth();
-  const { t } = useI18n();
   const isAdmin = isAdminEmail(profile?.email);
 
   const planId = (profile?.plan ?? "free") as PlanId;
-  const firstName = profile?.display_name ? profile.display_name.split(" ")[0] : "";
   const credits = (profile?.credits ?? 0).toLocaleString();
+  const showPlanBadge = isAdmin || isPaidPlan(planId);
   const videoOk = canAccessVideo({ plan: planId, email: profile?.email, isAdmin });
   const musicOk = canAccessMusic({ plan: planId, email: profile?.email, isAdmin });
 
@@ -116,20 +113,18 @@ export function SignedInHomeBody() {
     <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:max-w-7xl md:pb-12">
       <MalutoHomeHint />
 
-      {/* 1. Welcome + credits */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("home.welcome")}
-            {firstName ? `, ${firstName}` : ""}
-          </p>
-          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl md:text-3xl">
+          <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl md:text-3xl">
             What will you create?
           </h1>
+          <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+            Image · Video · Music · Restore · Edit
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CrownBadge plan={planId} showLabel size="md" />
-          <span className="rounded-full border border-border/80 bg-card/80 px-2.5 py-0.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
+          {showPlanBadge ? <CrownBadge plan={planId} showLabel size="md" /> : null}
+          <span className="rounded-full border border-border/80 bg-card/80 px-2.5 py-0.5 text-xs font-medium text-foreground shadow-sm backdrop-blur">
             {credits} credits
           </span>
           {isAdmin ? (
@@ -143,7 +138,6 @@ export function SignedInHomeBody() {
         </div>
       </div>
 
-      {/* 2. Capability carousel (no discontinued pricing) */}
       <section className="mt-4" aria-label="Promo">
         <Link
           to={slogan.to}
@@ -158,14 +152,14 @@ export function SignedInHomeBody() {
             aria-hidden
           />
           <div className="relative flex items-center justify-between gap-3 px-4 py-4 sm:px-5 md:py-5">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 pr-2">
               <p
                 key={sloganIdx}
                 className="text-sm font-bold leading-snug text-white drop-shadow-sm sm:text-base md:text-lg"
               >
                 {slogan.title}
               </p>
-              <p className="mt-0.5 truncate text-xs text-white/85 sm:text-sm">{slogan.sub}</p>
+              <p className="mt-0.5 text-xs text-white/85 sm:text-sm">{slogan.sub}</p>
               <div className="mt-2 flex gap-1.5" aria-hidden>
                 {HOME_SLOGANS.map((_, i) => (
                   <span
@@ -185,10 +179,8 @@ export function SignedInHomeBody() {
         </Link>
       </section>
 
-      {/* 3. Ace · Maluto AI — high on page */}
       <AutoEditHomeCard />
 
-      {/* 4. Sample discovery — primary proof of capability */}
       <div className="mt-8 md:mt-10">
         <div className="mb-3 flex items-end justify-between gap-2">
           <div>
@@ -203,7 +195,6 @@ export function SignedInHomeBody() {
 
       <DirectLinkAd placement="home-upper" variant="compact" />
 
-      {/* 5. Quick create */}
       <section className="mt-6">
         <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
           Quick create
@@ -266,7 +257,6 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* 6. Tool samples lower on page */}
       <div className="mt-10 space-y-8 md:mt-12">
         <CircleSampleGallery />
         <RemoveBgHomeCard />
