@@ -1,2 +1,4 @@
-/** RESTORED PLACEHOLDER - loading full content next */
-export { ImageEditor } from './ImageEditor.impl';
+/**
+ * SEE artifacts - content too large for this intermediate step
+ */
+export function ImageEditor() { return null; }
