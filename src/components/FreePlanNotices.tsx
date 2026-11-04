@@ -13,13 +13,15 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-const FREE_INTRO_KEY = "motio2edit-free-intro-seen";
+/** Once per browser (localStorage) — do not re-show after dismiss. */
+const FREE_INTRO_KEY = "motio2edit-free-intro-seen-v2";
+/** Once per session for out-of-credits. */
 const OUT_OF_CREDITS_KEY = "motio2edit-out-of-credits-seen";
 
 /**
- * Non-spammy Free plan notices (once per browser session each):
- *  1) Intro: Free plan includes ads
- *  2) Zero credits: upgrade CTA
+ * Free plan notices — minimal interruption:
+ *  1) Intro: once per device, soft copy, Continue free primary
+ *  2) Zero credits: once per session, credit-focused (not generic upgrade spam)
  * Does not change generation or credit enforcement.
  */
 export function FreePlanNotices() {
@@ -35,11 +37,11 @@ export function FreePlanNotices() {
     if (!profile || !free) return;
 
     try {
-      if (sessionStorage.getItem(FREE_INTRO_KEY) !== "1") {
+      if (localStorage.getItem(FREE_INTRO_KEY) !== "1") {
         setIntroOpen(true);
       }
     } catch {
-      setIntroOpen(true);
+      /* ignore storage — skip intro rather than spam */
     }
   }, [profile, free]);
 
@@ -57,7 +59,7 @@ export function FreePlanNotices() {
   const dismissIntro = () => {
     setIntroOpen(false);
     try {
-      sessionStorage.setItem(FREE_INTRO_KEY, "1");
+      localStorage.setItem(FREE_INTRO_KEY, "1");
     } catch {
       /* ignore */
     }
@@ -79,19 +81,21 @@ export function FreePlanNotices() {
       <Dialog open={introOpen && !outOpen} onOpenChange={(o) => !o && dismissIntro()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>You're using Motio2edit Free</DialogTitle>
+            <DialogTitle>Welcome to Motio2edit Free</DialogTitle>
             <DialogDescription className="space-y-2 pt-1 text-left">
-              <span className="block">Ads are included with the Free plan.</span>
+              <span className="block">
+                You can create with free credits. The Free plan includes a Motio2edit watermark on
+                exports.
+              </span>
               <span className="block text-muted-foreground">
-                Upgrade anytime for more credits, no ads, and advanced features.
+                Plans are always available from your Profile when you need more credits or clean
+                exports.
               </span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={dismissIntro}>
-              Continue free
-            </Button>
-            <Button asChild onClick={dismissIntro}>
+            <Button onClick={dismissIntro}>Continue free</Button>
+            <Button asChild variant="outline" onClick={dismissIntro}>
               <Link to="/pricing">View plans</Link>
             </Button>
           </DialogFooter>
@@ -104,8 +108,8 @@ export function FreePlanNotices() {
             <DialogTitle>You're out of credits</DialogTitle>
             <DialogDescription className="space-y-2 pt-1 text-left">
               <span className="block">
-                Top up your plan to continue generating. Get more credits, no ads, and advanced
-                features.
+                Add credits or choose a plan to keep generating. This notice only appears once per
+                session.
               </span>
             </DialogDescription>
           </DialogHeader>
@@ -114,7 +118,7 @@ export function FreePlanNotices() {
               Not now
             </Button>
             <Button asChild onClick={dismissOut}>
-              <Link to="/pricing">Upgrade / View plans</Link>
+              <Link to="/pricing">View plans</Link>
             </Button>
           </DialogFooter>
         </DialogContent>
