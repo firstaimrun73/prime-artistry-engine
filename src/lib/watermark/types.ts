@@ -24,6 +24,8 @@ export type FinalizeMediaInput = {
   email?: string | null | undefined;
   isAdmin?: boolean;
   keepWatermark?: boolean;
+  /** Client session after opt-in Sponsored unlock (free users only). */
+  sponsorUnlock?: boolean;
   userId: string;
   alreadyFinalizedHint?: boolean;
   /**
