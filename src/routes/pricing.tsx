@@ -15,16 +15,13 @@ import {
   PRICING_SHOW_PLAN_IDS,
   PRICING_POPULAR_PLAN_ID,
   annualSavingsMonths,
-  estimatedGenerations,
-  ESTIMATE_ASSUMPTIONS,
-  CREDIT_ADDON_PACKS,
   type DisplayCurrency,
   type PlanId,
   type PurchasablePlanId,
   type BillingInterval,
 } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
-import { Check, Coins, Crown, Image as ImageIcon, Video, Music } from "lucide-react";
+import { Check, Crown, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/pricing")({
@@ -86,7 +83,7 @@ function PricingPage() {
             {t("pricing.title") || "Pricing"}
           </h1>
           <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-            Simple plans. Pay once. Credits every month. Shared across Image, Video, and Music.
+            Simple plans. Monthly or yearly. Unlock Standard, Premium, or Ultra AI modes across Image, Video, and Music.
           </p>
         </div>
 
@@ -154,7 +151,6 @@ function PricingPage() {
             const monthlyUsd = DISPLAY_PRICES[plan.id]?.USD ?? 0;
             const annualUsd =
               DISPLAY_ANNUAL_PRICES_USD[plan.id as PurchasablePlanId] ?? monthlyUsd * 10;
-            const estimates = estimatedGenerations(plan.credits);
 
             let priceLabel: string;
             let periodLabel: string;
@@ -180,13 +176,20 @@ function PricingPage() {
               periodLabel = "per month";
             }
 
-            const maxVideo =
-              plan.id === "starter" ? "Up to 5s · SD" : plan.id === "pro" ? "Up to 10s · HD" : "Up to 15s";
+            const modeLabel =
+              plan.modelTier === "ultra"
+                ? "Ultra AI mode"
+                : plan.modelTier === "premium"
+                  ? "Premium mode"
+                  : "Standard mode";
 
             return (
               <div
                 key={plan.id}
-                className="relative flex w-full flex-col rounded-2xl border border-border bg-card p-5"
+                className={cn(
+                  "relative flex w-full flex-col rounded-2xl border bg-card p-5",
+                  isRecommended ? "border-primary/50 shadow-md shadow-primary/10" : "border-border",
+                )}
               >
                 {isRecommended && (
                   <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
@@ -207,57 +210,20 @@ function PricingPage() {
                   </p>
                 ) : null}
 
-                <div className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-primary">
-                  <Coins className="h-4 w-4 shrink-0" />
-                  {plan.credits.toLocaleString()} credits / month
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {modeLabel}
                 </div>
 
-                <div className="mt-3 space-y-1.5 rounded-xl border border-border/70 bg-muted/30 p-3 text-xs">
-                  <p className="font-semibold text-foreground">Estimated if used only for…</p>
-                  <div className="flex items-start gap-2 text-muted-foreground">
-                    <ImageIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span>
-                      <span className="font-semibold text-foreground">
-                        ~{estimates.images.toLocaleString()} images
-                      </span>{" "}
-                      · standard ({ESTIMATE_ASSUMPTIONS.imageCredits} cr each)
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2 text-muted-foreground">
-                    <Video className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span>
-                      <span className="font-semibold text-foreground">
-                        ~{estimates.videos.toLocaleString()} videos
-                      </span>{" "}
-                      · {ESTIMATE_ASSUMPTIONS.videoLabel.split("(")[0].trim()} ({ESTIMATE_ASSUMPTIONS.videoCredits}{" "}
-                      cr)
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2 text-muted-foreground">
-                    <Music className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span>
-                      <span className="font-semibold text-foreground">
-                        ~{estimates.music.toLocaleString()} instrumentals
-                      </span>{" "}
-                      · {ESTIMATE_ASSUMPTIONS.musicCredits} cr each
-                    </span>
-                  </div>
-                  <p className="pt-0.5 text-[10px] leading-snug text-muted-foreground">
-                    One shared credit balance — not all maxima at once. {maxVideo}.
-                  </p>
-                </div>
-
-                <p className="mt-3 text-xs leading-snug text-muted-foreground">{plan.positioning}</p>
+                <p className="mt-3 text-sm leading-snug text-muted-foreground">{plan.positioning}</p>
 
                 <ul className="mt-4 flex-1 space-y-2">
-                  {plan.features
-                    .filter((f) => !f.toLowerCase().includes("credits / month"))
-                    .map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <span className="min-w-0">{f}</span>
-                      </li>
-                    ))}
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="min-w-0">{f}</span>
+                    </li>
+                  ))}
                 </ul>
 
                 {isCurrent ? (
@@ -266,7 +232,7 @@ function PricingPage() {
                   </Button>
                 ) : (
                   <Button className="mt-6 w-full font-semibold" onClick={() => selectPlan(plan.id)}>
-                    Buy Now
+                    Get {plan.name}
                   </Button>
                 )}
               </div>
@@ -274,58 +240,31 @@ function PricingPage() {
           })}
         </div>
 
-        <div className="mx-auto mt-10 max-w-3xl">
-          <h2 className="text-center text-lg font-bold">Need more credits?</h2>
-          <p className="mt-1 text-center text-xs text-muted-foreground">
-            One-time packs. Credits never expire. Works with any plan.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {CREDIT_ADDON_PACKS.map((pack) => {
-              const videos = Math.floor(pack.credits / ESTIMATE_ASSUMPTIONS.videoCredits);
-              return (
-                <Link
-                  key={pack.id}
-                  to="/profile/top-up"
-                  className="rounded-2xl border border-border bg-card p-3 text-center transition hover:border-primary/40"
-                >
-                  <p className="text-sm font-bold">{pack.name}</p>
-                  <p className="mt-1 text-lg font-extrabold text-primary">${pack.priceUsd}</p>
-                  <p className="mt-1 text-xs font-semibold">{pack.credits.toLocaleString()} credits</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">~{videos}× 5s videos</p>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
         <div className="mx-auto mt-10 max-w-2xl space-y-3 rounded-2xl border border-border bg-muted/30 px-4 py-4 text-sm sm:px-6">
           <p className="font-semibold text-foreground">Good to know</p>
           <ul className="space-y-2 text-xs text-muted-foreground sm:text-sm">
             <li>
-              <span className="font-medium text-foreground">Estimates:</span> image {ESTIMATE_ASSUMPTIONS.imageCredits}{" "}
-              cr · video from {ESTIMATE_ASSUMPTIONS.videoCredits} cr (5s Standard) · instrumental{" "}
-              {ESTIMATE_ASSUMPTIONS.musicCredits} cr. Longer or Premium video costs more.
+              <span className="font-medium text-foreground">Modes:</span> Starter unlocks Standard tools;
+              Pro unlocks Premium models + Maluto AI; Ultra AI unlocks the highest models and full
+              toolkit.
             </li>
             <li>
               <span className="font-medium text-foreground">Yearly plans:</span> pay once for the year;
-              credits still arrive each month (not all at once).
+              access renews monthly (not all at once).
             </li>
             <li>
               <span className="font-medium text-foreground">Payments:</span> one-time checkout with manual
-              renewal — no silent auto-renew subscription conversion.
+              renewal — no silent auto-renew.
             </li>
             <li>
-              <span className="font-medium text-foreground">Credits:</span> valid up to one year from
-              grant or purchase date.
+              <span className="font-medium text-foreground">Need more later?</span> After you subscribe,
+              custom top-ups are available under{" "}
+              <Link to="/profile/top-up" className="font-medium text-primary hover:underline">
+                Profile → Credits
+              </Link>
+              .
             </li>
           </ul>
-          <p className="text-xs text-muted-foreground">
-            Top-ups also live under{" "}
-            <Link to="/profile/top-up" className="font-medium text-primary hover:underline">
-              Profile → Credits
-            </Link>
-            .
-          </p>
         </div>
       </div>
       <FooterAd placement="pricing" />
