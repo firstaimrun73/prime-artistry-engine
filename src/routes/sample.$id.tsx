@@ -1,7 +1,6 @@
 /**
  * Canonical media detail page — image / video / music.
- * Download & Share live here (not on homepage cards).
- * Resolves both primary catalog and account-2 discovery samples.
+ * Download & Share live here. Sponsored link on photo/video info pages.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +22,7 @@ import track3 from "@/assets/samples/track-3.mp3.asset.json";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { DirectLinkAd } from "@/components/ads";
 
 function categoryLabel(s: R2Sample | null, isMusic: boolean): string {
   if (isMusic) return "Music";
@@ -280,6 +280,10 @@ function SampleDetailPage() {
               {description}
             </p>
           </div>
+
+          {/* Sponsored offer on photo & video sample info */}
+          {kind !== "music" ? <DirectLinkAd placement="sample-detail" variant="compact" /> : null}
+
           {sample ? (
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
