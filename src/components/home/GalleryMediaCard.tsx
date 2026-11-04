@@ -1,12 +1,10 @@
 /**
- * Media-first discovery card.
- * Sizes to the sample's declared aspect ratio, then corrects from real media
- * metadata so 9:16 content is never forced into a 16:9 frame (and vice versa).
- * Fills grid cell width on desktop — no artificial max-width clamp.
+ * Discovery card — media only inside frame (no title/description overlay).
+ * Touch/click plays video in place; Info opens detail. Premium/Standard badge top-left clear of controls.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Crown, Heart, Info, Play } from "lucide-react";
+import { Crown, Heart, Info, Play, Pause } from "lucide-react";
 import type { R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
 
@@ -38,17 +36,10 @@ export function stripCardStyle(sample: R2Sample): React.CSSProperties {
   };
 }
 
-function categoryBadge(sample: R2Sample): string | null {
-  if (sample.homepageCategory === "try-now") return "TRY NOW";
-  if (sample.homepageCategory === "trend") return "TREND";
-  if (sample.studio === "circle") return "TRY NOW";
-  return null;
-}
-
 function QualityTierBadge({ tier }: { tier: string }) {
   if (tier === "Premium") {
     return (
-      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/95 px-2 py-0.5 text-[9px] font-bold text-black shadow-sm backdrop-blur-sm">
+      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/95 px-2 py-0.5 text-[9px] font-bold text-black shadow-sm">
         <Crown className="h-2.5 w-2.5 fill-current" aria-hidden />
         Premium
       </span>
@@ -56,15 +47,13 @@ function QualityTierBadge({ tier }: { tier: string }) {
   }
   if (tier === "Ultra AI") {
     return (
-      <span className="relative inline-flex overflow-hidden rounded-full px-2 py-0.5 text-[9px] font-bold text-white shadow-sm">
-        <span className="absolute inset-0 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-400" />
-        <span className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-        <span className="relative tracking-wide">Ultra AI</span>
+      <span className="rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-400 px-2 py-0.5 text-[9px] font-bold text-white shadow-sm">
+        Ultra AI
       </span>
     );
   }
   return (
-    <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-semibold text-zinc-800 backdrop-blur-sm">
+    <span className="rounded-full bg-white/90 px-2 py-0.5 text-[9px] font-semibold text-zinc-800 shadow-sm">
       Standard
     </span>
   );
@@ -95,19 +84,32 @@ export function GalleryMediaCard({
   const catalogRatio = parseRatio(sample.aspectRatio);
   const [liveRatio, setLiveRatio] = useState<number | null>(null);
   const ratio = liveRatio ?? catalogRatio;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
 
   const applyNaturalSize = useCallback((w: number, h: number) => {
     if (w > 0 && h > 0) setLiveRatio(w / h);
   }, []);
 
-  const openMedia = useCallback(
+  const togglePlay = useCallback(
     (e?: React.MouseEvent | React.TouchEvent) => {
       e?.stopPropagation();
       e?.preventDefault();
-      onOpenViewer?.(sample);
+      if (!isVideo || !videoRef.current) {
+        onOpenViewer?.(sample);
+        return;
+      }
+      const v = videoRef.current;
+      if (v.paused) {
+        void v.play().then(() => setPlaying(true)).catch(() => {});
+      } else {
+        v.pause();
+        setPlaying(false);
+      }
     },
-    [onOpenViewer, sample],
+    [isVideo, onOpenViewer, sample],
   );
+
   const onLike = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
       e.preventDefault();
@@ -119,133 +121,117 @@ export function GalleryMediaCard({
 
   if (failed) return null;
 
-  const badge = categoryBadge(sample);
   const tier = sample.qualityTier ?? null;
   const title = sample.title?.trim() || null;
-  const description = sample.description?.trim() || null;
 
   return (
-    <article
-      className={cn(
-        "group relative w-full overflow-hidden rounded-[14px]",
-        "bg-muted/15 ring-1 ring-border/25 transition duration-300",
-        "hover:ring-primary/30 hover:shadow-md",
-        className,
-      )}
-      style={stripMode ? { ...stripCardStyle(sample), aspectRatio: String(ratio) } : { aspectRatio: String(ratio) }}
-      data-sample-id={sample.id}
-      data-aspect={sample.aspectRatio}
-      data-ratio={sample.aspectRatio}
-    >
-      <div className="gallery-card__controls absolute right-2 top-2 z-20 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onLike}
-          className={cn(
-            "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
-            liked
-              ? "border-primary/40 bg-primary/25 text-primary"
-              : "border-white/20 bg-black/40 text-white",
-          )}
-          aria-label={liked ? "Unlike" : "Like"}
-        >
-          <Heart className={cn("h-3.5 w-3.5", liked && "fill-current")} />
-        </button>
-        <Link
-          to="/sample/$id"
-          params={{ id: sample.id }}
-          onClick={(e) => e.stopPropagation()}
-          className="grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md"
-          aria-label="View details"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </Link>
-      </div>
-
-      <button
-        type="button"
-        className="relative block h-full w-full overflow-hidden rounded-[14px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        onClick={openMedia}
-        aria-label={isVideo ? `Open video ${title || ""}` : `View ${title || "media"}`}
-      >
-        {isVideo ? (
-          <video
-            src={sample.url}
-            muted
-            playsInline
-            loop
-            preload="metadata"
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-            onLoadedMetadata={(e) => {
-              const v = e.currentTarget;
-              applyNaturalSize(v.videoWidth, v.videoHeight);
-            }}
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <img
-            src={sample.url}
-            alt={title || "Sample"}
-            className="absolute inset-0 h-full w-full object-cover"
-            loading="lazy"
-            decoding="async"
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              applyNaturalSize(img.naturalWidth, img.naturalHeight);
-            }}
-            onError={() => setFailed(true)}
-          />
+    <div className={cn("flex w-full flex-col", className)}>
+      <article
+        className={cn(
+          "group relative w-full overflow-hidden rounded-[14px]",
+          "bg-muted/20 ring-1 ring-border/30 transition duration-300",
+          "hover:ring-primary/35 hover:shadow-md",
         )}
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
-
-        <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-col gap-1">
-          {badge ? (
-            <span className="rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white/95 backdrop-blur-sm">
-              {badge}
-            </span>
-          ) : null}
-          {tier ? <QualityTierBadge tier={tier} /> : null}
+        style={stripMode ? { ...stripCardStyle(sample), aspectRatio: String(ratio) } : { aspectRatio: String(ratio) }}
+        data-sample-id={sample.id}
+        data-aspect={sample.aspectRatio}
+      >
+        {/* Controls top-right — clear of left badge */}
+        <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onLike}
+            className={cn(
+              "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
+              liked
+                ? "border-primary/40 bg-primary/25 text-primary"
+                : "border-white/20 bg-black/40 text-white",
+            )}
+            aria-label={liked ? "Unlike" : "Like"}
+          >
+            <Heart className={cn("h-3.5 w-3.5", liked && "fill-current")} />
+          </button>
+          <Link
+            to="/sample/$id"
+            params={{ id: sample.id }}
+            onClick={(e) => e.stopPropagation()}
+            className="grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md"
+            aria-label="Open details"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </Link>
         </div>
 
-        {isVideo ? (
-          <span
-            className={cn(
-              "absolute bottom-2.5 left-2.5 grid place-items-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur-md",
-              large ? "h-9 w-9" : "h-8 w-8",
-            )}
-            aria-hidden
-          >
-            <Play className={cn(large ? "h-4 w-4" : "h-3.5 w-3.5", "fill-current")} />
-          </span>
-        ) : null}
-
-        {(title || description) ? (
-          <div
-            className={cn(
-              "pointer-events-none absolute inset-x-0 bottom-0 px-2.5 pb-2.5",
-              isVideo && "pl-12",
-            )}
-          >
-            {title ? (
-              <p
-                className={cn(
-                  "line-clamp-2 font-semibold leading-snug text-white drop-shadow-sm",
-                  large ? "text-[13px]" : "text-[12px]",
-                )}
-              >
-                {title}
-              </p>
-            ) : null}
-            {description ? (
-              <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/80 drop-shadow-sm">
-                {description}
-              </p>
-            ) : null}
+        {/* Quality badge top-left — not under buttons */}
+        {tier ? (
+          <div className="pointer-events-none absolute left-2 top-2 z-10">
+            <QualityTierBadge tier={tier} />
           </div>
         ) : null}
-      </button>
-    </article>
+
+        <button
+          type="button"
+          className="relative block h-full w-full overflow-hidden rounded-[14px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          onClick={togglePlay}
+          aria-label={isVideo ? (playing ? "Pause" : "Play") : `View ${title || "media"}`}
+        >
+          {isVideo ? (
+            <video
+              ref={videoRef}
+              src={sample.url}
+              muted
+              playsInline
+              loop
+              preload="metadata"
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                applyNaturalSize(v.videoWidth, v.videoHeight);
+              }}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onError={() => setFailed(true)}
+            />
+          ) : (
+            <img
+              src={sample.url}
+              alt={title || "Sample"}
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="lazy"
+              decoding="async"
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                applyNaturalSize(img.naturalWidth, img.naturalHeight);
+              }}
+              onError={() => setFailed(true)}
+            />
+          )}
+
+          {isVideo ? (
+            <span
+              className={cn(
+                "absolute bottom-2.5 left-2.5 grid place-items-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur-md",
+                large ? "h-9 w-9" : "h-8 w-8",
+              )}
+              aria-hidden
+            >
+              {playing ? (
+                <Pause className={cn(large ? "h-4 w-4" : "h-3.5 w-3.5", "fill-current")} />
+              ) : (
+                <Play className={cn(large ? "h-4 w-4" : "h-3.5 w-3.5", "fill-current")} />
+              )}
+            </span>
+          ) : null}
+        </button>
+      </article>
+
+      {/* Title OUTSIDE the media frame */}
+      {title ? (
+        <p className="mt-1.5 line-clamp-2 px-0.5 text-[12px] font-semibold leading-snug text-foreground">
+          {title}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
