@@ -11,6 +11,7 @@ import {
   Crop,
   Eraser,
   ArrowRight,
+  Wand2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -59,7 +60,7 @@ const HOME_SLOGANS = [
     cta: "Explore Maluto AI →",
   },
   {
-    title: "Circle 2edit · Cropmix · Remove BG",
+    title: "Circle 2edit · Cropmix · Remove BG · AI+",
     sub: "Powerful creative tools. Simple workflows.",
     to: "/studio" as const,
     cta: "Explore AI Tools →",
@@ -71,7 +72,7 @@ const HOME_SLOGANS = [
     cta: "Open Image Studio →",
   },
   {
-    title: "More credits. More modes. No watermark.",
+    title: "More modes. No watermark.",
     sub: "Upgrade anytime — cancel anytime",
     to: "/pricing" as const,
     cta: "View plans →",
@@ -84,9 +85,9 @@ const QUICK_CREATE = [
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
   { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
   { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
+  { to: "/studio/image/filters" as const, label: "AI+ Filters", icon: Filter },
   { to: "/studio/video" as const, label: "Video", icon: Video },
   { to: "/studio/music" as const, label: "Music", icon: Music },
-  { to: "/studio/image/filters" as const, label: "Filters", icon: Filter },
 ] as const;
 
 export function SignedInHomeBody() {
@@ -119,14 +120,18 @@ export function SignedInHomeBody() {
             What will you create?
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
-            Image · Video · Music · Restore · Edit
+            Image · Video · Music · Maluto AI · AI+ Filters · Circle 2edit
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {showPlanBadge ? <CrownBadge plan={planId} showLabel size="md" /> : null}
-          <span className="rounded-full border border-border/80 bg-card/80 px-2.5 py-0.5 text-xs font-medium text-foreground shadow-sm backdrop-blur">
+          <Link
+            to="/profile"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/80 px-2.5 py-0.5 text-xs font-medium text-foreground shadow-sm backdrop-blur transition hover:border-primary/40"
+          >
+            <Wand2 className="h-3 w-3 text-primary" />
             {credits} credits
-          </span>
+          </Link>
           {isAdmin ? (
             <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
               Admin
@@ -197,7 +202,7 @@ export function SignedInHomeBody() {
 
       <section className="mt-6">
         <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          Quick create
+          Quick create · AI+ tools
         </h2>
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
           {QUICK_CREATE.map((q) => {
