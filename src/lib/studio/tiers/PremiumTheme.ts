@@ -5,7 +5,7 @@
 export const PREMIUM_TIER = "premium";
 
 export const premiumShellClass =
-  "studio-tier-premium studio-exp-ultra bg-[#0B1220] text-slate-100 [color-scheme:dark]";
+  "studio-tier-premium studio-exp-ultra mx-auto w-full max-w-3xl bg-[#0B1220] px-3 text-slate-100 [color-scheme:dark] sm:max-w-4xl sm:px-5 lg:max-w-5xl lg:px-6 xl:max-w-6xl";
 
 export const premiumCardClass =
   "rounded-2xl border border-[#D4AF37]/28 bg-[#121C30] text-slate-100 shadow-[0_20px_40px_-18px_rgba(11,18,32,0.85)] backdrop-blur-md";

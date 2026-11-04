@@ -3,11 +3,11 @@
  * Client session only — server still applies watermark unless keepWatermark=false
  * is allowed via matching client preference after unlock.
  *
- * Duration: 15 minutes after user confirms they completed a Sponsored offer.
+ * Duration: 20 minutes after user confirms they completed a Sponsored offer.
  */
 
 const KEY = "motio2edit-sponsor-unlock-until";
-export const SPONSOR_UNLOCK_MINUTES = 15;
+export const SPONSOR_UNLOCK_MINUTES = 20;
 
 export function getSponsorUnlockUntil(): number {
   try {
