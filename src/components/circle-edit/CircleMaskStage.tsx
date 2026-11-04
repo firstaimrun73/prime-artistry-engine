@@ -440,7 +440,7 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
       style={aspect ? { ["--circle-img-aspect" as string]: String(aspect) } : undefined}
     >
       {!disabled ? (
-      <div className="pointer-events-none absolute bottom-3 right-3 z-30 flex flex-col gap-1.5" data-circle-zoom-controls="true" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+      <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex flex-col gap-1.5" data-circle-zoom-controls="true" style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         <button type="button" aria-label="Zoom in" onClick={() => { setUserZoom((z) => { const n = Math.min(3, Math.round((z + 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">+</button>
         <button type="button" aria-label="Zoom out" onClick={() => { setUserZoom((z) => { const n = Math.max(0.5, Math.round((z - 0.25) * 100) / 100); userZoomRef.current = n; return n; }); }} className="pointer-events-auto grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-black/55 text-sm font-bold text-white shadow-md backdrop-blur-md">−</button>
       </div>
@@ -522,8 +522,8 @@ export const CircleMaskStage = forwardRef<CircleMaskStageHandle, Props>(function
                 cy={dispFlash.y}
                 r={18}
                 fill="url(#c2e-ab-flash)"
-                filter="url(#c2e-ab-glow)"
                 opacity={0.85}
+                filter="url(#c2e-ab-glow)"
               />
             ) : null}
           </svg>
