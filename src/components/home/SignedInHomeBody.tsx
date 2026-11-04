@@ -11,8 +11,6 @@ import {
   Crop,
   Eraser,
   ArrowRight,
-  Layers,
-  Scan,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -78,17 +76,16 @@ const HOME_SLOGANS = [
   },
 ] as const;
 
+/** Older representation: orange diagrammatic icons in rounded squares — no AI Studio tile */
 const AI_TOOLS = [
-  { to: "/studio/image/auto-edit" as const, label: "Maluto", icon: Sparkles, color: "bg-orange-500/15 text-orange-600" },
-  { to: "/editor" as const, label: "Image", icon: ImageIcon, color: "bg-violet-500/15 text-violet-600" },
-  { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle, color: "bg-sky-500/15 text-sky-600" },
-  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser, color: "bg-emerald-500/15 text-emerald-600" },
-  { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop, color: "bg-amber-500/15 text-amber-600" },
-  { to: "/studio/image/filters" as const, label: "AI+ Filters", icon: Filter, color: "bg-fuchsia-500/15 text-fuchsia-600" },
-  { to: "/studio" as const, label: "AI Studio", icon: Layers, color: "bg-primary/15 text-primary" },
-  { to: "/studio/video" as const, label: "Video", icon: Video, color: "bg-rose-500/15 text-rose-600" },
-  { to: "/studio/music" as const, label: "Music", icon: Music, color: "bg-cyan-500/15 text-cyan-600" },
-  { to: "/studio/image/circle-remove" as const, label: "Scan", icon: Scan, color: "bg-indigo-500/15 text-indigo-600" },
+  { to: "/studio/image/auto-edit" as const, label: "Maluto AI", icon: Sparkles },
+  { to: "/editor" as const, label: "Image", icon: ImageIcon },
+  { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
+  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
+  { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
+  { to: "/studio/image/filters" as const, label: "AI+ Filters", icon: Filter },
+  { to: "/studio/video" as const, label: "Video", icon: Video },
+  { to: "/studio/music" as const, label: "Music", icon: Music },
 ] as const;
 
 export function SignedInHomeBody() {
@@ -113,9 +110,9 @@ export function SignedInHomeBody() {
     <main className="mx-auto w-full max-w-6xl px-4 pt-4 pb-24 sm:pt-6 md:max-w-7xl md:pb-12">
       <MalutoHomeHint />
 
-      {/* Circular AI+ tools — horizontal on mobile, centered wrap on desktop */}
+      {/* Horizontal AI tools — orange rounded squares (previous style) */}
       <section className="mb-5" aria-label="AI tools">
-        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] md:flex-wrap md:justify-center md:overflow-visible [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] md:flex-wrap md:gap-3 md:overflow-visible [&::-webkit-scrollbar]:hidden">
           {AI_TOOLS.map((q) => {
             const Icon = q.icon;
             const locked =
@@ -128,7 +125,6 @@ export function SignedInHomeBody() {
                     | "/pricing"
                     | "/studio/cropmix"
                     | "/editor"
-                    | "/studio"
                     | "/studio/video"
                     | "/studio/music"
                     | "/studio/image/circle-remove"
@@ -141,17 +137,15 @@ export function SignedInHomeBody() {
                   : !locked && q.label === "Remove BG"
                     ? { search: { from: "home" as const } }
                     : {})}
-                className="flex w-[68px] shrink-0 flex-col items-center gap-1.5 text-center md:w-[76px]"
+                className="flex h-auto w-[72px] min-w-[72px] max-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-1.5 py-3 text-center transition-colors hover:border-primary/40 hover:bg-muted/40 md:w-[88px] md:min-w-[88px] md:max-w-[88px]"
               >
-                <span
-                  className={`relative flex h-14 w-14 items-center justify-center rounded-full border border-border/60 shadow-sm transition hover:scale-105 hover:border-primary/40 ${q.color}`}
-                >
+                <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
                   {locked && (
-                    <Lock className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full bg-background p-0.5 text-muted-foreground" />
+                    <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
                   )}
                 </span>
-                <span className="w-full truncate text-[10px] font-semibold leading-tight text-foreground">
+                <span className="w-full truncate text-[11px] font-semibold leading-tight">
                   {q.label}
                 </span>
               </Link>
