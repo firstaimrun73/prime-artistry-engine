@@ -1,9 +1,14 @@
 /**
  * ACE · Maluto AI — Ace of Diamonds restoration card.
  * Whole card links to /studio/image/auto-edit.
- * No discontinued Lite/$4.99 marketing.
+ * Real before/after restoration demo from assets.motio2edit.com.
  */
 import { Link } from "@tanstack/react-router";
+
+const MALUTO_BEFORE =
+  "https://assets.motio2edit.com/temp/IMG-20261105-WA0001.jpg";
+const MALUTO_AFTER =
+  "https://assets.motio2edit.com/temp/IMG-20261105-WA0000.jpg";
 
 export function AutoEditHomeCard() {
   return (
@@ -41,31 +46,29 @@ export function AutoEditHomeCard() {
           </div>
         </div>
 
-        {/* Right: before / after restoration demo (CSS illustration — no external stock) */}
+        {/* Right: real before / after restoration demo */}
         <div className="relative flex items-center justify-center border-t border-zinc-100 bg-gradient-to-br from-zinc-50 via-white to-rose-50 p-4 sm:border-l sm:border-t-0">
           <div className="relative flex w-full max-w-[280px] items-stretch gap-2">
             <div className="relative flex-1 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 shadow-sm">
-              <div
-                className="aspect-[3/4] w-full bg-[linear-gradient(160deg,#c4b5a0_0%,#a89f91_40%,#8a8278_100%)] opacity-90"
-                aria-hidden
-              />
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_30%,rgba(255,255,255,0.15),transparent_55%)]" />
-              <div className="pointer-events-none absolute inset-0 opacity-40 mix-blend-multiply"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 3px)",
-                }}
+              <img
+                src={MALUTO_BEFORE}
+                alt="Damaged photo before Maluto AI restoration"
+                className="aspect-[3/4] w-full object-cover object-center"
+                loading="lazy"
+                decoding="async"
               />
               <span className="absolute bottom-2 left-2 rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
                 Before
               </span>
             </div>
             <div className="relative flex-1 overflow-hidden rounded-xl border border-red-200/60 bg-white shadow-md">
-              <div
-                className="aspect-[3/4] w-full bg-[linear-gradient(160deg,#f5e6d3_0%,#e8d4b8_35%,#d4b896_100%)]"
-                aria-hidden
+              <img
+                src={MALUTO_AFTER}
+                alt="Photo restored with Maluto AI"
+                className="aspect-[3/4] w-full object-cover object-center"
+                loading="lazy"
+                decoding="async"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_40%_25%,rgba(255,255,255,0.45),transparent_50%)]" />
               <span
                 className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-red-500/80 to-transparent"
                 style={{ animation: "ace-scan 2.8s ease-in-out infinite" }}
