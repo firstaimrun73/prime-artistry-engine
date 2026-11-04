@@ -172,7 +172,7 @@ function StudioTile({
         <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{subtitle}</p>
       </div>
       {locked ? (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-centercenter gap-1 rounded-2xl bg-background/55 backdrop-blur-[2px] sm:rounded-3xl">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-2xl bg-background/55 backdrop-blur-[2px] sm:rounded-3xl">
           <Lock className="h-5 w-5 text-primary" />
           <span className="text-[11px] font-semibold text-muted-foreground">Requires paid plan</span>
         </div>
