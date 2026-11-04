@@ -148,7 +148,7 @@ export const PLANS: Plan[] = [
       "1,000 credits / month",
       "Standard image generation & editing",
       "AI+ Filters and Styles",
-      "Circle 2edit — Remove & Add",
+      "Circle 2edit — Remove",
       "Video Studio — SD, up to 5 seconds",
       "Music Studio — all 6 modes",
       "Watermark-free exports",
