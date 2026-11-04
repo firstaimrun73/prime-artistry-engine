@@ -68,6 +68,7 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
     email: input.email,
     isAdmin: input.isAdmin,
     keepWatermark: input.keepWatermark,
+    sponsorUnlock: input.sponsorUnlock === true,
     sourceUrl: input.sourceUrl,
     alreadyFinalizedHint: input.alreadyFinalizedHint,
   });
@@ -143,7 +144,6 @@ export async function finalizeMediaAsset(input: FinalizeMediaInput): Promise<Fin
 
   const contentType = input.mediaKind === "video" ? "video/mp4" : "image/jpeg";
   if (stamped.length > MAX_DATA_URL_BYTES) {
-    // Refuse permanent storage; fall back to source URL for oversized payloads.
     console.warn(
       "[WATERMARK_FINALIZE] stamped media too large for ephemeral data URL (%s bytes); returning source",
       stamped.length,
