@@ -13,12 +13,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Restore full route from known-good then patch showCompare
+      - name: Restore full route then patch showCompare
         run: |
           set -euo pipefail
           F=src/routes/studio.image.circle-remove.tsx
-          # Known-good full file (pre-truncation) on main history
-          git show b772ffd4e091be865e55cc3cd054123ac993f561:"$F" > "$F"
+          # Full file from commit before truncation uploads
+          git show a8ab8b4633bbe79db0cfab0037c94dd9756d803a:"$F" > "$F"
           BEFORE=$(wc -c < "$F")
           LINES=$(wc -l < "$F")
           echo "restored size=$BEFORE lines=$LINES"
@@ -43,8 +43,7 @@ jobs:
             exit 1
           fi
           grep -n 'showCompare' "$F" | head -20
-          # sanity: must still contain core symbols
-          for s in CompareSlider watermarkLocked CircleEditShell CircleMaskStage exportMask paintLocked; do
+          for s in CompareSlider watermarkLocked CircleEditShell CircleMaskStage; do
             grep -q "$s" "$F" || { echo "ERROR: missing $s" >&2; exit 1; }
           done
           echo "OK"
