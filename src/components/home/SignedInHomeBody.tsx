@@ -11,14 +11,13 @@ import {
   Crop,
   Eraser,
   ArrowRight,
-  Wand2,
+  Layers,
+  Scan,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import type { PlanId } from "@/lib/plans";
-import { canAccessMusic, canAccessVideo, isPaidPlan } from "@/lib/policy";
-import { Button } from "@/components/ui/button";
-import { CrownBadge } from "@/components/CrownBadge";
+import { canAccessMusic, canAccessVideo } from "@/lib/policy";
 import { CircleSampleGallery } from "@/components/circle-edit/CircleSampleGallery";
 import { RemoveBgHomeCard } from "@/components/remove-bg/RemoveBgHomeCard";
 import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery";
@@ -54,6 +53,12 @@ const HOME_CREATE_TAGS: { label: string; prompt: string; className: string }[] =
 
 const HOME_SLOGANS = [
   {
+    title: "Edit your photos with licensed-quality AI",
+    sub: "Restore, enhance, and restyle — ready for social and print",
+    to: "/editor" as const,
+    cta: "Start editing →",
+  },
+  {
     title: "Bring Your Old Photos Back to Life",
     sub: "Restore faded memories with Maluto AI",
     to: "/studio/image/auto-edit" as const,
@@ -71,23 +76,20 @@ const HOME_SLOGANS = [
     to: "/editor" as const,
     cta: "Open Image Studio →",
   },
-  {
-    title: "More modes. No watermark.",
-    sub: "Upgrade anytime — cancel anytime",
-    to: "/pricing" as const,
-    cta: "View plans →",
-  },
 ] as const;
 
-const QUICK_CREATE = [
-  { to: "/studio/image/auto-edit" as const, label: "Maluto AI", icon: Sparkles },
-  { to: "/editor" as const, label: "Image", icon: ImageIcon },
-  { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
-  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
-  { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop },
-  { to: "/studio/image/filters" as const, label: "AI+ Filters", icon: Filter },
-  { to: "/studio/video" as const, label: "Video", icon: Video },
-  { to: "/studio/music" as const, label: "Music", icon: Music },
+/** Circular AI+ tool icons — horizontal scroll row */
+const AI_TOOLS = [
+  { to: "/studio/image/auto-edit" as const, label: "Maluto", icon: Sparkles, color: "bg-orange-500/15 text-orange-600" },
+  { to: "/editor" as const, label: "Image", icon: ImageIcon, color: "bg-violet-500/15 text-violet-600" },
+  { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle, color: "bg-sky-500/15 text-sky-600" },
+  { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser, color: "bg-emerald-500/15 text-emerald-600" },
+  { to: "/studio/cropmix" as const, label: "Cropmix", icon: Crop, color: "bg-amber-500/15 text-amber-600" },
+  { to: "/studio/image/filters" as const, label: "AI+ Filters", icon: Filter, color: "bg-fuchsia-500/15 text-fuchsia-600" },
+  { to: "/studio" as const, label: "AI Studio", icon: Layers, color: "bg-primary/15 text-primary" },
+  { to: "/studio/video" as const, label: "Video", icon: Video, color: "bg-rose-500/15 text-rose-600" },
+  { to: "/studio/music" as const, label: "Music", icon: Music, color: "bg-cyan-500/15 text-cyan-600" },
+  { to: "/studio/image/circle-remove" as const, label: "Scan", icon: Scan, color: "bg-indigo-500/15 text-indigo-600" },
 ] as const;
 
 export function SignedInHomeBody() {
@@ -95,8 +97,6 @@ export function SignedInHomeBody() {
   const isAdmin = isAdminEmail(profile?.email);
 
   const planId = (profile?.plan ?? "free") as PlanId;
-  const credits = (profile?.credits ?? 0).toLocaleString();
-  const showPlanBadge = isAdmin || isPaidPlan(planId);
   const videoOk = canAccessVideo({ plan: planId, email: profile?.email, isAdmin });
   const musicOk = canAccessMusic({ plan: planId, email: profile?.email, isAdmin });
 
@@ -114,36 +114,55 @@ export function SignedInHomeBody() {
     <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:max-w-7xl md:pb-12">
       <MalutoHomeHint />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl md:text-3xl">
-            What will you create?
-          </h1>
-          <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
-            Image · Video · Music · Maluto AI · AI+ Filters · Circle 2edit
-          </p>
+      {/* Circular AI+ tools — horizontal, no credits / profile / "What will you create" */}
+      <section className="mb-4" aria-label="AI tools">
+        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {AI_TOOLS.map((q) => {
+            const Icon = q.icon;
+            const locked =
+              (q.label === "Video" && !videoOk) || (q.label === "Music" && !musicOk);
+            return (
+              <Link
+                key={q.label}
+                to={
+                  (locked ? "/pricing" : q.to) as
+                    | "/pricing"
+                    | "/studio/cropmix"
+                    | "/editor"
+                    | "/studio"
+                    | "/studio/video"
+                    | "/studio/music"
+                    | "/studio/image/circle-remove"
+                    | "/studio/image/remove-bg"
+                    | "/studio/image/auto-edit"
+                    | "/studio/image/filters"
+                }
+                {...(!locked && q.label === "Circle"
+                  ? { search: { mode: "remove" as const, from: "home" as const } }
+                  : !locked && q.label === "Remove BG"
+                    ? { search: { from: "home" as const } }
+                    : {})}
+                className="flex w-[68px] shrink-0 flex-col items-center gap-1.5 text-center"
+              >
+                <span
+                  className={`relative flex h-14 w-14 items-center justify-center rounded-full border border-border/60 shadow-sm transition hover:scale-105 hover:border-primary/40 ${q.color}`}
+                >
+                  <Icon className="h-5 w-5" />
+                  {locked && (
+                    <Lock className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full bg-background p-0.5 text-muted-foreground" />
+                  )}
+                </span>
+                <span className="w-full truncate text-[10px] font-semibold leading-tight text-foreground">
+                  {q.label}
+                </span>
+              </Link>
+            );
+          })}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {showPlanBadge ? <CrownBadge plan={planId} showLabel size="md" /> : null}
-          <Link
-            to="/profile"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/80 px-2.5 py-0.5 text-xs font-medium text-foreground shadow-sm backdrop-blur transition hover:border-primary/40"
-          >
-            <Wand2 className="h-3 w-3 text-primary" />
-            {credits} credits
-          </Link>
-          {isAdmin ? (
-            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
-              Admin
-            </span>
-          ) : null}
-          <Button asChild variant="outline" size="sm" className="rounded-full">
-            <Link to="/profile">Profile</Link>
-          </Button>
-        </div>
-      </div>
+      </section>
 
-      <section className="mt-4" aria-label="Promo">
+      {/* Colourful carousel — licensed photo / edit messaging */}
+      <section className="mt-1" aria-label="Promo">
         <Link
           to={slogan.to}
           className="group relative block overflow-hidden rounded-2xl border border-white/10 shadow-lg shadow-orange-500/10"
@@ -199,50 +218,6 @@ export function SignedInHomeBody() {
       </div>
 
       <DirectLinkAd placement="home-upper" variant="compact" />
-
-      <section className="mt-6">
-        <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          Quick create · AI+ tools
-        </h2>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
-          {QUICK_CREATE.map((q) => {
-            const Icon = q.icon;
-            const locked =
-              (q.label === "Video" && !videoOk) || (q.label === "Music" && !musicOk);
-            return (
-              <Link
-                key={q.label}
-                to={
-                  (locked ? "/pricing" : q.to) as
-                    | "/pricing"
-                    | "/studio/cropmix"
-                    | "/editor"
-                    | "/studio/video"
-                    | "/studio/music"
-                    | "/studio/image/circle-remove"
-                    | "/studio/image/remove-bg"
-                    | "/studio/image/auto-edit"
-                    | "/studio/image/filters"
-                }
-                {...(!locked && q.label === "Circle"
-                  ? { search: { mode: "remove" as const, from: "home" as const } }
-                  : !locked && q.label === "Remove BG"
-                    ? { search: { from: "home" as const } }
-                    : {})}
-                className="flex h-auto w-[72px] min-w-[72px] max-w-[72px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-border bg-card px-1.5 py-3.5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40 md:w-[88px] md:min-w-[88px] md:max-w-[88px]"
-              >
-                <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Icon className="h-5 w-5" />
-                  {locked && (
-                    <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                </span>
-                <span className="w-full truncate text-[11px] font-semibold leading-tight">{q.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
 
       <section className="mt-5" aria-label="Creative tags">
         <p className="mb-2 text-xs font-medium text-muted-foreground">
