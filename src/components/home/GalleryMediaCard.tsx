@@ -2,7 +2,7 @@
  * Media-first discovery card.
  * Sizes to the sample's declared aspect ratio, then corrects from real media
  * metadata so 9:16 content is never forced into a 16:9 frame (and vice versa).
- * Badge top-left · like/info top-right.
+ * Fills grid cell width on desktop — no artificial max-width clamp.
  */
 import { useCallback, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -130,8 +130,6 @@ export function GalleryMediaCard({
         "group relative w-full overflow-hidden rounded-[14px]",
         "bg-muted/15 ring-1 ring-border/25 transition duration-300",
         "hover:ring-primary/30 hover:shadow-md",
-        // Portrait cards stay narrower in multi-column grids
-        ratio < 0.85 && "max-w-[280px] justify-self-center",
         className,
       )}
       style={stripMode ? { ...stripCardStyle(sample), aspectRatio: String(ratio) } : { aspectRatio: String(ratio) }}
