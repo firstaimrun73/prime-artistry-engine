@@ -11,41 +11,52 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Patch showCompare defaults
+        with:
+          fetch-depth: 0
+      - name: Restore full route from known-good then patch showCompare
         run: |
           set -euo pipefail
           F=src/routes/studio.image.circle-remove.tsx
-          test -f "$F"
+          # Known-good full file (pre-truncation) on main history
+          git show b772ffd4e091be865e55cc3cd054123ac993f561:"$F" > "$F"
           BEFORE=$(wc -c < "$F")
-          # Only change showCompare-related true → false
+          LINES=$(wc -l < "$F")
+          echo "restored size=$BEFORE lines=$LINES"
+          if [ "$BEFORE" -lt 30000 ]; then
+            echo "ERROR: restored file still too small" >&2
+            exit 1
+          fi
           sed -i 's/const \[showCompare, setShowCompare\] = useState(true);/const [showCompare, setShowCompare] = useState(false);/' "$F"
           sed -i 's/setShowCompare(true);/setShowCompare(false);/g' "$F"
           AFTER=$(wc -c < "$F")
-          echo "size before=$BEFORE after=$AFTER"
-          # Must not shrink by more than a few bytes (true→false is same length)
-          if [ "$AFTER" -lt $((BEFORE - 5)) ]; then
-            echo "ERROR: file shrank unexpectedly" >&2
+          echo "after patch size=$AFTER"
+          if [ "$AFTER" -lt 30000 ]; then
+            echo "ERROR: file too small after patch" >&2
+            exit 1
+          fi
+          if grep -q 'setShowCompare(true)' "$F"; then
+            echo "ERROR: setShowCompare(true) remains" >&2
+            exit 1
+          fi
+          if ! grep -q 'const \[showCompare, setShowCompare\] = useState(false);' "$F"; then
+            echo "ERROR: default false missing" >&2
             exit 1
           fi
           grep -n 'showCompare' "$F" | head -20
-          # Ensure no setShowCompare(true) remains
-          if grep -q 'setShowCompare(true)' "$F"; then
-            echo "ERROR: setShowCompare(true) still present" >&2
-            exit 1
-          fi
-          if ! grep -q 'useState(false)' "$F"; then
-            echo "ERROR: useState(false) missing" >&2
-            exit 1
-          fi
-      - name: Commit and push if changed
+          # sanity: must still contain core symbols
+          for s in CompareSlider watermarkLocked CircleEditShell CircleMaskStage exportMask paintLocked; do
+            grep -q "$s" "$F" || { echo "ERROR: missing $s" >&2; exit 1; }
+          done
+          echo "OK"
+      - name: Commit and push
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/routes/studio.image.circle-remove.tsx
           if git diff --cached --quiet; then
-            echo "No changes to commit"
+            echo "No changes"
             exit 0
           fi
-          git commit -m "fix(circle2edit): showCompare false — auto-display generated result (CI surgical patch)"
+          git commit -m "fix(circle2edit): restore full route + showCompare false (auto result display)"
           git push origin HEAD:main
