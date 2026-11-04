@@ -1,8 +1,7 @@
 /**
  * Canonical media detail page — image / video / music.
  * Download & Share live here (not on homepage cards).
- * Exactly ONE Back control. No provider/model names. No original prompts.
- * Pass 10: redundant Info toggle removed — description always visible.
+ * Resolves both primary catalog and account-2 discovery samples.
  */
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -16,7 +15,8 @@ import {
   VolumeX,
   Maximize,
 } from "lucide-react";
-import { getR2SampleById, type R2Sample } from "@/lib/r2-catalog";
+import type { R2Sample } from "@/lib/r2-catalog";
+import { resolveSampleById } from "@/lib/resolve-sample";
 import track1 from "@/assets/samples/track-1.mp3.asset.json";
 import track2 from "@/assets/samples/track-2.mp3.asset.json";
 import track3 from "@/assets/samples/track-3.mp3.asset.json";
@@ -54,7 +54,7 @@ function mediaKind(s: R2Sample | null, id: string): "image" | "video" | "music" 
 
 export const Route = createFileRoute("/sample/$id")({
   head: ({ params }) => {
-    const s = getR2SampleById(params.id);
+    const s = resolveSampleById(params.id);
     const title = s ? `${s.title} — Motio2edit` : "Sample — Motio2edit";
     const description = s?.description ?? "Motio2edit media sample.";
     return {
@@ -74,7 +74,7 @@ function SampleDetailPage() {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const sample = getR2SampleById(id);
+  const sample = resolveSampleById(id);
   const kind = mediaKind(sample, id);
 
   const goBack = () => {
@@ -286,10 +286,10 @@ function SampleDetailPage() {
                 Details
               </h2>
               <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
-                {sample.quality ? (
+                {sample.qualityTier || sample.quality ? (
                   <div>
                     <dt className="text-muted-foreground">Quality</dt>
-                    <dd className="font-semibold">{sample.quality}</dd>
+                    <dd className="font-semibold">{sample.qualityTier || sample.quality}</dd>
                   </div>
                 ) : null}
                 <div>
