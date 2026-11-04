@@ -9,6 +9,7 @@ import { HomeHero } from "@/components/home/HomeHero";
 import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
 import { WatchDemoSection } from "@/components/home/WatchDemoSection";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
+import { PreLoginSampleStrip } from "@/components/home/PreLoginSampleStrip";
 import { useAuth } from "@/lib/auth";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/components/FeedbackCard";
@@ -55,23 +56,18 @@ function SignedInHome() {
 
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
- * Hard rule: do NOT render private creation/sample galleries here.
- * Editor buttons are display-only CTAs → always /auth (never open an editor logged-out).
+ * Pre-login samples: R2 account-2 pre-login* images only.
+ * Editor buttons are CTAs → /auth.
  */
 function SignedOutHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <HomeHero />
+      <PreLoginSampleStrip />
       <BeforeAfterShowcase />
-
       <WatchDemoSection variant="prominent" />
-
-      <div className="mx-auto w-full max-w-6xl px-4">
-      </div>
-
       <ArchitectureFlowSection />
-
       <StudioShowcase />
       <TrustSection />
       <HomeTestimonials />
