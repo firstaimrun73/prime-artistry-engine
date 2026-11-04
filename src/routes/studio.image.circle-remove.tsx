@@ -534,7 +534,7 @@ function Circle2editPage() {
             toast.message(next ? "Circle watermark on" : "Circle watermark off");
           }}
           className={cn(
-            "relative ml-auto h-5 w-9 rounded-full transition-colors",
+            "relative ml-auto h-5 w-9 shrink-0 rounded-full transition-colors",
             keepCircleWatermark ? "bg-[#7B6FE0]" : isDark ? "bg-white/20" : "bg-black/20",
           )}
         >
@@ -549,6 +549,173 @@ function Circle2editPage() {
     </div>
   );
 
+  const controls = preview ? (
+    <div className="flex flex-col gap-2">
+      {mode === "remove" || addConfirmed ? (
+        <CircleDrawToolbar
+          tool={drawTool}
+          onTool={setDrawTool}
+          brushSize={brushSize}
+          onBrushSize={setBrushSize}
+          hideCircle={mode === "add"}
+          onUndo={() => maskStageRef.current?.undo()}
+          onRedo={() => maskStageRef.current?.redo()}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          inkColor={inkColor}
+          onInkColor={setInkColor}
+        />
+      ) : null}
+      {mode === "add" && !addLocked ? (
+        <>
+          {!addConfirmed ? (
+            <button
+              type="button"
+              onClick={() => setAddDrawerOpen(true)}
+              className="rounded-xl border border-[#7B6FE0]/40 bg-[rgba(123,111,224,0.08)] px-3 py-1.5 text-[12px] font-semibold text-[#7B6FE0] backdrop-blur-md"
+            >
+              Browse objects
+            </button>
+          ) : selectedAsset ? (
+            <div
+              className={cn(
+                "flex w-full max-w-full items-center gap-1.5 overflow-hidden rounded-xl border px-2.5 py-1.5",
+                isDark ? "border-[#7B6FE0]/35 bg-[rgba(123,111,224,0.10)]" : "border-[#7B6FE0]/25 bg-[rgba(123,111,224,0.06)]",
+              )}
+              data-circle-place-chip="true"
+            >
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[rgba(123,111,224,0.2)]">
+                <AssetIcon asset={selectedAsset} size={16} isDark={isDark} selected />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-[#7B6FE0]">
+                Ready to place {selectedAsset.name}
+              </span>
+              <button
+                type="button"
+                aria-label="Change object"
+                onClick={() => {
+                  setAddConfirmed(false);
+                  setConfirmOpen(true);
+                }}
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium text-[#7B6FE0]/90"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                aria-label="Clear selected object"
+                onClick={() => {
+                  setAddObjectId(null);
+                  setFactorSelection({});
+                  setAddConfirmed(false);
+                  setConfirmOpen(false);
+                  maskStageRef.current?.clear();
+                  setHasMask(false);
+                }}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[13px] font-bold text-[#7B6FE0]/80"
+              >
+                X
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {mode === "add" && addLocked ? (
+        <p className="text-center text-[11px] font-medium text-[#7B6FE0]">Add requires a paid plan</p>
+      ) : null}
+    </div>
+  ) : null;
+
+  const addSheet =
+    mode === "add" ? (
+      <CircleAddAssetRail
+        isDark={isDark}
+        open={addDrawerOpen}
+        onClose={() => setAddDrawerOpen(false)}
+        addObjectId={addObjectId}
+        onSelect={(id) => {
+          setAddObjectId(id);
+          setFactorSelection({});
+          setAddConfirmed(false);
+          setAddDrawerOpen(false);
+          setConfirmOpen(true);
+        }}
+        disabled={addLocked || !preview}
+      />
+    ) : null;
+
+  const confirmSheet =
+    mode === "add" && confirmOpen && selectedAsset && !addConfirmed ? (
+      <>
+        <button
+          type="button"
+          aria-label="Close confirmation"
+          className="fixed inset-0 z-[45] bg-black/25"
+          onClick={() => {
+            setConfirmOpen(false);
+            setAddObjectId(null);
+            setFactorSelection({});
+          }}
+        />
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-[50] max-h-[50vh] overflow-y-auto border-t px-3 py-3 shadow-[0_-8px_28px_rgba(0,0,0,0.18)] backdrop-blur-xl sm:px-4",
+            isDark ? "border-white/10 bg-[#181A22]/96" : "border-black/6 bg-white/96",
+          )}
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          role="dialog"
+          aria-label="Confirm object to add"
+        >
+          <div className="mb-2 flex items-center gap-2">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[rgba(123,111,224,0.18)]">
+              <AssetIcon asset={selectedAsset} size={28} isDark={isDark} selected />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-[#7B6FE0]">{selectedAsset.name}</p>
+              <p className={cn("text-[11px]", isDark ? "text-[#9AA0B0]" : "text-[#5C6170]")}>
+                Choose options, then confirm to paint placement
+              </p>
+            </div>
+          </div>
+          <CircleFactorPicker
+            asset={selectedAsset}
+            selection={factorSelection}
+            onChange={setFactorSelection}
+            isDark={isDark}
+          />
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmOpen(false);
+                setAddObjectId(null);
+                setFactorSelection({});
+                setAddConfirmed(false);
+              }}
+              className={cn(
+                "flex-1 rounded-xl border px-3 py-2.5 text-[13px] font-semibold",
+                isDark ? "border-white/12 text-[#9AA0B0]" : "border-black/10 text-[#5C6170]",
+              )}
+            >
+              ✕ Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAddConfirmed(true);
+                setConfirmOpen(false);
+                setDrawTool("brush");
+                toast.message(`Ready to place ${selectedAsset.name}`);
+              }}
+              className="flex-1 rounded-xl bg-[#7B6FE0] px-3 py-2.5 text-[13px] font-semibold text-white"
+            >
+              ✓ Confirm
+            </button>
+          </div>
+        </div>
+      </>
+    ) : null;
+
   const showOutputWatermark = watermarkLocked || keepCircleWatermark;
 
   if (phase === "result" && output && preview) {
@@ -562,6 +729,7 @@ function Circle2editPage() {
         controls={null}
         actionBar={
           <div className="flex w-full flex-col items-center gap-2 px-3 py-2.5">
+            {/* Output screen only — watermark toggle never on edit screens */}
             {watermarkToggle}
             <div className="flex w-full flex-wrap items-center justify-center gap-2">
               <button
@@ -586,6 +754,7 @@ function Circle2editPage() {
                 onClick={() =>
                   void (async () => {
                     try {
+                      // Static still-frame watermark in export (no animation baked in)
                       const res = await secureDl({
                         data: {
                           imageUrl: output,
@@ -607,22 +776,40 @@ function Circle2editPage() {
           </div>
         }
       >
-        <div className="relative flex h-full min-h-0 flex-1 flex-col items-center justify-center overflow-hidden p-3">
-          <div className="relative flex h-full min-h-0 w-full max-w-full flex-1 items-center justify-center">
+        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center p-3">
+          <div className="relative inline-flex max-h-full max-w-full items-center justify-center">
             {showCompare ? (
-              <CompareSlider before={preview} after={output} className="h-full w-full" />
+              <CompareSlider before={preview} after={output} />
             ) : (
               <img src={output} alt="Result" className="max-h-full max-w-full rounded-xl object-contain" />
             )}
+            {/* On-screen only: rotating circle mark while watermark is shown (export stays static) */}
             {showOutputWatermark ? (
               <div
                 className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-lg bg-black/70 px-2 py-1.5 backdrop-blur-sm"
                 aria-hidden
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" className="shrink-0 animate-spin" style={{ animationDuration: "2.8s", color: CIRCLE_WATERMARK_PURPLE }}>
-                  <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="2.25" strokeDasharray="12 40" strokeLinecap="round" />
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  className="shrink-0 animate-spin"
+                  style={{ animationDuration: "2.8s", color: CIRCLE_WATERMARK_PURPLE }}
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="8.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.25"
+                    strokeDasharray="12 40"
+                    strokeLinecap="round"
+                  />
                 </svg>
-                <span className="text-[9px] font-semibold leading-tight text-white">Motio2edit</span>
+                <span className="text-[9px] font-semibold leading-tight text-white">
+                  Motio2edit
+                </span>
               </div>
             ) : null}
           </div>
@@ -639,23 +826,59 @@ function Circle2editPage() {
       addLocked={addLocked}
       generating={phase === "generating"}
       onBack={goBack}
-      controls={null}
+      controls={controls}
+      sheet={
+        <>
+          {addSheet}
+          {confirmSheet}
+        </>
+      }
       onGenerate={() => void runWithMask(mode)}
       generateDisabled={!canGenerate}
       generateLabel={mode === "remove" ? "Remove Object" : "Add Object"}
+      generateHint={
+        !preview
+          ? "Upload an image first"
+          : mode === "add" && !addObjectId
+            ? "Choose an object first"
+            : mode === "add" && !addConfirmed
+              ? "Confirm object first"
+              : !hasMask
+                ? "Select an area first"
+                : undefined
+      }
+      actionBar={
+        <CircleEditActionBar
+          hasImage={!!preview}
+          hasMask={hasMask}
+          onClearMask={onClearMask}
+          onClearImage={resetPhoto}
+          statusText={statusForMode()}
+          infoSlot={
+  <div className="flex items-center gap-1">
+    <CircleCreditsInfo title="Credits" lines={creditInfoLines} />
+  </div>
+}
+        />
+      }
     >
-      <div className="relative flex h-full min-h-0 flex-1 flex-col">
-        {phase === "generating" && (
-          <CircleEditGenOverlay
-            progressPct={progressPct}
-            activeStage={stageIdx}
-            stageCount={GEN_STAGES.length}
-            caption={GEN_STAGES[stageIdx] ?? "Working…"}
-          />
-        )}
-        {preview ? (
-          <div className="relative flex min-h-0 flex-1">
-            <CircleMaskStage
+      {phase === "generating" && (
+        <CircleEditGenOverlay
+          progressPct={progressPct}
+          activeStage={stageIdx}
+          stageCount={GEN_STAGES.length}
+          caption={GEN_STAGES[stageIdx]}
+        />
+      )}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        {!preview ? (
+          <div className="flex flex-1 items-center justify-center px-[18px] py-3">
+            <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
+          </div>
+        ) : (
+          <div className="relative flex min-h-0 flex-1 flex-col">
+  <CircleMaskStage
               ref={maskStageRef}
               imageUrl={preview}
               tool={drawToolToMaskTool(drawTool)}
@@ -666,10 +889,7 @@ function Circle2editPage() {
               onHistoryChange={onHistoryChange}
             />
           </div>
-        ) : (
-          <CircleEditUploadZone onPick={() => fileRef.current?.click()} />
         )}
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
       </div>
     </CircleEditShell>
   );
