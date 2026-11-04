@@ -1,20 +1,30 @@
 /**
- * Lightweight media viewer — image/video + full description.
- * Card stays clean; 100+ word description lives here.
+ * Media viewer — current sample + reel-style next items on scroll.
+ * Sponsored direct-link ad under description.
  */
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import type { R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
+import { DirectLinkAd } from "@/components/ads";
 
 type Props = {
   sample: R2Sample | null;
   open: boolean;
   onClose: () => void;
+  playlist?: R2Sample[];
+  onSelect?: (s: R2Sample) => void;
 };
 
-export function DiscoveryMediaViewer({ sample, open, onClose }: Props) {
+export function DiscoveryMediaViewer({
+  sample,
+  open,
+  onClose,
+  playlist = [],
+  onSelect,
+}: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -40,11 +50,20 @@ export function DiscoveryMediaViewer({ sample, open, onClose }: Props) {
     }
   }, [open]);
 
+  useEffect(() => {
+    // reset scroll when sample changes
+    listRef.current?.scrollTo({ top: 0 });
+  }, [sample?.id]);
+
   if (!open || !sample) return null;
 
   const isVideo = sample.format === "MP4" || sample.url.endsWith(".mp4");
   const mediaLabel = isVideo ? "Video" : "Image";
   const tier = sample.qualityTier ?? null;
+
+  const idx = playlist.findIndex((s) => s.id === sample.id);
+  const nextItems =
+    idx >= 0 ? playlist.slice(idx + 1, idx + 8) : playlist.filter((s) => s.id !== sample.id).slice(0, 8);
 
   return (
     <div
@@ -64,13 +83,15 @@ export function DiscoveryMediaViewer({ sample, open, onClose }: Props) {
       </button>
 
       <div
-        className="relative flex max-h-[min(94dvh,960px)] w-full max-w-[min(96vw,720px)] flex-col overflow-hidden rounded-t-2xl bg-zinc-950 sm:rounded-2xl"
+        ref={listRef}
+        className="relative flex max-h-[min(94dvh,960px)] w-full max-w-[min(96vw,720px)] flex-col overflow-y-auto overscroll-contain rounded-t-2xl bg-zinc-950 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex max-h-[55dvh] items-center justify-center bg-black px-2 pt-10 sm:max-h-[60dvh]">
+        <div className="flex max-h-[55dvh] shrink-0 items-center justify-center bg-black px-2 pt-10 sm:max-h-[60dvh]">
           {isVideo ? (
             <video
               ref={videoRef}
+              key={sample.id}
               src={sample.url}
               controls
               playsInline
@@ -80,6 +101,7 @@ export function DiscoveryMediaViewer({ sample, open, onClose }: Props) {
             />
           ) : (
             <img
+              key={sample.id}
               src={sample.url}
               alt={sample.title || "Sample"}
               className="max-h-[50dvh] max-w-full object-contain sm:max-h-[56dvh]"
@@ -87,7 +109,7 @@ export function DiscoveryMediaViewer({ sample, open, onClose }: Props) {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+        <div className="shrink-0 px-4 py-4 sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px] font-semibold text-white">
               {mediaLabel}
@@ -107,7 +129,60 @@ export function DiscoveryMediaViewer({ sample, open, onClose }: Props) {
           {sample.description ? (
             <p className={cn("mt-3 text-sm leading-relaxed text-white/75")}>{sample.description}</p>
           ) : null}
+
+          <div className="mt-4">
+            <DirectLinkAd placement="sample-detail" variant="compact" />
+          </div>
         </div>
+
+        {/* Reel-style next AI samples — scroll down */}
+        {nextItems.length > 0 ? (
+          <div className="border-t border-white/10 px-4 py-4 sm:px-5">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-white/50">
+              More AI samples
+            </p>
+            <div className="space-y-6">
+              {nextItems.map((s) => {
+                const vid = s.format === "MP4" || s.url.endsWith(".mp4");
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="block w-full text-left"
+                    onClick={() => onSelect?.(s)}
+                  >
+                    <div className="overflow-hidden rounded-xl bg-black">
+                      {vid ? (
+                        <video
+                          src={s.url}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="mx-auto max-h-[42dvh] w-full object-contain"
+                        />
+                      ) : (
+                        <img
+                          src={s.url}
+                          alt={s.title || "Sample"}
+                          className="mx-auto max-h-[42dvh] w-full object-contain"
+                          loading="lazy"
+                        />
+                      )}
+                    </div>
+                    {s.title ? (
+                      <p className="mt-2 text-sm font-semibold text-white">{s.title}</p>
+                    ) : null}
+                    {s.qualityTier ? (
+                      <span className="mt-1 inline-block text-[10px] font-semibold text-amber-400">
+                        {s.qualityTier}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
