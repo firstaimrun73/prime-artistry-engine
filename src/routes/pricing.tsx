@@ -21,6 +21,7 @@ import {
   type PurchasablePlanId,
   type BillingInterval,
 } from "@/lib/plans";
+import { isPaidPlan } from "@/lib/policy";
 import { useI18n } from "@/lib/i18n";
 import { Check, Crown, Sparkles, Image as ImageIcon, Video, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ function PricingPage() {
   const navigate = useNavigate();
   const [currency, setCurrency] = useState<DisplayCurrency>("USD");
   const [interval, setInterval] = useState<BillingInterval>("month");
+  const paid = isPaidPlan(profile?.plan);
 
   useEffect(() => {
     try {
@@ -217,7 +219,6 @@ function PricingPage() {
                   {modeLabel}
                 </div>
 
-                {/* Generation counts — numbers only, no per-credit cost text */}
                 <div className="mt-3 space-y-1.5 rounded-xl border border-border/70 bg-muted/30 p-3 text-xs">
                   <p className="font-semibold text-foreground">About this plan</p>
                   <div className="flex items-center gap-2 text-muted-foreground">
@@ -293,12 +294,18 @@ function PricingPage() {
               premium music (Song · SFX · Video music), video up to 15s.
             </li>
             <li>
-              <span className="font-medium text-foreground">Need more later?</span> After you
-              subscribe, custom top-ups are under{" "}
-              <Link to="/profile/top-up" className="font-medium text-primary hover:underline">
-                Profile → Credits
-              </Link>
-              .
+              <span className="font-medium text-foreground">Need more later?</span>{" "}
+              {paid ? (
+                <>
+                  Custom top-ups are under{" "}
+                  <Link to="/profile/top-up" className="font-medium text-primary hover:underline">
+                    Profile → Credits
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>Subscribe to a plan first — then custom top-ups unlock under Profile.</>
+              )}
             </li>
           </ul>
         </div>
