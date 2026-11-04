@@ -1,7 +1,6 @@
 /**
- * Motion2AI Creation — Discover (post-login).
- * Primary catalog + R2 account-2 videos/images (Video-1 included).
- * Aspect ratios drive layout buckets; qualityTier shows Standard/Premium badges.
+ * Discover feed — compact Shorts-style 9:16 pairs, with 1:1 / 3:4 stills
+ * interleaved between video rows for a balanced, attractive grid.
  */
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -27,18 +26,23 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "video", label: "Videos" },
 ];
 
-type RatioBucket = "wide" | "vertical" | "square" | "landscape";
-
 function normalizeAr(ar: string): string {
   return (ar || "1:1").replace(/\s/g, "");
 }
 
-function bucketFor(sample: R2Sample): RatioBucket {
+function isVertical(sample: R2Sample): boolean {
   const ar = normalizeAr(sample.aspectRatio);
-  if (ar === "16:9" || ar === "21:9") return "wide";
-  if (ar === "9:16" || ar === "3:4") return "vertical";
-  if (ar === "4:3" || ar === "3:2") return "landscape";
-  return "square";
+  return ar === "9:16" || ar === "3:4" || ar === "2:3" || ar === "4:5";
+}
+
+function isSquareLike(sample: R2Sample): boolean {
+  const ar = normalizeAr(sample.aspectRatio);
+  return ar === "1:1" || ar === "4:3" || ar === "3:2";
+}
+
+function isWide(sample: R2Sample): boolean {
+  const ar = normalizeAr(sample.aspectRatio);
+  return ar === "16:9" || ar === "21:9";
 }
 
 function dedupe(samples: R2Sample[]): R2Sample[] {
@@ -53,58 +57,48 @@ function dedupe(samples: R2Sample[]): R2Sample[] {
   return out.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-7">
-      <h3 className="mb-2.5 text-[13px] font-bold tracking-tight text-foreground md:text-sm">
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
+/** Build mixed rows: [short, short] then a photo row, etc. */
+function buildMixedRows(pool: R2Sample[]): { type: "shorts" | "photos" | "wide"; items: R2Sample[] }[] {
+  const shorts = pool.filter((s) => normalizeAr(s.aspectRatio) === "9:16");
+  const photos = pool.filter((s) => isSquareLike(s) || normalizeAr(s.aspectRatio) === "3:4");
+  const wide = pool.filter((s) => isWide(s));
+  const used = new Set<string>();
+  const rows: { type: "shorts" | "photos" | "wide"; items: R2Sample[] }[] = [];
 
-function CardList({
-  samples,
-  likedIds,
-  onToggleLike,
-  onOpenViewer,
-  layout,
-}: {
-  samples: R2Sample[];
-  likedIds: Set<string>;
-  onToggleLike: (s: R2Sample) => void;
-  onOpenViewer: (s: R2Sample) => void;
-  layout: "full" | "pair" | "desktopWide";
-}) {
-  if (samples.length === 0) return null;
-  return (
-    <div
-      className={cn(
-        layout === "full" && "grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4",
-        layout === "pair" && "grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-4",
-        layout === "desktopWide" &&
-          "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 md:gap-4",
-      )}
-    >
-      {samples.map((s) => (
-        <GalleryMediaCard
-          key={s.id}
-          sample={s}
-          liked={likedIds.has(s.id)}
-          onToggleLike={onToggleLike}
-          onOpenViewer={onOpenViewer}
-          size="large"
-        />
-      ))}
-    </div>
-  );
+  let si = 0;
+  let pi = 0;
+  let wi = 0;
+
+  while (si < shorts.length || pi < photos.length || wi < wide.length) {
+    // Two compact 9:16 side by side (YouTube Shorts style)
+    if (si < shorts.length) {
+      const pair: R2Sample[] = [];
+      for (let n = 0; n < 2 && si < shorts.length; n++, si++) {
+        pair.push(shorts[si]);
+        used.add(shorts[si].id);
+      }
+      if (pair.length) rows.push({ type: "shorts", items: pair });
+    }
+
+    // Photo strip (1:1 / 3:4) between video rows
+    if (pi < photos.length) {
+      const batch: R2Sample[] = [];
+      for (let n = 0; n < 3 && pi < photos.length; n++, pi++) {
+        batch.push(photos[pi]);
+        used.add(photos[pi].id);
+      }
+      if (batch.length) rows.push({ type: "photos", items: batch });
+    }
+
+    // Occasional wide
+    if (wi < wide.length) {
+      rows.push({ type: "wide", items: [wide[wi]] });
+      used.add(wide[wi].id);
+      wi++;
+    }
+  }
+
+  return rows;
 }
 
 export function VisualDiscoveryGallery() {
@@ -129,21 +123,7 @@ export function VisualDiscoveryGallery() {
   );
 
   const pool = tab === "img" ? images : tab === "video" ? videosOnly : all;
-
-  const { wide, vertical, square, landscape } = useMemo(() => {
-    const wide: R2Sample[] = [];
-    const vertical: R2Sample[] = [];
-    const square: R2Sample[] = [];
-    const landscape: R2Sample[] = [];
-    for (const s of pool) {
-      const b = bucketFor(s);
-      if (b === "wide") wide.push(s);
-      else if (b === "vertical") vertical.push(s);
-      else if (b === "landscape") landscape.push(s);
-      else square.push(s);
-    }
-    return { wide, vertical, square, landscape };
-  }, [pool]);
+  const rows = useMemo(() => buildMixedRows(pool), [pool]);
 
   const onToggleLike = useCallback(
     (sample: R2Sample) => {
@@ -185,55 +165,66 @@ export function VisualDiscoveryGallery() {
           Nothing here yet. Tap + to create.
         </p>
       ) : (
-        <>
-          {wide.length > 0 && (
-            <Section title="Wide 16:9">
-              <CardList
-                samples={wide}
-                likedIds={likedIds}
-                onToggleLike={onToggleLike}
-                onOpenViewer={setViewer}
-                layout="desktopWide"
-              />
-            </Section>
-          )}
-
-          {vertical.length > 0 && (
-            <Section title="Vertical 9:16">
-              <CardList
-                samples={vertical}
-                likedIds={likedIds}
-                onToggleLike={onToggleLike}
-                onOpenViewer={setViewer}
-                layout="pair"
-              />
-            </Section>
-          )}
-
-          {square.length > 0 && (
-            <Section title="Square 1:1">
-              <CardList
-                samples={square}
-                likedIds={likedIds}
-                onToggleLike={onToggleLike}
-                onOpenViewer={setViewer}
-                layout="pair"
-              />
-            </Section>
-          )}
-
-          {landscape.length > 0 && (
-            <Section title="Landscape">
-              <CardList
-                samples={landscape}
-                likedIds={likedIds}
-                onToggleLike={onToggleLike}
-                onOpenViewer={setViewer}
-                layout="full"
-              />
-            </Section>
-          )}
-        </>
+        <div className="space-y-4">
+          {rows.map((row, idx) => {
+            if (row.type === "shorts") {
+              return (
+                <div
+                  key={`shorts-${idx}`}
+                  className="mx-auto grid max-w-[340px] grid-cols-2 gap-2 sm:max-w-[400px] sm:gap-2.5"
+                >
+                  {row.items.map((s) => (
+                    <GalleryMediaCard
+                      key={s.id}
+                      sample={s}
+                      liked={likedIds.has(s.id)}
+                      onToggleLike={onToggleLike}
+                      onOpenViewer={setViewer}
+                      size="default"
+                      className="!max-w-none"
+                    />
+                  ))}
+                </div>
+              );
+            }
+            if (row.type === "photos") {
+              return (
+                <div
+                  key={`photos-${idx}`}
+                  className="grid grid-cols-3 gap-2 sm:gap-2.5"
+                >
+                  {row.items.map((s) => (
+                    <GalleryMediaCard
+                      key={s.id}
+                      sample={s}
+                      liked={likedIds.has(s.id)}
+                      onToggleLike={onToggleLike}
+                      onOpenViewer={setViewer}
+                      size="default"
+                      className="!max-w-none"
+                    />
+                  ))}
+                </div>
+              );
+            }
+            // wide
+            return (
+              <div key={`wide-${idx}`} className="mx-auto max-w-md sm:max-w-lg">
+                {row.items.map((s) => (
+                  <GalleryMediaCard
+                    key={s.id}
+                    sample={s}
+                    liked={likedIds.has(s.id)}
+                    onToggleLike={onToggleLike}
+                    onOpenViewer={setViewer}
+                    size="default"
+                    className="!max-w-none"
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       <DiscoveryMediaViewer sample={viewer} open={!!viewer} onClose={() => setViewer(null)} />
