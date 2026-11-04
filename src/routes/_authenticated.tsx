@@ -20,7 +20,6 @@ function hideChromeHeader(pathname: string): boolean {
   if (pathname.startsWith("/studio/music")) return true;
   if (pathname.startsWith("/studio/image/auto-edit")) return true;
   if (pathname.startsWith("/studio/image/circle-remove")) return true;
-  // Chatbot: dedicated workspace, simple Home nav only
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return true;
   return false;
 }
@@ -71,11 +70,8 @@ function AuthenticatedLayout() {
     >
       {!noHeader && <AppSidebar />}
       <div className={noHeader ? "w-full min-w-0" : "w-full min-w-0 md:pl-56"}>
-        {!noHeader && (
-          <div className="md:hidden">
-            <Header />
-          </div>
-        )}
+        {/* Top Header on all breakpoints so Home + remaining nav always visible on desktop */}
+        {!noHeader && <Header />}
         {main}
         <AdminPopupModal />
         <FirstGenerationFeedback />
