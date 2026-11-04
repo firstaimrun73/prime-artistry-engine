@@ -10,6 +10,7 @@ import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { Lock } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
 import { useI18n } from "@/lib/i18n";
+import { AVATAR_PRESETS } from "@/lib/avatar-presets";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,10 +42,9 @@ type NotifPrefs = {
 const DEFAULT_NOTIFS: NotifPrefs = { product: true, marketing: false, security: true };
 
 function SettingsPage() {
-  const { profile, user, refreshProfile, signOut } = useAuth();
+  const { profile, user, refreshProfile } = useAuth();
   const { theme, setTheme } = useTheme();
   const { t } = useI18n();
-  const navigate = useNavigate();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [saving, setSaving] = useState(false);
   const [pw, setPw] = useState("");
@@ -107,7 +107,6 @@ function SettingsPage() {
     }
     setPwSaving(true);
     try {
-      // Re-authenticate with current password before allowing a change.
       const { error: reauthErr } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPw,
@@ -124,21 +123,28 @@ function SettingsPage() {
       setPw("");
       setCurrentPw("");
       toast.success("Password changed.");
-      // Security email: prefer Supabase Auth hook (password_changed).
-      // Avoid dual-send from client.
     } finally {
       setPwSaving(false);
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate({ to: "/auth", search: { redirect: undefined } });
+  const pickPreset = async (id: string) => {
+    setAvatarBusy(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ avatar_url: `preset:${id}` })
+      .eq("id", profile.id);
+    setAvatarBusy(false);
+    if (error) toast.error(error.message);
+    else {
+      await refreshProfile();
+      toast.success("Avatar updated.");
+    }
   };
 
   const uploadAvatar = async (file: File) => {
     if (!canUploadAvatar) {
-      toast.error("Upgrade to Starter or above to change your profile picture.");
+      toast.error("Upgrade to Starter or above to upload a custom photo.");
       return;
     }
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
@@ -158,28 +164,12 @@ function SettingsPage() {
       toast.error(upErr.message);
       return;
     }
-    if (profile.avatar_url) {
-      await supabase.storage.from("avatars").remove([profile.avatar_url]);
-    }
     const { error } = await supabase.from("profiles").update({ avatar_url: path }).eq("id", profile.id);
     setAvatarBusy(false);
     if (error) toast.error(error.message);
     else {
       await refreshProfile();
       toast.success("Profile picture updated.");
-    }
-  };
-
-  const removeAvatar = async () => {
-    if (!profile.avatar_url) return;
-    setAvatarBusy(true);
-    await supabase.storage.from("avatars").remove([profile.avatar_url]);
-    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", profile.id);
-    setAvatarBusy(false);
-    if (error) toast.error(error.message);
-    else {
-      await refreshProfile();
-      toast.success("Profile picture removed.");
     }
   };
 
@@ -198,15 +188,9 @@ function SettingsPage() {
     setHistoryPrefs(next);
     if (!user?.id) return;
     setHistorySaving(true);
-    const res = await saveHistoryPrefs(user.id, next);
+    await saveHistoryPrefs(user.id, next);
     setHistorySaving(false);
-    if (res.backend) toast.success("History preference saved.");
-    else {
-      console.warn("[settings] history prefs backend write:", res.message);
-      toast.message("Preference saved on this device.", {
-        description: "Backend history_enabled columns not applied yet.",
-      });
-    }
+    toast.success("History preference saved.");
   };
 
   return (
@@ -217,49 +201,39 @@ function SettingsPage() {
       </div>
 
       <section className="mt-8 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">{t("settings.profilePicture")}</h2>
-        <div className="mt-4 flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={profile.avatar_signed_url ?? undefined} alt={profile.display_name ?? "Avatar"} />
-            <AvatarFallback className="text-lg">
-              {(profile.display_name || profile.email || "U").slice(0, 1).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          {canUploadAvatar ? (
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" disabled={avatarBusy} onClick={() => fileRef.current?.click()}>
-                {profile.avatar_url ? "Change" : "Upload"}
-              </Button>
-              {profile.avatar_url && (
-                <Button size="sm" variant="ghost" disabled={avatarBusy} onClick={removeAvatar}>
-                  Remove
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              <Button size="sm" variant="outline" disabled className="gap-1.5">
-                <Lock className="h-3.5 w-3.5" /> {t("home.locked")}
-              </Button>
-              <a href="/pricing" className="text-xs text-primary hover:underline">
-                {t("common.upgrade")}
-              </a>
-            </div>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) uploadAvatar(f);
-              e.target.value = "";
-            }}
-          />
+        <h2 className="font-semibold">Avatar</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Pick a cartoon animal or upload a photo (paid).</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {AVATAR_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              disabled={avatarBusy}
+              onClick={() => pickPreset(p.id)}
+              className="h-12 w-12 overflow-hidden rounded-full border border-border hover:ring-2 hover:ring-primary"
+              title={p.label}
+            >
+              <img src={p.src} alt={p.label} className="h-full w-full object-cover" />
+            </button>
+          ))}
         </div>
         {canUploadAvatar && (
-          <p className="mt-3 text-xs text-muted-foreground">JPG, PNG or WebP · Max 5MB.</p>
+          <div className="mt-3">
+            <Button size="sm" variant="outline" disabled={avatarBusy} onClick={() => fileRef.current?.click()}>
+              Upload photo
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadAvatar(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
         )}
       </section>
 
@@ -271,7 +245,7 @@ function SettingsPage() {
             <Input id="email" value={user?.email ?? ""} disabled className="mt-1.5" />
           </div>
           <div>
-            <Label htmlFor="name">Username / display name</Label>
+            <Label htmlFor="name">Display name</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5" />
           </div>
           <Button onClick={save} disabled={saving}>
@@ -283,7 +257,7 @@ function SettingsPage() {
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">{t("settings.security")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Confirm your current password before setting a new one. Minimum 8 characters.
+          Enter your current password, then a new password (min 8 characters).
         </p>
         <div className="mt-4 space-y-4">
           <div>
@@ -293,7 +267,6 @@ function SettingsPage() {
               type="password"
               value={currentPw}
               onChange={(e) => setCurrentPw(e.target.value)}
-              placeholder="Current password"
               className="mt-1.5"
               autoComplete="current-password"
             />
@@ -305,7 +278,6 @@ function SettingsPage() {
               type="password"
               value={pw}
               onChange={(e) => setPw(e.target.value)}
-              placeholder="At least 8 characters"
               className="mt-1.5"
               autoComplete="new-password"
             />
@@ -321,18 +293,10 @@ function SettingsPage() {
         <div className="mt-4 flex items-center justify-between">
           <span className="text-sm text-muted-foreground">{t("settings.theme")}</span>
           <div className="flex gap-2">
-            <Button
-              variant={theme === "light" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTheme("light")}
-            >
+            <Button variant={theme === "light" ? "default" : "outline"} size="sm" onClick={() => setTheme("light")}>
               <Sun className="mr-1.5 h-4 w-4" /> {t("settings.light")}
             </Button>
-            <Button
-              variant={theme === "dark" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTheme("dark")}
-            >
+            <Button variant={theme === "dark" ? "default" : "outline"} size="sm" onClick={() => setTheme("dark")}>
               <Moon className="mr-1.5 h-4 w-4" /> {t("settings.dark")}
             </Button>
           </div>
@@ -340,16 +304,19 @@ function SettingsPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <h2 className="font-semibold">Language</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Interface language (saved for this device).</p>
+        <div className="mt-4">
+          <GoogleLanguageSelect />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">History</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Controls whether your present generations are saved to History.
-        </p>
         <div className="mt-4 flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium">Save my history</p>
-            <p className="text-xs text-muted-foreground">
-              When on, new generations are saved here. When off, no more present generations are stored.
-            </p>
+            <p className="text-xs text-muted-foreground">When off, new generations are not stored.</p>
           </div>
           <Switch
             checked={historyPrefs.history_enabled}
@@ -360,85 +327,46 @@ function SettingsPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">{t("settings.language")}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Translate the Motio2edit interface using Google Translate. Your choice is saved and applied across pages.
-        </p>
-        <div className="mt-4">
-          <GoogleLanguageSelect />
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Numbers, credits, plan IDs, and form values are not meant to be translated. Brand name Motio2edit stays as written.
-        </p>
-      </section>
-
-      <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <h2 className="font-semibold">{t("settings.notifications")}</h2>
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Product updates</p>
-              <p className="text-xs text-muted-foreground">New features and improvements.</p>
-            </div>
+            <p className="text-sm font-medium">Product updates</p>
             <Switch checked={notifs.product} onCheckedChange={(v) => toggleNotif("product", v)} />
           </div>
           <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Marketing & offers</p>
-              <p className="text-xs text-muted-foreground">Promotions and tips.</p>
-            </div>
+            <p className="text-sm font-medium">Marketing & offers</p>
             <Switch checked={notifs.marketing} onCheckedChange={(v) => toggleNotif("marketing", v)} />
           </div>
           <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Security alerts</p>
-              <p className="text-xs text-muted-foreground">Important account and security notices.</p>
-            </div>
+            <p className="text-sm font-medium">Security alerts</p>
             <Switch checked={notifs.security} onCheckedChange={(v) => toggleNotif("security", v)} />
           </div>
         </div>
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">{t("settings.subscription")}</h2>
+        <h2 className="font-semibold">Plan</h2>
         <div className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{t("settings.currentPlan")}</span>
-            <span className="font-medium capitalize">{plan.name}</span>
+            <span className="text-muted-foreground">Current</span>
+            <span className="font-medium">{plan.name}</span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">{t("settings.creditsRemaining")}</span>
+            <span className="text-muted-foreground">Credits</span>
             <span className="font-medium">{isAdminEmail(profile.email) ? "∞" : profile.credits}</span>
-          </div>
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">Currency</span>
-            <span className="font-medium">{profile.currency}</span>
-          </div>
-          <div className="flex justify-between gap-2">
-            <span className="text-muted-foreground">Video generation</span>
-            <span className="font-medium">{plan.video ? "Enabled" : "Disabled"}</span>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
-          {profile.plan !== "business" && (
-            <Button asChild>
-              <Link to="/pricing">{t("common.upgrade")}</Link>
-            </Button>
-          )}
+          <Button asChild>
+            <Link to="/pricing">View pricing</Link>
+          </Button>
           <Button asChild variant="outline">
-            <Link to="/profile/subscription">{t("settings.subscription")}</Link>
+            <Link to="/tickets">Report a bug</Link>
           </Button>
         </div>
       </section>
 
-      <section className="mt-6 rounded-xl border border-border bg-card p-6">
-        <h2 className="font-semibold">{t("settings.account")}</h2>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Button variant="outline" onClick={handleSignOut}>
-            {t("settings.logout")}
-          </Button>
-        </div>
-      </section>
+      {/* Logout only on Profile dashboard — intentionally omitted here */}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getPlan, PLAN_CREDITS } from "@/lib/plans";
 import { CrownBadge } from "@/components/CrownBadge";
@@ -15,12 +16,9 @@ import {
   LogOut,
 } from "lucide-react";
 
-/**
- * Account / profile page — identity, credits, preferences links.
- * No studio catalogue. No large editor CTA.
- */
 export function ProfilePage() {
   const { profile, signOut } = useAuth();
+  const [confirmOut, setConfirmOut] = useState(false);
   if (!profile) return null;
 
   const plan = getPlan(profile.plan);
@@ -34,12 +32,15 @@ export function ProfilePage() {
   });
 
   const handleSignOut = async () => {
+    if (!confirmOut) {
+      setConfirmOut(true);
+      return;
+    }
     await signOut();
   };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 px-4 py-8 pb-24 md:py-10 md:pb-12">
-      {/* Identity */}
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex items-start gap-4">
           <Avatar className="h-16 w-16 shrink-0 ring-2 ring-primary/20 ring-offset-2 ring-offset-card sm:h-20 sm:w-20">
@@ -56,21 +57,13 @@ export function ProfilePage() {
             {profile.email && (
               <p className="mt-0.5 truncate text-sm text-muted-foreground">{profile.email}</p>
             )}
-            <p className="mt-2 text-sm text-muted-foreground">
-              {plan.name} plan
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">{plan.name} plan</p>
           </div>
         </div>
       </section>
 
-      {/* Credits */}
-      <CreditsUsageBar
-        available={profile.credits}
-        used={used}
-        allocation={allocation}
-      />
+      <CreditsUsageBar available={profile.credits} used={used} allocation={allocation} />
 
-      {/* Account links */}
       <section className="rounded-2xl border border-border bg-card shadow-sm">
         <h2 className="border-b border-border px-5 py-3 text-sm font-semibold">Account</h2>
         <nav className="divide-y divide-border">
@@ -81,7 +74,7 @@ export function ProfilePage() {
             <Settings className="h-4 w-4 text-primary" />
             <div className="min-w-0 flex-1">
               <p className="font-medium">Settings</p>
-              <p className="text-xs text-muted-foreground">Name, theme, language, avatar upload</p>
+              <p className="text-xs text-muted-foreground">Name, theme, language, avatar</p>
             </div>
           </Link>
           <Link
@@ -127,11 +120,22 @@ export function ProfilePage() {
         </nav>
       </section>
 
-      <div className="flex flex-wrap gap-3">
-        <Button variant="outline" className="gap-2" onClick={handleSignOut}>
-          <LogOut className="h-4 w-4" />
-          Log out
-        </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        {!confirmOut ? (
+          <Button variant="outline" className="gap-2" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4" />
+            Log out
+          </Button>
+        ) : (
+          <>
+            <Button variant="destructive" className="gap-2" onClick={handleSignOut}>
+              Confirm log out
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmOut(false)}>
+              Cancel
+            </Button>
+          </>
+        )}
         {profile.plan !== "business" && profile.plan !== "ultra" && (
           <Button asChild variant="ghost" size="sm">
             <Link to="/pricing">View plans</Link>
