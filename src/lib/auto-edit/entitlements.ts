@@ -3,7 +3,8 @@
  * Internal Master Studio plan id remains "business".
  *
  * Product rule: Maluto AI is NOT free.
- * Lite ($4.99) and above unlock restore / Auto Edit. Free plan is blocked.
+ * Paid plans unlock restore / Auto Edit. Free plan is blocked.
+ * Legacy Lite entitlements remain valid for existing accounts.
  */
 
 import type { PlanId } from "@/lib/plans";
@@ -19,7 +20,7 @@ export const AUTO_EDIT_QUALITIES_BY_PLAN: Record<PlanId, readonly AutoEditQualit
   business: ["sd", "hd", "2k", "4k", "8k", "8k_max"],
 };
 
-/** Free plan: zero Auto Edit runs. Must upgrade to Lite ($4.99)+. */
+/** Free plan: zero Auto Edit runs. */
 export const FREE_AUTO_EDIT_LIMIT = 0;
 
 export function planAllowsAutoEditQuality(
@@ -31,7 +32,7 @@ export function planAllowsAutoEditQuality(
   return list.includes(quality);
 }
 
-/** True when plan can use Maluto AI at all (Lite+). */
+/** True when plan can use Maluto AI at all (paid). */
 export function planAllowsMalutoAI(plan: string | null | undefined): boolean {
   const id = (plan ?? "free") as PlanId;
   if (id === "free") return false;
@@ -44,7 +45,7 @@ export function assertAutoEditQualityEntitlement(
 ): void {
   if (!planAllowsMalutoAI(plan)) {
     throw new Error(
-      "Maluto AI Restore is a paid feature. Upgrade to Lite ($4.99) to unlock — just upload a photo.",
+      "Maluto AI Restore is a paid feature. Upgrade your plan to unlock — just upload a photo.",
     );
   }
   if (!planAllowsAutoEditQuality(plan, quality)) {
@@ -62,7 +63,7 @@ export function assertFreeAutoEditAllowance(opts: {
   if (opts.isAdmin) return;
   if ((opts.plan ?? "free") === "free") {
     throw new Error(
-      "Maluto AI is not free. Upgrade to Lite for $4.99 — restore your photos with one upload.",
+      "Maluto AI is not free. Upgrade to a paid plan to restore photos with one upload.",
     );
   }
 }
