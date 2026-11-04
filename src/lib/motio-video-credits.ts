@@ -1,7 +1,8 @@
 /**
  * Motio2edit Video Studio — customer-facing credit estimates.
  *
- * Authoritative spend: provider COGS → Video COGS staircase (+100) → optional sound +25.
+ * Authoritative spend: provider COGS (incl. native audio when selected)
+ * → Video COGS staircase. No separate +25 sound surcharge (avoids double charge).
  * Face value: 1 Motio2edit credit = $0.01
  */
 
@@ -23,11 +24,11 @@ export type MotioVideoTier = "standard" | "premium";
 export type MotioVideoQuality = "SD" | "HD";
 export type MotioVideoMode = "text" | "image" | "video" | "audio";
 
-export const CREDIT_PRICING_VERSION = "2026-11-video-staircase-v2-plus100";
+export const CREDIT_PRICING_VERSION = "2026-11-video-staircase-v3-no-sound-double";
 export const PREMIUM_TIER_SURCHARGE_CREDITS = 0;
 export const IMAGE_MODE_SURCHARGE_CREDITS = 0;
-/** Sound / audio generation add-on on top of staircase */
-export const SOUND_ADDON_CREDITS = 25;
+/** Sound is priced inside provider COGS → staircase; do not add a flat surcharge. */
+export const SOUND_ADDON_CREDITS = 0;
 export const CREDIT_RETAIL_USD = VIDEO_CREDIT_FACE_CENTS / 100;
 export const VIDEO_CREDIT_FACE_CENTS_PUBLIC = VIDEO_CREDIT_FACE_CENTS;
 
@@ -182,7 +183,7 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
 
   try {
     const baseCredits = videoCogsToCredits(cogs);
-    const soundSurcharge = effectiveSound ? SOUND_ADDON_CREDITS : 0;
+    const soundSurcharge = 0;
     const credits = baseCredits + soundSurcharge;
     return {
       credits,
@@ -198,7 +199,7 @@ export function computeMotioVideoCredits(input: MotioVideoPriceInput): MotioVide
         soundOn: effectiveSound,
         baseCredits,
         soundSurcharge,
-        formula: `staircase $${cogs.toFixed(4)} → ${baseCredits} + sound ${soundSurcharge} = ${credits}`,
+        formula: `staircase $${cogs.toFixed(4)} → ${baseCredits} (audio in COGS when on)`,
       },
     };
   } catch (e) {
