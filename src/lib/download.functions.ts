@@ -9,6 +9,7 @@ const inputSchema = z.object({
   /** Preferred: resolve ownership + clean provider URL from DB. */
   generationId: z.string().uuid().optional(),
   keepWatermark: z.boolean().optional(),
+  sponsorUnlock: z.boolean().optional(),
   studioTier: z.enum(["standard", "pro", "premium"]).optional(),
   /** Circle 2edit uses purple-ring two-line brand; default generic Motio2edit. */
   watermarkBrand: z.enum(["generic", "circle"]).optional(),
@@ -30,17 +31,18 @@ export const secureDownloadImage = createServerFn({ method: "POST" })
     const isAdmin =
       !!profile.email && profile.email.trim().toLowerCase() === "firstaimrun89@gmail.com";
 
-    // Free plan: server forces watermark regardless of client keepWatermark.
+    // Free plan: server forces watermark unless active Sponsored unlock session.
     const keepWatermark =
       isAdmin
         ? data.keepWatermark === true
         : isFreePlan(profile.plan)
-          ? true
+          ? data.sponsorUnlock === true
+            ? false
+            : true
           : data.keepWatermark === true;
 
     let sourceUrl = data.imageUrl ?? "";
 
-    // Prefer generationId: ownership + clean fal/provider URL from DB (never trust only client URL).
     if (data.generationId) {
       const { data: row, error: gErr } = await supabase
         .from("generations")
@@ -76,7 +78,6 @@ export const secureDownloadImage = createServerFn({ method: "POST" })
       throw new Error("Invalid image URL.");
     }
 
-    // Recover broken public r2.dev user URLs → signed GET before fetch/finalize.
     try {
       const { r2ResolveStoredOutput } = await import("@/lib/r2.server");
       const resolved = await r2ResolveStoredOutput({ outputUrl: sourceUrl });
@@ -93,6 +94,7 @@ export const secureDownloadImage = createServerFn({ method: "POST" })
       email: profile.email,
       isAdmin,
       keepWatermark,
+      sponsorUnlock: data.sponsorUnlock === true && profile.plan === "free",
       userId,
       studioTier: data.studioTier,
       watermarkBrand: data.watermarkBrand === "circle" ? "circle" : "generic",
