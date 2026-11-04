@@ -1,7 +1,7 @@
 /**
  * Motion2AI Creation — Discover (post-login).
- * Includes primary catalog + Cloudflare R2 account-2 videos.
- * Desktop: compact multi-column for wide clips; mobile keeps pair/full layouts.
+ * Primary catalog + R2 account-2 videos/images (Video-1 included).
+ * Aspect ratios drive layout buckets; qualityTier shows Standard/Premium badges.
  */
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -10,7 +10,10 @@ import {
   getAllDiscoverSamples,
   type R2Sample,
 } from "@/lib/r2-catalog";
-import { getAccount2SignedInVideos } from "@/lib/r2-account2-samples";
+import {
+  getAccount2SignedInVideos,
+  getAccount2SignedInImages,
+} from "@/lib/r2-account2-samples";
 import { GalleryMediaCard } from "@/components/home/GalleryMediaCard";
 import { DiscoveryMediaViewer } from "@/components/home/DiscoveryMediaViewer";
 import { useAuth } from "@/lib/auth";
@@ -111,14 +114,18 @@ export function VisualDiscoveryGallery() {
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
   const account2Videos = useMemo(() => getAccount2SignedInVideos(), []);
-  const images = useMemo(() => getImagineOnlySamples(), []);
+  const account2Images = useMemo(() => getAccount2SignedInImages(), []);
+  const images = useMemo(
+    () => dedupe([...account2Images, ...getImagineOnlySamples()]),
+    [account2Images],
+  );
   const videosOnly = useMemo(
     () => dedupe([...account2Videos, ...getVideoOnlySamples()]),
     [account2Videos],
   );
   const all = useMemo(
-    () => dedupe([...account2Videos, ...getAllDiscoverSamples()]),
-    [account2Videos],
+    () => dedupe([...account2Videos, ...account2Images, ...getAllDiscoverSamples()]),
+    [account2Videos, account2Images],
   );
 
   const pool = tab === "img" ? images : tab === "video" ? videosOnly : all;
@@ -180,7 +187,7 @@ export function VisualDiscoveryGallery() {
       ) : (
         <>
           {wide.length > 0 && (
-            <Section title="Trending video">
+            <Section title="Wide 16:9">
               <CardList
                 samples={wide}
                 likedIds={likedIds}
@@ -204,7 +211,7 @@ export function VisualDiscoveryGallery() {
           )}
 
           {square.length > 0 && (
-            <Section title="Square & stills">
+            <Section title="Square 1:1">
               <CardList
                 samples={square}
                 likedIds={likedIds}
@@ -241,5 +248,9 @@ export function isExtraaCandidate(_s: R2Sample): boolean {
   return false;
 }
 export function getAllDiscoverySamples(): R2Sample[] {
-  return dedupe([...getAccount2SignedInVideos(), ...getAllDiscoverSamples()]);
+  return dedupe([
+    ...getAccount2SignedInVideos(),
+    ...getAccount2SignedInImages(),
+    ...getAllDiscoverSamples(),
+  ]);
 }
