@@ -55,20 +55,17 @@ export const TRANSACTION_FEE: Record<Currency, number> = {
 };
 
 /**
- * Reference credit costs for plan estimates and shared tools.
- * Video live charge uses COGS staircase (floor 150) — not a fixed 125.
- * Music instrumental uses music_lite; full song uses music.
+ * Reference credit costs for internal estimates and shared tools.
+ * Not shown on public plan cards.
  */
 export const CREDIT_COST = {
   image: 25,
-  /** Floor estimate for a 5s Standard SD clip (matches video staircase minimum). */
   video: 150,
   music: 100,
   music_lite: 50,
   video_enhance: 200,
 } as const;
 
-/** Explicit estimate assumptions shown on the pricing page. */
 export const ESTIMATE_ASSUMPTIONS = {
   imageCredits: CREDIT_COST.image,
   imageLabel: "standard image",
@@ -93,7 +90,7 @@ export const CREDIT_TOPUP = {
   bullets: ["350 AI credits", "Never expire", "Works with any plan"],
 } as const;
 
-/** One-time credit packs (not subscriptions) — kept for server/profile top-up only; not shown on public pricing. */
+/** One-time packs — profile top-up only; never shown on public pricing. */
 export const CREDIT_ADDON_PACKS = [
   {
     id: "credit-boost-499",
@@ -133,10 +130,6 @@ export function estimatedStandardImages(credits: number): number {
   return Math.floor(credits / STANDARD_IMAGE_CREDIT_COST);
 }
 
-/**
- * Estimated exclusive generations if the full monthly allowance were spent
- * on only that product type. Shared credit pool — not additive free grants.
- */
 export function estimatedGenerations(credits: number) {
   return {
     images: Math.floor(credits / ESTIMATE_ASSUMPTIONS.imageCredits),
@@ -171,6 +164,7 @@ export const MUSIC_STUDIO_MODE_LABELS = [
   "Video music",
 ] as const;
 
+/** Public prices: Starter ~$12 · Pro ~$25 · Ultra AI $89.99 */
 export const PLANS: Plan[] = [
   {
     id: "free",
@@ -194,8 +188,8 @@ export const PLANS: Plan[] = [
     priority: false,
     bestQuality: false,
     modelTier: "standard",
-    price: { USD: 13.99, EUR: 12.99, INR: 1199 },
-    priceAnnualUSD: 139.9,
+    price: { USD: 12.99, EUR: 11.99, INR: 1099 },
+    priceAnnualUSD: 129.9,
     publicOffer: true,
     positioning: "Standard mode · full creative starter kit.",
     features: [
@@ -217,8 +211,8 @@ export const PLANS: Plan[] = [
     priority: true,
     bestQuality: true,
     modelTier: "premium",
-    price: { USD: 29.99, EUR: 27.99, INR: 2499 },
-    priceAnnualUSD: 299.9,
+    price: { USD: 24.99, EUR: 22.99, INR: 2099 },
+    priceAnnualUSD: 249.9,
     publicOffer: true,
     positioning: "Premium mode · Maluto AI + longer HD video.",
     features: [
@@ -269,7 +263,7 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 0,
     publicOffer: false,
     positioning: "Legacy Lite plan.",
-    features: ["350 credits / month"],
+    features: ["Legacy plan"],
   },
   {
     id: "plus",
@@ -283,7 +277,7 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 0,
     publicOffer: false,
     positioning: "Legacy Plus plan.",
-    features: ["800 credits / month"],
+    features: ["Legacy plan"],
   },
   {
     id: "studio",
@@ -297,7 +291,7 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 0,
     publicOffer: false,
     positioning: "Legacy AI Studio plan.",
-    features: ["5,000 credits / month"],
+    features: ["Legacy plan"],
   },
   {
     id: "business",
@@ -311,7 +305,7 @@ export const PLANS: Plan[] = [
     priceAnnualUSD: 0,
     publicOffer: false,
     positioning: "Legacy Master Studio plan.",
-    features: ["10,000 credits / month"],
+    features: ["Legacy plan"],
   },
 ];
 
@@ -368,8 +362,8 @@ export const DISPLAY_CURRENCIES: DisplayCurrency[] = ["USD", "EUR", "INR"];
 
 export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
   free: { USD: 0, EUR: 0, INR: 0 },
-  starter: { USD: 13.99, EUR: 12.99, INR: 1199 },
-  pro: { USD: 29.99, EUR: 27.99, INR: 2499 },
+  starter: { USD: 12.99, EUR: 11.99, INR: 1099 },
+  pro: { USD: 24.99, EUR: 22.99, INR: 2099 },
   ultra: { USD: 89.99, EUR: 82.99, INR: 7499 },
   lite: { USD: 4.99, EUR: 4.59, INR: 449 },
   plus: { USD: 9.99, EUR: 9.19, INR: 899 },
@@ -379,8 +373,8 @@ export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
 
 /** Annual = 10 × monthly (2 months free). */
 export const DISPLAY_ANNUAL_PRICES_USD: Record<PurchasablePlanId, number> = {
-  starter: 139.9,
-  pro: 299.9,
+  starter: 129.9,
+  pro: 249.9,
   ultra: 899.9,
 };
 
@@ -396,7 +390,6 @@ export function monthlyCreditsForPlan(planId: PlanId): number {
   return PLAN_CREDITS[planId] ?? 0;
 }
 
-/** PayPal commercial fee helper (India receiving international): 4.40% + $0.30 USD. */
 export function estimatePaypalNetUsd(grossUsd: number): {
   gross: number;
   fee: number;
