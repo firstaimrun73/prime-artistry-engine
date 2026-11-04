@@ -1,0 +1,51 @@
+name: fix-circle-showcompare
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fix-circle-showcompare.yml"
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch showCompare defaults
+        run: |
+          set -euo pipefail
+          F=src/routes/studio.image.circle-remove.tsx
+          test -f "$F"
+          BEFORE=$(wc -c < "$F")
+          # Only change showCompare-related true → false
+          sed -i 's/const \[showCompare, setShowCompare\] = useState(true);/const [showCompare, setShowCompare] = useState(false);/' "$F"
+          sed -i 's/setShowCompare(true);/setShowCompare(false);/g' "$F"
+          AFTER=$(wc -c < "$F")
+          echo "size before=$BEFORE after=$AFTER"
+          # Must not shrink by more than a few bytes (true→false is same length)
+          if [ "$AFTER" -lt $((BEFORE - 5)) ]; then
+            echo "ERROR: file shrank unexpectedly" >&2
+            exit 1
+          fi
+          grep -n 'showCompare' "$F" | head -20
+          # Ensure no setShowCompare(true) remains
+          if grep -q 'setShowCompare(true)' "$F"; then
+            echo "ERROR: setShowCompare(true) still present" >&2
+            exit 1
+          fi
+          if ! grep -q 'useState(false)' "$F"; then
+            echo "ERROR: useState(false) missing" >&2
+            exit 1
+          fi
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/studio.image.circle-remove.tsx
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(circle2edit): showCompare false — auto-display generated result (CI surgical patch)"
+          git push origin HEAD:main
