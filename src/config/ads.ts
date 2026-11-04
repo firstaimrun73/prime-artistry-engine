@@ -44,7 +44,8 @@ export function adPlacementCategory(
     p.startsWith("workspace") ||
     p.startsWith("studio") ||
     p.startsWith("profile") ||
-    p.startsWith("dashboard")
+    p.startsWith("dashboard") ||
+    p.startsWith("sample")
   ) {
     return "home";
   }
