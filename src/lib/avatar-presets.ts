@@ -1,7 +1,6 @@
 /**
- * Simple initials-based avatars. No cartoon gallery.
- * Uploaded profile photos remain in profiles.avatar_url as storage paths.
- * When no photo: render initials circle via initialsAvatarDataUrl().
+ * Cartoon animal avatar presets (Dicebear open license) + initials fallback.
+ * Uploaded photos still use profiles.avatar_url storage paths.
  */
 
 export type AvatarPreset = {
@@ -10,8 +9,17 @@ export type AvatarPreset = {
   src: string;
 };
 
-/** Empty list — gallery removed. Keep type for compile compatibility. */
-export const AVATAR_PRESETS: AvatarPreset[] = [];
+/** Cute animal bots — free Dicebear bottts style, seed-stable URLs. */
+export const AVATAR_PRESETS: AvatarPreset[] = [
+  { id: "fox", label: "Fox", src: "https://api.dicebear.com/7.x/bottts/svg?seed=Fox&backgroundColor=0E0C0A" },
+  { id: "panda", label: "Panda", src: "https://api.dicebear.com/7.x/bottts/svg?seed=Panda&backgroundColor=0E0C0A" },
+  { id: "cat", label: "Cat", src: "https://api.dicebear.com/7.x/bottts/svg?seed=Cat&backgroundColor=0E0C0A" },
+  { id: "owl", label: "Owl", src: "https://api.dicebear.com/7.x/bottts/svg?seed=Owl&backgroundColor=0E0C0A" },
+  { id: "bear", label: "Bear", src: "https://api.dicebear.com/7.x/bottts/svg?seed=Bear&backgroundColor=0E0C0A" },
+  { id: "rabbit", label: "Rabbit", src: "https://api.dicebear.com/7.x/bottts/svg?seed=Rabbit&backgroundColor=0E0C0A" },
+  { id: "dog", label: "Dog", src: "https://api.dicebear.com/7.x/bottts/svg?seed=Dog&backgroundColor=0E0C0A" },
+  { id: "lion", label: "Lion", src: "https://api.dicebear.com/7.x/bottts/svg?seed=Lion&backgroundColor=0E0C0A" },
+];
 
 export function isPresetAvatar(avatarUrl: string | null | undefined): boolean {
   return !!avatarUrl && avatarUrl.startsWith("preset:");
@@ -22,18 +30,16 @@ export function presetIdFromUrl(avatarUrl: string | null | undefined): string | 
   return avatarUrl.slice("preset:".length);
 }
 
-export function getPresetSrc(_id: string): string | null {
-  return null;
+export function getPresetSrc(id: string): string | null {
+  return AVATAR_PRESETS.find((p) => p.id === id)?.src ?? null;
 }
 
-/** Deterministic initials color from user id. */
 function hashHue(userId: string): number {
   let h = 0;
   for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) >>> 0;
   return h % 360;
 }
 
-/** SVG data URL: circular initials on Motio-friendly dark background. */
 export function initialsAvatarDataUrl(
   nameOrEmail: string | null | undefined,
   userId?: string,
@@ -41,9 +47,7 @@ export function initialsAvatarDataUrl(
   const raw = (nameOrEmail || "U").trim();
   const parts = raw.split(/[\s@._-]+/).filter(Boolean);
   const initials = (
-    parts.length >= 2
-      ? (parts[0][0] + parts[1][0])
-      : raw.slice(0, 2)
+    parts.length >= 2 ? parts[0][0] + parts[1][0] : raw.slice(0, 2)
   ).toUpperCase();
   const hue = hashHue(userId || raw);
   const bg = `hsl(${hue} 42% 28%)`;
@@ -55,19 +59,23 @@ export function initialsAvatarDataUrl(
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-/** Resolve display src: uploaded signed URL, or initials. Never cartoon presets. */
 export function resolveAvatarSrc(
   avatarUrl: string | null | undefined,
   signedUrl?: string | null,
   opts?: { nameOrEmail?: string | null; userId?: string },
 ): string | undefined {
-  if (avatarUrl && !avatarUrl.startsWith("preset:")) {
+  if (avatarUrl?.startsWith("preset:")) {
+    return getPresetSrc(avatarUrl.slice("preset:".length)) ?? undefined;
+  }
+  if (avatarUrl) {
     return signedUrl ?? undefined;
   }
   return initialsAvatarDataUrl(opts?.nameOrEmail, opts?.userId);
 }
 
-/** @deprecated Prefer initialsAvatarDataUrl. Kept for compile compat. */
-export function defaultPresetId(_userId: string): string {
-  return "initials";
+export function defaultPresetId(userId: string): string {
+  const i = Math.abs(
+    [...userId].reduce((a, c) => a + c.charCodeAt(0), 0),
+  ) % AVATAR_PRESETS.length;
+  return AVATAR_PRESETS[i]?.id ?? "fox";
 }

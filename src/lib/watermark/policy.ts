@@ -10,13 +10,15 @@ export type ResolvePolicyInput = {
   keepWatermark?: boolean;
   sourceUrl?: string | null;
   alreadyFinalizedHint?: boolean;
+  /** Client session after opt-in Sponsored unlock (free users only). */
+  sponsorUnlock?: boolean;
 };
 
 /**
  * Watermark entitlement:
- * - Admin (firstaimrun89@gmail.com): default OFF / clean; may opt in
- * - Free: forced Motio2edit primary (no secondary)
- * - Paid: respect keepWatermark (client default ON)
+ * - Admin: default OFF / clean; may opt in
+ * - Free: Motio2edit primary unless sponsorUnlock + keepWatermark false
+ * - Paid: respect keepWatermark
  */
 export function resolveWatermarkPolicy(input: ResolvePolicyInput): WatermarkPolicy {
   const url = input.sourceUrl ?? "";
@@ -29,7 +31,6 @@ export function resolveWatermarkPolicy(input: ResolvePolicyInput): WatermarkPoli
     input.isAdmin === true ||
     isAdminClaims({ email: input.email ?? undefined });
 
-  // Sole admin: clean output by default; optional stamp when keepWatermark=true
   if (admin) {
     if (input.keepWatermark === true) {
       return {
@@ -49,8 +50,17 @@ export function resolveWatermarkPolicy(input: ResolvePolicyInput): WatermarkPoli
     };
   }
 
-  // Free: forced primary Motio2edit only — no secondary watermark.
   if (isFreePlan(input.plan)) {
+    // Temporary clean export after explicit Sponsored unlock session
+    if (input.sponsorUnlock === true && input.keepWatermark === false) {
+      return {
+        mode: "none",
+        primary: false,
+        secondary: false,
+        alreadyFinalized,
+        reason: "free_sponsor_unlock",
+      };
+    }
     return {
       mode: "primary",
       primary: true,
@@ -60,7 +70,6 @@ export function resolveWatermarkPolicy(input: ResolvePolicyInput): WatermarkPoli
     };
   }
 
-  // Paid: respect user preference (default ON is a client concern).
   if (isPaidPlan(input.plan)) {
     if (input.keepWatermark === true) {
       return {
@@ -80,7 +89,6 @@ export function resolveWatermarkPolicy(input: ResolvePolicyInput): WatermarkPoli
     };
   }
 
-  // Unknown plan: safe default — primary only (no secondary).
   return {
     mode: "primary",
     primary: true,

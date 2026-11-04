@@ -1,11 +1,12 @@
 /**
  * STANDARD tier — clean, focused Image Studio.
+ * Desktop: centered max width so controls don't stretch edge-to-edge.
  */
 
 export const STANDARD_TIER = "standard";
 
 export const standardShellClass =
-  "studio-tier-standard bg-background text-foreground";
+  "studio-tier-standard mx-auto w-full max-w-3xl bg-background px-3 text-foreground sm:max-w-4xl sm:px-4 lg:max-w-5xl";
 
 export const standardCardClass =
   "rounded-2xl border border-border/80 bg-card/80 shadow-sm backdrop-blur-sm";
