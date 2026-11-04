@@ -47,33 +47,83 @@ export type PlanId =
 export type ModelTier = "standard" | "premium" | "ultra";
 export type BillingInterval = "month" | "year";
 
+/** Approximate fixed checkout processing buffer (display only; not a line item). */
 export const TRANSACTION_FEE: Record<Currency, number> = {
   USD: 1,
   EUR: 1,
   INR: 85,
 };
 
+/**
+ * Reference credit costs for plan estimates and shared tools.
+ * Video live charge uses COGS staircase (floor 150) — not a fixed 125.
+ * Music instrumental uses music_lite; full song uses music.
+ */
 export const CREDIT_COST = {
   image: 25,
-  video: 125,
+  /** Floor estimate for a 5s Standard SD clip (matches video staircase minimum). */
+  video: 150,
   music: 100,
   music_lite: 50,
   video_enhance: 200,
+} as const;
+
+/** Explicit estimate assumptions shown on the pricing page. */
+export const ESTIMATE_ASSUMPTIONS = {
+  imageCredits: CREDIT_COST.image,
+  imageLabel: "standard image",
+  videoCredits: CREDIT_COST.video,
+  videoLabel: "5s Standard SD video (no extra sound surcharge)",
+  musicCredits: CREDIT_COST.music_lite,
+  musicLabel: "instrumental track",
 } as const;
 
 export const STANDARD_IMAGE_CREDIT_COST = 25;
 export const UNLIMITED_CREDITS = 9_999_999;
 export const FREE_SIGNUP_CREDITS = 40;
 
+/** Legacy single top-up kept for older checkout paths. */
 export const CREDIT_TOPUP = {
   id: "credit-topup-499",
-  name: "Credit Top-up",
+  name: "Credit Boost",
   price: 4.99,
-  credits: 280,
+  credits: 350,
   type: "one_time" as const,
-  description: "280 AI credits",
-  bullets: ["280 AI credits", "Works with any plan"],
+  description: "350 AI credits",
+  bullets: ["350 AI credits", "Never expire", "Works with any plan"],
 } as const;
+
+/** One-time credit packs (not subscriptions). */
+export const CREDIT_ADDON_PACKS = [
+  {
+    id: "credit-boost-499",
+    name: "Credit Boost",
+    priceUsd: 4.99,
+    credits: 350,
+    type: "one_time" as const,
+  },
+  {
+    id: "creator-boost-999",
+    name: "Creator Boost",
+    priceUsd: 9.99,
+    credits: 600,
+    type: "one_time" as const,
+  },
+  {
+    id: "studio-boost-1999",
+    name: "Studio Boost",
+    priceUsd: 19.99,
+    credits: 1300,
+    type: "one_time" as const,
+  },
+  {
+    id: "mega-boost-3999",
+    name: "Mega Boost",
+    priceUsd: 39.99,
+    credits: 2800,
+    type: "one_time" as const,
+  },
+] as const;
 
 export function creditsLabel(credits: number): string {
   return credits >= UNLIMITED_CREDITS ? "Unlimited" : String(credits);
@@ -83,11 +133,15 @@ export function estimatedStandardImages(credits: number): number {
   return Math.floor(credits / STANDARD_IMAGE_CREDIT_COST);
 }
 
+/**
+ * Estimated exclusive generations if the full monthly allowance were spent
+ * on only that product type. Shared credit pool — not additive free grants.
+ */
 export function estimatedGenerations(credits: number) {
   return {
-    images: Math.floor(credits / CREDIT_COST.image),
-    videos: Math.floor(credits / CREDIT_COST.video),
-    music: Math.floor(credits / CREDIT_COST.music_lite),
+    images: Math.floor(credits / ESTIMATE_ASSUMPTIONS.imageCredits),
+    videos: Math.floor(credits / ESTIMATE_ASSUMPTIONS.videoCredits),
+    music: Math.floor(credits / ESTIMATE_ASSUMPTIONS.musicCredits),
   };
 }
 
@@ -140,17 +194,17 @@ export const PLANS: Plan[] = [
     priority: false,
     bestQuality: false,
     modelTier: "standard",
-    price: { USD: 12, EUR: 11, INR: 999 },
-    priceAnnualUSD: 120,
+    price: { USD: 13.99, EUR: 12.99, INR: 1199 },
+    priceAnnualUSD: 139.9,
     publicOffer: true,
-    positioning: "Standard AI image tools, limited video, and full Music Studio.",
+    positioning: "Standard tools, 5s SD video, and Music Studio.",
     features: [
       "1,000 credits / month",
       "Standard image generation & editing",
       "AI+ Filters and Styles",
       "Circle 2edit — Remove",
       "Video Studio — SD, up to 5 seconds",
-      "Music Studio — all 6 modes",
+      "Music Studio — instrumental & all modes",
       "Watermark-free exports",
     ],
   },
@@ -162,17 +216,17 @@ export const PLANS: Plan[] = [
     priority: true,
     bestQuality: true,
     modelTier: "premium",
-    price: { USD: 25, EUR: 23, INR: 2099 },
-    priceAnnualUSD: 250,
+    price: { USD: 29.99, EUR: 27.99, INR: 2499 },
+    priceAnnualUSD: 299.9,
     publicOffer: true,
-    positioning: "Premium models, Maluto AI, and longer video options.",
+    positioning: "Premium models, Maluto AI, and up to 10s video.",
     features: [
       "2,500 credits / month",
       "Premium image generation & editing",
       "Maluto AI photo restoration",
       "Circle 2edit — Remove & Add",
-      "Video Studio — 5s and 10s",
-      "Music Studio — all 6 modes",
+      "Video Studio — up to 10 seconds, HD",
+      "Music Studio — instrumental & all modes",
       "AI+ Filters and Styles",
       "Priority processing",
       "Watermark-free exports",
@@ -186,8 +240,8 @@ export const PLANS: Plan[] = [
     priority: true,
     bestQuality: true,
     modelTier: "ultra",
-    price: { USD: 79, EUR: 73, INR: 6599 },
-    priceAnnualUSD: 790,
+    price: { USD: 89.99, EUR: 82.99, INR: 7499 },
+    priceAnnualUSD: 899.9,
     publicOffer: true,
     positioning: "Highest-tier models and the full Motio2edit toolkit.",
     features: [
@@ -196,8 +250,8 @@ export const PLANS: Plan[] = [
       "Premium AI+ Filters and Styles",
       "Maluto AI photo restoration",
       "Circle 2edit — Remove & Add",
-      "Video Studio — 5s, 10s, 15s",
-      "Music Studio — all 6 modes",
+      "Video Studio — up to 15 seconds",
+      "Music Studio — instrumental & all modes",
       "Priority processing",
       "Watermark-free exports",
     ],
@@ -313,19 +367,20 @@ export const DISPLAY_CURRENCIES: DisplayCurrency[] = ["USD", "EUR", "INR"];
 
 export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
   free: { USD: 0, EUR: 0, INR: 0 },
-  starter: { USD: 12, EUR: 11, INR: 999 },
-  pro: { USD: 25, EUR: 23, INR: 2099 },
-  ultra: { USD: 79, EUR: 73, INR: 6599 },
+  starter: { USD: 13.99, EUR: 12.99, INR: 1199 },
+  pro: { USD: 29.99, EUR: 27.99, INR: 2499 },
+  ultra: { USD: 89.99, EUR: 82.99, INR: 7499 },
   lite: { USD: 4.99, EUR: 4.59, INR: 449 },
   plus: { USD: 9.99, EUR: 9.19, INR: 899 },
   studio: { USD: 55, EUR: 50.99, INR: 4999 },
   business: { USD: 110, EUR: 101.99, INR: 9999 },
 };
 
+/** Annual = 10 × monthly (2 months free). */
 export const DISPLAY_ANNUAL_PRICES_USD: Record<PurchasablePlanId, number> = {
-  starter: 120,
-  pro: 250,
-  ultra: 790,
+  starter: 139.9,
+  pro: 299.9,
+  ultra: 899.9,
 };
 
 export function annualSavingsMonths(): number {
@@ -338,4 +393,18 @@ export function toCheckoutCurrency(c: DisplayCurrency): Currency {
 
 export function monthlyCreditsForPlan(planId: PlanId): number {
   return PLAN_CREDITS[planId] ?? 0;
+}
+
+/** PayPal commercial fee helper (India receiving international): 4.40% + $0.30 USD. */
+export function estimatePaypalNetUsd(grossUsd: number): {
+  gross: number;
+  fee: number;
+  net: number;
+} {
+  const fee = grossUsd * 0.044 + 0.3;
+  return {
+    gross: +grossUsd.toFixed(2),
+    fee: +fee.toFixed(2),
+    net: +(grossUsd - fee).toFixed(2),
+  };
 }
