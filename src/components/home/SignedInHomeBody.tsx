@@ -78,7 +78,6 @@ const HOME_SLOGANS = [
   },
 ] as const;
 
-/** Circular AI+ tool icons — horizontal scroll row */
 const AI_TOOLS = [
   { to: "/studio/image/auto-edit" as const, label: "Maluto", icon: Sparkles, color: "bg-orange-500/15 text-orange-600" },
   { to: "/editor" as const, label: "Image", icon: ImageIcon, color: "bg-violet-500/15 text-violet-600" },
@@ -111,12 +110,12 @@ export function SignedInHomeBody() {
   const slogan = HOME_SLOGANS[sloganIdx];
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:pt-8 md:max-w-7xl md:pb-12">
+    <main className="mx-auto w-full max-w-6xl px-4 pt-4 pb-24 sm:pt-6 md:max-w-7xl md:pb-12">
       <MalutoHomeHint />
 
-      {/* Circular AI+ tools — horizontal, no credits / profile / "What will you create" */}
-      <section className="mb-4" aria-label="AI tools">
-        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Circular AI+ tools — horizontal on mobile, centered wrap on desktop */}
+      <section className="mb-5" aria-label="AI tools">
+        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] md:flex-wrap md:justify-center md:overflow-visible [&::-webkit-scrollbar]:hidden">
           {AI_TOOLS.map((q) => {
             const Icon = q.icon;
             const locked =
@@ -142,7 +141,7 @@ export function SignedInHomeBody() {
                   : !locked && q.label === "Remove BG"
                     ? { search: { from: "home" as const } }
                     : {})}
-                className="flex w-[68px] shrink-0 flex-col items-center gap-1.5 text-center"
+                className="flex w-[68px] shrink-0 flex-col items-center gap-1.5 text-center md:w-[76px]"
               >
                 <span
                   className={`relative flex h-14 w-14 items-center justify-center rounded-full border border-border/60 shadow-sm transition hover:scale-105 hover:border-primary/40 ${q.color}`}
@@ -161,7 +160,6 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      {/* Colourful carousel — licensed photo / edit messaging */}
       <section className="mt-1" aria-label="Promo">
         <Link
           to={slogan.to}
