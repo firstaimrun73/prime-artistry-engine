@@ -1,12 +1,16 @@
 /**
- * Discovery card — media only inside frame (no title/description overlay).
- * Touch/click plays video in place; Info opens detail. Premium/Standard badge top-left clear of controls.
+ * Discovery card — media only inside frame (title below).
+ * One video plays at a time (global pause). Mute/unmute control on videos.
+ * Wide ratios (16:9 etc.) use col-span-2 via parent + spanClassForSample.
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Crown, Heart, Info, Play, Pause } from "lucide-react";
+import { Crown, Heart, Info, Play, Pause, Volume2, VolumeX } from "lucide-react";
 import type { R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
+
+/** Global: only one discovery video plays at a time. */
+const PLAY_EVENT = "motio-discovery-video-play";
 
 function parseRatio(ar: string): number {
   const m = /^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/.exec(ar.trim());
@@ -17,9 +21,10 @@ function parseRatio(ar: string): number {
   return w / h;
 }
 
+/** Wide landscape (≥ ~1.4) spans both columns so 16:9 is not squeezed. */
 export function spanClassForSample(sample: R2Sample): string {
   const r = parseRatio(sample.aspectRatio);
-  if (r >= 1.5) return "col-span-2";
+  if (r >= 1.35) return "col-span-2";
   return "col-span-1";
 }
 
@@ -86,10 +91,29 @@ export function GalleryMediaCard({
   const ratio = liveRatio ?? catalogRatio;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
 
   const applyNaturalSize = useCallback((w: number, h: number) => {
     if (w > 0 && h > 0) setLiveRatio(w / h);
   }, []);
+
+  // Pause this video when another card starts playing
+  useEffect(() => {
+    if (!isVideo) return;
+    const onOtherPlay = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail !== sample.id && videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause();
+        setPlaying(false);
+      }
+    };
+    window.addEventListener(PLAY_EVENT, onOtherPlay);
+    return () => window.removeEventListener(PLAY_EVENT, onOtherPlay);
+  }, [isVideo, sample.id]);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted]);
 
   const togglePlay = useCallback(
     (e?: React.MouseEvent | React.TouchEvent) => {
@@ -101,13 +125,15 @@ export function GalleryMediaCard({
       }
       const v = videoRef.current;
       if (v.paused) {
+        window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: sample.id }));
+        v.muted = muted;
         void v.play().then(() => setPlaying(true)).catch(() => {});
       } else {
         v.pause();
         setPlaying(false);
       }
     },
-    [isVideo, onOpenViewer, sample],
+    [isVideo, onOpenViewer, sample, muted],
   );
 
   const onLike = useCallback(
@@ -123,20 +149,30 @@ export function GalleryMediaCard({
 
   const tier = sample.qualityTier ?? null;
   const title = sample.title?.trim() || null;
+  const wide = ratio >= 1.35;
 
   return (
-    <div className={cn("flex w-full flex-col", className)}>
+    <div
+      className={cn(
+        "flex w-full flex-col",
+        !stripMode && (wide ? "col-span-2" : "col-span-1"),
+        className,
+      )}
+    >
       <article
         className={cn(
           "group relative w-full overflow-hidden rounded-[14px]",
           "bg-muted/20 ring-1 ring-border/30 transition duration-300",
           "hover:ring-primary/35 hover:shadow-md",
         )}
-        style={stripMode ? { ...stripCardStyle(sample), aspectRatio: String(ratio) } : { aspectRatio: String(ratio) }}
+        style={
+          stripMode
+            ? { ...stripCardStyle(sample), aspectRatio: String(ratio) }
+            : { aspectRatio: String(ratio) }
+        }
         data-sample-id={sample.id}
         data-aspect={sample.aspectRatio}
       >
-        {/* Controls top-right — clear of left badge */}
         <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
           <button
             type="button"
@@ -162,7 +198,6 @@ export function GalleryMediaCard({
           </Link>
         </div>
 
-        {/* Quality badge top-left — not under buttons */}
         {tier ? (
           <div className="pointer-events-none absolute left-2 top-2 z-10">
             <QualityTierBadge tier={tier} />
@@ -179,7 +214,7 @@ export function GalleryMediaCard({
             <video
               ref={videoRef}
               src={sample.url}
-              muted
+              muted={muted}
               playsInline
               loop
               preload="metadata"
@@ -223,9 +258,22 @@ export function GalleryMediaCard({
             </span>
           ) : null}
         </button>
+
+        {isVideo ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMuted((m) => !m);
+            }}
+            className="absolute bottom-2.5 right-2.5 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/25 bg-black/55 text-white backdrop-blur-md"
+            aria-label={muted ? "Unmute" : "Mute"}
+          >
+            {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+          </button>
+        ) : null}
       </article>
 
-      {/* Title OUTSIDE the media frame */}
       {title ? (
         <p className="mt-1.5 line-clamp-2 px-0.5 text-[12px] font-semibold leading-snug text-foreground">
           {title}

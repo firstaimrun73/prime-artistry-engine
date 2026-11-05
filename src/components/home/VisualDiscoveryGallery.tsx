@@ -1,6 +1,9 @@
 /**
- * YouTube-style discovery: dense grid, no empty holes.
- * Mobile: 2-col mixed. Desktop: 2 Shorts side-by-side rows + photo grid.
+ * Discovery feed: mixed aspect grid.
+ * - 9:16 / 3:4 / 1:1 share columns
+ * - 16:9 and wide items span full width (not squeezed side-by-side)
+ * - Dedupe near-duplicate titles across image/video
+ * - No reel system (viewer is single-item)
  */
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -30,30 +33,62 @@ function normalizeAr(ar: string): string {
   return (ar || "1:1").replace(/\s/g, "");
 }
 
+function titleKey(s: R2Sample): string {
+  return (s.title || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function dedupe(samples: R2Sample[]): R2Sample[] {
-  const seen = new Set<string>();
+  const seenUrl = new Set<string>();
+  const seenTitleMedia = new Set<string>();
   const out: R2Sample[] = [];
   for (const s of samples) {
     if (!s.active) continue;
-    if (seen.has(s.url)) continue;
-    seen.add(s.url);
+    if (seenUrl.has(s.url)) continue;
+    seenUrl.add(s.url);
+    // Avoid stacking same creative as both image and video back-to-back
+    const tk = titleKey(s);
+    const media = s.format === "MP4" || s.url.endsWith(".mp4") ? "v" : "i";
+    if (tk) {
+      const pairKey = `${tk}`;
+      // Prefer keeping the first occurrence of a title; skip exact title+format dupes
+      const full = `${pairKey}|${media}`;
+      if (seenTitleMedia.has(full)) continue;
+      seenTitleMedia.add(full);
+      // If we already showed an image with this title, skip video of same title (and vice versa)
+      const other = media === "v" ? "i" : "v";
+      if (seenTitleMedia.has(`${pairKey}|${other}`)) continue;
+    }
     out.push(s);
   }
   return out.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-/** Interleave shorts (9:16) with photos so the grid never looks sparse. */
+/** Prefer pairing portrait shorts; place wide items so they get full row. */
 function buildFeed(pool: R2Sample[]): R2Sample[] {
-  const shorts = pool.filter((s) => normalizeAr(s.aspectRatio) === "9:16");
-  const others = pool.filter((s) => normalizeAr(s.aspectRatio) !== "9:16");
+  const isWide = (s: R2Sample) => {
+    const ar = normalizeAr(s.aspectRatio);
+    if (ar === "16:9" || ar === "21:9") return true;
+    const m = /^(\d+):(\d+)$/.exec(ar);
+    if (!m) return false;
+    return Number(m[1]) / Number(m[2]) >= 1.35;
+  };
+  const isShort = (s: R2Sample) => normalizeAr(s.aspectRatio) === "9:16";
+
+  const shorts = pool.filter(isShort);
+  const wides = pool.filter(isWide);
+  const mids = pool.filter((s) => !isShort(s) && !isWide(s));
+
   const out: R2Sample[] = [];
   let si = 0;
-  let oi = 0;
-  while (si < shorts.length || oi < others.length) {
-    // pair of shorts
+  let mi = 0;
+  let wi = 0;
+  while (si < shorts.length || mi < mids.length || wi < wides.length) {
     for (let n = 0; n < 2 && si < shorts.length; n++, si++) out.push(shorts[si]);
-    // then a few photos/wide
-    for (let n = 0; n < 2 && oi < others.length; n++, oi++) out.push(others[oi]);
+    for (let n = 0; n < 2 && mi < mids.length; n++, mi++) out.push(mids[mi]);
+    if (wi < wides.length) out.push(wides[wi++]);
   }
   return out;
 }
@@ -129,7 +164,6 @@ export function VisualDiscoveryGallery() {
         </p>
       ) : (
         <>
-          {/* Dense YouTube-like grid: 2 cols mobile, 2–3 desktop for balanced Shorts */}
           <div className="mx-auto grid w-full max-w-4xl grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-2 lg:grid-cols-3 lg:max-w-5xl">
             {shown.map((s) => (
               <GalleryMediaCard
