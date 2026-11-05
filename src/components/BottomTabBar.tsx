@@ -12,7 +12,7 @@ export { hideBottomNav };
 
 /**
  * Center + mark — motion: rest → travel → AI spark → settle (~1.5s) → rest.
- * Links to Studio hub (not Maluto). Label is "Create" only.
+ * Links to Maluto AI (auto-edit / restore). Label is "Maluto AI".
  */
 function AutoCenterIcon({ active }: { active?: boolean }) {
   const [phase, setPhase] = useState<"rest" | "travel" | "spark" | "hold">("rest");
@@ -169,9 +169,8 @@ export function BottomTabBar() {
   if (!user) return null;
   if (hideBottomNav(pathname)) return null;
 
-  // Highlight Create when on any studio path (Image Studio, Video, etc.)
-  const createActive =
-    pathname.startsWith("/studio") && !pathname.startsWith("/studio/image/auto-edit");
+  // Highlight Maluto AI when on the auto-edit / Maluto route
+  const malutoActive = pathname.startsWith("/studio/image/auto-edit");
 
   const left = [
     { to: "/" as const, label: t("nav.home") || "Home", icon: Home },
@@ -219,18 +218,18 @@ export function BottomTabBar() {
           </li>
         ))}
 
-        {/* Center + → Studio hub (Image Studio entry). No Maluto AI label. */}
+        {/* Center + → Maluto AI (auto-edit / restore) */}
         <li className="flex justify-center">
           <Link
-            to="/studio"
-            aria-label="Create — open AI Studio"
+            to="/studio/image/auto-edit"
+            aria-label="Maluto AI — restore and auto-edit photos"
             className={cn(
               "flex flex-col items-center justify-end pb-1",
-              createActive ? "text-primary" : "text-muted-foreground",
+              malutoActive ? "text-primary" : "text-muted-foreground",
             )}
           >
-            <AutoCenterIcon active={createActive} />
-            <span className="-mt-1 text-[9px] font-semibold leading-none tracking-tight">Create</span>
+            <AutoCenterIcon active={malutoActive} />
+            <span className="-mt-1 text-[9px] font-semibold leading-none tracking-tight">Maluto AI</span>
           </Link>
         </li>
 
