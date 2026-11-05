@@ -1,6 +1,6 @@
 /**
- * One-time guided tour: measures the real Maluto AI bottom-tab button
- * and pins spotlight + card above it (works across iOS/Android safe areas).
+ * One-time guided tour pointing at the center Create (+) tab
+ * (Studio hub — Image Studio / AI tools). Maluto AI is reached from Studio.
  */
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -9,14 +9,14 @@ import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "motio2edit-maluto-tour-v1";
-/** Must match data-maluto-tab on BottomTabBar center link. */
-export const MALUTO_TAB_SELECTOR = '[data-maluto-tab="1"]';
+/** Center Create tab on BottomTabBar. */
+export const CREATE_TAB_SELECTOR = 'nav[aria-label="Primary"] a[aria-label^="Create"]';
 
 type TargetBox = { top: number; left: number; width: number; height: number; cx: number; cy: number };
 
-function measureMalutoTab(): TargetBox | null {
+function measureCreateTab(): TargetBox | null {
   if (typeof document === "undefined") return null;
-  const el = document.querySelector(MALUTO_TAB_SELECTOR) as HTMLElement | null;
+  const el = document.querySelector(CREATE_TAB_SELECTOR) as HTMLElement | null;
   if (!el) return null;
   const r = el.getBoundingClientRect();
   if (r.width < 8 || r.height < 8) return null;
@@ -38,7 +38,7 @@ export function MalutoGuideTour() {
   const [target, setTarget] = useState<TargetBox | null>(null);
 
   const refreshTarget = useCallback(() => {
-    setTarget(measureMalutoTab());
+    setTarget(measureCreateTab());
   }, []);
 
   useEffect(() => {
@@ -114,7 +114,7 @@ export function MalutoGuideTour() {
     <div
       className="fixed inset-0 z-[60] md:hidden"
       role="dialog"
-      aria-label="Where is Maluto AI"
+      aria-label="Open AI Studio"
     >
       <button
         type="button"
@@ -164,26 +164,26 @@ export function MalutoGuideTour() {
           </span>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600 dark:text-orange-400">
-              Find Maluto AI
+              AI Studio
             </p>
             <h2 className="mt-0.5 text-base font-extrabold tracking-tight">
-              Restore your photos — just upload
+              Edit any photo in Image Studio
             </h2>
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-              Tap the glowing center button below labeled{" "}
-              <strong className="text-foreground">Maluto AI</strong>. Upload one photo and Maluto
-              restores it automatically.
+              Tap the glowing <strong className="text-foreground">Create</strong> button below to open
+              Studio — start with <strong className="text-foreground">Image Studio</strong> to edit
+              photos, or open Maluto AI from the Studio list.
             </p>
           </div>
         </div>
 
         <div className="mt-3 flex gap-2">
           <Link
-            to="/studio/image/auto-edit"
+            to="/studio/image"
             onClick={dismiss}
             className="flex-1 rounded-full bg-gradient-to-r from-orange-500 to-violet-600 py-2.5 text-center text-sm font-bold text-white shadow-md"
           >
-            Restore Your Photo
+            Image Studio
           </Link>
           <button
             type="button"
@@ -196,7 +196,7 @@ export function MalutoGuideTour() {
 
         <div className="mt-2 flex flex-col items-center text-orange-500" aria-hidden>
           <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-            {target ? "This button" : "Center tab below"}
+            {target ? "Create button" : "Center tab below"}
           </span>
           <span className="mt-0.5 animate-bounce text-xl leading-none">↓</span>
         </div>
@@ -204,7 +204,7 @@ export function MalutoGuideTour() {
 
       {!hole && (
         <p className="pointer-events-none absolute bottom-24 left-1/2 z-[61] w-[90%] -translate-x-1/2 text-center text-xs font-medium text-white/90">
-          Look for the center <strong>Maluto AI</strong> button on the bottom bar
+          Look for the center <strong>Create</strong> button on the bottom bar
         </p>
       )}
     </div>
