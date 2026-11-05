@@ -1,7 +1,8 @@
 /**
- * Discovery card — media only inside frame (title below).
- * One video plays at a time (global pause). Mute/unmute control on videos.
- * Wide ratios (16:9 etc.) use col-span-2 via parent + spanClassForSample.
+ * Discovery card — media inside frame, title + description below.
+ * Failed R2 media never disappear: show a clean text card with the sample details.
+ * One video plays at a time (global pause). Mute/unmute on videos.
+ * Wide ratios (16:9 etc.) span full width via col-span-2.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -97,7 +98,6 @@ export function GalleryMediaCard({
     if (w > 0 && h > 0) setLiveRatio(w / h);
   }, []);
 
-  // Pause this video when another card starts playing
   useEffect(() => {
     if (!isVideo) return;
     const onOtherPlay = (e: Event) => {
@@ -119,7 +119,7 @@ export function GalleryMediaCard({
     (e?: React.MouseEvent | React.TouchEvent) => {
       e?.stopPropagation();
       e?.preventDefault();
-      if (!isVideo || !videoRef.current) {
+      if (!isVideo || !videoRef.current || failed) {
         onOpenViewer?.(sample);
         return;
       }
@@ -133,7 +133,7 @@ export function GalleryMediaCard({
         setPlaying(false);
       }
     },
-    [isVideo, onOpenViewer, sample, muted],
+    [isVideo, onOpenViewer, sample, muted, failed],
   );
 
   const onLike = useCallback(
@@ -145,11 +145,80 @@ export function GalleryMediaCard({
     [onToggleLike, sample],
   );
 
-  if (failed) return null;
-
   const tier = sample.qualityTier ?? null;
-  const title = sample.title?.trim() || null;
+  const title = sample.title?.trim() || "Untitled";
+  const description = sample.description?.trim() || "";
   const wide = ratio >= 1.35;
+
+  // Failed media: still render a full card filled with title + detailed description (no black empty hole)
+  if (failed) {
+    return (
+      <div
+        className={cn(
+          "flex w-full flex-col",
+          !stripMode && (wide ? "col-span-2" : "col-span-1"),
+          className,
+        )}
+      >
+        <article
+          className={cn(
+            "group relative flex w-full flex-col justify-end overflow-hidden rounded-[14px]",
+            "bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 ring-1 ring-border/40",
+            "min-h-[160px] p-3.5",
+          )}
+          style={stripMode ? { ...stripCardStyle(sample) } : { aspectRatio: String(Math.min(ratio, 1.2) || 0.75) }}
+          data-sample-id={sample.id}
+        >
+          <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onLike}
+              className={cn(
+                "grid h-8 w-8 place-items-center rounded-full border backdrop-blur-md",
+                liked
+                  ? "border-primary/40 bg-primary/25 text-primary"
+                  : "border-white/20 bg-black/40 text-white",
+              )}
+              aria-label={liked ? "Unlike" : "Like"}
+            >
+              <Heart className={cn("h-3.5 w-3.5", liked && "fill-current")} />
+            </button>
+            <Link
+              to="/sample/$id"
+              params={{ id: sample.id }}
+              onClick={(e) => e.stopPropagation()}
+              className="grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md"
+              aria-label="Open details"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          {tier ? (
+            <div className="pointer-events-none absolute left-2 top-2 z-10">
+              <QualityTierBadge tier={tier} />
+            </div>
+          ) : null}
+
+          <div className="relative z-10 space-y-1.5 pr-10 pt-8">
+            <p className="text-[13px] font-bold leading-snug text-white">{title}</p>
+            {description ? (
+              <p className="text-[11px] leading-relaxed text-white/75 line-clamp-4">{description}</p>
+            ) : null}
+          </div>
+        </article>
+
+        <p className="mt-1.5 line-clamp-2 px-0.5 text-[12px] font-semibold leading-snug text-foreground">
+          {title}
+        </p>
+        {description ? (
+          <p className="mt-0.5 line-clamp-2 px-0.5 text-[11px] leading-snug text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -208,7 +277,7 @@ export function GalleryMediaCard({
           type="button"
           className="relative block h-full w-full overflow-hidden rounded-[14px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           onClick={togglePlay}
-          aria-label={isVideo ? (playing ? "Pause" : "Play") : `View ${title || "media"}`}
+          aria-label={isVideo ? (playing ? "Pause" : "Play") : `View ${title}`}
         >
           {isVideo ? (
             <video
@@ -230,7 +299,7 @@ export function GalleryMediaCard({
           ) : (
             <img
               src={sample.url}
-              alt={title || "Sample"}
+              alt={title}
               className="absolute inset-0 h-full w-full object-cover"
               loading="lazy"
               decoding="async"
@@ -274,9 +343,13 @@ export function GalleryMediaCard({
         ) : null}
       </article>
 
-      {title ? (
-        <p className="mt-1.5 line-clamp-2 px-0.5 text-[12px] font-semibold leading-snug text-foreground">
-          {title}
+      {/* Title + detailed description always visible under the card */}
+      <p className="mt-1.5 line-clamp-2 px-0.5 text-[12px] font-semibold leading-snug text-foreground">
+        {title}
+      </p>
+      {description ? (
+        <p className="mt-0.5 line-clamp-2 px-0.5 text-[11px] leading-snug text-muted-foreground">
+          {description}
         </p>
       ) : null}
     </div>
