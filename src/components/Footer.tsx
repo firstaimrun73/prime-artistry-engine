@@ -6,6 +6,7 @@ const LINKS: { label: string; to: string }[] = [
   { label: "Privacy", to: "/privacy" },
   { label: "Terms", to: "/terms" },
   { label: "Security", to: "/security" },
+  { label: "Advertising", to: "/advertising" },
   { label: "Contact", to: "/support" },
   { label: "Support", to: "/support" },
   { label: "Help", to: "/faq" },
@@ -31,8 +32,10 @@ function shouldShowFooter(pathname: string, signedIn: boolean): boolean {
     pathname.startsWith("/security") ||
     pathname.startsWith("/terms") ||
     pathname.startsWith("/privacy") ||
+    pathname.startsWith("/advertising") ||
     pathname.startsWith("/features") ||
-    pathname.startsWith("/feedback")
+    pathname.startsWith("/feedback") ||
+    pathname.startsWith("/learn")
   ) {
     return true;
   }
