@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { getLearnArticle, LEARN_ARTICLES } from "@/lib/learn-articles";
@@ -57,34 +58,51 @@ function LearnArticlePage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <article className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
-        <nav className="text-xs text-muted-foreground">
-          <Link to="/" className="hover:text-foreground">
-            Home
+      <header className="sticky top-14 z-20 border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-6">
+          <Link
+            to="/learn"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary"
+            aria-label="Back to guides"
+          >
+            <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
           </Link>
-          <span className="mx-1.5">/</span>
-          <Link to="/learn" className="hover:text-foreground">
-            Learn
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Motio2edit</p>
+            <p className="truncate text-sm font-medium">Article</p>
+          </div>
+          <Link
+            to="/about"
+            className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
+          >
+            About Product
           </Link>
-          <span className="mx-1.5">/</span>
-          <span className="text-foreground">{article.title}</span>
-        </nav>
-        <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{article.title}</h1>
-        <p className="mt-3 text-muted-foreground">{article.description}</p>
-        <p className="mt-2 text-xs text-muted-foreground">Updated {article.datePublished} · Motio2edit</p>
+        </div>
+      </header>
 
-        {article.sections.map((s) => (
-          <section key={s.heading} className="mt-10">
-            <h2 className="text-xl font-semibold">{s.heading}</h2>
-            {s.body.map((p) => (
-              <p key={p.slice(0, 48)} className="mt-3 text-base leading-relaxed text-muted-foreground">
-                {p}
-              </p>
-            ))}
-          </section>
-        ))}
+      <article className="mx-auto max-w-3xl px-4 pb-20 pt-10 sm:px-6 sm:pt-12">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Guide</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{article.title}</h1>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">{article.description}</p>
+        <p className="mt-2 text-xs text-muted-foreground">Updated {article.datePublished}</p>
 
-        <div className="mt-12 rounded-2xl border border-border bg-card p-5">
+        <div className="mt-10 space-y-4">
+          {article.sections.map((s) => (
+            <section
+              key={s.heading}
+              className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+            >
+              <h2 className="text-lg font-semibold tracking-tight">{s.heading}</h2>
+              {s.body.map((p) => (
+                <p key={p.slice(0, 48)} className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+                  {p}
+                </p>
+              ))}
+            </section>
+          ))}
+        </div>
+
+        <div className="mt-10 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <p className="font-semibold">Try it in Motio2edit</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Sign in to open Image Studio, Circle 2edit, Remove BG, and Video Studio with your plan credits.
@@ -92,15 +110,15 @@ function LearnArticlePage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               to="/auth"
-              className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              className="inline-flex rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
               Sign in
             </Link>
             <Link
-              to="/features"
-              className="inline-flex rounded-md border border-border px-4 py-2 text-sm font-medium"
+              to="/about"
+              className="inline-flex rounded-full border border-border px-4 py-2 text-sm font-medium"
             >
-              Features
+              About Product
             </Link>
           </div>
         </div>
@@ -108,19 +126,18 @@ function LearnArticlePage() {
         {others.length > 0 && (
           <aside className="mt-12">
             <h2 className="text-lg font-semibold">More guides</h2>
-            <ul className="mt-3 space-y-2">
+            <div className="mt-4 grid gap-3">
               {others.map((a) => (
-                <li key={a.slug}>
-                  <Link
-                    to="/learn/$slug"
-                    params={{ slug: a.slug }}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    {a.title}
-                  </Link>
-                </li>
+                <Link
+                  key={a.slug}
+                  to="/learn/$slug"
+                  params={{ slug: a.slug }}
+                  className="rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium transition hover:border-primary/40"
+                >
+                  {a.title}
+                </Link>
               ))}
-            </ul>
+            </div>
           </aside>
         )}
       </article>

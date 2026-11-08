@@ -11,30 +11,30 @@ export type LearnArticle = {
 export const LEARN_ARTICLES: LearnArticle[] = [
   {
     slug: "who-owns-your-face-ai-privacy",
-    title: "Who Owns Your Face in the Age of AI? The Hidden Privacy Risks Behind AI Image and Video Generation",
+    title: "Faces, Uploads, and AI Image Tools: A Practical Privacy Guide",
     description:
-      "An educational guide to how AI photo and video tools handle faces, uploads, retention, third-party processing, and your rights — and how Motio2edit approaches privacy without overclaiming.",
+      "How AI photo and video tools use uploads, what temporary processing means, and what Motio2edit states on Security and Privacy — without industry ranking claims.",
     datePublished: "2026-11-08",
     sections: [
       {
-        heading: "Why faces feel different from other pixels",
+        heading: "Why faces need careful handling",
         body: [
-          "A face is not just another region of an image. It is biometric-adjacent information: it can identify you, link you across apps, and — when combined with other data — support profiling or impersonation. When you upload a selfie or a family portrait to an AI editor, you are not only asking for a better crop or a cleaner background. You are handing a service a high-signal representation of a person.",
-          "That does not mean every AI tool is misusing faces. It does mean that privacy-minded creators should understand the difference between generation inputs, temporary processing, long-term retention, and model training. Those four buckets are often mixed together in marketing language. Separating them is the first step toward informed use.",
+          "A face in a photo can identify a person. When you upload a portrait for restoration, style change, or video motion, you are sharing a high-signal image so the tool can complete that job.",
+          "Good practice is to separate four ideas: the input needed for generation, temporary processing for that job, retention for account history or support, and any use of content to improve models. Marketing language often mixes these. Clear product pages help you decide what you are comfortable uploading.",
         ],
       },
       {
-        heading: "Generation inputs vs retention vs training",
+        heading: "What Motio2edit documents today",
         body: [
-          "Generation input is the photo, mask, or prompt required to produce a result. Without that input, the job cannot run. Temporary processing means the provider receives what it needs for that job and is not expected to keep the material as a permanent product dataset. Retention means the platform keeps copies — for history, re-download, support, abuse review, or product analytics — for some period under its own rules. Training means content may be used to improve models that serve many users, not only your account.",
-          "Motio2edit’s public security and privacy pages describe processing as temporary for generation workflows, content as staying tied to your account, and uploads as sent to AI providers only as needed to produce results. They do not claim end-to-end encryption of every media pipeline.",
+          "Motio2edit’s Security and Privacy pages describe content as tied to your account, uploads sent to AI providers only as needed to produce results, and processing as part of generation workflows. Motio2edit uses multiple AI providers for image and video generation depending on the feature and plan path.",
+          "Those pages do not claim end-to-end encryption of every media pipeline. For account access, deletion, or support questions, use the Support channel listed on the site.",
         ],
       },
       {
-        heading: "What privacy-first can honestly mean",
+        heading: "Practical tips for creators",
         body: [
-          "Privacy-first is not the same as zero data. Editing in the cloud requires data movement. Privacy-first is closer to: minimize what is collected, tie content to the account that created it, process for the stated job, avoid selling personal content, and give users paths to access or delete personal data through support channels.",
-          "For creators comparing tools, useful questions include: Is training on my uploads disclosed? Can I delete account data? Are payments separated from media storage?",
+          "Prefer photos you have rights to use. For other people’s portraits, get permission before public or commercial edits.",
+          "Review outputs before you publish. If a result drifts from the person or product you intended, regenerate with a clearer keep-identity instruction.",
         ],
       },
     ],
@@ -49,15 +49,15 @@ export const LEARN_ARTICLES: LearnArticle[] = [
       {
         heading: "Still frames become motion",
         body: [
-          "Image-to-video models estimate how a scene might move over a few seconds: camera drift, subject motion, water, wind, or subtle facial dynamics. The still image anchors identity and composition; the model invents plausible motion between frames.",
-          "In Motio2edit Video Studio, you upload a reference image, choose duration and aspect ratio where your plan allows, and generate a short clip. Preview before download and refine with a clearer motion instruction if needed.",
+          "Image-to-video estimates how a scene might move over a few seconds: camera drift, subject motion, water, wind, or subtle facial dynamics. The still anchors identity and composition; the model invents plausible motion between frames.",
+          "In Motio2edit Video Studio, upload a reference image, choose duration and aspect ratio where your plan allows, and generate a short clip. Preview before download and refine with a clearer motion instruction if needed.",
         ],
       },
       {
         heading: "What works best",
         body: [
           "Clear subjects, good lighting, and simple backgrounds usually animate more cleanly than heavy compression, extreme blur, or crowded scenes. Vertical 9:16 and 3:4 frames suit reels; landscape suits cinematic pans.",
-          "Prompt for direction: “slow push-in,” “gentle head turn,” “rippling water,” rather than vague “make it move.” Over-aggressive motion can distort faces or products.",
+          "Prompt for direction — slow push-in, gentle head turn, rippling water — rather than a vague “make it move.” Over-aggressive motion can distort faces or products.",
         ],
       },
     ],
