@@ -10,6 +10,7 @@ import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
 import { WatchDemoSection } from "@/components/home/WatchDemoSection";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
 import { PreLoginSampleStrip } from "@/components/home/PreLoginSampleStrip";
+import { PrivacyPhilosophySection } from "@/components/home/PrivacyPhilosophySection";
 import { useAuth } from "@/lib/auth";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/components/FeedbackCard";
@@ -67,6 +68,7 @@ function SignedOutHome() {
       <PreLoginSampleStrip />
       <BeforeAfterShowcase />
       <WatchDemoSection variant="prominent" />
+      <PrivacyPhilosophySection />
       <ArchitectureFlowSection />
       <StudioShowcase />
       <TrustSection />
