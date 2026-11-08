@@ -5,18 +5,18 @@ import { Button } from "@/components/ui/button";
 const PILLARS = [
   {
     icon: Shield,
-    title: "Your photos stay yours",
-    body: "Content stays tied to your account. We do not sell your personal content for advertising.",
+    title: "Content tied to your account",
+    body: "Generations and uploads you create in Motio2edit stay linked to your signed-in account for history and re-download.",
   },
   {
     icon: Lock,
-    title: "Processing for the job only",
-    body: "Uploads are sent to AI providers only as needed to produce results. Processing is temporary for generation workflows.",
+    title: "Processing for the job",
+    body: "Files are sent to AI providers only as needed to complete the edit or generation you request. Processing follows the job workflow described on Security.",
   },
   {
     icon: EyeOff,
-    title: "Access limited to you",
-    body: "Authenticated sessions and owner-scoped access mean each user can only reach their own profile and generations.",
+    title: "Owner-scoped access",
+    body: "Authenticated sessions are designed so each user reaches their own profile and generations — not other accounts’ work.",
   },
 ] as const;
 
@@ -27,21 +27,18 @@ export function PrivacyPhilosophySection() {
         <div className="border-b border-border bg-secondary/40 px-6 py-8 text-center sm:px-10 sm:py-10">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
             <Sparkles className="h-3.5 w-3.5" />
-            Privacy-first AI
+            Account-first design
           </span>
           <h2
             id="privacy-philosophy-heading"
             className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl md:text-4xl"
           >
-            AI That Respects Your Privacy.{" "}
-            <span className="text-primary">Creativity Without Compromise.</span>
+            Built so your work stays{" "}
+            <span className="text-primary">with your account.</span>
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Most AI tools learn from your uploads. Motio2edit keeps your creativity yours.
-            Your photos. Your creations. Your privacy.
-          </p>
-          <p className="mx-auto mt-2 max-w-xl text-sm font-medium text-foreground/90">
-            Create with AI. Stay in control of your data.
+            Motio2edit is a credit-based studio. Uploads power the edit you ask for; access is scoped to your
+            login. For the full operational picture, see Security and Privacy.
           </p>
         </div>
 
@@ -64,7 +61,7 @@ export function PrivacyPhilosophySection() {
 
         <div className="flex flex-col items-center gap-3 border-t border-border bg-secondary/20 px-6 py-6 sm:flex-row sm:justify-between sm:px-10">
           <p className="text-center text-sm text-muted-foreground sm:text-left">
-            Want the full picture on faces, training data, and your rights in AI image tools?
+            Practical notes on faces, uploads, and how AI image tools handle data.
           </p>
           <Button asChild variant="outline" className="gap-2 shrink-0">
             <Link to="/learn/$slug" params={{ slug: "who-owns-your-face-ai-privacy" }}>

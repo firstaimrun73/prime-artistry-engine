@@ -1,6 +1,18 @@
+import { useRef, useCallback, useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, Video, Music, Zap, Play, ArrowRight, Upload, Wand2, Download } from "lucide-react";
+import {
+  Image as ImageIcon,
+  Video,
+  Music,
+  Zap,
+  Play,
+  ArrowRight,
+  Upload,
+  Wand2,
+  Download,
+} from "lucide-react";
+import { getDemoVideoSample } from "@/lib/r2-catalog";
 
 const VALUE_PROPS = [
   { icon: ImageIcon, label: "AI Image Editing" },
@@ -16,8 +28,9 @@ const STEPS = [
 ];
 
 /** Pre-login hero — never deep-link into product editors (Circle, Lens, etc.). */
-const AUTH_THEN_CIRCLE =
-  "/studio/image/circle-remove?mode=remove&from=home";
+const AUTH_THEN_CIRCLE = "/studio/image/circle-remove?mode=remove&from=home";
+
+const DEMO = getDemoVideoSample();
 
 function scrollToWatchDemo() {
   const el = document.querySelector("[data-watch-demo]");
@@ -25,10 +38,39 @@ function scrollToWatchDemo() {
 }
 
 /**
- * Hero copy + CTAs only. The old local mountain demo (/demo/video/motio2edit-demo.mp4)
- * was removed — the single official demo is WatchDemoSection (R2 Demo_Video.mp4).
+ * Hero: copy + CTAs + compact official R2 demo under Watch demo
+ * (same Demo_Video as WatchDemoSection — single source of truth).
  */
 export function HomeHero() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [ratio, setRatio] = useState("9 / 16");
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onMeta = () => {
+      if (v.videoWidth > 0 && v.videoHeight > 0) {
+        setRatio(`${v.videoWidth} / ${v.videoHeight}`);
+      }
+    };
+    v.addEventListener("loadedmetadata", onMeta);
+    if (v.readyState >= 1) onMeta();
+    return () => v.removeEventListener("loadedmetadata", onMeta);
+  }, []);
+
+  const toggle = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      void v.play().catch(() => {});
+      setPlaying(true);
+    } else {
+      v.pause();
+      setPlaying(false);
+    }
+  }, []);
+
   return (
     <section className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-10 sm:pb-16 sm:pt-16">
       <div className="reveal-up mx-auto max-w-3xl text-center">
@@ -46,8 +88,8 @@ export function HomeHero() {
           Edit images and videos with AI in one workspace. Remove objects, enhance portraits,
           change outfits, generate video — upload, describe, and generate.
         </p>
-        <p className="mx-auto mt-3 max-w-xl text-sm font-medium text-foreground/90">
-          Most AI tools learn from your uploads. Motio2edit keeps your creativity yours.
+        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
+          Your generations stay tied to your account. Clear credits, one studio for image, video, and music.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
@@ -62,6 +104,38 @@ export function HomeHero() {
           <Button type="button" size="lg" variant="ghost" className="gap-2" onClick={scrollToWatchDemo}>
             <Play className="h-4 w-4" /> Watch demo
           </Button>
+        </div>
+
+        {/* Compact official demo under CTAs — same R2 Demo_Video as WatchDemoSection */}
+        <div className="mx-auto mt-8 max-w-[280px] sm:max-w-[320px]">
+          <div
+            className="relative overflow-hidden rounded-2xl border border-border/60 bg-muted/20 shadow-md"
+            style={{ aspectRatio: ratio }}
+          >
+            <video
+              ref={videoRef}
+              src={DEMO.url}
+              playsInline
+              preload="metadata"
+              className="h-full w-full object-contain"
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              aria-label={DEMO.title}
+            />
+            <button
+              type="button"
+              onClick={toggle}
+              className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/10"
+              aria-label={playing ? "Pause demo" : "Play demo"}
+            >
+              {!playing && (
+                <span className="grid h-12 w-12 place-items-center rounded-full border border-white/30 bg-black/50 text-white backdrop-blur-md">
+                  <Play className="h-5 w-5 fill-current" />
+                </span>
+              )}
+            </button>
+          </div>
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">Product demo · Motio2edit</p>
         </div>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
