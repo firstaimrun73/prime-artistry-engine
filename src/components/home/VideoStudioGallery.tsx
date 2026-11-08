@@ -1,6 +1,7 @@
 /**
  * VIDEO gallery — Motion2AI Creation samples.
  * Media-first cards; native aspect; hover/touch preview; one unmuted video at a time.
+ * Img-video samples show a special "Image→Video" badge.
  */
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
@@ -14,6 +15,14 @@ function isPortraitRatio(aspectRatio: string): boolean {
     aspectRatio === "3:4" ||
     aspectRatio === "2:3" ||
     aspectRatio === "4:5"
+  );
+}
+
+function isImgVideoSample(sample: R2Sample): boolean {
+  return (
+    sample.id.startsWith("vid-imgvid-") ||
+    sample.label === "Image→Video" ||
+    (sample.url || "").includes("/Img-video/")
   );
 }
 
@@ -39,6 +48,7 @@ function VideoCard({
   const [portrait, setPortrait] = useState(catalogPortrait);
   const [failed, setFailed] = useState(false);
   const isUnmuted = unmutedId === sample.id;
+  const imgVideo = isImgVideoSample(sample);
 
   useEffect(() => {
     const v = ref.current;
@@ -147,18 +157,26 @@ function VideoCard({
         >
           {isUnmuted ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
         </button>
-        {sample.qualityTier ? (
-          <span
-            className={cn(
-              "absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-[9px] font-bold shadow-sm backdrop-blur-sm",
-              sample.qualityTier === "Premium" && "bg-amber-500/95 text-black",
-              sample.qualityTier === "Ultra AI" && "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-400 text-white",
-              sample.qualityTier === "Standard" && "bg-white/90 text-zinc-800",
-            )}
-          >
-            {sample.qualityTier}
-          </span>
-        ) : null}
+        <div className="absolute left-2 top-2 z-10 flex flex-col gap-1">
+          {imgVideo ? (
+            <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground shadow-sm">
+              Image→Video
+            </span>
+          ) : null}
+          {sample.qualityTier ? (
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[9px] font-bold shadow-sm backdrop-blur-sm",
+                sample.qualityTier === "Premium" && "bg-amber-500/95 text-black",
+                sample.qualityTier === "Ultra AI" &&
+                  "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-cyan-400 text-white",
+                sample.qualityTier === "Standard" && "bg-white/90 text-zinc-800",
+              )}
+            >
+              {sample.qualityTier}
+            </span>
+          ) : null}
+        </div>
       </div>
       {sample.title ? (
         <p className="truncate px-1.5 pt-1.5 text-[11px] font-medium leading-tight text-foreground/80">
