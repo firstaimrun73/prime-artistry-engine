@@ -3,6 +3,10 @@
  *
  * Single UI surface: GoogleLanguageSelect (icon → menu) in the Header.
  * TranslateWidget only initializes the hidden GT engine (no floating control).
+ *
+ * Ukrainian (uk) is supported. On first visit (no saved language), visitors whose
+ * IP resolves to Ukraine (country code UA) are auto-set to Ukrainian. A manual
+ * language pick is always respected and never overwritten by geo.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -10,10 +14,13 @@ import { Check, Languages } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "motio2edit-gt-lang";
+/** "user" = explicit pick; "geo" = auto from IP — geo can refresh on country change */
+const SOURCE_KEY = "motio2edit-gt-lang-source";
 const PAGE_LANG = "en";
 
 export const GT_LANGUAGES = [
   { code: "en", label: "English" },
+  { code: "uk", label: "Ukrainian" },
   { code: "hi", label: "Hindi" },
   { code: "es", label: "Spanish" },
   { code: "fr", label: "French" },
@@ -51,6 +58,10 @@ declare global {
   }
 }
 
+function isSupportedLang(code: string): code is GtLangCode {
+  return GT_LANGUAGES.some((l) => l.code === code);
+}
+
 function setGoogTransCookie(target: string) {
   const value = target === PAGE_LANG ? "" : `/${PAGE_LANG}/${target}`;
   const expire =
@@ -69,17 +80,36 @@ function setGoogTransCookie(target: string) {
 function readStoredLang(): string {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
-    if (s && GT_LANGUAGES.some((l) => l.code === s)) return s;
+    if (s && isSupportedLang(s)) return s;
   } catch {
     /* ignore */
   }
   try {
     const m = document.cookie.match(/(?:^|;\s*)googtrans=\/[^/]*\/([^;]+)/);
-    if (m?.[1] && GT_LANGUAGES.some((l) => l.code === m[1])) return m[1];
+    if (m?.[1] && isSupportedLang(m[1])) return m[1];
   } catch {
     /* ignore */
   }
   return PAGE_LANG;
+}
+
+function readLangSource(): "user" | "geo" | null {
+  try {
+    const s = localStorage.getItem(SOURCE_KEY);
+    if (s === "user" || s === "geo") return s;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function persistLang(lang: string, source: "user" | "geo") {
+  try {
+    localStorage.setItem(STORAGE_KEY, lang);
+    localStorage.setItem(SOURCE_KEY, source);
+  } catch {
+    /* ignore */
+  }
 }
 
 function fireComboChange(combo: HTMLSelectElement, lang: string) {
@@ -87,12 +117,8 @@ function fireComboChange(combo: HTMLSelectElement, lang: string) {
   combo.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-function applyLanguage(lang: string) {
-  try {
-    localStorage.setItem(STORAGE_KEY, lang);
-  } catch {
-    /* ignore */
-  }
+function applyLanguage(lang: string, source: "user" | "geo" = "user") {
+  persistLang(lang, source);
   setGoogTransCookie(lang);
 
   const combo =
@@ -106,6 +132,83 @@ function applyLanguage(lang: string) {
   }
 
   window.location.reload();
+}
+
+/**
+ * Resolve preferred language from IP country.
+ * Ukraine (UA) → Ukrainian (uk). Other countries → null (keep English default).
+ * Uses a lightweight public country lookup; fails soft to null.
+ */
+async function detectLangFromIp(): Promise<GtLangCode | null> {
+  try {
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), 3500);
+    // country.is returns { country: "UA" } for the client IP
+    const res = await fetch("https://api.country.is/", {
+      signal: ctrl.signal,
+      credentials: "omit",
+    });
+    window.clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { country?: string };
+    const cc = (data.country || "").toUpperCase();
+    if (cc === "UA") return "uk";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Browser Accept-Language hint when IP lookup is unavailable. */
+function detectLangFromBrowser(): GtLangCode | null {
+  try {
+    const list = navigator.languages?.length ? navigator.languages : [navigator.language];
+    for (const raw of list) {
+      const tag = (raw || "").toLowerCase();
+      if (tag.startsWith("uk")) return "uk";
+      // map exact matches already in GT_LANGUAGES
+      const base = tag.split("-")[0];
+      if (isSupportedLang(tag)) return tag;
+      if (isSupportedLang(base)) return base as GtLangCode;
+      if (tag.startsWith("zh")) return "zh-CN";
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/**
+ * Auto language for visitors without a manual choice.
+ * - User pick always wins.
+ * - Geo (Ukraine → uk) applies on first visit and when last source was geo.
+ */
+async function resolveAutoLanguage(): Promise<string> {
+  const source = readLangSource();
+  if (source === "user") {
+    return readStoredLang();
+  }
+
+  const fromIp = await detectLangFromIp();
+  if (fromIp) {
+    persistLang(fromIp, "geo");
+    setGoogTransCookie(fromIp);
+    return fromIp;
+  }
+
+  // If we already stored a geo lang and IP lookup failed this time, keep stored
+  if (source === "geo") {
+    return readStoredLang();
+  }
+
+  const fromBrowser = detectLangFromBrowser();
+  if (fromBrowser && fromBrowser !== PAGE_LANG) {
+    persistLang(fromBrowser, "geo");
+    setGoogTransCookie(fromBrowser);
+    return fromBrowser;
+  }
+
+  return PAGE_LANG;
 }
 
 function injectHideStyles() {
@@ -164,51 +267,60 @@ export function TranslateWidget() {
 
     injectHideStyles();
 
-    const initial = readStoredLang();
-    if (initial !== PAGE_LANG) {
-      setGoogTransCookie(initial);
-    }
+    let cancelled = false;
 
-    window.googleTranslateElementInit = () => {
-      try {
-        if (!window.google?.translate?.TranslateElement) return;
-        const included = GT_LANGUAGES.map((l) => l.code).join(",");
-        // eslint-disable-next-line no-new
-        new window.google.translate.TranslateElement(
-          {
-            pageLanguage: PAGE_LANG,
-            includedLanguages: included,
-            autoDisplay: false,
-          },
-          "google_translate_element",
-        );
-        stripGoogleJunkNodes();
+    void (async () => {
+      const initial = await resolveAutoLanguage();
+      if (cancelled) return;
 
-        const stored = readStoredLang();
-        if (stored && stored !== PAGE_LANG) {
-          setTimeout(() => {
-            const combo = document.querySelector("select.goog-te-combo") as HTMLSelectElement | null;
-            if (combo) fireComboChange(combo, stored);
-            stripGoogleJunkNodes();
-          }, 400);
-        }
-      } catch (e) {
-        console.warn("[TranslateWidget] init failed", e);
+      if (initial !== PAGE_LANG) {
+        setGoogTransCookie(initial);
       }
-    };
 
-    if (!document.getElementById("google_translate_element")) {
-      const host = document.createElement("div");
-      host.id = "google_translate_element";
-      host.setAttribute("aria-hidden", "true");
-      document.body.appendChild(host);
-    }
+      window.googleTranslateElementInit = () => {
+        try {
+          if (!window.google?.translate?.TranslateElement) return;
+          const included = GT_LANGUAGES.map((l) => l.code).join(",");
+          // eslint-disable-next-line no-new
+          new window.google.translate.TranslateElement(
+            {
+              pageLanguage: PAGE_LANG,
+              includedLanguages: included,
+              autoDisplay: false,
+            },
+            "google_translate_element",
+          );
+          stripGoogleJunkNodes();
 
-    ensureGoogleScript();
+          const stored = readStoredLang();
+          if (stored && stored !== PAGE_LANG) {
+            setTimeout(() => {
+              const combo = document.querySelector("select.goog-te-combo") as HTMLSelectElement | null;
+              if (combo) fireComboChange(combo, stored);
+              stripGoogleJunkNodes();
+            }, 400);
+          }
+        } catch (e) {
+          console.warn("[TranslateWidget] init failed", e);
+        }
+      };
+
+      if (!document.getElementById("google_translate_element")) {
+        const host = document.createElement("div");
+        host.id = "google_translate_element";
+        host.setAttribute("aria-hidden", "true");
+        document.body.appendChild(host);
+      }
+
+      ensureGoogleScript();
+    })();
 
     const obs = new MutationObserver(() => stripGoogleJunkNodes());
     obs.observe(document.body, { childList: true, subtree: true });
-    return () => obs.disconnect();
+    return () => {
+      cancelled = true;
+      obs.disconnect();
+    };
   }, []);
 
   return null;
@@ -226,7 +338,14 @@ export function GoogleLanguageSelect({ className }: { className?: string }) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setLang(readStoredLang());
+    let cancelled = false;
+    void (async () => {
+      const resolved = await resolveAutoLanguage();
+      if (!cancelled) setLang(resolved);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -252,7 +371,7 @@ export function GoogleLanguageSelect({ className }: { className?: string }) {
   const pick = (code: string) => {
     setLang(code);
     setOpen(false);
-    applyLanguage(code);
+    applyLanguage(code, "user");
   };
 
   return (
