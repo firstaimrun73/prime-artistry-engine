@@ -1,10 +1,12 @@
 /**
  * Central R2 sample catalog — production public URLs only.
  * Domain: https://assets.motio2edit.com
- * Tiers: Standard/Premium for video; Standard/Premium/Ultra AI for image.
+ * Large sample lists live in split modules to keep this file maintainable.
  */
-
 import { R2_IMG_VIDEO_SAMPLES } from "./r2-img-video-samples";
+import { R2_EXTRA_IMAGE_SAMPLES } from "./r2-extra-images";
+import { R2_EXTRA_VIDEO_SAMPLES } from "./r2-extra-videos";
+
 export const R2_PUBLIC = "https://assets.motio2edit.com" as const;
 
 export type R2Studio = "image" | "video" | "circle" | "auto-edit";
@@ -96,12 +98,11 @@ export const DEMO_VIDEO_SAMPLE: R2Sample = {
   active: true,
 };
 
-export const R2_IMAGE_SAMPLES: R2Sample[] = [
-  { id: "img-m6-statue-standard", title: "Museum Antelope Statue", description: "White antelope statue stands inside a classical marble museum hall.", studio: "image", feature: "image-generation", homepageCategory: "samples", url: media("media_6", "Statue_Standard.png"), filename: "Statue_Standard.png", width: 1024, height: 1024, aspectRatio: "1:1", format: "PNG", qualityTier: "Standard", sortOrder: 400, active: true },
-];
-
-export const R2_VIDEO_SAMPLES: R2Sample[] = [
-  { id: "vid-m1-storm-bow", title: "Storm Ship Bridge", description: "Ship bridge faces stormy waves under a lightning filled sky.", studio: "video", feature: "video-generation", homepageCategory: "video", url: media("media_1", "Alone-sail_standard.mp4"), filename: "Alone-sail_standard.mp4", width: 768, height: 768, aspectRatio: "1:1", format: "MP4", qualityTier: "Standard", hasAudio: true, sortOrder: 100, active: true },
+/** Re-export combined lists for callers that still read the arrays. */
+export const R2_IMAGE_SAMPLES = R2_EXTRA_IMAGE_SAMPLES as unknown as R2Sample[];
+export const R2_VIDEO_SAMPLES = [
+  ...(R2_EXTRA_VIDEO_SAMPLES as unknown as R2Sample[]),
+  ...(R2_IMG_VIDEO_SAMPLES as unknown as R2Sample[]),
 ];
 
 function dedupeByUrl(samples: R2Sample[]): R2Sample[] {
@@ -125,7 +126,7 @@ export function getActiveR2ImageSamples(): R2Sample[] {
 }
 
 export function getActiveR2VideoSamples(): R2Sample[] {
-  return dedupeByUrl([...R2_VIDEO_SAMPLES, ...R2_IMG_VIDEO_SAMPLES]).sort((a, b) => a.sortOrder - b.sortOrder);
+  return dedupeByUrl(R2_VIDEO_SAMPLES).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export function getImagineOnlySamples(): R2Sample[] {
@@ -145,7 +146,7 @@ export function getVideoOnlySamples(): R2Sample[] {
 }
 
 export function getAllDiscoverSamples(): R2Sample[] {
-  return dedupeByUrl([DEMO_VIDEO_SAMPLE, ...R2_IMAGE_SAMPLES, ...R2_VIDEO_SAMPLES, ...R2_IMG_VIDEO_SAMPLES]).sort(
+  return dedupeByUrl([DEMO_VIDEO_SAMPLE, ...R2_IMAGE_SAMPLES, ...R2_VIDEO_SAMPLES]).sort(
     (a, b) => a.sortOrder - b.sortOrder,
   );
 }
@@ -154,7 +155,6 @@ export function getR2SampleById(id: string): R2Sample | null {
   return (
     R2_IMAGE_SAMPLES.find((s) => s.id === id) ??
     R2_VIDEO_SAMPLES.find((s) => s.id === id) ??
-    R2_IMG_VIDEO_SAMPLES.find((s) => s.id === id) ??
     (DEMO_VIDEO_SAMPLE.id === id ? DEMO_VIDEO_SAMPLE : null)
   );
 }
