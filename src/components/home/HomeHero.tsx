@@ -44,6 +44,9 @@ export function HomeHero() {
             Edit images and videos with AI in one workspace. Remove objects, enhance portraits,
             change outfits, generate video — upload, describe, and generate.
           </p>
+          <p className="mx-auto mt-3 max-w-xl text-sm font-medium text-foreground/90 lg:mx-0">
+            Most AI tools learn from your uploads. Motio2edit keeps your creativity yours.
+          </p>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
             <Button asChild size="lg" className="gap-2">
