@@ -17,7 +17,6 @@ import { FeedbackCard } from "@/components/FeedbackCard";
 import { TrustSection } from "@/components/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
-import { FooterAd } from "@/components/ads";
 import { pageHead, SITE_BRAND_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
@@ -58,6 +57,7 @@ function SignedInHome() {
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
  * Single official demo lives in HomeHero (no duplicate WatchDemoSection).
+ * No FooterAd on the public homepage.
  */
 function SignedOutHome() {
   return (
@@ -72,7 +72,6 @@ function SignedOutHome() {
       <TrustSection />
       <HomeTestimonials />
       <FinalCTA />
-      <FooterAd placement="home" />
       <Footer />
       <FloatingLanguageButton />
     </div>

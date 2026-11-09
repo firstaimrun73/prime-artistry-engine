@@ -1,7 +1,8 @@
 /**
  * Signed-out homepage sample strip.
  * Still images (account-2 pre-login*) + six public R2 video samples.
- * Cards respect each sample's aspect ratio. Videos use lazy preload + click-to-play.
+ * Landscape videos use a consistent 16:9 frame + object-cover (no tall empty bands).
+ * Videos: lazy preload, click-to-play, pause siblings.
  */
 import { useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
@@ -31,11 +32,8 @@ function VideoCard({ sample }: { sample: R2Sample }) {
     const v = ref.current;
     if (!v) return;
     if (v.paused) {
-      // Pause other sample videos on the page
       document.querySelectorAll<HTMLVideoElement>("[data-prelogin-sample-video]").forEach((other) => {
-        if (other !== v) {
-          other.pause();
-        }
+        if (other !== v) other.pause();
       });
       void v.play().catch(() => {});
       setPlaying(true);
@@ -46,15 +44,16 @@ function VideoCard({ sample }: { sample: R2Sample }) {
   }, []);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className={cn("relative overflow-hidden bg-secondary", aspectClass(sample.aspectRatio))}>
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      {/* Fixed 16:9 frame for all landscape pre-login videos — consistent mobile rows */}
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
         <video
           ref={ref}
           data-prelogin-sample-video
           src={sample.url}
           playsInline
           preload="none"
-          className="h-full w-full object-contain"
+          className="absolute inset-0 h-full w-full object-cover"
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           aria-label={sample.title}
@@ -62,7 +61,7 @@ function VideoCard({ sample }: { sample: R2Sample }) {
         <button
           type="button"
           onClick={toggle}
-          className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/15"
+          className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/20"
           aria-label={playing ? `Pause ${sample.title}` : `Play ${sample.title}`}
         >
           {!playing && (
@@ -72,13 +71,13 @@ function VideoCard({ sample }: { sample: R2Sample }) {
           )}
         </button>
       </div>
-      <div className="p-3.5">
+      <div className="flex flex-1 flex-col p-3.5">
         <p className="text-sm font-bold leading-snug">{sample.title}</p>
         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{sample.description}</p>
         <Link
           to="/auth"
           search={{ mode: "signup", redirect: "/studio/video" }}
-          className="mt-2 inline-block text-xs font-semibold text-primary"
+          className="mt-auto pt-2 text-xs font-semibold text-primary"
         >
           Sign in to create →
         </Link>
@@ -98,7 +97,7 @@ function ImageCard({ sample }: { sample: R2Sample }) {
       to="/auth"
       search={{ mode: "signup", redirect: "/" }}
       className={cn(
-        "group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:border-primary/40 hover:shadow-md",
+        "group flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:border-primary/40 hover:shadow-md",
         portrait && "sm:max-w-xs sm:justify-self-center",
       )}
     >
@@ -111,10 +110,10 @@ function ImageCard({ sample }: { sample: R2Sample }) {
           draggable={false}
         />
       </div>
-      <div className="p-3.5">
+      <div className="flex flex-1 flex-col p-3.5">
         <p className="text-sm font-bold leading-snug">{sample.title}</p>
         <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{sample.description}</p>
-        <span className="mt-2 inline-block text-xs font-semibold text-primary">Sign in to try →</span>
+        <span className="mt-auto pt-2 text-xs font-semibold text-primary">Sign in to try →</span>
       </div>
     </Link>
   );
@@ -139,7 +138,7 @@ export function PreLoginSampleStrip() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {samples.map((s) =>
           isVideoSample(s) ? <VideoCard key={s.id} sample={s} /> : <ImageCard key={s.id} sample={s} />,
         )}
