@@ -5,7 +5,7 @@ const TRUST_ITEMS = [
   {
     icon: ShieldCheck,
     title: "Private by default",
-    body: "Your uploads are processed securely and never used to train public models.",
+    body: "Your uploads and creations are not used to train AI models.",
   },
   {
     icon: Zap,
@@ -51,7 +51,7 @@ export function TrustSection() {
       <div className="mb-8 text-center">
         <h2 className="text-2xl font-bold sm:text-3xl">Built for creators who care</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Motion2AI powers every studio — simple controls, serious quality.
+          Motio2edit gives you clear controls and quality results — powered by the Motion2AI engine.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
