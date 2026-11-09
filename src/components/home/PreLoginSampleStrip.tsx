@@ -1,10 +1,14 @@
 /**
  * Signed-out homepage sample strip.
- * Uses ONLY Cloudflare account-2 files named pre-login* / pre_login*.
- * Card frame follows each sample's aspectRatio (9:16 stays portrait, 16:9 stays wide).
+ * Still images (account-2 pre-login*) + six public R2 video samples.
+ * Cards respect each sample's aspect ratio. Videos use lazy preload + click-to-play.
  */
+import { useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
+import { Play } from "lucide-react";
 import { getAccount2PreloginSamples } from "@/lib/r2-account2-samples";
+import { getPreloginVideoSamples } from "@/lib/r2-prelogin-videos";
+import type { R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
 
 function aspectClass(ar: string): string {
@@ -12,12 +16,114 @@ function aspectClass(ar: string): string {
   if (n === "9:16" || n === "3:4" || n === "2:3" || n === "4:5") return "aspect-[9/16]";
   if (n === "1:1") return "aspect-square";
   if (n === "4:3" || n === "3:2") return "aspect-[4/3]";
-  // 16:9, 21:9, 16:10, default landscape
   return "aspect-video";
 }
 
+function isVideoSample(s: R2Sample): boolean {
+  return s.format.toUpperCase() === "MP4" || /\.mp4($|\?)/i.test(s.url);
+}
+
+function VideoCard({ sample }: { sample: R2Sample }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const toggle = useCallback(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (v.paused) {
+      // Pause other sample videos on the page
+      document.querySelectorAll<HTMLVideoElement>("[data-prelogin-sample-video]").forEach((other) => {
+        if (other !== v) {
+          other.pause();
+        }
+      });
+      void v.play().catch(() => {});
+      setPlaying(true);
+    } else {
+      v.pause();
+      setPlaying(false);
+    }
+  }, []);
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <div className={cn("relative overflow-hidden bg-secondary", aspectClass(sample.aspectRatio))}>
+        <video
+          ref={ref}
+          data-prelogin-sample-video
+          src={sample.url}
+          playsInline
+          preload="none"
+          className="h-full w-full object-contain"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          aria-label={sample.title}
+        />
+        <button
+          type="button"
+          onClick={toggle}
+          className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/15"
+          aria-label={playing ? `Pause ${sample.title}` : `Play ${sample.title}`}
+        >
+          {!playing && (
+            <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-black/55 text-white backdrop-blur-md">
+              <Play className="h-5 w-5 fill-current" />
+            </span>
+          )}
+        </button>
+      </div>
+      <div className="p-3.5">
+        <p className="text-sm font-bold leading-snug">{sample.title}</p>
+        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{sample.description}</p>
+        <Link
+          to="/auth"
+          search={{ mode: "signup", redirect: "/studio/video" }}
+          className="mt-2 inline-block text-xs font-semibold text-primary"
+        >
+          Sign in to create →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function ImageCard({ sample }: { sample: R2Sample }) {
+  const portrait =
+    sample.aspectRatio === "9:16" ||
+    sample.aspectRatio === "3:4" ||
+    sample.aspectRatio === "2:3" ||
+    sample.aspectRatio === "4:5";
+  return (
+    <Link
+      to="/auth"
+      search={{ mode: "signup", redirect: "/" }}
+      className={cn(
+        "group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:border-primary/40 hover:shadow-md",
+        portrait && "sm:max-w-xs sm:justify-self-center",
+      )}
+    >
+      <div className={cn("relative overflow-hidden bg-secondary", aspectClass(sample.aspectRatio))}>
+        <img
+          src={sample.url}
+          alt={sample.title}
+          loading="lazy"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          draggable={false}
+        />
+      </div>
+      <div className="p-3.5">
+        <p className="text-sm font-bold leading-snug">{sample.title}</p>
+        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{sample.description}</p>
+        <span className="mt-2 inline-block text-xs font-semibold text-primary">Sign in to try →</span>
+      </div>
+    </Link>
+  );
+}
+
 export function PreLoginSampleStrip() {
-  const samples = getAccount2PreloginSamples();
+  const images = getAccount2PreloginSamples();
+  const videos = getPreloginVideoSamples();
+  const samples: R2Sample[] = [...images, ...videos];
   if (samples.length === 0) return null;
 
   return (
@@ -34,41 +140,9 @@ export function PreLoginSampleStrip() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {samples.map((s) => {
-          const portrait =
-            s.aspectRatio === "9:16" ||
-            s.aspectRatio === "3:4" ||
-            s.aspectRatio === "2:3" ||
-            s.aspectRatio === "4:5";
-          return (
-            <Link
-              key={s.id}
-              to="/auth"
-              search={{ redirect: "/" }}
-              className={cn(
-                "group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:border-primary/40 hover:shadow-md",
-                portrait && "sm:max-w-xs sm:justify-self-center",
-              )}
-            >
-              <div className={cn("relative overflow-hidden bg-secondary", aspectClass(s.aspectRatio))}>
-                <img
-                  src={s.url}
-                  alt={s.title}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                  draggable={false}
-                />
-              </div>
-              <div className="p-3.5">
-                <p className="text-sm font-bold leading-snug">{s.title}</p>
-                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{s.description}</p>
-                <span className="mt-2 inline-block text-xs font-semibold text-primary">
-                  Sign in to try →
-                </span>
-              </div>
-            </Link>
-          );
-        })}
+        {samples.map((s) =>
+          isVideoSample(s) ? <VideoCard key={s.id} sample={s} /> : <ImageCard key={s.id} sample={s} />,
+        )}
       </div>
     </section>
   );

@@ -1,44 +1,40 @@
 import { Link } from "@tanstack/react-router";
-import { Shield, Lock, EyeOff, ArrowRight, Sparkles } from "lucide-react";
+import { FolderOpen, Workflow, UserRound, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PILLARS = [
   {
-    icon: Shield,
-    title: "Content tied to your account",
-    body: "Generations and uploads you create in Motio2edit stay linked to your signed-in account for history and re-download.",
+    icon: FolderOpen,
+    title: "Your creative workspace",
+    body: "Generations and projects you create stay linked to your Motio2edit account so you can revisit and download them later.",
   },
   {
-    icon: Lock,
-    title: "Processing for the job",
-    body: "Files are sent to AI providers only as needed to complete the edit or generation you request. Processing follows the job workflow described on Security.",
+    icon: Workflow,
+    title: "Processing for the requested job",
+    body: "When you run an edit or generation, files are processed through the job pipeline needed to complete that request.",
   },
   {
-    icon: EyeOff,
-    title: "Owner-scoped access",
-    body: "Authenticated sessions are designed so each user reaches their own profile and generations — not other accounts’ work.",
+    icon: UserRound,
+    title: "Account-scoped access",
+    body: "Signed-in sessions are designed so you work in your own profile and history — not another account’s workspace.",
   },
 ] as const;
 
 export function PrivacyPhilosophySection() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16" aria-labelledby="privacy-philosophy-heading">
+    <section className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16" aria-labelledby="account-first-heading">
       <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         <div className="border-b border-border bg-secondary/40 px-6 py-8 text-center sm:px-10 sm:py-10">
-          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
-            <Sparkles className="h-3.5 w-3.5" />
-            Account-first design
-          </span>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Account-first design</p>
           <h2
-            id="privacy-philosophy-heading"
-            className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl md:text-4xl"
+            id="account-first-heading"
+            className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl md:text-4xl"
           >
-            Built so your work stays{" "}
-            <span className="text-primary">with your account.</span>
+            Your creations. Your account. Your workspace.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Motio2edit is a credit-based studio. Uploads power the edit you ask for; access is scoped to your
-            login. For the full operational picture, see Security and Privacy.
+            Create, edit and revisit your creative work with Motio2edit. Your account gives you a personal
+            workspace for your generations and saved projects.
           </p>
         </div>
 
@@ -61,14 +57,19 @@ export function PrivacyPhilosophySection() {
 
         <div className="flex flex-col items-center gap-3 border-t border-border bg-secondary/20 px-6 py-6 sm:flex-row sm:justify-between sm:px-10">
           <p className="text-center text-sm text-muted-foreground sm:text-left">
-            Practical notes on faces, uploads, and how AI image tools handle data.
+            Operational details live on Security and Privacy.
           </p>
-          <Button asChild variant="outline" className="gap-2 shrink-0">
-            <Link to="/learn/$slug" params={{ slug: "who-owns-your-face-ai-privacy" }}>
-              Read the guide
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/security">
+                Security
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/privacy">Privacy</Link>
+            </Button>
+          </div>
         </div>
       </div>
     </section>
