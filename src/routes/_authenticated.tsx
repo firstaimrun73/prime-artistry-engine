@@ -6,6 +6,7 @@ import { AdminPopupModal } from "@/components/AdminPopupModal";
 import { FirstGenerationFeedback } from "@/components/FirstGenerationFeedback";
 import { FreePlanNotices } from "@/components/FreePlanNotices";
 import { MusicAccessGate } from "@/components/MusicAccessGate";
+import { AvatarCommentBubble } from "@/components/AvatarCommentBubble";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -17,6 +18,18 @@ function hideChromeHeader(pathname: string): boolean {
   if (pathname.startsWith("/studio/video")) return true;
   if (pathname === "/music" || pathname.startsWith("/music/")) return true;
   if (pathname.startsWith("/studio/music")) return true;
+  if (pathname.startsWith("/studio/image/auto-edit")) return true;
+  if (pathname.startsWith("/studio/image/circle-remove")) return true;
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) return true;
+  return false;
+}
+
+/** Hide floating comments over focused creation UIs. */
+function hideAvatarComments(pathname: string): boolean {
+  if (pathname.startsWith("/editor")) return true;
+  if (pathname.startsWith("/studio/video")) return true;
+  if (pathname.startsWith("/studio/music") || pathname === "/music" || pathname.startsWith("/music/"))
+    return true;
   if (pathname.startsWith("/studio/image/auto-edit")) return true;
   if (pathname.startsWith("/studio/image/circle-remove")) return true;
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return true;
@@ -50,6 +63,7 @@ function AuthenticatedLayout() {
   const isMusicRoute = pathname === "/music" || pathname.startsWith("/music/");
   const noHeader = hideChromeHeader(pathname);
   const isEditorShell = pathname.startsWith("/editor");
+  const showComments = !hideAvatarComments(pathname);
 
   const main = isMusicRoute ? (
     <MusicAccessGate>
@@ -67,13 +81,13 @@ function AuthenticatedLayout() {
           : "min-h-screen w-full min-w-0 overflow-x-clip bg-background"
       }
     >
-      {/* Single primary nav: top Header only — no left AppSidebar on desktop. */}
       <div className="w-full min-w-0">
         {!noHeader && <Header />}
         {main}
         <AdminPopupModal />
         <FirstGenerationFeedback />
         <FreePlanNotices />
+        {showComments ? <AvatarCommentBubble /> : null}
       </div>
     </div>
   );
