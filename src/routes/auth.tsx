@@ -10,9 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
+function parseAuthMode(raw: unknown): "signin" | "signup" | "otp" | undefined {
+  if (raw === "signin" || raw === "login") return "signin";
+  if (raw === "signup" || raw === "register" || raw === "sign-up") return "signup";
+  if (raw === "otp") return "otp";
+  return undefined;
+}
+
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
     redirect: typeof s.redirect === "string" ? s.redirect : undefined,
+    mode: parseAuthMode(s.mode),
   }),
   component: AuthPage,
 });
@@ -20,8 +28,8 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { redirect } = useSearch({ from: "/auth" });
-  const [mode, setMode] = useState<"signin" | "signup" | "otp">("signin");
+  const { redirect, mode: modeFromSearch } = useSearch({ from: "/auth" });
+  const [mode, setMode] = useState<"signin" | "signup" | "otp">(modeFromSearch || "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -31,6 +39,10 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   const dest = redirect || "/dashboard";
+
+  useEffect(() => {
+    if (modeFromSearch) setMode(modeFromSearch);
+  }, [modeFromSearch]);
 
   useEffect(() => {
     if (user) navigate({ to: dest });
@@ -66,7 +78,6 @@ function AuthPage() {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        // When email confirmation is required, no session is returned yet.
         if (!data.session) {
           toast.success("Account created! Check your email to verify your account before signing in.");
           setMode("signin");
@@ -126,17 +137,18 @@ function AuthPage() {
   };
 
   const handleGoogle = async () => {
+    const params = new URLSearchParams();
+    if (dest) params.set("redirect", dest);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth${dest ? `?redirect=${encodeURIComponent(dest)}` : ""}`,
+        redirectTo: `${window.location.origin}/auth${params.toString() ? `?${params}` : ""}`,
         queryParams: { prompt: "select_account" },
       },
     });
     if (error) {
       toast.error("Google sign-in failed.");
     }
-    // On success the browser is redirected to Google by Supabase.
   };
 
   const handleReset = async () => {
