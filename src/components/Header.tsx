@@ -50,7 +50,10 @@ export function Header() {
   ];
 
   const authLinks: NavItem[] = showChat ? [...authLinksBase, CHAT_LINK] : authLinksBase;
-  const links: NavItem[] = user ? authLinks : PUBLIC_LINKS;
+  /** Mobile sheet links for signed-in users. Desktop signed-in uses AppSidebar. */
+  const mobileAuthLinks: NavItem[] = authLinks;
+  /** Center nav is public-only — avoids duplicating AppSidebar on signed-in desktop. */
+  const centerLinks: NavItem[] = user ? [] : PUBLIC_LINKS;
 
   const avatarSrc = resolveAvatarSrc(profile?.avatar_url, profile?.avatar_signed_url, {
     nameOrEmail: profile?.display_name || profile?.email,
@@ -70,27 +73,22 @@ export function Header() {
           <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
-          {links.map((l) => (
-            <Link
-              key={`${l.to}-${l.label}`}
-              to={l.to}
-              activeProps={{ className: "bg-secondary/80 text-foreground" }}
-              activeOptions={l.to === "/" ? { exact: true } : undefined}
-              className="rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:px-2.5 xl:px-3"
-            >
-              {l.label}
-            </Link>
-          ))}
-          {user && admin && (
-            <Link
-              to="/admin"
-              className="ml-1 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-secondary"
-            >
-              <ShieldCheck className="h-4 w-4" /> Admin
-            </Link>
-          )}
-        </nav>
+        {/* Desktop center links: signed-out only (signed-in desktop uses left AppSidebar) */}
+        {centerLinks.length > 0 ? (
+          <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
+            {centerLinks.map((l) => (
+              <Link
+                key={`${l.to}-${l.label}`}
+                to={l.to}
+                activeProps={{ className: "bg-secondary/80 text-foreground" }}
+                activeOptions={l.to === "/" ? { exact: true } : undefined}
+                className="rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:px-2.5 xl:px-3"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {user ? <GoogleLanguageSelect /> : null}
@@ -123,6 +121,14 @@ export function Header() {
                   </span>
                 )}
               </button>
+              {admin ? (
+                <Link
+                  to="/admin"
+                  className="hidden items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-primary hover:bg-secondary md:inline-flex"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" /> Admin
+                </Link>
+              ) : null}
             </>
           ) : (
             <div className="flex items-center gap-1 sm:gap-2">
@@ -144,7 +150,7 @@ export function Header() {
             </div>
           )}
 
-          {/* Mobile menu: signed-in only. Pre-login uses Sign in / Get started in the bar. */}
+          {/* Mobile menu: signed-in only. Desktop signed-in uses AppSidebar. */}
           {user ? (
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
@@ -157,7 +163,7 @@ export function Header() {
                   <BrandMark />
                 </div>
                 <nav className="flex flex-col p-2">
-                  {links.map((l) => (
+                  {mobileAuthLinks.map((l) => (
                     <Link
                       key={`${l.to}-${l.label}`}
                       to={l.to}
@@ -169,6 +175,15 @@ export function Header() {
                       {l.label}
                     </Link>
                   ))}
+                  {admin ? (
+                    <Link
+                      to="/admin"
+                      onClick={() => setMenuOpen(false)}
+                      className="rounded-lg px-4 py-3 text-base font-medium text-primary"
+                    >
+                      Admin
+                    </Link>
+                  ) : null}
                 </nav>
               </SheetContent>
             </Sheet>

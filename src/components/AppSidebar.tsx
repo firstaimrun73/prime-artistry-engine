@@ -11,6 +11,7 @@ import {
   Crown,
   Sparkles,
   LayoutGrid,
+  LayoutDashboard,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -20,9 +21,8 @@ import { BrandMark } from "@/components/BrandMark";
 import { useI18n } from "@/lib/i18n";
 
 /**
- * Desktop vertical sidebar for authenticated routes.
- * Always shows Home, Image, Maluto, Pricing + Profile/Settings.
- * Video / Music / History / Chat when policy allows.
+ * Desktop vertical sidebar for authenticated routes (md+).
+ * Primary navigation when signed in — Header no longer repeats these links.
  */
 export function AppSidebar() {
   const { user, profile } = useAuth();
@@ -39,6 +39,7 @@ export function AppSidebar() {
   type NavItem = { to: string; label: string; icon: typeof Home; exact?: boolean };
   const items: NavItem[] = [
     { to: "/", label: t("nav.home") || "Home", icon: Home, exact: true },
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/studio", label: "AI Studio", icon: LayoutGrid },
     { to: "/studio/image", label: t("nav.image") || "Image", icon: ImageIcon },
     { to: "/studio/image/auto-edit", label: "Maluto AI", icon: Sparkles },
@@ -48,7 +49,6 @@ export function AppSidebar() {
   if (paid) {
     items.push({ to: "/history", label: t("nav.history") || "History", icon: History });
   }
-  // Pricing always available
   items.push({ to: "/pricing", label: "Pricing", icon: Crown });
   if (showChat) items.push({ to: "/chat", label: t("nav.chat") || "Chat", icon: MessageSquare });
 
@@ -84,14 +84,22 @@ export function AppSidebar() {
       </nav>
       <div className="space-y-0.5 border-t border-border px-3 py-3">
         <Link
-          to={user ? "/dashboard" : "/auth"}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          to={user ? "/profile" : "/auth"}
+          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            pathname.startsWith("/profile")
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
         >
           <User className="h-4 w-4" /> {t("nav.profile") || "Profile"}
         </Link>
         <Link
           to="/settings"
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            pathname.startsWith("/settings")
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
         >
           <Settings className="h-4 w-4" /> {t("nav.settings") || "Settings"}
         </Link>
