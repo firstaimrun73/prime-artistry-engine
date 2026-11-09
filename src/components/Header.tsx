@@ -37,14 +37,13 @@ export function Header() {
   const showChat = paid;
 
   /**
-   * Signed-in desktop top nav — single Pricing entry (no separate Plans).
-   * History for paid users; no Plans+Pricing pair.
+   * Signed-in top nav — single primary system.
+   * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
    */
   const authLinksBase: NavItem[] = [
     { to: "/", label: "Home" },
     { to: "/studio", label: "AI Studio" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
-    { to: "/dashboard", label: "Dashboard" },
     ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
     { to: "/pricing", label: "Pricing" },
   ];
@@ -71,7 +70,6 @@ export function Header() {
           <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        {/* Desktop center nav — sole primary nav on authenticated desktop (no left sidebar) */}
         <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
           {centerLinks.map((l) => (
             <Link
@@ -107,20 +105,22 @@ export function Header() {
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
+              {/* Avatar = Dashboard shortcut (not a separate Dashboard nav item) */}
               <button
                 type="button"
-                onClick={() => navigate({ to: "/profile" })}
-                className="relative"
-                aria-label="Profile"
+                onClick={() => navigate({ to: "/dashboard" })}
+                className="relative rounded-full ring-offset-2 ring-offset-background transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
+                aria-label="Open dashboard"
+                title="Dashboard"
               >
-                <Avatar className="h-9 w-9 border border-border">
+                <Avatar className="h-9 w-9 border border-border transition hover:opacity-90">
                   <AvatarImage src={avatarSrc} alt="" />
                   <AvatarFallback>
                     {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 {isPaidPlan(profile?.plan) && (
-                  <span className="absolute -right-1 -top-1">
+                  <span className="absolute -right-1 -top-1 pointer-events-none">
                     <CrownBadge />
                   </span>
                 )}
@@ -146,7 +146,6 @@ export function Header() {
             </div>
           )}
 
-          {/* Mobile hamburger — signed-in menu. Pre-login uses Sign in / Get started only. */}
           {user ? (
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
@@ -159,6 +158,13 @@ export function Header() {
                   <BrandMark />
                 </div>
                 <nav className="flex flex-col p-2">
+                  <Link
+                    to="/dashboard"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  >
+                    Dashboard
+                  </Link>
                   {sheetLinks.map((l) => (
                     <Link
                       key={`${l.to}-${l.label}`}
