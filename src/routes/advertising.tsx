@@ -5,62 +5,58 @@ import { Footer } from "@/components/Footer";
 export const Route = createFileRoute("/advertising")({
   head: () => ({
     meta: [
-      { title: "Advertising & Ads Policy — MOTIO2EDIT" },
+      { title: "Advertising — MOTIO2EDIT" },
       {
         name: "description",
         content:
-          "How Motio2edit displays ads, third-party ad partners, cookies, and user choices. Written for transparency and advertising program compliance.",
+          "How Motio2edit may show limited sponsored placements for free-plan experiences, and how that relates to privacy choices.",
       },
-      { property: "og:title", content: "Advertising & Ads Policy — MOTIO2EDIT" },
+      { property: "og:title", content: "Advertising — MOTIO2EDIT" },
       {
         property: "og:description",
-        content: "Ads, partners, cookies, and privacy choices on Motio2edit.",
+        content: "Sponsored placements and privacy choices on Motio2edit.",
       },
     ],
   }),
   component: AdvertisingPolicy,
 });
 
+/**
+ * Policy reflects the current product code (Direct Link / optional network tags for
+ * eligible free signed-in users; AdSense scripts are actively stripped).
+ */
 const SECTIONS: { title: string; body: string }[] = [
   {
     title: "Purpose of this page",
-    body: "This Advertising & Ads Policy explains how Motio2edit may show advertisements, how third-party ad technology can work on free or ad-supported experiences, and how that relates to your privacy choices. It supplements our Privacy & Safety page and is maintained so visitors and advertising programs can understand our practices.",
+    body: "This page explains how Motio2edit may show limited sponsored or partner placements, who may see them, and where to find related privacy controls. It supplements Privacy & Safety and is kept aligned with the product as it ships.",
   },
   {
-    title: "Where ads may appear",
-    body: "Ads may appear on public marketing pages and on some free-plan product experiences where the product indicates an ad-supported mode. Paid plans that remove ads will not show those placements when your account is correctly upgraded. We do not place ads inside private generation results you download as your own files.",
+    title: "What we show today",
+    body: "Motio2edit may display a small number of sponsored direct-link cards for eligible free-plan, signed-in users on allowed routes. Paid plans and admin accounts are treated as ad-free for those placements. Public marketing pages do not rely on third-party display-ad networks as a primary experience. We do not place ads inside private generation files you download.",
   },
   {
-    title: "Third-party advertising partners",
-    body: "We may work with third-party advertising networks and technology providers (for example Google AdSense or similar partners) to deliver and measure ads. Those partners may use cookies, mobile identifiers, or similar technologies to serve relevant ads, limit how often you see the same ad, and understand aggregate performance. Partner practices are governed by their own policies in addition to ours.",
+    title: "Partners and scripts",
+    body: "The product includes optional partner integrations that can be enabled for eligible free users (for example a sponsored outbound link, and optional network tags controlled by site settings). Google AdSense / googlesyndication scripts are not used as an active display stack in the current client; disallowed third-party ad artifacts are cleaned up by the app when a visitor is not eligible for ads.",
   },
   {
     title: "Cookies and similar technologies",
-    body: "Advertising cookies and similar technologies may store or access information on your device to support ad delivery and measurement. You can control cookies through your browser settings. Blocking some cookies may reduce personalization or cause some features to work less smoothly. For broader data practices, see our Privacy & Safety page.",
+    body: "Core product cookies support authentication and preferences. Additional partner technologies, if enabled for an eligible session, may use cookies or similar storage under their own policies. You can control cookies in your browser; blocking some cookies may affect personalization or partner measurement where those partners are active.",
   },
   {
-    title: "Personalized vs non-personalized ads",
-    body: "Depending on your region, consent choices, and partner settings, you may see personalized ads based on interests inferred from activity, or non-personalized ads that rely less on individual profiles (for example contextual or general ads). Where required by law, we aim to respect consent and opt-out mechanisms provided by applicable platforms.",
+    title: "Paid plans",
+    body: "When your account is on a paid plan (or admin), the in-app sponsored placements described above are not shown. Plan status is evaluated on the server-side product rules the app already uses for credits and entitlements.",
   },
   {
-    title: "Children and restricted audiences",
-    body: "Motio2edit is not directed at children under 13 (or the minimum age required in your country). We do not knowingly collect personal information from children for advertising. If you believe a child has provided data inappropriately, contact us through Support so we can take appropriate action.",
-  },
-  {
-    title: "Prohibited content in ads we control",
-    body: "When we control ad inventory directly, we do not intentionally run ads that promote illegal activity, malware, or content that clearly violates our acceptable-use standards. Third-party networks apply their own review systems; report problematic ads via Support with a screenshot and URL when possible.",
-  },
-  {
-    title: "Data we share for advertising",
-    body: "We do not sell your private generations or account content as an advertising product. Limited technical data needed to operate ad placements (such as page URLs, device type, or approximate location inferred by partners) may be processed by ad technology providers under their terms. Account-tied creative files remain governed by our Privacy & Safety commitments.",
+    title: "Children",
+    body: "Motio2edit is not directed at children under 13 (or the minimum age required in your country). We do not knowingly collect personal information from children for advertising.",
   },
   {
     title: "Your choices",
-    body: "You may adjust browser cookie settings, use industry opt-out tools where available, upgrade to an ad-free plan when offered, or contact Support with privacy requests (access, correction, deletion) related to personal data we hold. For Google advertising settings and ad personalization controls, use Google’s published user tools when Google ads are present.",
+    body: "You may adjust browser cookie settings, upgrade to a paid plan when available, or contact Support with privacy requests related to personal data we hold. For broader data practices, see Privacy & Safety.",
   },
   {
     title: "Changes and contact",
-    body: "We may update this page as products or partners change. Material updates will be reflected by the date on this page when practical. Questions: support@motio2edit.com or the Support page. Related documents: Privacy & Safety, Terms of Service, and Security.",
+    body: "We may update this page as products or partners change. Questions: support@motio2edit.com or the Support page. Related documents: Privacy & Safety, Terms of Service, and Security.",
   },
 ];
 
@@ -70,12 +66,9 @@ function AdvertisingPolicy() {
       <Header />
       <div className="mx-auto max-w-3xl px-4 py-16">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Policy</p>
-        <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
-          Advertising &amp; Ads Policy
-        </h1>
+        <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Advertising</h1>
         <p className="mt-3 text-muted-foreground">
-          Transparency for visitors, creators, and advertising program review. Last updated 8 November
-          2026.
+          How limited sponsored placements may appear for free experiences. Last updated 10 November 2026.
         </p>
         <div className="mt-10 space-y-6">
           {SECTIONS.map((s) => (
