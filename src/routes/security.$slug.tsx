@@ -21,7 +21,7 @@ type Detail = {
   sections: { heading: string; body: string }[];
 };
 
-/** Claims stay aligned with product architecture — no invented encryption marketing. */
+/** Claims stay aligned with product architecture and Privacy — no invented guarantees. */
 const PAGES: Record<string, Detail> = {
   encryption: {
     title: "Data Encryption",
@@ -86,12 +86,12 @@ const PAGES: Record<string, Detail> = {
         body: "Generations and uploads associated with your account remain private to your account views. We do not sell your creative content for advertising.",
       },
       {
-        heading: "Sharing",
-        body: "Content is only shared when you download or publish it yourself, or when required to process a generation through AI infrastructure partners.",
+        heading: "Limited sharing",
+        body: "Content is shared with AI infrastructure and other service providers only as needed to complete a job you start, run authentication, store account data, send transactional email, or process payments — not for third-party marketing of your work.",
       },
       {
         heading: "More detail",
-        body: "See the Privacy policy and Trust pages for policy language that governs legal processing of personal data.",
+        body: "See the Privacy policy for how job processing, account history, and AI model training are distinguished.",
       },
     ],
   },
@@ -104,12 +104,16 @@ const PAGES: Record<string, Detail> = {
         body: "When you generate or edit, the application sends the required inputs (such as prompts and uploaded media) to AI providers so a result can be produced.",
       },
       {
-        heading: "Temporary processing",
-        body: "Provider processing is used to complete the requested generation. Motio2edit stores generation records and outputs needed for your history and downloads according to product design.",
+        heading: "Temporary processing vs account history",
+        body: "Provider processing is used to complete the requested generation. Motio2edit stores generation records and outputs needed for your history and downloads according to product design. Completing a job is not the same as training a model.",
+      },
+      {
+        heading: "AI model training",
+        body: "Your content is not used to train AI models by Motio2edit. We do not fine-tune Motio2edit models on customer uploads, prompts, or generations.",
       },
       {
         heading: "Honest limits",
-        body: "We do not claim that inputs are never processed by third-party AI systems — that is how cloud generation works. Use the product only with content you have rights to process.",
+        body: "Cloud generation requires sending inputs to AI infrastructure partners. Use the product only with content you have rights to process. See Privacy for limited processor sharing.",
       },
     ],
   },
