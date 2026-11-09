@@ -16,14 +16,13 @@ import { Coins, ShieldCheck, Menu } from "lucide-react";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NavItem = { to: any; label: string };
 
+/** Lean public nav — About / Security remain in the footer. */
 const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
-  { to: "/about", label: "About" },
   { to: "/studio/image/auto-edit", label: "Maluto AI" },
   { to: "/pricing", label: "Pricing" },
-  { to: "/faq", label: "FAQs" },
-  { to: "/security", label: "Security" },
+  { to: "/faq", label: "FAQ" },
   { to: "/support", label: "Support" },
 ];
 
@@ -95,8 +94,10 @@ export function Header() {
           )}
         </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <GoogleLanguageSelect />
+        <div className="flex items-center gap-1.5 sm:gap-3">
+          {/* Language stays in header only when signed in. Pre-login uses floating control. */}
+          {user ? <GoogleLanguageSelect /> : null}
+
           {user ? (
             <>
               <button
@@ -127,15 +128,20 @@ export function Header() {
               </button>
             </>
           ) : (
-            <div className="hidden items-center gap-2 sm:flex">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Button
                 variant="ghost"
                 size="sm"
+                className="px-2.5 sm:px-3"
                 onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}
               >
                 Sign in
               </Button>
-              <Button size="sm" onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}>
+              <Button
+                size="sm"
+                className="px-2.5 sm:px-3"
+                onClick={() => navigate({ to: "/auth", search: { redirect: undefined } })}
+              >
                 Get started
               </Button>
             </div>

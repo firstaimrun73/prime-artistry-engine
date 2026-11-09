@@ -11,6 +11,7 @@ import { WatchDemoSection } from "@/components/home/WatchDemoSection";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
 import { PreLoginSampleStrip } from "@/components/home/PreLoginSampleStrip";
 import { PrivacyPhilosophySection } from "@/components/home/PrivacyPhilosophySection";
+import { FloatingLanguageButton } from "@/components/FloatingLanguageButton";
 import { useAuth } from "@/lib/auth";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/components/FeedbackCard";
@@ -76,6 +77,8 @@ function SignedOutHome() {
       <FinalCTA />
       <FooterAd placement="home" />
       <Footer />
+      {/* Pre-login only language control — not shown after login */}
+      <FloatingLanguageButton />
     </div>
   );
 }
@@ -89,7 +92,10 @@ function HomeTestimonials() {
   if (!data || data.length === 0) return null;
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:py-14">
-      <h2 className="text-center text-2xl font-bold sm:text-3xl">Loved by creators worldwide</h2>
+      <h2 className="text-center text-2xl font-bold sm:text-3xl">What creators are saying</h2>
+      <p className="mx-auto mt-2 max-w-lg text-center text-sm text-muted-foreground">
+        Feedback from people using Motio2edit — not staged quotes.
+      </p>
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {data.slice(0, 6).map((f) => (
           <FeedbackCard key={f.id} f={f} />
