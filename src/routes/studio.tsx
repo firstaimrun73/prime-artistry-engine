@@ -28,7 +28,11 @@ function StudioLayout() {
   return <StudioHub />;
 }
 
-/** Fixed viewport tool picker — mobile layout preserved; desktop uses wider balanced grid. */
+/**
+ * AI Studio hub.
+ * Mobile: preserved 2-col + full-width Music, flexible rows for short viewports.
+ * Desktop (md+): balanced 3-col grid — five equal cards, no stretched columns.
+ */
 function StudioHub() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
@@ -37,22 +41,27 @@ function StudioHub() {
   const musicOk = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background">
+    <div className="flex min-h-[100dvh] flex-col bg-background md:min-h-0 md:h-[100dvh] md:max-h-[100dvh] md:overflow-hidden">
       <Header />
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 md:max-w-6xl lg:max-w-7xl">
-        <div className="mb-2 shrink-0 text-center sm:mb-3">
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 md:max-w-6xl md:overflow-hidden lg:max-w-7xl">
+        <div className="mb-3 shrink-0 text-center sm:mb-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             AI+ Tools
           </p>
           <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a tool</h1>
         </div>
 
-        {/* Mobile: 2-col + wide Music. Desktop (md+): 4-col top row, Music full width below. */}
+        {/*
+          Mobile: 2 columns, Music spans full width, flexible heights.
+          Desktop: 3 columns × balanced auto-rows; Music sits in the same grid (not oversized).
+        */}
         <div
           className={cn(
             "grid min-h-0 flex-1 gap-2.5 sm:gap-3",
-            "grid-cols-2 grid-rows-[1.1fr_1fr_0.85fr]",
-            "md:grid-cols-4 md:grid-rows-[1.15fr_0.9fr] md:gap-4",
+            /* mobile */
+            "grid-cols-2 auto-rows-[minmax(9.5rem,1fr)]",
+            /* desktop: balanced cards, fixed max height so tiles are not skyscrapers */
+            "md:grid-cols-3 md:auto-rows-[minmax(11rem,14rem)] md:content-start md:gap-4",
           )}
         >
           <StudioTile
@@ -113,7 +122,7 @@ function StudioHub() {
             subtitle={musicOk ? "Prompt-to-music" : "Requires a paid plan"}
             gradient="from-fuchsia-500/30 via-transparent to-transparent"
             locked={!musicOk}
-            className="col-span-2 md:col-span-4"
+            className="col-span-2 md:col-span-1"
             icon={
               <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
                 <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.4s_ease-in-out_infinite]" />

@@ -2,7 +2,6 @@ import { createFileRoute, Outlet, useRouter, useRouterState } from "@tanstack/re
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Header } from "@/components/Header";
-import { AppSidebar } from "@/components/AppSidebar";
 import { AdminPopupModal } from "@/components/AdminPopupModal";
 import { FirstGenerationFeedback } from "@/components/FirstGenerationFeedback";
 import { FreePlanNotices } from "@/components/FreePlanNotices";
@@ -12,7 +11,7 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-/** Focused creative / exception pages — no top Header / sidebar chrome. */
+/** Focused creative / exception pages — no top Header chrome. */
 function hideChromeHeader(pathname: string): boolean {
   if (pathname.startsWith("/editor")) return true;
   if (pathname.startsWith("/studio/video")) return true;
@@ -68,9 +67,8 @@ function AuthenticatedLayout() {
           : "min-h-screen w-full min-w-0 overflow-x-clip bg-background"
       }
     >
-      {!noHeader && <AppSidebar />}
-      <div className={noHeader ? "w-full min-w-0" : "w-full min-w-0 md:pl-56"}>
-        {/* Top Header on all breakpoints so Home + remaining nav always visible on desktop */}
+      {/* Single primary nav: top Header only — no left AppSidebar on desktop. */}
+      <div className="w-full min-w-0">
         {!noHeader && <Header />}
         {main}
         <AdminPopupModal />
