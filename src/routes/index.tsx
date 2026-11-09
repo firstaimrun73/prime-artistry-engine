@@ -7,7 +7,6 @@ import { Image as ImageIcon, Video, Music, ArrowRight, Check, Loader2 } from "lu
 import { Button } from "@/components/ui/button";
 import { HomeHero } from "@/components/home/HomeHero";
 import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
-import { WatchDemoSection } from "@/components/home/WatchDemoSection";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
 import { PreLoginSampleStrip } from "@/components/home/PreLoginSampleStrip";
 import { PrivacyPhilosophySection } from "@/components/home/PrivacyPhilosophySection";
@@ -58,8 +57,7 @@ function SignedInHome() {
 
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
- * Pre-login samples: R2 account-2 pre-login* images only.
- * Editor buttons are CTAs → /auth.
+ * Single official demo lives in HomeHero (no duplicate WatchDemoSection).
  */
 function SignedOutHome() {
   return (
@@ -68,7 +66,6 @@ function SignedOutHome() {
       <HomeHero />
       <PreLoginSampleStrip />
       <BeforeAfterShowcase />
-      <WatchDemoSection variant="prominent" />
       <PrivacyPhilosophySection />
       <ArchitectureFlowSection />
       <StudioShowcase />
@@ -77,7 +74,6 @@ function SignedOutHome() {
       <FinalCTA />
       <FooterAd placement="home" />
       <Footer />
-      {/* Pre-login only language control — not shown after login */}
       <FloatingLanguageButton />
     </div>
   );
@@ -159,7 +155,7 @@ function StudioShowcase() {
         {STUDIO_CARDS.map((c) => {
           const Icon = c.icon;
           const onClick = () => {
-            navigate({ to: "/auth", search: { redirect: c.href } });
+            navigate({ to: "/auth", search: { redirect: c.href, mode: "signin" } });
           };
           return (
             <button

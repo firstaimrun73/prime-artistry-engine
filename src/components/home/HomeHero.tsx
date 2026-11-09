@@ -32,14 +32,14 @@ const AUTH_THEN_CIRCLE = "/studio/image/circle-remove?mode=remove&from=home";
 
 const DEMO = getDemoVideoSample();
 
-function scrollToWatchDemo() {
+function scrollToHeroDemo() {
   const el = document.querySelector("[data-watch-demo]");
   if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 /**
- * Hero: copy + CTAs + compact official R2 demo under Watch demo
- * (same Demo_Video as WatchDemoSection — single source of truth).
+ * Hero: copy + CTAs + single official R2 demo under Watch demo.
+ * WatchDemoSection is not rendered on signed-out home (avoids duplicate).
  */
 export function HomeHero() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -71,6 +71,15 @@ export function HomeHero() {
     }
   }, []);
 
+  const onWatchDemo = useCallback(() => {
+    scrollToHeroDemo();
+    const v = videoRef.current;
+    if (v && v.paused) {
+      void v.play().catch(() => {});
+      setPlaying(true);
+    }
+  }, []);
+
   return (
     <section className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-10 sm:pb-16 sm:pt-16">
       <div className="reveal-up mx-auto max-w-3xl text-center">
@@ -94,20 +103,20 @@ export function HomeHero() {
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg" className="gap-2">
-            <Link to="/auth" search={{ redirect: AUTH_THEN_CIRCLE }}>
+            <Link to="/auth" search={{ redirect: AUTH_THEN_CIRCLE, mode: "signup" }}>
               Try Now <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline" className="gap-2">
             <Link to="/pricing">View pricing</Link>
           </Button>
-          <Button type="button" size="lg" variant="ghost" className="gap-2" onClick={scrollToWatchDemo}>
+          <Button type="button" size="lg" variant="ghost" className="gap-2" onClick={onWatchDemo}>
             <Play className="h-4 w-4" /> Watch demo
           </Button>
         </div>
 
-        {/* Compact official demo under CTAs — same R2 Demo_Video as WatchDemoSection */}
-        <div className="mx-auto mt-8 max-w-[280px] sm:max-w-[320px]">
+        {/* Single official demo — first and only product demo on pre-login home */}
+        <div className="mx-auto mt-8 max-w-[280px] sm:max-w-[320px]" data-watch-demo="hero">
           <div
             className="relative overflow-hidden rounded-2xl border border-border/60 bg-muted/20 shadow-md"
             style={{ aspectRatio: ratio }}
