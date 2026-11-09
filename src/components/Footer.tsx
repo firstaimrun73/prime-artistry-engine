@@ -6,7 +6,6 @@ const LINKS: { label: string; to: string }[] = [
   { label: "Privacy", to: "/privacy" },
   { label: "Terms", to: "/terms" },
   { label: "Security", to: "/security" },
-  { label: "Advertising", to: "/advertising" },
   { label: "Contact", to: "/support" },
   { label: "Support", to: "/support" },
   { label: "Help", to: "/faq" },
@@ -24,7 +23,6 @@ function shouldShowFooter(pathname: string, signedIn: boolean): boolean {
     if (pathname.startsWith("/dashboard")) return true;
     return false;
   }
-  // Logged-out marketing / legal only
   if (
     pathname === "/" ||
     pathname.startsWith("/faq") ||
@@ -32,14 +30,12 @@ function shouldShowFooter(pathname: string, signedIn: boolean): boolean {
     pathname.startsWith("/security") ||
     pathname.startsWith("/terms") ||
     pathname.startsWith("/privacy") ||
-    pathname.startsWith("/advertising") ||
     pathname.startsWith("/features") ||
     pathname.startsWith("/feedback") ||
     pathname.startsWith("/learn")
   ) {
     return true;
   }
-  // Pricing footer hidden for everyone (cleaner checkout path)
   return false;
 }
 
@@ -47,9 +43,7 @@ export function Footer({
   force,
   forceHide,
 }: {
-  /** Always show (e.g. profile page). */
   force?: boolean;
-  /** Always hide (e.g. signed-in homepage). */
   forceHide?: boolean;
 } = {}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -73,11 +67,7 @@ export function Footer({
         </Link>
         <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
           {LINKS.map((l) => (
-            <Link
-              key={l.label}
-              to={l.to}
-              className="transition-colors hover:text-foreground"
-            >
+            <Link key={l.label} to={l.to} className="transition-colors hover:text-foreground">
               {l.label}
             </Link>
           ))}
@@ -97,7 +87,6 @@ export function Footer({
   );
 }
 
-/** Profile / Settings only — account resource links. */
 export function ProfileResourceFooter() {
   return <Footer force />;
 }

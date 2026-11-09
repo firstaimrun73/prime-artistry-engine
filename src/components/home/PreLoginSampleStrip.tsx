@@ -1,8 +1,7 @@
 /**
  * Signed-out homepage sample strip.
- * Still images (account-2 pre-login*) + six public R2 video samples.
- * Landscape videos use a consistent 16:9 frame + object-cover (no tall empty bands).
- * Videos: lazy preload, click-to-play, pause siblings.
+ * Still images + six public R2 video samples.
+ * Videos keep native width/height (object-contain, no forced 16:9 crop).
  */
 import { useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
@@ -27,6 +26,8 @@ function isVideoSample(s: R2Sample): boolean {
 function VideoCard({ sample }: { sample: R2Sample }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const w = sample.width || 16;
+  const h = sample.height || 9;
 
   const toggle = useCallback(() => {
     const v = ref.current;
@@ -45,15 +46,17 @@ function VideoCard({ sample }: { sample: R2Sample }) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      {/* Fixed 16:9 frame for all landscape pre-login videos — consistent mobile rows */}
-      <div className="relative aspect-video w-full overflow-hidden bg-black">
+      <div
+        className="relative w-full overflow-hidden bg-black"
+        style={{ aspectRatio: `${w} / ${h}` }}
+      >
         <video
           ref={ref}
           data-prelogin-sample-video
           src={sample.url}
           playsInline
           preload="none"
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-contain"
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           aria-label={sample.title}

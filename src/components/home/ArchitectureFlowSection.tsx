@@ -1,7 +1,7 @@
 /**
- * How Motion2AI Works — clean 8-step engine flow.
+ * How Motio2edit works — clean 8-step product flow.
  * Short labels only. Subtle sequential animation.
- * Always refer to the backend as "the engine".
+ * Public product brand: Motio2edit. Engine identity: Motion2AI where relevant.
  */
 import { cn } from "@/lib/utils";
 import {
@@ -79,14 +79,10 @@ export function ArchitectureFlowSection() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16">
       <div className="text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-          How it works
-        </p>
-        <h2 className="mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">
-          How Motion2AI Works
-        </h2>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">How it works</p>
+        <h2 className="mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">How Motio2edit Works</h2>
         <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-          From your photo to the final result — powered by the engine.
+          From your photo to the final result — powered by the Motion2AI engine.
         </p>
       </div>
 

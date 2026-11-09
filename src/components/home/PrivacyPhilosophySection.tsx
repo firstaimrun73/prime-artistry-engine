@@ -1,63 +1,48 @@
 import { Link } from "@tanstack/react-router";
-import { FolderOpen, Workflow, UserRound, ArrowRight } from "lucide-react";
+import { ShieldCheck, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const PILLARS = [
-  {
-    icon: FolderOpen,
-    title: "Your creative workspace",
-    body: "Generations and projects you create stay linked to your Motio2edit account so you can revisit and download them later.",
-  },
-  {
-    icon: Workflow,
-    title: "Processing for the requested job",
-    body: "When you run an edit or generation, files are processed through the job pipeline needed to complete that request.",
-  },
-  {
-    icon: UserRound,
-    title: "Account-scoped access",
-    body: "Signed-in sessions are designed so you work in your own profile and history — not another account’s workspace.",
-  },
-] as const;
-
+/**
+ * Customer-facing account & privacy message for the pre-login homepage.
+ * Distinguishes: (1) processing to complete a job, (2) storing results on the account,
+ * (3) model training — Motio2edit does not train on customer content.
+ * Aligns with Security: temporary processing for generation workflows.
+ */
 export function PrivacyPhilosophySection() {
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16" aria-labelledby="account-first-heading">
+    <section className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16" aria-labelledby="privacy-heading">
       <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-        <div className="border-b border-border bg-secondary/40 px-6 py-8 text-center sm:px-10 sm:py-10">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Account-first design</p>
+        <div className="px-6 py-10 text-center sm:px-12 sm:py-12">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Your work</p>
           <h2
-            id="account-first-heading"
+            id="privacy-heading"
             className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl md:text-4xl"
           >
-            Your creations. Your account. Your workspace.
+            Your creations belong to your creative journey.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Create, edit and revisit your creative work with Motio2edit. Your account gives you a personal
-            workspace for your generations and saved projects.
+            Your uploads and generations are handled to provide the creative service you request. Your
+            work stays associated with your account so you can access your projects and results.
           </p>
-        </div>
 
-        <div className="grid gap-0 sm:grid-cols-3">
-          {PILLARS.map(({ icon: Icon, title, body }, i) => (
-            <div
-              key={title}
-              className={`flex flex-col p-6 sm:p-7 ${
-                i < PILLARS.length - 1 ? "border-b border-border sm:border-b-0 sm:border-r" : ""
-              }`}
-            >
-              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background">
-                <Icon className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="text-base font-bold">{title}</h3>
-              <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{body}</p>
+          <div className="mx-auto mt-8 max-w-xl rounded-2xl border border-primary/25 bg-primary/5 px-5 py-4">
+            <div className="flex items-start gap-3 text-left sm:items-center sm:justify-center sm:text-center">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary sm:mt-0" />
+              <p className="text-sm font-semibold leading-snug text-foreground sm:text-base">
+                Your content is not used to train AI models.
+              </p>
             </div>
-          ))}
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+              Motio2edit processes media to complete the job you start, and keeps results with your
+              account history. That is not the same as using your content to train AI models — and we
+              do not do that.
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-col items-center gap-3 border-t border-border bg-secondary/20 px-6 py-6 sm:flex-row sm:justify-between sm:px-10">
+        <div className="flex flex-col items-center gap-3 border-t border-border bg-secondary/20 px-6 py-5 sm:flex-row sm:justify-between sm:px-10">
           <p className="text-center text-sm text-muted-foreground sm:text-left">
-            Operational details live on Security and Privacy.
+            More detail on Security and Privacy.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Button asChild variant="outline" size="sm" className="gap-1.5">
