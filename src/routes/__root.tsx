@@ -10,7 +10,6 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
-// Side-effect import ensures CSS is always in the client JS graph (not only a <link>).
 import "../styles.css";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -23,6 +22,7 @@ import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
 import { MonetagVignette } from "../components/ads/MonetagVignette";
+import { MonetagInPagePush } from "../components/ads/MonetagInPagePush";
 import { AdDebugPanel } from "../components/ads/AdDebugPanel";
 import {
   SITE_NAME,
@@ -94,24 +94,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-/**
- * SAFE critical CSS only — must NOT override Tailwind responsive utilities
- * (e.g. never force nav{display:flex} which breaks hidden lg:flex on mobile).
- */
 const CRITICAL_CSS = `
 html,body{margin:0;padding:0;-webkit-text-size-adjust:100%}
 *,*::before,*::after{box-sizing:border-box}
 img,video{max-width:100%;height:auto}
-/* Google Translate: do not shove layout */
 body{top:0!important}
 .goog-te-banner-frame,.goog-te-balloon-frame,#goog-gt-tt{display:none!important;height:0!important;visibility:hidden!important}
 `;
 
-/**
- * Boot guard:
- * 1) Clear googtrans cookies that rewrite the DOM
- * 2) If main CSS clearly failed, re-inject stylesheet once
- */
 const BOOT_GUARD_SCRIPT = `
 (function(){
   try {
@@ -198,10 +188,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
       },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
     ],
     scripts: [
       { src: "https://checkout.razorpay.com/v1/checkout.js", defer: true },
@@ -266,6 +253,7 @@ function RootComponent() {
           <PageViewTracker />
           <AdPolicyGate />
           <MonetagVignette />
+          <MonetagInPagePush />
           <AdDebugPanel />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />

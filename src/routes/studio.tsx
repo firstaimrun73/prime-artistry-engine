@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { cn } from "@/lib/utils";
+import { CreditSpendHint, DirectLinkAd, EarnCreditsCard } from "@/components/ads";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
@@ -28,11 +29,6 @@ function StudioLayout() {
   return <StudioHub />;
 }
 
-/**
- * AI Studio hub.
- * Mobile: preserved 2-col + full-width Music, flexible rows for short viewports.
- * Desktop (md+): balanced 3-col grid — five equal cards, no stretched columns.
- */
 function StudioHub() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
@@ -43,7 +39,7 @@ function StudioHub() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background md:min-h-0 md:h-[100dvh] md:max-h-[100dvh] md:overflow-hidden">
       <Header />
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 md:max-w-6xl md:overflow-hidden lg:max-w-7xl">
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 md:max-w-6xl md:overflow-y-auto lg:max-w-7xl">
         <div className="mb-3 shrink-0 text-center sm:mb-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             AI+ Tools
@@ -51,16 +47,15 @@ function StudioHub() {
           <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a tool</h1>
         </div>
 
-        {/*
-          Mobile: 2 columns, Music spans full width, flexible heights.
-          Desktop: 3 columns × balanced auto-rows; Music sits in the same grid (not oversized).
-        */}
+        <CreditSpendHint
+          className="mb-3 shrink-0"
+          costLabel="Edits spend credits from your balance"
+        />
+
         <div
           className={cn(
             "grid min-h-0 flex-1 gap-2.5 sm:gap-3",
-            /* mobile */
             "grid-cols-2 auto-rows-[minmax(9.5rem,1fr)]",
-            /* desktop: balanced cards, fixed max height so tiles are not skyscrapers */
             "md:grid-cols-3 md:auto-rows-[minmax(11rem,14rem)] md:content-start md:gap-4",
           )}
         >
@@ -129,6 +124,11 @@ function StudioHub() {
               </span>
             }
           />
+        </div>
+
+        <div className="mt-4 shrink-0 space-y-1">
+          <DirectLinkAd placement="studio-hub" variant="compact" />
+          <EarnCreditsCard />
         </div>
 
         <style>{`
