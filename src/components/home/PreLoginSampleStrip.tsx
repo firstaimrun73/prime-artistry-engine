@@ -1,6 +1,6 @@
 /**
  * Homepage sample strip (images + six R2 videos).
- * Optional sponsored card for free signed-in users only (DirectLinkAd gates itself).
+ * Ads removed — emergency.
  */
 import { useRef, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
@@ -9,7 +9,6 @@ import { getAccount2PreloginSamples } from "@/lib/r2-account2-samples";
 import { getPreloginVideoSamples } from "@/lib/r2-prelogin-videos";
 import type { R2Sample } from "@/lib/r2-catalog";
 import { cn } from "@/lib/utils";
-import { DirectLinkAd } from "@/components/ads";
 
 function aspectClass(ar: string): string {
   const n = (ar || "16:9").replace(/\s/g, "");
@@ -146,8 +145,6 @@ export function PreLoginSampleStrip() {
           isVideoSample(s) ? <VideoCard key={s.id} sample={s} /> : <ImageCard key={s.id} sample={s} />,
         )}
       </div>
-
-      <DirectLinkAd placement="samples" variant="compact" />
     </section>
   );
 }

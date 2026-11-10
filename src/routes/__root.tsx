@@ -21,9 +21,6 @@ import { TranslateWidget } from "../components/TranslateWidget";
 import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
-import { MonetagVignette } from "../components/ads/MonetagVignette";
-import { MonetagInPagePush } from "../components/ads/MonetagInPagePush";
-import { AdDebugPanel } from "../components/ads/AdDebugPanel";
 import {
   SITE_NAME,
   SITE_URL,
@@ -114,6 +111,11 @@ const BOOT_GUARD_SCRIPT = `
       document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + dom;
     });
     try { localStorage.removeItem('motio2edit-gt-lang'); } catch(e) {}
+
+    /* EMERGENCY: strip known ad scripts on boot */
+    try {
+      document.querySelectorAll('script[src*="n6wxm.com"],script[src*="nap5k.com"],script[src*="monetag"],#motio-monetag-vignette,#motio-monetag-ipp').forEach(function(el){ el.remove(); });
+    } catch (e) {}
 
     var href = ${JSON.stringify(appCss)};
     function cssLoaded(){
@@ -251,10 +253,8 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <PageViewTracker />
+          {/* Ads OFF — only cleanup gate remains */}
           <AdPolicyGate />
-          <MonetagVignette />
-          <MonetagInPagePush />
-          <AdDebugPanel />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />

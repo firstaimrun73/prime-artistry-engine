@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { cn } from "@/lib/utils";
-import { CreditSpendHint, DirectLinkAd, EarnCreditsCard } from "@/components/ads";
+import { CreditSpendHint } from "@/components/ads";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
@@ -124,11 +124,6 @@ function StudioHub() {
               </span>
             }
           />
-        </div>
-
-        <div className="mt-4 shrink-0 space-y-1">
-          <DirectLinkAd placement="studio-hub" variant="compact" />
-          <EarnCreditsCard />
         </div>
 
         <style>{`
