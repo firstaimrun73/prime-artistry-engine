@@ -10,6 +10,7 @@ import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
+import { isSimplifiedStudioExperimentActive } from "@/config/experiment";
 
 import { Coins, ShieldCheck, Menu } from "lucide-react";
 
@@ -35,20 +36,29 @@ export function Header() {
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
   const showChat = paid;
+  const simplified = isSimplifiedStudioExperimentActive();
 
   /**
    * Signed-in top nav — single primary system.
    * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
+   * Experiment: Image Studio + Video Studio + Pricing only in primary nav.
    */
-  const authLinksBase: NavItem[] = [
-    { to: "/", label: "Home" },
-    { to: "/studio", label: "AI Studio" },
-    { to: "/studio/image/auto-edit", label: "Maluto AI" },
-    ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
-    { to: "/pricing", label: "Pricing" },
-  ];
+  const authLinksBase: NavItem[] = simplified
+    ? [
+        { to: "/editor", label: "Image Studio" },
+        { to: "/studio/video", label: "Video Studio" },
+        { to: "/pricing", label: "Pricing" },
+      ]
+    : [
+        { to: "/", label: "Home" },
+        { to: "/studio", label: "AI Studio" },
+        { to: "/studio/image/auto-edit", label: "Maluto AI" },
+        ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
+        { to: "/pricing", label: "Pricing" },
+      ];
 
-  const authLinks: NavItem[] = showChat ? [...authLinksBase, CHAT_LINK] : authLinksBase;
+  const authLinks: NavItem[] =
+    showChat && !simplified ? [...authLinksBase, CHAT_LINK] : authLinksBase;
   const centerLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
   const sheetLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 

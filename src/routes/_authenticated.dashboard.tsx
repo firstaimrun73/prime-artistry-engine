@@ -14,8 +14,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
-import { ArrowRight, LayoutGrid, Image as ImageIcon, History } from "lucide-react";
+import { Image as ImageIcon, Video, CreditCard } from "lucide-react";
 import { DirectLinkAd, EarnCreditsCard } from "@/components/ads";
+import { isSimplifiedStudioExperimentActive } from "@/config/experiment";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -41,6 +42,7 @@ export function Dashboard() {
   const { profile, user } = useAuth();
   const [gens, setGens] = useState<Generation[]>([]);
   const [loading, setLoading] = useState(true);
+  const simplified = isSimplifiedStudioExperimentActive();
 
   useEffect(() => {
     if (!user) return;
@@ -127,44 +129,83 @@ export function Dashboard() {
 
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Quick actions
+          {simplified ? "Create" : "Quick actions"}
         </h2>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Link
-            to="/editor"
-            className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
-          >
-            <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
-            <span className="text-sm font-semibold">Image Editor</span>
-          </Link>
-          <Link
-            to="/studio"
-            className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
-          >
-            <LayoutGrid className="h-4 w-4 shrink-0 text-primary" />
-            <span className="text-sm font-semibold">AI+ Tools</span>
-          </Link>
-          <Link
-            to="/history"
-            className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
-          >
-            <History className="h-4 w-4 shrink-0 text-primary" />
-            <span className="text-sm font-semibold">History</span>
-          </Link>
-          <Link
-            to="/studio/image/auto-edit"
-            className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
-          >
-            <ArrowRight className="h-4 w-4 shrink-0 text-primary" />
-            <span className="text-sm font-semibold">Maluto AI</span>
-          </Link>
-        </div>
+        {simplified ? (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Link
+              to="/editor"
+              className="flex flex-col gap-2 rounded-2xl border border-primary/30 bg-card p-4 shadow-sm transition-colors hover:border-primary/60 hover:bg-primary/5"
+            >
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <ImageIcon className="h-5 w-5" />
+              </span>
+              <span className="text-base font-bold tracking-tight">Image Studio</span>
+              <span className="text-xs text-muted-foreground">Edit, restore, generate images</span>
+            </Link>
+            <Link
+              to="/studio/video"
+              className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40"
+            >
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background">
+                <Video className="h-5 w-5 text-primary" />
+              </span>
+              <span className="text-base font-bold tracking-tight">Video Studio</span>
+              <span className="text-xs text-muted-foreground">Text-to-video & image-to-video</span>
+            </Link>
+            <Link
+              to="/pricing"
+              className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40"
+            >
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background">
+                <CreditCard className="h-5 w-5 text-primary" />
+              </span>
+              <span className="text-base font-bold tracking-tight">Pricing</span>
+              <span className="text-xs text-muted-foreground">Credits & plans</span>
+            </Link>
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Link
+              to="/editor"
+              className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
+            >
+              <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
+              <span className="text-sm font-semibold">Image Editor</span>
+            </Link>
+            <Link
+              to="/studio"
+              className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
+            >
+              <Video className="h-4 w-4 shrink-0 text-primary" />
+              <span className="text-sm font-semibold">AI+ Tools</span>
+            </Link>
+            <Link
+              to="/history"
+              className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
+            >
+              <CreditCard className="h-4 w-4 shrink-0 text-primary" />
+              <span className="text-sm font-semibold">History</span>
+            </Link>
+            <Link
+              to="/studio/image/auto-edit"
+              className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-3 transition-colors hover:border-primary/40"
+            >
+              <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
+              <span className="text-sm font-semibold">Maluto AI</span>
+            </Link>
+          </div>
+        )}
       </section>
 
       <RecentProjects gens={gens} loading={loading} historyUnlocked={historyUnlocked} />
 
-      <DirectLinkAd placement="dashboard" variant="compact" />
-      <EarnCreditsCard />
+      {!simplified && (
+        <>
+          <DirectLinkAd placement="dashboard" variant="compact" />
+          <EarnCreditsCard />
+        </>
+      )}
     </div>
   );
 }
