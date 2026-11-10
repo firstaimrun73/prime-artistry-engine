@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import { ArrowRight, LayoutGrid, Image as ImageIcon, History } from "lucide-react";
+import { DirectLinkAd, EarnCreditsCard } from "@/components/ads";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -36,9 +37,6 @@ const HISTORY_SELECT_CORE =
 const HISTORY_SELECT_MIN =
   "id, type, prompt, output_url, status, created_at, metadata";
 
-/**
- * Compact account overview — not a studio catalogue, not a marketing page.
- */
 export function Dashboard() {
   const { profile, user } = useAuth();
   const [gens, setGens] = useState<Generation[]>([]);
@@ -102,7 +100,6 @@ export function Dashboard() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 pb-24 md:py-10 md:pb-12">
-      {/* Compact identity strip */}
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
         <div className="flex min-w-0 items-center gap-3">
           <Link to="/profile" className="shrink-0">
@@ -121,21 +118,13 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground">{plan.name} · account overview</p>
           </div>
         </div>
-        <Link
-          to="/profile"
-          className="text-sm font-medium text-primary hover:underline"
-        >
+        <Link to="/profile" className="text-sm font-medium text-primary hover:underline">
           Manage account →
         </Link>
       </section>
 
-      <CreditsUsageBar
-        available={profile.credits}
-        used={used}
-        allocation={allocation}
-      />
+      <CreditsUsageBar available={profile.credits} used={used} allocation={allocation} />
 
-      {/* Useful shortcuts — not a full studio catalogue */}
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Quick actions
@@ -172,11 +161,10 @@ export function Dashboard() {
         </div>
       </section>
 
-      <RecentProjects
-        gens={gens}
-        loading={loading}
-        historyUnlocked={historyUnlocked}
-      />
+      <RecentProjects gens={gens} loading={loading} historyUnlocked={historyUnlocked} />
+
+      <DirectLinkAd placement="dashboard" variant="compact" />
+      <EarnCreditsCard />
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { FooterAd } from "@/components/ads";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -310,7 +309,7 @@ function PricingPage() {
           </ul>
         </div>
       </div>
-      <FooterAd placement="pricing" />
+      {/* No ads on pricing — checkout-focused page */}
       <Footer />
     </div>
   );
