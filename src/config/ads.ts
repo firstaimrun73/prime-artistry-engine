@@ -3,7 +3,12 @@
  * - Vignette + In-Page Push: Monetag zones (free signed-in users only, via components)
  * - Static Direct Link / multitags partner link for in-content placements
  * - Never on pricing, auth, checkout, settings, admin, full editor canvas
+ *
+ * During the 7-day simplified studio experiment, all intrusive website ads are off.
+ * External ad accounts are not modified — only client-side placements are gated.
  */
+import { isSimplifiedStudioExperimentActive } from "@/config/experiment";
+
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 
 /** Monetag multitags / partner offer — same network destination used for "earn / partner" cards. */
@@ -18,6 +23,7 @@ export const MONETAG_IPP_ZONE = "12004581" as const;
 export const MONETAG_IPP_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
 
 export const ADS_CONFIG = {
+  /** Base flag; effective enable also requires experiment off. */
   enabled: true,
   /** Routes where ads must never appear (scripts + static cards). */
   excludedRoutes: [
@@ -39,6 +45,8 @@ export const ADS_CONFIG = {
 } as const;
 
 export function isAdRouteAllowed(pathname: string): boolean {
+  // Experiment: temporarily disable all website ad placements (not SEO / GA / GSC).
+  if (isSimplifiedStudioExperimentActive()) return false;
   if (!ADS_CONFIG.enabled) return false;
   return !ADS_CONFIG.excludedRoutes.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 }
