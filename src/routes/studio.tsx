@@ -7,6 +7,7 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 import { CreditSpendHint, DirectLinkAd, EarnCreditsCard } from "@/components/ads";
+import { isSimplifiedStudioExperimentActive } from "@/config/experiment";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
@@ -35,6 +36,7 @@ function StudioHub() {
   const plan = profile?.plan;
   const videoOk = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
   const musicOk = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
+  const simplified = isSimplifiedStudioExperimentActive();
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background md:min-h-0 md:h-[100dvh] md:max-h-[100dvh] md:overflow-hidden">
@@ -42,9 +44,11 @@ function StudioHub() {
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 md:max-w-6xl md:overflow-y-auto lg:max-w-7xl">
         <div className="mb-3 shrink-0 text-center sm:mb-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            AI+ Tools
+            {simplified ? "Studios" : "AI+ Tools"}
           </p>
-          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a tool</h1>
+          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">
+            {simplified ? "Image Studio & Video Studio" : "Choose a tool"}
+          </h1>
         </div>
 
         <CreditSpendHint
@@ -52,84 +56,114 @@ function StudioHub() {
           costLabel="Edits spend credits from your balance"
         />
 
-        <div
-          className={cn(
-            "grid min-h-0 flex-1 gap-2.5 sm:gap-3",
-            "grid-cols-2 auto-rows-[minmax(9.5rem,1fr)]",
-            "md:grid-cols-3 md:auto-rows-[minmax(11rem,14rem)] md:content-start md:gap-4",
-          )}
-        >
-          <StudioTile
-            to="/editor"
-            title="Image"
-            subtitle="Generate · enhance"
-            gradient="from-primary/35 via-primary/10 to-transparent"
-            icon={
-              <span className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg sm:p-3.5">
-                <ImageIcon className="h-6 w-6 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
+        {simplified ? (
+          <div className="grid min-h-0 flex-1 gap-3 sm:grid-cols-2 md:content-start md:gap-4">
+            <StudioTile
+              to="/editor"
+              title="Image Studio"
+              subtitle="Edit · restore · generate"
+              gradient="from-primary/35 via-primary/10 to-transparent"
+              icon={
+                <span className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg sm:p-3.5">
+                  <ImageIcon className="h-6 w-6 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3s_ease-in-out_infinite]" />
+                </span>
+              }
+            />
+            <StudioTile
+              to={videoOk ? "/studio/video" : "/pricing"}
+              title="Video Studio"
+              subtitle={videoOk ? "Text-to-video · image-to-video" : "Requires a paid plan"}
+              gradient="from-rose-500/30 via-transparent to-transparent"
+              locked={!videoOk}
+              icon={
+                <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
+                  <Video className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.2s_ease-in-out_infinite]" />
+                </span>
+              }
+            />
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "grid min-h-0 flex-1 gap-2.5 sm:gap-3",
+              "grid-cols-2 auto-rows-[minmax(9.5rem,1fr)]",
+              "md:grid-cols-3 md:auto-rows-[minmax(11rem,14rem)] md:content-start md:gap-4",
+            )}
+          >
+            <StudioTile
+              to="/editor"
+              title="Image"
+              subtitle="Generate · enhance"
+              gradient="from-primary/35 via-primary/10 to-transparent"
+              icon={
+                <span className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg sm:p-3.5">
+                  <ImageIcon className="h-6 w-6 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3s_ease-in-out_infinite]" />
+                </span>
+              }
+            />
 
-          <StudioTile
-            to="/studio/image/circle-remove"
-            search={{ mode: "remove" as const, from: "studio" as const }}
-            title={
-              <>
-                <span className="text-[#7B6FE0]">Circle</span>
-                <span className="font-medium text-foreground/90"> 2edit</span>
-              </>
-            }
-            subtitle="Remove · Add"
-            gradient="from-[#7B6FE0]/25 via-transparent to-transparent"
-            borderClass="border-[#7B6FE0]/35 dark:border-[#7B6FE0]/40"
-            icon={<CircleMetaRing />}
-          />
+            <StudioTile
+              to="/studio/image/circle-remove"
+              search={{ mode: "remove" as const, from: "studio" as const }}
+              title={
+                <>
+                  <span className="text-[#7B6FE0]">Circle</span>
+                  <span className="font-medium text-foreground/90"> 2edit</span>
+                </>
+              }
+              subtitle="Remove · Add"
+              gradient="from-[#7B6FE0]/25 via-transparent to-transparent"
+              borderClass="border-[#7B6FE0]/35 dark:border-[#7B6FE0]/40"
+              icon={<CircleMetaRing />}
+            />
 
-          <StudioTile
-            to={videoOk ? "/studio/video" : "/pricing"}
-            title="Video"
-            subtitle={videoOk ? "Cinematic motion" : "Requires a paid plan"}
-            gradient="from-rose-500/30 via-transparent to-transparent"
-            locked={!videoOk}
-            icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
-                <Video className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.2s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
+            <StudioTile
+              to={videoOk ? "/studio/video" : "/pricing"}
+              title="Video"
+              subtitle={videoOk ? "Cinematic motion" : "Requires a paid plan"}
+              gradient="from-rose-500/30 via-transparent to-transparent"
+              locked={!videoOk}
+              icon={
+                <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
+                  <Video className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.2s_ease-in-out_infinite]" />
+                </span>
+              }
+            />
 
-          <StudioTile
-            to="/studio/frames"
-            title="Frames"
-            subtitle="Frame · Glass"
-            gradient="from-slate-400/30 via-zinc-200/10 to-transparent"
-            icon={
-              <span className="inline-flex rounded-2xl border border-slate-400/40 bg-background/80 p-3 sm:p-3.5">
-                <Frame className="h-6 w-6 text-slate-600 dark:text-slate-300 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_2.8s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
+            <StudioTile
+              to="/studio/frames"
+              title="Frames"
+              subtitle="Frame · Glass"
+              gradient="from-slate-400/30 via-zinc-200/10 to-transparent"
+              icon={
+                <span className="inline-flex rounded-2xl border border-slate-400/40 bg-background/80 p-3 sm:p-3.5">
+                  <Frame className="h-6 w-6 text-slate-600 dark:text-slate-300 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_2.8s_ease-in-out_infinite]" />
+                </span>
+              }
+            />
 
-          <StudioTile
-            to={musicOk ? "/studio/music" : "/pricing"}
-            title="Music"
-            subtitle={musicOk ? "Prompt-to-music" : "Requires a paid plan"}
-            gradient="from-fuchsia-500/30 via-transparent to-transparent"
-            locked={!musicOk}
-            className="col-span-2 md:col-span-1"
-            icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
-                <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.4s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
-        </div>
+            <StudioTile
+              to={musicOk ? "/studio/music" : "/pricing"}
+              title="Music"
+              subtitle={musicOk ? "Prompt-to-music" : "Requires a paid plan"}
+              gradient="from-fuchsia-500/30 via-transparent to-transparent"
+              locked={!musicOk}
+              className="col-span-2 md:col-span-1"
+              icon={
+                <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
+                  <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.4s_ease-in-out_infinite]" />
+                </span>
+              }
+            />
+          </div>
+        )}
 
-        <div className="mt-4 shrink-0 space-y-1">
-          <DirectLinkAd placement="studio-hub" variant="compact" />
-          <EarnCreditsCard />
-        </div>
+        {!simplified && (
+          <div className="mt-4 shrink-0 space-y-1">
+            <DirectLinkAd placement="studio-hub" variant="compact" />
+            <EarnCreditsCard />
+          </div>
+        )}
 
         <style>{`
           @keyframes iconFloat {
