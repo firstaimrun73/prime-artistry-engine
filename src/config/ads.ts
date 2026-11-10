@@ -1,17 +1,25 @@
 /**
  * Controlled ad configuration.
- * - Vignette: Monetag zone 12136694 via vignette.min.js
- * - In-Page Push: disabled
- * - Static Direct Link: few high-quality sponsor cards only
+ * - Vignette + In-Page Push: Monetag zones (free signed-in users only, via components)
+ * - Static Direct Link / multitags partner link for in-content placements
+ * - Never on pricing, auth, checkout, settings, admin, full editor canvas
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 
-/** Official Monetag Vignette tag (from publisher dashboard). */
+/** Monetag multitags / partner offer — same network destination used for "earn / partner" cards. */
+export const MONETAG_MULTITAG_URL = DIRECT_LINK_URL;
+
+/** Official Monetag Vignette (publisher dashboard). */
 export const MONETAG_VIGNETTE_ZONE = "12136694" as const;
 export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" as const;
 
+/** Official Monetag In-Page Push. */
+export const MONETAG_IPP_ZONE = "12004581" as const;
+export const MONETAG_IPP_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
+
 export const ADS_CONFIG = {
   enabled: true,
+  /** Routes where ads must never appear (scripts + static cards). */
   excludedRoutes: [
     "/editor",
     "/login",
