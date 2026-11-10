@@ -1,8 +1,6 @@
 /**
  * Controlled ad configuration.
- * - Vignette + In-Page Push: Monetag zones (free signed-in users only, via components)
- * - Static Direct Link / multitags partner link for in-content placements
- * - Never on pricing, auth, checkout, settings, admin, full editor canvas
+ * Master kill switch: ADS_CONFIG.enabled = false turns off all ad UI and scripts.
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 
@@ -18,7 +16,8 @@ export const MONETAG_IPP_ZONE = "12004581" as const;
 export const MONETAG_IPP_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
 
 export const ADS_CONFIG = {
-  enabled: true,
+  /** Global kill switch — false = no vignette, IPP, or static sponsored cards. */
+  enabled: false,
   /** Routes where ads must never appear (scripts + static cards). */
   excludedRoutes: [
     "/editor",
