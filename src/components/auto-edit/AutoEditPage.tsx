@@ -1,6 +1,7 @@
 /**
  * Maluto AI — Auto Edit product page.
  * Credits/plan checked BEFORE any animation or upload.
+ * Complimentary Access Assistance may unlock Maluto for approved free users.
  */
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -44,8 +45,9 @@ import {
 import {
   autoEditQualitiesForPlan,
   defaultAutoEditQualityForPlan,
+  AUTO_EDIT_QUALITY_OPTIONS,
 } from "@/lib/auto-edit/auto-edit.quality";
-import { planAllowsMalutoAI } from "@/lib/auto-edit/entitlements";
+import { canUseMalutoAI } from "@/lib/auto-edit/entitlements";
 import { isAdminEmail } from "@/lib/admin-config";
 import { secureDownloadImage } from "@/lib/download.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
@@ -70,11 +72,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "How many credits does it cost?",
-    a: "SD and HD cost 45 credits. 2K is 50, 4K is 60, 8K is 60, and 8K Max is 65. Analysis and edit are bundled into one charge. Failed jobs do not charge credits.",
+    a: "SD and HD cost 45 credits. 2K is 50, 4K is 60, 8K is 60, and 8K Max is 65. Failed jobs do not charge credits.",
   },
   {
     q: "Which qualities are available?",
-    a: "SD, HD, 2K, 4K, 8K (and 8K Max on higher plans). Your plan controls which tiers appear.",
+    a: "SD, HD, 2K, 4K, 8K (and 8K Max on higher plans). Your plan or complimentary access controls which tiers appear.",
   },
   {
     q: "Does it save to History?",
@@ -132,12 +134,28 @@ export function AutoEditPage() {
   const costPanelRef = useRef<HTMLDivElement>(null);
 
   const plan = (profile as { plan?: string } | null)?.plan ?? "free";
-  const qualityOptions = useMemo(() => autoEditQualitiesForPlan(plan), [plan]);
-  const [quality, setQuality] = useState<AutoEditQuality>(() => defaultAutoEditQualityForPlan(plan));
   const isAdmin = isAdminEmail(user?.email);
+  const malutoUnlocked = canUseMalutoAI({
+    plan,
+    isAdmin,
+    profile: profile as {
+      complimentary_expires_at?: string | null;
+      complimentary_tools?: string[] | null;
+    } | null,
+  });
+
+  const qualityOptions = useMemo(() => {
+    const fromPlan = autoEditQualitiesForPlan(plan);
+    if (fromPlan.length > 0) return fromPlan;
+    if (malutoUnlocked) {
+      return AUTO_EDIT_QUALITY_OPTIONS.filter((o) => o.id === "sd" || o.id === "hd");
+    }
+    return fromPlan;
+  }, [plan, malutoUnlocked]);
+
+  const [quality, setQuality] = useState<AutoEditQuality>(() => defaultAutoEditQualityForPlan(plan));
   const creditCost = autoEditCreditCost(quality);
   const availableCredits = profile?.credits ?? 0;
-  const malutoUnlocked = isAdmin || planAllowsMalutoAI(plan);
 
   const goHome = useCallback(() => {
     void navigate({ to: "/", replace: true });
@@ -150,7 +168,7 @@ export function AutoEditPage() {
       const shortfall = Math.max(0, opts.required - opts.available);
       const description =
         opts.reason === "plan"
-          ? "Maluto AI restore is available on paid plans. View plans to unlock, or top up after upgrading."
+          ? "Maluto AI restore is available on paid plans or approved complimentary access. View plans, top up, or request access assistance."
           : opts.available <= 0
             ? `You need ${opts.required} credits to restore this photo. Your balance is 0 — top up or choose a plan to continue.`
             : `Available: ${opts.available} · Required: ${opts.required} · You need ${shortfall} more credit${shortfall === 1 ? "" : "s"} to restore this photo.`;
@@ -289,7 +307,8 @@ export function AutoEditPage() {
         lower.includes("paid") ||
         lower.includes("not free") ||
         lower.includes("plan does not") ||
-        lower.includes("unlock");
+        lower.includes("unlock") ||
+        lower.includes("complimentary");
       if (isAccess) {
         showCreditWarning({
           available: availableCredits,
@@ -495,7 +514,12 @@ export function AutoEditPage() {
                         <strong className="text-foreground">{availableCredits}</strong>
                       </>
                     ) : (
-                      <>Maluto AI restore requires a paid plan</>
+                      <>
+                        Maluto AI requires a paid plan or{" "}
+                        <Link to="/access-assistance" className="font-semibold text-primary hover:underline">
+                          access assistance
+                        </Link>
+                      </>
                     )}
                   </p>
                 )}
