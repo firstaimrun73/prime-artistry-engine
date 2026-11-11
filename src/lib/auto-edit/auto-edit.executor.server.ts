@@ -1,12 +1,5 @@
 /**
  * MOTIO2EDIT Auto executor (server-only).
- *
- * Pipeline:
- *   ONE https image
- *     → Gemini 2.5 Flash Lite (fal any-llm/vision) analysis + final_edit_prompt
- *     → NO_CHANGE → return original, charge 0 (still save History)
- *     → fal-ai/flux-kontext-lora with same image URL + prompt
- *     → validate → watermark → charge once
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -41,6 +34,8 @@ export type RunStandaloneAutoEditArgs = {
     credits: number;
     email?: string | null;
     auto_edit_used_count?: number | null;
+    complimentary_expires_at?: string | null;
+    complimentary_tools?: string[] | null;
   };
   isAdmin: boolean;
 };
@@ -54,11 +49,12 @@ export async function executeStandaloneAutoEdit(
   }
 
   const quality: AutoEditQuality = args.imageQuality ?? "hd";
-  assertAutoEditQualityEntitlement(args.profile.plan, quality);
+  assertAutoEditQualityEntitlement(args.profile.plan, quality, args.profile, args.isAdmin);
   assertFreeAutoEditAllowance({
     plan: args.profile.plan,
     isAdmin: args.isAdmin,
     autoEditUsedCount: args.profile.auto_edit_used_count ?? 0,
+    profile: args.profile,
   });
 
   const cost = autoEditCreditCost(quality);
@@ -130,14 +126,7 @@ export async function executeStandaloneAutoEdit(
     quality,
   });
 
-  console.log(
-    "[AutoEdit] model:",
-    AUTO_EDIT_FAL_MODEL,
-    "| quality:",
-    quality,
-    "| credits:",
-    cost,
-  );
+  console.log("[AutoEdit] model:", AUTO_EDIT_FAL_MODEL, "| quality:", quality, "| credits:", cost);
 
   return {
     success: true,

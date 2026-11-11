@@ -7,6 +7,9 @@ type AutoEditProfileRow = {
   plan: string;
   credits: number;
   email: string | null;
+  complimentary_expires_at?: string | null;
+  complimentary_tools?: string[] | null;
+  auto_edit_used_count?: number | null;
 };
 
 const inputSchema = z.object({
@@ -25,15 +28,21 @@ export const runAutoEdit = createServerFn({ method: "POST" })
 
     const { data: profileRaw, error: pErr } = await supabase
       .from("profiles")
-      .select("plan, credits, email")
+      .select("plan, credits, email, complimentary_expires_at, complimentary_tools, auto_edit_used_count")
       .eq("id", userId)
       .single();
 
-    if (pErr || !profileRaw) {
-      throw new Error("Could not load your account.");
+    // Fallback if complimentary columns not migrated yet
+    let profile = profileRaw as unknown as AutoEditProfileRow | null;
+    if (pErr || !profile) {
+      const fallback = await supabase
+        .from("profiles")
+        .select("plan, credits, email")
+        .eq("id", userId)
+        .single();
+      if (fallback.error || !fallback.data) throw new Error("Could not load your account.");
+      profile = fallback.data as unknown as AutoEditProfileRow;
     }
-
-    const profile = profileRaw as unknown as AutoEditProfileRow;
 
     const { isAdminClaims } = await import("@/lib/admin-guard.server");
     const isAdmin = isAdminClaims({ email: profile.email ?? undefined });
@@ -50,10 +59,12 @@ export const runAutoEdit = createServerFn({ method: "POST" })
         plan: profile.plan,
         credits: profile.credits,
         email: profile.email,
+        complimentary_expires_at: profile.complimentary_expires_at ?? null,
+        complimentary_tools: profile.complimentary_tools ?? null,
+        auto_edit_used_count: profile.auto_edit_used_count ?? 0,
       },
       isAdmin,
     });
   });
 
-/** Alias expected by Auto Edit studio route. */
 export const runStandaloneAutoEdit = runAutoEdit;
