@@ -63,7 +63,9 @@ export async function executeStandaloneAutoEdit(
 
   const cost = autoEditCreditCost(quality);
   if (!args.isAdmin && args.profile.credits < cost) {
-    throw new Error(`Not enough credits. Auto Edit costs ${cost} credits per job.`);
+    throw new Error(
+      `Not enough credits. Required: ${cost}. Available: ${args.profile.credits}. Top up credits or choose a plan to continue Maluto AI.`,
+    );
   }
 
   const analysis = await analyzeImageWithGemini(validated.imageUrl);
