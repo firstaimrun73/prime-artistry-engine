@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { DailyRestorationsBadge } from "@/components/home/DailyRestorationsBadge";
 import { isAdminEmail } from "@/lib/admin-config";
 import type { PlanId } from "@/lib/plans";
 import { canAccessMusic, canAccessVideo } from "@/lib/policy";
@@ -76,7 +77,6 @@ const HOME_SLOGANS = [
   },
 ] as const;
 
-/** Older representation: orange diagrammatic icons in rounded squares — no AI Studio tile */
 const AI_TOOLS = [
   { to: "/studio/image/auto-edit" as const, label: "Maluto AI", icon: Sparkles },
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
@@ -110,7 +110,10 @@ export function SignedInHomeBody() {
     <main className="mx-auto w-full max-w-6xl px-4 pt-4 pb-24 sm:pt-6 md:max-w-7xl md:pb-12">
       <MalutoHomeHint />
 
-      {/* Horizontal AI tools — orange rounded squares (previous style) */}
+      <div className="mb-4 flex justify-center sm:justify-start">
+        <DailyRestorationsBadge />
+      </div>
+
       <section className="mb-5" aria-label="AI tools">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] md:flex-wrap md:gap-3 md:overflow-visible [&::-webkit-scrollbar]:hidden">
           {AI_TOOLS.map((q) => {
@@ -145,9 +148,7 @@ export function SignedInHomeBody() {
                     <Lock className="absolute -right-1 -top-1 h-3.5 w-3.5 text-muted-foreground" />
                   )}
                 </span>
-                <span className="w-full truncate text-[11px] font-semibold leading-tight">
-                  {q.label}
-                </span>
+                <span className="w-full truncate text-[11px] font-semibold leading-tight">{q.label}</span>
               </Link>
             );
           })}
