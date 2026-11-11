@@ -9,8 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   adminListFreeAccessApplications,
   adminReviewFreeAccessApplication,
+  adminRevokeComplimentaryAccess,
 } from "@/lib/free-access.functions";
-import { COMPLIMENTARY_TOOL_OPTIONS, type ComplimentaryTool } from "@/lib/complimentary-access";
+import {
+  ENFORCED_COMPLIMENTARY_TOOL_OPTIONS,
+  type ComplimentaryTool,
+} from "@/lib/complimentary-access";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,18 +39,24 @@ type AppRow = {
   extra_info: string | null;
   status: string;
   created_at: string;
+  credits_granted?: number | null;
+  tools_granted?: string[] | null;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  admin_note?: string | null;
 };
 
 function AdminFreeAccessPage() {
   const listFn = useServerFn(adminListFreeAccessApplications);
   const reviewFn = useServerFn(adminReviewFreeAccessApplication);
+  const revokeFn = useServerFn(adminRevokeComplimentaryAccess);
   const [rows, setRows] = useState<AppRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AppRow | null>(null);
   const [note, setNote] = useState("");
   const [credits, setCredits] = useState("50");
   const [days, setDays] = useState("14");
-  const [tools, setTools] = useState<ComplimentaryTool[]>(["maluto", "image"]);
+  const [tools, setTools] = useState<ComplimentaryTool[]>(["maluto"]);
   const [busy, setBusy] = useState(false);
 
   const reload = async () => {
@@ -90,6 +100,31 @@ function AdminFreeAccessPage() {
     }
   };
 
+  const revoke = async () => {
+    if (!selected) return;
+    const ok = window.confirm(
+      `Revoke complimentary access for ${selected.email}?\n\nThis clears complimentary tool flags and expiry. Application history is kept. Already-spent credits are not clawed back.`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await revokeFn({
+        data: {
+          applicationId: selected.id,
+          adminNote: note || undefined,
+        },
+      });
+      toast.success("Complimentary access revoked");
+      setSelected(null);
+      setNote("");
+      await reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Revoke failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 pb-24">
       <Link to="/admin" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
@@ -98,7 +133,7 @@ function AdminFreeAccessPage() {
       <h1 className="mt-3 text-2xl font-bold">Free access requests</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Manual review only. Approving grants credits + complimentary tool flags with an expiry. Submission never unlocks
-        access.
+        access. Only <strong>Maluto AI</strong> is enforced server-side for complimentary grants today.
       </p>
 
       {loading ? (
@@ -141,6 +176,18 @@ function AdminFreeAccessPage() {
               {selected.extra_info && (
                 <p className="mt-2 text-xs text-muted-foreground">Extra: {selected.extra_info}</p>
               )}
+              {selected.status === "approved" && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Granted: {selected.credits_granted ?? 0} credits
+                  {selected.tools_granted?.length ? ` · ${selected.tools_granted.join(", ")}` : ""}
+                  {selected.expires_at ? ` · expires ${new Date(selected.expires_at).toLocaleDateString()}` : ""}
+                </p>
+              )}
+              {selected.revoked_at && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  Revoked {new Date(selected.revoked_at).toLocaleString()}
+                </p>
+              )}
 
               {selected.status === "pending" && (
                 <div className="mt-4 space-y-3 border-t border-border pt-4">
@@ -158,26 +205,31 @@ function AdminFreeAccessPage() {
                       <Input value={days} onChange={(e) => setDays(e.target.value)} type="number" min={1} />
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {COMPLIMENTARY_TOOL_OPTIONS.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() =>
-                          setTools((prev) =>
-                            prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
-                          )
-                        }
-                        className={cn(
-                          "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                          tools.includes(t.id)
-                            ? "border-primary bg-primary/15 text-primary"
-                            : "border-border text-muted-foreground",
-                        )}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+                  <div>
+                    <Label className="text-xs text-muted-foreground">
+                      Grantable tools (server-enforced only)
+                    </Label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {ENFORCED_COMPLIMENTARY_TOOL_OPTIONS.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() =>
+                            setTools((prev) =>
+                              prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                            )
+                          }
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                            tools.includes(t.id)
+                              ? "border-primary bg-primary/15 text-primary"
+                              : "border-border text-muted-foreground",
+                          )}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Button disabled={busy} onClick={() => void review("approved")} className="flex-1">
@@ -187,6 +239,18 @@ function AdminFreeAccessPage() {
                       Reject
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {selected.status === "approved" && !selected.revoked_at && (
+                <div className="mt-4 space-y-3 border-t border-border pt-4">
+                  <div>
+                    <Label>Revoke note (optional)</Label>
+                    <Textarea value={note} onChange={(e) => setNote(e.target.value)} className="mt-1" />
+                  </div>
+                  <Button disabled={busy} variant="destructive" onClick={() => void revoke()} className="w-full">
+                    Revoke complimentary access
+                  </Button>
                 </div>
               )}
             </div>

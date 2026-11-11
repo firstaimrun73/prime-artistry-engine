@@ -9,6 +9,7 @@ export type ComplimentaryTool =
   | "video"
   | "music";
 
+/** Tools users may request interest in (form). */
 export const COMPLIMENTARY_TOOL_OPTIONS: { id: ComplimentaryTool; label: string }[] = [
   { id: "maluto", label: "Maluto AI restore" },
   { id: "image", label: "Image generation / edit" },
@@ -18,6 +19,16 @@ export const COMPLIMENTARY_TOOL_OPTIONS: { id: ComplimentaryTool; label: string 
   { id: "video", label: "Video Studio" },
   { id: "music", label: "Music Studio" },
 ];
+
+/**
+ * Only these tools have server-side complimentary entitlement checks today.
+ * Admin grant UI and review handler must not grant tools outside this list.
+ */
+export const ENFORCED_COMPLIMENTARY_TOOLS: ComplimentaryTool[] = ["maluto"];
+
+export const ENFORCED_COMPLIMENTARY_TOOL_OPTIONS = COMPLIMENTARY_TOOL_OPTIONS.filter((t) =>
+  ENFORCED_COMPLIMENTARY_TOOLS.includes(t.id),
+);
 
 export type ComplimentaryProfileFields = {
   complimentary_expires_at?: string | null;
