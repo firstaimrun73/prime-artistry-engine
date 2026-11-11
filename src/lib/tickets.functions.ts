@@ -3,7 +3,15 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const ticketInput = z.object({
-  category: z.enum(["payment", "technical", "account", "feature_request", "bug_report", "other"]),
+  category: z.enum([
+    "payment",
+    "technical",
+    "account",
+    "feature_request",
+    "bug_report",
+    "free_access_request",
+    "other",
+  ]),
   priority: z.enum(["low", "normal", "high", "critical"]),
   subject: z.string().trim().min(3).max(120),
   message: z.string().trim().min(10).max(2000),
@@ -11,7 +19,6 @@ const ticketInput = z.object({
 });
 
 function ticketCode(id: string): string {
-  // TKT-XXXXX format derived from the ticket UUID.
   return `TKT-${id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 5).toUpperCase()}`;
 }
 
@@ -19,7 +26,12 @@ function esc(s: string): string {
   return s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
 }
 
-async function sendResendEmail(args: { from: string; to: string; subject: string; html: string }): Promise<void> {
+async function sendResendEmail(args: {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.error("[tickets] RESEND_API_KEY not configured — skipping email");
@@ -42,7 +54,6 @@ export const submitTicket = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // 1. Save the ticket (RLS scopes to this user; status defaults to 'open').
     const { data: row, error } = await supabase
       .from("support_tickets")
       .insert({
@@ -61,7 +72,6 @@ export const submitTicket = createServerFn({ method: "POST" })
     const supportEmail = process.env.SUPPORT_EMAIL || "support@motio2edit.com";
     const fromEmail = `Motio2Edit Support <${supportEmail}>`;
 
-    // Resolve user details.
     const { data: profile } = await supabase
       .from("profiles")
       .select("display_name, email")
@@ -71,7 +81,6 @@ export const submitTicket = createServerFn({ method: "POST" })
     const userEmail = profile?.email || context.claims?.email || "";
     const createdDate = new Date(row.created_at).toUTCString();
 
-    // 2. Email to support inbox.
     const supportHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
       <div style="background:#6c63ff;color:#fff;padding:20px;border-radius:8px 8px 0 0">
         <h2 style="margin:0">New Support Ticket ${code}</h2>
@@ -80,6 +89,7 @@ export const submitTicket = createServerFn({ method: "POST" })
         <p><b>Ticket ID:</b> ${code}</p>
         <p><b>Name:</b> ${esc(userName)}</p>
         <p><b>Email:</b> ${esc(userEmail)}</p>
+        <p><b>Category:</b> ${esc(data.category)}</p>
         <p><b>Subject:</b> ${esc(data.subject)}</p>
         <p><b>Message:</b><br/>${esc(data.message).replace(/\n/g, "<br/>")}</p>
         <p><b>Created:</b> ${createdDate}</p>
@@ -87,7 +97,6 @@ export const submitTicket = createServerFn({ method: "POST" })
       </div>
     </div>`;
 
-    // 3. Confirmation email to the user.
     const userHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
       <div style="background:#6c63ff;color:#fff;padding:20px;border-radius:8px 8px 0 0">
         <h2 style="margin:0">We received your ticket</h2>
@@ -101,9 +110,19 @@ export const submitTicket = createServerFn({ method: "POST" })
 
     let emailError: string | null = null;
     try {
-      await sendResendEmail({ from: fromEmail, to: supportEmail, subject: `[Ticket ${code}] ${data.subject}`, html: supportHtml });
+      await sendResendEmail({
+        from: fromEmail,
+        to: supportEmail,
+        subject: `[Ticket ${code}] ${data.subject}`,
+        html: supportHtml,
+      });
       if (userEmail) {
-        await sendResendEmail({ from: fromEmail, to: userEmail, subject: `Your ticket ${code} has been received`, html: userHtml });
+        await sendResendEmail({
+          from: fromEmail,
+          to: userEmail,
+          subject: `Your ticket ${code} has been received`,
+          html: userHtml,
+        });
       }
     } catch (err) {
       emailError = err instanceof Error ? err.message : "EMAIL_SEND_FAILED";
