@@ -13,6 +13,7 @@ import {
   Download,
 } from "lucide-react";
 import { getDemoVideoSample } from "@/lib/r2-catalog";
+import { DailyRestorationsBadge } from "@/components/home/DailyRestorationsBadge";
 
 const VALUE_PROPS = [
   { icon: ImageIcon, label: "AI Image Editing" },
@@ -39,7 +40,6 @@ function scrollToHeroDemo() {
 
 /**
  * Hero: copy + CTAs + single official R2 demo under Watch demo.
- * WatchDemoSection is not rendered on signed-out home (avoids duplicate).
  */
 export function HomeHero() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -113,6 +113,10 @@ export function HomeHero() {
           <Button type="button" size="lg" variant="ghost" className="gap-2" onClick={onWatchDemo}>
             <Play className="h-4 w-4" /> Watch demo
           </Button>
+        </div>
+
+        <div className="mt-5 flex justify-center">
+          <DailyRestorationsBadge />
         </div>
 
         {/* Single official demo — first and only product demo on pre-login home */}
