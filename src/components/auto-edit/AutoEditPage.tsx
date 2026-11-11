@@ -1,7 +1,6 @@
 /**
  * Maluto AI — Auto Edit product page.
- * Backend: runStandaloneAutoEdit (vision + FLUX Kontext).
- * Back always navigates to homepage `/` (never Image Studio).
+ * Credits/plan checked BEFORE any animation or upload.
  */
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -24,7 +23,6 @@ import {
   Eye,
   FileStack,
   Gem,
-  ImageIcon,
   Info,
   Loader2,
   Sparkles,
@@ -47,6 +45,7 @@ import {
   autoEditQualitiesForPlan,
   defaultAutoEditQualityForPlan,
 } from "@/lib/auto-edit/auto-edit.quality";
+import { planAllowsMalutoAI } from "@/lib/auto-edit/entitlements";
 import { isAdminEmail } from "@/lib/admin-config";
 import { secureDownloadImage } from "@/lib/download.functions";
 import { triggerBrowserDownload } from "@/lib/secure-image-download";
@@ -75,11 +74,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "Which qualities are available?",
-    a: "SD, HD, 2K, 4K, 8K (and 8K Max on higher plans). Your plan controls which tiers appear. Free and Lite start with SD and HD.",
+    a: "SD, HD, 2K, 4K, 8K (and 8K Max on higher plans). Your plan controls which tiers appear.",
   },
   {
     q: "Does it save to History?",
-    a: "Yes. Every successful Maluto AI generation is saved to your History with the input image, output image, and selected quality.",
+    a: "Yes. Every successful Maluto AI generation is saved to your History.",
   },
   {
     q: "What happens if generation fails?",
@@ -99,20 +98,12 @@ const FLOW_STEPS = [
 ] as const;
 
 function isAcceptableImageFile(file: File): boolean {
-  return (
-    file.type.startsWith("image/") ||
-    /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)
-  );
+  return file.type.startsWith("image/") || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
 }
 
 function FlowConnectors() {
   return (
-    <svg
-      className="pointer-events-none absolute inset-x-0 top-[22px] hidden h-8 w-full sm:block"
-      viewBox="0 0 100 20"
-      preserveAspectRatio="none"
-      aria-hidden
-    >
+    <svg className="pointer-events-none absolute inset-x-0 top-[22px] hidden h-8 w-full sm:block" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden>
       <path d="M12 10 C 22 2, 28 18, 37 10" fill="none" stroke="currentColor" strokeWidth="0.6" strokeDasharray="1.2 1.4" className="text-violet-400/70 dark:text-violet-300/50" />
       <path d="M37 10 C 47 2, 53 18, 62 10" fill="none" stroke="currentColor" strokeWidth="0.6" strokeDasharray="1.2 1.4" className="text-violet-400/70 dark:text-violet-300/50" />
       <path d="M62 10 C 72 2, 78 18, 88 10" fill="none" stroke="currentColor" strokeWidth="0.6" strokeDasharray="1.2 1.4" className="text-violet-400/70 dark:text-violet-300/50" />
@@ -142,27 +133,53 @@ export function AutoEditPage() {
 
   const plan = (profile as { plan?: string } | null)?.plan ?? "free";
   const qualityOptions = useMemo(() => autoEditQualitiesForPlan(plan), [plan]);
-  const [quality, setQuality] = useState<AutoEditQuality>(() =>
-    defaultAutoEditQualityForPlan(plan),
-  );
+  const [quality, setQuality] = useState<AutoEditQuality>(() => defaultAutoEditQualityForPlan(plan));
   const isAdmin = isAdminEmail(user?.email);
   const creditCost = autoEditCreditCost(quality);
+  const availableCredits = profile?.credits ?? 0;
+  const malutoUnlocked = isAdmin || planAllowsMalutoAI(plan);
 
   const goHome = useCallback(() => {
     void navigate({ to: "/", replace: true });
   }, [navigate]);
 
-  const toggleCost = useCallback(() => {
-    setShowCost((v) => !v);
-  }, []);
+  const toggleCost = useCallback(() => setShowCost((v) => !v), []);
+
+  const showCreditWarning = useCallback(
+    (opts: { available: number; required: number; reason: "credits" | "plan" }) => {
+      const shortfall = Math.max(0, opts.required - opts.available);
+      const description =
+        opts.reason === "plan"
+          ? "Maluto AI restore is available on paid plans. View plans to unlock, or top up after upgrading."
+          : opts.available <= 0
+            ? `You need ${opts.required} credits to restore this photo. Your balance is 0 — top up or choose a plan to continue.`
+            : `Available: ${opts.available} · Required: ${opts.required} · You need ${shortfall} more credit${shortfall === 1 ? "" : "s"} to restore this photo.`;
+
+      toast.warning("Not enough credits", {
+        description,
+        duration: 12_000,
+        action: {
+          label: "View plans",
+          onClick: () => {
+            void navigate({ to: "/pricing" });
+          },
+        },
+        cancel: {
+          label: "Top up",
+          onClick: () => {
+            void navigate({ to: "/profile/top-up" });
+          },
+        },
+      });
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     if (!showCost) return;
     const onPointer = (e: MouseEvent | TouchEvent) => {
       const el = costPanelRef.current;
-      if (el && !el.contains(e.target as Node)) {
-        setShowCost(false);
-      }
+      if (el && !el.contains(e.target as Node)) setShowCost(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setShowCost(false);
@@ -217,6 +234,7 @@ export function AutoEditPage() {
   };
 
   const run = async () => {
+    if (busy) return;
     if (!user) {
       toast.error("Sign in required");
       return;
@@ -225,12 +243,22 @@ export function AutoEditPage() {
       toast.error("Upload a photo first");
       return;
     }
+
+    if (!malutoUnlocked) {
+      showCreditWarning({ available: availableCredits, required: creditCost, reason: "plan" });
+      return;
+    }
+
+    if (!isAdmin && availableCredits < creditCost) {
+      showCreditWarning({ available: availableCredits, required: creditCost, reason: "credits" });
+      return;
+    }
+
     setBusy(true);
     setProgress(5);
     setStep(0);
     setOutput(null);
     try {
-      setStep(0);
       setProgress(15);
       const uploaded = await uploadToStorage(file, user.id);
       setStep(1);
@@ -238,10 +266,7 @@ export function AutoEditPage() {
       setStep(2);
       setProgress(50);
       const result = await runEdit({
-        data: {
-          imageUrl: uploaded,
-          imageQuality: quality,
-        },
+        data: { imageUrl: uploaded, imageQuality: quality },
       });
       setStep(3);
       setProgress(85);
@@ -256,8 +281,26 @@ export function AutoEditPage() {
       toast.success(AUTO_EDIT_PRODUCT_NAME + " complete");
       void refreshProfile?.();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Auto Edit failed");
+      const msg = err instanceof Error ? err.message : "Auto Edit failed";
+      const lower = msg.toLowerCase();
+      const isAccess =
+        lower.includes("credit") ||
+        lower.includes("upgrade") ||
+        lower.includes("paid") ||
+        lower.includes("not free") ||
+        lower.includes("plan does not") ||
+        lower.includes("unlock");
+      if (isAccess) {
+        showCreditWarning({
+          available: availableCredits,
+          required: creditCost,
+          reason: lower.includes("credit") ? "credits" : "plan",
+        });
+      } else {
+        toast.error(msg);
+      }
       setStep(0);
+      setProgress(0);
     } finally {
       setBusy(false);
     }
@@ -298,16 +341,10 @@ export function AutoEditPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-400 text-white shadow-lg">
             <Sparkles className="h-8 w-8" />
           </div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
-            Motio2edit
-          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">Motio2edit</p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight">{AUTO_EDIT_PRODUCT_NAME}</h1>
           <p className="mt-2 text-sm text-muted-foreground">Sign in to enhance one photo.</p>
-          <Link
-            to="/auth"
-            search={{ redirect: "/studio/image/auto-edit" }}
-            className="mt-6 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
-          >
+          <Link to="/auth" search={{ redirect: "/studio/image/auto-edit" }} className="mt-6 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
             Sign in
           </Link>
         </main>
@@ -331,6 +368,43 @@ export function AutoEditPage() {
                 <span className="absolute inset-0.5 animate-pulse rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-400 to-cyan-400 opacity-80" />
                 <Gem className="relative h-3.5 w-3.5 text-white drop-shadow" />
               </span>
+              {!isAdmin && (
+                <div className="relative ml-1" ref={costPanelRef}>
+                  <button
+                    type="button"
+                    onClick={toggleCost}
+                    className="grid h-8 w-8 place-items-center rounded-full border border-border bg-card text-violet-600 shadow-sm dark:text-violet-300"
+                    aria-label={showCost ? "Hide credit costs" : "Show credit costs"}
+                    aria-expanded={showCost}
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
+                  {showCost && (
+                    <div role="dialog" aria-label="Credit costs" className="absolute left-0 top-full z-40 mt-2 w-48 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-violet-300/40 bg-white p-2 shadow-xl dark:border-violet-500/30 dark:bg-violet-950">
+                      <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">Credit costs</p>
+                      <div className="space-y-0.5">
+                        {CREDIT_TABLE.map((row) => (
+                          <div
+                            key={row.label}
+                            className={cn(
+                              "flex items-center justify-between rounded-lg px-2 py-1 text-[11px]",
+                              row.credits === creditCost
+                                ? "bg-violet-500/15 font-semibold text-violet-700 dark:text-violet-200"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            <span>{row.label}</span>
+                            <span>{row.credits}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-1.5 border-t border-violet-200/50 px-1 pt-1.5 text-[10px] text-muted-foreground dark:border-violet-500/20">
+                        Selected: <strong>{creditCost} credits</strong> · Balance: <strong>{availableCredits}</strong>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -351,10 +425,16 @@ export function AutoEditPage() {
         </div>
 
         <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
-          className={cn("relative overflow-hidden rounded-3xl border border-white/60 bg-white/45 p-5 shadow-lg backdrop-blur-xl transition dark:border-white/10 dark:bg-white/5", dragOver && "border-violet-400 ring-2 ring-violet-400/30")}
+          className={cn(
+            "relative overflow-hidden rounded-3xl border border-white/60 bg-white/45 p-5 shadow-lg backdrop-blur-xl transition dark:border-white/10 dark:bg-white/5",
+            dragOver && "border-violet-400 ring-2 ring-violet-400/30",
+          )}
         >
           {!preview ? (
             <button type="button" onClick={() => inputRef.current?.click()} className="flex w-full flex-col items-center gap-3 py-14 text-center">
@@ -395,48 +475,6 @@ export function AutoEditPage() {
                     {opt.label}
                   </button>
                 ))}
-
-                {!isAdmin && (
-                  <div className="relative ml-auto" ref={costPanelRef}>
-                    <button
-                      type="button"
-                      onClick={toggleCost}
-                      className="grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-white/40 text-violet-600 backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-violet-300"
-                      aria-label={showCost ? "Hide credit costs" : "Show credit costs"}
-                      aria-expanded={showCost}
-                    >
-                      <Info className="h-4 w-4" />
-                    </button>
-                    {showCost && (
-                      <div
-                        role="dialog"
-                        aria-label="Credit costs"
-                        className="absolute right-0 top-full z-30 mt-2 w-44 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-violet-300/40 bg-white/95 p-2 shadow-xl backdrop-blur-xl dark:border-violet-500/30 dark:bg-violet-950/95"
-                      >
-                        <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">Credit costs</p>
-                        <div className="space-y-0.5">
-                          {CREDIT_TABLE.map((row) => (
-                            <div
-                              key={row.label}
-                              className={cn(
-                                "flex items-center justify-between rounded-lg px-2 py-1 text-[11px]",
-                                row.credits === creditCost
-                                  ? "bg-violet-500/15 font-semibold text-violet-700 dark:text-violet-200"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              <span>{row.label}</span>
-                              <span>{row.credits}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="mt-1.5 border-t border-violet-200/50 px-1 pt-1.5 text-[10px] text-muted-foreground dark:border-violet-500/20">
-                          Selected: <strong>{creditCost} credits</strong>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {busy && (
@@ -449,9 +487,21 @@ export function AutoEditPage() {
               )}
 
               <div className="space-y-2">
+                {!isAdmin && !output && (
+                  <p className="text-center text-[11px] text-muted-foreground">
+                    {malutoUnlocked ? (
+                      <>
+                        This restore uses <strong className="text-foreground">{creditCost}</strong> credits · You have{" "}
+                        <strong className="text-foreground">{availableCredits}</strong>
+                      </>
+                    ) : (
+                      <>Maluto AI restore requires a paid plan</>
+                    )}
+                  </p>
+                )}
                 {!output ? (
                   <Button
-                    className="w-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 hover:from-violet-700 hover:via-fuchsia-600 hover:to-violet-700 text-white shadow-lg border-0"
+                    className="w-full border-0 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 text-white shadow-lg hover:from-violet-700 hover:via-fuchsia-600 hover:to-violet-700"
                     size="lg"
                     disabled={busy || !file}
                     onClick={() => void run()}
@@ -510,11 +560,7 @@ export function AutoEditPage() {
           <div className="space-y-2">
             {FAQ_ITEMS.map((item, i) => (
               <div key={item.q} className="overflow-hidden rounded-xl border border-white/50 bg-white/40 dark:border-white/10 dark:bg-white/5">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold"
-                  onClick={() => setOpenFaq((v) => (v === i ? null : i))}
-                >
+                <button type="button" className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold" onClick={() => setOpenFaq((v) => (v === i ? null : i))}>
                   {item.q}
                   <ChevronDown className={cn("h-4 w-4 shrink-0 transition", openFaq === i && "rotate-180")} />
                 </button>
@@ -528,13 +574,7 @@ export function AutoEditPage() {
       </main>
 
       {viewerOpen && output && (
-        <AutoEditResultViewer
-          url={output}
-          open={viewerOpen}
-          onClose={() => setViewerOpen(false)}
-          onDownload={() => void downloadResult()}
-          downloadBusy={dlBusy}
-        />
+        <AutoEditResultViewer url={output} open={viewerOpen} onClose={() => setViewerOpen(false)} onDownload={() => void downloadResult()} downloadBusy={dlBusy} />
       )}
     </div>
   );
