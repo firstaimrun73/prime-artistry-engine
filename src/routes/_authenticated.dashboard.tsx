@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import { ArrowRight, LayoutGrid, Image as ImageIcon, History } from "lucide-react";
+import { AccessAssistanceCard } from "@/components/AccessAssistanceCard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -123,6 +124,10 @@ export function Dashboard() {
       </section>
 
       <CreditsUsageBar available={profile.credits} used={used} allocation={allocation} />
+
+      {!isPaidPlan(profile.plan) && (
+        <AccessAssistanceCard />
+      )}
 
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">

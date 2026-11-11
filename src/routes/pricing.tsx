@@ -24,6 +24,7 @@ import { isPaidPlan } from "@/lib/policy";
 import { useI18n } from "@/lib/i18n";
 import { Check, Crown, Sparkles, Image as ImageIcon, Video, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AccessAssistanceCard } from "@/components/AccessAssistanceCard";
 
 export const Route = createFileRoute("/pricing")({
   component: PricingPage,
@@ -308,7 +309,9 @@ function PricingPage() {
             </li>
           </ul>
         </div>
-      </div>
+
+        <AccessAssistanceCard className="mx-auto mt-10 max-w-2xl" />
+
       {/* No ads on pricing — checkout-focused page */}
       <Footer />
     </div>
