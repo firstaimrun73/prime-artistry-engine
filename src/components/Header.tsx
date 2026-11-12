@@ -70,7 +70,8 @@ export function Header() {
           <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
+        {/* desktop-shell: wide + fine pointer + hover — never force desktop nav on phones */}
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 desktop-shell:flex">
           {centerLinks.map((l) => (
             <Link
               key={`${l.to}-${l.label}`}
@@ -149,7 +150,12 @@ export function Header() {
           {user ? (
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 md:hidden">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Open menu"
+                  className="h-9 w-9 shrink-0 desktop-shell:hidden"
+                >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>

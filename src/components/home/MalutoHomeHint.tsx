@@ -1,6 +1,6 @@
 /**
  * Compact discovery hint on Home — Maluto AI.
- * Mobile only (never shown on desktop).
+ * Mobile only (never shown on true desktop shell).
  * Dismissible once per session; hides on scroll.
  */
 import { useEffect, useState } from "react";
@@ -47,7 +47,7 @@ export function MalutoHomeHint() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-[max(4.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-3 md:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-[max(4.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-3 desktop-shell:hidden"
       role="status"
     >
       <div

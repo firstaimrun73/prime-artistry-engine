@@ -194,7 +194,8 @@ export function BottomTabBar() {
   return (
     <nav
       className={cn(
-        "fixed z-40 md:hidden",
+        /* desktop-shell: hide on true desktop; keep on phones even if viewport is wide */
+        "fixed z-40 desktop-shell:hidden",
         "transition-transform duration-300",
         hiddenByScroll && "translate-y-full",
         isIOS

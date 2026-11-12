@@ -112,7 +112,7 @@ export function MalutoGuideTour() {
 
   return (
     <div
-      className="fixed inset-0 z-[60] md:hidden"
+      className="fixed inset-0 z-[60] desktop-shell:hidden"
       role="dialog"
       aria-label="Open AI Studio"
     >

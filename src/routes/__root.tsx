@@ -255,7 +255,7 @@ function RootComponent() {
           <PageViewTracker />
           {/* Ads OFF — only cleanup gate remains */}
           <AdPolicyGate />
-          <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
+          <div className={padForTabs ? "pb-16 desktop-shell:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />
             <BottomTabBar />
