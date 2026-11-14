@@ -2,6 +2,9 @@
  * Public aggregate: successful Maluto AI (auto-edit) jobs completed "today".
  * Uses service-role count only — never exposes user rows, URLs, or PII.
  * Timezone: Asia/Kolkata (IST) to match product ops.
+ *
+ * If auto-edit metadata filtering fails, returns unavailable (does NOT count
+ * unrelated Image Studio / other generation rows as restorations).
  */
 import { createServerFn } from "@tanstack/react-start";
 
@@ -36,8 +39,8 @@ export const getDailyRestorationsCount = createServerFn({ method: "GET" }).handl
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-      // Count successful auto-edit rows created today (IST).
-      // Filter by metadata experience when present; also accept source standalone_auto.
+      // Count only successful auto-edit / Maluto rows for today (IST).
+      // metadata.experience = auto-edit OR source = standalone_auto OR operation = auto_edit
       const { count, error } = await supabaseAdmin
         .from("generations")
         .select("id", { count: "exact", head: true })
@@ -50,29 +53,14 @@ export const getDailyRestorationsCount = createServerFn({ method: "GET" }).handl
         );
 
       if (error) {
-        // Fallback: broader success image count for the day if metadata filter unsupported
-        const fallback = await supabaseAdmin
-          .from("generations")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "success")
-          .eq("type", "image")
-          .gte("created_at", bounds.startIso)
-          .lt("created_at", bounds.endIso);
-
-        if (fallback.error) {
-          console.warn("[daily-restorations]", error.message, fallback.error.message);
-          return {
-            ok: false,
-            count: 0,
-            dayLabel: bounds.label,
-            source: "unavailable",
-          };
-        }
+        // Do NOT fall back to counting all image generations — that would inflate
+        // the restoration counter with unrelated Image Studio jobs.
+        console.warn("[daily-restorations] metadata filter failed:", error.message);
         return {
-          ok: true,
-          count: fallback.count ?? 0,
+          ok: false,
+          count: 0,
           dayLabel: bounds.label,
-          source: "generations",
+          source: "unavailable",
         };
       }
 
