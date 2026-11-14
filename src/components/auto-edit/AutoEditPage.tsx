@@ -2,17 +2,24 @@
  * Maluto AI — Auto Edit product page.
  * Backend: runStandaloneAutoEdit (vision + FLUX Kontext).
  * Back always navigates to homepage `/` (never Image Studio).
+ *
+ * Credit flow:
+ *   1) Server preflight (live balance + plan) — no upload, no animation
+ *   2) Only on ok → upload + progress pipeline + generation
+ *   3) Server re-checks credits when the job is created
  */
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ChangeEvent,
   type DragEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
@@ -24,7 +31,6 @@ import {
   Eye,
   FileStack,
   Gem,
-  ImageIcon,
   Info,
   Loader2,
   Sparkles,
@@ -33,10 +39,23 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AutoEditBeforeAfter } from "@/components/auto-edit/AutoEditBeforeAfter";
 import { AutoEditResultViewer } from "@/components/auto-edit/AutoEditResultViewer";
 import { useAuth } from "@/lib/auth";
-import { runStandaloneAutoEdit } from "@/lib/auto-edit/auto-edit.functions";
+import {
+  preflightAutoEdit,
+  runStandaloneAutoEdit,
+} from "@/lib/auto-edit/auto-edit.functions";
 import {
   AUTO_EDIT_PRODUCT_NAME,
   AUTO_EDIT_CREDITS_BY_QUALITY,
@@ -120,10 +139,13 @@ function FlowConnectors() {
   );
 }
 
+type CostPanelPos = { top: number; left: number; maxWidth: number };
+
 export function AutoEditPage() {
   const { user, profile, refreshProfile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const runEdit = useServerFn(runStandaloneAutoEdit);
+  const preflight = useServerFn(preflightAutoEdit);
   const secureDl = useServerFn(secureDownloadImage);
 
   const [file, setFile] = useState<File | null>(null);
@@ -136,9 +158,20 @@ export function AutoEditPage() {
   const [dlBusy, setDlBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [showCost, setShowCost] = useState(false);
+  const [costPos, setCostPos] = useState<CostPanelPos | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(1);
+  const [creditAlert, setCreditAlert] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    cost: number;
+    balance: number;
+    reason: "credits" | "plan" | "quality" | "error";
+  }>({ open: false, title: "", message: "", cost: 0, balance: 0, reason: "credits" });
   const inputRef = useRef<HTMLInputElement>(null);
+  const costBtnRef = useRef<HTMLButtonElement>(null);
   const costPanelRef = useRef<HTMLDivElement>(null);
+  const runLockRef = useRef(false);
 
   const plan = (profile as { plan?: string } | null)?.plan ?? "free";
   const qualityOptions = useMemo(() => autoEditQualitiesForPlan(plan), [plan]);
@@ -152,30 +185,68 @@ export function AutoEditPage() {
     void navigate({ to: "/", replace: true });
   }, [navigate]);
 
-  const toggleCost = useCallback(() => {
-    setShowCost((v) => !v);
+  const placeCostPanel = useCallback(() => {
+    const btn = costBtnRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const panelW = 176;
+    const gap = 8;
+    const vw = window.innerWidth;
+    const pad = 12;
+    let left = r.right - panelW;
+    if (left < pad) left = pad;
+    if (left + panelW > vw - pad) left = Math.max(pad, vw - panelW - pad);
+    if (r.right + gap + panelW > vw - pad && r.left - gap - panelW >= pad) {
+      left = r.left - gap - panelW;
+    }
+    const top = Math.min(r.bottom + gap, window.innerHeight - 220);
+    setCostPos({
+      top: Math.max(pad, top),
+      left,
+      maxWidth: Math.min(panelW, vw - pad * 2),
+    });
   }, []);
+
+  const toggleCost = useCallback(() => {
+    setShowCost((v) => {
+      if (!v) {
+        requestAnimationFrame(() => placeCostPanel());
+      }
+      return !v;
+    });
+  }, [placeCostPanel]);
+
+  useLayoutEffect(() => {
+    if (!showCost) return;
+    placeCostPanel();
+  }, [showCost, placeCostPanel]);
 
   useEffect(() => {
     if (!showCost) return;
     const onPointer = (e: MouseEvent | TouchEvent) => {
-      const el = costPanelRef.current;
-      if (el && !el.contains(e.target as Node)) {
-        setShowCost(false);
-      }
+      const panel = costPanelRef.current;
+      const btn = costBtnRef.current;
+      const t = e.target as Node;
+      if (panel?.contains(t) || btn?.contains(t)) return;
+      setShowCost(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setShowCost(false);
     };
+    const onReposition = () => placeCostPanel();
     document.addEventListener("mousedown", onPointer);
-    document.addEventListener("touchstart", onPointer);
+    document.addEventListener("touchstart", onPointer, { passive: true });
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
     return () => {
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("touchstart", onPointer);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
     };
-  }, [showCost]);
+  }, [showCost, placeCostPanel]);
 
   const onPick = useCallback((f: File | null) => {
     if (!f) return;
@@ -216,7 +287,13 @@ export function AutoEditPage() {
     });
   };
 
+  const openBuyCredits = () => {
+    setCreditAlert((s) => ({ ...s, open: false }));
+    void navigate({ to: "/pricing" });
+  };
+
   const run = async () => {
+    if (runLockRef.current || busy) return;
     if (!user) {
       toast.error("Sign in required");
       return;
@@ -225,41 +302,92 @@ export function AutoEditPage() {
       toast.error("Upload a photo first");
       return;
     }
-    setBusy(true);
-    setProgress(5);
-    setStep(0);
-    setOutput(null);
+
+    runLockRef.current = true;
     try {
+      let check;
+      try {
+        check = await preflight({ data: { imageQuality: quality } });
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not verify credits. Please try again.",
+        );
+        return;
+      }
+
+      if (!check.ok) {
+        const title =
+          check.reason === "credits"
+            ? "You're out of credits!"
+            : check.reason === "plan" || check.reason === "quality"
+              ? "Upgrade required"
+              : "Unable to start";
+        setCreditAlert({
+          open: true,
+          title,
+          message: check.message,
+          cost: check.cost,
+          balance: check.credits,
+          reason:
+            check.reason === "plan" || check.reason === "quality" || check.reason === "credits"
+              ? check.reason
+              : "error",
+        });
+        return;
+      }
+
+      setBusy(true);
+      setProgress(5);
       setStep(0);
-      setProgress(15);
-      const uploaded = await uploadToStorage(file, user.id);
-      setStep(1);
-      setProgress(35);
-      setStep(2);
-      setProgress(50);
-      const result = await runEdit({
-        data: {
-          imageUrl: uploaded,
-          imageQuality: quality,
-        },
-      });
-      setStep(3);
-      setProgress(85);
-      const outUrl =
-        (result as { outputUrl?: string })?.outputUrl ||
-        (result as { url?: string })?.url ||
-        null;
-      if (!outUrl) throw new Error("No output returned");
-      setOutput(outUrl);
-      setStep(4);
-      setProgress(100);
-      toast.success(AUTO_EDIT_PRODUCT_NAME + " complete");
-      void refreshProfile?.();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Auto Edit failed");
-      setStep(0);
+      setOutput(null);
+      try {
+        setStep(0);
+        setProgress(15);
+        const uploaded = await uploadToStorage(file, user.id);
+        setStep(1);
+        setProgress(35);
+        setStep(2);
+        setProgress(50);
+        const result = await runEdit({
+          data: {
+            imageUrl: uploaded,
+            imageQuality: quality,
+          },
+        });
+        setStep(3);
+        setProgress(85);
+        const outUrl =
+          (result as { outputUrl?: string })?.outputUrl ||
+          (result as { url?: string })?.url ||
+          null;
+        if (!outUrl) throw new Error("No output returned");
+        setOutput(outUrl);
+        setStep(4);
+        setProgress(100);
+        toast.success(AUTO_EDIT_PRODUCT_NAME + " complete");
+        void refreshProfile?.();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Auto Edit failed";
+        if (/INSUFFICIENT_CREDITS|Not enough credits|out of credits/i.test(msg)) {
+          const cost = autoEditCreditCost(quality);
+          setCreditAlert({
+            open: true,
+            title: "You're out of credits!",
+            message: msg,
+            cost,
+            balance: (profile as { credits?: number } | null)?.credits ?? 0,
+            reason: "credits",
+          });
+        } else {
+          toast.error(msg);
+        }
+        setStep(0);
+        setProgress(0);
+      } finally {
+        setBusy(false);
+      }
     } finally {
-      setBusy(false);
+      runLockRef.current = false;
     }
   };
 
@@ -314,6 +442,48 @@ export function AutoEditPage() {
       </div>
     );
   }
+
+  const costPortal =
+    showCost &&
+    costPos &&
+    typeof document !== "undefined" &&
+    createPortal(
+      <div
+        ref={costPanelRef}
+        role="dialog"
+        aria-label="Credit costs"
+        className="fixed z-[80] overflow-visible rounded-2xl border border-violet-300/40 bg-white p-2 shadow-xl dark:border-violet-500/30 dark:bg-violet-950"
+        style={{
+          top: costPos.top,
+          left: costPos.left,
+          width: costPos.maxWidth,
+        }}
+      >
+        <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+          Credit costs
+        </p>
+        <div className="space-y-0.5">
+          {CREDIT_TABLE.map((row) => (
+            <div
+              key={row.label}
+              className={cn(
+                "flex items-center justify-between rounded-lg px-2 py-1 text-[11px]",
+                row.credits === creditCost
+                  ? "bg-violet-500/15 font-semibold text-violet-700 dark:text-violet-200"
+                  : "text-muted-foreground",
+              )}
+            >
+              <span className="whitespace-nowrap">{row.label}</span>
+              <span className="whitespace-nowrap tabular-nums">{row.credits}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-1.5 border-t border-violet-200/50 px-1 pt-1.5 text-[10px] text-muted-foreground dark:border-violet-500/20">
+          Selected: <strong className="whitespace-nowrap">{creditCost} credits</strong>
+        </p>
+      </div>,
+      document.body,
+    );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-violet-50/90 via-background to-cyan-50/30 dark:from-violet-950/40 dark:via-background dark:to-background">
@@ -397,8 +567,9 @@ export function AutoEditPage() {
                 ))}
 
                 {!isAdmin && (
-                  <div className="relative ml-auto" ref={costPanelRef}>
+                  <div className="relative ml-auto">
                     <button
+                      ref={costBtnRef}
                       type="button"
                       onClick={toggleCost}
                       className="grid h-8 w-8 place-items-center rounded-full border border-white/40 bg-white/40 text-violet-600 backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-violet-300"
@@ -407,34 +578,6 @@ export function AutoEditPage() {
                     >
                       <Info className="h-4 w-4" />
                     </button>
-                    {showCost && (
-                      <div
-                        role="dialog"
-                        aria-label="Credit costs"
-                        className="absolute right-0 top-full z-30 mt-2 w-44 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-violet-300/40 bg-white/95 p-2 shadow-xl backdrop-blur-xl dark:border-violet-500/30 dark:bg-violet-950/95"
-                      >
-                        <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">Credit costs</p>
-                        <div className="space-y-0.5">
-                          {CREDIT_TABLE.map((row) => (
-                            <div
-                              key={row.label}
-                              className={cn(
-                                "flex items-center justify-between rounded-lg px-2 py-1 text-[11px]",
-                                row.credits === creditCost
-                                  ? "bg-violet-500/15 font-semibold text-violet-700 dark:text-violet-200"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              <span>{row.label}</span>
-                              <span>{row.credits}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="mt-1.5 border-t border-violet-200/50 px-1 pt-1.5 text-[10px] text-muted-foreground dark:border-violet-500/20">
-                          Selected: <strong>{creditCost} credits</strong>
-                        </p>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -451,7 +594,7 @@ export function AutoEditPage() {
               <div className="space-y-2">
                 {!output ? (
                   <Button
-                    className="w-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 hover:from-violet-700 hover:via-fuchsia-600 hover:to-violet-700 text-white shadow-lg border-0"
+                    className="w-full border-0 bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 text-white shadow-lg hover:from-violet-700 hover:via-fuchsia-600 hover:to-violet-700"
                     size="lg"
                     disabled={busy || !file}
                     onClick={() => void run()}
@@ -464,7 +607,7 @@ export function AutoEditPage() {
                     ) : (
                       <>
                         <Sparkles className="mr-2 h-4 w-4" />
-                        Enhance
+                        Enhance · {creditCost} credits
                       </>
                     )}
                   </Button>
@@ -526,6 +669,38 @@ export function AutoEditPage() {
           </div>
         </section>
       </main>
+
+      {costPortal}
+
+      <AlertDialog
+        open={creditAlert.open}
+        onOpenChange={(open) => setCreditAlert((s) => ({ ...s, open }))}
+      >
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{creditAlert.title}</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 text-left">
+              <span className="block">{creditAlert.message}</span>
+              {creditAlert.reason === "credits" && (
+                <span className="mt-1 block text-sm text-foreground">
+                  Required: <strong>{creditAlert.cost}</strong> · Balance:{" "}
+                  <strong>{creditAlert.balance}</strong>
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            {(creditAlert.reason === "credits" ||
+              creditAlert.reason === "plan" ||
+              creditAlert.reason === "quality") && (
+              <AlertDialogAction onClick={openBuyCredits}>
+                {creditAlert.reason === "credits" ? "Buy Credits" : "View plans"}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {viewerOpen && output && (
         <AutoEditResultViewer
