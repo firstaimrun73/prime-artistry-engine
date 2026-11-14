@@ -11,6 +11,7 @@ import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSecti
 import { PreLoginSampleStrip } from "@/components/home/PreLoginSampleStrip";
 import { PrivacyPhilosophySection } from "@/components/home/PrivacyPhilosophySection";
 import { FloatingLanguageButton } from "@/components/FloatingLanguageButton";
+import { DailyRestorationsStrip } from "@/components/home/DailyRestorationsStrip";
 import { useAuth } from "@/lib/auth";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/components/FeedbackCard";
@@ -48,6 +49,7 @@ function SignedInHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <DailyRestorationsStrip />
       <SignedInHomeBody />
       <Footer />
     </div>
@@ -64,6 +66,7 @@ function SignedOutHome() {
     <div className="min-h-screen bg-background">
       <Header />
       <HomeHero />
+      <DailyRestorationsStrip />
       <PreLoginSampleStrip />
       <BeforeAfterShowcase />
       <PrivacyPhilosophySection />
