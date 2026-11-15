@@ -37,14 +37,13 @@ export function Header() {
   const showChat = paid;
 
   /**
-   * Signed-in top nav — single primary system.
-   * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
+   * Signed-in top nav — Studio first, then Maluto AI, Pricing.
+   * Home removed from primary nav. Dashboard lives on avatar/profile menu.
+   * History remains available from Dashboard / profile areas.
    */
   const authLinksBase: NavItem[] = [
-    { to: "/", label: "Home" },
-    { to: "/studio", label: "AI Studio" },
+    { to: "/studio", label: "Studio" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
-    ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
     { to: "/pricing", label: "Pricing" },
   ];
 
