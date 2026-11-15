@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
-import { Image as ImageIcon, Video, Music, Lock, Frame } from "lucide-react";
+import { Image as ImageIcon, Video, Music, Lock, Frame, Sparkles, Crop, Eraser, Circle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
@@ -11,12 +11,12 @@ import { CreditSpendHint } from "@/components/ads";
 export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
-      { title: "AI+ Tools — Motio2edit" },
+      { title: "Studio — Motio2edit" },
       {
         name: "description",
-        content: "Image, Circle 2edit, Video, Frames, and Music tools in one Motio2edit hub.",
+        content: "Unified Image, Video and Music generation workspace.",
       },
-      { property: "og:title", content: "AI+ Tools — Motio2edit" },
+      { property: "og:title", content: "Studio — Motio2edit" },
       { name: "robots", content: "noindex, follow" },
     ],
   }),
@@ -25,11 +25,12 @@ export const Route = createFileRoute("/studio")({
 
 function StudioLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Child product routes under /studio/* render via Outlet (existing implementations).
   if (pathname !== "/studio") return <Outlet />;
-  return <StudioHub />;
+  return <UnifiedStudio />;
 }
 
-function StudioHub() {
+function UnifiedStudio() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
@@ -39,202 +40,252 @@ function StudioHub() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background md:min-h-0 md:h-[100dvh] md:max-h-[100dvh] md:overflow-hidden">
       <Header />
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 md:max-w-6xl md:overflow-y-auto lg:max-w-7xl">
-        <div className="mb-3 shrink-0 text-center sm:mb-4">
+      <main className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-4 sm:pb-6 md:max-w-6xl md:overflow-y-auto lg:max-w-7xl">
+        {/* Ambient glass backdrop */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+        >
+          <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute -right-16 top-40 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-3xl" />
+          <div className="absolute bottom-20 left-1/3 h-48 w-48 rounded-full bg-sky-500/10 blur-3xl" />
+        </div>
+
+        <div className="mb-4 shrink-0 text-center sm:mb-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            AI+ Tools
+            Creative workspace
           </p>
-          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a tool</h1>
+          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">
+            Studio
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            One workspace · Image · Video · Music
+          </p>
+        </div>
+
+        {/* Mode switch — primary navigation inside Studio */}
+        <div className="mb-4 flex shrink-0 justify-center">
+          <div
+            className={cn(
+              "inline-flex items-center gap-1 rounded-2xl border border-white/20 bg-white/10 p-1.5 shadow-lg backdrop-blur-xl",
+              "dark:border-white/10 dark:bg-white/5",
+            )}
+            role="tablist"
+            aria-label="Studio mode"
+          >
+            <ModeTab to="/editor" label="Image" icon={<ImageIcon className="h-4 w-4" />} active />
+            <ModeTab
+              to={videoOk ? "/studio/video" : "/pricing"}
+              label="Video"
+              icon={<Video className="h-4 w-4" />}
+              locked={!videoOk}
+            />
+            <ModeTab
+              to={musicOk ? "/music" : "/pricing"}
+              label="Music"
+              icon={<Music className="h-4 w-4" />}
+              locked={!musicOk}
+            />
+          </div>
         </div>
 
         <CreditSpendHint
-          className="mb-3 shrink-0"
-          costLabel="Edits spend credits from your balance"
+          className="mb-4 shrink-0"
+          costLabel="Generations spend credits from your balance"
         />
 
-        <div
+        {/* Image mode tools — kept as image tools, not separate top-level nav */}
+        <section
           className={cn(
-            "grid min-h-0 flex-1 gap-2.5 sm:gap-3",
-            "grid-cols-2 auto-rows-[minmax(9.5rem,1fr)]",
-            "md:grid-cols-3 md:auto-rows-[minmax(11rem,14rem)] md:content-start md:gap-4",
+            "mb-5 rounded-3xl border border-white/15 bg-white/8 p-4 shadow-xl backdrop-blur-xl",
+            "dark:border-white/10 dark:bg-white/5 sm:p-5",
           )}
         >
-          <StudioTile
-            to="/editor"
-            title="Image"
-            subtitle="Generate · enhance"
-            gradient="from-primary/35 via-primary/10 to-transparent"
-            icon={
-              <span className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg sm:p-3.5">
-                <ImageIcon className="h-6 w-6 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <ImageIcon className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-bold tracking-tight">Image</h2>
+              <p className="text-[11px] text-muted-foreground">Generate and edit with real tools</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 md:gap-3">
+            <ToolCard
+              to="/editor"
+              title="Generate & Edit"
+              subtitle="Prompt · enhance · restyle"
+              icon={<Sparkles className="h-5 w-5" />}
+              accent="from-primary/40"
+            />
+            <ToolCard
+              to="/studio/image/circle-remove"
+              search={{ mode: "remove" as const, from: "studio" as const }}
+              title="Circle 2edit"
+              subtitle="Remove · Add"
+              icon={<Circle className="h-5 w-5 text-[#7B6FE0]" />}
+              accent="from-[#7B6FE0]/30"
+            />
+            <ToolCard
+              to="/studio/image/remove-bg"
+              title="Background"
+              subtitle="Remove background"
+              icon={<Eraser className="h-5 w-5" />}
+              accent="from-emerald-500/30"
+            />
+            <ToolCard
+              to="/studio/cropmix"
+              title="Crop"
+              subtitle="Crop & compose"
+              icon={<Crop className="h-5 w-5" />}
+              accent="from-amber-500/30"
+            />
+            <ToolCard
+              to="/studio/frames"
+              title="Frames"
+              subtitle="Frame · Glass"
+              icon={<Frame className="h-5 w-5" />}
+              accent="from-slate-400/30"
+            />
+            <ToolCard
+              to="/studio/image/auto-edit"
+              title="Maluto AI"
+              subtitle="Restore · auto-edit"
+              icon={<Sparkles className="h-5 w-5 text-orange-500" />}
+              accent="from-orange-500/30"
+            />
+          </div>
+        </section>
 
-          <StudioTile
-            to="/studio/image/circle-remove"
-            search={{ mode: "remove" as const, from: "studio" as const }}
-            title={
-              <>
-                <span className="text-[#7B6FE0]">Circle</span>
-                <span className="font-medium text-foreground/90"> 2edit</span>
-              </>
-            }
-            subtitle="Remove · Add"
-            gradient="from-[#7B6FE0]/25 via-transparent to-transparent"
-            borderClass="border-[#7B6FE0]/35 dark:border-[#7B6FE0]/40"
-            icon={<CircleMetaRing />}
-          />
-
-          <StudioTile
+        {/* Video + Music quick entry */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ModeCard
             to={videoOk ? "/studio/video" : "/pricing"}
             title="Video"
-            subtitle={videoOk ? "Cinematic motion" : "Requires a paid plan"}
-            gradient="from-rose-500/30 via-transparent to-transparent"
+            subtitle={videoOk ? "Prompt-to-video generation" : "Requires a paid plan"}
+            icon={<Video className="h-6 w-6" />}
             locked={!videoOk}
-            icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
-                <Video className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.2s_ease-in-out_infinite]" />
-              </span>
-            }
+            gradient="from-rose-500/25 via-transparent to-transparent"
           />
-
-          <StudioTile
-            to="/studio/frames"
-            title="Frames"
-            subtitle="Frame · Glass"
-            gradient="from-slate-400/30 via-zinc-200/10 to-transparent"
-            icon={
-              <span className="inline-flex rounded-2xl border border-slate-400/40 bg-background/80 p-3 sm:p-3.5">
-                <Frame className="h-6 w-6 text-slate-600 dark:text-slate-300 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_2.8s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
-
-          <StudioTile
-            to={musicOk ? "/studio/music" : "/pricing"}
+          <ModeCard
+            to={musicOk ? "/music" : "/pricing"}
             title="Music"
-            subtitle={musicOk ? "Prompt-to-music" : "Requires a paid plan"}
-            gradient="from-fuchsia-500/30 via-transparent to-transparent"
+            subtitle={musicOk ? "Prompt-to-music generation" : "Requires a paid plan"}
+            icon={<Music className="h-6 w-6" />}
             locked={!musicOk}
-            className="col-span-2 md:col-span-1"
-            icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
-                <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.4s_ease-in-out_infinite]" />
-              </span>
-            }
+            gradient="from-fuchsia-500/25 via-transparent to-transparent"
           />
         </div>
-
-        <style>{`
-          @keyframes iconFloat {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
-          }
-        `}</style>
       </main>
     </div>
   );
 }
 
-function StudioTile({
+function ModeTab({
+  to,
+  label,
+  icon,
+  active,
+  locked,
+}: {
+  to: string;
+  label: string;
+  icon: ReactNode;
+  active?: boolean;
+  locked?: boolean;
+}) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+        active
+          ? "bg-background/90 text-foreground shadow-md dark:bg-background/80"
+          : "text-muted-foreground hover:bg-white/10 hover:text-foreground",
+        locked && "opacity-70",
+      )}
+      role="tab"
+      aria-selected={!!active}
+    >
+      {icon}
+      {label}
+      {locked ? <Lock className="h-3 w-3 opacity-70" /> : null}
+    </Link>
+  );
+}
+
+function ToolCard({
   to,
   search,
   title,
   subtitle,
   icon,
-  gradient,
-  borderClass,
-  locked,
-  className,
+  accent,
 }: {
   to: string;
   search?: Record<string, string>;
-  title: ReactNode;
+  title: string;
   subtitle: string;
   icon: ReactNode;
-  gradient: string;
-  borderClass?: string;
-  locked?: boolean;
-  className?: string;
+  accent: string;
 }) {
   return (
     <Link
       to={to}
-      search={search as never}
+      search={search}
       className={cn(
-        "group relative flex min-h-0 flex-col justify-between overflow-hidden rounded-2xl border bg-card/80 p-3.5 shadow-sm backdrop-blur-md transition-transform active:scale-[0.98] sm:rounded-3xl sm:p-4",
-        "border-border/80",
-        borderClass,
-        className,
+        "group relative flex flex-col gap-2 overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-3.5 shadow-md backdrop-blur-md transition",
+        "hover:border-white/25 hover:bg-white/15 hover:shadow-lg dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10",
+      )}
+    >
+      <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-80", accent, "to-transparent")} />
+      <div className="relative text-foreground">{icon}</div>
+      <div className="relative">
+        <h3 className="text-sm font-bold tracking-tight">{title}</h3>
+        <p className="text-[10px] text-muted-foreground sm:text-[11px]">{subtitle}</p>
+      </div>
+    </Link>
+  );
+}
+
+function ModeCard({
+  to,
+  title,
+  subtitle,
+  icon,
+  locked,
+  gradient,
+}: {
+  to: string;
+  title: string;
+  subtitle: string;
+  icon: ReactNode;
+  locked?: boolean;
+  gradient: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        "relative flex min-h-[7.5rem] flex-col justify-between overflow-hidden rounded-3xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-xl transition",
+        "hover:border-white/25 hover:bg-white/15 dark:border-white/10 dark:bg-white/5",
+        locked && "opacity-90",
       )}
     >
       <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br", gradient)} />
-      <div className="relative">{icon}</div>
-      <div className="relative mt-auto">
-        <h2 className="text-base font-extrabold tracking-tight sm:text-lg">{title}</h2>
-        <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{subtitle}</p>
+      <div className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border/60 bg-background/70 text-primary shadow-sm">
+        {icon}
+      </div>
+      <div className="relative mt-3">
+        <h2 className="text-lg font-extrabold tracking-tight">{title}</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
       </div>
       {locked ? (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-2xl bg-background/55 backdrop-blur-[2px] sm:rounded-3xl">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-3xl bg-background/50 backdrop-blur-[2px]">
           <Lock className="h-5 w-5 text-primary" />
           <span className="text-[11px] font-semibold text-muted-foreground">Requires paid plan</span>
         </div>
       ) : null}
     </Link>
-  );
-}
-
-function CircleMetaRing() {
-  return (
-    <span
-      className="relative grid h-12 w-12 place-items-center rounded-2xl border border-[#7B6FE0]/45 bg-white/90 shadow-lg dark:bg-[#22252F] sm:h-14 sm:w-14"
-      aria-hidden
-    >
-      <svg viewBox="0 0 40 40" className="h-9 w-9 overflow-visible sm:h-10 sm:w-10">
-        <defs>
-          <linearGradient id="studioMetaRing" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#A8A0F0" />
-            <stop offset="50%" stopColor="#7B6FE0" />
-            <stop offset="100%" stopColor="#C8C4E8" />
-          </linearGradient>
-        </defs>
-        <circle
-          cx="20"
-          cy="20"
-          r="15"
-          fill="none"
-          stroke="url(#studioMetaRing)"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeDasharray="28 60"
-          className="origin-center motion-safe:animate-[spin_5.5s_linear_infinite]"
-        />
-        <circle
-          cx="20"
-          cy="20"
-          r="10"
-          fill="none"
-          stroke="#7B6FE0"
-          strokeWidth="1.5"
-          opacity="0.75"
-          strokeDasharray="18 40"
-          className="origin-center motion-safe:animate-[spin_9s_linear_infinite_reverse]"
-        />
-        <circle
-          cx="20"
-          cy="20"
-          r="3.4"
-          fill="#7B6FE0"
-          className="motion-safe:animate-[c2ePulse_2.4s_ease-in-out_infinite]"
-        />
-      </svg>
-      <style>{`
-        @keyframes c2ePulse {
-          0%, 100% { opacity: 0.85; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.15); }
-        }
-      `}</style>
-    </span>
   );
 }
