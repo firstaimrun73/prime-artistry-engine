@@ -1,12 +1,9 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-/**
- * Music page consolidation: the Music Studio editor at /music is the single
- * music page. This legacy route keeps old links working by redirecting.
- */
+/** Legacy Music Studio URL → unified Motion2AI workspace */
 export const Route = createFileRoute("/studio/music")({
   beforeLoad: () => {
-    throw redirect({ to: "/music" });
+    throw redirect({ to: "/motion2ai", search: { mode: "music" } });
   },
   component: () => null,
 });
