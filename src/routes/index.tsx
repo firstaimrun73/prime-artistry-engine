@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
@@ -16,11 +16,6 @@ import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/components/FeedbackCard";
 import { TrustSection } from "@/components/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
-import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
-import {
-  Motion2AILanding,
-  Motion2AIWorkspaceHeader,
-} from "@/components/motion2ai/Motion2AIWorkspace";
 import { pageHead, SITE_BRAND_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
@@ -44,29 +39,14 @@ function HomePage() {
     );
   }
 
-  if (user) return <SignedInHome />;
+  // Signed-in users land on the unified Motion2AI workspace
+  if (user) return <Navigate to="/motion2ai" search={{ mode: "image" }} />;
   return <SignedOutHome />;
-}
-
-function SignedInHome() {
-  return (
-    <div className="min-h-screen bg-background">
-      <Motion2AIWorkspaceHeader activeMode="image" />
-      <Motion2AILanding />
-      {/* Keep discovery + AI+ tools accessible below the primary workspace entry */}
-      <div className="border-t border-border/50">
-        <SignedInHomeBody />
-      </div>
-      <Footer />
-    </div>
-  );
 }
 
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
- * Single official demo lives in HomeHero (no duplicate WatchDemoSection).
- * No FooterAd on the public homepage.
- * Visitors can still explore samples; generation remains auth-gated.
+ * Visitors can explore samples; generation remains auth-gated via /motion2ai.
  */
 function SignedOutHome() {
   return (
@@ -116,17 +96,19 @@ function HomeTestimonials() {
 
 type StudioCardSpec = {
   name: string;
-  href: "/studio/image" | "/studio/video" | "/studio/music";
+  href: "/motion2ai" | "/studio/image" | "/studio/video" | "/studio/music";
   icon: typeof ImageIcon;
   accent: string;
   bullets: string[];
   freeAllowed: boolean;
+  mode?: "image" | "video" | "music";
 };
 
 const STUDIO_CARDS: StudioCardSpec[] = [
   {
     name: "Image Studio",
-    href: "/studio/image",
+    href: "/motion2ai",
+    mode: "image",
     icon: ImageIcon,
     accent: "gradient-image",
     bullets: ["Remove objects & backgrounds", "Upscale, restore & colorize", "AI headshot & style transfer"],
@@ -134,7 +116,8 @@ const STUDIO_CARDS: StudioCardSpec[] = [
   },
   {
     name: "Video Studio",
-    href: "/studio/video",
+    href: "/motion2ai",
+    mode: "video",
     icon: Video,
     accent: "gradient-video",
     bullets: ["Text-to-video & image-to-video", "Cinematic camera moves", "Reels & shorts presets"],
@@ -142,7 +125,8 @@ const STUDIO_CARDS: StudioCardSpec[] = [
   },
   {
     name: "Music Studio",
-    href: "/studio/music",
+    href: "/motion2ai",
+    mode: "music",
     icon: Music,
     accent: "gradient-music",
     bullets: ["Prompt-to-music tracks", "Genre + mood chips", "Up to 3-minute exports"],
@@ -162,8 +146,9 @@ function StudioShowcase() {
       <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {STUDIO_CARDS.map((c) => {
           const Icon = c.icon;
+          const redirect = c.mode ? `/motion2ai?mode=${c.mode}` : c.href;
           const onClick = () => {
-            navigate({ to: "/auth", search: { redirect: c.href, mode: "signin" } });
+            navigate({ to: "/auth", search: { redirect, mode: "signin" } });
           };
           return (
             <button
