@@ -1,51 +1,50 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { MusicAccessGate } from "@/components/MusicAccessGate";
 import { MusicModeCards } from "@/components/music/MusicModeCards";
 import { MusicResultCard } from "@/components/music/MusicResultCard";
-import {
-  LOADING_STEPS as LOADING,
-  type VoiceId,
-} from "@/components/music/musicStudioData";
+import { type VoiceId } from "@/components/music/musicStudioData";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
 import {
-  generateMusic, getMusicCapabilities, MUSIC_GENRES, MUSIC_MOODS, type MusicMode,
+  generateMusic,
+  getMusicCapabilities,
+  MUSIC_GENRES,
+  MUSIC_MOODS,
+  type MusicMode,
 } from "@/lib/music.functions";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { toast } from "sonner";
 import { Sparkles, Loader2, Coins, Music2 } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
-import {
-  readAdminTestPlan,
-} from "@/lib/studio/image/admin-test-plan";
+import { readAdminTestPlan } from "@/lib/studio/image/admin-test-plan";
 import type { PlanId } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
-async function uploadFile(file: File, userId: string, folder: string) {
-  const ext = file.name.split(".").pop() || "bin";
-  const path = `${userId}/${folder}/${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from("uploads").upload(path, file, {
-    contentType: file.type || "application/octet-stream", upsert: true,
-  });
-  if (error) throw new Error(error.message || "Upload failed.");
-  const { data } = await supabase.storage.from("uploads").createSignedUrl(path, 60 * 60 * 24 * 7);
-  if (!data?.signedUrl) throw new Error("Could not create a secure file URL.");
-  return data.signedUrl;
-}
-
 function Label({ children }: { children: React.ReactNode }) {
-  return <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground">{children}</p>;
+  return (
+    <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground">
+      {children}
+    </p>
+  );
 }
 
 function AutoGrowTextarea({
-  value, onChange, placeholder, className, minRows = 3, maxHeight = 220,
+  value,
+  onChange,
+  placeholder,
+  className,
+  minRows = 3,
+  maxHeight = 220,
 }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; className?: string;
-  minRows?: number; maxHeight?: number;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+  minRows?: number;
+  maxHeight?: number;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
   useEffect(() => {
@@ -75,7 +74,10 @@ function AutoGrowTextarea({
 
 /** Safe search for embed in /music or /motion2ai */
 function useMusicSearch(): { mode?: string; videoUrl?: string } {
-  const search = useRouterState({ select: (s) => s.location.search }) as Record<string, unknown>;
+  const search = useRouterState({ select: (s) => s.location.search }) as Record<
+    string,
+    unknown
+  >;
   return {
     mode: typeof search?.mode === "string" ? search.mode : undefined,
     videoUrl: typeof search?.videoUrl === "string" ? search.videoUrl : undefined,
@@ -103,23 +105,27 @@ function MusicStudio() {
 
   const [mode, setMode] = useState<MusicMode>(initialMode);
   const [prompt, setPrompt] = useState("");
-  const [lyrics, setLyrics] = useState("");
-  const [genre, setGenre] = useState("");
-  const [mood, setMood] = useState("");
-  const [instrument, setInstrument] = useState("");
-  const [duration, setDuration] = useState(30);
-  const [voice, setVoice] = useState<VoiceId>("eve");
-  const [qualityTier, setQualityTier] = useState<"standard" | "premium">("standard");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [lyrics] = useState("");
+  const [genre] = useState("");
+  const [mood] = useState("");
+  const [instrument] = useState("");
+  const [duration] = useState(30);
+  const [voice] = useState<VoiceId>("eve");
+  const [qualityTier, setQualityTier] = useState<"standard" | "premium">(
+    "standard",
+  );
+  const [imageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(search.videoUrl ?? null);
-  const [uploading, setUploading] = useState(false);
+  const [uploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [trackTitle, setTrackTitle] = useState<string | null>(null);
   const [resultModel, setResultModel] = useState<string | null>(null);
   const [charged, setCharged] = useState<number | null>(null);
   const isAdmin = isAdminEmail(profile?.email);
-  const [adminTestPlan] = useState<PlanId | null>(() => (typeof window !== "undefined" ? readAdminTestPlan() : null));
+  const [adminTestPlan] = useState<PlanId | null>(() =>
+    typeof window !== "undefined" ? readAdminTestPlan() : null,
+  );
   const [musicCaps, setMusicCaps] = useState<{
     qualityTiers: ("standard" | "premium")[];
     promptMaxChars: number;
@@ -127,7 +133,9 @@ function MusicStudio() {
     maxTrackDurationSeconds: number;
   } | null>(null);
   const [resultVideoUrl, setResultVideoUrl] = useState<string | null>(null);
-  const [resultOutputType, setResultOutputType] = useState<"audio" | "video" | null>(null);
+  const [resultOutputType, setResultOutputType] = useState<
+    "audio" | "video" | null
+  >(null);
   const [resultMode, setResultMode] = useState<MusicMode | null>(null);
   const [videoAudioMode] = useState<"replace" | "mix">("replace");
 
@@ -142,21 +150,38 @@ function MusicStudio() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await getCaps({ data: { adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined } });
+        const res = await getCaps({
+          data: {
+            adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined,
+          },
+        });
         if (cancelled || !res) return;
         setMusicCaps({
-          qualityTiers: (res.qualityTiers as ("standard" | "premium")[]) ?? ["standard"],
-          promptMaxChars: typeof res.promptMaxChars === "number" ? res.promptMaxChars : 0,
+          qualityTiers:
+            (res.qualityTiers as ("standard" | "premium")[]) ?? ["standard"],
+          promptMaxChars:
+            typeof res.promptMaxChars === "number" ? res.promptMaxChars : 0,
           modes: (res.modes as MusicMode[]) ?? ["song", "instrumental"],
-          maxTrackDurationSeconds: typeof res.maxTrackDurationSeconds === "number" ? res.maxTrackDurationSeconds : 30,
+          maxTrackDurationSeconds:
+            typeof res.maxTrackDurationSeconds === "number"
+              ? res.maxTrackDurationSeconds
+              : 30,
         });
-      } catch { /* best-effort */ }
+      } catch {
+        /* best-effort */
+      }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [getCaps, adminTestPlan, isAdmin]);
 
-  const premiumAllowed = !musicCaps || musicCaps.qualityTiers.includes("premium");
-  const promptMax = musicCaps?.promptMaxChars && musicCaps.promptMaxChars > 0 ? musicCaps.promptMaxChars : null;
+  const premiumAllowed =
+    !musicCaps || musicCaps.qualityTiers.includes("premium");
+  const promptMax =
+    musicCaps?.promptMaxChars && musicCaps.promptMaxChars > 0
+      ? musicCaps.promptMaxChars
+      : null;
 
   useEffect(() => {
     if (!premiumAllowed && qualityTier === "premium") setQualityTier("standard");
@@ -164,10 +189,17 @@ function MusicStudio() {
 
   async function onGenerate() {
     if (loading || uploading) return;
-    if (mode === "voiceover" && !prompt.trim()) return toast.error("Enter a script.");
-    if ((mode === "song" || mode === "instrumental" || mode === "bgm") && !prompt.trim() && !imageUrl && !videoUrl)
+    if (mode === "voiceover" && !prompt.trim())
+      return toast.error("Enter a script.");
+    if (
+      (mode === "song" || mode === "instrumental" || mode === "bgm") &&
+      !prompt.trim() &&
+      !imageUrl &&
+      !videoUrl
+    )
       return toast.error("Add a description, image, or video.");
-    if (mode === "video_music" && !videoUrl) return toast.error("Upload or attach a video for Video Music.");
+    if (mode === "video_music" && !videoUrl)
+      return toast.error("Upload or attach a video for Video Music.");
 
     setLoading(true);
     setAudioUrl(null);
@@ -188,15 +220,24 @@ function MusicStudio() {
           mode,
           prompt: prompt.trim(),
           lyrics: mode === "song" ? lyrics.trim() || undefined : undefined,
-          genre: genre && (MUSIC_GENRES as readonly string[]).includes(genre) ? (genre as (typeof MUSIC_GENRES)[number]) : undefined,
-          mood: mood && (MUSIC_MOODS as readonly string[]).includes(mood) ? (mood as (typeof MUSIC_MOODS)[number]) : undefined,
+          genre:
+            genre && (MUSIC_GENRES as readonly string[]).includes(genre)
+              ? (genre as (typeof MUSIC_GENRES)[number])
+              : undefined,
+          mood:
+            mood && (MUSIC_MOODS as readonly string[]).includes(mood)
+              ? (mood as (typeof MUSIC_MOODS)[number])
+              : undefined,
           instrument: instrument || undefined,
           durationSeconds: duration,
           imageUrl: imageUrl || undefined,
           videoUrl: videoUrl || undefined,
           voice: mode === "voiceover" ? voice : undefined,
           instrumental: mode === "instrumental" || mode === "bgm",
-          qualityTier: mode === "song" || mode === "instrumental" || mode === "bgm" ? qualityTier : "standard",
+          qualityTier:
+            mode === "song" || mode === "instrumental" || mode === "bgm"
+              ? qualityTier
+              : "standard",
           videoAudioMode: mode === "video_music" ? videoAudioMode : undefined,
           idempotencyKey,
           adminTestPlan: isAdmin ? (adminTestPlan ?? undefined) : undefined,
@@ -211,7 +252,11 @@ function MusicStudio() {
       setResultModel(res.model ?? null);
       setCharged(res.creditsCharged ?? null);
       void refreshProfile?.();
-      toast.success(res.creditsCharged ? `Ready · ${res.creditsCharged} credits` : "Track ready");
+      toast.success(
+        res.creditsCharged
+          ? `Ready · ${res.creditsCharged} credits`
+          : "Track ready",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Generation failed.");
     } finally {
@@ -232,7 +277,9 @@ function MusicStudio() {
               <div className="min-w-0">
                 <h1 className="truncate text-lg font-extrabold tracking-tight sm:text-xl">
                   Music{" "}
-                  <span className="bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 bg-clip-text text-transparent">Studio</span>
+                  <span className="bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 bg-clip-text text-transparent">
+                    Studio
+                  </span>
                 </h1>
                 <p className="hidden text-xs text-muted-foreground sm:block">
                   Songs · Instrumentals · BGM · AI Voice · Sound · Video Music
@@ -242,7 +289,9 @@ function MusicStudio() {
             <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-card px-2.5 py-1 text-sm shadow-sm">
               <Coins className="h-3.5 w-3.5 text-orange-500" />
               <span className="tabular-nums font-semibold">
-                {profile?.credits != null ? profile.credits.toLocaleString() : "—"}
+                {profile?.credits != null
+                  ? profile.credits.toLocaleString()
+                  : "—"}
               </span>
             </div>
           </div>
@@ -250,7 +299,11 @@ function MusicStudio() {
         </header>
 
         <section className="mb-5">
-          <MusicModeCards mode={mode} onChange={setMode} allowedModes={musicCaps?.modes ?? null} />
+          <MusicModeCards
+            mode={mode}
+            onChange={setMode}
+            allowedModes={musicCaps?.modes ?? null}
+          />
         </section>
 
         <section className="space-y-4">
@@ -321,12 +374,18 @@ function MusicStudio() {
           {audioUrl && (
             <MusicResultCard
               audioUrl={audioUrl}
-              title={trackTitle}
+              trackTitle={trackTitle ?? "Generated track"}
+              mode={resultMode ?? mode}
+              charged={charged}
               model={resultModel}
-              credits={charged}
               videoUrl={resultVideoUrl}
               outputType={resultOutputType}
-              mode={resultMode}
+              onAgain={() => {
+                setAudioUrl(null);
+                setResultVideoUrl(null);
+                setTrackTitle(null);
+                setCharged(null);
+              }}
             />
           )}
         </section>
