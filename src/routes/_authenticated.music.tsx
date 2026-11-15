@@ -1,33 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
-import { MusicStudioPage } from "@/components/music/MusicStudioPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-const searchSchema = z.object({
-  mode: z.enum(["song", "instrumental", "bgm", "voiceover", "sfx", "video-music", "video_music"]).optional(),
-  videoUrl: z.string().url().optional(),
-});
-
-function MusicRoutePage() {
-  return <MusicStudioPage />;
-}
-
+/** Legacy /music → unified Motion2AI workspace */
 export const Route = createFileRoute("/_authenticated/music")({
-  validateSearch: (s) => {
-    try {
-      return searchSchema.parse(s);
-    } catch {
-      return {};
-    }
+  beforeLoad: () => {
+    throw redirect({ to: "/motion2ai", search: { mode: "music" } });
   },
-  head: () => ({
-    meta: [
-      { title: "Music Studio — Motio2edit" },
-      {
-        name: "description",
-        content:
-          "Motio2edit Music Studio: create songs, instrumentals, BGM, AI voice narration, sound effects, and video soundtracks — with plan-based quality, duration, and voice limits.",
-      },
-    ],
-  }),
-  component: MusicRoutePage,
+  component: () => null,
 });
