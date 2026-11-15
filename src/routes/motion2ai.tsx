@@ -1,15 +1,23 @@
 /**
- * Unified Motion2AI workspace — one surface, three modes, no route hop on switch.
- * Reuses production ImageEditor, VideoEditor, and MusicStudioPage.
- * Generation remains server-authorized; logged-out users can explore UI/samples.
+ * Motion2AI Creative Studio — one surface, three modes.
+ * Real ImageEditor / VideoEditor / MusicStudioPage kept mounted (hidden when inactive)
+ * so drafts, uploads and results survive mode switches.
  */
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
-import { Image as ImageIcon, Video, Music, Coins, Sparkles, ArrowUpRight, Loader2 } from "lucide-react";
+import {
+  Image as ImageIcon,
+  Video,
+  Music,
+  Coins,
+  Sparkles,
+  ArrowUpRight,
+  Loader2,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
-import { canAccessVideo, canAccessMusic } from "@/lib/policy";
+import { canAccessVideo } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { PlanId } from "@/lib/plans";
@@ -17,7 +25,6 @@ import { ImageEditor } from "@/components/editor/image/ImageEditor";
 import { VideoEditor } from "@/components/editor/video/VideoEditor";
 import { MusicStudioPage } from "@/components/music/MusicStudioPage";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
-import { Link } from "@tanstack/react-router";
 
 const searchSchema = z.object({
   mode: z.enum(["image", "video", "music"]).optional().default("image"),
@@ -35,10 +42,11 @@ export const Route = createFileRoute("/motion2ai")({
   },
   head: () => ({
     meta: [
-      { title: "Motion2AI — Motio2edit" },
+      { title: "Motion2AI Creative Studio — Motio2edit" },
       {
         name: "description",
-        content: "Unified creative workspace: Image, Video, and Music generation in one place.",
+        content:
+          "Create images, videos, and music in one premium studio. What will you create today?",
       },
     ],
   }),
@@ -60,17 +68,25 @@ function Motion2AIPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const { user, profile, loading } = useAuth();
   const [mode, setMode] = useState<Motion2AIMode>(searchMode ?? "image");
+  // Track which modes have been visited so we only mount once, then keep alive
+  const [mounted, setMounted] = useState<Record<Motion2AIMode, boolean>>({
+    image: true,
+    video: false,
+    music: false,
+  });
 
-  // Keep local mode in sync with URL (shareable / back-button friendly) without remounting chrome
   useEffect(() => {
     if (searchMode && searchMode !== mode) setMode(searchMode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchMode]);
 
+  useEffect(() => {
+    setMounted((prev) => (prev[mode] ? prev : { ...prev, [mode]: true }));
+  }, [mode]);
+
   const isAdmin = isAdminEmail(profile?.email);
   const planId = (profile?.plan ?? "free") as PlanId;
   const videoOk = canAccessVideo({ plan: planId, email: profile?.email, isAdmin });
-  const musicOk = canAccessMusic({ plan: planId, email: profile?.email, isAdmin });
   const credits = profile?.credits ?? 0;
 
   const switchMode = useCallback(
@@ -79,7 +95,6 @@ function Motion2AIPage() {
         navigate({ to: "/pricing" });
         return;
       }
-      // Music is allowed for all signed-in; free has limited caps server-side
       setMode(next);
       void navigate({
         search: (prev) => ({ ...prev, mode: next }),
@@ -106,14 +121,12 @@ function Motion2AIPage() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
-      {/* Ambient glass orbs */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
         <div className="absolute -left-24 top-16 h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
         <div className="absolute -right-20 top-40 h-80 w-80 rounded-full bg-orange-400/10 blur-3xl" />
         <div className="absolute bottom-20 left-1/3 h-56 w-56 rounded-full bg-fuchsia-500/10 blur-3xl" />
       </div>
 
-      {/* Workspace header — always visible */}
       <header className="sticky top-0 z-40 border-b border-border/50 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-2.5">
           <Link to="/" className="flex min-w-0 items-center gap-2">
@@ -124,14 +137,15 @@ function Motion2AIPage() {
               <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Motio2edit
               </p>
-              <p className="truncate text-sm font-extrabold tracking-tight">Motion2AI</p>
+              <p className="truncate text-sm font-extrabold tracking-tight">
+                Motion2AI Creative Studio
+              </p>
             </div>
           </Link>
 
-          {/* Desktop mode tabs — in-place */}
           <nav
             className="hidden items-center gap-0.5 rounded-2xl border border-border/60 bg-card/50 p-1 shadow-sm backdrop-blur-md sm:flex"
-            aria-label="Motion2AI modes"
+            aria-label="Creative modes"
           >
             {MODE_META.map((m) => {
               const Icon = m.icon;
@@ -191,7 +205,6 @@ function Motion2AIPage() {
           </div>
         </div>
 
-        {/* Mobile mode tabs */}
         <div className="border-t border-border/30 px-3 pb-2 pt-1.5 sm:hidden">
           <div className="flex gap-1 rounded-2xl border border-border/60 bg-card/50 p-1">
             {MODE_META.map((m) => {
@@ -218,12 +231,21 @@ function Motion2AIPage() {
         </div>
       </header>
 
-      {/* Mode content — in place, no full navigation */}
+      {/* Tagline strip */}
+      <div className="border-b border-border/30 bg-card/30 px-4 py-2.5 text-center backdrop-blur-sm">
+        <p className="text-sm font-semibold tracking-tight text-foreground sm:text-base">
+          What will you create today?
+        </p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">
+          Image · Video · Music — one creative studio
+        </p>
+      </div>
+
       <main className="relative flex-1">
         {!user && (
           <div className="mx-auto max-w-3xl px-4 pt-3">
             <div className="rounded-2xl border border-border/60 bg-card/60 px-4 py-3 text-center text-sm text-muted-foreground backdrop-blur-md">
-              Explore Motion2AI.{" "}
+              Explore samples freely.{" "}
               <button
                 type="button"
                 className="font-semibold text-primary hover:underline"
@@ -241,72 +263,71 @@ function Motion2AIPage() {
           </div>
         )}
 
-        <div
-          key={mode}
-          className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
-        >
-          {mode === "image" && (
-            <div className="pb-8">
+        {/* Keep-alive panels: mount once, hide inactive — preserves drafts */}
+        <div className={cn("pb-8", mode !== "image" && "hidden")} aria-hidden={mode !== "image"}>
+          {mounted.image && (
+            <>
               {user && profile ? (
                 <ImageEditor />
               ) : (
-                <ExploreImagePlaceholder onSignIn={() =>
-                  navigate({
-                    to: "/auth",
-                    search: { redirect: "/motion2ai?mode=image", mode: "signin" },
-                  })
-                } />
+                <ExploreImagePlaceholder
+                  onSignIn={() =>
+                    navigate({
+                      to: "/auth",
+                      search: { redirect: "/motion2ai?mode=image", mode: "signin" },
+                    })
+                  }
+                />
               )}
-              {/* Preserve existing horizontal sample carousel below creative area */}
               <div className="mx-auto max-w-5xl px-2 sm:px-4">
                 <ImageStudioWeeklyCarousel />
               </div>
-            </div>
+            </>
           )}
+        </div>
 
-          {mode === "video" && (
-            <div className="pb-8">
-              {user && profile && videoOk ? (
-                <VideoEditor />
-              ) : user && !videoOk ? (
-                <LockedMode
-                  title="Video"
-                  message="Upgrade to unlock AI video generation."
-                  onUpgrade={() => navigate({ to: "/pricing" })}
-                />
-              ) : (
-                <ExploreModePlaceholder
-                  title="Video"
-                  blurb="Text-to-video, image-to-video, and cinematic styles. Sign in on a paid plan to create."
-                  onSignIn={() =>
-                    navigate({
-                      to: "/auth",
-                      search: { redirect: "/motion2ai?mode=video", mode: "signin" },
-                    })
-                  }
-                />
-              )}
-            </div>
-          )}
+        <div className={cn("pb-8", mode !== "video" && "hidden")} aria-hidden={mode !== "video"}>
+          {mounted.video &&
+            (user && profile && videoOk ? (
+              <VideoEditor />
+            ) : user && !videoOk ? (
+              <LockedMode
+                title="Video"
+                message="Upgrade to unlock AI video generation."
+                onUpgrade={() => navigate({ to: "/pricing" })}
+              />
+            ) : (
+              <ExploreModePlaceholder
+                title="Video"
+                blurb="Text-to-video, image-to-video, and cinematic styles. Sign in on a paid plan to create."
+                onSignIn={() =>
+                  navigate({
+                    to: "/auth",
+                    search: { redirect: "/motion2ai?mode=video", mode: "signin" },
+                  })
+                }
+              />
+            ))}
+        </div>
 
-          {mode === "music" && (
-            <div className="pb-8">
-              {user && profile ? (
-                <MusicStudioEmbedded />
-              ) : (
-                <ExploreModePlaceholder
-                  title="Music"
-                  blurb="Songs, instrumentals, BGM, voiceover, and SFX. Sign in to create."
-                  onSignIn={() =>
-                    navigate({
-                      to: "/auth",
-                      search: { redirect: "/motion2ai?mode=music", mode: "signin" },
-                    })
-                  }
-                />
-              )}
-            </div>
-          )}
+        <div className={cn("pb-8", mode !== "music" && "hidden")} aria-hidden={mode !== "music"}>
+          {mounted.music &&
+            (user && profile ? (
+              <div className="music-embed [&>div]:min-h-0">
+                <MusicStudioPage />
+              </div>
+            ) : (
+              <ExploreModePlaceholder
+                title="Music"
+                blurb="Songs, instrumentals, BGM, voiceover, SFX, and video music. Sign in to create."
+                onSignIn={() =>
+                  navigate({
+                    to: "/auth",
+                    search: { redirect: "/motion2ai?mode=music", mode: "signin" },
+                  })
+                }
+              />
+            ))}
         </div>
       </main>
 
@@ -321,24 +342,15 @@ function Motion2AIPage() {
   );
 }
 
-/** Music page uses route-scoped search; embed safely with defaults */
-function MusicStudioEmbedded() {
-  return (
-    <div className="music-embed [&>div]:min-h-0">
-      <MusicStudioPage />
-    </div>
-  );
-}
-
 function ExploreImagePlaceholder({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div className="mx-auto max-w-lg px-4 py-10 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/25">
         <ImageIcon className="h-7 w-7" />
       </div>
-      <h2 className="mt-4 text-xl font-extrabold tracking-tight">Image Studio</h2>
+      <h2 className="mt-4 text-xl font-extrabold tracking-tight">Image</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Standard · Premium · Ultra AI. Upload, prompt, and generate. Browse samples below.
+        Standard · Premium · Ultra. Upload, prompt, and generate. Browse samples below.
       </p>
       <Button className="mt-6 rounded-full" onClick={onSignIn}>
         Sign in to create
