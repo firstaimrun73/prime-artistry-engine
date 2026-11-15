@@ -17,6 +17,10 @@ import { FeedbackCard } from "@/components/FeedbackCard";
 import { TrustSection } from "@/components/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
+import {
+  Motion2AILanding,
+  Motion2AIWorkspaceHeader,
+} from "@/components/motion2ai/Motion2AIWorkspace";
 import { pageHead, SITE_BRAND_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
@@ -47,8 +51,12 @@ function HomePage() {
 function SignedInHome() {
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <SignedInHomeBody />
+      <Motion2AIWorkspaceHeader activeMode="image" />
+      <Motion2AILanding />
+      {/* Keep discovery + AI+ tools accessible below the primary workspace entry */}
+      <div className="border-t border-border/50">
+        <SignedInHomeBody />
+      </div>
       <Footer />
     </div>
   );
@@ -58,6 +66,7 @@ function SignedInHome() {
  * Signed-out homepage — PUBLIC MARKETING ONLY.
  * Single official demo lives in HomeHero (no duplicate WatchDemoSection).
  * No FooterAd on the public homepage.
+ * Visitors can still explore samples; generation remains auth-gated.
  */
 function SignedOutHome() {
   return (
@@ -148,7 +157,7 @@ function StudioShowcase() {
     <section className="mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16">
       <div className="mb-8 text-center">
         <h2 className="text-2xl font-bold sm:text-3xl">Three studios, one workspace</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Sign in to open any studio.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Explore samples freely. Sign in to create.</p>
       </div>
       <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
         {STUDIO_CARDS.map((c) => {
