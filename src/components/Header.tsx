@@ -14,13 +14,13 @@ import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import { Coins, ShieldCheck, Menu } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type NavItem = { to: any; label: string };
+type NavItem = { to: any; label: string; search?: Record<string, string> };
 
-/** Lean public nav — About / Security remain in the footer. */
+/** Lean public nav — Studio = unified Image/Video/Music generation */
 const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
-  { to: "/features", label: "Features" },
-  { to: "/studio/image/auto-edit", label: "Maluto AI" },
+  { to: "/motion2ai", label: "Studio", search: { mode: "image" } },
+  { to: "/studio", label: "AI Tools" },
   { to: "/pricing", label: "Pricing" },
   { to: "/faq", label: "FAQ" },
   { to: "/support", label: "Support" },
@@ -37,13 +37,13 @@ export function Header() {
   const showChat = paid;
 
   /**
-   * Signed-in top nav — single primary system.
-   * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
+   * Signed-in top nav — Studio opens unified generation (Image/Video/Music).
+   * AI Tools = Circle, Frames, Filters, etc.
    */
   const authLinksBase: NavItem[] = [
     { to: "/", label: "Home" },
-    { to: "/studio", label: "AI Studio" },
-    { to: "/studio/image/auto-edit", label: "Maluto AI" },
+    { to: "/motion2ai", label: "Studio", search: { mode: "image" } },
+    { to: "/studio", label: "AI Tools" },
     ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
     { to: "/pricing", label: "Pricing" },
   ];
@@ -75,6 +75,7 @@ export function Header() {
             <Link
               key={`${l.to}-${l.label}`}
               to={l.to}
+              search={l.search as never}
               activeProps={{ className: "bg-secondary/80 text-foreground" }}
               activeOptions={l.to === "/" ? { exact: true } : undefined}
               className="rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:px-2.5 xl:px-3"
@@ -105,7 +106,6 @@ export function Header() {
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
-              {/* Avatar = Dashboard shortcut (not a separate Dashboard nav item) */}
               <button
                 type="button"
                 onClick={() => navigate({ to: "/dashboard" })}
@@ -139,7 +139,12 @@ export function Header() {
               <Button
                 size="sm"
                 className="h-9 px-2.5 text-sm sm:px-3"
-                onClick={() => navigate({ to: "/auth", search: { mode: "signup", redirect: undefined } })}
+                onClick={() =>
+                  navigate({
+                    to: "/auth",
+                    search: { mode: "signup", redirect: "/motion2ai?mode=image" },
+                  })
+                }
               >
                 Get started
               </Button>
@@ -169,6 +174,7 @@ export function Header() {
                     <Link
                       key={`${l.to}-${l.label}`}
                       to={l.to}
+                      search={l.search as never}
                       onClick={() => setMenuOpen(false)}
                       activeProps={{ className: "bg-secondary text-foreground" }}
                       activeOptions={l.to === "/" ? { exact: true } : undefined}
