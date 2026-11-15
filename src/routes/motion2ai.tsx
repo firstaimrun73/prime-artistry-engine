@@ -1,7 +1,6 @@
 /**
- * Motio2edit Studio — ONE page for Image | Video | Music.
- * Shared prompt bar + upload + mode switch. Real generateMedia / generateMusic.
- * Not a chatbot — generation only.
+ * Motio2edit Studio — Image | Video | Music on one page.
+ * Prompt bar + upload + samples below (image carousel + video style thumbs).
  */
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -32,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { startGeneration, endGeneration } from "@/lib/generation-status";
 import { toast } from "sonner";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
+import { VideoStyleStrip } from "@/components/video/VideoStyleStrip";
 
 const searchSchema = z.object({
   mode: z.enum(["image", "video", "music"]).optional().default("image"),
@@ -119,6 +119,7 @@ function Motion2AIPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<StudioResult[]>([]);
+  const [videoStyle, setVideoStyle] = useState("none");
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -233,6 +234,7 @@ function Motion2AIPage() {
             videoDuration: mode === "video" ? 5 : null,
             videoResolution: mode === "video" ? "720p" : null,
             videoAspect: mode === "video" ? "16:9" : null,
+            videoStyle: mode === "video" && videoStyle !== "none" ? videoStyle : null,
           },
         });
         const url =
@@ -280,7 +282,6 @@ function Motion2AIPage() {
         <div className="absolute bottom-20 left-1/3 h-56 w-56 rounded-full bg-fuchsia-500/10 blur-3xl" />
       </div>
 
-      {/* Brand + credits */}
       <header className="sticky top-0 z-40 border-b border-border/50 bg-background/75 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3">
           <Link to="/" className="min-w-0">
@@ -315,7 +316,6 @@ function Motion2AIPage() {
           </div>
         </div>
 
-        {/* Image | Video | Music */}
         <div className="mx-auto max-w-3xl px-4 pb-3">
           <div
             className="flex gap-1 rounded-2xl border border-border/60 bg-card/60 p-1 shadow-sm backdrop-blur-md"
@@ -350,11 +350,11 @@ function Motion2AIPage() {
         </div>
       </header>
 
-      {/* Feed */}
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-36 pt-4">
+      {/* Feed — extra bottom padding for prompt + samples dock */}
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-[min(52vh,28rem)] pt-4">
         {!user && (
           <div className="mb-4 rounded-2xl border border-border/60 bg-card/60 px-4 py-3 text-center text-sm text-muted-foreground backdrop-blur-md">
-            Explore Studio freely.{" "}
+            Explore samples freely.{" "}
             <button type="button" className="font-semibold text-primary hover:underline" onClick={requireAuth}>
               Sign in
             </button>{" "}
@@ -363,14 +363,13 @@ function Motion2AIPage() {
         )}
 
         {results.length === 0 && !busy && (
-          <div className="flex flex-1 flex-col items-center justify-center py-12 text-center">
+          <div className="flex flex-col items-center justify-center py-10 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/25">
               <Sparkles className="h-7 w-7" />
             </span>
             <h1 className="mt-4 text-xl font-extrabold tracking-tight">What will you create today?</h1>
             <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-              Pick <strong>Image</strong>, <strong>Video</strong>, or <strong>Music</strong>, add a prompt,
-              optional upload, and generate.
+              Image, Video, or Music — prompt below, samples underneath.
             </p>
           </div>
         )}
@@ -418,16 +417,10 @@ function Motion2AIPage() {
           )}
           <div ref={bottomRef} />
         </div>
-
-        {mode === "image" && (
-          <div className="mt-8">
-            <ImageStudioWeeklyCarousel />
-          </div>
-        )}
       </main>
 
-      {/* Composer — chat-style bottom bar */}
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/50 bg-background/90 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl">
+      {/* Prompt bar + samples BELOW it */}
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/50 bg-background/95 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl">
         <div className="mx-auto w-full max-w-3xl px-3 sm:px-4">
           {preview && (
             <div className="mb-2 flex items-center gap-2">
@@ -500,10 +493,43 @@ function Motion2AIPage() {
             </Button>
           </div>
 
-          <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-            AI Tools (Circle, Frames, Filters) →{" "}
+          {/* Samples BELOW prompt bar */}
+          <div className="mt-2 max-h-[28vh] overflow-y-auto overscroll-contain">
+            {mode === "image" && (
+              <div className="rounded-xl border border-border/40 bg-card/40 px-1 py-1">
+                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Sample edits
+                </p>
+                <ImageStudioWeeklyCarousel />
+              </div>
+            )}
+
+            {mode === "video" && (
+              <div className="rounded-xl border border-border/40 bg-card/40 px-2 py-2">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Video styles
+                </p>
+                <VideoStyleStrip
+                  selectedId={videoStyle}
+                  onSelect={setVideoStyle}
+                  plan={profile?.plan}
+                  isAdmin={isAdmin}
+                  disabled={busy}
+                />
+              </div>
+            )}
+
+            {mode === "music" && (
+              <p className="px-1 py-2 text-center text-[11px] text-muted-foreground">
+                Song · instrumental · mood from your prompt. Upload optional image or video reference.
+              </p>
+            )}
+          </div>
+
+          <p className="mt-1 text-center text-[10px] text-muted-foreground">
+            AI Tools →{" "}
             <Link to="/studio" className="font-semibold text-primary hover:underline">
-              AI Tools
+              Circle, Frames, Filters
             </Link>
           </p>
         </div>
