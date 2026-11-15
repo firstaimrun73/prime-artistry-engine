@@ -1,11 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Home, LayoutGrid, History, User, Plus, Crown } from "lucide-react";
+import { LayoutGrid, History, User, Crown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { isAdminEmail } from "@/lib/admin-config";
-import { isPaidPlan } from "@/lib/policy";
 
 import { hideBottomNav } from "@/components/hideBottomNav";
 export { hideBottomNav };
@@ -90,12 +88,18 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
         )}
       />
 
-      <Plus
+      {/* Plus icon */}
+      <svg
         className={cn(
           "h-6 w-6 stroke-[2.5] transition-all duration-300 ease-out",
           showA || showSpark ? "scale-0 opacity-0 rotate-45" : "scale-100 opacity-100 rotate-0",
         )}
-      />
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+      >
+        <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+      </svg>
 
       <span
         className={cn(
@@ -143,12 +147,10 @@ function AutoCenterIcon({ active }: { active?: boolean }) {
 }
 
 export function BottomTabBar() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { t } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [hiddenByScroll, setHiddenByScroll] = useState(false);
-  const admin = isAdminEmail(profile?.email);
-  const paid = admin || isPaidPlan(profile?.plan);
 
   useEffect(() => {
     if (pathname !== "/") {
@@ -173,18 +175,13 @@ export function BottomTabBar() {
   const malutoActive = pathname.startsWith("/studio/image/auto-edit");
 
   const left = [
-    { to: "/" as const, label: t("nav.home") || "Home", icon: Home },
     { to: "/studio" as const, label: t("nav.studio") || "Studio", icon: LayoutGrid },
+    { to: "/pricing" as const, label: "Pricing", icon: Crown },
   ];
-  const right = paid
-    ? [
-        { to: "/history" as const, label: t("nav.history") || "History", icon: History },
-        { to: "/profile" as const, label: t("nav.profile") || "Profile", icon: User },
-      ]
-    : [
-        { to: "/pricing" as const, label: "Plans", icon: Crown },
-        { to: "/profile" as const, label: t("nav.profile") || "Profile", icon: User },
-      ];
+  const right = [
+    { to: "/dashboard" as const, label: "Dashboard", icon: History },
+    { to: "/profile" as const, label: t("nav.profile") || "Profile", icon: User },
+  ];
 
   const isIOS =
     typeof navigator !== "undefined" &&
