@@ -15,9 +15,9 @@ import {
 import { getDemoVideoSample } from "@/lib/r2-catalog";
 
 const VALUE_PROPS = [
-  { icon: ImageIcon, label: "AI Image Editing" },
-  { icon: Video, label: "AI Video Editing" },
-  { icon: Music, label: "AI Music Generation" },
+  { icon: ImageIcon, label: "AI Image" },
+  { icon: Video, label: "AI Video" },
+  { icon: Music, label: "AI Music" },
   { icon: Zap, label: "Fast Cloud Processing" },
 ];
 
@@ -27,9 +27,6 @@ const STEPS = [
   { icon: Download, label: "Generate" },
 ];
 
-/** Pre-login hero — never deep-link into product editors (Circle, Lens, etc.). */
-const AUTH_THEN_CIRCLE = "/studio/image/circle-remove?mode=remove&from=home";
-
 const DEMO = getDemoVideoSample();
 
 function scrollToHeroDemo() {
@@ -37,10 +34,6 @@ function scrollToHeroDemo() {
   if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-/**
- * Hero: copy + CTAs + single official R2 demo under Watch demo.
- * WatchDemoSection is not rendered on signed-out home (avoids duplicate).
- */
 export function HomeHero() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -88,23 +81,20 @@ export function HomeHero() {
           <span className="notranslate" translate="no">
             Motio2edit
           </span>{" "}
-          · Credit-based AI studio
+          · One Studio for Image, Video & Music
         </span>
         <h1 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-          AI Image & Video Editing, <span className="text-primary">Made Simple</span>
+          Create in one <span className="text-primary">Studio</span>
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-          Edit images and videos with AI in one workspace. Remove objects, enhance portraits,
-          change outfits, generate video — upload, describe, and generate.
-        </p>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Your generations stay tied to your account. Clear credits, one studio for image, video, and music.
+          Switch between Image, Video, and Music in a single interface. Upload, describe, generate —
+          with clear credits and plan-aware tools.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg" className="gap-2">
-            <Link to="/auth" search={{ redirect: AUTH_THEN_CIRCLE, mode: "signup" }}>
-              Try Now <ArrowRight className="h-4 w-4" />
+            <Link to="/motion2ai" search={{ mode: "image" }}>
+              Open Studio <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline" className="gap-2">
@@ -115,7 +105,6 @@ export function HomeHero() {
           </Button>
         </div>
 
-        {/* Single official demo — first and only product demo on pre-login home */}
         <div className="mx-auto mt-8 max-w-[280px] sm:max-w-[320px]" data-watch-demo="hero">
           <div
             className="relative overflow-hidden rounded-2xl border border-border/60 bg-muted/20 shadow-md"
