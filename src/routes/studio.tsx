@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
-import { Image as ImageIcon, Video, Music, Lock, Frame } from "lucide-react";
+import { Sparkles, Lock, Frame, Eraser, Crop, Filter, Circle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
-import { canAccessVideo, canAccessMusic } from "@/lib/policy";
+import { canAccessMalutoAI } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 import { CreditSpendHint } from "@/components/ads";
 
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/studio")({
       { title: "AI+ Tools — Motio2edit" },
       {
         name: "description",
-        content: "Image, Circle 2edit, Video, Frames, and Music tools in one Motio2edit hub.",
+        content: "Circle 2edit, Background Remover, Cropmix, Filters, Frames, Lenses and more.",
       },
       { property: "og:title", content: "AI+ Tools — Motio2edit" },
       { name: "robots", content: "noindex, follow" },
@@ -29,12 +29,18 @@ function StudioLayout() {
   return <StudioHub />;
 }
 
+/**
+ * AI+ Tools hub — editing utilities only.
+ * Image / Video / Music generation lives in the unified Motion2AI workspace.
+ */
 function StudioHub() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
-  const plan = profile?.plan;
-  const videoOk = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
-  const musicOk = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
+  const malutoOk = canAccessMalutoAI({
+    plan: profile?.plan,
+    email: profile?.email,
+    isAdmin: admin,
+  });
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background md:min-h-0 md:h-[100dvh] md:max-h-[100dvh] md:overflow-hidden">
@@ -44,7 +50,15 @@ function StudioHub() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             AI+ Tools
           </p>
-          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a tool</h1>
+          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">
+            Edit & enhance
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Generate Image, Video & Music in{" "}
+            <Link to="/motion2ai" search={{ mode: "image" as const }} className="font-semibold text-primary hover:underline">
+              Motion2AI
+            </Link>
+          </p>
         </div>
 
         <CreditSpendHint
@@ -52,25 +66,32 @@ function StudioHub() {
           costLabel="Edits spend credits from your balance"
         />
 
+        {/* Single CTA into unified workspace */}
+        <Link
+          to="/motion2ai"
+          search={{ mode: "image" as const }}
+          className="group relative mb-3 flex shrink-0 items-center gap-3 overflow-hidden rounded-2xl border border-primary/30 bg-card/80 p-4 shadow-sm backdrop-blur-md transition hover:border-primary/50 hover:shadow-md sm:rounded-3xl"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-primary/20 via-orange-500/10 to-transparent" />
+          <span className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+            <Sparkles className="h-6 w-6" />
+          </span>
+          <div className="relative min-w-0 flex-1">
+            <p className="text-base font-extrabold tracking-tight">Motion2AI</p>
+            <p className="text-[11px] text-muted-foreground">
+              One workspace · Image · Video · Music
+            </p>
+          </div>
+          <span className="relative text-xs font-bold text-primary">Open →</span>
+        </Link>
+
         <div
           className={cn(
             "grid min-h-0 flex-1 gap-2.5 sm:gap-3",
-            "grid-cols-2 auto-rows-[minmax(9.5rem,1fr)]",
-            "md:grid-cols-3 md:auto-rows-[minmax(11rem,14rem)] md:content-start md:gap-4",
+            "grid-cols-2 auto-rows-[minmax(8.5rem,1fr)]",
+            "md:grid-cols-3 md:auto-rows-[minmax(10rem,13rem)] md:content-start md:gap-4",
           )}
         >
-          <StudioTile
-            to="/editor"
-            title="Image"
-            subtitle="Generate · enhance"
-            gradient="from-primary/35 via-primary/10 to-transparent"
-            icon={
-              <span className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg sm:p-3.5">
-                <ImageIcon className="h-6 w-6 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
-
           <StudioTile
             to="/studio/image/circle-remove"
             search={{ mode: "remove" as const, from: "studio" as const }}
@@ -87,14 +108,38 @@ function StudioHub() {
           />
 
           <StudioTile
-            to={videoOk ? "/studio/video" : "/pricing"}
-            title="Video"
-            subtitle={videoOk ? "Cinematic motion" : "Requires a paid plan"}
-            gradient="from-rose-500/30 via-transparent to-transparent"
-            locked={!videoOk}
+            to="/studio/image/remove-bg"
+            search={{ from: "studio" as const }}
+            title="Remove BG"
+            subtitle="Cutout · clean edges"
+            gradient="from-emerald-500/25 via-transparent to-transparent"
             icon={
               <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
-                <Video className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.2s_ease-in-out_infinite]" />
+                <Eraser className="h-6 w-6 text-primary sm:h-7 sm:w-7" />
+              </span>
+            }
+          />
+
+          <StudioTile
+            to="/studio/cropmix"
+            title="Cropmix"
+            subtitle="Crop · compose"
+            gradient="from-amber-500/25 via-transparent to-transparent"
+            icon={
+              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
+                <Crop className="h-6 w-6 text-primary sm:h-7 sm:w-7" />
+              </span>
+            }
+          />
+
+          <StudioTile
+            to="/studio/image/filters"
+            title="Filters"
+            subtitle="Looks · grade"
+            gradient="from-sky-500/25 via-transparent to-transparent"
+            icon={
+              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
+                <Filter className="h-6 w-6 text-primary sm:h-7 sm:w-7" />
               </span>
             }
           />
@@ -106,32 +151,24 @@ function StudioHub() {
             gradient="from-slate-400/30 via-zinc-200/10 to-transparent"
             icon={
               <span className="inline-flex rounded-2xl border border-slate-400/40 bg-background/80 p-3 sm:p-3.5">
-                <Frame className="h-6 w-6 text-slate-600 dark:text-slate-300 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_2.8s_ease-in-out_infinite]" />
+                <Frame className="h-6 w-6 text-slate-600 dark:text-slate-300 sm:h-7 sm:w-7" />
               </span>
             }
           />
 
           <StudioTile
-            to={musicOk ? "/studio/music" : "/pricing"}
-            title="Music"
-            subtitle={musicOk ? "Prompt-to-music" : "Requires a paid plan"}
-            gradient="from-fuchsia-500/30 via-transparent to-transparent"
-            locked={!musicOk}
-            className="col-span-2 md:col-span-1"
+            to={malutoOk ? "/studio/image/auto-edit" : "/pricing"}
+            title="Maluto AI"
+            subtitle={malutoOk ? "Restore · revive" : "Requires a paid plan"}
+            gradient="from-orange-500/30 via-transparent to-transparent"
+            locked={!malutoOk}
             icon={
               <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
-                <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.4s_ease-in-out_infinite]" />
+                <Sparkles className="h-6 w-6 text-primary sm:h-7 sm:w-7" />
               </span>
             }
           />
         </div>
-
-        <style>{`
-          @keyframes iconFloat {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
-          }
-        `}</style>
       </main>
     </div>
   );
