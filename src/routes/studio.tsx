@@ -1,41 +1,69 @@
+/**
+ * Unified Studio — Image | Video | Music command center.
+ * BUILD_MARKER: 2026-11-17-unblank-v3
+ * Must never export a null component — production blank page was caused by
+ * a deployed stub: `var e=()=>null;export{e as component}`
+ */
 import { useState, useRef, type ChangeEvent } from "react";
-import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { Header } from "@/components/Header";
-import { Image as ImageIcon, Video, Music, Coins, ArrowUp, Paperclip, Lock } from "lucide-react";
+import {
+  Image as ImageIcon,
+  Video,
+  Music,
+  Coins,
+  ArrowUp,
+  Paperclip,
+  Lock,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
-import { canAccessVideo, canAccessMusic, isPaidPlan } from "@/lib/policy";
+import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
       { title: "Studio — Motio2edit" },
-      { name: "description", content: "Create images, video, and music with Motio2edit." },
+      {
+        name: "description",
+        content: "Create images, video, and music with Motio2edit Studio.",
+      },
       { property: "og:title", content: "Studio — Motio2edit" },
       { name: "robots", content: "noindex, follow" },
     ],
   }),
-  component: StudioLayout,
+  component: StudioPage,
 });
 
 type StudioMode = "image" | "video" | "music";
 
-function StudioLayout() {
+/** Top-level page component — always renders real UI (never null). */
+function StudioPage() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  if (pathname !== "/studio") return <Outlet />;
-  return <UnifiedAiStudio />;
+  // Child routes under /studio/* keep their own pages via Outlet.
+  if (pathname !== "/studio") {
+    return <Outlet />;
+  }
+  return <StudioWorkspace />;
 }
 
-function UnifiedAiStudio() {
+function StudioWorkspace() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
-  const videoOk = admin || canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
-  const musicOk = admin || canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
+  const videoOk =
+    admin || canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
+  const musicOk =
+    admin || canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
   const credits = profile?.credits ?? 0;
 
   const [mode, setMode] = useState<StudioMode>("image");
@@ -46,7 +74,13 @@ function UnifiedAiStudio() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (mode === "image" && !file.type.startsWith("image/")) return;
-    if (mode === "video" && !file.type.startsWith("image/") && !file.type.startsWith("video/")) return;
+    if (
+      mode === "video" &&
+      !file.type.startsWith("image/") &&
+      !file.type.startsWith("video/")
+    ) {
+      return;
+    }
     if (preview) URL.revokeObjectURL(preview);
     setPreview(URL.createObjectURL(file));
   };
@@ -64,133 +98,153 @@ function UnifiedAiStudio() {
   };
 
   const onGenerate = () => {
+    const trimmed = prompt.trim();
     if (mode === "video") {
-      if (prompt.trim()) {
+      if (trimmed) {
         try {
           sessionStorage.setItem(
             "motio2edit-preset",
-            JSON.stringify({ prompt: prompt.trim(), mode: "video" }),
+            JSON.stringify({ prompt: trimmed, mode: "video" }),
           );
-        } catch {}
+        } catch {
+          /* private mode */
+        }
+      }
+      if (!videoOk) {
+        navigate({ to: "/pricing" });
+        return;
       }
       navigate({ to: "/studio/video" });
       return;
     }
     if (mode === "music") {
-      if (prompt.trim()) {
+      if (trimmed) {
         try {
           sessionStorage.setItem(
             "motio2edit-preset",
-            JSON.stringify({ prompt: prompt.trim(), mode: "music" }),
+            JSON.stringify({ prompt: trimmed, mode: "music" }),
           );
-        } catch {}
+        } catch {
+          /* private mode */
+        }
+      }
+      if (!musicOk) {
+        navigate({ to: "/pricing" });
+        return;
       }
       navigate({ to: "/music" });
       return;
     }
-    if (prompt.trim()) {
+    // Image → editor (Simple Mode / full image studio)
+    if (trimmed) {
       try {
         sessionStorage.setItem(
           "motio2edit-preset",
-          JSON.stringify({ prompt: prompt.trim(), mode: "image" }),
+          JSON.stringify({ prompt: trimmed, mode: "image" }),
         );
-      } catch {}
+      } catch {
+        /* private mode */
+      }
+      navigate({
+        to: "/editor",
+        search: { prompt: trimmed } as never,
+      });
+      return;
     }
-    navigate({ to: "/studio/image/auto-edit" });
+    navigate({ to: "/editor" });
   };
+
+  const modes = [
+    { id: "image" as const, icon: ImageIcon, label: "Image", ok: true },
+    { id: "video" as const, icon: Video, label: "Video", ok: videoOk },
+    { id: "music" as const, icon: Music, label: "Music", ok: musicOk },
+  ];
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <Header />
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-3 pb-4 pt-3 sm:px-4">
-        <div className="mb-3 flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-2">
-            <h1 className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-4 sm:pt-6">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Motio2edit
+            </p>
+            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
               Studio
             </h1>
-            <button
-              type="button"
-              onClick={() => navigate({ to: "/profile" })}
-              className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-semibold tabular-nums"
-            >
-              <Coins className="h-3 w-3 text-amber-500" />
-              {credits.toLocaleString()}
-            </button>
           </div>
-
-          <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-muted/30 p-1">
-            {(
-              [
-                { id: "image" as const, icon: ImageIcon, label: "Image Studio", ok: true },
-                { id: "video" as const, icon: Video, label: "Video Studio", ok: videoOk },
-                { id: "music" as const, icon: Music, label: "Music Studio", ok: musicOk },
-              ] as const
-            ).map(({ id, icon: Icon, label, ok }) => {
-              const active = mode === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    if (!ok) {
-                      navigate({ to: "/pricing" });
-                      return;
-                    }
-                    setMode(id);
-                    if (preview) {
-                      URL.revokeObjectURL(preview);
-                      setPreview(null);
-                    }
-                  }}
-                  className={cn(
-                    "relative flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold transition sm:text-sm",
-                    active
-                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                      : "text-muted-foreground hover:text-foreground",
-                    !ok && "opacity-60",
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{label}</span>
-                  {!ok && <Lock className="h-3 w-3 shrink-0 opacity-70" />}
-                </button>
-              );
-            })}
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/dashboard" })}
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-semibold tabular-nums"
+          >
+            <Coins className="h-3.5 w-3.5 text-amber-500" />
+            {credits.toLocaleString()}
+          </button>
         </div>
 
-        <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
-          <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            {mode === "image"
-              ? "Create something new"
-              : mode === "video"
-                ? "Create a cinematic scene"
-                : "Compose your sound"}
-          </h2>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+        {/* Mode switcher */}
+        <div className="mb-4 flex items-center gap-1 rounded-xl border border-border/80 bg-muted/30 p-1">
+          {modes.map(({ id, icon: Icon, label, ok }) => {
+            const active = mode === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  if (!ok) {
+                    navigate({ to: "/pricing" });
+                    return;
+                  }
+                  setMode(id);
+                  if (preview) {
+                    URL.revokeObjectURL(preview);
+                    setPreview(null);
+                  }
+                }}
+                className={cn(
+                  "relative flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-xs font-semibold transition sm:text-sm",
+                  active
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:text-foreground",
+                  !ok && "opacity-60",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+                {!ok ? <Lock className="h-3 w-3 opacity-70" /> : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Helper copy */}
+        <div className="mb-4 flex-1">
+          <p className="text-sm text-muted-foreground">
             {mode === "image"
               ? "Type a prompt or attach a photo to edit."
               : mode === "video"
                 ? "Describe the scene, then generate."
                 : "Describe a song or instrumental."}
           </p>
-          {preview && (
+          {preview ? (
             <img
               src={preview}
-              alt="Attachment"
+              alt="Attachment preview"
               className="mt-4 h-24 w-24 rounded-xl object-cover ring-1 ring-border"
             />
-          )}
+          ) : null}
         </div>
 
-        <div className="mt-auto pt-3">
-          <div className="rounded-2xl border border-border bg-card/70 p-2 shadow-lg backdrop-blur-xl">
+        {/* Composer */}
+        <div className="mt-auto pt-2">
+          <div className="rounded-2xl border border-border bg-card/80 p-2 shadow-lg backdrop-blur-xl">
             <div className="flex items-end gap-1.5">
               <button
                 type="button"
                 onClick={onAttach}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-                aria-label="Attach"
+                aria-label="Attach file"
               >
                 <Paperclip className="h-5 w-5" />
               </button>
@@ -223,6 +277,9 @@ function UnifiedAiStudio() {
               </button>
             </div>
           </div>
+          <p className="mt-2 text-center text-[10px] text-muted-foreground/80">
+            Credits apply on generate · BUILD 2026-11-17-unblank-v3
+          </p>
         </div>
 
         <input
