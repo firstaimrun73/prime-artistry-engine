@@ -34,10 +34,11 @@ function HomePage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  // Post-login: land in unified Studio. SignedInHomeBody is preserved for future restore.
+  // Post-login: Image editor (stable). /studio production bundle was a null stub —
+  // switch back to /studio after deploy confirms studio-*.js is non-null.
   useEffect(() => {
     if (!loading && user) {
-      navigate({ to: "/studio", replace: true });
+      navigate({ to: "/editor", replace: true });
     }
   }, [loading, user, navigate]);
 

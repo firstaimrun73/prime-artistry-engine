@@ -38,7 +38,7 @@ function AuthPage() {
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const dest = redirect || "/studio";
+  const dest = redirect || "/editor";
 
   useEffect(() => {
     if (modeFromSearch) setMode(modeFromSearch);
