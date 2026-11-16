@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useState, useRef, type ChangeEvent } from "react";
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Image as ImageIcon, Video, Music, Coins, ArrowUp, Paperclip, Lock } from "lucide-react";
@@ -30,8 +30,7 @@ function StudioLayout() {
 function UnifiedAiStudio() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const fileRef = useState<HTMLInputElement | null>(null)[0];
-  const fileInputRef = useState(() => ({ current: null as HTMLInputElement | null }))[0];
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
@@ -89,7 +88,6 @@ function UnifiedAiStudio() {
       navigate({ to: "/music" });
       return;
     }
-    // Image: go to auto-edit with prompt if available
     if (prompt.trim()) {
       try {
         sessionStorage.setItem(
@@ -228,9 +226,7 @@ function UnifiedAiStudio() {
         </div>
 
         <input
-          ref={(el) => {
-            fileInputRef.current = el;
-          }}
+          ref={fileInputRef}
           type="file"
           accept={mode === "image" ? "image/*" : "image/*,video/*"}
           className="hidden"
