@@ -9,15 +9,13 @@ import {
   Music,
   Coins,
   ArrowUp,
-  Lock,
   Paperclip,
-  SlidersHorizontal,
   X,
-  Zap,
-  Crown,
-  Sparkles,
   Download,
   Loader2,
+  Lock,
+  Mic,
+  SlidersHorizontal,
   RotateCcw,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -25,31 +23,7 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic, isPaidPlan } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  maxPromptCharsForPlan,
-  isPromptEffectivelyUnlimited,
-} from "@/utils/planLimits";
-import { getMusicPlanCapabilities } from "@/lib/music/music-plan-capabilities";
-import {
-  STANDARD_VIDEO_PROMPT_MAX,
-  PREMIUM_VIDEO_PROMPT_MAX,
-} from "@/components/video/VideoPromptBar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import {
-  type StudioTier,
-  STUDIO_TIER_META,
-} from "@/lib/studio/studio-tier";
+import { type StudioTier } from "@/lib/studio/studio-tier";
 import { generateMedia } from "@/lib/generate.functions";
 import { uploadToStorage } from "@/lib/editor/editor.utils";
 import {
@@ -58,7 +32,6 @@ import {
   completeGeneration,
   failGeneration,
   endGeneration,
-  useGenerationStatus,
   useInFlightStageAdvance,
 } from "@/lib/generation-status";
 import { toast } from "sonner";
@@ -69,7 +42,7 @@ export const Route = createFileRoute("/studio")({
       { title: "Studio — Motio2edit" },
       {
         name: "description",
-        content: "Unified AI Studio — create images, video, and music in one place.",
+        content: "Create images, videos and music in one AI workspace.",
       },
       { property: "og:title", content: "Studio — Motio2edit" },
       { name: "robots", content: "noindex, follow" },
@@ -80,22 +53,42 @@ export const Route = createFileRoute("/studio")({
 
 type StudioMode = "image" | "video" | "music";
 
-type ConversationResult = {
-  id: string;
-  kind: "image" | "video" | "music";
-  prompt: string;
-  url: string;
-  createdAt: number;
-  experience: StudioTier;
+type AttachedItem = { id: string; file: File; preview: string };
+
+type ChatItem =
+  | { id: string; role: "user"; text: string; mode: StudioMode; previews?: string[] }
+  | {
+      id: string;
+      role: "assistant";
+      kind: "image";
+      prompt: string;
+      url: string;
+      watermarked: boolean;
+    };
+
+const IMAGE_ASPECTS = ["auto", "1:1", "4:3", "3:2", "16:9", "9:16", "3:4"] as const;
+const VIDEO_ASPECTS = ["auto", "16:9", "9:16", "1:1"] as const;
+const VIDEO_DURATIONS = [5, 10, 15] as const;
+
+const EXAMPLES: Record<StudioMode, string[]> = {
+  image: [
+    "A cinematic portrait in golden-hour lighting.",
+    "A product photo of a glass bottle on marble, soft studio light.",
+    "An illustration of a quiet rainy city street at night.",
+  ],
+  video: [
+    "A futuristic city with flying vehicles at sunset.",
+    "Slow drone shot over misty mountains at sunrise.",
+    "Close-up of coffee pouring into a cup, steam rising.",
+  ],
+  music: [
+    "A relaxing piano instrumental for a peaceful evening.",
+    "Upbeat indie pop with warm acoustic guitar.",
+    "Dark cinematic score with deep drums and strings.",
+  ],
 };
 
-const IMAGE_ASPECTS = ["1:1", "4:3", "3:4", "16:9", "9:16"] as const;
-const VIDEO_ASPECTS = ["16:9", "9:16", "1:1"] as const;
-const VIDEO_DURATIONS = [5, 8, 10] as const;
-const MUSIC_MODES = [
-  { id: "song", label: "Song" },
-  { id: "instrumental", label: "Instrumental" },
-] as const;
+const MAX_FILE_MB = 12;
 
 function StudioLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -108,137 +101,174 @@ function UnifiedAiStudio() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const generate = useServerFn(generateMedia);
-  const genStatus = useGenerationStatus();
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
   const paid = admin || isPaidPlan(plan);
-  const videoOk = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
-  const musicOk = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
-  const musicCaps = useMemo(() => getMusicPlanCapabilities(plan), [plan]);
+  const free = !paid;
+  const videoOk =
+    admin || canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
+  const musicOk =
+    admin || canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
 
   const [mode, setMode] = useState<StudioMode>("image");
-  const [prompt, setPrompt] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [tier, setTier] = useState<StudioTier>("standard");
-  const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
-  const [attachedName, setAttachedName] = useState<string | null>(null);
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [attached, setAttached] = useState<AttachedItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [statusText, setStatusText] = useState<string | null>(null);
-  const [results, setResults] = useState<ConversationResult[]>([]);
+  const [chat, setChat] = useState<ChatItem[]>([]);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const [imageAspect, setImageAspect] = useState<string>("1:1");
-  const [videoAspect, setVideoAspect] = useState<string>("16:9");
+  const [imageAspect, setImageAspect] = useState<string>("auto");
+  const [videoAspect, setVideoAspect] = useState<string>("auto");
   const [videoDuration, setVideoDuration] = useState<number>(5);
-  const [musicMode, setMusicMode] = useState<"song" | "instrumental">("song");
+  const [musicKind, setMusicKind] = useState<"song" | "instrumental">("song");
 
   const modeLocked =
     (mode === "video" && !videoOk) || (mode === "music" && !musicOk);
+  const multiBlocked = free && attached.length > 1;
+  const tierBlocked = free && tier !== "standard";
+  const needsUpgrade = modeLocked || multiBlocked || tierBlocked;
 
   const credits = profile?.credits ?? 0;
-  const planLabel = (plan || "free").toString();
+  const canGenerate =
+    !busy &&
+    !needsUpgrade &&
+    (prompt.trim().length > 0 || (mode === "image" && attached.length > 0));
 
   useInFlightStageAdvance(busy && mode === "image");
 
   useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat, busy, statusText]);
+
+  useEffect(() => {
     return () => {
-      document.documentElement.classList.remove("studio-composer-focus");
+      recognitionRef.current?.stop();
+      attached.forEach((a) => URL.revokeObjectURL(a.preview));
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const setComposerFocus = (on: boolean) => {
-    document.documentElement.classList.toggle("studio-composer-focus", on);
-  };
+  const placeholder =
+    mode === "image"
+      ? attached.length > 0
+        ? "Describe the change you want for this reference…"
+        : "Describe the image you want to create…"
+      : mode === "video"
+        ? "Describe the video you want to create…"
+        : "Describe your song, soundtrack or instrumental…";
 
-  const promptMax = useMemo(() => {
-    if (mode === "image") {
-      if (isPromptEffectivelyUnlimited(plan)) return null;
-      return maxPromptCharsForPlan(plan, admin);
-    }
-    if (mode === "video") {
-      return paid ? PREMIUM_VIDEO_PROMPT_MAX : STANDARD_VIDEO_PROMPT_MAX;
-    }
-    return musicCaps.promptMaxChars > 0 ? musicCaps.promptMaxChars : 500;
-  }, [mode, plan, admin, paid, musicCaps.promptMaxChars]);
-
-  const placeholder = useMemo(() => {
-    if (mode === "image") {
-      return attachedPreview
-        ? "Describe what you want to change in this photo…"
-        : "Describe your image idea, or what you want to change in a photo…";
-    }
-    if (mode === "video") {
-      return "A cinematic drone shot over misty mountains at sunrise…";
-    }
-    return "Upbeat indie pop with warm acoustic guitar and soft vocals…";
-  }, [mode, attachedPreview]);
-
-  const overLimit = promptMax != null && prompt.length > promptMax;
-
-  const onPromptChange = (value: string) => {
-    if (promptMax != null && value.length > promptMax) {
-      setPrompt(value.slice(0, promptMax));
-      return;
-    }
-    setPrompt(value);
-  };
-
-  const clearAttachment = useCallback(() => {
-    setAttachedPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
+  const clearAttachments = useCallback(() => {
+    setAttached((prev) => {
+      prev.forEach((a) => URL.revokeObjectURL(a.preview));
+      return [];
     });
-    setAttachedName(null);
-    setAttachedFile(null);
     if (fileRef.current) fileRef.current.value = "";
   }, []);
 
-  const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) {
-      toast.error("Please choose an image file.");
-      return;
-    }
-    if (file.size > 25 * 1024 * 1024) {
-      toast.error("Image must be under 25MB.");
-      return;
-    }
-    setAttachedPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
+  const removeAttachment = (id: string) => {
+    setAttached((prev) => {
+      const hit = prev.find((a) => a.id === id);
+      if (hit) URL.revokeObjectURL(hit.preview);
+      return prev.filter((a) => a.id !== id);
     });
-    setAttachedName(file.name);
-    setAttachedFile(file);
   };
 
-  const onAttachClick = () => {
-    if (mode === "image") {
-      fileRef.current?.click();
-      return;
+  const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const list = e.target.files;
+    if (!list?.length) return;
+    const next: AttachedItem[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const file = list[i];
+      if (!file.type.startsWith("image/")) continue;
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        toast.error(`Each image must be under ${MAX_FILE_MB}MB`);
+        continue;
+      }
+      next.push({
+        id: `${Date.now()}-${i}`,
+        file,
+        preview: URL.createObjectURL(file),
+      });
     }
-    if (mode === "video") {
-      navigate({ to: "/studio/video" });
-      return;
-    }
-    navigate({ to: "/music" });
+    setAttached((prev) => [...prev, ...next].slice(0, paid ? 10 : 5));
+    if (fileRef.current) fileRef.current.value = "";
   };
 
-  /**
-   * Image: real in-conversation generation via generateMedia.
-   * Video / Music: hand off to existing full studios (still powered by same backend).
-   */
-  const onGenerate = async () => {
-    if (busy) return;
-    if (modeLocked) {
+  const switchMode = (m: StudioMode) => {
+    if ((m === "video" && !videoOk) || (m === "music" && !musicOk)) {
       navigate({ to: "/pricing" });
       return;
     }
-    if (overLimit) return;
+    setMode(m);
+    setAdvancedOpen(false);
+    if (m !== "image") clearAttachments();
+  };
+
+  const toggleMic = () => {
+    type Rec = {
+      continuous: boolean;
+      interimResults: boolean;
+      lang: string;
+      start: () => void;
+      stop: () => void;
+      onresult: ((e: {
+        results: { [i: number]: { [j: number]: { transcript: string } } };
+      }) => void) | null;
+      onend: (() => void) | null;
+      onerror: (() => void) | null;
+    };
+    const W = window as unknown as {
+      SpeechRecognition?: new () => Rec;
+      webkitSpeechRecognition?: new () => Rec;
+    };
+    const SR = W.SpeechRecognition || W.webkitSpeechRecognition;
+    if (!SR) {
+      toast.message("Voice input is not supported in this browser");
+      return;
+    }
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = "en-US";
+    rec.onresult = (e) => {
+      const t = e.results?.[0]?.[0]?.transcript;
+      if (typeof t === "string" && t.trim()) {
+        setPrompt((p) => (p ? `${p} ${t}` : t).trim());
+      }
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      toast.error("Could not start microphone");
+      setListening(false);
+    }
+  };
+
+  const onGenerate = async () => {
+    if (busy) return;
+    if (needsUpgrade) {
+      navigate({ to: "/pricing" });
+      return;
+    }
     const trimmed = prompt.trim();
-    if (!trimmed && mode === "image" && !attachedFile) {
-      toast.error("Enter a prompt or attach an image.");
+    if (!trimmed && !(mode === "image" && attached.length > 0)) {
+      toast.error("Enter a prompt to generate.");
       return;
     }
 
@@ -250,7 +280,7 @@ function UnifiedAiStudio() {
             prompt: trimmed || undefined,
             mode: "video",
             experience: tier,
-            aspectRatio: videoAspect,
+            aspectRatio: videoAspect === "auto" ? undefined : videoAspect,
             duration: videoDuration,
           }),
         );
@@ -261,11 +291,23 @@ function UnifiedAiStudio() {
       return;
     }
     if (mode === "music") {
+      try {
+        sessionStorage.setItem(
+          "motio2edit-preset",
+          JSON.stringify({
+            prompt: trimmed || undefined,
+            mode: "music",
+            musicKind,
+            experience: tier,
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
       navigate({ to: "/music" });
       return;
     }
 
-    // —— Image path: stay on /studio ——
     if (!user) {
       navigate({ to: "/auth" });
       return;
@@ -276,638 +318,539 @@ function UnifiedAiStudio() {
     setStatusText("Preparing…");
     startGeneration("image", "/studio");
 
+    setChat((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-u`,
+        role: "user",
+        text: trimmed || "(edit image)",
+        mode: "image",
+        previews: attached.map((a) => a.preview),
+      },
+    ]);
+
     try {
       let imageUrl: string | undefined;
-
-      if (attachedFile) {
-        setStatusText("Uploading image…");
+      if (attached[0]) {
+        setStatusText("Uploading reference…");
         setGenerationStage("PREPARING");
-        imageUrl = await uploadToStorage(attachedFile, profile?.id ?? user.id ?? "anon");
+        imageUrl = await uploadToStorage(
+          attached[0].file,
+          profile?.id ?? user.id ?? "anon",
+        );
         if (!imageUrl?.startsWith("https://")) {
-          throw new Error("Upload failed. Please try a smaller image.");
+          throw new Error("Upload failed. Try a smaller image.");
         }
       }
 
-      setStatusText("Generating…");
+      setStatusText("Generating image…");
       setGenerationStage("GENERATING");
+
+      const aspectPayload = imageAspect === "auto" ? undefined : imageAspect;
 
       const res = (await generate({
         data: {
           type: "image",
           prompt: trimmed || "Enhance this image",
           imageUrl: imageUrl ?? null,
-          aspectRatio: imageAspect,
+          aspectRatio: aspectPayload ?? null,
           studioTier: tier,
           imageQuality: tier === "standard" ? "sd" : "hd",
         },
-      })) as { outputUrl?: string; url?: string; credits?: number; error?: string };
+      })) as { outputUrl?: string; url?: string; error?: string };
 
       const outputUrl = res?.outputUrl || res?.url;
       if (!outputUrl || typeof outputUrl !== "string" || !outputUrl.startsWith("http")) {
         throw new Error(
           (res as { message?: string })?.message ||
             res?.error ||
-            "Generation returned no image URL.",
+            "No image returned.",
         );
       }
 
       completeGeneration();
-      setResults((prev) => [
-        {
-          id: `${Date.now()}`,
-          kind: "image",
-          prompt: trimmed || "(image edit)",
-          url: outputUrl,
-          createdAt: Date.now(),
-          experience: tier,
-        },
+      setChat((prev) => [
         ...prev,
+        {
+          id: `${Date.now()}-a`,
+          role: "assistant",
+          kind: "image",
+          prompt: trimmed || "(edit)",
+          url: outputUrl,
+          watermarked: free,
+        },
       ]);
       setStatusText(null);
+      setPrompt("");
+      clearAttachments();
       toast.success("Image ready");
       try {
         await refreshProfile?.();
       } catch {
-        /* profile refresh is best-effort */
+        /* ignore */
       }
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Generation failed. Please try again.";
+        err instanceof Error ? err.message : "Generation failed.";
       failGeneration(message);
       setLastError(message);
       setStatusText(null);
       toast.error(message);
     } finally {
       setBusy(false);
-      // Clear global bar after a short delay so COMPLETE/ERROR is visible
-      setTimeout(() => endGeneration(), 1200);
+      setTimeout(() => endGeneration(), 800);
     }
   };
 
-  const visibleTiers: StudioTier[] =
-    mode === "image" ? ["standard", "pro", "premium"] : ["standard", "pro"];
-
-  const contextualSuggestion = useMemo(() => {
-    if (mode !== "image") return null;
-    if (attachedPreview) {
-      return {
-        title: "Edit your uploaded image",
-        body: "Describe what you want to change in your photo.",
-      };
-    }
-    return {
-      title: "Create from a prompt",
-      body: "Describe your idea and let AI turn it into an image.",
-    };
-  }, [mode, attachedPreview]);
-
-  const stageLabel =
-    genStatus?.stage && busy
-      ? genStatus.stage.replace(/_/g, " ").toLowerCase()
-      : statusText;
-
-  const settingsPanel = (
-    <div className="space-y-4 text-sm">
-      {mode === "image" && (
-        <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Aspect ratio</p>
-          <div className="flex flex-wrap gap-1.5">
-            {IMAGE_ASPECTS.map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => setImageAspect(a)}
-                className={cn(
-                  "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
-                  imageAspect === a
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {a}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {mode === "video" && (
-        <>
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Aspect ratio</p>
-            <div className="flex flex-wrap gap-1.5">
-              {VIDEO_ASPECTS.map((a) => (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => setVideoAspect(a)}
-                  className={cn(
-                    "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
-                    videoAspect === a
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {a}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Duration</p>
-            <div className="flex flex-wrap gap-1.5">
-              {VIDEO_DURATIONS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setVideoDuration(d)}
-                  className={cn(
-                    "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
-                    videoDuration === d
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {d}s
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-      {mode === "music" && (
-        <div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Type</p>
-          <div className="flex flex-wrap gap-1.5">
-            {MUSIC_MODES.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setMusicMode(m.id)}
-                className={cn(
-                  "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
-                  musicMode === m.id
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const empty = chat.length === 0 && !busy;
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <Header />
 
-      <button
-        type="button"
-        onClick={() => navigate({ to: "/pricing" })}
-        className={cn(
-          "fixed z-30 hidden sm:inline-flex items-center gap-1.5 rounded-full",
-          "border border-primary/30 bg-card/90 px-3 py-1.5 text-xs font-semibold",
-          "text-foreground shadow-md backdrop-blur-md hover:bg-primary/10",
-          "right-4 top-[4.5rem]",
-        )}
-        title={`Current plan: ${planLabel}`}
-      >
-        <Crown className="h-3.5 w-3.5 text-primary" />
-        Upgrade
-        <span className="text-[10px] font-normal text-muted-foreground capitalize">
-          · {planLabel}
-        </span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => navigate({ to: "/pricing" })}
-        className={cn(
-          "fixed z-30 sm:hidden inline-flex items-center gap-1 rounded-full",
-          "border border-primary/30 bg-card/95 px-2.5 py-1.5 text-[11px] font-semibold",
-          "text-foreground shadow-lg backdrop-blur-md",
-          "right-3 bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+4.25rem))]",
-        )}
-        title={`Current plan: ${planLabel}`}
-      >
-        <Crown className="h-3.5 w-3.5 text-primary" />
-        Upgrade
-      </button>
-
-      <main
-        className={cn(
-          "relative mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-5 sm:max-w-2xl sm:pt-8",
-          "pb-[max(6.5rem,calc(env(safe-area-inset-bottom)+5.5rem))]",
-        )}
-      >
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute left-1/2 top-[12%] h-56 w-56 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/14" />
-        </div>
-
-        <div className="mb-5 text-center sm:mb-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Motio2edit
-          </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            Your AI creative studio
-          </h1>
-        </div>
-
-        <div className="mb-4 flex justify-center sm:mb-5">
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-3 pt-3 sm:px-4 sm:pt-5">
+        {/* TOP — prominent mode selector */}
+        <div className="mb-3 flex items-center justify-between gap-2">
           <div
-            className={cn(
-              "inline-flex rounded-full border border-border/70 bg-muted/40 p-1 backdrop-blur-sm",
-              "dark:border-white/10 dark:bg-muted/25",
-            )}
+            className="inline-flex flex-1 rounded-xl border border-border bg-muted/30 p-1"
             role="tablist"
-            aria-label="Studio mode"
+            aria-label="Creation mode"
           >
-            <ModePill
+            <ModeTab
               active={mode === "image"}
-              onClick={() => {
-                setMode("image");
-                setTier("standard");
-              }}
-              icon={<ImageIcon className="h-3.5 w-3.5" />}
+              onClick={() => switchMode("image")}
+              icon={<ImageIcon className="h-4 w-4" />}
               label="Image"
             />
-            <ModePill
+            <ModeTab
               active={mode === "video"}
-              onClick={() => {
-                setMode("video");
-                setTier("standard");
-              }}
-              icon={<Video className="h-3.5 w-3.5" />}
+              onClick={() => switchMode("video")}
+              icon={<Video className="h-4 w-4" />}
               label="Video"
               locked={!videoOk}
             />
-            <ModePill
+            <ModeTab
               active={mode === "music"}
-              onClick={() => {
-                setMode("music");
-                setTier("standard");
-              }}
-              icon={<Music className="h-3.5 w-3.5" />}
+              onClick={() => switchMode("music")}
+              icon={<Music className="h-4 w-4" />}
               label="Music"
               locked={!musicOk}
             />
           </div>
-        </div>
-
-        <div className="mb-3 flex items-center justify-between px-0.5">
-          <p className="text-xs text-muted-foreground">
-            {mode === "image"
-              ? "Image · create or edit"
-              : mode === "video"
-                ? "Video · opens full Video Studio"
-                : "Music · opens Music Studio"}
-          </p>
           <button
             type="button"
             onClick={() => navigate({ to: "/dashboard" })}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card/80 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-foreground backdrop-blur-sm hover:bg-secondary"
-            title="Credits"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-2.5 py-1.5 text-xs font-semibold tabular-nums"
           >
-            <Coins className="h-3 w-3 text-amber-500" />
+            <Coins className="h-3.5 w-3.5 text-amber-500" />
             {credits.toLocaleString()}
           </button>
         </div>
 
-        <div className="mb-3">
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Experience
-          </p>
-          <div
-            className={cn(
-              "grid gap-2",
-              visibleTiers.length === 3 ? "grid-cols-3" : "grid-cols-2",
-            )}
-          >
-            {visibleTiers.map((id) => {
-              const meta = STUDIO_TIER_META[id];
-              const active = tier === id;
-              const Icon =
-                id === "standard" ? Zap : id === "pro" ? Crown : Sparkles;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTier(id)}
-                  className={cn(
-                    "flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center transition-all",
-                    active &&
-                      id === "standard" &&
-                      "border-primary bg-primary/12 ring-1 ring-primary/30",
-                    active &&
-                      id === "pro" &&
-                      "border-orange-500/80 bg-orange-500/10 ring-1 ring-orange-500/35",
-                    active &&
-                      id === "premium" &&
-                      "border-amber-400/70 bg-amber-500/10 ring-1 ring-amber-400/40",
-                    !active &&
-                      "border-border/70 bg-card/60 text-muted-foreground hover:border-primary/35 hover:text-foreground",
-                  )}
-                  aria-pressed={active}
-                >
-                  <Icon
-                    className={cn(
-                      "h-4 w-4",
-                      active && id === "standard" && "text-primary",
-                      active && id === "pro" && "text-orange-500",
-                      active && id === "premium" && "text-amber-400",
-                    )}
-                  />
-                  <span className="text-[11px] font-semibold leading-tight sm:text-xs">
-                    {meta.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {contextualSuggestion && (
-          <div
-            className={cn(
-              "mb-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 backdrop-blur-sm",
-              "dark:border-white/8 dark:bg-muted/20",
-            )}
-          >
-            <p className="text-xs font-semibold text-foreground">
-              {contextualSuggestion.title}
-            </p>
-            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-              {contextualSuggestion.body}
-            </p>
-          </div>
-        )}
-
-        {/* Conversation results */}
-        {results.length > 0 && (
-          <div className="mb-4 space-y-3">
-            {results.map((r) => (
-              <div
-                key={r.id}
-                className="overflow-hidden rounded-2xl border border-border/70 bg-card/80 shadow-sm backdrop-blur-sm"
-              >
-                <div className="border-b border-border/50 px-3 py-2">
-                  <p className="truncate text-xs text-muted-foreground">{r.prompt}</p>
-                  <p className="text-[10px] text-muted-foreground/80">
-                    {STUDIO_TIER_META[r.experience].label} · image
-                  </p>
-                </div>
-                <img
-                  src={r.url}
-                  alt="Generated result"
-                  className="max-h-[420px] w-full object-contain bg-muted/20"
-                />
-                <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-                  <a
-                    href={r.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
-                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-secondary"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download
-                  </a>
+        {/* Workspace */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2">
+          {empty && (
+            <div className="flex flex-1 flex-col items-center justify-center px-2 py-8 text-center">
+              <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                What do you want to create?
+              </h1>
+              <p className="mt-2 max-w-md text-sm text-muted-foreground">
+                Create stunning images, videos and music with one simple prompt.
+              </p>
+              <div className="mt-6 flex w-full max-w-md flex-col gap-2">
+                {EXAMPLES[mode].map((ex) => (
                   <button
+                    key={ex}
                     type="button"
-                    onClick={() => {
-                      setPrompt(r.prompt);
-                      setTier(r.experience);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-secondary"
+                    onClick={() => setPrompt(ex)}
+                    className="rounded-xl border border-border bg-card/80 px-3 py-2.5 text-left text-sm text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
                   >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Use prompt again
+                    {ex}
                   </button>
-                </div>
-                {/* Sponsored slot — only renders when a campaign is configured later */}
-                <div className="border-t border-border/40 px-3 py-2">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                    Sponsored
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Ad placement ready — configure campaign in admin to show links here.
+                ))}
+              </div>
+            </div>
+          )}
+
+          {chat.map((item) =>
+            item.role === "user" ? (
+              <div key={item.id} className="flex justify-end">
+                <div className="max-w-[90%] rounded-2xl rounded-br-md bg-primary/12 px-3 py-2 text-sm">
+                  {item.previews && item.previews.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {item.previews.map((p) => (
+                        <img
+                          key={p}
+                          src={p}
+                          alt=""
+                          className="h-12 w-12 rounded-lg object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-foreground">{item.text}</p>
+                  <p className="mt-1 text-[10px] capitalize text-muted-foreground">
+                    {item.mode} · sent
                   </p>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-
-        {attachedPreview && mode === "image" && (
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-border/70 bg-card/70 p-2 backdrop-blur-sm">
-            <img
-              src={attachedPreview}
-              alt="Upload preview"
-              className="h-14 w-14 rounded-lg object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-foreground">
-                {attachedName ?? "Uploaded image"}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Will upload securely, then generate in this studio
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={clearAttachment}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
-              aria-label="Remove attachment"
-              disabled={busy}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        {lastError && (
-          <div className="mb-3 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {lastError}
-            {/credit|enough/i.test(lastError) && (
-              <button
-                type="button"
-                className="ml-2 font-semibold underline"
-                onClick={() => navigate({ to: "/pricing" })}
-              >
-                Get credits
-              </button>
-            )}
-          </div>
-        )}
-
-        {busy && stageLabel && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-            <span className="capitalize">{stageLabel}</span>
-          </div>
-        )}
-
-        <div
-          className={cn(
-            "rounded-2xl border border-border/80 bg-card/90 shadow-lg backdrop-blur-md",
-            "dark:border-white/10 dark:bg-card/80",
-            "focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15",
-            "transition-shadow duration-200",
-          )}
-        >
-          <textarea
-            value={prompt}
-            onChange={(e) => onPromptChange(e.target.value)}
-            onFocus={() => setComposerFocus(true)}
-            onBlur={() => setComposerFocus(false)}
-            placeholder={placeholder}
-            rows={4}
-            disabled={busy}
-            className={cn(
-              "w-full resize-none bg-transparent px-4 pt-4 text-[15px] leading-relaxed text-foreground",
-              "placeholder:text-muted-foreground/65 focus:outline-none",
-              "min-h-[7.5rem] max-h-[40vh]",
-              busy && "opacity-70",
-            )}
-            aria-label={`${mode} prompt`}
-          />
-
-          <div className="flex items-center gap-1.5 border-t border-border/50 px-2.5 py-2 sm:gap-2 sm:px-3">
-            <button
-              type="button"
-              onClick={onAttachClick}
-              disabled={busy}
-              className={cn(
-                "inline-flex h-9 w-9 items-center justify-center rounded-xl",
-                "text-muted-foreground transition hover:bg-secondary hover:text-foreground",
-                attachedPreview && mode === "image" && "text-primary",
-              )}
-              title={mode === "image" ? "Upload image" : "Open studio uploads"}
-              aria-label="Attach"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
-
-            <div className="hidden sm:block">
-              <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      "inline-flex h-9 w-9 items-center justify-center rounded-xl",
-                      "text-muted-foreground transition hover:bg-secondary hover:text-foreground",
-                      settingsOpen && "bg-secondary text-foreground",
+            ) : (
+              <div key={item.id} className="flex justify-start">
+                <div className="max-w-[95%] overflow-hidden rounded-2xl rounded-bl-md border border-border bg-card">
+                  <div className="relative">
+                    <img
+                      src={item.url}
+                      alt="Generated"
+                      className="max-h-[440px] w-full object-contain bg-muted/15"
+                    />
+                    {item.watermarked && (
+                      <span className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
+                        Motio2edit · Free
+                      </span>
                     )}
-                    title="Filters & settings"
-                    aria-label="Open settings"
-                  >
-                    <SlidersHorizontal className="h-4 w-4" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-72 p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-sm font-semibold">Settings</p>
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {mode}
-                    </span>
                   </div>
-                  {settingsPanel}
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="sm:hidden">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      "inline-flex h-9 w-9 items-center justify-center rounded-xl",
-                      "text-muted-foreground transition hover:bg-secondary hover:text-foreground",
+                  <div className="flex flex-wrap gap-1 border-t border-border px-2 py-1.5">
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-secondary"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setPrompt(item.prompt)}
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-secondary"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Regenerate
+                    </button>
+                    {item.watermarked && (
+                      <button
+                        type="button"
+                        onClick={() => navigate({ to: "/pricing" })}
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-primary hover:bg-secondary"
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                        Remove watermark
+                      </button>
                     )}
-                    title="Filters & settings"
-                    aria-label="Open settings"
-                  >
-                    <SlidersHorizontal className="h-4 w-4" />
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-8 pt-4">
-                  <SheetHeader className="mb-3 text-left">
-                    <SheetTitle className="text-base capitalize">{mode} settings</SheetTitle>
-                  </SheetHeader>
-                  {settingsPanel}
-                </SheetContent>
-              </Sheet>
-            </div>
+                  </div>
+                </div>
+              </div>
+            ),
+          )}
 
-            <div className="ml-1 min-w-0 flex-1">
-              {promptMax != null ? (
-                <span
-                  className={cn(
-                    "text-[10px] tabular-nums text-muted-foreground",
-                    overLimit && "font-semibold text-destructive",
-                  )}
-                >
-                  {prompt.length.toLocaleString()} / {promptMax.toLocaleString()}
-                </span>
-              ) : (
-                <span className="text-[10px] tabular-nums text-muted-foreground">
-                  {prompt.length.toLocaleString()}
-                </span>
-              )}
+          {lastError && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {lastError}
             </div>
+          )}
 
-            <Button
-              size="sm"
-              className="h-9 shrink-0 gap-1.5 rounded-full px-3.5 sm:px-4"
-              onClick={() => void onGenerate()}
-              disabled={overLimit || busy}
-            >
-              {busy ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span className="hidden sm:inline">Working</span>
-                </>
-              ) : modeLocked ? (
-                <>
-                  <Lock className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Upgrade</span>
-                </>
-              ) : (
-                <>
-                  Generate
-                  <ArrowUp className="h-3.5 w-3.5" />
-                </>
-              )}
-            </Button>
-          </div>
+          {busy && statusText && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              {statusText}
+            </div>
+          )}
+
+          <div ref={bottomRef} />
         </div>
 
-        {modeLocked ? (
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            {mode === "video" ? "Video" : "Music"} needs a paid plan.{" "}
-            <button
-              type="button"
-              className="font-medium text-primary underline-offset-2 hover:underline"
-              onClick={() => navigate({ to: "/pricing" })}
-            >
-              View plans
-            </button>
-          </p>
-        ) : (
-          <p className="mt-3 text-center text-[11px] text-muted-foreground/80">
-            {mode === "image"
-              ? "Image generation runs in this studio. Credits are charged only on successful jobs."
-              : "Video and Music open their full studios with the same credit system."}
-          </p>
-        )}
+        {/* Composer */}
+        <div className="sticky bottom-0 z-20 -mx-3 border-t border-border/70 bg-background/95 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:-mx-4 sm:px-4">
+          {/* Attachment strip — thumbnails only */}
+          {attached.length > 0 && mode === "image" && (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {attached.map((a) => (
+                <div key={a.id} className="relative">
+                  <img
+                    src={a.preview}
+                    alt=""
+                    className="h-14 w-14 rounded-xl object-cover ring-1 ring-border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(a.id)}
+                    disabled={busy}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-background shadow ring-1 ring-border"
+                    aria-label="Remove reference"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {multiBlocked && (
+                <p className="text-[11px] text-muted-foreground">
+                  Multiple references need a paid plan — Upgrade to generate.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div
+            className={cn(
+              "rounded-2xl border border-border bg-card shadow-md",
+              "focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15",
+            )}
+          >
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder={placeholder}
+              rows={3}
+              disabled={busy}
+              className={cn(
+                "w-full resize-none bg-transparent px-4 pt-3 text-[15px] leading-relaxed text-foreground",
+                "placeholder:text-muted-foreground/55 focus:outline-none",
+                "min-h-[5rem] max-h-[40vh]",
+              )}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (canGenerate || needsUpgrade) void onGenerate();
+                }
+              }}
+              aria-label="Prompt"
+            />
+
+            {/* Toolbar groups */}
+            <div className="flex flex-wrap items-center gap-1 border-t border-border/50 px-2 py-2">
+              {/* Left: attach + advanced */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (mode === "image") fileRef.current?.click();
+                  else if (mode === "video") {
+                    if (!videoOk) navigate({ to: "/pricing" });
+                    else navigate({ to: "/studio/video" });
+                  } else if (!musicOk) navigate({ to: "/pricing" });
+                  else navigate({ to: "/music" });
+                }}
+                disabled={busy}
+                className={cn(
+                  "inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  attached.length > 0 && "text-primary",
+                )}
+                title="Add reference"
+                aria-label="Attach"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((o) => !o)}
+                className={cn(
+                  "inline-flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  advancedOpen && "bg-secondary text-foreground",
+                )}
+                aria-expanded={advancedOpen}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+
+              <div className="min-w-0 flex-1" />
+
+              {/* Right: mic + generate */}
+              <button
+                type="button"
+                onClick={toggleMic}
+                className={cn(
+                  "relative inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary",
+                  listening && "text-primary",
+                )}
+                title="Voice input"
+                aria-label="Microphone"
+              >
+                {listening && (
+                  <span className="absolute inset-1 animate-ping rounded-xl bg-primary/25" />
+                )}
+                <Mic className="relative h-4 w-4" />
+              </button>
+
+              <Button
+                size="sm"
+                className="h-10 gap-1.5 rounded-full px-4"
+                onClick={() => void onGenerate()}
+                disabled={busy || (!canGenerate && !needsUpgrade)}
+              >
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : needsUpgrade ? (
+                  <>
+                    Upgrade
+                    <Lock className="h-3.5 w-3.5" />
+                  </>
+                ) : (
+                  <>
+                    Generate
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Advanced settings — mode specific */}
+            {advancedOpen && (
+              <div className="space-y-3 border-t border-border/60 px-3 py-3 text-sm">
+                {mode === "image" && (
+                  <>
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                        Aspect ratio
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {IMAGE_ASPECTS.map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => setImageAspect(a)}
+                            className={cn(
+                              "rounded-lg border px-2.5 py-1.5 text-xs font-medium capitalize",
+                              imageAspect === a
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            {a === "auto" ? "Auto" : a}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Auto uses the model default — not forced to a fixed ratio.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                        Experience
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(
+                          [
+                            ["standard", "Standard"],
+                            ["pro", "Premium"],
+                            ["premium", "Ultra AI"],
+                          ] as const
+                        ).map(([id, label]) => {
+                          const locked = free && id !== "standard";
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => {
+                                if (locked) navigate({ to: "/pricing" });
+                                else setTier(id);
+                              }}
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium",
+                                tier === id && !locked
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border text-muted-foreground",
+                              )}
+                            >
+                              {label}
+                              {locked && <Lock className="h-3 w-3" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {mode === "video" && (
+                  <>
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                        Duration
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {VIDEO_DURATIONS.map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => setVideoDuration(d)}
+                            className={cn(
+                              "rounded-lg border px-2.5 py-1.5 text-xs font-medium",
+                              videoDuration === d
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border text-muted-foreground",
+                            )}
+                          >
+                            {d}s
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                        Aspect ratio
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {VIDEO_ASPECTS.map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => setVideoAspect(a)}
+                            className={cn(
+                              "rounded-lg border px-2.5 py-1.5 text-xs font-medium capitalize",
+                              videoAspect === a
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border text-muted-foreground",
+                            )}
+                          >
+                            {a === "auto" ? "Auto" : a}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {mode === "music" && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                      Type
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(
+                        [
+                          ["song", "Song"],
+                          ["instrumental", "Instrumental"],
+                        ] as const
+                      ).map(([id, label]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setMusicKind(id)}
+                          className={cn(
+                            "rounded-lg border px-2.5 py-1.5 text-xs font-medium",
+                            musicKind === id
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border text-muted-foreground",
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
         <input
           ref={fileRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           aria-hidden
           onChange={onFileChange}
@@ -917,7 +860,7 @@ function UnifiedAiStudio() {
   );
 }
 
-function ModePill({
+function ModeTab({
   active,
   onClick,
   icon,
@@ -937,7 +880,7 @@ function ModePill({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-all sm:px-3.5",
+        "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-sm font-semibold transition",
         active
           ? "bg-background text-foreground shadow-sm"
           : "text-muted-foreground hover:text-foreground",
@@ -945,7 +888,7 @@ function ModePill({
     >
       {icon}
       <span>{label}</span>
-      {locked ? <Lock className="h-3 w-3 opacity-55" /> : null}
+      {locked ? <Lock className="h-3 w-3 opacity-60" /> : null}
     </button>
   );
 }
