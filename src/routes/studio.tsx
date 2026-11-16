@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { useMemo, useRef, useState } from "react";
+import type { ReactNode, ChangeEvent } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import {
@@ -11,13 +11,16 @@ import {
   Lock,
   Paperclip,
   SlidersHorizontal,
+  X,
+  Zap,
+  Crown,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic, isPaidPlan } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { MotioMarkIcon } from "@/components/BrandMark";
 import {
   maxPromptCharsForPlan,
   isPromptEffectivelyUnlimited,
@@ -39,6 +42,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  type StudioTier,
+  STUDIO_TIER_META,
+} from "@/lib/studio/studio-tier";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
@@ -46,7 +53,7 @@ export const Route = createFileRoute("/studio")({
       { title: "Studio — Motio2edit" },
       {
         name: "description",
-        content: "Unified AI Studio — create images, video, and music with Maluto AI.",
+        content: "Unified AI Studio — create images, video, and music in one place.",
       },
       { property: "og:title", content: "Studio — Motio2edit" },
       { name: "robots", content: "noindex, follow" },
@@ -86,6 +93,9 @@ function UnifiedAiStudio() {
   const [mode, setMode] = useState<StudioMode>("image");
   const [prompt, setPrompt] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tier, setTier] = useState<StudioTier>("standard");
+  const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
+  const [attachedName, setAttachedName] = useState<string | null>(null);
 
   const [imageAspect, setImageAspect] = useState<string>("1:1");
   const [videoAspect, setVideoAspect] = useState<string>("16:9");
@@ -108,25 +118,17 @@ function UnifiedAiStudio() {
     return musicCaps.promptMaxChars > 0 ? musicCaps.promptMaxChars : 500;
   }, [mode, plan, admin, paid, musicCaps.promptMaxChars]);
 
-  const greeting = useMemo(() => {
-    if (mode === "image") {
-      return "Describe the image you want to create, or tell me how to edit a photo.";
-    }
-    if (mode === "video") {
-      return "Describe your scene — camera, motion, and mood. I'll help turn it into a video.";
-    }
-    return "Describe your music: mood, genre, instruments, and vocals.";
-  }, [mode]);
-
   const placeholder = useMemo(() => {
     if (mode === "image") {
-      return "Describe your image idea, or what you want to change in a photo…";
+      return attachedPreview
+        ? "Describe what you want to change in this photo…"
+        : "Describe your image idea, or what you want to change in a photo…";
     }
     if (mode === "video") {
       return "A cinematic drone shot over misty mountains at sunrise…";
     }
     return "Upbeat indie pop with warm acoustic guitar and soft vocals…";
-  }, [mode]);
+  }, [mode, attachedPreview]);
 
   const overLimit = promptMax != null && prompt.length > promptMax;
 
@@ -138,6 +140,39 @@ function UnifiedAiStudio() {
     setPrompt(value);
   };
 
+  const clearAttachment = useCallback(() => {
+    setAttachedPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setAttachedName(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }, []);
+
+  const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    // Revoke previous object URL to avoid leaks
+    setAttachedPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+    setAttachedName(file.name);
+    // Stay in unified Studio — do not navigate away
+  };
+
+  const onAttachClick = () => {
+    if (mode === "image") {
+      fileRef.current?.click();
+      return;
+    }
+    if (mode === "video") {
+      navigate({ to: "/studio/video" });
+      return;
+    }
+    navigate({ to: "/music" });
+  };
+
   const onGenerate = () => {
     if (modeLocked) {
       navigate({ to: "/pricing" });
@@ -147,9 +182,14 @@ function UnifiedAiStudio() {
     const trimmed = prompt.trim();
 
     if (mode === "image") {
+      // Hand off to existing Image Studio / editor with prompt + experience.
+      // Full File transfer into the editor pipeline is the next integration step.
       navigate({
         to: "/editor",
-        search: (trimmed ? { prompt: trimmed } : {}) as never,
+        search: {
+          ...(trimmed ? { prompt: trimmed } : {}),
+          ...(tier !== "standard" ? { experience: tier } : {}),
+        } as never,
       });
       return;
     }
@@ -160,17 +200,22 @@ function UnifiedAiStudio() {
     navigate({ to: "/music" });
   };
 
-  const onAttach = () => {
-    if (mode === "image") {
-      navigate({ to: "/editor" });
-      return;
+  const visibleTiers: StudioTier[] =
+    mode === "image" ? ["standard", "pro", "premium"] : ["standard", "pro"];
+
+  const contextualSuggestion = useMemo(() => {
+    if (mode !== "image") return null;
+    if (attachedPreview) {
+      return {
+        title: "Edit your uploaded image",
+        body: "Describe what you want to change in your photo.",
+      };
     }
-    if (mode === "video") {
-      navigate({ to: "/studio/video" });
-      return;
-    }
-    navigate({ to: "/music" });
-  };
+    return {
+      title: "Create from a prompt",
+      body: "Describe your idea and let AI turn it into an image.",
+    };
+  }, [mode, attachedPreview]);
 
   const settingsPanel = (
     <div className="space-y-4 text-sm">
@@ -195,7 +240,7 @@ function UnifiedAiStudio() {
             ))}
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Applied when you open Image Studio. Models and quality follow your plan.
+            Applied when you open Image Studio. Models and quality follow your plan and experience.
           </p>
         </div>
       )}
@@ -278,45 +323,60 @@ function UnifiedAiStudio() {
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <Header />
 
-      <main className="relative mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-4 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-6 sm:max-w-2xl sm:pt-10">
+      <main
+        className={cn(
+          "relative mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-5 sm:max-w-2xl sm:pt-8",
+          // Extra bottom padding so content clears the mobile tab bar + safe area
+          "pb-[max(6.5rem,calc(env(safe-area-inset-bottom)+5.5rem))]",
+        )}
+      >
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute left-1/2 top-[18%] h-64 w-64 -translate-x-1/2 rounded-full bg-primary/12 blur-3xl" />
+          <div className="absolute left-1/2 top-[12%] h-56 w-56 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl dark:bg-primary/14" />
         </div>
 
-        <div className="mb-6 text-center sm:mb-8">
+        <div className="mb-5 text-center sm:mb-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Motio2edit
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             Your AI creative studio
           </h1>
         </div>
 
-        <div className="mb-5 flex justify-center sm:mb-6">
+        <div className="mb-4 flex justify-center sm:mb-5">
           <div
             className={cn(
               "inline-flex rounded-full border border-border/70 bg-muted/40 p-1 backdrop-blur-sm",
-              "dark:bg-muted/25",
+              "dark:border-white/10 dark:bg-muted/25",
             )}
             role="tablist"
             aria-label="Studio mode"
           >
             <ModePill
               active={mode === "image"}
-              onClick={() => setMode("image")}
+              onClick={() => {
+                setMode("image");
+                setTier("standard");
+              }}
               icon={<ImageIcon className="h-3.5 w-3.5" />}
               label="Image"
             />
             <ModePill
               active={mode === "video"}
-              onClick={() => setMode("video")}
+              onClick={() => {
+                setMode("video");
+                setTier("standard");
+              }}
               icon={<Video className="h-3.5 w-3.5" />}
               label="Video"
               locked={!videoOk}
             />
             <ModePill
               active={mode === "music"}
-              onClick={() => setMode("music")}
+              onClick={() => {
+                setMode("music");
+                setTier("standard");
+              }}
               icon={<Music className="h-3.5 w-3.5" />}
               label="Music"
               locked={!musicOk}
@@ -324,23 +384,14 @@ function UnifiedAiStudio() {
           </div>
         </div>
 
-        <div className="mb-4 flex items-start gap-3 px-0.5 sm:mb-5">
-          <div
-            className={cn(
-              "grid h-10 w-10 shrink-0 place-items-center rounded-2xl",
-              "border border-primary/25 bg-primary/10",
-            )}
-            aria-hidden
-          >
-            <MotioMarkIcon className="h-6 w-6" />
-          </div>
-          <div className="min-w-0 flex-1 pt-0.5">
-            <p className="text-xs font-semibold text-foreground">
-              Maluto AI
-              <span className="ml-1.5 font-normal text-muted-foreground">· assistant</span>
-            </p>
-            <p className="mt-0.5 text-sm leading-snug text-muted-foreground">{greeting}</p>
-          </div>
+        <div className="mb-3 flex items-center justify-between px-0.5">
+          <p className="text-xs text-muted-foreground">
+            {mode === "image"
+              ? "Image · create or edit"
+              : mode === "video"
+                ? "Video · text or image"
+                : "Music · song or instrumental"}
+          </p>
           <button
             type="button"
             onClick={() => navigate({ to: "/dashboard" })}
@@ -352,11 +403,107 @@ function UnifiedAiStudio() {
           </button>
         </div>
 
+        <div className="mb-3">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Experience
+          </p>
+          <div
+            className={cn(
+              "grid gap-2",
+              visibleTiers.length === 3 ? "grid-cols-3" : "grid-cols-2",
+            )}
+          >
+            {visibleTiers.map((id) => {
+              const meta = STUDIO_TIER_META[id];
+              const active = tier === id;
+              const Icon =
+                id === "standard" ? Zap : id === "pro" ? Crown : Sparkles;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTier(id)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center transition-all",
+                    active &&
+                      id === "standard" &&
+                      "border-primary bg-primary/12 ring-1 ring-primary/30",
+                    active &&
+                      id === "pro" &&
+                      "border-orange-500/80 bg-orange-500/10 ring-1 ring-orange-500/35",
+                    active &&
+                      id === "premium" &&
+                      "border-amber-400/70 bg-amber-500/10 ring-1 ring-amber-400/40",
+                    !active &&
+                      "border-border/70 bg-card/60 text-muted-foreground hover:border-primary/35 hover:text-foreground",
+                  )}
+                  aria-pressed={active}
+                >
+                  <Icon
+                    className={cn(
+                      "h-4 w-4",
+                      active && id === "standard" && "text-primary",
+                      active && id === "pro" && "text-orange-500",
+                      active && id === "premium" && "text-amber-400",
+                    )}
+                  />
+                  <span className="text-[11px] font-semibold leading-tight sm:text-xs">
+                    {meta.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {contextualSuggestion && (
+          <div
+            className={cn(
+              "mb-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 backdrop-blur-sm",
+              "dark:border-white/8 dark:bg-muted/20",
+            )}
+          >
+            <p className="text-xs font-semibold text-foreground">
+              {contextualSuggestion.title}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              {contextualSuggestion.body}
+            </p>
+          </div>
+        )}
+
+        {attachedPreview && mode === "image" && (
+          <div className="mb-3 flex items-center gap-3 rounded-xl border border-border/70 bg-card/70 p-2 backdrop-blur-sm">
+            <img
+              src={attachedPreview}
+              alt="Upload preview"
+              className="h-14 w-14 rounded-lg object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
+                {attachedName ?? "Uploaded image"}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Ready to edit — describe the change below
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearAttachment}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+              aria-label="Remove attachment"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         <div
           className={cn(
             "rounded-2xl border border-border/80 bg-card/90 shadow-lg backdrop-blur-md",
             "dark:border-white/10 dark:bg-card/80",
-            "focus-within:border-primary/35 focus-within:ring-2 focus-within:ring-primary/12",
+            "focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15",
+            "transition-shadow duration-200",
           )}
         >
           <textarea
@@ -375,13 +522,14 @@ function UnifiedAiStudio() {
           <div className="flex items-center gap-1.5 border-t border-border/50 px-2.5 py-2 sm:gap-2 sm:px-3">
             <button
               type="button"
-              onClick={onAttach}
+              onClick={onAttachClick}
               className={cn(
                 "inline-flex h-9 w-9 items-center justify-center rounded-xl",
                 "text-muted-foreground transition hover:bg-secondary hover:text-foreground",
+                attachedPreview && mode === "image" && "text-primary",
               )}
-              title={mode === "image" ? "Upload or open editor" : "Open studio uploads"}
-              aria-label="Attach reference"
+              title={mode === "image" ? "Upload image" : "Open studio uploads"}
+              aria-label="Attach"
             >
               <Paperclip className="h-4 w-4" />
             </button>
@@ -488,12 +636,19 @@ function UnifiedAiStudio() {
             </button>
           </p>
         ) : (
-          <p className="mt-4 text-center text-[11px] text-muted-foreground/80">
-            Credits apply on generate. Simple Mode and full tools open inside each studio.
+          <p className="mt-3 text-center text-[11px] text-muted-foreground/80">
+            Credits apply on generate. Full tools and advanced options open inside each studio.
           </p>
         )}
 
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" aria-hidden />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          aria-hidden
+          onChange={onFileChange}
+        />
       </main>
     </div>
   );
