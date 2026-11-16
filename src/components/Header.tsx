@@ -15,201 +15,184 @@ import {
 import { BrandMark } from "@/components/BrandMark";
 import { CrownBadge } from "@/components/CrownBadge";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
-import { resolveAvatarSrc } from "@/lib/avatar";
+import { resolveAvatarSrc } from "@/lib/avatar-presets";
 
 type NavItem = { to: string; label: string };
+
+/** Authenticated primary nav — Studio first, then Maluto AI, Pricing. */
+const AUTHED_LINKS: NavItem[] = [
+  { to: "/studio", label: "Studio" },
+  { to: "/studio/image/auto-edit", label: "Maluto AI" },
+  { to: "/pricing", label: "Pricing" },
+];
 
 const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
   { to: "/pricing", label: "Pricing" },
-  { to: "/studio/image/auto-edit", label: "Maluto AI" },
+  { to: "/faq", label: "FAQ" },
 ];
 
-const CHAT_LINK: NavItem = { to: "/chat", label: "Chat" };
-
 export function Header() {
-  const { user, profile } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const admin = isAdminEmail(profile?.email);
-  const paid = admin || isPaidPlan(profile?.plan);
+  const [open, setOpen] = useState(false);
+  const isAdmin = isAdminEmail(profile?.email);
+  const paid = isPaidPlan(profile?.plan);
 
-  const signedInLinks: NavItem[] = [
-    { to: "/studio", label: "Studio" },
-    { to: "/studio/image/auto-edit", label: "Maluto AI" },
-    { to: "/pricing", label: "Pricing" },
-  ];
-
-  const sheetLinks = user ? signedInLinks : PUBLIC_LINKS;
+  const links = user ? AUTHED_LINKS : PUBLIC_LINKS;
 
   const avatarSrc = resolveAvatarSrc(profile?.avatar_url, profile?.avatar_signed_url, {
-    nameOrEmail: profile?.display_name || profile?.email,
-    userId: profile?.id || user?.id,
+    nameOrEmail: profile?.display_name || profile?.email || user?.email,
+    userId: user?.id,
   });
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-3 sm:px-4">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2">
-            <BrandMark />
-          </Link>
-        </div>
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/85 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-3 sm:h-16 sm:px-4">
+        <Link to="/" className="shrink-0" aria-label="Motio2edit home">
+          <BrandMark size="sm" />
+        </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
-          {(user ? signedInLinks : PUBLIC_LINKS).map((l) => (
+        <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
+          {links.map((item) => (
             <Link
-              key={`${l.to}-${l.label}`}
-              to={l.to}
-              activeProps={{ className: "text-foreground" }}
-              activeOptions={l.to === "/" ? { exact: true } : undefined}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              key={item.to + item.label}
+              to={item.to}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+              activeProps={{ className: "bg-secondary text-foreground" }}
             >
-              {l.label}
+              {item.label}
             </Link>
           ))}
-          {user && admin && (
-            <Link
-              to="/admin"
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-primary"
-            >
-              Admin
-            </Link>
-          )}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          {user ? <GoogleLanguageSelect /> : null}
+        <div className="ml-auto flex items-center gap-2">
+          <div className="hidden sm:block">
+            <GoogleLanguageSelect />
+          </div>
 
           {user ? (
             <>
               <button
                 type="button"
-                onClick={() => navigate({ to: "/profile" })}
-                className="hidden items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold text-foreground sm:inline-flex"
+                onClick={() => navigate({ to: "/dashboard" })}
+                className="hidden items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-semibold tabular-nums sm:inline-flex"
+                title="Credits · Dashboard"
               >
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
-              <button
-                type="button"
-                onClick={() => navigate({ to: "/profile" })}
-                className="relative rounded-full ring-offset-2 ring-offset-background transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
-                aria-label="Open profile"
-                title="Profile"
-              >
-                <Avatar className="h-9 w-9 border border-border transition hover:opacity-90">
-                  <AvatarImage src={avatarSrc} alt="" />
-                  <AvatarFallback>
-                    {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                {isPaidPlan(profile?.plan) && (
-                  <span className="absolute -right-1 -top-1 pointer-events-none">
-                    <CrownBadge />
-                  </span>
-                )}
-              </button>
+
+              <div className="relative hidden md:block">
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-full border border-border bg-card p-0.5 pr-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={avatarSrc} alt="" />
+                      <AvatarFallback className="text-xs">
+                        {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {paid ? <CrownBadge className="h-3.5 w-3.5" /> : null}
+                  </summary>
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card p-1.5 shadow-lg">
+                    <Link
+                      to="/dashboard"
+                      className="block rounded-lg px-3 py-2 text-sm hover:bg-secondary"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      to="/profile"
+                      className="block rounded-lg px-3 py-2 text-sm hover:bg-secondary"
+                    >
+                      Profile
+                    </Link>
+                    {isAdmin ? (
+                      <Link
+                        to="/admin"
+                        className="block rounded-lg px-3 py-2 text-sm hover:bg-secondary"
+                      >
+                        Admin
+                      </Link>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => signOut()}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-destructive hover:bg-secondary"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </details>
+              </div>
             </>
           ) : (
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2.5 text-sm sm:px-3"
-                onClick={() => navigate({ to: "/auth", search: { mode: "signin", redirect: undefined } })}
-              >
+            <Button asChild size="sm" className="hidden sm:inline-flex">
+              <Link to="/auth" search={{ mode: "signin" }}>
                 Sign in
-              </Button>
-              <Button
-                size="sm"
-                className="h-9 px-2.5 text-sm sm:px-3"
-                onClick={() => navigate({ to: "/auth", search: { mode: "signup", redirect: undefined } })}
-              >
-                Get started
-              </Button>
-            </div>
+              </Link>
+            </Button>
           )}
 
-          {user ? (
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 md:hidden">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
-                <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-                  <BrandMark />
-                </div>
-                <nav className="flex flex-col p-2">
-                  {sheetLinks.map((l) => (
-                    <Link
-                      key={`${l.to}-${l.label}`}
-                      to={l.to}
-                      onClick={() => setMenuOpen(false)}
-                      activeProps={{ className: "bg-secondary text-foreground" }}
-                      activeOptions={l.to === "/" ? { exact: true } : undefined}
-                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      {l.label}
-                    </Link>
-                  ))}
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[min(100%,20rem)]">
+              <nav className="mt-8 flex flex-col gap-1">
+                {links.map((item) => (
                   <Link
-                    to="/profile"
-                    onClick={() => setMenuOpen(false)}
-                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    key={item.to + item.label}
+                    to={item.to}
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
                   >
-                    Profile
+                    {item.label}
                   </Link>
+                ))}
+                {user ? (
+                  <>
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setOpen(false)}
+                      className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      to="/profile"
+                      onClick={() => setOpen(false)}
+                      className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
+                    >
+                      Profile
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        signOut();
+                      }}
+                      className="rounded-lg px-3 py-2.5 text-left text-sm font-medium text-destructive hover:bg-secondary"
+                    >
+                      Sign out
+                    </button>
+                  </>
+                ) : (
                   <Link
-                    to="/settings"
-                    onClick={() => setMenuOpen(false)}
-                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    to="/auth"
+                    search={{ mode: "signin" }}
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-primary hover:bg-secondary"
                   >
-                    Settings
+                    Sign in
                   </Link>
-                  {admin ? (
-                    <Link
-                      to="/admin"
-                      onClick={() => setMenuOpen(false)}
-                      className="rounded-lg px-4 py-3 text-base font-medium text-primary"
-                    >
-                      Admin
-                    </Link>
-                  ) : null}
-                </nav>
-              </SheetContent>
-            </Sheet>
-          ) : (
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 md:hidden">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
-                <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-                  <BrandMark />
-                </div>
-                <nav className="flex flex-col p-2">
-                  {sheetLinks.map((l) => (
-                    <Link
-                      key={`${l.to}-${l.label}`}
-                      to={l.to}
-                      onClick={() => setMenuOpen(false)}
-                      activeProps={{ className: "bg-secondary text-foreground" }}
-                      activeOptions={l.to === "/" ? { exact: true } : undefined}
-                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      {l.label}
-                    </Link>
-                  ))}
-                </nav>
-              </SheetContent>
-            </Sheet>
-          )}
+                )}
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>
