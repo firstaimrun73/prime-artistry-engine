@@ -11,7 +11,7 @@ import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
 import { PreLoginSampleStrip } from "@/components/home/PreLoginSampleStrip";
 import { PrivacyPhilosophySection } from "@/components/home/PrivacyPhilosophySection";
-import { FloatingLanguageSelect } from "@/components/FloatingLanguageButton";
+import { FloatingLanguageButton } from "@/components/FloatingLanguageButton";
 import { useAuth } from "@/lib/auth";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/components/FeedbackCard";
@@ -65,6 +65,8 @@ function SignedInHome() {
 
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
+ * Single official demo lives in HomeHero (no duplicate WatchDemoSection).
+ * No FooterAd on the public homepage.
  */
 function SignedOutHome() {
   return (
@@ -80,7 +82,7 @@ function SignedOutHome() {
       <HomeTestimonials />
       <FinalCTA />
       <Footer />
-      <FloatingLanguageSelect />
+      <FloatingLanguageButton />
     </div>
   );
 }
