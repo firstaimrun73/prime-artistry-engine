@@ -1,2 +1,1 @@
-// truncated
-export function Header() { return null; }
+SEE_LOCAL_ARTIFACTS
