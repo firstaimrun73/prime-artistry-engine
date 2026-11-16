@@ -1,5 +1,5 @@
 import type { ReactNode, ChangeEvent } from "react";
-import { useMemo, useRef, useState, useCallback } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import {
@@ -96,6 +96,7 @@ function UnifiedAiStudio() {
   const [tier, setTier] = useState<StudioTier>("standard");
   const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
   const [attachedName, setAttachedName] = useState<string | null>(null);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
   const [imageAspect, setImageAspect] = useState<string>("1:1");
   const [videoAspect, setVideoAspect] = useState<string>("16:9");
@@ -106,6 +107,18 @@ function UnifiedAiStudio() {
     (mode === "video" && !videoOk) || (mode === "music" && !musicOk);
 
   const credits = profile?.credits ?? 0;
+  const planLabel = (plan || "free").toString();
+
+  // Clean up focus class on unmount
+  useEffect(() => {
+    return () => {
+      document.documentElement.classList.remove("studio-composer-focus");
+    };
+  }, []);
+
+  const setComposerFocus = (on: boolean) => {
+    document.documentElement.classList.toggle("studio-composer-focus", on);
+  };
 
   const promptMax = useMemo(() => {
     if (mode === "image") {
@@ -146,19 +159,19 @@ function UnifiedAiStudio() {
       return null;
     });
     setAttachedName(null);
+    setAttachedFile(null);
     if (fileRef.current) fileRef.current.value = "";
   }, []);
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
-    // Revoke previous object URL to avoid leaks
     setAttachedPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
     });
     setAttachedName(file.name);
-    // Stay in unified Studio — do not navigate away
+    setAttachedFile(file);
   };
 
   const onAttachClick = () => {
@@ -173,6 +186,13 @@ function UnifiedAiStudio() {
     navigate({ to: "/music" });
   };
 
+  /**
+   * Hand-off to existing generation backends.
+   * Uses sessionStorage preset so ImageEditor receives prompt + mode.
+   * The real File is retained in state for the next integration step
+   * (upload-to-URL then generateMedia). Until that lands, /editor remains
+   * the full image pipeline.
+   */
   const onGenerate = () => {
     if (modeLocked) {
       navigate({ to: "/pricing" });
@@ -182,8 +202,20 @@ function UnifiedAiStudio() {
     const trimmed = prompt.trim();
 
     if (mode === "image") {
-      // Hand off to existing Image Studio / editor with prompt + experience.
-      // Full File transfer into the editor pipeline is the next integration step.
+      try {
+        sessionStorage.setItem(
+          "motio2edit-preset",
+          JSON.stringify({
+            prompt: trimmed || undefined,
+            mode: "image",
+            experience: tier,
+            aspectRatio: imageAspect,
+          }),
+        );
+        sessionStorage.setItem("motio2edit-mode", "image");
+      } catch {
+        // ignore quota errors
+      }
       navigate({
         to: "/editor",
         search: {
@@ -194,6 +226,20 @@ function UnifiedAiStudio() {
       return;
     }
     if (mode === "video") {
+      try {
+        sessionStorage.setItem(
+          "motio2edit-preset",
+          JSON.stringify({
+            prompt: trimmed || undefined,
+            mode: "video",
+            experience: tier,
+            aspectRatio: videoAspect,
+            duration: videoDuration,
+          }),
+        );
+      } catch {
+        // ignore
+      }
       navigate({ to: "/studio/video" });
       return;
     }
@@ -323,10 +369,44 @@ function UnifiedAiStudio() {
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <Header />
 
+      {/* Floating Upgrade Plan — does not cover Generate */}
+      <button
+        type="button"
+        onClick={() => navigate({ to: "/pricing" })}
+        className={cn(
+          "fixed z-30 hidden sm:inline-flex items-center gap-1.5 rounded-full",
+          "border border-primary/30 bg-card/90 px-3 py-1.5 text-xs font-semibold",
+          "text-foreground shadow-md backdrop-blur-md hover:bg-primary/10",
+          "right-4 top-[4.5rem]",
+        )}
+        title={`Current plan: ${planLabel}`}
+      >
+        <Crown className="h-3.5 w-3.5 text-primary" />
+        Upgrade
+        <span className="text-[10px] font-normal text-muted-foreground capitalize">
+          · {planLabel}
+        </span>
+      </button>
+
+      {/* Mobile floating upgrade (bottom-right, above tab bar) */}
+      <button
+        type="button"
+        onClick={() => navigate({ to: "/pricing" })}
+        className={cn(
+          "fixed z-30 sm:hidden inline-flex items-center gap-1 rounded-full",
+          "border border-primary/30 bg-card/95 px-2.5 py-1.5 text-[11px] font-semibold",
+          "text-foreground shadow-lg backdrop-blur-md",
+          "right-3 bottom-[max(4.75rem,calc(env(safe-area-inset-bottom)+4.25rem))]",
+        )}
+        title={`Current plan: ${planLabel}`}
+      >
+        <Crown className="h-3.5 w-3.5 text-primary" />
+        Upgrade
+      </button>
+
       <main
         className={cn(
           "relative mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-5 sm:max-w-2xl sm:pt-8",
-          // Extra bottom padding so content clears the mobile tab bar + safe area
           "pb-[max(6.5rem,calc(env(safe-area-inset-bottom)+5.5rem))]",
         )}
       >
@@ -484,7 +564,9 @@ function UnifiedAiStudio() {
                 {attachedName ?? "Uploaded image"}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Ready to edit — describe the change below
+                {attachedFile
+                  ? "File ready — describe the change, then Generate"
+                  : "Ready to edit — describe the change below"}
               </p>
             </div>
             <button
@@ -509,6 +591,8 @@ function UnifiedAiStudio() {
           <textarea
             value={prompt}
             onChange={(e) => onPromptChange(e.target.value)}
+            onFocus={() => setComposerFocus(true)}
+            onBlur={() => setComposerFocus(false)}
             placeholder={placeholder}
             rows={4}
             className={cn(
@@ -637,7 +721,7 @@ function UnifiedAiStudio() {
           </p>
         ) : (
           <p className="mt-3 text-center text-[11px] text-muted-foreground/80">
-            Credits apply on generate. Full tools and advanced options open inside each studio.
+            Credits apply on generate. Full tools open inside each studio. Uploaded files are kept for the next step.
           </p>
         )}
 
