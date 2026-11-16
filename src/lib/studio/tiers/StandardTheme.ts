@@ -19,7 +19,7 @@ export const standardGenerateClass =
 export const standardMeta = {
   id: STANDARD_TIER,
   label: "Standard",
-  short: "Everyday edits",
+  short: "Everyday ideas",
   blurb:
-    "Fast and reliable image creation for everyday edits, enhancements, restyling, and creative generation.",
+    "Fast and reliable AI creation for everyday ideas, edits and improvements. Prompt adherence: Balanced (up to 2,000 characters for Image).",
 } as const;
