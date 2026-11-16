@@ -76,17 +76,17 @@ export function Header() {
             <>
               <button
                 type="button"
-                onClick={() => navigate({ to: "/dashboard" })}
-                className="hidden items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-semibold tabular-nums sm:inline-flex"
-                title="Credits · Dashboard"
+                onClick={() => navigate({ to: "/profile" })}
+                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-semibold tabular-nums"
+                title="Credits · Profile"
               >
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
 
-              <div className="relative hidden md:block">
+              <div className="relative">
                 <details className="group">
-                  <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-full border border-border bg-card p-0.5 pr-2">
+                  <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-full border border-border bg-card p-0.5 pr-1.5 sm:pr-2">
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={avatarSrc} alt="" />
                       <AvatarFallback className="text-xs">
@@ -96,12 +96,6 @@ export function Header() {
                     {paid ? <CrownBadge className="h-3.5 w-3.5" /> : null}
                   </summary>
                   <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card p-1.5 shadow-lg">
-                    <Link
-                      to="/dashboard"
-                      className="block rounded-lg px-3 py-2 text-sm hover:bg-secondary"
-                    >
-                      Dashboard
-                    </Link>
                     <Link
                       to="/profile"
                       className="block rounded-lg px-3 py-2 text-sm hover:bg-secondary"
@@ -155,13 +149,6 @@ export function Header() {
                 ))}
                 {user ? (
                   <>
-                    <Link
-                      to="/dashboard"
-                      onClick={() => setOpen(false)}
-                      className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
-                    >
-                      Dashboard
-                    </Link>
                     <Link
                       to="/profile"
                       onClick={() => setOpen(false)}
