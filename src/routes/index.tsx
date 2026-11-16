@@ -11,7 +11,7 @@ import { BeforeAfterShowcase } from "@/components/home/BeforeAfterShowcase";
 import { ArchitectureFlowSection } from "@/components/home/ArchitectureFlowSection";
 import { PreLoginSampleStrip } from "@/components/home/PreLoginSampleStrip";
 import { PrivacyPhilosophySection } from "@/components/home/PrivacyPhilosophySection";
-import { FloatingLanguageButton } from "@/components/FloatingLanguageButton";
+import { FloatingLanguageSelect } from "@/components/FloatingLanguageButton";
 import { useAuth } from "@/lib/auth";
 import { listPublicFeedback } from "@/lib/feedback.functions";
 import { FeedbackCard } from "@/components/FeedbackCard";
@@ -34,11 +34,10 @@ function HomePage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
-  // Post-login: Image editor (stable). /studio production bundle was a null stub —
-  // switch back to /studio after deploy confirms studio-*.js is non-null.
+  // Post-login: unified Studio.
   useEffect(() => {
     if (!loading && user) {
-      navigate({ to: "/editor", replace: true });
+      navigate({ to: "/studio", replace: true });
     }
   }, [loading, user, navigate]);
 
@@ -66,8 +65,6 @@ function SignedInHome() {
 
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
- * Single official demo lives in HomeHero (no duplicate WatchDemoSection).
- * No FooterAd on the public homepage.
  */
 function SignedOutHome() {
   return (
@@ -83,7 +80,7 @@ function SignedOutHome() {
       <HomeTestimonials />
       <FinalCTA />
       <Footer />
-      <FloatingLanguageButton />
+      <FloatingLanguageSelect />
     </div>
   );
 }
