@@ -1,8 +1,9 @@
 /**
- * Unified Studio — Image | Video | Music command center.
- * BUILD_MARKER: 2026-11-17-unblank-v3
- * Must never export a null component — production blank page was caused by
- * a deployed stub: `var e=()=>null;export{e as component}`
+ * Unified Studio — Image | Video | Music
+ * BUILD_MARKER: 2026-11-17-unblank-v4-FORCE
+ *
+ * CRITICAL: production was stuck on `export { e as component }` where e=()=>null.
+ * This file must never export a null component.
  */
 import { useState, useRef, type ChangeEvent } from "react";
 import {
@@ -26,6 +27,14 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 
+function StudioPage() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (pathname !== "/studio") {
+    return <Outlet />;
+  }
+  return <StudioWorkspace />;
+}
+
 export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
@@ -42,16 +51,6 @@ export const Route = createFileRoute("/studio")({
 });
 
 type StudioMode = "image" | "video" | "music";
-
-/** Top-level page component — always renders real UI (never null). */
-function StudioPage() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  // Child routes under /studio/* keep their own pages via Outlet.
-  if (pathname !== "/studio") {
-    return <Outlet />;
-  }
-  return <StudioWorkspace />;
-}
 
 function StudioWorkspace() {
   const { profile } = useAuth();
@@ -107,7 +106,7 @@ function StudioWorkspace() {
             JSON.stringify({ prompt: trimmed, mode: "video" }),
           );
         } catch {
-          /* private mode */
+          /* ignore */
         }
       }
       if (!videoOk) {
@@ -125,7 +124,7 @@ function StudioWorkspace() {
             JSON.stringify({ prompt: trimmed, mode: "music" }),
           );
         } catch {
-          /* private mode */
+          /* ignore */
         }
       }
       if (!musicOk) {
@@ -135,7 +134,6 @@ function StudioWorkspace() {
       navigate({ to: "/music" });
       return;
     }
-    // Image → editor (Simple Mode / full image studio)
     if (trimmed) {
       try {
         sessionStorage.setItem(
@@ -143,7 +141,7 @@ function StudioWorkspace() {
           JSON.stringify({ prompt: trimmed, mode: "image" }),
         );
       } catch {
-        /* private mode */
+        /* ignore */
       }
       navigate({
         to: "/editor",
@@ -183,7 +181,6 @@ function StudioWorkspace() {
           </button>
         </div>
 
-        {/* Mode switcher */}
         <div className="mb-4 flex items-center gap-1 rounded-xl border border-border/80 bg-muted/30 p-1">
           {modes.map(({ id, icon: Icon, label, ok }) => {
             const active = mode === id;
@@ -218,7 +215,6 @@ function StudioWorkspace() {
           })}
         </div>
 
-        {/* Helper copy */}
         <div className="mb-4 flex-1">
           <p className="text-sm text-muted-foreground">
             {mode === "image"
@@ -236,7 +232,6 @@ function StudioWorkspace() {
           ) : null}
         </div>
 
-        {/* Composer */}
         <div className="mt-auto pt-2">
           <div className="rounded-2xl border border-border bg-card/80 p-2 shadow-lg backdrop-blur-xl">
             <div className="flex items-end gap-1.5">
@@ -278,7 +273,7 @@ function StudioWorkspace() {
             </div>
           </div>
           <p className="mt-2 text-center text-[10px] text-muted-foreground/80">
-            Credits apply on generate · BUILD 2026-11-17-unblank-v3
+            Credits apply on generate · BUILD 2026-11-17-unblank-v4
           </p>
         </div>
 
