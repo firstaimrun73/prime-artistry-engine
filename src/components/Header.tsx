@@ -18,8 +18,9 @@ type NavItem = { to: any; label: string };
 
 /** Lean public nav — About / Security remain in the footer. */
 const PUBLIC_LINKS: NavItem[] = [
-  { to: "/", label: "Discover" },
+  { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
+  { to: "/studio/image/auto-edit", label: "Maluto AI" },
   { to: "/pricing", label: "Pricing" },
   { to: "/faq", label: "FAQ" },
   { to: "/support", label: "Support" },
@@ -36,13 +37,12 @@ export function Header() {
   const showChat = paid;
 
   /**
-   * Signed-in top nav — Image Studio first so users find generation immediately.
-   * Discover is the feed/home. Avatar still opens Dashboard.
+   * Signed-in top nav — single primary system.
+   * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
    */
   const authLinksBase: NavItem[] = [
-    { to: "/studio/image", label: "Image Studio" },
-    { to: "/", label: "Discover" },
-    { to: "/studio", label: "AI+ Tools" },
+    { to: "/", label: "Home" },
+    { to: "/studio", label: "AI Studio" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
     ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
     { to: "/pricing", label: "Pricing" },
@@ -85,7 +85,7 @@ export function Header() {
           {user && admin && (
             <Link
               to="/admin"
-              className="ml-1 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary"
+              className="ml-1 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-secondary"
             >
               <ShieldCheck className="h-4 w-4" /> Admin
             </Link>
@@ -105,6 +105,7 @@ export function Header() {
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
+              {/* Avatar = Dashboard shortcut (not a separate Dashboard nav item) */}
               <button
                 type="button"
                 onClick={() => navigate({ to: "/dashboard" })}
@@ -171,7 +172,7 @@ export function Header() {
                       onClick={() => setMenuOpen(false)}
                       activeProps={{ className: "bg-secondary text-foreground" }}
                       activeOptions={l.to === "/" ? { exact: true } : undefined}
-                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
                       {l.label}
                     </Link>
