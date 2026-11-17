@@ -1,7 +1,5 @@
 /** Routes where the global mobile bottom tab bar must be hidden. */
 export function hideBottomNav(pathname: string): boolean {
-  // Unified Studio — ChatGPT-style; no bottom chrome
-  if (pathname === "/studio") return true;
   if (pathname.startsWith("/editor")) return true;
   if (pathname.startsWith("/studio/video")) return true;
   if (pathname.startsWith("/studio/frames")) return true;
@@ -13,10 +11,13 @@ export function hideBottomNav(pathname: string): boolean {
   if (pathname.startsWith("/studio/image/circle-add-discover")) return true;
   if (pathname.startsWith("/studio/image/auto-edit")) return true;
   if (pathname.startsWith("/studio/image/remove-bg")) return true;
+  // Dedicated filter editor surfaces — never cover intensity/Apply controls
   if (pathname.startsWith("/studio/image/filters")) return true;
   if (pathname.startsWith("/studio/image/filter-editor")) return true;
   if (pathname.startsWith("/studio/image/age")) return true;
+  // About Product — editorial page; hide app bottom nav on mobile
   if (pathname === "/about" || pathname.startsWith("/about/")) return true;
+  // Sample detail — dedicated media page; no bottom studio tabs
   if (pathname.startsWith("/sample/")) return true;
   return false;
 }
