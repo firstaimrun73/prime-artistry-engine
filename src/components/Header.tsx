@@ -19,8 +19,9 @@ import { resolveAvatarSrc } from "@/lib/avatar-presets";
 
 type NavItem = { to: string; label: string };
 
-/** Authenticated primary nav — Studio first, then Maluto AI, Pricing. */
+/** Authenticated primary nav — Home restored, then Studio, Maluto AI, Pricing. */
 const AUTHED_LINKS: NavItem[] = [
+  { to: "/", label: "Home" },
   { to: "/studio", label: "Studio" },
   { to: "/studio/image/auto-edit", label: "Maluto AI" },
   { to: "/pricing", label: "Pricing" },

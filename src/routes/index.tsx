@@ -1,5 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
@@ -32,16 +31,8 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
 
-  // Post-login: unified Studio.
-  useEffect(() => {
-    if (!loading && user) {
-      navigate({ to: "/studio", replace: true });
-    }
-  }, [loading, user, navigate]);
-
-  if (loading || user) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading" />
@@ -49,10 +40,10 @@ function HomePage() {
     );
   }
 
+  if (user) return <SignedInHome />;
   return <SignedOutHome />;
 }
 
-/** Kept intact so the old authenticated homepage can be restored if needed. */
 function SignedInHome() {
   return (
     <div className="min-h-screen bg-background">
