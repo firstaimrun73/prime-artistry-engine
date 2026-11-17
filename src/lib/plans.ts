@@ -1,5 +1,32 @@
 // Checkout currency helpers + plan definitions for Motio2edit public pricing.
-export type CurrencyCode = "USD" | "EUR" | "INR";
+export type Currency = "USD" | "EUR" | "INR";
+export type PaymentMethod = "card" | "paypal";
+
+export const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
+  { id: "card", label: "Credit / Debit Card" },
+];
+
+export const CURRENCY_METHODS: Record<Currency, PaymentMethod[]> = {
+  INR: ["card"],
+  USD: ["card"],
+  EUR: ["card"],
+};
+
+export type CardProvider = "paypal" | "razorpay";
+
+export const CARD_PROVIDERS: { id: CardProvider; label: string; note: string }[] = [
+  { id: "paypal", label: "PayPal", note: "PayPal or card (USD)" },
+  { id: "razorpay", label: "Razorpay", note: "UPI / cards — India (INR)" },
+];
+
+export function cardProvidersForCurrency(currency: Currency): typeof CARD_PROVIDERS {
+  if (currency === "INR") return CARD_PROVIDERS.filter((p) => p.id === "razorpay");
+  return CARD_PROVIDERS.filter((p) => p.id === "paypal");
+}
+
+export function defaultCardProvider(currency: Currency): CardProvider {
+  return currency === "INR" ? "razorpay" : "paypal";
+}
 
 export type PlanId =
   | "free"
@@ -152,7 +179,30 @@ export function getPlan(id: string | null | undefined): Plan {
   return found ?? PLANS[0]!;
 }
 
-export function formatMoney(amount: number, currency: CurrencyCode): string {
+export type DisplayCurrency = Currency;
+
+export function toCheckoutCurrency(c: DisplayCurrency): Currency {
+  return c;
+}
+
+export function monthlyCreditsForPlan(planId: PlanId): number {
+  return PLAN_CREDITS[planId] ?? 0;
+}
+
+export function estimatePaypalNetUsd(grossUsd: number): {
+  gross: number;
+  fee: number;
+  net: number;
+} {
+  const fee = grossUsd * 0.044 + 0.3;
+  return {
+    gross: +grossUsd.toFixed(2),
+    fee: +fee.toFixed(2),
+    net: +(grossUsd - fee).toFixed(2),
+  };
+}
+
+export function formatMoney(amount: number, currency: Currency): string {
   try {
     return new Intl.NumberFormat(undefined, {
       style: "currency",
