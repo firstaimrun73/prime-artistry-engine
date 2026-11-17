@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LayoutGrid, User, Crown, Compass, Image as ImageIcon } from "lucide-react";
+import { LayoutGrid, User, Crown, Sparkles, Home } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -9,8 +9,9 @@ import { hideBottomNav } from "@/components/hideBottomNav";
 export { hideBottomNav };
 
 /**
- * Mobile bottom nav — Image Studio first, then Discover | Tools | Plans | Profile.
+ * Mobile bottom nav — Home restored + Studio | Maluto AI | Pricing | Profile
  * iPhone: floating capsule with strong left/right curves + safe-area.
+ * On /studio: hide when keyboard opens or composer is focused.
  */
 export function BottomTabBar() {
   const { user } = useAuth();
@@ -37,7 +38,7 @@ export function BottomTabBar() {
   }, [pathname]);
 
   useEffect(() => {
-    const onStudio = pathname === "/studio" || pathname.startsWith("/studio/") || pathname === "/editor";
+    const onStudio = pathname === "/studio" || pathname.startsWith("/studio/");
     if (!onStudio) {
       setHiddenByKeyboard(false);
       return;
@@ -59,8 +60,7 @@ export function BottomTabBar() {
   }, [pathname]);
 
   useEffect(() => {
-    const onStudio =
-      pathname === "/studio" || pathname === "/editor" || pathname.startsWith("/studio/image");
+    const onStudio = pathname === "/studio";
     if (!onStudio) {
       setHiddenByComposer(false);
       return;
@@ -81,38 +81,35 @@ export function BottomTabBar() {
 
   const shouldHide =
     hiddenByScroll ||
-    ((pathname === "/studio" ||
-      pathname.startsWith("/studio/") ||
-      pathname === "/editor") &&
+    ((pathname === "/studio" || pathname.startsWith("/studio/")) &&
       (hiddenByKeyboard || hiddenByComposer));
 
   const items = [
     {
-      to: "/studio/image" as const,
-      label: "Image",
-      icon: ImageIcon,
-      active:
-        pathname === "/studio/image" ||
-        pathname.startsWith("/studio/image/") ||
-        pathname === "/editor",
-    },
-    {
       to: "/" as const,
-      label: t("nav.discover") || "Discover",
-      icon: Compass,
+      label: t("nav.home") || "Home",
+      icon: Home,
       active: pathname === "/",
     },
     {
       to: "/studio" as const,
-      label: t("nav.studio") || "Tools",
+      label: t("nav.studio") || "Studio",
       icon: LayoutGrid,
       active:
-        (pathname === "/studio" || pathname.startsWith("/studio/")) &&
-        !pathname.startsWith("/studio/image"),
+        pathname === "/studio" ||
+        pathname.startsWith("/studio/") ||
+        pathname === "/editor" ||
+        pathname === "/music",
+    },
+    {
+      to: "/studio/image/auto-edit" as const,
+      label: "Maluto AI",
+      icon: Sparkles,
+      active: pathname.startsWith("/studio/image/auto-edit"),
     },
     {
       to: "/pricing" as const,
-      label: "Plans",
+      label: "Pricing",
       icon: Crown,
       active: pathname.startsWith("/pricing"),
     },
@@ -140,9 +137,9 @@ export function BottomTabBar() {
         shouldHide && "translate-y-[120%] pointer-events-none opacity-0",
         isIOS
           ? [
-              "left-2.5 right-2.5",
+              "left-3 right-3",
               "bottom-[max(0.6rem,env(safe-area-inset-bottom))]",
-              "rounded-[2rem]",
+              "rounded-[1.75rem]",
               "border border-white/20 dark:border-white/10",
               "bg-background/75 dark:bg-background/70",
               "shadow-[0_10px_40px_rgba(0,0,0,0.22),0_2px_8px_rgba(0,0,0,0.08)]",
