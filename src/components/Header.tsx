@@ -18,9 +18,8 @@ type NavItem = { to: any; label: string };
 
 /** Lean public nav — About / Security remain in the footer. */
 const PUBLIC_LINKS: NavItem[] = [
-  { to: "/", label: "Home" },
+  { to: "/", label: "Discover" },
   { to: "/features", label: "Features" },
-  { to: "/studio/image/auto-edit", label: "Maluto AI" },
   { to: "/pricing", label: "Pricing" },
   { to: "/faq", label: "FAQ" },
   { to: "/support", label: "Support" },
@@ -33,16 +32,17 @@ export function Header() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const admin = isAdminEmail(profile?.email);
-  const paid = admin || isPaidPlan(profile?.plan);
+  const paid = admin || isPaidPlan(profile?.plan.plan);
   const showChat = paid;
 
   /**
-   * Signed-in top nav — single primary system.
-   * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
+   * Signed-in top nav — Image Studio first so users find generation immediately.
+   * Discover is the feed/home. Avatar still opens Dashboard.
    */
   const authLinksBase: NavItem[] = [
-    { to: "/", label: "Home" },
-    { to: "/studio", label: "AI Studio" },
+    { to: "/studio/image", label: "Image Studio" },
+    { to: "/", label: "Discover" },
+    { to: "/studio", label: "AI+ Tools" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
     ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
     { to: "/pricing", label: "Pricing" },
@@ -105,7 +105,6 @@ export function Header() {
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
-              {/* Avatar = Dashboard shortcut (not a separate Dashboard nav item) */}
               <button
                 type="button"
                 onClick={() => navigate({ to: "/dashboard" })}
