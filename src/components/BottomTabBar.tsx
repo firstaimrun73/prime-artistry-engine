@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LayoutGrid, User, Crown, Sparkles } from "lucide-react";
+import { LayoutGrid, User, Crown, Sparkles, Home } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -9,8 +9,7 @@ import { hideBottomNav } from "@/components/hideBottomNav";
 export { hideBottomNav };
 
 /**
- * Mobile bottom nav — 4 equal items.
- * Studio | Maluto AI | Pricing | Profile
+ * Mobile bottom nav — Home restored + Studio | Maluto AI | Pricing | Profile
  * iPhone: floating capsule with strong left/right curves + safe-area.
  * On /studio: hide when keyboard opens or composer is focused.
  */
@@ -87,6 +86,12 @@ export function BottomTabBar() {
 
   const items = [
     {
+      to: "/" as const,
+      label: t("nav.home") || "Home",
+      icon: Home,
+      active: pathname === "/",
+    },
+    {
       to: "/studio" as const,
       label: t("nav.studio") || "Studio",
       icon: LayoutGrid,
@@ -148,7 +153,7 @@ export function BottomTabBar() {
     >
       <ul
         className={cn(
-          "mx-auto grid h-[3.6rem] max-w-lg grid-cols-4 items-center",
+          "mx-auto grid h-[3.6rem] max-w-lg grid-cols-5 items-center",
           isIOS ? "px-2.5 gap-0.5" : "px-1",
         )}
       >
