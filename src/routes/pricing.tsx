@@ -85,8 +85,7 @@ function PricingPage() {
             {t("pricing.title") || "Pricing"}
           </h1>
           <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-            Simple credit plans. Pay monthly or yearly. Choose Standard, Premium, or Ultra AI —
-            upgrade anytime.
+            Simple plans. Monthly or yearly. Unlock Standard, Premium, or Ultra AI modes.
           </p>
         </div>
 
@@ -282,16 +281,16 @@ function PricingPage() {
           <p className="font-semibold text-foreground">Good to know</p>
           <ul className="space-y-2 text-xs text-muted-foreground sm:text-sm">
             <li>
-              <span className="font-medium text-foreground">Starter:</span> Everyday image edit
-              & generation, Circle Remove, short SD video (up to 5s), and instrumental music.
+              <span className="font-medium text-foreground">Starter:</span> Standard image edit,
+              Circle Remove, short SD video, instrumental music.
             </li>
             <li>
-              <span className="font-medium text-foreground">Pro:</span> Premium image models,
-              full Maluto AI restore, Circle Remove & Add, HD video up to 10s, and more music modes.
+              <span className="font-medium text-foreground">Pro:</span> Premium models, Maluto AI,
+              Circle Remove & Add, HD video up to 10s.
             </li>
             <li>
-              <span className="font-medium text-foreground">Ultra AI:</span> Highest-quality image
-              models, longer video (up to 15s), and premium music (Song · SFX · Video music).
+              <span className="font-medium text-foreground">Ultra AI:</span> Top image models,
+              premium music (Song · SFX · Video music), video up to 15s.
             </li>
             <li>
               <span className="font-medium text-foreground">Need more later?</span>{" "}
@@ -310,6 +309,7 @@ function PricingPage() {
           </ul>
         </div>
       </div>
+      {/* No ads on pricing — checkout-focused page */}
       <Footer />
     </div>
   );
