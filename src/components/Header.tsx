@@ -1,186 +1,209 @@
 import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Menu, Coins } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { isAdminEmail } from "@/lib/admin-config";
-import { isPaidPlan } from "@/lib/policy";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { BrandMark } from "@/components/BrandMark";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CrownBadge } from "@/components/CrownBadge";
+import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
+import { isAdminEmail } from "@/lib/admin-config";
+import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 
-type NavItem = { to: string; label: string };
+import { Coins, ShieldCheck, Menu } from "lucide-react";
 
-/** Authenticated primary nav — Home restored, then Studio, Maluto AI, Pricing. */
-const AUTHED_LINKS: NavItem[] = [
-  { to: "/", label: "Home" },
-  { to: "/studio", label: "Studio" },
-  { to: "/studio/image/auto-edit", label: "Maluto AI" },
-  { to: "/pricing", label: "Pricing" },
-];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type NavItem = { to: any; label: string };
 
+/** Lean public nav — About / Security remain in the footer. */
 const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
+  { to: "/studio/image/auto-edit", label: "Maluto AI" },
   { to: "/pricing", label: "Pricing" },
   { to: "/faq", label: "FAQ" },
+  { to: "/support", label: "Support" },
 ];
 
-export function Header() {
-  const { user, profile, signOut } = useAuth();
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const isAdmin = isAdminEmail(profile?.email);
-  const paid = isPaidPlan(profile?.plan);
+const CHAT_LINK: NavItem = { to: "/chat", label: "Chat" };
 
-  const links = user ? AUTHED_LINKS : PUBLIC_LINKS;
+export function Header() {
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const admin = isAdminEmail(profile?.email);
+  const paid = admin || isPaidPlan(profile?.plan);
+  const showChat = paid;
+
+  /**
+   * Signed-in top nav — single primary system.
+   * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
+   */
+  const authLinksBase: NavItem[] = [
+    { to: "/", label: "Home" },
+    { to: "/studio", label: "AI Studio" },
+    { to: "/studio/image/auto-edit", label: "Maluto AI" },
+    ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
+    { to: "/pricing", label: "Pricing" },
+  ];
+
+  const authLinks: NavItem[] = showChat ? [...authLinksBase, CHAT_LINK] : authLinksBase;
+  const centerLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
+  const sheetLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 
   const avatarSrc = resolveAvatarSrc(profile?.avatar_url, profile?.avatar_signed_url, {
-    nameOrEmail: profile?.display_name || profile?.email || user?.email,
-    userId: user?.id,
+    nameOrEmail: profile?.display_name || profile?.email,
+    userId: profile?.id || user?.id,
   });
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-3 sm:h-16 sm:px-4">
-        <Link to="/" className="shrink-0" aria-label="Motio2edit home">
-          <BrandMark size="sm" />
+    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
+      <div className="relative mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-4 lg:max-w-7xl">
+        <Link
+          to="/"
+          className="notranslate flex min-w-0 shrink items-center gap-1.5 sm:gap-2"
+          translate="no"
+          aria-label="Motio2edit home"
+        >
+          <BrandMark />
+          <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
-          {links.map((item) => (
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
+          {centerLinks.map((l) => (
             <Link
-              key={item.to + item.label}
-              to={item.to}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-              activeProps={{ className: "bg-secondary text-foreground" }}
+              key={`${l.to}-${l.label}`}
+              to={l.to}
+              activeProps={{ className: "bg-secondary/80 text-foreground" }}
+              activeOptions={l.to === "/" ? { exact: true } : undefined}
+              className="rounded-lg px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground lg:px-2.5 xl:px-3"
             >
-              {item.label}
+              {l.label}
             </Link>
           ))}
+          {user && admin && (
+            <Link
+              to="/admin"
+              className="ml-1 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-secondary"
+            >
+              <ShieldCheck className="h-4 w-4" /> Admin
+            </Link>
+          )}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
-          <div className="hidden sm:block">
-            <GoogleLanguageSelect />
-          </div>
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          {user ? <GoogleLanguageSelect /> : null}
 
           {user ? (
             <>
               <button
                 type="button"
-                onClick={() => navigate({ to: "/profile" })}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-semibold tabular-nums"
-                title="Credits · Profile"
+                onClick={() => navigate({ to: "/dashboard" })}
+                className="hidden items-center gap-1.5 rounded-full border border-border bg-secondary/60 px-2.5 py-1 text-xs font-semibold text-foreground sm:inline-flex"
               >
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
-
-              <div className="relative">
-                <details className="group">
-                  <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-full border border-border bg-card p-0.5 pr-1.5 sm:pr-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={avatarSrc} alt="" />
-                      <AvatarFallback className="text-xs">
-                        {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    {paid ? <CrownBadge className="h-3.5 w-3.5" /> : null}
-                  </summary>
-                  <div className="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card p-1.5 shadow-lg">
-                    <Link
-                      to="/profile"
-                      className="block rounded-lg px-3 py-2 text-sm hover:bg-secondary"
-                    >
-                      Profile
-                    </Link>
-                    {isAdmin ? (
-                      <Link
-                        to="/admin"
-                        className="block rounded-lg px-3 py-2 text-sm hover:bg-secondary"
-                      >
-                        Admin
-                      </Link>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => signOut()}
-                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-destructive hover:bg-secondary"
-                    >
-                      Sign out
-                    </button>
-                  </div>
-                </details>
-              </div>
+              {/* Avatar = Dashboard shortcut (not a separate Dashboard nav item) */}
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/dashboard" })}
+                className="relative rounded-full ring-offset-2 ring-offset-background transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
+                aria-label="Open dashboard"
+                title="Dashboard"
+              >
+                <Avatar className="h-9 w-9 border border-border transition hover:opacity-90">
+                  <AvatarImage src={avatarSrc} alt="" />
+                  <AvatarFallback>
+                    {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {isPaidPlan(profile?.plan) && (
+                  <span className="absolute -right-1 -top-1 pointer-events-none">
+                    <CrownBadge />
+                  </span>
+                )}
+              </button>
             </>
           ) : (
-            <Button asChild size="sm" className="hidden sm:inline-flex">
-              <Link to="/auth" search={{ mode: "signin" }}>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 px-2.5 text-sm sm:px-3"
+                onClick={() => navigate({ to: "/auth", search: { mode: "signin", redirect: undefined } })}
+              >
                 Sign in
-              </Link>
-            </Button>
+              </Button>
+              <Button
+                size="sm"
+                className="h-9 px-2.5 text-sm sm:px-3"
+                onClick={() => navigate({ to: "/auth", search: { mode: "signup", redirect: undefined } })}
+              >
+                Get started
+              </Button>
+            </div>
           )}
 
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[min(100%,20rem)]">
-              <nav className="mt-8 flex flex-col gap-1">
-                {links.map((item) => (
+          {user ? (
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
+                <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+                  <BrandMark />
+                </div>
+                <nav className="flex flex-col p-2">
                   <Link
-                    key={item.to + item.label}
-                    to={item.to}
-                    onClick={() => setOpen(false)}
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
+                    to="/dashboard"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
                   >
-                    {item.label}
+                    Dashboard
                   </Link>
-                ))}
-                {user ? (
-                  <>
+                  {sheetLinks.map((l) => (
                     <Link
-                      to="/profile"
-                      onClick={() => setOpen(false)}
-                      className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-secondary"
+                      key={`${l.to}-${l.label}`}
+                      to={l.to}
+                      onClick={() => setMenuOpen(false)}
+                      activeProps={{ className: "bg-secondary text-foreground" }}
+                      activeOptions={l.to === "/" ? { exact: true } : undefined}
+                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                     >
-                      Profile
+                      {l.label}
                     </Link>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOpen(false);
-                        signOut();
-                      }}
-                      className="rounded-lg px-3 py-2.5 text-left text-sm font-medium text-destructive hover:bg-secondary"
-                    >
-                      Sign out
-                    </button>
-                  </>
-                ) : (
+                  ))}
                   <Link
-                    to="/auth"
-                    search={{ mode: "signin" }}
-                    onClick={() => setOpen(false)}
-                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-primary hover:bg-secondary"
+                    to="/profile"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
                   >
-                    Sign in
+                    Profile
                   </Link>
-                )}
-              </nav>
-            </SheetContent>
-          </Sheet>
+                  <Link
+                    to="/settings"
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  >
+                    Settings
+                  </Link>
+                  {admin ? (
+                    <Link
+                      to="/admin"
+                      onClick={() => setMenuOpen(false)}
+                      className="rounded-lg px-4 py-3 text-base font-medium text-primary"
+                    >
+                      Admin
+                    </Link>
+                  ) : null}
+                </nav>
+              </SheetContent>
+            </Sheet>
+          ) : null}
         </div>
       </div>
     </header>
