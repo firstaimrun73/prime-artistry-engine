@@ -32,7 +32,7 @@ export function Header() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const admin = isAdminEmail(profile?.email);
-  const paid = admin || isPaidPlan(profile?.plan.plan);
+  const paid = admin || isPaidPlan(profile?.plan);
   const showChat = paid;
 
   /**
@@ -85,7 +85,7 @@ export function Header() {
           {user && admin && (
             <Link
               to="/admin"
-              className="ml-1 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-secondary"
+              className="ml-1 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary"
             >
               <ShieldCheck className="h-4 w-4" /> Admin
             </Link>
@@ -171,7 +171,7 @@ export function Header() {
                       onClick={() => setMenuOpen(false)}
                       activeProps={{ className: "bg-secondary text-foreground" }}
                       activeOptions={l.to === "/" ? { exact: true } : undefined}
-                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
                     >
                       {l.label}
                     </Link>
