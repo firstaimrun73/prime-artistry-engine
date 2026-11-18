@@ -26,29 +26,25 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/support", label: "Support" },
 ];
 
-const CHAT_LINK: NavItem = { to: "/chat", label: "Chat" };
-
 export function Header() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
-  const showChat = paid;
 
   /**
    * Signed-in top nav — single primary system.
    * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
+   * Chat page removed from product navigation.
    */
-  const authLinksBase: NavItem[] = [
+  const authLinks: NavItem[] = [
     { to: "/", label: "Home" },
     { to: "/studio", label: "AI Studio" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
     ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
     { to: "/pricing", label: "Pricing" },
   ];
-
-  const authLinks: NavItem[] = showChat ? [...authLinksBase, CHAT_LINK] : authLinksBase;
   const centerLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
   const sheetLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 

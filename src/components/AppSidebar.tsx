@@ -5,7 +5,6 @@ import {
   Video,
   Music,
   History,
-  MessageSquare,
   User,
   Settings,
   Crown,
@@ -16,7 +15,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { isAdminEmail } from "@/lib/admin-config";
-import { canAccessChat, canAccessVideo, canAccessMusic, isPaidPlan } from "@/lib/policy";
+import { canAccessVideo, canAccessMusic, isPaidPlan } from "@/lib/policy";
 import { BrandMark } from "@/components/BrandMark";
 import { useI18n } from "@/lib/i18n";
 
@@ -34,7 +33,6 @@ export function AppSidebar() {
 
   const showVideo = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
   const showMusic = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
-  const showChat = canAccessChat({ plan, email: profile?.email, isAdmin: admin });
 
   type NavItem = { to: string; label: string; icon: typeof Home; exact?: boolean };
   const items: NavItem[] = [
@@ -50,7 +48,6 @@ export function AppSidebar() {
     items.push({ to: "/history", label: t("nav.history") || "History", icon: History });
   }
   items.push({ to: "/pricing", label: "Pricing", icon: Crown });
-  if (showChat) items.push({ to: "/chat", label: t("nav.chat") || "Chat", icon: MessageSquare });
 
   return (
     <aside
