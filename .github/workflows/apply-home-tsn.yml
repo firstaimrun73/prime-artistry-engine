@@ -1,0 +1,29 @@
+name: Restore homepage + TSN carousel
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/patch_home_tsn_carousel.py"
+      - ".github/workflows/apply-home-tsn.yml"
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore SignedInHomeBody
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_home_tsn_carousel.py
+          test $(wc -c < src/components/home/SignedInHomeBody.tsx) -gt 5000
+          grep -q ImageStudioWeeklyCarousel src/components/home/SignedInHomeBody.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/home/SignedInHomeBody.tsx
+          if git diff --cached --quiet; then echo no changes; exit 0; fi
+          git commit -m "fix(home): restore SignedInHomeBody + Try Something New carousel"
+          git push origin HEAD:main
