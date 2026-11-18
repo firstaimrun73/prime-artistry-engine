@@ -28,7 +28,7 @@ function StudioLayout() {
   return <StudioLauncher />;
 }
 
-type LauncherApp = {
+type LauncherTool = {
   id: string;
   title: string;
   to: string;
@@ -44,7 +44,7 @@ function StudioLauncher() {
   const videoOk = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
   const musicOk = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
 
-  const apps: LauncherApp[] = [
+  const tools: LauncherTool[] = [
     {
       id: "image",
       title: "Image",
@@ -77,41 +77,54 @@ function StudioLauncher() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <Header />
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-6 sm:px-6">
-        <div className="mb-8 text-center sm:mb-10">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-5 pb-[max(6.5rem,env(safe-area-inset-bottom))] pt-8 sm:px-8 sm:pt-10">
+        <div className="mb-10 text-center sm:mb-12 md:mb-14">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Motio2edit
           </p>
-          <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
             Studio
           </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">Choose an app to open</p>
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+            Choose a tool to open
+          </p>
         </div>
 
         <div
           className={cn(
-            "grid w-full max-w-md grid-cols-2 gap-x-6 gap-y-8 sm:max-w-none sm:grid-cols-4 sm:gap-x-8 sm:gap-y-6",
+            "grid w-full place-items-center",
+            "grid-cols-2 gap-x-8 gap-y-10",
+            "max-w-[22rem]",
+            "sm:max-w-none sm:grid-cols-4 sm:gap-x-10 sm:gap-y-8",
+            "md:gap-x-14",
+            "lg:gap-x-16",
           )}
           role="list"
-          aria-label="Studio apps"
+          aria-label="Studio tools"
         >
-          {apps.map((app, index) => (
-            <AppIcon key={app.id} app={app} delayMs={index * 60} />
+          {tools.map((tool, index) => (
+            <ToolIcon key={tool.id} tool={tool} index={index} />
           ))}
         </div>
 
         <style>{`
-          @keyframes studioIconIdle {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-2px); }
+          @keyframes studioToolEnter {
+            0% { opacity: 0; transform: scale(0.82) translateY(16px); }
+            70% { opacity: 1; transform: scale(1.04) translateY(-2px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
           }
-          @keyframes studioIconEnter {
-            from { opacity: 0; transform: scale(0.92) translateY(8px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
+          @keyframes studioToolIdle {
+            0%, 100% { transform: translateY(0) scale(1); }
+            40% { transform: translateY(-5px) scale(1.02); }
+            60% { transform: translateY(-3px) scale(1.01); }
+          }
+          @keyframes studioToolGlow {
+            0%, 100% { box-shadow: 0 8px 20px -6px color-mix(in oklab, var(--primary) 35%, transparent); }
+            50% { box-shadow: 0 12px 28px -4px color-mix(in oklab, var(--primary) 55%, transparent); }
           }
           @media (prefers-reduced-motion: reduce) {
-            .studio-app-icon,
-            .studio-app-icon .studio-icon-face {
+            .studio-tool-icon,
+            .studio-tool-icon .studio-tool-face {
               animation: none !important;
             }
           }
@@ -121,46 +134,54 @@ function StudioLauncher() {
   );
 }
 
-function AppIcon({ app, delayMs }: { app: LauncherApp; delayMs: number }) {
-  const Icon = app.icon;
+function ToolIcon({ tool, index }: { tool: LauncherTool; index: number }) {
+  const Icon = tool.icon;
+  const enterDelay = index * 80;
+  const idleDelay = index * 280;
 
   return (
     <Link
-      to={app.to}
-      search={(app.search ?? {}) as never}
+      to={tool.to}
+      search={(tool.search ?? {}) as never}
       role="listitem"
-      aria-label={app.locked ? `${app.title} — requires paid plan` : `Open ${app.title}`}
+      aria-label={tool.locked ? `${tool.title} — requires paid plan` : `Open ${tool.title}`}
       className={cn(
-        "studio-app-icon group relative flex flex-col items-center gap-2.5 outline-none",
-        "transition-transform duration-200 ease-out",
-        "hover:scale-110 active:scale-95",
-        "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-2xl",
+        "studio-tool-icon group relative flex flex-col items-center gap-3 outline-none",
+        "transition-transform duration-200 ease-out will-change-transform",
+        "hover:scale-[1.12] active:scale-[0.92]",
+        "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-3xl",
       )}
       style={{
-        animation: `studioIconEnter 0.35s ease-out ${delayMs}ms both`,
+        animation: `studioToolEnter 0.5s cubic-bezier(0.22, 1, 0.36, 1) ${enterDelay}ms both`,
       }}
     >
       <span
         className={cn(
-          "studio-icon-face relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[1.35rem] sm:h-[5rem] sm:w-[5rem] sm:rounded-[1.5rem]",
+          "studio-tool-face relative flex items-center justify-center",
+          "h-[5.25rem] w-[5.25rem] rounded-[1.45rem]",
+          "sm:h-[5.75rem] sm:w-[5.75rem] sm:rounded-[1.55rem]",
+          "md:h-[6.25rem] md:w-[6.25rem] md:rounded-[1.65rem]",
           "bg-primary text-primary-foreground",
-          "shadow-md shadow-primary/25",
           "transition-[box-shadow,transform] duration-200 ease-out",
-          "group-hover:shadow-lg group-hover:shadow-primary/40",
-          "group-active:shadow-sm",
-          "motion-safe:animate-[studioIconIdle_3.2s_ease-in-out_infinite]",
+          "group-hover:shadow-[0_16px_36px_-8px_color-mix(in_oklab,var(--primary)_60%,transparent)]",
+          "group-active:shadow-md",
+          "motion-safe:animate-[studioToolIdle_2.8s_ease-in-out_infinite,studioToolGlow_3.2s_ease-in-out_infinite]",
         )}
-        style={{ animationDelay: `${delayMs}ms` }}
+        style={{ animationDelay: `${idleDelay}ms, ${idleDelay}ms` }}
       >
-        <Icon className="h-8 w-8 sm:h-9 sm:w-9" strokeWidth={1.75} aria-hidden />
-        {app.locked ? (
-          <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-card text-primary shadow-sm">
-            <Lock className="h-3 w-3" aria-hidden />
+        <Icon
+          className="h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11 transition-transform duration-200 group-hover:scale-110 group-active:scale-95"
+          strokeWidth={1.7}
+          aria-hidden
+        />
+        {tool.locked ? (
+          <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-card text-primary shadow-sm">
+            <Lock className="h-3.5 w-3.5" aria-hidden />
           </span>
         ) : null}
       </span>
-      <span className="max-w-[6.5rem] text-center text-[13px] font-semibold leading-tight text-foreground sm:max-w-none sm:text-sm">
-        {app.title}
+      <span className="max-w-[7.5rem] text-center text-[14px] font-semibold leading-tight text-foreground sm:max-w-none sm:text-[15px] md:text-base">
+        {tool.title}
       </span>
     </Link>
   );
