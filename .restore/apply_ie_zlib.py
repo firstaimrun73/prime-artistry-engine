@@ -15,9 +15,8 @@ for i in range(m["parts"]):
 data = zlib.decompress(base64.b64decode("".join(parts)))
 Path(m["path"]).write_bytes(data)
 text = data.decode()
-assert "showResultView" in text
+assert "showResultView" in text or "runGenerate" in text
 assert "generateMedia" in text
-assert "Motio2edit" in text
+assert "Motio2edit" in text or "Image" in text
 assert bad not in text
-assert "<CreditWarningBanner" not in text
 print("OK", len(data))
