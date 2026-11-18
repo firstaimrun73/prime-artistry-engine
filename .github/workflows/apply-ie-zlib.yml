@@ -1,0 +1,37 @@
+name: Apply ImageEditor redesign zlib
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.restore/ie_zlib.part*.b64'
+      - '.restore/ie_zlib.manifest.json'
+      - '.restore/apply_ie_zlib.py'
+      - '.github/workflows/apply-ie-zlib.yml'
+concurrency:
+  group: apply-ie-zlib
+  cancel-in-progress: true
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Decompress and commit ImageEditor
+        run: |
+          set -euo pipefail
+          python3 .restore/apply_ie_zlib.py
+          test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 40000
+          grep -q showResultView src/components/editor/image/ImageEditor.tsx
+          grep -q generateMedia src/components/editor/image/ImageEditor.tsx
+          grep -q Motio2edit src/components/editor/image/ImageEditor.tsx
+          ! grep -q PLACEHOLDER src/components/editor/image/ImageEditor.tsx
+          ! grep -q '<CreditWarningBanner' src/components/editor/image/ImageEditor.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx
+          if git diff --cached --quiet; then echo no changes; exit 0; fi
+          git commit -m "feat(image-studio): compact glass create workspace + post-gen result experience"
+          git push origin HEAD:main
