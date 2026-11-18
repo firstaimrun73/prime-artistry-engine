@@ -62,6 +62,8 @@ interface EditorOptionsPanelProps {
   setKeepWatermark: React.Dispatch<React.SetStateAction<boolean>>;
   isFree: boolean;
   studioTier?: StudioTier;
+  /** Auto workspace: denser chips, hide pre-gen watermark row */
+  compact?: boolean;
 }
 
 /** Compact shape preview — proportions match the real aspect ratio. */
@@ -113,6 +115,7 @@ export function EditorOptionsPanel({
   setKeepWatermark,
   isFree,
   studioTier = "standard",
+  compact = false,
 }: EditorOptionsPanelProps) {
   const [costOpen, setCostOpen] = useState(false);
   const expLabel = studioExperienceLabel(studioTier);
@@ -122,7 +125,7 @@ export function EditorOptionsPanel({
     IMAGE_QUALITY_OPTIONS.find((q) => q.id === imageQuality)?.label ?? imageQuality.toUpperCase();
 
   return (
-    <section className="space-y-4">
+    <section className={compact ? "space-y-2.5" : "space-y-4"}>
       {mediaType === "image" ? null : (
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           4. Options
@@ -226,8 +229,6 @@ export function EditorOptionsPanel({
           </span>
         </div>
       )}
-
-      {/* Multi-reference selection is handled by the gallery + slot only — no separate lock tile. */}
 
       {mediaType === "video" && (
         <div className="space-y-3 rounded-lg border border-border bg-card p-3">
@@ -355,7 +356,7 @@ export function EditorOptionsPanel({
         </div>
       )}
 
-      {(mediaType === "video" || mediaType === "image") && (
+      {!compact && (mediaType === "video" || mediaType === "image") && (
       <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 px-3 py-2.5">
         <span className="text-xs font-medium text-muted-foreground">Watermark</span>
         {(planIsFree || isFree) ? (
