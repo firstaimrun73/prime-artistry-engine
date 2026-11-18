@@ -2,6 +2,9 @@ name: Restore ImageEditor
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/restore-image-editor.yml"
 
 permissions:
   contents: write
@@ -19,10 +22,14 @@ jobs:
       - name: Restore ImageEditor from known-good commit
         run: |
           set -euo pipefail
-          GOOD=bc0304b66b63ee8bbc1e596ff5f0f54913b88aee
+          # Full ImageEditor (pre-redesign) — verified >40KB with real generation code
+          GOOD=6e1d896emergency
+          # Resolve short SHA
+          GOOD=$(git rev-list -n 1 6e1d896 2>/dev/null || git rev-parse 6e1d896^{commit})
+          echo "Using good commit: $GOOD"
           git checkout "$GOOD" -- src/components/editor/image/ImageEditor.tsx
           if [ -f src/components/editor/image/ImageEditorCore.tsx ]; then
-            git rm -f src/components/editor/image/ImageEditorCore.tsx
+            git rm -f src/components/editor/image/ImageEditorCore.tsx || rm -f src/components/editor/image/ImageEditorCore.tsx
           fi
           BYTES=$(wc -c < src/components/editor/image/ImageEditor.tsx)
           echo "ImageEditor.tsx size: $BYTES bytes"
@@ -30,13 +37,20 @@ jobs:
             echo "ERROR: restored file too small ($BYTES) — aborting"
             exit 1
           fi
-          # Must be the real editor, not a re-export stub
           if grep -q 'Re-export workspace' src/components/editor/image/ImageEditor.tsx; then
             echo "ERROR: still a re-export stub"
             exit 1
           fi
+          if grep -q 'PLACEHOLDER' src/components/editor/image/ImageEditor.tsx; then
+            echo "ERROR: PLACEHOLDER content"
+            exit 1
+          fi
           if ! grep -q 'export function ImageEditor' src/components/editor/image/ImageEditor.tsx; then
             echo "ERROR: missing ImageEditor export"
+            exit 1
+          fi
+          if ! grep -q 'runGenerate\|generateMedia' src/components/editor/image/ImageEditor.tsx; then
+            echo "ERROR: missing generation wiring"
             exit 1
           fi
 
@@ -50,5 +64,5 @@ jobs:
             echo "No changes — ImageEditor already good"
             exit 0
           fi
-          git commit -m "emergency: restore full ImageEditor.tsx from bc0304b (fix production Image Studio)"
+          git commit -m "emergency: restore full ImageEditor.tsx from 6e1d896 (fix production Image Studio)"
           git push origin HEAD:main
