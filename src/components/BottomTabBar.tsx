@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { LayoutGrid, User, Crown, Sparkles, Home } from "lucide-react";
+import { LayoutGrid, User, Crown, Plus, Home } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -77,12 +77,8 @@ export function BottomTabBar() {
   }, [pathname]);
 
   if (!user) return null;
-  if (hideBottomNav(pathname)) return null;
 
-  const shouldHide =
-    hiddenByScroll ||
-    ((pathname === "/studio" || pathname.startsWith("/studio/")) &&
-      (hiddenByKeyboard || hiddenByComposer));
+  const shouldHide = hideBottomNav(pathname) || hiddenByScroll || hiddenByKeyboard || hiddenByComposer;
 
   const items = [
     {
@@ -93,34 +89,27 @@ export function BottomTabBar() {
     },
     {
       to: "/studio" as const,
-      label: t("nav.studio") || "Studio",
+      label: "Studio",
       icon: LayoutGrid,
-      active:
-        pathname === "/studio" ||
-        pathname.startsWith("/studio/") ||
-        pathname === "/editor" ||
-        pathname === "/music",
+      active: pathname === "/studio" || (pathname.startsWith("/studio/") && !pathname.startsWith("/studio/image/auto-edit")),
     },
     {
       to: "/studio/image/auto-edit" as const,
       label: "Maluto AI",
-      icon: Sparkles,
+      icon: Plus,
       active: pathname.startsWith("/studio/image/auto-edit"),
     },
     {
       to: "/pricing" as const,
-      label: "Pricing",
+      label: t("nav.pricing") || "Pricing",
       icon: Crown,
-      active: pathname.startsWith("/pricing"),
+      active: pathname.startsWith("/pricing") || pathname.startsWith("/checkout"),
     },
     {
       to: "/profile" as const,
       label: t("nav.profile") || "Profile",
       icon: User,
-      active:
-        pathname === "/profile" ||
-        pathname.startsWith("/profile/") ||
-        pathname === "/dashboard",
+      active: pathname.startsWith("/profile") || pathname.startsWith("/settings") || pathname.startsWith("/dashboard"),
     },
   ];
 
@@ -174,16 +163,30 @@ export function BottomTabBar() {
               )}
               <Icon
                 className={cn(
-                  "h-5 w-5 transition-transform",
+                  "h-5 w-5 transition-transform duration-200",
                   active && isIOS && "scale-110 text-primary",
                   active && "text-primary",
+                  active && label === "Maluto AI" && "motion-safe:animate-[malutoPlusPulse_1.6s_ease-in-out_infinite]",
+                  !active && label === "Maluto AI" && "motion-safe:animate-[malutoPlusIdle_2.8s_ease-in-out_infinite]",
                 )}
+                strokeWidth={label === "Maluto AI" ? 2.4 : undefined}
               />
               <span className={cn(active && "font-semibold")}>{label}</span>
             </Link>
           </li>
         ))}
       </ul>
+      <style>{`
+        @keyframes malutoPlusPulse {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          40% { transform: scale(1.18) rotate(90deg); }
+          70% { transform: scale(1.08) rotate(90deg); }
+        }
+        @keyframes malutoPlusIdle {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.08); opacity: 0.92; }
+        }
+      `}</style>
     </nav>
   );
 }
