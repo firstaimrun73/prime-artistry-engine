@@ -1,0 +1,34 @@
+name: Apply ImageEditor MOTIO2EDIT patches
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/patch_image_editor_motio2edit.py"
+      - ".restore/TRIGGER_IE_PATCH"
+      - ".github/workflows/apply-ie-motio2edit.yml"
+concurrency:
+  group: apply-ie-motio2edit
+  cancel-in-progress: true
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Patch ImageEditor from 70c4f3b + MOTIO2EDIT
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_image_editor_motio2edit.py
+          test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 40000
+          grep -q "planMaxImages = getPlanLimits" src/components/editor/image/ImageEditor.tsx
+          ! grep -q ImageStudioWeeklyCarousel src/components/editor/image/ImageEditor.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx
+          if git diff --cached --quiet; then echo no changes; exit 0; fi
+          git commit -m "fix(image-studio): MOTIO2EDIT — free multi-ref (5), remove TSN from studio, locked experiences prep"
+          git push origin HEAD:main
