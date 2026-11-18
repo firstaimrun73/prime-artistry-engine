@@ -1,22 +1,21 @@
-import type { ReactNode } from "react";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
-import { Image as ImageIcon, Video, Music, Lock, Frame } from "lucide-react";
+import { Image as ImageIcon, Video, Music, CircleDot, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { cn } from "@/lib/utils";
-import { CreditSpendHint } from "@/components/ads";
+import type { LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
     meta: [
-      { title: "AI+ Tools — Motio2edit" },
+      { title: "Studio — Motio2edit" },
       {
         name: "description",
-        content: "Image, Circle 2edit, Video, Frames, and Music tools in one Motio2edit hub.",
+        content: "Open Image, Circle 2edit, Video, or Music Studio in Motio2edit.",
       },
-      { property: "og:title", content: "AI+ Tools — Motio2edit" },
+      { property: "og:title", content: "Studio — Motio2edit" },
       { name: "robots", content: "noindex, follow" },
     ],
   }),
@@ -26,110 +25,95 @@ export const Route = createFileRoute("/studio")({
 function StudioLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   if (pathname !== "/studio") return <Outlet />;
-  return <StudioHub />;
+  return <StudioLauncher />;
 }
 
-function StudioHub() {
+type LauncherApp = {
+  id: string;
+  title: string;
+  to: string;
+  search?: Record<string, string>;
+  icon: LucideIcon;
+  locked?: boolean;
+};
+
+function StudioLauncher() {
   const { profile } = useAuth();
   const admin = isAdminEmail(profile?.email);
   const plan = profile?.plan;
   const videoOk = canAccessVideo({ plan, email: profile?.email, isAdmin: admin });
   const musicOk = canAccessMusic({ plan, email: profile?.email, isAdmin: admin });
 
-  return (
-    <div className="flex min-h-[100dvh] flex-col bg-background md:min-h-0 md:h-[100dvh] md:max-h-[100dvh] md:overflow-hidden">
-      <Header />
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-6 md:max-w-6xl md:overflow-y-auto lg:max-w-7xl">
-        <div className="mb-3 shrink-0 text-center sm:mb-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            AI+ Tools
-          </p>
-          <h1 className="mt-0.5 text-xl font-extrabold tracking-tight sm:text-2xl">Choose a tool</h1>
-        </div>
+  const apps: LauncherApp[] = [
+    {
+      id: "image",
+      title: "Image",
+      to: "/editor",
+      icon: ImageIcon,
+    },
+    {
+      id: "circle",
+      title: "Circle 2edit",
+      to: "/studio/image/circle-remove",
+      search: { mode: "remove", from: "studio" },
+      icon: CircleDot,
+    },
+    {
+      id: "video",
+      title: "Video",
+      to: videoOk ? "/studio/video" : "/pricing",
+      icon: Video,
+      locked: !videoOk,
+    },
+    {
+      id: "music",
+      title: "Music",
+      to: musicOk ? "/studio/music" : "/pricing",
+      icon: Music,
+      locked: !musicOk,
+    },
+  ];
 
-        <CreditSpendHint
-          className="mb-3 shrink-0"
-          costLabel="Edits spend credits from your balance"
-        />
+  return (
+    <div className="flex min-h-[100dvh] flex-col bg-background">
+      <Header />
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-4 pb-[max(6rem,env(safe-area-inset-bottom))] pt-6 sm:px-6">
+        <div className="mb-8 text-center sm:mb-10">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Motio2edit
+          </p>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+            Studio
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">Choose an app to open</p>
+        </div>
 
         <div
           className={cn(
-            "grid min-h-0 flex-1 gap-2.5 sm:gap-3",
-            "grid-cols-2 auto-rows-[minmax(9.5rem,1fr)]",
-            "md:grid-cols-3 md:auto-rows-[minmax(11rem,14rem)] md:content-start md:gap-4",
+            "grid w-full max-w-md grid-cols-2 gap-x-6 gap-y-8 sm:max-w-none sm:grid-cols-4 sm:gap-x-8 sm:gap-y-6",
           )}
+          role="list"
+          aria-label="Studio apps"
         >
-          <StudioTile
-            to="/editor"
-            title="Image"
-            subtitle="Generate · enhance"
-            gradient="from-primary/35 via-primary/10 to-transparent"
-            icon={
-              <span className="inline-flex rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg sm:p-3.5">
-                <ImageIcon className="h-6 w-6 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
-
-          <StudioTile
-            to="/studio/image/circle-remove"
-            search={{ mode: "remove" as const, from: "studio" as const }}
-            title={
-              <>
-                <span className="text-[#7B6FE0]">Circle</span>
-                <span className="font-medium text-foreground/90"> 2edit</span>
-              </>
-            }
-            subtitle="Remove · Add"
-            gradient="from-[#7B6FE0]/25 via-transparent to-transparent"
-            borderClass="border-[#7B6FE0]/35 dark:border-[#7B6FE0]/40"
-            icon={<CircleMetaRing />}
-          />
-
-          <StudioTile
-            to={videoOk ? "/studio/video" : "/pricing"}
-            title="Video"
-            subtitle={videoOk ? "Cinematic motion" : "Requires a paid plan"}
-            gradient="from-rose-500/30 via-transparent to-transparent"
-            locked={!videoOk}
-            icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
-                <Video className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.2s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
-
-          <StudioTile
-            to="/studio/frames"
-            title="Frames"
-            subtitle="Frame · Glass"
-            gradient="from-slate-400/30 via-zinc-200/10 to-transparent"
-            icon={
-              <span className="inline-flex rounded-2xl border border-slate-400/40 bg-background/80 p-3 sm:p-3.5">
-                <Frame className="h-6 w-6 text-slate-600 dark:text-slate-300 sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_2.8s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
-
-          <StudioTile
-            to={musicOk ? "/studio/music" : "/pricing"}
-            title="Music"
-            subtitle={musicOk ? "Prompt-to-music" : "Requires a paid plan"}
-            gradient="from-fuchsia-500/30 via-transparent to-transparent"
-            locked={!musicOk}
-            className="col-span-2 md:col-span-1"
-            icon={
-              <span className="inline-flex rounded-2xl border border-border bg-background/80 p-3 sm:p-3.5">
-                <Music className="h-6 w-6 text-primary sm:h-7 sm:w-7 motion-safe:animate-[iconFloat_3.4s_ease-in-out_infinite]" />
-              </span>
-            }
-          />
+          {apps.map((app, index) => (
+            <AppIcon key={app.id} app={app} delayMs={index * 60} />
+          ))}
         </div>
 
         <style>{`
-          @keyframes iconFloat {
+          @keyframes studioIconIdle {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
+            50% { transform: translateY(-2px); }
+          }
+          @keyframes studioIconEnter {
+            from { opacity: 0; transform: scale(0.92) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .studio-app-icon,
+            .studio-app-icon .studio-icon-face {
+              animation: none !important;
+            }
           }
         `}</style>
       </main>
@@ -137,104 +121,47 @@ function StudioHub() {
   );
 }
 
-function StudioTile({
-  to,
-  search,
-  title,
-  subtitle,
-  icon,
-  gradient,
-  borderClass,
-  locked,
-  className,
-}: {
-  to: string;
-  search?: Record<string, string>;
-  title: ReactNode;
-  subtitle: string;
-  icon: ReactNode;
-  gradient: string;
-  borderClass?: string;
-  locked?: boolean;
-  className?: string;
-}) {
+function AppIcon({ app, delayMs }: { app: LauncherApp; delayMs: number }) {
+  const Icon = app.icon;
+
   return (
     <Link
-      to={to}
-      search={search as never}
+      to={app.to}
+      search={(app.search ?? {}) as never}
+      role="listitem"
+      aria-label={app.locked ? `${app.title} — requires paid plan` : `Open ${app.title}`}
       className={cn(
-        "group relative flex min-h-0 flex-col justify-between overflow-hidden rounded-2xl border bg-card/80 p-3.5 shadow-sm backdrop-blur-md transition-transform active:scale-[0.98] sm:rounded-3xl sm:p-4",
-        "border-border/80",
-        borderClass,
-        className,
+        "studio-app-icon group relative flex flex-col items-center gap-2.5 outline-none",
+        "transition-transform duration-200 ease-out",
+        "hover:scale-110 active:scale-95",
+        "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-2xl",
       )}
+      style={{
+        animation: `studioIconEnter 0.35s ease-out ${delayMs}ms both`,
+      }}
     >
-      <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br", gradient)} />
-      <div className="relative">{icon}</div>
-      <div className="relative mt-auto">
-        <h2 className="text-base font-extrabold tracking-tight sm:text-lg">{title}</h2>
-        <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{subtitle}</p>
-      </div>
-      {locked ? (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-2xl bg-background/55 backdrop-blur-[2px] sm:rounded-3xl">
-          <Lock className="h-5 w-5 text-primary" />
-          <span className="text-[11px] font-semibold text-muted-foreground">Requires paid plan</span>
-        </div>
-      ) : null}
+      <span
+        className={cn(
+          "studio-icon-face relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-[1.35rem] sm:h-[5rem] sm:w-[5rem] sm:rounded-[1.5rem]",
+          "bg-primary text-primary-foreground",
+          "shadow-md shadow-primary/25",
+          "transition-[box-shadow,transform] duration-200 ease-out",
+          "group-hover:shadow-lg group-hover:shadow-primary/40",
+          "group-active:shadow-sm",
+          "motion-safe:animate-[studioIconIdle_3.2s_ease-in-out_infinite]",
+        )}
+        style={{ animationDelay: `${delayMs}ms` }}
+      >
+        <Icon className="h-8 w-8 sm:h-9 sm:w-9" strokeWidth={1.75} aria-hidden />
+        {app.locked ? (
+          <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-card text-primary shadow-sm">
+            <Lock className="h-3 w-3" aria-hidden />
+          </span>
+        ) : null}
+      </span>
+      <span className="max-w-[6.5rem] text-center text-[13px] font-semibold leading-tight text-foreground sm:max-w-none sm:text-sm">
+        {app.title}
+      </span>
     </Link>
-  );
-}
-
-function CircleMetaRing() {
-  return (
-    <span
-      className="relative grid h-12 w-12 place-items-center rounded-2xl border border-[#7B6FE0]/45 bg-white/90 shadow-lg dark:bg-[#22252F] sm:h-14 sm:w-14"
-      aria-hidden
-    >
-      <svg viewBox="0 0 40 40" className="h-9 w-9 overflow-visible sm:h-10 sm:w-10">
-        <defs>
-          <linearGradient id="studioMetaRing" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#A8A0F0" />
-            <stop offset="50%" stopColor="#7B6FE0" />
-            <stop offset="100%" stopColor="#C8C4E8" />
-          </linearGradient>
-        </defs>
-        <circle
-          cx="20"
-          cy="20"
-          r="15"
-          fill="none"
-          stroke="url(#studioMetaRing)"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeDasharray="28 60"
-          className="origin-center motion-safe:animate-[spin_5.5s_linear_infinite]"
-        />
-        <circle
-          cx="20"
-          cy="20"
-          r="10"
-          fill="none"
-          stroke="#7B6FE0"
-          strokeWidth="1.5"
-          opacity="0.75"
-          strokeDasharray="18 40"
-          className="origin-center motion-safe:animate-[spin_9s_linear_infinite_reverse]"
-        />
-        <circle
-          cx="20"
-          cy="20"
-          r="3.4"
-          fill="#7B6FE0"
-          className="motion-safe:animate-[c2ePulse_2.4s_ease-in-out_infinite]"
-        />
-      </svg>
-      <style>{`
-        @keyframes c2ePulse {
-          0%, 100% { opacity: 0.85; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.15); }
-        }
-      `}</style>
-    </span>
   );
 }
