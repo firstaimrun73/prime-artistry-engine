@@ -1,6 +1,2 @@
-/**
- * Image Editor workspace — independent of Video Editor.
- * UPLOAD → WRITE & SELECT → GENERATE → OUTPUT (compact glass UI)
- * RESTORED 2026-11-04 from 53c55f95 + FreeUserSponsorStrip (client-only Multitag unlock)
- */
-export function ImageEditor() { return null; }
+/** Re-export workspace — split for deploy payload size. */
+export { ImageEditor } from "./ImageEditorCore";
