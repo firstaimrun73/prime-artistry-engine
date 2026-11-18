@@ -76,20 +76,20 @@ function PricingPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:py-12 md:pb-12">
+      <div className="mx-auto max-w-6xl px-4 py-6 pb-24 sm:py-12 md:pb-12">
         <div className="text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 sm:mb-3 sm:h-11 sm:w-11">
             <Crown className="h-5 w-5 text-primary" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
             {t("pricing.title") || "Pricing"}
           </h1>
-          <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
+          <p className="mx-auto mt-1.5 max-w-lg text-sm text-muted-foreground sm:mt-2">
             Simple plans. Monthly or yearly. Unlock Standard, Premium, or Ultra AI modes.
           </p>
         </div>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-5 flex justify-center sm:mt-8">
           <div className="inline-flex items-center rounded-full border border-border bg-muted/40 p-1">
             <button
               type="button"
@@ -121,7 +121,7 @@ function PricingPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:mt-4">
           {DISPLAY_CURRENCIES.map((code) => (
             <button
               key={code}
@@ -146,7 +146,7 @@ function PricingPage() {
           ))}
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3 md:items-stretch md:gap-5">
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:mt-8 sm:gap-4 md:grid-cols-3 md:items-stretch md:gap-5">
           {visiblePlans.map((plan) => {
             const isRecommended = plan.id === PRICING_POPULAR_PLAN_ID;
             const isCurrent = profile?.plan === plan.id;
@@ -190,7 +190,7 @@ function PricingPage() {
               <div
                 key={plan.id}
                 className={cn(
-                  "relative flex w-full flex-col rounded-2xl border bg-card p-5",
+                  "relative flex w-full flex-col rounded-2xl border bg-card p-4 sm:p-5",
                   isRecommended ? "border-primary/50 shadow-md shadow-primary/10" : "border-border",
                 )}
               >
@@ -205,7 +205,7 @@ function PricingPage() {
                   <h2 className="text-lg font-bold">{plan.name}</h2>
                 </div>
 
-                <p className="mt-3 text-3xl font-extrabold tracking-tight">{priceLabel}</p>
+                <p className="mt-2 text-3xl font-extrabold tracking-tight sm:mt-3">{priceLabel}</p>
                 <p className="text-xs text-muted-foreground">{periodLabel}</p>
                 {interval === "year" && yearlyMonthlyEquiv ? (
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -213,62 +213,64 @@ function PricingPage() {
                   </p>
                 ) : null}
 
-                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
+                <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary sm:mt-3">
                   <Sparkles className="h-3.5 w-3.5" />
                   {modeLabel}
                 </div>
 
-                <div className="mt-3 space-y-1.5 rounded-xl border border-border/70 bg-muted/30 p-3 text-xs">
-                  <p className="font-semibold text-foreground">About this plan</p>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <ImageIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span>
-                      <span className="font-semibold text-foreground">
+                <div className="mt-3 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                      Monthly credits
+                    </span>
+                    <span className="text-lg font-extrabold tabular-nums text-foreground sm:text-xl">
+                      {plan.credits.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-1.5 text-center">
+                    <div className="rounded-lg bg-background/80 px-1 py-1.5">
+                      <p className="text-sm font-bold tabular-nums text-foreground">
                         ~{estimates.images.toLocaleString()}
-                      </span>{" "}
-                      images
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Video className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span>
-                      <span className="font-semibold text-foreground">
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">images</p>
+                    </div>
+                    <div className="rounded-lg bg-background/80 px-1 py-1.5">
+                      <p className="text-sm font-bold tabular-nums text-foreground">
                         ~{estimates.videos.toLocaleString()}
-                      </span>{" "}
-                      videos
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Music className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span>
-                      <span className="font-semibold text-foreground">
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">videos</p>
+                    </div>
+                    <div className="rounded-lg bg-background/80 px-1 py-1.5">
+                      <p className="text-sm font-bold tabular-nums text-foreground">
                         ~{estimates.music.toLocaleString()}
-                      </span>{" "}
-                      music tracks
-                    </span>
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">music</p>
+                    </div>
                   </div>
-                  <p className="pt-0.5 text-[10px] leading-snug text-muted-foreground">
-                    Shared monthly allowance — not all at once.
+                  <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
+                    Shared monthly pool — not separate quotas.
                   </p>
                 </div>
 
-                <p className="mt-3 text-sm leading-snug text-muted-foreground">{plan.positioning}</p>
+                <p className="mt-2.5 text-xs leading-snug text-muted-foreground sm:text-sm">
+                  {plan.positioning}
+                </p>
 
-                <ul className="mt-4 flex-1 space-y-2">
+                <ul className="mt-2.5 flex-1 space-y-1.5 sm:mt-3 sm:space-y-2">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground sm:text-sm">
+                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4" />
                       <span className="min-w-0">{f}</span>
                     </li>
                   ))}
                 </ul>
 
                 {isCurrent ? (
-                  <Button className="mt-6 w-full" variant="outline" disabled>
+                  <Button className="mt-4 w-full sm:mt-5" variant="outline" disabled>
                     Current plan
                   </Button>
                 ) : (
-                  <Button className="mt-6 w-full font-semibold" onClick={() => selectPlan(plan.id)}>
+                  <Button className="mt-4 w-full font-semibold sm:mt-5" onClick={() => selectPlan(plan.id)}>
                     Get {plan.name}
                   </Button>
                 )}
@@ -277,20 +279,20 @@ function PricingPage() {
           })}
         </div>
 
-        <div className="mx-auto mt-10 max-w-2xl space-y-3 rounded-2xl border border-border bg-muted/30 px-4 py-4 text-sm sm:px-6">
+        <div className="mx-auto mt-6 max-w-2xl space-y-2 rounded-2xl border border-border bg-muted/30 px-3 py-3 text-sm sm:mt-10 sm:space-y-3 sm:px-6 sm:py-4">
           <p className="font-semibold text-foreground">Good to know</p>
           <ul className="space-y-2 text-xs text-muted-foreground sm:text-sm">
             <li>
-              <span className="font-medium text-foreground">Starter:</span> Standard image edit,
-              Circle Remove, short SD video, instrumental music.
+              <span className="font-medium text-foreground">Starter:</span> Standard quality, up to 5
+              reference images, solid Prompt Adherence, Circle Remove, short SD video.
             </li>
             <li>
-              <span className="font-medium text-foreground">Pro:</span> Premium models, Maluto AI,
-              Circle Remove & Add, HD video up to 10s.
+              <span className="font-medium text-foreground">Pro:</span> Premium models, up to 10
+              refs, stronger Prompt Adherence, Maluto AI, Circle Remove & Add, HD video to 10s.
             </li>
             <li>
-              <span className="font-medium text-foreground">Ultra AI:</span> Top image models,
-              premium music (Song · SFX · Video music), video up to 15s.
+              <span className="font-medium text-foreground">Ultra AI:</span> Top models, max Prompt
+              Adherence, best detail preservation, premium music, video up to 15s.
             </li>
             <li>
               <span className="font-medium text-foreground">Need more later?</span>{" "}
@@ -309,7 +311,6 @@ function PricingPage() {
           </ul>
         </div>
       </div>
-      {/* No ads on pricing — checkout-focused page */}
       <Footer />
     </div>
   );
