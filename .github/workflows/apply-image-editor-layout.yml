@@ -3,8 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - '.restore/image_editor_layout.part*.b64'
-      - '.restore/manifest.json'
+      - '.restore/image_editor_layout.patch'
       - '.github/workflows/apply-image-editor-layout.yml'
 concurrency:
   group: apply-image-editor-layout
@@ -16,28 +15,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Reassemble ImageEditor layout
+      - name: Apply layout patch
         run: |
           set -euo pipefail
-          python3 << 'PY'
-          import base64, json
-          from pathlib import Path
-          manifest = json.loads(Path(".restore/manifest.json").read_text())
-          for item in manifest["items"]:
-              if item["path"] != "src/components/editor/image/ImageEditor.tsx":
-                  continue
-              prefix = item["prefix"]
-              parts = item["parts"]
-              b64 = ""
-              for i in range(parts):
-                  p = Path(f".restore/{prefix}.part{i}.b64")
-                  if not p.exists():
-                      raise SystemExit(f"missing {p}")
-                  b64 += p.read_text().strip()
-              data = base64.b64decode(b64)
-              Path(item["path"]).write_bytes(data)
-              print(item["path"], len(data))
-          PY
+          test -f .restore/image_editor_layout.patch
+          patch -p1 -i .restore/image_editor_layout.patch
           BYTES=$(wc -c < src/components/editor/image/ImageEditor.tsx)
           echo "size=$BYTES"
           test "$BYTES" -gt 40000
