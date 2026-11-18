@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - '.restore/apply_image_layout.py'
       - '.github/workflows/apply-image-editor-layout.yml'
 concurrency:
   group: apply-image-editor-layout
@@ -16,227 +17,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Transform ImageEditor layout in Python
+      - name: Apply layout script
         run: |
           set -euo pipefail
-          python3 << 'PY'
-          from pathlib import Path
-          p = Path("src/components/editor/image/ImageEditor.tsx")
-          t = p.read_text()
-          if "workspaceMode" in t and "Motio2edit" in t:
-              print("already applied")
-              raise SystemExit(0)
-          assert "export function ImageEditor" in t
-          assert "generateMedia" in t
-
-          t = t.replace(
-              '  const [studioTier, setStudioTier] = useState<StudioTier>("standard");',
-              '  const [studioTier, setStudioTier] = useState<StudioTier>("standard");\n  /** Auto = default compact; Composer = expanded controls. Only one visible. */\n  const [workspaceMode, setWorkspaceMode] = useState<"auto" | "composer">("auto");',
-          )
-          t = t.replace(
-              '    <div className={cn("min-h-[100dvh] overflow-x-hidden pb-24 sm:pb-10", studioShellClass(studioTier))}>',
-              '    <div className={cn("flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden", studioShellClass(studioTier))}>',
-          )
-          t = t.replace(
-              '        <div className="mx-auto min-w-0 max-w-5xl overflow-x-hidden px-3 py-3 sm:px-4 sm:py-6">',
-              '        <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden px-3 py-2 sm:px-4 sm:py-3">',
-          )
-          old_h = '''                <h1 className="min-w-0 text-lg font-extrabold tracking-tight leading-tight sm:text-xl">
-                  <span className="text-foreground">Image</span>{" "}
-                  <span className="text-[#FF5A1F]">Studio</span>'''
-          new_h = '''                <h1 className="min-w-0 text-base font-extrabold tracking-tight leading-tight sm:text-lg">
-                  <span className="mr-1.5 hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:inline">Motio2edit</span>
-                  <span className="text-foreground">Image</span>{" "}
-                  <span className="text-[#FF5A1F]">Studio</span>'''
-          if old_h not in t:
-              raise SystemExit("h1 block missing")
-          t = t.replace(old_h, new_h)
-
-          old_banner = '''          <div className="mt-3">
-            <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
-            <div className="mt-2">
-              <FreeUserSponsorStrip isFree={isFree} />
-            </div>
-          </div>
-
-          <p
-            aria-label="Workflow stages"
-            className="mt-2 text-[10px] text-muted-foreground sm:text-[11px]"
-          >
-            <span className={cn((gallery.length > 0 || !!inputDataUrl) && "text-[#FF5A1F] font-medium")}>① Upload</span>
-            <span className="mx-1.5 text-border">·</span>
-            <span className={cn(prompt.trim().length > 0 && "text-[#FF5A1F] font-medium")}>② Write & Select</span>
-            <span className="mx-1.5 text-border">·</span>
-            <span className={cn(loading && "text-[#FF5A1F] font-medium")}>③ Generate</span>
-            <span className="mx-1.5 text-border">·</span>
-            <span className={cn(!!output && state === "success" && "text-[#FF5A1F] font-medium")}>④ Output</span>
-          </p>'''
-          new_banner = '''          <div className="mt-1.5 shrink-0 space-y-1.5">
-            <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
-            <FreeUserSponsorStrip isFree={isFree} />
-          </div>
-
-          <div
-            className="mt-2 flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card/50 p-0.5 backdrop-blur-md"
-            role="tablist"
-            aria-label="Workspace mode"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspaceMode === "auto"}
-              onClick={() => setWorkspaceMode("auto")}
-              className={cn(
-                "flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm",
-                workspaceMode === "auto"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Auto
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspaceMode === "composer"}
-              onClick={() => setWorkspaceMode("composer")}
-              className={cn(
-                "flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm",
-                workspaceMode === "composer"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Composer
-            </button>
-          </div>'''
-          if old_banner not in t:
-              raise SystemExit("banner block missing")
-          t = t.replace(old_banner, new_banner)
-
-          t = t.replace(
-              '          <div className="mt-3 grid min-w-0 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[1fr_minmax(280px,360px)] lg:gap-5">\n            <div className="order-1 min-w-0 space-y-3 sm:space-y-3.5">',
-              '          <div className="mt-2 grid min-h-0 flex-1 gap-2 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(300px,42%)] lg:gap-4">\n            <div className="order-2 flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:order-1 lg:pb-2">',
-          )
-
-          old_up = '''              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/50 bg-card/40 p-3 backdrop-blur-md sm:p-4", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  <span className="text-[#FF5A1F]">①</span> Upload
-                </p>
-                <EditorUpload'''
-          new_up = '''              {workspaceMode === "composer" && (
-              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  Upload
-                </p>
-                <EditorUpload'''
-          if old_up not in t:
-              raise SystemExit("upload start missing")
-          t = t.replace(old_up, new_up)
-
-          old_up_end = '''                />
-              </section>
-
-              <section className={cn("min-w-0 space-y-3 rounded-2xl border border-border/50 bg-card/40 p-3 backdrop-blur-md sm:p-4", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  <span className="text-[#FF5A1F]">②</span> Write & Select
-                </p>
-                <EditorPromptPanel'''
-          new_up_end = '''                />
-              </section>
-              )}
-
-              {workspaceMode === "auto" && (
-              <section className={cn("min-w-0 rounded-2xl border border-border/40 bg-card/50 p-2 shadow-sm backdrop-blur-xl", studioCardClass(studioTier))}>
-                <EditorUpload
-                  fileRef={fileRef}
-                  mediaType="image"
-                  videoLocked={false}
-                  loading={loading}
-                  inputPreview={inputPreview}
-                  inputKind={inputKind}
-                  maxImageMb={MAX_IMAGE_MB}
-                  maxVideoMb={200}
-                  onFile={onFile}
-                  gallery={gallery}
-                  activeImage={activeImage}
-                  maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, effectiveMaxImages)}
-                  onSwitchImage={(idx) => {
-                    switchImage(idx);
-                    const item = gallery[idx];
-                    if (item?.preview) setLightboxSrc(item.preview);
-                  }}
-                  onRemoveImage={removeImage}
-                  lockAdd={isFree}
-                  onLockedAdd={() =>
-                    toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {
-                      action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } },
-                    })
-                  }
-                />
-              </section>
-              )}
-
-              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  Write & Select
-                </p>
-                <EditorPromptPanel'''
-          if old_up_end not in t:
-              raise SystemExit("upload end missing")
-          t = t.replace(old_up_end, new_up_end)
-
-          t = t.replace(
-              '                  studioTier={studioTier}\n                />\n              </section>\n\n              <section\n                className={cn(\n                  "sticky bottom-3 z-30',
-              '                  studioTier={studioTier}\n                  compact={workspaceMode === "auto"}\n                />\n              </section>\n\n              <section\n                className={cn(\n                  "fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30',
-          )
-          t = t.replace(
-              'min-w-0 rounded-2xl border border-[#FF5A1F]/25 bg-card/80 p-3 shadow-[0_8px_32px_-8px_rgba(255,90,31,0.25)] backdrop-blur-xl sm:static sm:bottom-auto sm:shadow-md",',
-              'min-w-0 rounded-2xl border border-[#FF5A1F]/30 bg-card/90 p-2.5 shadow-[0_12px_40px_-10px_rgba(255,90,31,0.35)] backdrop-blur-xl lg:static lg:inset-auto lg:bottom-auto lg:shadow-md",',
-          )
-          t = t.replace(
-              '            <div className="order-2 min-w-0 space-y-3 lg:sticky lg:top-4 lg:self-start">',
-              '            <div className="order-1 flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain lg:order-2">',
-          )
-          t = t.replace(
-              '''              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/50 bg-card/40 p-3 backdrop-blur-md sm:p-4", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  <span className="text-[#FF5A1F]">④</span> Output
-                </p>''',
-              '''              <section className={cn("flex min-h-0 flex-1 flex-col space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  Output
-                </p>''',
-          )
-          t = t.replace(
-              '''                  <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-border/40 bg-muted/10 px-4 py-8 text-center">
-                    <ImageIcon className="mb-2 h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
-                    <p className="text-sm text-muted-foreground">Result appears after Generate</p>
-                  </div>''',
-              '''                  <div className="flex min-h-[42vw] flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border/40 bg-gradient-to-b from-muted/20 to-transparent px-4 py-10 text-center sm:min-h-[220px] lg:min-h-[280px]">
-                    <ImageIcon className="mb-2 h-10 w-10 text-[#FF5A1F]/35" strokeWidth={1.5} />
-                    <p className="text-sm font-medium text-muted-foreground">Your image will appear here</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground/80">Write a prompt and tap Generate</p>
-                  </div>''',
-          )
-          t = t.replace(
-              '              <ImageStudioWeeklyCarousel />\n              <EditorDisclaimer />',
-              '              <div className="hidden lg:block">\n                <ImageStudioWeeklyCarousel />\n                <EditorDisclaimer />\n              </div>',
-          )
-
-          if t.count("{") != t.count("}"):
-              raise SystemExit(f"brace mismatch {t.count('{')} vs {t.count('}')}")
-          if "workspaceMode" not in t or "Motio2edit" not in t or "generateMedia" not in t:
-              raise SystemExit("missing markers after transform")
-          p.write_text(t)
-          print("transformed", len(t.encode()), "bytes")
-          PY
+          python3 .restore/apply_image_layout.py
           BYTES=$(wc -c < src/components/editor/image/ImageEditor.tsx)
           echo "size=$BYTES"
           test "$BYTES" -gt 40000
           grep -q workspaceMode src/components/editor/image/ImageEditor.tsx
           grep -q Motio2edit src/components/editor/image/ImageEditor.tsx
           grep -q generateMedia src/components/editor/image/ImageEditor.tsx
+          ! grep -q PLACEHOLDER src/components/editor/image/ImageEditor.tsx
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/components/editor/image/ImageEditor.tsx
