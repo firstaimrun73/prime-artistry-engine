@@ -1,9 +1,9 @@
 {
   "items": [
     {
-      "path": "src/lib/generate.functions.ts",
-      "prefix": "genfix",
-      "parts": 6
+      "prefix": "image_editor_layout",
+      "parts": 9,
+      "path": "src/components/editor/image/ImageEditor.tsx"
     }
   ]
 }
