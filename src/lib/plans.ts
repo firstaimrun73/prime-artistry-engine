@@ -92,8 +92,7 @@ export const CREDIT_ADDON_PACKS = [
 ] as const;
 
 export function creditsLabel(credits: number): string {
-  if (credits >= UNLIMITED_CREDITS) return "Unlimited";
-  return credits.toLocaleString();
+  return credits >= UNLIMITED_CREDITS ? "Unlimited" : String(credits);
 }
 
 export function estimatedStandardImages(credits: number): number {
@@ -108,6 +107,8 @@ export function estimatedGenerations(credits: number) {
   };
 }
 
+export type GenerationType = keyof typeof CREDIT_COST;
+
 export type Plan = {
   id: PlanId;
   name: string;
@@ -118,11 +119,21 @@ export type Plan = {
   modelTier: ModelTier;
   price: Record<Currency, number>;
   priceAnnualUSD: number;
-  publicOffer: boolean;
-  positioning: string;
   features: string[];
+  positioning: string;
+  publicOffer: boolean;
 };
 
+export const MUSIC_STUDIO_MODE_LABELS = [
+  "Song",
+  "Instrumental",
+  "BGM",
+  "Voiceover",
+  "SFX",
+  "Video music",
+] as const;
+
+/** Unique feature lists per plan — no repeated boilerplate; no per-credit cost text. */
 export const PLANS: Plan[] = [
   {
     id: "free",
@@ -204,4 +215,153 @@ export const PLANS: Plan[] = [
       "Priority processing · watermark-free exports",
     ],
   },
+  {
+    id: "lite",
+    name: "Lite",
+    credits: 350,
+    video: true,
+    priority: false,
+    bestQuality: false,
+    modelTier: "standard",
+    price: { USD: 4.99, EUR: 4.59, INR: 449 },
+    priceAnnualUSD: 0,
+    publicOffer: false,
+    positioning: "Legacy Lite plan.",
+    features: ["Legacy plan"],
+  },
+  {
+    id: "plus",
+    name: "Plus",
+    credits: 800,
+    video: true,
+    priority: false,
+    bestQuality: false,
+    modelTier: "standard",
+    price: { USD: 9.99, EUR: 9.19, INR: 899 },
+    priceAnnualUSD: 0,
+    publicOffer: false,
+    positioning: "Legacy Plus plan.",
+    features: ["Legacy plan"],
+  },
+  {
+    id: "studio",
+    name: "AI Studio",
+    credits: 5000,
+    video: true,
+    priority: true,
+    bestQuality: true,
+    modelTier: "ultra",
+    price: { USD: 55, EUR: 50.99, INR: 4999 },
+    priceAnnualUSD: 0,
+    publicOffer: false,
+    positioning: "Legacy AI Studio plan.",
+    features: ["Legacy plan"],
+  },
+  {
+    id: "business",
+    name: "Master Studio",
+    credits: 10000,
+    video: true,
+    priority: true,
+    bestQuality: true,
+    modelTier: "ultra",
+    price: { USD: 110, EUR: 101.99, INR: 9999 },
+    priceAnnualUSD: 0,
+    publicOffer: false,
+    positioning: "Legacy Master Studio plan.",
+    features: ["Legacy plan"],
+  },
 ];
+
+export const PRICING_SHOW_PLAN_IDS: PlanId[] = ["starter", "pro", "ultra"];
+export const PRICING_POPULAR_PLAN_ID: PlanId = "pro";
+export type PurchasablePlanId = "starter" | "pro" | "ultra";
+
+export const PLAN_CREDITS: Record<PlanId, number> = {
+  free: FREE_SIGNUP_CREDITS,
+  starter: 1000,
+  pro: 2500,
+  ultra: 8000,
+  lite: 350,
+  plus: 800,
+  studio: 5000,
+  business: 10000,
+};
+
+export const PLAN_MODEL_TIER: Record<PlanId, ModelTier> = {
+  free: "standard",
+  starter: "standard",
+  lite: "standard",
+  plus: "standard",
+  pro: "premium",
+  ultra: "ultra",
+  studio: "ultra",
+  business: "ultra",
+};
+
+export function getModelTier(plan: PlanId | null | undefined): ModelTier {
+  if (!plan) return "standard";
+  return PLAN_MODEL_TIER[plan] ?? "standard";
+}
+
+export function canAccessModelTier(
+  userPlan: PlanId | null | undefined,
+  required: ModelTier,
+): boolean {
+  const rank: Record<ModelTier, number> = { standard: 0, premium: 1, ultra: 2 };
+  return rank[getModelTier(userPlan)] >= rank[required];
+}
+
+export function getPlan(id: PlanId): Plan {
+  return PLANS.find((p) => p.id === id) ?? PLANS[0];
+}
+
+export function findPlan(id: string | undefined | null): Plan | undefined {
+  if (!id) return undefined;
+  return PLANS.find((p) => p.id === id);
+}
+
+export type DisplayCurrency = "USD" | "EUR" | "INR";
+export const DISPLAY_CURRENCIES: DisplayCurrency[] = ["USD", "EUR", "INR"];
+
+export const DISPLAY_PRICES: Record<PlanId, Record<DisplayCurrency, number>> = {
+  free: { USD: 0, EUR: 0, INR: 0 },
+  starter: { USD: 12.99, EUR: 11.99, INR: 1099 },
+  pro: { USD: 24.99, EUR: 22.99, INR: 2099 },
+  ultra: { USD: 89.99, EUR: 82.99, INR: 7499 },
+  lite: { USD: 4.99, EUR: 4.59, INR: 449 },
+  plus: { USD: 9.99, EUR: 9.19, INR: 899 },
+  studio: { USD: 55, EUR: 50.99, INR: 4999 },
+  business: { USD: 110, EUR: 101.99, INR: 9999 },
+};
+
+export const DISPLAY_ANNUAL_PRICES_USD: Record<PurchasablePlanId, number> = {
+  starter: 129.9,
+  pro: 249.9,
+  ultra: 899.9,
+};
+
+export function annualSavingsMonths(): number {
+  return 2;
+}
+
+export function toCheckoutCurrency(c: DisplayCurrency): Currency {
+  return c;
+}
+
+export function monthlyCreditsForPlan(planId: PlanId): number {
+  return PLAN_CREDITS[planId] ?? 0;
+}
+
+export function estimatePaypalNetUsd(grossUsd: number): {
+  gross: number;
+  fee: number;
+  net: number;
+} {
+  const fee = grossUsd * 0.044 + 0.3;
+  return {
+    gross: +grossUsd.toFixed(2),
+    fee: +fee.toFixed(2),
+    net: +(grossUsd - fee).toFixed(2),
+  };
+}
