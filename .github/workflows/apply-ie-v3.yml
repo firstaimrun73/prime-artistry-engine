@@ -3,11 +3,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - '.restore/ie_v3.part*.b64'
-      - '.restore/up_v3.part*.b64'
-      - '.restore/ie_v3.manifest.json'
-      - '.restore/up_v3.manifest.json'
-      - '.restore/apply_ie_v3.py'
+      - '.restore/ie_v3_data_a.py'
+      - '.restore/ie_v3_data_b.py'
+      - '.restore/up_v3_data.py'
+      - '.restore/apply_ie_v3_embedded.py'
       - '.github/workflows/apply-ie-v3.yml'
 concurrency:
   group: apply-ie-v3
@@ -24,7 +23,7 @@ jobs:
       - name: Apply layout package
         run: |
           set -euo pipefail
-          python3 .restore/apply_ie_v3.py
+          python3 .restore/apply_ie_v3_embedded.py
           test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 40000
           grep -q showResultView src/components/editor/image/ImageEditor.tsx
           grep -q "Try Something New" src/components/editor/image/ImageEditor.tsx
