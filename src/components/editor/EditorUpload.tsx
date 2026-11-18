@@ -17,7 +17,6 @@ interface EditorUploadProps {
   maxGalleryImages: number;
   onSwitchImage: (idx: number) => void;
   onRemoveImage: (idx: number) => void;
-  /** Free plan: keep + visible but locked. */
   lockAdd?: boolean;
   onLockedAdd?: () => void;
   /** Slim strip for glass Image Studio (no tall dashed dropzone). */
@@ -48,31 +47,26 @@ export function EditorUpload({
       <input
         ref={fileRef}
         type="file"
-        accept={mediaType === "image" ? "image/*" : "image/*,video/*"}
-        multiple={mediaType === "image" && maxGalleryImages > 1 && !lockAdd}
-        onChange={onFile}
+        accept={mediaType === "video" ? "image/*,video/*" : "image/*"}
+        multiple
         className="hidden"
+        onChange={onFile}
       />
 
-      {/* Upload control — parent Image/Video section supplies the stage heading */}
       <section className="min-w-0 space-y-2">
         {gallery.length === 0 ? (
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={videoLocked || loading}
-            className={
-              compact
-                ? "flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 bg-card/50 px-3 py-2 text-xs text-muted-foreground transition hover:border-[#FF5A1F]/50 disabled:opacity-50"
-                : "flex min-h-[96px] w-full max-w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-card px-3 py-4 text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50 sm:min-h-[120px] sm:gap-2 sm:px-4 sm:py-6 md:min-h-[140px]"
-            }
-          >
-            <Upload className={compact ? "h-4 w-4" : "h-6 w-6"} />
-            {mediaType === "video"
-              ? "Upload image or video (optional)"
-              : compact
-                ? "Upload image"
+          compact ? null : (
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={videoLocked || loading}
+              className="flex min-h-[96px] w-full max-w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-card px-3 py-4 text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50 sm:min-h-[120px] sm:gap-2 sm:px-4 sm:py-6 md:min-h-[140px]"
+            >
+              <Upload className="h-6 w-6" />
+              {mediaType === "video"
+                ? "Upload image or video (optional)"
                 : "Upload image (optional)"}
-          </button>
+            </button>
+          )
         ) : (
           <button
             onClick={() => fileRef.current?.click()}
@@ -84,35 +78,30 @@ export function EditorUpload({
               ? `Replace ${inputKind ?? "media"}`
               : mediaType === "video"
                 ? "Upload image or video"
-                : "Upload image"}
+                : "Add another image"}
           </button>
         )}
-        <p className="text-[11px] text-muted-foreground">
-          Max file size: {maxImageMb} MB for images
-          {mediaType === "video" ? `, ${maxVideoMb} MB for videos` : ""}.
-        </p>
-        {mediaType === "video" && (
+        {!compact && (
           <p className="text-[11px] text-muted-foreground">
-            {inputKind === "video"
-              ? "Video → Video: your clip will be enhanced/transformed."
-              : inputKind === "image"
-                ? "Image → Video: motion will be generated from your image."
-                : "No upload = Text → Video. Upload an image for Image → Video, or a video for Video → Video."}
+            Max file size: {maxImageMb} MB for images
+            {mediaType === "video" ? `, ${maxVideoMb} MB for videos` : ""}.
           </p>
         )}
-
-        {/* Multi-image strip — switch between uploads; Free shows locked + */}
-        <EditorGallery
-          gallery={gallery}
-          activeImage={activeImage}
-          maxImages={maxGalleryImages}
-          loading={loading}
-          onSwitch={onSwitchImage}
-          onRemove={onRemoveImage}
-          onAddMore={() => fileRef.current?.click()}
-          lockAdd={lockAdd}
-          onLockedAdd={onLockedAdd}
-        />
+        {gallery.length > 0 && (
+          <EditorGallery
+            gallery={gallery}
+            activeImage={activeImage}
+            maxGalleryImages={maxGalleryImages}
+            onSwitchImage={onSwitchImage}
+            onRemoveImage={onRemoveImage}
+            lockAdd={lockAdd}
+            onLockedAdd={onLockedAdd}
+            onAddMore={() => {
+              if (lockAdd) onLockedAdd?.();
+              else fileRef.current?.click();
+            }}
+          />
+        )}
       </section>
     </>
   );
