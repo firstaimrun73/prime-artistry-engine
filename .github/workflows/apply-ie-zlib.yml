@@ -6,6 +6,7 @@ on:
       - '.restore/ie_zlib.part*.b64'
       - '.restore/ie_zlib.manifest.json'
       - '.restore/apply_ie_zlib.py'
+      - '.restore/TRIGGER_IE_ZLIB'
       - '.github/workflows/apply-ie-zlib.yml'
 concurrency:
   group: apply-ie-zlib
@@ -19,6 +20,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: List restore package
+        run: |
+          ls -la .restore/ie_zlib* || true
+          wc -c .restore/ie_zlib.part*.b64 || true
       - name: Decompress and commit ImageEditor
         run: |
           set -euo pipefail
