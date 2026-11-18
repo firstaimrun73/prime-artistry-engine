@@ -19,6 +19,7 @@ export type PlanLimits = {
 /**
  * Product matrix (access only — does not change AI edit quality or credit prices).
  *
+ * Free:   Standard only · up to 5 images · 2000 chars
  * Lite:   Standard only · up to 5 images · 2000 chars
  * Plus:   Standard only · up to 10 images · 4000 chars
  * Pro:    Standard + Premium · up to 10 · 6000 chars
@@ -27,7 +28,8 @@ export type PlanLimits = {
  */
 export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   free: {
-    maxImages: 1,
+    /** Free Standard may use up to 5 reference images (same Standard experience ceiling). */
+    maxImages: 5,
     maxPromptChars: 2000,
     videoEnabled: false,
     hd: false,
@@ -69,11 +71,29 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
     hd: true,
     premiumUnlocked: true,
     ultraUnlocked: true,
-    ultraFullUnlocked: false, // IMAX / Custom / 8k_max locked for Studio
+    ultraFullUnlocked: false,
   },
   business: {
     maxImages: 10,
-    maxPromptChars: 7000, // backend safety ceiling only — UI uses isPromptEffectivelyUnlimited
+    maxPromptChars: 7000,
+    videoEnabled: true,
+    hd: true,
+    premiumUnlocked: true,
+    ultraUnlocked: true,
+    ultraFullUnlocked: true,
+  },
+  starter: {
+    maxImages: 5,
+    maxPromptChars: 2000,
+    videoEnabled: true,
+    hd: false,
+    premiumUnlocked: false,
+    ultraUnlocked: false,
+    ultraFullUnlocked: false,
+  },
+  ultra: {
+    maxImages: 10,
+    maxPromptChars: 6000,
     videoEnabled: true,
     hd: true,
     premiumUnlocked: true,
@@ -86,7 +106,7 @@ export function getPlanLimits(plan: string): PlanLimits {
   return PLAN_LIMITS[plan as PlanId] ?? PLAN_LIMITS.free;
 }
 
-/** Free (and unknown) plans cannot use multi-image. */
+/** True when plan max is a single image only. */
 export function isMultiImageLocked(plan: string | undefined | null, isAdmin = false): boolean {
   if (isAdmin) return false;
   return getPlanLimits(plan ?? "free").maxImages <= 1;
@@ -94,7 +114,6 @@ export function isMultiImageLocked(plan: string | undefined | null, isAdmin = fa
 
 /** Max concurrent gallery / reference images for this plan. */
 export function maxImagesForPlan(plan: string | undefined | null, isAdmin = false): number {
-  // Admin may bypass free 1-image lock, but never exceeds plan matrix (and experience caps elsewhere).
   if (isAdmin) return Math.max(getPlanLimits(plan ?? "free").maxImages, 1);
   return getPlanLimits(plan ?? "free").maxImages;
 }
@@ -115,4 +134,4 @@ export function isPromptEffectivelyUnlimited(plan: string | undefined | null): b
 }
 
 export const MULTI_IMAGE_UPGRADE_MESSAGE =
-  "Multi-image editing is available on paid plans. Upgrade your plan to use multiple images.";
+  "You can add up to 5 images on Standard. Premium and Ultra AI unlock higher limits and stronger models.";
