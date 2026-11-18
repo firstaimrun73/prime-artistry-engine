@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# layout v3 apply — verified 2026-11-18
 import base64, zlib, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(".restore").resolve()))
