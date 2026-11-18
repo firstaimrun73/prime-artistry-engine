@@ -35,7 +35,7 @@ export function CreditWarningBanner({
 
   return (
     <div
-      className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm animate-fade-in ${
+      className={`mb-0 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs sm:text-sm animate-fade-in ${
         empty
           ? "border-destructive/50 bg-destructive/10"
           : "border-primary/50 bg-primary/10"
@@ -44,8 +44,8 @@ export function CreditWarningBanner({
       <span className="flex items-center gap-2 font-medium">
         <AlertTriangle className={`h-4 w-4 ${empty ? "text-destructive" : "text-primary"}`} />
         {empty
-          ? "You have no credits left. Upgrade your plan to continue."
-          : `Running low on credits (${credits} left). Top up to keep creating.`}
+          ? "Need credits to keep creating."
+          : `Get more credits to keep creating (${credits} left).`}
       </span>
       <span className="flex items-center gap-2">
         <Link
@@ -56,7 +56,7 @@ export function CreditWarningBanner({
               : "bg-primary text-primary-foreground"
           }`}
         >
-          {empty ? "Upgrade →" : "Get Credits →"}
+          Get more credits →
         </Link>
         {!empty && (
           <button
