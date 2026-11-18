@@ -103,9 +103,10 @@ export function EditorUpload({
           <EditorGallery
             gallery={gallery}
             activeImage={activeImage}
-            maxGalleryImages={maxGalleryImages}
-            onSwitchImage={onSwitchImage}
-            onRemoveImage={onRemoveImage}
+            maxImages={maxGalleryImages}
+            loading={loading}
+            onSwitch={onSwitchImage}
+            onRemove={onRemoveImage}
             lockAdd={lockAdd}
             onLockedAdd={onLockedAdd}
             onAddMore={() => {

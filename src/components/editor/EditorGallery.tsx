@@ -1,11 +1,12 @@
-import { Plus, X } from "lucide-react";
+import { Plus, X, Lock } from "lucide-react";
 import type { GalleryItem } from "@/lib/editor/editor.types";
 
 interface EditorGalleryProps {
   gallery: GalleryItem[];
   activeImage: number;
+  /** Max images allowed for current plan + experience. */
   maxImages: number;
-  loading: boolean;
+  loading?: boolean;
   onSwitch: (idx: number) => void;
   onRemove: (idx: number) => void;
   onAddMore: () => void;
@@ -19,7 +20,7 @@ export function EditorGallery({
   gallery,
   activeImage,
   maxImages,
-  loading,
+  loading = false,
   onSwitch,
   onRemove,
   onAddMore,
@@ -35,11 +36,8 @@ export function EditorGallery({
   return (
     <div className="min-w-0 space-y-2">
       <div className="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span className="min-w-0 truncate">
-          {gallery.length} image{gallery.length === 1 ? "" : "s"} selected
-        </span>
-        <span className="shrink-0 tabular-nums">
-          Limit {maxImages} · active {activeImage + 1}/{gallery.length}
+        <span className="min-w-0 truncate tabular-nums font-medium text-foreground/80">
+          {gallery.length} / {maxImages} images selected
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -50,14 +48,15 @@ export function EditorGallery({
               onClick={() => onSwitch(i)}
               className={`h-full w-full overflow-hidden rounded-lg border-2 transition-colors ${
                 i === activeImage
-                  ? "border-primary ring-1 ring-primary/40"
-                  : "border-border hover:border-primary/50"
+                  ? "border-[#FF5A1F] ring-2 ring-[#FF5A1F]/35"
+                  : "border-border hover:border-[#FF5A1F]/50"
               }`}
             >
               <img
                 src={item.preview}
                 alt={`Upload ${i + 1}`}
                 className="h-full w-full object-cover protected-image"
+                draggable={false}
               />
             </button>
             <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1 text-[10px] font-bold text-white">
@@ -66,9 +65,13 @@ export function EditorGallery({
             <button
               type="button"
               aria-label={`Remove image ${i + 1}`}
-              onClick={() => onRemove(i)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!loading) onRemove(i);
+              }}
               disabled={loading}
-              className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-destructive text-destructive-foreground disabled:opacity-50"
+              className="absolute -right-1.5 -top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full bg-destructive text-destructive-foreground shadow-sm disabled:opacity-50"
             >
               <X className="h-3 w-3" />
             </button>
@@ -80,24 +83,22 @@ export function EditorGallery({
             type="button"
             onClick={onAddMore}
             disabled={loading}
-            className="grid h-16 w-16 shrink-0 place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50 sm:h-[72px] sm:w-[72px]"
+            className="grid h-16 w-16 shrink-0 place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-[#FF5A1F] hover:text-[#FF5A1F] disabled:opacity-50 sm:h-[72px] sm:w-[72px]"
             aria-label="Add more images"
           >
             <Plus className="h-4 w-4" />
           </button>
         )}
 
-        {/* At limit / free lock: no standalone lock card — only open + when more can be added.
-            Free users still get upgrade toast via onLockedAdd if they try add paths elsewhere. */}
-        {showLockedAdd && !lockAdd && (
+        {showLockedAdd && (
           <button
             type="button"
             onClick={() => onLockedAdd?.()}
             disabled={loading}
-            className="grid h-16 w-16 shrink-0 place-items-center rounded-lg border-2 border-dashed border-border/50 text-[10px] font-medium text-muted-foreground disabled:opacity-50 sm:h-[72px] sm:w-[72px]"
+            className="grid h-16 w-16 shrink-0 place-items-center rounded-lg border-2 border-dashed border-border/50 text-muted-foreground disabled:opacity-50 sm:h-[72px] sm:w-[72px]"
             aria-label="Image limit reached"
           >
-            Full
+            <Lock className="h-3.5 w-3.5 opacity-70" />
           </button>
         )}
       </div>
