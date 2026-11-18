@@ -1,1 +1,7 @@
-{"parts":8,"path":"src/components/editor/image/ImageEditor.tsx"}
+{
+  "parts": 3,
+  "raw_size": 54115,
+  "zlib_size": 12540,
+  "sha256_prefix": "3d5f13ab395e7771",
+  "path": "src/components/editor/image/ImageEditor.tsx"
+}
