@@ -1,0 +1,52 @@
+name: Apply MOTIO2EDIT Image Studio patches
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/patch_image_editor_motio2edit_full.py"
+      - "scripts/patch_generate_motio2edit.py"
+      - "src/lib/studio/studio-taglines.ts"
+      - ".github/workflows/apply-motio2edit-patches.yml"
+      - ".restore/TRIGGER_MOTIO_PATCH"
+concurrency:
+  group: apply-motio2edit-patches
+  cancel-in-progress: true
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Require taglines file
+        run: |
+          test -f src/lib/studio/studio-taglines.ts
+          test $(wc -c < src/lib/studio/studio-taglines.ts) -gt 10000
+          grep -q STUDIO_TAGLINES src/lib/studio/studio-taglines.ts
+      - name: Patch ImageEditor
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_image_editor_motio2edit_full.py
+          test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 50000
+          grep -q VoiceInputButton src/components/editor/image/ImageEditor.tsx
+          grep -q canAccessImageExperience src/components/editor/image/ImageEditor.tsx
+          grep -q "What will you create today" src/components/editor/image/ImageEditor.tsx
+          ! grep -q "Describe or upload to begin" src/components/editor/image/ImageEditor.tsx
+      - name: Patch generate.functions
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_generate_motio2edit.py
+          grep -q assertImageExperienceAccess src/lib/generate.functions.ts
+          grep -q "Authoritative experience lock" src/lib/generate.functions.ts
+          grep -q premUrls src/lib/generate.functions.ts
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx src/lib/generate.functions.ts src/lib/studio/studio-taglines.ts
+          if git diff --cached --quiet; then echo no changes; exit 0; fi
+          git commit -m "fix(image-studio): MOTIO2EDIT — experience locks, VoiceInput, taglines, Auto/Composer, avatar Balance, server multi-ref"
+          git push origin HEAD:main
