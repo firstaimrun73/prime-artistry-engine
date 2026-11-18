@@ -121,3 +121,14 @@
   0%, 16%, 22%, 38%, 44%, 60%, 66%, 100% { opacity: 1; }
   18%, 40%, 62% { opacity: 0.55; }
 }
+
+/* Maluto AI bottom-nav + icon */
+@keyframes malutoPlusPulse {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  40% { transform: scale(1.18) rotate(90deg); }
+  70% { transform: scale(1.08) rotate(90deg); }
+}
+@keyframes malutoPlusIdle {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.92; }
+}
