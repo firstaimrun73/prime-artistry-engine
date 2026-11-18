@@ -1,0 +1,7 @@
+{
+  "parts": 3,
+  "raw_size": 55272,
+  "zlib_size": 12714,
+  "prefix": "ie_motio_part",
+  "path": "src/components/editor/image/ImageEditor.tsx"
+}
