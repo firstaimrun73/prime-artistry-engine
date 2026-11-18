@@ -1,0 +1,111 @@
+                      key={studioTagline}
+                      className="mt-1.5 max-w-xs text-[11px] leading-relaxed text-muted-foreground animate-in fade-in duration-500 sm:text-xs"
+                    >
+                      {studioTagline}
+                    </p>
+                  </div>"""
+if old_empty not in text:
+    raise SystemExit("empty state not found")
+text = text.replace(old_empty, new_empty, 1)
+check(text, "empty")
+
+old_header = """            {!isAdmin && (
+              <span className="shrink-0 rounded-full border border-border/50 bg-card/50 px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground backdrop-blur-sm">
+                {profile.credits} credits
+              </span>
+            )}
+          </header>"""
+new_header = """            <Link
+              to="/profile"
+              className="flex shrink-0 flex-col items-center gap-0.5 rounded-xl px-1 py-0.5 transition hover:bg-card/50"
+              title="Profile"
+            >
+              <Avatar className="h-8 w-8 border border-border/60">
+                <AvatarImage src={avatarSrc} alt="" />
+                <AvatarFallback className="text-[10px]">
+                  {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              {!isAdmin && (
+                <span className="flex flex-col items-center leading-none">
+                  <span className="text-[8px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Balance
+                  </span>
+                  <span className="text-[10px] font-semibold tabular-nums text-foreground">
+                    {(profile?.credits ?? 0).toLocaleString()}
+                  </span>
+                </span>
+              )}
+            </Link>
+          </header>"""
+if old_header not in text:
+    raise SystemExit("header credits not found")
+text = text.replace(old_header, new_header, 1)
+check(text, "header")
+
+# mic
+idx = text.find("SpeechRecognition?")
+if idx < 0:
+    raise SystemExit("SpeechRecognition not found")
+start = text.rfind("<button", 0, idx)
+i = start
+depth = 0
+end = None
+while i < len(text):
+    if text.startswith("<button", i):
+        depth += 1
+        i += 7
+        continue
+    if text.startswith("</button>", i):
+        depth -= 1
+        if depth == 0:
+            end = i + len("</button>")
+            break
+        i += 9
+        continue
+    i += 1
+if not end:
+    raise SystemExit("mic button end not found")
+if "Mic" not in text[start:end]:
+    raise SystemExit("mic region invalid")
+text = text[:start] + """<VoiceInputButton
+                    onTranscript={(t) => setPrompt((p) => (p ? p.trimEnd() + " " + t : t))}
+                    disabled={loading}
+                    className="shrink-0"
+                  />""" + text[end:]
+check(text, "mic")
+
+old_modes = """                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceMode("auto");
+                    setAspectMenuOpen(false);
+                    setQualityMenuOpen(false);
+                  }}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[11px] font-semibold transition sm:text-xs",
+                    workspaceMode === "auto"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceMode("composer")}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[11px] font-semibold transition sm:text-xs",
+                    workspaceMode === "composer"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Composer
+                </button>"""
+new_modes = """                <div
+                  role="group"
+                  aria-label="Workspace mode"
+                  className="relative inline-flex items-center rounded-full border border-border/60 bg-muted/40 p-0.5 text-[11px] font-semibold sm:text-xs"
+                >
+                  <span
