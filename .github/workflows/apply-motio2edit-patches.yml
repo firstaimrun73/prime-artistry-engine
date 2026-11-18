@@ -5,8 +5,11 @@ on:
     paths:
       - "scripts/generate_studio_taglines.py"
       - "scripts/patch_generate_motio2edit.py"
-      - ".restore/ie_py_part*.txt"
-      - ".restore/assemble_ie_patch.py"
+      - "scripts/patch_ie_step1_imports.py"
+      - "scripts/patch_ie_step2_locks.py"
+      - "scripts/patch_ie_step3_empty_header.py"
+      - "scripts/install_step4_mic_modes.py"
+      - "scripts/install_step5_gen_suggestions.py"
       - ".github/workflows/apply-motio2edit-patches.yml"
       - ".restore/TRIGGER_MOTIO_PATCH"
 concurrency:
@@ -21,33 +24,32 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Assemble ImageEditor patch script
+      - name: Install steps 4-5
         run: |
-          set -euo pipefail
-          ls -la .restore/ie_py_part*.txt
-          python3 .restore/assemble_ie_patch.py
-          test -f scripts/patch_image_editor_motio2edit_full.py
-      - name: Generate 220 taglines
-        run: |
-          set -euo pipefail
-          python3 scripts/generate_studio_taglines.py
-          test -f src/lib/studio/studio-taglines.ts
-          grep -q pickStudioTagline src/lib/studio/studio-taglines.ts
+          python3 scripts/install_step4_mic_modes.py
+          python3 scripts/install_step5_gen_suggestions.py
+      - name: Generate taglines
+        run: python3 scripts/generate_studio_taglines.py
       - name: Patch ImageEditor
         run: |
           set -euo pipefail
-          python3 scripts/patch_image_editor_motio2edit_full.py
+          python3 scripts/patch_ie_step1_imports.py
+          python3 scripts/patch_ie_step2_locks.py
+          python3 scripts/patch_ie_step3_empty_header.py
+          python3 scripts/patch_ie_step4_mic_modes.py
+          python3 scripts/patch_ie_step5_gen_suggestions.py
+      - name: Patch generate.functions
+        run: python3 scripts/patch_generate_motio2edit.py
+      - name: Verify
+        run: |
+          set -euo pipefail
           test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 50000
           grep -q VoiceInputButton src/components/editor/image/ImageEditor.tsx
           grep -q canAccessImageExperience src/components/editor/image/ImageEditor.tsx
           grep -q "What will you create today" src/components/editor/image/ImageEditor.tsx
           ! grep -q "Describe or upload to begin" src/components/editor/image/ImageEditor.tsx
-      - name: Patch generate.functions
-        run: |
-          set -euo pipefail
-          python3 scripts/patch_generate_motio2edit.py
           grep -q assertImageExperienceAccess src/lib/generate.functions.ts
-          grep -q premUrls src/lib/generate.functions.ts
+          grep -q pickStudioTagline src/lib/studio/studio-taglines.ts
       - name: Commit
         run: |
           set -euo pipefail
