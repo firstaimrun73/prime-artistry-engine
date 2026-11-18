@@ -15,11 +15,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Apply layout patch
         run: |
           set -euo pipefail
+          echo "=== workspace ==="
+          ls -la .restore/ || true
           test -f .restore/image_editor_layout.patch
-          patch -p1 -i .restore/image_editor_layout.patch
+          wc -c .restore/image_editor_layout.patch
+          wc -c src/components/editor/image/ImageEditor.tsx
+          # Apply even if partially applied
+          patch -p1 --forward --batch -i .restore/image_editor_layout.patch || {
+            echo "patch exit $? — trying fuzz"
+            patch -p1 --forward --batch --fuzz=3 -i .restore/image_editor_layout.patch
+          }
           BYTES=$(wc -c < src/components/editor/image/ImageEditor.tsx)
           echo "size=$BYTES"
           test "$BYTES" -gt 40000
