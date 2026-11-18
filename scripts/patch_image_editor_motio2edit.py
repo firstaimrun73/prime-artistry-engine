@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Restore ImageEditor from known-good commit and apply MOTIO2EDIT patches."""
+import re
 import subprocess
 from pathlib import Path
 
@@ -12,79 +13,64 @@ raw = subprocess.check_output(
 )
 text = raw.decode()
 
-# 1 free multi-ref
-text = text.replace(
-"""  const planMaxImages = isFree
-    ? 1
-    : getPlanLimits(profile?.plan ?? \"free\").maxImages;""",
-"""  const planMaxImages = getPlanLimits(profile?.plan ?? \"free\").maxImages;""",
+# 1) Free Standard multi-ref: use planLimits (free maxImages is 5)
+old_plan = (
+    "const planMaxImages = isFree\n"
+    "    ? 1\n"
+    "    : getPlanLimits(profile?.plan ?? \"free\").maxImages;"
 )
+new_plan = 'const planMaxImages = getPlanLimits(profile?.plan ?? "free").maxImages;'
+if old_plan not in text:
+    raise SystemExit("planMaxImages block not found")
+text = text.replace(old_plan, new_plan)
 
-# 2 remove free-only-1 toast block
-old = """      if (room <= 0) {
-        if (isFree) {
-          return toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {
-            action: { label: \"Upgrade\", onClick: () => { window.location.href = \"/pricing\"; } },
-          });
-        }
-        return toast.error(
-          maxAllowed <= 5
-            ? (\"Standard supports up to \" + maxAllowed + \" images (base + references).\")
-            : (\"This experience allows up to \" + maxAllowed + \" images at a time.\"),
-        );
-      }
-      if (files.length > room) {
-        toast.message(
-          \"Only \" + room + \" more image\" + (room === 1 ? \"\" : \"s\") + \" can be added (max \" + maxAllowed + \").\",
-        );
-      }
-      if (isFree && files.length > 1) {
-        toast.message(\"Free plan: only 1 image. Extra files were ignored.\");
-      }"""
-new = """      if (room <= 0) {
-        return toast.error(
-          maxAllowed <= 5
-            ? (\"Standard supports up to \" + maxAllowed + \" images (base + references).\")
-            : (\"This experience allows up to \" + maxAllowed + \" images at a time.\"),
-        );
-      }
-      if (files.length > room) {
-        toast.message(
-          \"Only \" + room + \" more image\" + (room === 1 ? \"\" : \"s\") + \" can be added (max \" + maxAllowed + \").\",
-        );
-      }"""
-if old not in text:
-    raise SystemExit(\"onFile block not found\")
-text = text.replace(old, new)
+# 2) Remove free-only single-image client restriction
+old_free = (
+    "if (isFree && files.length > 1) {\n"
+    "        toast.message(\"Free plan: only 1 image. Extra files were ignored.\");\n"
+    "      }"
+)
+text = text.replace(old_free, "")
 
-# 3 remove TSN section
-import re
+old_room = (
+    "if (room <= 0) {\n"
+    "        if (isFree) {\n"
+    "          return toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {\n"
+    "            action: { label: \"Upgrade\", onClick: () => { window.location.href = \"/pricing\"; } },\n"
+    "          });\n"
+    "        }\n"
+    "        return toast.error(\n"
+)
+new_room = (
+    "if (room <= 0) {\n"
+    "        return toast.error(\n"
+)
+if old_room not in text:
+    raise SystemExit("room<=0 free block not found")
+text = text.replace(old_room, new_room)
+
+# 3) Remove Try Something New block from Studio
 text2, n = re.subn(
-    r\"\\n\\s*\\{/* Try Something New — mobile \\+ desktop \\*/\\}.*?ImageStudioWeeklyCarousel\\s*/>\\s*</div>\",
-    \"\",
+    r"\n\s*\{/\* Try Something New — mobile \+ desktop \*/\}.*?ImageStudioWeeklyCarousel\s*/>\s*</div>",
+    "",
     text,
     count=1,
     flags=re.S,
 )
 if n != 1:
-    raise SystemExit(f\"TSN removal failed n={n}\")
+    raise SystemExit("TSN removal failed n=%s" % n)
 text = text2
-# drop import lines for carousel
-text = \"\\n\".join(ln for ln in text.splitlines() if \"ImageStudioWeeklyCarousel\" not in ln) + \"\\n\"
+text = "\n".join(ln for ln in text.splitlines() if "ImageStudioWeeklyCarousel" not in ln) + "\n"
 
-# 4 lock experiences + avatar - lighter patch: inject canAccess import
-if \"canAccessImageExperience\" not in text:
+# 4) Import for locked experiences
+if "canAccessImageExperience" not in text:
     text = text.replace(
-        'import { visibleImageExperiences } from \"@/lib/studio/image/image-experience-access\";',
-        'import { visibleImageExperiences, canAccessImageExperience } from \"@/lib/studio/image/image-experience-access\";\\nimport { Avatar, AvatarFallback, AvatarImage } from \"@/components/ui/avatar\";\\nimport { resolveAvatarSrc } from \"@/lib/avatar-presets\";',
-    )
-    text = text.replace(
-        'import { RotateCcw, Image as ImageIcon, ChevronDown, Mic, Sparkles, Upload as UploadIcon } from \"lucide-react\";',
-        'import { RotateCcw, Image as ImageIcon, ChevronDown, Mic, Sparkles, Upload as UploadIcon, Lock } from \"lucide-react\";',
+        'import { visibleImageExperiences } from "@/lib/studio/image/image-experience-access";',
+        'import { visibleImageExperiences, canAccessImageExperience } from "@/lib/studio/image/image-experience-access";',
     )
 
 TARGET.write_text(text)
-assert \"planMaxImages = getPlanLimits\" in text
-assert \"ImageStudioWeeklyCarousel\" not in text
+assert "planMaxImages = getPlanLimits" in text
+assert "ImageStudioWeeklyCarousel" not in text
 assert len(text) > 40000
-print(\"OK\", len(text))
+print("OK", len(text))
