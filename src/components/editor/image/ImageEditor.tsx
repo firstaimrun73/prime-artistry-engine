@@ -5,7 +5,7 @@
  */
 import { EditorDisclaimer } from "@/components/EditorDisclaimer";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { generateMedia } from "@/lib/generate.functions";
 import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
@@ -26,7 +26,7 @@ import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWa
 import { FreeUserSponsorStrip } from "@/components/sponsor/FreeUserSponsorStrip";
 import { isSponsorUnlockActive } from "@/lib/sponsor-unlock";
 import { toast } from "sonner";
-import { RotateCcw, Image as ImageIcon, ChevronDown } from "lucide-react";
+import { RotateCcw, Image as ImageIcon, ChevronDown, Mic, Sparkles, Upload as UploadIcon } from "lucide-react";
 import { StudioBackLink } from "@/components/StudioBackLink";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
 import { readKeepWatermarkPref } from "@/lib/watermark-pref";
@@ -115,6 +115,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [studioTier, setStudioTier] = useState<StudioTier>("standard");
   /** Auto = default compact; Composer = expanded controls. */
   const [workspaceMode, setWorkspaceMode] = useState<"auto" | "composer">("auto");
+  const [aspectMenuOpen, setAspectMenuOpen] = useState(false);
+  const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
   const [contextTags, setContextTags] = useState<string[]>([]);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [tierMenuOpen, setTierMenuOpen] = useState(false);
@@ -786,8 +788,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             ? "success"
             : "loading";
 
+  const showResultView =
+    !!output && state === "success" && !loading && !standardCompleteHold && !premiumCompleteHold && !ultraCompleteHold;
+  const displayPreview = inputPreview || (gallery[activeImage]?.preview ?? null);
   return (
-    <div className={cn("flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden", studioShellClass(studioTier))}>
+    <div className={cn("flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background", studioShellClass(studioTier))}>
       {showStandardOverlay && (
         <StandardImageGenerationOverlay
           phase={standardPhase}
@@ -815,30 +820,79 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         />
       )}
 
-      {!hideFormDuringGen && (
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden px-3 py-2 sm:px-4 sm:py-3">
-          <div className="mb-1 flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3 animate-fade-in">
+      {showResultView && !hideFormDuringGen && (
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden px-3 py-2 sm:px-4 sm:py-3">
+          <div className="mb-2 flex shrink-0 items-center justify-between gap-2 border-b border-border/40 pb-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <StudioBackLink className="shrink-0" />
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Motio2edit</span>
+              <h1 className="truncate text-base font-extrabold tracking-tight">
+                <span className="text-foreground">Image</span>{" "}
+                <span className="text-[#FF5A1F]">Studio</span>
+              </h1>
+            </div>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition hover:border-[#FF5A1F]/40"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              New
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-4">
+              <EditorPreview
+                state={state}
+                loadingMessage={LOADING_MESSAGES[msgIdx]}
+                progress={progress}
+                stage={stage}
+                stages={stages}
+                output={output}
+                outputIsVideo={false}
+                mediaType="image"
+                inputPreview={inputPreview}
+                inputKind={inputKind}
+                isAdmin={isAdmin}
+                isFree={isFree}
+                keepWatermark={isFreePlanForWm ? true : keepWatermark}
+                studioTier={studioTier}
+              />
+              <EditorResult
+                output={output}
+                loading={false}
+                onDownload={handleDownload}
+                onRegenerate={runGenerate}
+                onEditAgain={handleUseResultAsInput}
+                onShare={handleShare}
+                onClear={handleClear}
+                isFree={isFree}
+                downloaded={downloaded}
+                hasSourceImage={!!inputDataUrl || refImages.length > 0}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!hideFormDuringGen && !showResultView && (
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden px-3 pt-2 sm:px-4 sm:pt-3">
+          <header className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2">
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <StudioBackLink className="shrink-0" />
-              <span className="hidden h-5 w-px shrink-0 bg-border/60 sm:block" aria-hidden />
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className="studio-image-icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[#FF5A1F]/25 bg-[#FF5A1F]/10 text-[#FF5A1F] shadow-[0_0_12px_-4px_rgba(255,90,31,0.45)] backdrop-blur-sm sm:h-9 sm:w-9"
-                  aria-hidden
-                >
-                  <ImageIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" strokeWidth={2.25} />
-                </span>
-                <h1 className="min-w-0 text-base font-extrabold tracking-tight leading-tight sm:text-lg">
-                  <span className="mr-1.5 hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:inline">Motio2edit</span>
-                  <span className="text-foreground">Image</span>{" "}
-                  <span className="text-[#FF5A1F]">Studio</span>
-                  <span className="mx-1.5 text-muted-foreground/40 font-normal">·</span>
-                  <span className="relative inline-block align-middle">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Motio2edit</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <h1 className="text-base font-extrabold tracking-tight sm:text-lg">
+                    <span className="text-foreground">Image</span>{" "}
+                    <span className="text-[#FF5A1F]">Studio</span>
+                  </h1>
+                  <span className="relative inline-block">
                     <button
                       type="button"
                       onClick={() => setTierMenuOpen((o) => !o)}
                       className={cn(
-                        "inline-flex items-center gap-0.5 rounded-lg border border-border/50 bg-card/50 px-1.5 py-0.5 text-sm font-semibold backdrop-blur-md transition hover:border-[#FF5A1F]/40 hover:bg-card/80 sm:text-base",
+                        "inline-flex items-center gap-0.5 rounded-lg border border-border/50 bg-card/60 px-1.5 py-0.5 text-xs font-semibold backdrop-blur-md transition hover:border-[#FF5A1F]/40 sm:text-sm",
                         studioTier === "premium" && "border-[#D4AF37]/40 text-[#E8C547]",
                         studioTier === "pro" && "border-orange-500/30 text-orange-600 dark:text-orange-400",
                         studioTier === "standard" && "text-[#FF5A1F]",
@@ -851,36 +905,29 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                     </button>
                     {tierMenuOpen && (
                       <>
-                        <button
-                          type="button"
-                          className="fixed inset-0 z-40 cursor-default"
-                          aria-label="Close tier menu"
-                          onClick={() => setTierMenuOpen(false)}
-                        />
+                        <button type="button" className="fixed inset-0 z-40 cursor-default" aria-label="Close" onClick={() => setTierMenuOpen(false)} />
                         <ul
                           role="listbox"
-                          className="absolute left-0 top-full z-50 mt-1 min-w-[140px] overflow-hidden rounded-xl border border-border/60 bg-card/95 py-1 shadow-xl backdrop-blur-xl"
+                          className="absolute left-0 top-full z-50 mt-1 min-w-[150px] overflow-hidden rounded-xl border border-border/60 bg-card/95 py-1 shadow-xl backdrop-blur-xl"
                         >
-                          {visibleImageExperiences(profile.plan, false).map((t) => (
-                            <li key={t}>
+                          {visibleImageExperiences(profile?.plan ?? "free", isAdmin).map((tier) => (
+                            <li key={tier}>
                               <button
                                 type="button"
                                 role="option"
-                                aria-selected={studioTier === t}
+                                aria-selected={studioTier === tier}
                                 className={cn(
-                                  "flex w-full px-3 py-2 text-left text-sm font-medium transition hover:bg-muted",
-                                  studioTier === t && "bg-[#FF5A1F]/10 text-[#FF5A1F]",
+                                  "flex w-full items-center px-3 py-2 text-left text-sm transition hover:bg-[#FF5A1F]/10",
+                                  studioTier === tier && "bg-[#FF5A1F]/10 text-[#FF5A1F]",
                                 )}
                                 onClick={() => {
-                                  setStudioTier(t);
-                                  const allowed = imageQualitiesForStudioTier(t);
-                                  const preferred = studioTierToImageQuality(t);
+                                  setStudioTier(tier);
+                                  const preferred = studioTierToImageQuality(tier);
                                   if (!qualityTouchedRef.current) setImageQuality(preferred);
-                                  else if (!allowed.includes(imageQuality)) setImageQuality(preferred);
                                   setTierMenuOpen(false);
                                 }}
                               >
-                                {studioExperienceLabel(t)}
+                                {studioExperienceLabel(tier)}
                               </button>
                             </li>
                           ))}
@@ -888,264 +935,279 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                       </>
                     )}
                   </span>
-                </h1>
+                </div>
               </div>
             </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
-              <Button size="sm" variant="ghost" onClick={handleClear} className="min-h-[36px]">
-                <RotateCcw className="mr-1.5 h-4 w-4" /> New
-              </Button>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {!isAdmin && (
+                <span className="rounded-full border border-border/50 bg-card/50 px-2 py-0.5 font-medium tabular-nums backdrop-blur-sm">
+                  {profile.credits} credits
+                </span>
+              )}
             </div>
-          </div>
+          </header>
 
-          <style>{`
-            @keyframes studio-spark-burst {
-              0%, 100% { transform: scale(1); opacity: 1; }
-              35% { transform: scale(1.12); opacity: 1; }
-              55% { transform: scale(0.96); opacity: 0.92; }
-              75% { transform: scale(1.04); opacity: 1; }
-            }
-            @keyframes studio-spark-ray {
-              0%, 100% { transform: scale(0.4); opacity: 0; }
-              30% { transform: scale(1); opacity: 0.7; }
-              60% { transform: scale(1.35); opacity: 0; }
-              100% { transform: scale(0.4); opacity: 0; }
-            }
-            .studio-image-icon { position: relative; animation: studio-spark-burst 2.8s ease-in-out infinite; }
-            .studio-image-icon::before,
-            .studio-image-icon::after {
-              content: "";
-              position: absolute;
-              inset: -3px;
-              border-radius: 9999px;
-              border: 1.5px solid rgba(255, 90, 31, 0.35);
-              animation: studio-spark-ray 2.8s ease-out infinite;
-              pointer-events: none;
-            }
-            .studio-image-icon::after {
-              inset: -6px;
-              border-color: rgba(255, 90, 31, 0.18);
-              animation-delay: 0.15s;
-            }
-            @media (prefers-reduced-motion: reduce) {
-              .studio-image-icon,
-              .studio-image-icon::before,
-              .studio-image-icon::after { animation: none; }
-            }
-          `}</style>
-
-          <div className="mt-1.5 shrink-0 space-y-1.5">
-            <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
-            <FreeUserSponsorStrip isFree={isFree} />
-          </div>
-
-          <div
-            className="mt-2 flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card/50 p-0.5 backdrop-blur-md"
-            role="tablist"
-            aria-label="Workspace mode"
-          >
-            <button type="button" role="tab" aria-selected={workspaceMode === "auto"} onClick={() => setWorkspaceMode("auto")}
-              className={cn("flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm", workspaceMode === "auto" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Auto</button>
-            <button type="button" role="tab" aria-selected={workspaceMode === "composer"} onClick={() => setWorkspaceMode("composer")}
-              className={cn("flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm", workspaceMode === "composer" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Composer</button>
-          </div>
-
-          <div className="mt-2 grid min-h-0 flex-1 gap-2 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(300px,42%)] lg:gap-4">
-            <div className="order-2 flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:order-1 lg:pb-2">
-              {workspaceMode === "composer" && (
-              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  Upload
-                </p>
-                <EditorUpload
-                  fileRef={fileRef}
-                  mediaType="image"
-                  videoLocked={false}
-                  loading={loading}
-                  inputPreview={inputPreview}
-                  inputKind={inputKind}
-                  maxImageMb={MAX_IMAGE_MB}
-                  maxVideoMb={200}
-                  onFile={onFile}
-                  gallery={gallery}
-                  activeImage={activeImage}
-                  maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, effectiveMaxImages)}
-                  onSwitchImage={(idx) => {
-                    switchImage(idx);
-                    const item = gallery[idx];
-                    if (item?.preview) setLightboxSrc(item.preview);
-                  }}
-                  onRemoveImage={removeImage}
-                  lockAdd={isFree}
-                  onLockedAdd={() =>
-                    toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {
-                      action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } },
-                    })
-                  }
-                />
-              </section>
+          <section className="relative mb-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/40 shadow-sm backdrop-blur-xl">
+            <div className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-3">
+              {displayPreview ? (
+                <button
+                  type="button"
+                  className="relative max-h-full max-w-full overflow-hidden rounded-xl"
+                  onClick={() => setLightboxSrc(displayPreview)}
+                >
+                  <img
+                    src={displayPreview}
+                    alt="Selected"
+                    className="max-h-[min(36vh,320px)] w-auto max-w-full object-contain sm:max-h-[min(42vh,420px)]"
+                    draggable={false}
+                  />
+                </button>
+              ) : prompt.trim() ? (
+                <div className="max-w-md px-4 text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#FF5A1F]/80">Prompt preview</p>
+                  <p className="mt-1 line-clamp-4 text-sm text-foreground/90">{prompt.trim()}</p>
+                </div>
+              ) : (
+                <div className="flex max-w-sm flex-col items-center px-4 py-4 text-center">
+                  <ImageIcon className="mb-2 h-8 w-8 text-[#FF5A1F]/30" strokeWidth={1.5} />
+                  <p className="text-sm font-medium text-muted-foreground">Describe or upload to begin</p>
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={loading}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-dashed border-border/70 bg-background/40 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-[#FF5A1F]/50 hover:text-foreground"
+                  >
+                    <UploadIcon className="h-3.5 w-3.5" />
+                    Upload image
+                  </button>
+                </div>
               )}
+            </div>
+            <div className="shrink-0 border-t border-border/30 px-2 py-1.5">
+              <EditorUpload
+                fileRef={fileRef}
+                mediaType="image"
+                videoLocked={false}
+                loading={loading}
+                inputPreview={inputPreview}
+                inputKind={inputKind}
+                maxImageMb={MAX_IMAGE_MB}
+                maxVideoMb={200}
+                onFile={onFile}
+                gallery={gallery}
+                activeImage={activeImage}
+                maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, effectiveMaxImages)}
+                onSwitchImage={(idx) => {
+                  switchImage(idx);
+                  const item = gallery[idx];
+                  if (item?.preview) setLightboxSrc(item.preview);
+                }}
+                onRemoveImage={removeImage}
+                lockAdd={gallery.length >= effectiveMaxImages}
+                onLockedAdd={() =>
+                  toast.error(
+                    isFree && effectiveMaxImages <= 1
+                      ? MULTI_IMAGE_UPGRADE_MESSAGE
+                      : `Up to ${effectiveMaxImages} images on this experience.`,
+                    isFree && effectiveMaxImages <= 1
+                      ? { action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } } }
+                      : undefined,
+                  )
+                }
+              />
+            </div>
+            <div className="hidden shrink-0 border-t border-border/30 px-2 py-1 sm:block">
+              <ImageStudioWeeklyCarousel />
+            </div>
+          </section>
 
-              {workspaceMode === "auto" && (
-              <section className={cn("min-w-0 rounded-2xl border border-border/40 bg-card/50 p-2 shadow-sm backdrop-blur-xl", studioCardClass(studioTier))}>
-                <EditorUpload
-                  fileRef={fileRef}
-                  mediaType="image"
-                  videoLocked={false}
-                  loading={loading}
-                  inputPreview={inputPreview}
-                  inputKind={inputKind}
-                  maxImageMb={MAX_IMAGE_MB}
-                  maxVideoMb={200}
-                  onFile={onFile}
-                  gallery={gallery}
-                  activeImage={activeImage}
-                  maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, effectiveMaxImages)}
-                  onSwitchImage={(idx) => {
-                    switchImage(idx);
-                    const item = gallery[idx];
-                    if (item?.preview) setLightboxSrc(item.preview);
-                  }}
-                  onRemoveImage={removeImage}
-                  lockAdd={isFree}
-                  onLockedAdd={() =>
-                    toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {
-                      action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } },
-                    })
-                  }
+          <div className="mb-2 flex shrink-0 items-center justify-between gap-2 text-xs sm:text-sm">
+            <Link
+              to="/pricing"
+              className="font-semibold text-[#FF5A1F] underline-offset-2 hover:underline"
+            >
+              Upgrade
+            </Link>
+            <span className="rounded-full border border-border/50 bg-card/50 px-2.5 py-1 font-medium tabular-nums text-muted-foreground backdrop-blur-sm">
+              Charge: <span className="text-foreground">{cost}</span> credits
+            </span>
+          </div>
+
+          <div className="shrink-0 space-y-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <div className="rounded-2xl border border-border/50 bg-card/70 p-2 shadow-lg backdrop-blur-xl sm:p-2.5">
+              <div className="flex items-end gap-2">
+                <textarea
+                  ref={taRef}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  disabled={loading}
+                  rows={2}
+                  placeholder="Describe what you want to create..."
+                  className="min-h-[44px] max-h-[96px] flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground/70"
                 />
-              </section>
+                <button
+                  type="button"
+                  className="mb-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/50 text-muted-foreground transition hover:border-[#FF5A1F]/40 hover:text-[#FF5A1F]"
+                  aria-label="Voice input"
+                  title="Voice input"
+                  onClick={() => {
+                    try {
+                      const W = window as unknown as {
+                        SpeechRecognition?: new () => { start: () => void; onresult: ((e: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void) | null };
+                        webkitSpeechRecognition?: new () => { start: () => void; onresult: ((e: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void) | null };
+                      };
+                      const SR = W.SpeechRecognition || W.webkitSpeechRecognition;
+                      if (!SR) {
+                        toast.message("Voice input is not supported in this browser.");
+                        return;
+                      }
+                      const rec = new SR();
+                      rec.onresult = (e) => {
+                        const said = e.results?.[0]?.[0]?.transcript;
+                        if (said) setPrompt((prev) => (prev ? `${prev} ${said}` : said));
+                      };
+                      rec.start();
+                    } catch {
+                      toast.message("Could not start voice input.");
+                    }
+                  }}
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorkspaceMode("auto");
+                    setAspectMenuOpen(false);
+                    setQualityMenuOpen(false);
+                  }}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[11px] font-semibold transition sm:text-xs",
+                    workspaceMode === "auto"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWorkspaceMode("composer")}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[11px] font-semibold transition sm:text-xs",
+                    workspaceMode === "composer"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  Composer
+                </button>
+
+                {workspaceMode === "composer" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAspectMenuOpen((v) => !v);
+                        setQualityMenuOpen(false);
+                      }}
+                      className="inline-flex items-center gap-0.5 rounded-full border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground sm:text-xs"
+                    >
+                      Aspect {aspectRatio}
+                      <ChevronDown className="h-3 w-3 opacity-70" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQualityMenuOpen((v) => !v);
+                        setAspectMenuOpen(false);
+                      }}
+                      className="inline-flex items-center gap-0.5 rounded-full border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground sm:text-xs"
+                    >
+                      Quality {imageQuality.toUpperCase()}
+                      <ChevronDown className="h-3 w-3 opacity-70" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {workspaceMode === "composer" && aspectMenuOpen && (
+                <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/30 pt-2">
+                  {(["1:1", "4:3", "16:9", "9:16", "3:4"] as const).map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => {
+                        setAspectRatio(a);
+                        setAspectMenuOpen(false);
+                      }}
+                      className={cn(
+                        "rounded-lg border px-2.5 py-1 text-[11px] font-semibold",
+                        aspectRatio === a
+                          ? "border-[#FF5A1F] bg-[#FF5A1F]/15 text-[#FF5A1F]"
+                          : "border-border/60 text-muted-foreground",
+                      )}
+                    >
+                      {a}
+                    </button>
+                  ))}
+                </div>
               )}
+              {workspaceMode === "composer" && qualityMenuOpen && (
+                <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/30 pt-2">
+                  {imageQualitiesForStudioTier(studioTier).filter((id) => id !== "8k_max").map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => {
+                        qualityTouchedRef.current = true;
+                        setImageQuality(q);
+                        setQualityMenuOpen(false);
+                      }}
+                      className={cn(
+                        "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                        imageQuality === q
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground",
+                      )}
+                    >
+                      {q.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  Write & Select
-                </p>
-                <EditorPromptPanel
-                  mediaType="image"
-                  loading={loading}
-                  inputDataUrl={inputDataUrl}
-                  inputPreview={inputPreview}
-                  prompt={prompt}
-                  setPrompt={setPrompt}
-                  taRef={taRef}
-                  suggestions={suggestions}
-                  onSelectTool={handleSelectTool}
-                  studioTier={studioTier}
-                  referenceCount={refImages.length}
-                  maxChars={maxPromptCharsForPlan(profile?.plan ?? "free", isAdmin)}
-                  promptUnlimited={isPromptEffectivelyUnlimited(profile?.plan ?? "free")}
-                  contextTags={contextTags}
-                  onToggleTag={(id) => {
-                    setContextTags((prev) =>
-                      prev.includes(id) ? prev.filter((t) => t !== id) : prev.length >= 10 ? prev : [...prev, id],
-                    );
-                  }}
-                />
-                <EditorOptionsPanel
-                  mediaType="image"
-                  loading={loading}
-                  inputDataUrl={inputDataUrl}
-                  aspectRatio={aspectRatio}
-                  setAspectRatio={setAspectRatio}
-                  imageQuality={imageQuality}
-                  setImageQuality={(q) => {
-                    qualityTouchedRef.current = true;
-                    setImageQuality(q);
-                  }}
-                  strength={strength}
-                  setStrength={() => {}}
-                  canAddRefImages={canAddRefImages}
-                  refImages={refImages}
-                  setRefImages={setRefImages}
-                  userPlan={profile.plan}
-                  videoDuration={noopVideoDuration}
-                  setVideoDuration={noopSetVideoDuration as never}
-                  videoAspect={noopVideoAspect}
-                  setVideoAspect={noopSetVideoAspect as never}
-                  videoResolution={noopVideoRes}
-                  setVideoResolution={noopSetVideoRes as never}
-                  cost={cost}
-                  isAdmin={isAdmin}
-                  credits={profile.credits}
-                  keepWatermark={keepWatermark}
-                  setKeepWatermark={setKeepWatermark}
-                  isFree={isFreePlanForWm}
-                  studioTier={studioTier}
-                  compact={workspaceMode === "auto"}
-                />
-              </section>
-
-              <section
+            {noCredits ? (
+              <Link
+                to="/pricing"
                 className={cn(
-                  "fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 min-w-0 rounded-2xl border border-[#FF5A1F]/30 bg-card/90 p-2.5 shadow-[0_12px_40px_-10px_rgba(255,90,31,0.35)] backdrop-blur-xl lg:static lg:inset-auto lg:bottom-auto lg:shadow-md",
-                  studioCardClass(studioTier),
+                  "flex min-h-[48px] w-full items-center justify-center rounded-2xl text-base font-semibold text-primary-foreground",
+                  studioGenerateClass(studioTier),
                 )}
               >
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  <span className="text-[#FF5A1F]">③</span> Generate
-                </p>
-                <EditorGenerationControls
-                  loading={loading}
-                  onGenerate={runGenerate}
-                  hideStop
-                  videoLocked={false}
-                  noCredits={noCredits}
-                  generateClassName={studioGenerateClass(studioTier)}
-                  showAutoToggle={false}
-/>
-              </section>
-            </div>
-
-            <div className="order-1 flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain lg:order-2">
-              <section className={cn("flex min-h-0 flex-1 flex-col space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  Output
-                </p>
-                {showInlinePreview && output ? (
-                  <>
-                    <EditorPreview
-                      state={state}
-                      loadingMessage={LOADING_MESSAGES[msgIdx]}
-                      progress={progress}
-                      stage={stage}
-                      stages={stages}
-                      output={output}
-                      outputIsVideo={false}
-                      mediaType="image"
-                      inputPreview={inputPreview}
-                      inputKind={inputKind}
-                      isAdmin={isAdmin}
-                      isFree={isFree}
-                      keepWatermark={isFreePlanForWm ? true : keepWatermark}
-                      studioTier={studioTier}
-                    />
-                    <EditorResult
-                      output={output}
-                      loading={loading || standardCompleteHold || premiumCompleteHold || ultraCompleteHold}
-                      onDownload={handleDownload}
-                      onRegenerate={runGenerate}
-                      onEditAgain={handleUseResultAsInput}
-                      onShare={handleShare}
-                      onClear={handleClear}
-                      isFree={isFree}
-                      downloaded={downloaded}
-                      hasSourceImage={!!inputDataUrl || refImages.length > 0}
-                    />
-                  </>
-                ) : (
-                  <div className="flex min-h-[42vw] flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border/40 bg-gradient-to-b from-muted/20 to-transparent px-4 py-10 text-center sm:min-h-[220px] lg:min-h-[280px]">
-                    <ImageIcon className="mb-2 h-10 w-10 text-[#FF5A1F]/35" strokeWidth={1.5} />
-                    <p className="text-sm font-medium text-muted-foreground">Your image will appear here</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground/80">Write a prompt and tap Generate</p>
-                  </div>
+                Upgrade
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={runGenerate}
+                className={cn(
+                  "flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl text-base font-semibold text-primary-foreground transition hover:opacity-95 disabled:opacity-60",
+                  studioGenerateClass(studioTier),
                 )}
-              </section>
-              <div className="hidden lg:block">
-                <ImageStudioWeeklyCarousel />
-                <EditorDisclaimer />
-              </div>
-            </div>
+              >
+                <Sparkles className="h-4 w-4" />
+                {loading ? "Generating…" : "Generate"}
+                <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold tabular-nums">
+                  {cost}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       )}
