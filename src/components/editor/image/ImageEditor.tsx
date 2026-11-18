@@ -113,6 +113,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [activeImage, setActiveImage] = useState(0);
   const [imageQuality, setImageQuality] = useState<ImageQuality>("sd");
   const [studioTier, setStudioTier] = useState<StudioTier>("standard");
+  /** Auto = default compact; Composer = expanded controls. */
+  const [workspaceMode, setWorkspaceMode] = useState<"auto" | "composer">("auto");
   const [contextTags, setContextTags] = useState<string[]>([]);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [tierMenuOpen, setTierMenuOpen] = useState(false);
@@ -785,7 +787,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             : "loading";
 
   return (
-    <div className={cn("min-h-[100dvh] overflow-x-hidden pb-24 sm:pb-10", studioShellClass(studioTier))}>
+    <div className={cn("flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden", studioShellClass(studioTier))}>
       {showStandardOverlay && (
         <StandardImageGenerationOverlay
           phase={standardPhase}
@@ -814,7 +816,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       )}
 
       {!hideFormDuringGen && (
-        <div className="mx-auto min-w-0 max-w-5xl overflow-x-hidden px-3 py-3 sm:px-4 sm:py-6">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden px-3 py-2 sm:px-4 sm:py-3">
           <div className="mb-1 flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3 animate-fade-in">
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <StudioBackLink className="shrink-0" />
@@ -826,7 +828,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 >
                   <ImageIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" strokeWidth={2.25} />
                 </span>
-                <h1 className="min-w-0 text-lg font-extrabold tracking-tight leading-tight sm:text-xl">
+                <h1 className="min-w-0 text-base font-extrabold tracking-tight leading-tight sm:text-lg">
+                  <span className="mr-1.5 hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:inline">Motio2edit</span>
                   <span className="text-foreground">Image</span>{" "}
                   <span className="text-[#FF5A1F]">Studio</span>
                   <span className="mx-1.5 text-muted-foreground/40 font-normal">·</span>
@@ -931,31 +934,28 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             }
           `}</style>
 
-          <div className="mt-3">
+          <div className="mt-1.5 shrink-0 space-y-1.5">
             <CreditWarningBanner credits={profile.credits} isAdmin={isAdmin} />
-            <div className="mt-2">
-              <FreeUserSponsorStrip isFree={isFree} />
-            </div>
+            <FreeUserSponsorStrip isFree={isFree} />
           </div>
 
-          <p
-            aria-label="Workflow stages"
-            className="mt-2 text-[10px] text-muted-foreground sm:text-[11px]"
+          <div
+            className="mt-2 flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card/50 p-0.5 backdrop-blur-md"
+            role="tablist"
+            aria-label="Workspace mode"
           >
-            <span className={cn((gallery.length > 0 || !!inputDataUrl) && "text-[#FF5A1F] font-medium")}>① Upload</span>
-            <span className="mx-1.5 text-border">·</span>
-            <span className={cn(prompt.trim().length > 0 && "text-[#FF5A1F] font-medium")}>② Write & Select</span>
-            <span className="mx-1.5 text-border">·</span>
-            <span className={cn(loading && "text-[#FF5A1F] font-medium")}>③ Generate</span>
-            <span className="mx-1.5 text-border">·</span>
-            <span className={cn(!!output && state === "success" && "text-[#FF5A1F] font-medium")}>④ Output</span>
-          </p>
+            <button type="button" role="tab" aria-selected={workspaceMode === "auto"} onClick={() => setWorkspaceMode("auto")}
+              className={cn("flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm", workspaceMode === "auto" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Auto</button>
+            <button type="button" role="tab" aria-selected={workspaceMode === "composer"} onClick={() => setWorkspaceMode("composer")}
+              className={cn("flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors sm:text-sm", workspaceMode === "composer" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>Composer</button>
+          </div>
 
-          <div className="mt-3 grid min-w-0 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[1fr_minmax(280px,360px)] lg:gap-5">
-            <div className="order-1 min-w-0 space-y-3 sm:space-y-3.5">
-              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/50 bg-card/40 p-3 backdrop-blur-md sm:p-4", studioCardClass(studioTier))}>
+          <div className="mt-2 grid min-h-0 flex-1 gap-2 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(300px,42%)] lg:gap-4">
+            <div className="order-2 flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:order-1 lg:pb-2">
+              {workspaceMode === "composer" && (
+              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  <span className="text-[#FF5A1F]">①</span> Upload
+                  Upload
                 </p>
                 <EditorUpload
                   fileRef={fileRef}
@@ -984,10 +984,42 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   }
                 />
               </section>
+              )}
 
-              <section className={cn("min-w-0 space-y-3 rounded-2xl border border-border/50 bg-card/40 p-3 backdrop-blur-md sm:p-4", studioCardClass(studioTier))}>
+              {workspaceMode === "auto" && (
+              <section className={cn("min-w-0 rounded-2xl border border-border/40 bg-card/50 p-2 shadow-sm backdrop-blur-xl", studioCardClass(studioTier))}>
+                <EditorUpload
+                  fileRef={fileRef}
+                  mediaType="image"
+                  videoLocked={false}
+                  loading={loading}
+                  inputPreview={inputPreview}
+                  inputKind={inputKind}
+                  maxImageMb={MAX_IMAGE_MB}
+                  maxVideoMb={200}
+                  onFile={onFile}
+                  gallery={gallery}
+                  activeImage={activeImage}
+                  maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, effectiveMaxImages)}
+                  onSwitchImage={(idx) => {
+                    switchImage(idx);
+                    const item = gallery[idx];
+                    if (item?.preview) setLightboxSrc(item.preview);
+                  }}
+                  onRemoveImage={removeImage}
+                  lockAdd={isFree}
+                  onLockedAdd={() =>
+                    toast.error(MULTI_IMAGE_UPGRADE_MESSAGE, {
+                      action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } },
+                    })
+                  }
+                />
+              </section>
+              )}
+
+              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  <span className="text-[#FF5A1F]">②</span> Write & Select
+                  Write & Select
                 </p>
                 <EditorPromptPanel
                   mediaType="image"
@@ -1040,12 +1072,13 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   setKeepWatermark={setKeepWatermark}
                   isFree={isFreePlanForWm}
                   studioTier={studioTier}
+                  compact={workspaceMode === "auto"}
                 />
               </section>
 
               <section
                 className={cn(
-                  "sticky bottom-3 z-30 min-w-0 rounded-2xl border border-[#FF5A1F]/25 bg-card/80 p-3 shadow-[0_8px_32px_-8px_rgba(255,90,31,0.25)] backdrop-blur-xl sm:static sm:bottom-auto sm:shadow-md",
+                  "fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 min-w-0 rounded-2xl border border-[#FF5A1F]/30 bg-card/90 p-2.5 shadow-[0_12px_40px_-10px_rgba(255,90,31,0.35)] backdrop-blur-xl lg:static lg:inset-auto lg:bottom-auto lg:shadow-md",
                   studioCardClass(studioTier),
                 )}
               >
@@ -1064,10 +1097,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               </section>
             </div>
 
-            <div className="order-2 min-w-0 space-y-3 lg:sticky lg:top-4 lg:self-start">
-              <section className={cn("min-w-0 space-y-2 rounded-2xl border border-border/50 bg-card/40 p-3 backdrop-blur-md sm:p-4", studioCardClass(studioTier))}>
+            <div className="order-1 flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain lg:order-2">
+              <section className={cn("flex min-h-0 flex-1 flex-col space-y-2 rounded-2xl border border-border/40 bg-card/50 p-2.5 shadow-sm backdrop-blur-xl sm:p-3", studioCardClass(studioTier))}>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
-                  <span className="text-[#FF5A1F]">④</span> Output
+                  Output
                 </p>
                 {showInlinePreview && output ? (
                   <>
@@ -1101,14 +1134,17 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                     />
                   </>
                 ) : (
-                  <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-border/40 bg-muted/10 px-4 py-8 text-center">
-                    <ImageIcon className="mb-2 h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
-                    <p className="text-sm text-muted-foreground">Result appears after Generate</p>
+                  <div className="flex min-h-[42vw] flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border/40 bg-gradient-to-b from-muted/20 to-transparent px-4 py-10 text-center sm:min-h-[220px] lg:min-h-[280px]">
+                    <ImageIcon className="mb-2 h-10 w-10 text-[#FF5A1F]/35" strokeWidth={1.5} />
+                    <p className="text-sm font-medium text-muted-foreground">Your image will appear here</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground/80">Write a prompt and tap Generate</p>
                   </div>
                 )}
               </section>
-              <ImageStudioWeeklyCarousel />
-              <EditorDisclaimer />
+              <div className="hidden lg:block">
+                <ImageStudioWeeklyCarousel />
+                <EditorDisclaimer />
+              </div>
             </div>
           </div>
         </div>
