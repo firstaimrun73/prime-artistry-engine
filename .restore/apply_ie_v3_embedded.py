@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-import base64, zlib
+import base64, zlib, sys
 from pathlib import Path
+sys.path.insert(0, str(Path(".restore").resolve()))
+from ie_v3_suffix_a import SA
+from ie_v3_suffix_b import SB
+SUFFIX = SA + SB
 
-def load_chunks(prefix, n):
+def load_file_chunks(n=4):
     parts = []
     for i in range(n):
-        p = Path(f".restore/{prefix}{i}.txt")
+        p = Path(f".restore/ie_v3_chunk{i}.txt")
         if not p.exists():
             raise SystemExit(f"missing {p}")
         parts.append("".join(p.read_text().split()))
@@ -22,8 +26,7 @@ def write(path, b64, checks):
     Path(path).write_bytes(data)
     print("OK", path, len(data))
 
-n = len(list(Path(".restore").glob("ie_v3_chunk*.txt")))
-ie = load_chunks("ie_v3_chunk", n)
+ie = load_file_chunks(4) + SUFFIX
 write("src/components/editor/image/ImageEditor.tsx", ie,
       ["showResultView", "generateMedia", "Motio2edit", "Try Something New", "lg:grid-cols-"])
 ns = {}
