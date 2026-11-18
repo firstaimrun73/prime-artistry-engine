@@ -1,0 +1,39 @@
+name: Apply ImageEditor source parts
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".restore/ie_src_part*.txt"
+      - ".restore/ie_src.manifest.json"
+      - ".restore/apply_ie_src.py"
+      - ".restore/TRIGGER_IE_SRC"
+      - ".github/workflows/apply-ie-src.yml"
+concurrency:
+  group: apply-ie-src
+  cancel-in-progress: true
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Concatenate and commit ImageEditor
+        run: |
+          set -euo pipefail
+          ls -la .restore/ie_src_part*.txt
+          python3 .restore/apply_ie_src.py
+          test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 50000
+          grep -q VoiceInputButton src/components/editor/image/ImageEditor.tsx
+          grep -q canAccessImageExperience src/components/editor/image/ImageEditor.tsx
+          grep -q "What will you create today" src/components/editor/image/ImageEditor.tsx
+          ! grep -q "Describe or upload to begin" src/components/editor/image/ImageEditor.tsx
+          ! grep -q PLACEHOLDER src/components/editor/image/ImageEditor.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx
+          if git diff --cached --quiet; then echo no changes; exit 0; fi
+          git commit -m "fix(image-studio): MOTIO2EDIT ImageEditor — locks, VoiceInput, taglines, Auto/Composer, avatar Balance"
+          git push origin HEAD:main
