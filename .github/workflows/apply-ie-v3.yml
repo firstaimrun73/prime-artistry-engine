@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - '.restore/ie_v3_chunk*.txt'
+      - '.restore/ie_v3_suffix_a.py'
+      - '.restore/ie_v3_suffix_b.py'
       - '.restore/up_v3_data.py'
       - '.restore/apply_ie_v3_embedded.py'
       - '.github/workflows/apply-ie-v3.yml'
@@ -22,7 +24,7 @@ jobs:
       - name: Apply layout package
         run: |
           set -euo pipefail
-          ls -la .restore/ie_v3_chunk*.txt .restore/up_v3_data.py
+          ls -la .restore/ie_v3_chunk*.txt .restore/ie_v3_suffix_*.py .restore/up_v3_data.py
           python3 .restore/apply_ie_v3_embedded.py
           test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 40000
           grep -q showResultView src/components/editor/image/ImageEditor.tsx
