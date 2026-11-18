@@ -1,45 +1,54 @@
 name: Restore ImageEditor
+
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.restore/**'
+
+permissions:
+  contents: write
+
 jobs:
-  apply:
+  restore:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Reassemble and commit ImageEditor
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore ImageEditor from known-good commit
         run: |
           set -euo pipefail
-          python3 << 'PY'
-          import base64, json
-          from pathlib import Path
-          manifest = json.loads(Path('.restore/manifest.json').read_text())
-          for item in manifest:
-              prefix = item['prefix']
-              parts = item['parts']
-              path = item['path']
-              b64 = ''
-              for i in range(parts):
-                  p = Path(f'.restore/{prefix}.part{i}.b64')
-                  if not p.exists():
-                      raise SystemExit(f'missing {p}')
-                  b64 += p.read_text().strip()
-              data = base64.b64decode(b64)
-              Path(path).parent.mkdir(parents=True, exist_ok=True)
-              Path(path).write_bytes(data)
-              print(path, len(data))
-          PY
-          test -f src/components/editor/image/ImageEditor.tsx
-          SIZE=$(wc -c < src/components/editor/image/ImageEditor.tsx)
-          echo "ImageEditor size=$SIZE"
-          test "$SIZE" -gt 30000
+          GOOD=bc0304b66b63ee8bbc1e596ff5f0f54913b88aee
+          git checkout "$GOOD" -- src/components/editor/image/ImageEditor.tsx
+          if [ -f src/components/editor/image/ImageEditorCore.tsx ]; then
+            git rm -f src/components/editor/image/ImageEditorCore.tsx
+          fi
+          BYTES=$(wc -c < src/components/editor/image/ImageEditor.tsx)
+          echo "ImageEditor.tsx size: $BYTES bytes"
+          if [ "$BYTES" -lt 40000 ]; then
+            echo "ERROR: restored file too small ($BYTES) — aborting"
+            exit 1
+          fi
+          # Must be the real editor, not a re-export stub
+          if grep -q 'Re-export workspace' src/components/editor/image/ImageEditor.tsx; then
+            echo "ERROR: still a re-export stub"
+            exit 1
+          fi
+          if ! grep -q 'export function ImageEditor' src/components/editor/image/ImageEditor.tsx; then
+            echo "ERROR: missing ImageEditor export"
+            exit 1
+          fi
+
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/components/editor/image/ImageEditor.tsx
-          git diff --cached --quiet && echo "no changes" && exit 0
-          git commit -m "fix(Image Studio): restore ImageEditor full source via .restore"
-          git push
+          git add -A src/components/editor/image/
+          if git diff --cached --quiet; then
+            echo "No changes — ImageEditor already good"
+            exit 0
+          fi
+          git commit -m "emergency: restore full ImageEditor.tsx from bc0304b (fix production Image Studio)"
+          git push origin HEAD:main
