@@ -20,6 +20,8 @@ interface EditorUploadProps {
   /** Free plan: keep + visible but locked. */
   lockAdd?: boolean;
   onLockedAdd?: () => void;
+  /** Slim strip for glass Image Studio (no tall dashed dropzone). */
+  compact?: boolean;
 }
 
 export function EditorUpload({
@@ -39,6 +41,7 @@ export function EditorUpload({
   onRemoveImage,
   lockAdd = false,
   onLockedAdd,
+  compact = false,
 }: EditorUploadProps) {
   return (
     <>
@@ -57,12 +60,18 @@ export function EditorUpload({
           <button
             onClick={() => fileRef.current?.click()}
             disabled={videoLocked || loading}
-            className="flex min-h-[96px] w-full max-w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-card px-3 py-4 text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50 sm:min-h-[120px] sm:gap-2 sm:px-4 sm:py-6 md:min-h-[140px]"
+            className={
+              compact
+                ? "flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border/70 bg-card/50 px-3 py-2 text-xs text-muted-foreground transition hover:border-[#FF5A1F]/50 disabled:opacity-50"
+                : "flex min-h-[96px] w-full max-w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-card px-3 py-4 text-sm text-muted-foreground transition-all hover:border-primary hover:bg-primary/5 disabled:opacity-50 sm:min-h-[120px] sm:gap-2 sm:px-4 sm:py-6 md:min-h-[140px]"
+            }
           >
-            <Upload className="h-6 w-6" />
+            <Upload className={compact ? "h-4 w-4" : "h-6 w-6"} />
             {mediaType === "video"
               ? "Upload image or video (optional)"
-              : "Upload image (optional)"}
+              : compact
+                ? "Upload image"
+                : "Upload image (optional)"}
           </button>
         ) : (
           <button

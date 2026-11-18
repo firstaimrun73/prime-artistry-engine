@@ -876,12 +876,15 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       )}
 
       {!hideFormDuringGen && !showResultView && (
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden px-3 pt-2 sm:px-4 sm:pt-3">
-          <header className="mb-2 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2">
-            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden px-3 pt-2 sm:px-4 sm:pt-3 lg:px-6">
+          {/* ——— HEADER ——— */}
+          <header className="mb-2 flex shrink-0 items-center justify-between gap-2 border-b border-border/40 pb-2">
+            <div className="flex min-w-0 items-center gap-2">
               <StudioBackLink className="shrink-0" />
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Motio2edit</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Motio2edit
+                </p>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <h1 className="text-base font-extrabold tracking-tight sm:text-lg">
                     <span className="text-foreground">Image</span>{" "}
@@ -938,94 +941,120 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {!isAdmin && (
-                <span className="rounded-full border border-border/50 bg-card/50 px-2 py-0.5 font-medium tabular-nums backdrop-blur-sm">
-                  {profile.credits} credits
-                </span>
-              )}
-            </div>
+            {!isAdmin && (
+              <span className="shrink-0 rounded-full border border-border/50 bg-card/50 px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground backdrop-blur-sm">
+                {profile.credits} credits
+              </span>
+            )}
           </header>
 
-          <section className="relative mb-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/40 shadow-sm backdrop-blur-xl">
-            <div className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-3">
-              {displayPreview ? (
-                <button
-                  type="button"
-                  className="relative max-h-full max-w-full overflow-hidden rounded-xl"
-                  onClick={() => setLightboxSrc(displayPreview)}
-                >
-                  <img
-                    src={displayPreview}
-                    alt="Selected"
-                    className="max-h-[min(36vh,320px)] w-auto max-w-full object-contain sm:max-h-[min(42vh,420px)]"
-                    draggable={false}
-                  />
-                </button>
-              ) : prompt.trim() ? (
-                <div className="max-w-md px-4 text-center">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#FF5A1F]/80">Prompt preview</p>
-                  <p className="mt-1 line-clamp-4 text-sm text-foreground/90">{prompt.trim()}</p>
-                </div>
-              ) : (
-                <div className="flex max-w-sm flex-col items-center px-4 py-4 text-center">
-                  <ImageIcon className="mb-2 h-8 w-8 text-[#FF5A1F]/30" strokeWidth={1.5} />
-                  <p className="text-sm font-medium text-muted-foreground">Describe or upload to begin</p>
+          {/* ——— BODY: mobile stack | desktop 2-col ——— */}
+          <div className="grid min-h-0 flex-1 gap-2 overflow-hidden lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.75fr)] lg:gap-4">
+            {/* DISPLAY */}
+            <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/40 shadow-sm backdrop-blur-xl">
+              <div className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-3">
+                {displayPreview ? (
                   <button
                     type="button"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={loading}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-dashed border-border/70 bg-background/40 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-[#FF5A1F]/50 hover:text-foreground"
+                    className="relative max-h-full max-w-full overflow-hidden rounded-xl"
+                    onClick={() => setLightboxSrc(displayPreview)}
                   >
-                    <UploadIcon className="h-3.5 w-3.5" />
-                    Upload image
+                    <img
+                      src={displayPreview}
+                      alt="Selected"
+                      className="max-h-[min(28vh,240px)] w-auto max-w-full object-contain sm:max-h-[min(34vh,320px)] lg:max-h-[min(48vh,480px)]"
+                      draggable={false}
+                    />
                   </button>
-                </div>
-              )}
-            </div>
-            <div className="shrink-0 border-t border-border/30 px-2 py-1.5">
-              <EditorUpload
-                fileRef={fileRef}
-                mediaType="image"
-                videoLocked={false}
-                loading={loading}
-                inputPreview={inputPreview}
-                inputKind={inputKind}
-                maxImageMb={MAX_IMAGE_MB}
-                maxVideoMb={200}
-                onFile={onFile}
-                gallery={gallery}
-                activeImage={activeImage}
-                maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, effectiveMaxImages)}
-                onSwitchImage={(idx) => {
-                  switchImage(idx);
-                  const item = gallery[idx];
-                  if (item?.preview) setLightboxSrc(item.preview);
-                }}
-                onRemoveImage={removeImage}
-                lockAdd={gallery.length >= effectiveMaxImages}
-                onLockedAdd={() =>
-                  toast.error(
-                    isFree && effectiveMaxImages <= 1
-                      ? MULTI_IMAGE_UPGRADE_MESSAGE
-                      : `Up to ${effectiveMaxImages} images on this experience.`,
-                    isFree && effectiveMaxImages <= 1
-                      ? { action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } } }
-                      : undefined,
-                  )
-                }
-              />
-            </div>
-            <div className="hidden shrink-0 border-t border-border/30 px-2 py-1 sm:block">
-              <ImageStudioWeeklyCarousel />
-            </div>
-          </section>
+                ) : prompt.trim() ? (
+                  <div className="max-w-md px-3 text-center">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#FF5A1F]/80">
+                      Prompt preview
+                    </p>
+                    <p className="mt-1 line-clamp-3 text-sm text-foreground/90 sm:line-clamp-4">
+                      {prompt.trim()}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex max-w-sm flex-col items-center px-3 py-2 text-center">
+                    <ImageIcon className="mb-1.5 h-7 w-7 text-[#FF5A1F]/30" strokeWidth={1.5} />
+                    <p className="text-xs font-medium text-muted-foreground sm:text-sm">
+                      Describe or upload to begin
+                    </p>
+                  </div>
+                )}
+              </div>
 
-          <div className="mb-2 flex shrink-0 items-center justify-between gap-2 text-xs sm:text-sm">
-            <Link
-              to="/pricing"
-              className="font-semibold text-[#FF5A1F] underline-offset-2 hover:underline"
-            >
+              {/* Compact upload + gallery (always available; not a tall dropzone) */}
+              <div className="shrink-0 border-t border-border/30 px-2 py-1.5">
+                <EditorUpload
+                  fileRef={fileRef}
+                  mediaType="image"
+                  videoLocked={false}
+                  loading={loading}
+                  inputPreview={inputPreview}
+                  inputKind={inputKind}
+                  maxImageMb={MAX_IMAGE_MB}
+                  maxVideoMb={200}
+                  onFile={onFile}
+                  gallery={gallery}
+                  activeImage={activeImage}
+                  maxGalleryImages={Math.min(MAX_GALLERY_IMAGES, effectiveMaxImages)}
+                  onSwitchImage={(idx) => {
+                    switchImage(idx);
+                    const item = gallery[idx];
+                    if (item?.preview) setLightboxSrc(item.preview);
+                  }}
+                  onRemoveImage={removeImage}
+                  lockAdd={gallery.length >= effectiveMaxImages}
+                  onLockedAdd={() =>
+                    toast.error(
+                      isFree && effectiveMaxImages <= 1
+                        ? MULTI_IMAGE_UPGRADE_MESSAGE
+                        : `Up to ${effectiveMaxImages} images on this experience.`,
+                      isFree && effectiveMaxImages <= 1
+                        ? { action: { label: "Upgrade", onClick: () => { window.location.href = "/pricing"; } } }
+                        : undefined,
+                    )
+                  }
+                  compact
+                />
+              </div>
+
+              {/* Try Something New — mobile + desktop */}
+              <div className="shrink-0 border-t border-border/30 px-1.5 py-1 max-h-[76px] overflow-hidden sm:max-h-[96px] lg:max-h-[120px]">
+                <p className="px-1 pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Try Something New
+                </p>
+                <ImageStudioWeeklyCarousel />
+              </div>
+            </section>
+
+            {/* DESKTOP SIDE: tips / secondary glass panel */}
+            <aside className="hidden min-h-0 flex-col gap-2 overflow-hidden rounded-2xl border border-border/40 bg-card/30 p-3 backdrop-blur-xl lg:flex">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Workspace
+              </p>
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                <li className="rounded-xl border border-border/40 bg-background/40 px-3 py-2">
+                  <span className="font-semibold text-foreground">Auto</span> — describe what you want; settings adapt automatically.
+                </li>
+                <li className="rounded-xl border border-border/40 bg-background/40 px-3 py-2">
+                  <span className="font-semibold text-foreground">Composer</span> — expand Aspect Ratio and Quality when you need control.
+                </li>
+                <li className="rounded-xl border border-border/40 bg-background/40 px-3 py-2">
+                  Upload references from the Display strip. Charge updates with experience and quality.
+                </li>
+              </ul>
+              <div className="mt-auto rounded-xl border border-[#FF5A1F]/20 bg-[#FF5A1F]/5 px-3 py-2 text-xs text-muted-foreground">
+                Prompt + optional image → Generate. Results open in a dedicated view.
+              </div>
+            </aside>
+          </div>
+
+          {/* ——— UPGRADE / CHARGE ——— */}
+          <div className="mt-2 flex shrink-0 items-center justify-between gap-2 text-xs sm:text-sm">
+            <Link to="/pricing" className="font-semibold text-[#FF5A1F] underline-offset-2 hover:underline">
               Upgrade
             </Link>
             <span className="rounded-full border border-border/50 bg-card/50 px-2.5 py-1 font-medium tabular-nums text-muted-foreground backdrop-blur-sm">
@@ -1033,7 +1062,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             </span>
           </div>
 
-          <div className="shrink-0 space-y-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          {/* ——— BOTTOM COMPOSER + GENERATE ——— */}
+          <div className="mt-2 shrink-0 space-y-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <div className="rounded-2xl border border-border/50 bg-card/70 p-2 shadow-lg backdrop-blur-xl sm:p-2.5">
               <div className="flex items-end gap-2">
                 <textarea
@@ -1043,7 +1073,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   disabled={loading}
                   rows={2}
                   placeholder="Describe what you want to create..."
-                  className="min-h-[44px] max-h-[96px] flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground/70"
+                  className="min-h-[44px] max-h-[88px] flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground/70"
                 />
                 <button
                   type="button"
@@ -1158,25 +1188,27 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
               )}
               {workspaceMode === "composer" && qualityMenuOpen && (
                 <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/30 pt-2">
-                  {imageQualitiesForStudioTier(studioTier).filter((id) => id !== "8k_max").map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => {
-                        qualityTouchedRef.current = true;
-                        setImageQuality(q);
-                        setQualityMenuOpen(false);
-                      }}
-                      className={cn(
-                        "rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                        imageQuality === q
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-muted-foreground",
-                      )}
-                    >
-                      {q.toUpperCase()}
-                    </button>
-                  ))}
+                  {imageQualitiesForStudioTier(studioTier)
+                    .filter((id) => id !== "8k_max")
+                    .map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => {
+                          qualityTouchedRef.current = true;
+                          setImageQuality(q);
+                          setQualityMenuOpen(false);
+                        }}
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                          imageQuality === q
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-muted-foreground",
+                        )}
+                      >
+                        {q.toUpperCase()}
+                      </button>
+                    ))}
                 </div>
               )}
             </div>
