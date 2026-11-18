@@ -11,7 +11,7 @@ on:
       - '.github/workflows/apply-ie-v3.yml'
 concurrency:
   group: apply-ie-v3
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   apply:
     runs-on: ubuntu-latest
