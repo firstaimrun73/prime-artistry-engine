@@ -1,0 +1,35 @@
+/**
+ * Image Editor workspace — independent of Video Editor.
+ * UPLOAD → WRITE & SELECT → GENERATE → OUTPUT (compact glass UI)
+ * RESTORED 2026-11-04 from 53c55f95 + FreeUserSponsorStrip (client-only Multitag unlock)
+ * MOTIO2EDIT: free multi-ref, experience locks, VoiceInput, Auto/Composer, avatar Balance, taglines
+ */
+import { EditorDisclaimer } from "@/components/EditorDisclaimer";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, Link } from "@tanstack/react-router";
+import { useAuth } from "@/lib/auth";
+import { generateMedia } from "@/lib/generate.functions";
+import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
+import { type ImageQuality } from "@/lib/quality-options";
+import { quoteStandardCredits } from "@/lib/studio/image/standard";
+import { quoteUltraCredits, normalizeUltraQuality } from "@/lib/studio/image/ultra";
+import { quotePremiumCredits, normalizePremiumQuality } from "@/lib/studio/image/premium";
+import { quoteGptImage2MultiCredits } from "@/lib/studio/image/gpt-image-2";
+import { secureDownloadImage } from "@/lib/download.functions";
+import { triggerBrowserDownload } from "@/lib/secure-image-download";
+import { SmartRemoveModal, SMART_REMOVE_PROMPT } from "@/components/SmartRemoveModal";
+import { isAdminEmail } from "@/lib/admin-config";
+import { useServerFn } from "@tanstack/react-start";
+import { Button } from "@/components/ui/button";
+import { getPlanLimits, maxPromptCharsForPlan, isPromptEffectivelyUnlimited, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
+import { startGeneration, endGeneration } from "@/lib/generation-status";
+import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
+import { FreeUserSponsorStrip } from "@/components/sponsor/FreeUserSponsorStrip";
+import { isSponsorUnlockActive } from "@/lib/sponsor-unlock";
+import { toast } from "sonner";
+import { RotateCcw, Image as ImageIcon, ChevronDown, Sparkles, Upload as UploadIcon, Lock, Wand2, Settings2 } from "lucide-react";
+import { VoiceInputButton } from "@/components/VoiceInputButton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { resolveAvatarSrc } from "@/lib/avatar-presets";
+import { pickStudioTagline } from "@/lib/studio/studio-taglines";
+import { StudioBackLink } from "@/components/StudioBackLink";
