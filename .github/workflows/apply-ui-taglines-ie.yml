@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/apply-ui-taglines-ie.yml"
       - ".restore/apply_ui_taglines_ie.py"
+      - ".restore/apply_ui_taglines_ie_p1.py.txt"
+      - ".restore/apply_ui_taglines_ie_p2.py.txt"
 permissions:
   contents: write
 jobs:
