@@ -1,0 +1,1 @@
+{"manifest": [{"path": "src/lib/studio/studio-taglines-a.ts", "start": 0, "end": 47377, "size": 47377}, {"path": "src/lib/studio/studio-taglines-b.ts", "start": 47377, "end": 94378, "size": 47001}, {"path": "src/components/editor/image/ImageEditor.tsx", "start": 94378, "end": 147611, "size": 53233}], "chunks": 1}

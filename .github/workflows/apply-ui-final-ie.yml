@@ -1,0 +1,36 @@
+name: apply-ui-final-ie
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/apply-ui-final-ie.yml"
+      - ".restore/ui_payload_final/**"
+      - ".restore/apply_ui_final.py"
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: apply-ui-final-ie
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 5
+      - name: Apply UI final
+        run: |
+          set -euo pipefail
+          python3 .restore/apply_ui_final.py
+      - name: Commit
+        run: |
+          git config user.name "firstaimrun73"
+          git config user.email "firstaimrun73@users.noreply.github.com"
+          git add src/lib/studio/studio-taglines-a.ts src/lib/studio/studio-taglines-b.ts src/components/editor/image/ImageEditor.tsx
+          git status
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(image-studio): remove duplicate preview, 2000 unique taglines, mode icons, balance, focus-stop"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
