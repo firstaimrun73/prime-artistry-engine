@@ -1,0 +1,128 @@
+name: restore-ie-and-fix-ui
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/restore-ie-and-fix-ui.yml"
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: restore-ie-and-fix-ui
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Restore ImageEditor from pre-PLACEHOLDER commit
+        run: |
+          set -euo pipefail
+          GOOD=2a3ba88e97739e25ccd3f0f092f7643161da7c42
+          git show "$GOOD:src/components/editor/image/ImageEditor.tsx" > src/components/editor/image/ImageEditor.tsx
+          test "$(wc -c < src/components/editor/image/ImageEditor.tsx)" -gt 40000
+          python3 .restore/apply_ui_final_embedded.py 2>/dev/null || true
+          # If embedded not ready, surgical fix inline
+          python3 << 'PY'
+from pathlib import Path
+src = Path("src/components/editor/image/ImageEditor.tsx").read_text()
+if "PLACEHOLDER" in src and len(src) < 100:
+    raise SystemExit("still placeholder")
+# ensure imports
+if "InspirationTagline" not in src:
+    src = src.replace(
+        'import { RotateCcw, Image as ImageIcon, ChevronDown, Mic, Sparkles, Upload as UploadIcon } from "lucide-react";',
+        'import { RotateCcw, Image as ImageIcon, ChevronDown, Mic, Sparkles, Upload as UploadIcon, Crown, WandSparkles } from "lucide-react";\nimport { InspirationTagline } from "@/components/editor/image/InspirationTagline";'
+    )
+if "promptFocused" not in src:
+    src = src.replace(
+        'const [prompt, setPrompt] = useState(bootstrap?.initialPrompt ?? "");',
+        'const [prompt, setPrompt] = useState(bootstrap?.initialPrompt ?? "");\n  const [promptFocused, setPromptFocused] = useState(false);'
+    )
+# remove large selected preview block if present
+old = '              <div className="flex shrink-0 items-center justify-center p-1.5 sm:p-2">\n                {displayPreview ? ('
+idx = src.find(old)
+if idx != -1:
+    end = src.find('{/* Compact upload + gallery', idx)
+    if end != -1:
+        rep = '''              {/* Empty-state inspiration only — no large selected-image preview */}\n              {gallery.length === 0 && !promptFocused && !prompt.trim() && (\n                <InspirationTagline active className="shrink-0" />\n              )}\n\n              '''
+        src = src[:idx] + rep + src[end:]
+        print("removed display block")
+# credits
+oldc = '''              {!isAdmin && (\n                <span className="rounded-full border border-border/50 bg-card/50 px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground backdrop-blur-sm">\n                  {profile?.credits ?? 0} credits\n                </span>\n              )}'''
+newc = '''              {!isAdmin && (\n                <div className="flex flex-col items-end rounded-xl border border-border/50 bg-card/60 px-2.5 py-1 backdrop-blur-sm leading-tight">\n                  <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Balance</span>\n                  <span className="text-xs font-bold tabular-nums text-foreground sm:text-sm">\n                    {profile?.credits ?? 0} <span className="font-medium text-muted-foreground">credits</span>\n                  </span>\n                </div>\n              )}'''
+if oldc in src:
+    src = src.replace(oldc, newc)
+    print("credits")
+# tier icons
+oldi = '''                                {studioExperienceLabel(tier)}\n                                {!canAccessImageExperience(profile?.plan, tier, isAdmin) && (\n                                  <span className="ml-2 shrink-0 text-[11px] font-semibold text-[#FF5A1F]">Upgrade</span>\n                                )}'''
+newi = '''                                <span className="inline-flex items-center gap-1.5">\n                                  {tier === "standard" && <ImageIcon className="h-3.5 w-3.5 shrink-0 opacity-80" />}\n                                  {tier === "pro" && <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-80" />}\n                                  {tier === "premium" && <Crown className="h-3.5 w-3.5 shrink-0 opacity-80" />}\n                                  {studioExperienceLabel(tier)}\n                                </span>\n                                {!canAccessImageExperience(profile?.plan, tier, isAdmin) && (\n                                  <span className="ml-2 shrink-0 text-[11px] font-semibold text-[#FF5A1F]">Upgrade</span>\n                                )}'''
+if oldi in src:
+    src = src.replace(oldi, newi)
+    print("icons")
+if 'onFocus={() => setPromptFocused(true)}' not in src:
+    src = src.replace(
+        '''                  onChange={(e) => setPrompt(e.target.value)}\n                  disabled={loading}\n                  rows={2}\n                  placeholder="Describe what you want to create..."''',
+        '''                  onChange={(e) => setPrompt(e.target.value)}\n                  onFocus={() => setPromptFocused(true)}\n                  onBlur={() => setPromptFocused(false)}\n                  disabled={loading}\n                  rows={2}\n                  placeholder="Describe what you want to create..."'''
+    )
+    print("focus")
+Path("src/components/editor/image/ImageEditor.tsx").write_text(src)
+print("IE size", len(src))
+assert "InspirationTagline" in src
+assert 'alt="Selected"' not in src
+print("VERIFY_IE_OK")
+PY
+          # generate 2000 taglines
+          python3 << 'PY'
+import itertools, random, re
+from pathlib import Path
+random.seed(42)
+bases = {"creativity": ["Turn your imagination into reality", "Every image begins with an idea", "Create something extraordinary today", "Your imagination has no limits", "Make your vision visible", "Transform ordinary into extraordinary", "Bring your creative ideas to life", "Imagine it. Describe it. Create it", "Your next masterpiece starts here", "Let creativity take the lead", "Ideas become images here", "What will you invent today", "Sketch with words, finish with AI", "Dream it. Generate it", "The blank canvas is waiting", "One prompt away from amazing", "From thought to visual in seconds", "Unlock a new visual language", "Creativity compounds with every try", "Start with a spark of an idea"], "photography": ["Frame the moment you imagine", "Capture light that never existed", "Compose a shot only you can see", "Rewrite the light in any scene", "Shoot without a camera today", "Portrait light, studio control", "Golden hour on demand", "Every angle starts with a prompt", "Photo realism from pure description", "Lens and light at your command"], "art": ["Paint with language instead of brushes", "Oil, ink, or watercolor—your call", "Gallery walls start as sentences", "Abstract becomes tangible here", "Brushstroke precision from text", "Art direction in a single line", "From sketchbook to finished piece", "Style transfer of the imagination", "Curate a world that does not exist yet", "Fine art resolution of your idea"], "portraits": ["Faces that feel familiar and new", "Character sheets from a short brief", "Expression, age, and mood in words", "Portrait lighting without a studio", "Identity preserved, style transformed", "Headshots that match the brief", "Emotion written into the eyes", "Cast any character you describe", "Skin, hair, and light under control", "Likeness guided by your references"], "cinematic": ["Cinematic frames from a logline", "Camera moves described, then seen", "Film stills that never needed a set", "Mood boards that become final frames", "Anamorphic feeling from a prompt", "Story beats as still images", "Color grade before the shoot", "Blocking without a crew", "Scene continuity from text", "Director notes, visual results"], "fantasy": ["Worlds that only exist in your head", "Dragons, cities, and quiet magic", "Myth made visible in minutes", "Enchanted forests on demand", "Armor, castles, and soft power", "Creatures from half-remembered dreams", "Spell light and ancient stone", "Epic scale from a short line", "Lore you can finally see", "Fantasy that feels photographed"], "design": ["Product shots before the prototype", "Packaging concepts in real light", "Brand systems as living images", "UI mockups that look shipped", "Material studies without samples", "Layout exploration at image speed", "Typography meets atmosphere", "Design directions you can show", "Concept art ready for clients", "Visual systems that scale"], "restoration": ["Bring faded photos back to life", "Repair damage with careful AI", "Colorize history with respect", "Sharpen what time softened", "Recover detail from old scans", "Restore faces with gentle care", "Archive quality from imperfect sources", "Healing tools guided by description", "Make memory look present again", "Preserve, enhance, then share"], "imagination": ["What if the sky were different", "Rewrite the weather in a frame", "Place yourself in any era", "Objects that should not exist—yet do", "Surreal scenes that still feel real", "Impossible architecture, solid light", "Hybrid creatures with believable form", "Parallel versions of familiar places", "Stories that only images can tell", "The next idea is already forming"]}
+verbs = ["Create", "Build", "Craft", "Shape", "Forge", "Design", "Invent", "Compose", "Render", "Generate", "Reveal", "Unlock", "Spark", "Ignite", "Launch"]
+nouns = ["vision", "idea", "scene", "world", "portrait", "story", "moment", "mood", "style", "frame", "concept", "dream", "look", "atmosphere", "character"]
+adj = ["bold", "quiet", "cinematic", "vivid", "subtle", "epic", "intimate", "surreal", "precise", "playful", "dramatic", "soft", "sharp", "warm", "cool"]
+endings = ["today", "now", "in one prompt", "with a single description", "from pure imagination", "before the day ends", "while inspiration is fresh", "without leaving this page", "and share it instantly", "as only you would"]
+lines = set()
+for lst in bases.values():
+    for s in lst: lines.add(s.rstrip("."))
+for v,n,a,e in itertools.product(verbs, nouns, adj, endings):
+    if len(lines) >= 2300: break
+    lines.add(f"{v} a {a} {n} {e}")
+for v,n in itertools.product(verbs, nouns):
+    lines.add(f"{v} the {n} you have been holding")
+    lines.add(f"Your {n} deserves a {random.choice(adj)} frame")
+prefixes = ["Start with", "Begin from", "Lean into", "Follow", "Trust", "Explore", "Push", "Refine", "Expand", "Focus on"]
+mids = ["the feeling", "the light", "the subject", "the atmosphere", "the detail", "the silhouette", "the color", "the motion", "the silence", "the scale"]
+for p,m in itertools.product(prefixes, mids):
+    lines.add(f"{p} {m}, then describe the rest")
+    lines.add(f"{p} {m} and let the image arrive")
+clean=[]; seen=set()
+for s in sorted(lines):
+    s=" ".join(s.split()).strip(" .")
+    if not s or len(s)<12 or len(s)>90: continue
+    k=s.lower()
+    if k in seen: continue
+    seen.add(k); clean.append(s+".")
+    if len(clean)>=2000: break
+assert len(clean)==2000 and len(set(clean))==2000
+A,B=clean[:1000],clean[1000:]
+def fmt(arr,name):
+    body=",\n".join(f'  "{x}"' for x in arr)
+    return f"export const {name}: readonly string[] = [\n{body},\n];\n"
+Path("src/lib/studio/studio-taglines-a.ts").write_text(fmt(A,"STUDIO_TAGLINES_A"))
+Path("src/lib/studio/studio-taglines-b.ts").write_text(fmt(B,"STUDIO_TAGLINES_B"))
+print("TAGLINES_OK", len(A)+len(B))
+PY
+      - name: Commit
+        run: |
+          git config user.name "firstaimrun73"
+          git config user.email "firstaimrun73@users.noreply.github.com"
+          git add src/components/editor/image/ImageEditor.tsx src/lib/studio/studio-taglines-a.ts src/lib/studio/studio-taglines-b.ts
+          git status
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(image-studio): remove duplicate preview, 2000 unique taglines, mode icons, balance, focus-stop"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
