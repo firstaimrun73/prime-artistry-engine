@@ -1,0 +1,54 @@
+name: emergency-restore-ie
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/emergency-restore-ie.yml'
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: emergency-restore-ie
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 20
+      - name: Restore known-good files from f3bacb03
+        run: |
+          set -euo pipefail
+          GOOD=f3bacb03f70f1f0a7a07b42326a98581b63c6573
+          BASE=https://raw.githubusercontent.com/firstaimrun73/prime-artistry-engine/${GOOD}
+          curl -fsSL "$BASE/src/lib/generate.functions.ts" -o src/lib/generate.functions.ts
+          curl -fsSL "$BASE/src/components/editor/image/ImageEditor.tsx" -o src/components/editor/image/ImageEditor.tsx
+          curl -fsSL "$BASE/src/components/editor/EditorUpload.tsx" -o src/components/editor/EditorUpload.tsx
+          curl -fsSL "$BASE/src/lib/studio/studio-taglines-a.ts" -o src/lib/studio/studio-taglines-a.ts
+          curl -fsSL "$BASE/src/lib/studio/studio-taglines-b.ts" -o src/lib/studio/studio-taglines-b.ts
+          # Keep InspirationTagline if already fixed; otherwise restore
+          if ! grep -q 'font-bold' src/components/editor/image/InspirationTagline.tsx 2>/dev/null; then
+            curl -fsSL "$BASE/src/components/editor/image/InspirationTagline.tsx" -o src/components/editor/image/InspirationTagline.tsx || true
+          fi
+          test -s src/lib/generate.functions.ts
+          test -s src/components/editor/image/ImageEditor.tsx
+          grep -q 'FAL_API_KEY' src/lib/generate.functions.ts
+          grep -q 'InspirationTagline' src/components/editor/image/ImageEditor.tsx
+          grep -qv 'PLACEHOLDER' src/lib/generate.functions.ts
+          echo RESTORE_OK
+      - name: Commit restore
+        run: |
+          git config user.name "firstaimrun73"
+          git config user.email "firstaimrun73@users.noreply.github.com"
+          git add src/lib/generate.functions.ts \
+                  src/components/editor/image/ImageEditor.tsx \
+                  src/components/editor/EditorUpload.tsx \
+                  src/lib/studio/studio-taglines-a.ts \
+                  src/lib/studio/studio-taglines-b.ts \
+                  src/components/editor/image/InspirationTagline.tsx || true
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(image-studio): emergency restore from f3bacb03 — undo PLACEHOLDER regression"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
