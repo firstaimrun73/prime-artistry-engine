@@ -27,6 +27,8 @@ import {
 } from "@/lib/billing";
 import { buildVideoFromRegistry } from "@/lib/video-fal-step";
 import { computeImageExperienceCredits } from "@/lib/studio/image/image-experience-credits";
+import { assertImageExperienceAccess } from "@/lib/studio/image/image-experience-access";
+import { maxImagesForStudioTier } from "@/lib/studio/studio-tier";
 import { isAdminClaims } from "@/lib/admin-guard.server";
 import {
   executeStandardImage,
@@ -195,6 +197,18 @@ export const generateMedia = createServerFn({ method: "POST" })
 
     const plan = (profile.plan || "free") as PlanId;
     const credits = profile.credits ?? 0;
+
+    // Authoritative experience entitlement - never trust client-only tier selection
+    if (data.type === "image" && data.studioTier) {
+      assertImageExperienceAccess(plan, data.studioTier, isAdmin);
+      const multi = (data.imageUrls || []).filter(Boolean) as string[];
+      const expMax = maxImagesForStudioTier(data.studioTier);
+      if (multi.length > expMax && !isAdmin) {
+        throw new Error(
+          `This experience allows up to ${expMax} reference images (received ${multi.length}).`,
+        );
+      }
+    }
 
     let cost = 0;
     let reservedVideoQuote: GenerationQuote | null = null;

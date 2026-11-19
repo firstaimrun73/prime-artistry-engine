@@ -204,6 +204,7 @@ export function maxImagesForStudioTier(tier: StudioTier): number {
     case "pro":
       return 10;
     case "premium":
-      return 10;
+      // Ultra AI product cap is 9 reference images
+      return 9;
   }
 }

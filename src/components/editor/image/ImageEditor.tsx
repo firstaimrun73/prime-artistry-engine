@@ -28,6 +28,8 @@ import { isSponsorUnlockActive } from "@/lib/sponsor-unlock";
 import { toast } from "sonner";
 import { RotateCcw, Image as ImageIcon, ChevronDown, Mic, Sparkles, Upload as UploadIcon } from "lucide-react";
 import { StudioBackLink } from "@/components/StudioBackLink";
+import { resolveAvatarSrc } from "@/lib/avatar-presets";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { readKeepWatermarkPref } from "@/lib/watermark-pref";
 import type { GenState, GalleryItem } from "@/lib/editor/editor.types";
 import {
@@ -620,6 +622,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   };
 
   const runGenerate = async () => {
+    if (!isAdmin && !canAccessImageExperience(profile?.plan, studioTier, isAdmin)) {
+      toast.error("Upgrade to use this experience.");
+      window.location.href = "/pricing";
+      return;
+    }
     if (!prompt.trim()) return toast.error("Enter a prompt first.");
     await runImageJob({ jobPrompt: prompt.trim() });
   };
@@ -914,6 +921,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                                   studioTier === tier && "bg-[#FF5A1F]/10 text-[#FF5A1F]",
                                 )}
                                 onClick={() => {
+                                  if (!canAccessImageExperience(profile?.plan, tier, isAdmin)) {
+                                    setTierMenuOpen(false);
+                                    window.location.href = "/pricing";
+                                    return;
+                                  }
                                   setStudioTier(tier);
                                   const preferred = studioTierToImageQuality(tier);
                                   if (!qualityTouchedRef.current) setImageQuality(preferred);
@@ -921,6 +933,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                                 }}
                               >
                                 {studioExperienceLabel(tier)}
+                                {!canAccessImageExperience(profile?.plan, tier, isAdmin) && (
+                                  <span className="ml-2 shrink-0 text-[11px] font-semibold text-[#FF5A1F]">Upgrade</span>
+                                )}
                               </button>
                             </li>
                           ))}
@@ -952,7 +967,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                     <img
                       src={displayPreview}
                       alt="Selected"
-                      className="max-h-[min(28vh,240px)] w-auto max-w-full object-contain sm:max-h-[min(34vh,320px)] lg:max-h-[min(48vh,480px)]"
+                      className="max-h-[min(18vh,160px)] w-auto max-w-full object-contain sm:max-h-[min(20vh,180px)] lg:max-h-[min(28vh,260px)]"
                       draggable={false}
                     />
                   </button>
