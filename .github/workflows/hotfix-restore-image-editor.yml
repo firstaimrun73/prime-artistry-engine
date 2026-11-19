@@ -11,6 +11,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Download known-good ImageEditor (ed91933b33c6, 51k)
         run: |
           curl -fsSL -o src/components/editor/image/ImageEditor.tsx \
@@ -21,11 +23,15 @@ jobs:
           ! grep -q "Image Studio loading" src/components/editor/image/ImageEditor.tsx
           ! grep -q "PLACEHOLDER" src/components/editor/image/ImageEditor.tsx
           test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 50000
-      - name: Commit restored full ImageEditor
+      - name: Commit and push restored full ImageEditor
         run: |
           git config user.name "firstaimrun73"
           git config user.email "firstaimrun73@gmail.com"
           git add src/components/editor/image/ImageEditor.tsx
-          git diff --cached --quiet && echo "already good" && exit 0
+          if git diff --cached --quiet; then
+            echo "already good"
+            exit 0
+          fi
           git commit -m "CRITICAL HOTFIX: restore full 51k ImageEditor.tsx from ed91933b33c6 (working generation, multi-ref, experience locks)"
-          git push
+          git pull --rebase origin main || true
+          git push origin HEAD:main
