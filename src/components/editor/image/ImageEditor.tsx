@@ -26,7 +26,8 @@ import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWa
 import { FreeUserSponsorStrip } from "@/components/sponsor/FreeUserSponsorStrip";
 import { isSponsorUnlockActive } from "@/lib/sponsor-unlock";
 import { toast } from "sonner";
-import { RotateCcw, Image as ImageIcon, ChevronDown, Mic, Sparkles, Upload as UploadIcon } from "lucide-react";
+import { RotateCcw, Image as ImageIcon, ChevronDown, Mic, Sparkles, Upload as UploadIcon, Crown, WandSparkles } from "lucide-react";
+import { InspirationTagline } from "@/components/editor/image/InspirationTagline";
 import { StudioBackLink } from "@/components/StudioBackLink";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -87,6 +88,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   const [prompt, setPrompt] = useState(bootstrap?.initialPrompt ?? "");
+  const [promptFocused, setPromptFocused] = useState(false);
   const [inputPreview, setInputPreview] = useState<string | null>(
     bootstrap?.reuseUrl && bootstrap.reuseKind !== "video" ? bootstrap.reuseUrl : null,
   );
@@ -937,7 +939,12 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                                   setTierMenuOpen(false);
                                 }}
                               >
-                                {studioExperienceLabel(tier)}
+                                <span className="inline-flex items-center gap-1.5">
+                                  {tier === "standard" && <ImageIcon className="h-3.5 w-3.5 shrink-0 opacity-80" />}
+                                  {tier === "pro" && <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-80" />}
+                                  {tier === "premium" && <Crown className="h-3.5 w-3.5 shrink-0 opacity-80" />}
+                                  {studioExperienceLabel(tier)}
+                                </span>
                                 {!canAccessImageExperience(profile?.plan, tier, isAdmin) && (
                                   <span className="ml-2 shrink-0 text-[11px] font-semibold text-[#FF5A1F]">Upgrade</span>
                                 )}
@@ -953,9 +960,12 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {!isAdmin && (
-                <span className="rounded-full border border-border/50 bg-card/50 px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground backdrop-blur-sm">
-                  {profile?.credits ?? 0} credits
-                </span>
+                <div className="flex flex-col items-end rounded-xl border border-border/50 bg-card/60 px-2.5 py-1 backdrop-blur-sm leading-tight">
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Balance</span>
+                  <span className="text-xs font-bold tabular-nums text-foreground sm:text-sm">
+                    {profile?.credits ?? 0} <span className="font-medium text-muted-foreground">credits</span>
+                  </span>
+                </div>
               )}
               <button
                 type="button"
@@ -977,38 +987,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           <div className="grid min-h-0 flex-1 gap-2 overflow-hidden lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.75fr)] lg:gap-4">
             {/* REFERENCES — compact strip (no large empty display) */}
             <section className="flex min-h-0 min-w-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/40 shadow-sm backdrop-blur-xl lg:min-h-0 lg:flex-1">
-              <div className="flex shrink-0 items-center justify-center p-1.5 sm:p-2">
-                {displayPreview ? (
-                  <button
-                    type="button"
-                    className="relative max-h-full max-w-full overflow-hidden rounded-xl"
-                    onClick={() => setLightboxSrc(displayPreview)}
-                  >
-                    <img
-                      src={displayPreview}
-                      alt="Selected"
-                      className="max-h-[min(12vh,110px)] w-auto max-w-full object-contain sm:max-h-[min(14vh,120px)] lg:max-h-[min(16vh,140px)]"
-                      draggable={false}
-                    />
-                  </button>
-                ) : prompt.trim() ? (
-                  <div className="max-w-md px-3 text-center">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#FF5A1F]/80">
-                      Prompt preview
-                    </p>
-                    <p className="mt-1 line-clamp-3 text-sm text-foreground/90 sm:line-clamp-4">
-                      {prompt.trim()}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex max-w-sm flex-col items-center px-3 py-2 text-center">
-                    <ImageIcon className="mb-1.5 h-7 w-7 text-[#FF5A1F]/30" strokeWidth={1.5} />
-                    <p className="text-xs font-medium text-muted-foreground sm:text-sm">
-                      Describe or upload to begin
-                    </p>
-                  </div>
-                )}
-              </div>
+              {/* Empty-state inspiration only — no large selected-image preview */}
+              {gallery.length === 0 && !promptFocused && !prompt.trim() && (
+                <InspirationTagline active className="shrink-0" />
+              )}
 
               {/* Compact upload + gallery (always available; not a tall dropzone) */}
               <div className="shrink-0 border-t border-border/30 px-2 py-1.5">
@@ -1087,6 +1069,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
                   ref={taRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
+                  onFocus={() => setPromptFocused(true)}
+                  onBlur={() => setPromptFocused(false)}
                   disabled={loading}
                   rows={2}
                   placeholder="Describe what you want to create..."
