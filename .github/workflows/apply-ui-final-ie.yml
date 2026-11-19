@@ -4,7 +4,9 @@ on:
   push:
     paths:
       - ".github/workflows/apply-ui-final-ie.yml"
-      - ".restore/apply_ui_final_embedded.py"
+      - ".restore/apply_ui_final_embedded_p1.py.txt"
+      - ".restore/apply_ui_final_embedded_p2.py.txt"
+      - ".restore/assemble_emb.py"
 permissions:
   contents: write
 jobs:
@@ -18,9 +20,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 5
-      - name: Apply UI final
+      - name: Assemble and apply
         run: |
           set -euo pipefail
+          python3 .restore/assemble_emb.py
           python3 .restore/apply_ui_final_embedded.py
       - name: Commit
         run: |
