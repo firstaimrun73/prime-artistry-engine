@@ -3,10 +3,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - '.restore/ie_fix_a.py'
-      - '.restore/ie_fix_b.py'
-      - '.restore/gen_fix_a.py'
-      - '.restore/gen_fix_b.py'
+      - '.restore/ie_c*.txt'
+      - '.restore/gen_c*.txt'
+      - '.restore/ie_n.txt'
+      - '.restore/gen_n.txt'
       - '.restore/apply_image_studio_fix.py'
       - '.github/workflows/apply-image-studio-fix.yml'
 concurrency:
@@ -24,6 +24,7 @@ jobs:
       - name: Apply package
         run: |
           set -euo pipefail
+          ls -la .restore/ie_c*.txt .restore/gen_c*.txt
           python3 .restore/apply_image_studio_fix.py
           test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 40000
           grep -q canAccessImageExperience src/components/editor/image/ImageEditor.tsx
