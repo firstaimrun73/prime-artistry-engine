@@ -1,0 +1,41 @@
+name: surgical-ie-auth-ui-v2
+on:
+  push:
+    paths:
+      - '.github/workflows/surgical-ie-auth-ui-v2.yml'
+      - '.restore/surgical_apply_p1.py.txt'
+      - '.restore/surgical_apply_p2.py.txt'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: surgical-ie-auth-ui-v2
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 5
+      - name: Assemble and run surgical script
+        run: |
+          set -euo pipefail
+          cat .restore/surgical_apply_p1.py.txt .restore/surgical_apply_p2.py.txt > /tmp/surgical_apply.py
+          python3 /tmp/surgical_apply.py
+      - name: Commit
+        run: |
+          git config user.name "firstaimrun73"
+          git config user.email "firstaimrun73@users.noreply.github.com"
+          git add src/lib/generate.functions.ts \
+                  src/components/editor/image/ImageEditor.tsx \
+                  src/components/editor/EditorUpload.tsx \
+                  src/lib/studio/studio-taglines-a.ts \
+                  src/lib/studio/studio-taglines-b.ts
+          git status
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(image-studio): FAL key diagnostics, 266 quality taglines, centered empty workspace; Auto/Composer + refund intact"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
