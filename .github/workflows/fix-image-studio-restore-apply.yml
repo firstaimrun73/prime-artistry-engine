@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/fix-image-studio-restore-apply.yml"
       - ".restore/apply_surgical_image_studio.py"
+permissions:
+  contents: write
 jobs:
   apply:
     runs-on: ubuntu-latest
