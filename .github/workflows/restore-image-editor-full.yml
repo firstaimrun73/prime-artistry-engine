@@ -1,9 +1,11 @@
-name: restore-image-editor-full
+name: Restore full ImageEditor
 on:
   workflow_dispatch:
   push:
     paths:
-      - ".github/workflows/restore-image-editor-full.yml"
+      - ".restore/ie_full_part*.txt"
+      - "scripts/assemble_image_editor_full.py"
+      - ".restore/TRIGGER_IE_FULL"
 jobs:
   restore:
     runs-on: ubuntu-latest
@@ -11,21 +13,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Restore full ImageEditor
+      - name: Assemble ImageEditor
+        run: python3 scripts/assemble_image_editor_full.py
+      - name: Verify
         run: |
-          set -euo pipefail
-          git show 53c55f95c0d2c4623f6ce0fd7b2be14de11b8724:src/components/editor/image/ImageEditor.tsx > /tmp/ImageEditor.tsx
-          python3 scripts/patch-image-editor-sponsor.py /tmp/ImageEditor.tsx src/components/editor/image/ImageEditor.tsx
-
-      - name: Commit
+          wc -c src/components/editor/image/ImageEditor.tsx
+          grep -q "VoiceInputButton" src/components/editor/image/ImageEditor.tsx
+          grep -q "pickStudioTagline" src/components/editor/image/ImageEditor.tsx
+          grep -q "canAccessImageExperience" src/components/editor/image/ImageEditor.tsx
+          ! grep -q "Image Studio loading" src/components/editor/image/ImageEditor.tsx
+          ! grep -q "Describe or upload" src/components/editor/image/ImageEditor.tsx
+      - name: Commit restored file
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "firstaimrun73"
+          git config user.email "firstaimrun73@gmail.com"
           git add src/components/editor/image/ImageEditor.tsx
-          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
-          git commit -m "fix(image-studio): restore full ImageEditor + client-only FreeUserSponsorStrip"
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "CRITICAL HOTFIX: restore full 52k ImageEditor.tsx (MOTIO2EDIT VoiceInput + taglines + multi-ref + experience locks)"
           git push
