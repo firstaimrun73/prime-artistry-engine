@@ -1,0 +1,32 @@
+name: Apply surgical Image Studio fixes
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.restore/apply_surgical_image_studio.py'
+      - '.github/workflows/apply-surgical-image-studio.yml'
+concurrency:
+  group: apply-surgical-image-studio
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply surgical patches
+        run: |
+          set -euo pipefail
+          python3 .restore/apply_surgical_image_studio.py
+          grep -q 'return 9' src/lib/studio/studio-tier.ts
+          grep -q assertImageExperienceAccess src/lib/generate.functions.ts
+          grep -q 'Upgrade to use this experience' src/components/editor/image/ImageEditor.tsx || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/studio/studio-tier.ts src/lib/generate.functions.ts src/components/editor/image/ImageEditor.tsx
+          if git diff --cached --quiet; then echo no changes; exit 0; fi
+          git commit -m "fix(image-studio): free-plan locks, server assert, Ultra 9 refs, tier Upgrade labels"
+          git push origin HEAD:main
