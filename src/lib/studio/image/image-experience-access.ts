@@ -39,7 +39,7 @@ export function canAccessImageExperience(
   tier: StudioTier,
   isAdmin = false,
 ): boolean {
-  void isAdmin;
+  if (isAdmin) return true;
   const planId = normalizePlanId(plan);
   return (IMAGE_EXPERIENCE_ALLOWED_PLANS[tier] as readonly string[]).includes(planId);
 }
