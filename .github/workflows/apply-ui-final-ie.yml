@@ -4,8 +4,7 @@ on:
   push:
     paths:
       - ".github/workflows/apply-ui-final-ie.yml"
-      - ".restore/ui_payload_final/**"
-      - ".restore/apply_ui_final.py"
+      - ".restore/apply_ui_final_embedded.py"
 permissions:
   contents: write
 jobs:
@@ -22,7 +21,7 @@ jobs:
       - name: Apply UI final
         run: |
           set -euo pipefail
-          python3 .restore/apply_ui_final.py
+          python3 .restore/apply_ui_final_embedded.py
       - name: Commit
         run: |
           git config user.name "firstaimrun73"
