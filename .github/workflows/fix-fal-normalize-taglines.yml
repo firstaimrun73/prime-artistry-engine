@@ -1,0 +1,96 @@
+name: fix-fal-normalize-taglines
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fix-fal-normalize-taglines.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: fix-fal-normalize-taglines
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 5
+      - name: Patch generate.functions + taglines + InspirationTagline
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          from pathlib import Path
+          import json, re
+
+          gf_path = Path('src/lib/generate.functions.ts')
+          gf = gf_path.read_text()
+          old = '''    const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;\n    if (!falKey) throw new Error("FAL API key is not configured.");'''
+          new = '''    // Existing Production FAL env only — normalize whitespace/quotes; never rotate keys here.\n    const falKeyRaw = process.env.FAL_API_KEY || process.env.FAL_KEY || "";\n    const falKeySource = process.env.FAL_API_KEY ? "FAL_API_KEY" : process.env.FAL_KEY ? "FAL_KEY" : null;\n    const falKey = falKeyRaw.trim().replace(/^[\'"]|[\'"]$/g, "");\n    if (!falKey) {\n      console.error("[generate] FAL env missing at runtime", { hasFAL_API_KEY: Boolean(process.env.FAL_API_KEY), hasFAL_KEY: Boolean(process.env.FAL_KEY) });\n      throw new Error("FAL API key is not configured.");\n    }\n    console.info("[generate] FAL auth context", { source: falKeySource, keyLen: falKey.length, studioTier: (data as { studioTier?: string | null }).studioTier ?? null, type: data.type, hasImageUrl: Boolean(data.imageUrl) });'''
+          if old not in gf:
+            if 'keyLen:' in gf and 'FAL auth context' in gf:
+              print('generate already normalized')
+            else:
+              raise SystemExit('FAL block not found')
+          else:
+            gf_path.write_text(gf.replace(old, new, 1))
+            print('generate.functions normalized')
+
+          # ImageEditor centering
+          ie_path = Path('src/components/editor/image/ImageEditor.tsx')
+          ie = ie_path.read_text()
+          assert 'useServerFn(generateMedia)' in ie and 'imageUrl: mediaUrl' in ie
+          a = '''              {gallery.length === 0 && !promptFocused && !prompt.trim() && (\n                <InspirationTagline active className="shrink-0" />\n              )}\n\n              {/* Compact upload + gallery (always available; not a tall dropzone) */}\n              <div className="shrink-0 border-t border-border/30 px-2 py-1.5">'''
+          b = '''              {gallery.length === 0 && !promptFocused && !prompt.trim() && (\n                <InspirationTagline active className="w-full shrink-0" />\n              )}\n\n              {/* Compact upload + gallery — centered when empty */}\n              <div className={gallery.length === 0 ? "flex flex-1 flex-col items-center justify-center px-3 pb-4 pt-1 sm:pb-6" : "shrink-0 border-t border-border/30 px-2 py-1.5"}>'''
+          if a in ie:
+            ie_path.write_text(ie.replace(a, b, 1))
+            print('ImageEditor centered')
+          else:
+            print('ImageEditor pattern skip')
+
+          # InspirationTagline
+          Path('src/components/editor/image/InspirationTagline.tsx').write_text('''/**\n * Empty-state creative inspiration for Image Studio.\n * Rotates until user focuses/types or adds references.\n * Bold foreground text, centered.\n */\nimport { useEffect, useState } from "react";\nimport { cn } from "@/lib/utils";\nimport { pickStudioTagline } from "@/lib/studio/studio-taglines";\n\nconst INTERVAL_MS = 7000;\nconst FADE_MS = 420;\n\ntype Props = { active: boolean; className?: string };\n\nexport function InspirationTagline({ active, className }: Props) {\n  const [line, setLine] = useState(() => pickStudioTagline());\n  const [visible, setVisible] = useState(true);\n  useEffect(() => {\n    if (!active) return;\n    let cancelled = false;\n    let fadeTimer: ReturnType<typeof setTimeout> | undefined;\n    const id = setInterval(() => {\n      setVisible(false);\n      fadeTimer = setTimeout(() => {\n        if (cancelled) return;\n        setLine((prev) => pickStudioTagline(prev));\n        setVisible(true);\n      }, FADE_MS);\n    }, INTERVAL_MS);\n    return () => { cancelled = true; clearInterval(id); if (fadeTimer) clearTimeout(fadeTimer); };\n  }, [active]);\n  if (!active) return null;\n  return (\n    <div className={cn("flex w-full items-center justify-center px-4 py-3 text-center sm:px-6 sm:py-4", className)} aria-live="polite">\n      <p className={cn("max-w-lg text-base font-bold leading-snug tracking-tight text-foreground transition-opacity duration-300 sm:text-lg", visible ? "opacity-100" : "opacity-0")}>{line}</p>\n    </div>\n  );\n}\n''')
+          print('InspirationTagline written')
+
+          # Quality taglines (200+)
+          lines = ["Create the world of your own thoughts.","Turn imagination into something extraordinary.","Your ideas deserve a beautiful canvas.","Imagine it. Describe it. Create it.","Give your imagination a new dimension.","Every picture begins with an idea.","Think beyond the ordinary.","Let your creativity take shape.","Make the impossible feel real.","Your vision, brought to life.","Describe the change. Watch it happen.","One prompt. Endless possibilities.","Shape light, color, and mood with words.","From a simple photo to a new story.","Your creativity starts here.","Build scenes that only you can see.","Turn a quiet idea into a vivid image.","Rewrite the moment. Keep the soul.","Bring faded memories back to clarity.","Change the background. Keep the subject.","Remove what doesn't belong.","Enhance what matters most.","Paint with language, finish with AI.","A blank frame is waiting for your words.","Transform the ordinary into art.","Capture the feeling, not just the scene.","Design the atmosphere you want to feel.","Soft light, strong intent.","Make portraits feel cinematic.","Turn day into golden hour.","Add drama without losing identity.","Let the subject shine.","Rewrite the sky. Keep the truth.","Create stillness that feels alive.","Find beauty in a single instruction.","Your next visual starts with a sentence.","Compose emotion before composition.","Make the impossible look natural.","Turn reference into refinement.","Guide the model. Own the result.","A better image is one prompt away.","Speak simply. Create boldly.","Keep the person. Change the world around them.","Refine the frame with intention.","Give old photos a second life.","Invent a place that feels real.","Light is a language. Write it carefully.","Make quiet images speak loudly.","Turn sketches of thought into photographs.","Control mood with a few clear words.","Create what cameras alone cannot.","Transform reality without losing honesty.","Shape identity-preserving edits.","Clean the noise. Keep the character.","Make product shots feel premium.","Turn a snapshot into a statement.","Build cinematic tension in one frame.","Let color tell the story.","Design the scene you wished you had.","Elevate everyday photographs.","Craft a look that is unmistakably yours.","Turn inspiration into instruction.","Bring dreamlike softness to real photos.","Sharpen the story, not just the edges.","Create portraits full of presence.","Rewrite weather, time, and season.","Make small changes with big impact.","Keep the face. Change the feeling.","Turn a prompt into a finished frame.","Your imagination deserves precision.","Make the background disappear.","Reveal the best version of the photo.","Create calm, clarity, and focus.","Turn clutter into clean composition.","Design luxury with simple language.","Make the subject impossible to ignore.","Restore warmth to cold images.","Add depth without distortion.","Create night scenes that still feel true.","Turn a selfie into a portrait.","Make textures feel tactile.","Guide style without losing substance.","Create editorial energy in one click.","Let the frame breathe.","Turn memory into a finished image.","Build atmosphere from a short sentence.","Make color grading feel intentional.","Create cinematic contrast with care.","Transform outfits while keeping identity.","Rewrite the setting, not the person.","Make every pixel earn its place.","Turn vague ideas into clear visuals.","Create images worth keeping.","Shape light the way a director would.","Make the ordinary extraordinary.","Turn a description into a destination.","Create art that still feels photographic.","Refine until the image feels right.","Give your prompt room to breathe.","Make realism and imagination meet.","Turn a still into a story.","Create presence, not just polish.","Make the edit invisible where it should be.","Design the mood first.","Turn reference photos into new scenes.","Create clarity out of chaos.","Make the subject feel closer.","Build a world inside a single frame.","Turn intention into image.","Create soft transitions and strong results.","Make restoration look effortless.","Rewrite the lighting plan.","Turn a sketch of an idea into a finish.","Create images that feel deliberate.","Keep honesty. Add craft.","Make quiet edits speak clearly.","Turn a prompt into polish.","Create the look you can describe.","Shape emotion through composition.","Make the frame feel complete.","Turn ordinary light into atmosphere.","Create portraits with character.","Rewrite the background story.","Make detail feel natural again.","Turn imagination into a usable image.","Create space for the subject to breathe.","Make style serve the story.","Turn a few words into a finished edit.","Create cinematic calm.","Make the impossible practical.","Turn a photo into a new chapter.","Create balance between realism and wonder.","Make the edit feel inevitable.","Turn inspiration into a clean result.","Create images that hold attention.","Make every change purposeful.","Turn the prompt into the plan.","Create the scene you can already see.","Make identity the priority.","Turn noise into nuance.","Create depth that feels honest.","Make the image feel finished.","Turn a simple request into craft.","Create beauty without excess.","Make the subject the hero.","Create the look of intention.","Make the edit disappear into the photo.","Turn description into direction.","Create images that feel lived-in.","Make light work for the story.","Turn a concept into a clear picture.","Create quiet power in a single image.","Make restoration feel respectful.","Turn style into substance.","Create frames worth sharing.","Make the prompt do real work.","Turn vision into visible form.","Create the next version of this photo.","Make imagination practical.","Turn a wish into a working image.","Create clarity, color, and confidence.","Make the background support the subject.","Turn editing into storytelling.","Create images with quiet confidence.","Make every word count.","Turn the blank space into possibility.","Create the world you can describe.","Make the photo match the idea.","Turn a feeling into a finish.","Create images that feel inevitable.","Make the craft invisible.","Turn a request into a result.","Create the scene that was missing.","Make identity-safe creativity the default.","Turn a simple edit into a strong image.","Create presence with precision.","Make the ordinary frame remarkable.","Turn intention into impact.","Create the image you meant to take.","Make imagination concrete.","Turn a prompt into proof.","Create something only you would ask for.","Make the workspace feel creative again.","Turn description into discovery.","Create the next frame of your story.","Make the result feel earned.","Turn a photo into possibility.","Create with clarity and care.","Make the vision visible.","Turn words into worlds.","Create images that stay with you.","Make the edit serve the emotion.","Turn a thought into a finished picture.","Create the look you can name.","Make the process feel simple.","Turn complexity into one clear instruction.","Create beauty that still feels true.","Make the subject unmistakable.","Turn a moment into a finished work.","Create the image behind the idea.","Make creativity feel immediate.","Turn a blank canvas into a beginning.","Create what you can already imagine.","Make the result match the request.","Turn a short prompt into a strong image.","Create the atmosphere you need.","Make every generation intentional.","Turn inspiration into instruction, then image.","Create frames that feel complete.","Make the studio work for your ideas.","Turn the ordinary into the intentional.","Create images that feel designed.","Make the process disappear.","Turn a description into a decision.","Create the picture you can defend.","Make the idea visible now.","Turn imagination into something shareable.","Create with purpose, not noise.","Make the photo become the idea.","Turn a single sentence into a scene.","Create the world inside the frame.","Make creativity feel precise.","Turn a request into a reliable result.","Create images that feel authored.","Make the next frame better than the last.","Turn vision into a finished edit.","Create the image that matches the words.","Make the studio a place for ideas.","Turn a quiet prompt into a loud image.","Create something worth keeping.","Make the idea land clearly.","Turn a concept into a clean photograph.","Create the mood first, then the details.","Make the result feel inevitable.","Turn a few words into a finished look.","Create images that respect the subject.","Make the process simple and strong.","Turn imagination into a usable frame.","Create the next version of your vision.","Make every prompt count.","Create images that feel considered.","Make the edit feel natural.","Turn a thought into a tangible picture.","Create the scene you can describe in one line.","Make the studio respond to your intent.","Turn a description into a destination image.","Create with clarity from the first try.","Make the photo finish the idea.","Turn inspiration into a finished image.","Create the look that only you asked for.","Make the result feel true to the prompt.","Turn a simple idea into a strong visual.","Create images that hold the story.","Make the frame feel deliberate.","Turn words into a working picture.","Create the atmosphere the moment needs.","Make creativity practical and precise.","Turn a prompt into a polished result.","Create the image that answers the request.","Make the studio feel ready.","Turn imagination into visible form.","Create something extraordinary from something simple."]
+          seen=set(); clean=[]
+          for t in lines:
+            if t not in seen:
+              seen.add(t); clean.append(t)
+          assert len(clean) >= 200, len(clean)
+          half=len(clean)//2
+          def emit(name, arr):
+            body=',\n'.join('  '+json.dumps(s) for s in arr)
+            return f'export const {name}: readonly string[] = [\n{body},\n];\n'
+          Path('src/lib/studio/studio-taglines-a.ts').write_text(emit('STUDIO_TAGLINES_A', clean[:half]))
+          Path('src/lib/studio/studio-taglines-b.ts').write_text(emit('STUDIO_TAGLINES_B', clean[half:]))
+          print('taglines', len(clean))
+
+          # EditorUpload button
+          eu=Path('src/components/editor/EditorUpload.tsx')
+          t=eu.read_text()
+          t2=t.replace(
+            'className="group inline-flex items-center gap-2 rounded-2xl border border-dashed border-[#FF5A1F]/50 bg-[#FF5A1F]/5 px-5 py-2.5 text-sm font-semibold text-[#FF5A1F] transition hover:border-[#FF5A1F] hover:bg-[#FF5A1F]/10 disabled:opacity-50"',
+            'className="group inline-flex items-center gap-2 rounded-2xl border-2 border-dashed border-[#FF5A1F]/55 bg-[#FF5A1F]/8 px-6 py-3 text-sm font-bold text-[#FF5A1F] shadow-sm transition hover:border-[#FF5A1F] hover:bg-[#FF5A1F]/15 disabled:opacity-50 sm:px-8 sm:py-3.5 sm:text-base"',
+          ).replace('className="flex justify-center py-1"','className="flex w-full justify-center py-2"')
+          eu.write_text(t2)
+          print('EditorUpload ok')
+          print('ALL_OK')
+          PY
+      - name: Commit
+        run: |
+          git config user.name "firstaimrun73"
+          git config user.email "firstaimrun73@users.noreply.github.com"
+          git add src/lib/generate.functions.ts \
+                  src/components/editor/image/ImageEditor.tsx \
+                  src/components/editor/image/InspirationTagline.tsx \
+                  src/components/editor/EditorUpload.tsx \
+                  src/lib/studio/studio-taglines-a.ts \
+                  src/lib/studio/studio-taglines-b.ts
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(image-studio): normalize existing FAL env (no rotation); 200+ quality taglines; centered workspace; keep generateMedia"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
