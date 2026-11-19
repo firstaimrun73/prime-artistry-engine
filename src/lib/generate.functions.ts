@@ -185,8 +185,15 @@ export const generateMedia = createServerFn({ method: "POST" })
       claims: unknown;
     };
     const isAdmin = isAdminClaims(claims as any);
-    const falKey = process.env.FAL_API_KEY || process.env.FAL_KEY;
-    if (!falKey) throw new Error("FAL API key is not configured.");
+    // Existing Production FAL env only — normalize whitespace/quotes; never rotate keys here.
+    const falKeyRaw = process.env.FAL_API_KEY || process.env.FAL_KEY || "";
+    const falKeySource = process.env.FAL_API_KEY ? "FAL_API_KEY" : process.env.FAL_KEY ? "FAL_KEY" : null;
+    const falKey = falKeyRaw.trim().replace(/^['"]|['"]$/g, "");
+    if (!falKey) {
+      console.error("[generate] FAL env missing at runtime", { hasFAL_API_KEY: Boolean(process.env.FAL_API_KEY), hasFAL_KEY: Boolean(process.env.FAL_KEY) });
+      throw new Error("FAL API key is not configured.");
+    }
+    console.info("[generate] FAL auth context", { source: falKeySource, keyLen: falKey.length, studioTier: (data as { studioTier?: string | null }).studioTier ?? null, type: data.type, hasImageUrl: Boolean(data.imageUrl) });
 
     const { data: profile, error: profileErr } = await supabase
       .from("profiles")

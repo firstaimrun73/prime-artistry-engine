@@ -989,11 +989,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
             <section className="flex min-h-0 min-w-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-border/40 bg-card/40 shadow-sm backdrop-blur-xl lg:min-h-0 lg:flex-1">
               {/* Empty-state inspiration only — no large selected-image preview */}
               {gallery.length === 0 && !promptFocused && !prompt.trim() && (
-                <InspirationTagline active className="shrink-0" />
+                <InspirationTagline active className="w-full shrink-0" />
               )}
 
-              {/* Compact upload + gallery (always available; not a tall dropzone) */}
-              <div className="shrink-0 border-t border-border/30 px-2 py-1.5">
+              {/* Compact upload + gallery — centered when empty */}
+              <div className={gallery.length === 0 ? "flex flex-1 flex-col items-center justify-center px-3 pb-4 pt-1 sm:pb-6" : "shrink-0 border-t border-border/30 px-2 py-1.5"}>
                 <EditorUpload
                   fileRef={fileRef}
                   mediaType="image"

@@ -56,12 +56,12 @@ export function EditorUpload({
       <section className="min-w-0 space-y-2">
         {gallery.length === 0 ? (
           compact ? (
-            <div className="flex justify-center py-1">
+            <div className="flex w-full justify-center py-2">
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={videoLocked || loading}
-                className="group inline-flex items-center gap-2 rounded-2xl border border-dashed border-[#FF5A1F]/50 bg-[#FF5A1F]/5 px-5 py-2.5 text-sm font-semibold text-[#FF5A1F] transition hover:border-[#FF5A1F] hover:bg-[#FF5A1F]/10 disabled:opacity-50"
+                className="group inline-flex items-center gap-2 rounded-2xl border-2 border-dashed border-[#FF5A1F]/55 bg-[#FF5A1F]/8 px-6 py-3 text-sm font-bold text-[#FF5A1F] shadow-sm transition hover:border-[#FF5A1F] hover:bg-[#FF5A1F]/15 disabled:opacity-50 sm:px-8 sm:py-3.5 sm:text-base"
               >
                 <Upload className="h-5 w-5 animate-[pulse_2.5s_ease-in-out_infinite] transition group-hover:scale-110 group-hover:animate-none" />
                 Upload Image
