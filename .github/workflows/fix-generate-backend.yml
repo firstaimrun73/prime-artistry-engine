@@ -1,10 +1,10 @@
 name: Fix generate backend Premium/Ultra/Auto
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   push:
     paths:
-      - ".github/workflows/fix-generate-backend.yml"
       - ".github/scripts/patch_generate_backend.py"
+      - ".github/scripts/patch_ie_workspace.py"
 permissions:
   contents: write
 concurrency:
@@ -27,26 +27,8 @@ jobs:
           grep -n "falKey, runStep" src/lib/generate.functions.ts | head -5
           grep -n "AUTO_SERVER" src/lib/generate.functions.ts | head -3
           grep -n "workspaceMode" src/lib/generate.functions.ts | head -5
-      - name: Patch ImageEditor workspaceMode only
-        run: |
-          set -e
-          python3 -c "
-from pathlib import Path
-path = Path('src/components/editor/image/ImageEditor.tsx')
-text = path.read_text(encoding='utf-8')
-needle = 'keepWatermark: isFreePlanForWm ? true : keepWatermark,'
-idx = text.find(needle)
-assert idx != -1
-if 'workspaceMode,' in text[idx:idx+100]:
-    print('workspaceMode already present')
-else:
-    text = text.replace(needle + chr(10) + '        },', needle + chr(10) + '          workspaceMode,' + chr(10) + '        },', 1)
-    path.write_text(text, encoding='utf-8')
-    print('ImageEditor patched')
-assert 'export function ImageEditor' in path.read_text()
-assert 'ImageEditor stub' not in path.read_text()
-print('IE size', path.stat().st_size)
-"
+      - name: Patch ImageEditor workspaceMode
+        run: python3 .github/scripts/patch_ie_workspace.py
       - name: Commit
         run: |
           set -e
