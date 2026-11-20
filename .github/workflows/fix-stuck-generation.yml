@@ -1,0 +1,43 @@
+name: Fix stuck image generation
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - ".github/scripts/patch_stuck_generation.py"
+permissions:
+  contents: write
+concurrency:
+  group: fix-stuck-generation
+  cancel-in-progress: false
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Apply stuck-generation patches
+        run: python3 .github/scripts/patch_stuck_generation.py
+      - name: Verify markers
+        run: |
+          set -e
+          grep -n "90_000\|genRequestId\|fal submitted" src/lib/generate.functions.ts | head -15
+          grep -n "CLIENT_GEN_TIMEOUT_MS\|Promise.race" src/components/editor/image/ImageEditor.tsx | head -10
+          grep -n "90_000" src/lib/studio/image/standard/fal-client.ts | head -5
+          ! grep -q "retrying automatically" src/components/editor/image/ImageEditor.tsx
+          ! grep -q "ImageEditor stub" src/components/editor/image/ImageEditor.tsx
+      - name: Commit
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts src/lib/studio/image/standard/fal-client.ts src/components/editor/image/ImageEditor.tsx
+          git status
+          if git diff --cached --quiet; then
+            echo No changes
+          else
+            git commit -m "fix(image-studio): prevent stuck Auto generation (FAL deadline + client timeout + clear errors)"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
