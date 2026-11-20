@@ -1,0 +1,61 @@
+name: Apply generate.functions full fix
+on: [workflow_dispatch]
+permissions:
+  contents: write
+concurrency:
+  group: apply-gen-full-fix
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Decompress and write generate.functions.ts
+        run: |
+          set -e
+          python3 .restore/gen_payload/apply_gen.py
+          wc -c src/lib/generate.functions.ts
+          grep -n "falKey, runStep\|AUTO_SERVER\|workspaceMode:" src/lib/generate.functions.ts | head -20
+      - name: Ensure ImageEditor passes workspaceMode
+        run: |
+          set -e
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("src/components/editor/image/ImageEditor.tsx")
+          text = path.read_text(encoding="utf-8")
+          needle = "keepWatermark: isFreePlanForWm ? true : keepWatermark,"
+          idx = text.find(needle)
+          if idx == -1:
+              raise SystemExit("keepWatermark not found")
+          window = text[idx:idx+100]
+          if "workspaceMode," in window:
+              print("workspaceMode already in payload")
+          else:
+              text = text.replace(
+                  needle + "\n        },",
+                  needle + "\n          workspaceMode,\n        },",
+                  1,
+              )
+              path.write_text(text, encoding="utf-8")
+              print("added workspaceMode")
+          assert "export function ImageEditor" in path.read_text()
+          assert "ImageEditor stub" not in path.read_text()
+          print("IE", path.stat().st_size)
+          PY
+      - name: Commit
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts src/components/editor/image/ImageEditor.tsx
+          git status
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "fix(generate): correct Premium/Ultra execute + refs + Auto server orchestration"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
