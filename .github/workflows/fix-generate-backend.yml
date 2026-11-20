@@ -1,4 +1,4 @@
-name: Fix generate backend Premium Ultra Auto
+name: Fix generate backend Premium/Ultra/Auto
 on: [workflow_dispatch]
 permissions:
   contents: write
@@ -13,29 +13,49 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-      - name: Restore generate.functions.ts
+      - name: Apply generate.functions patch
         run: |
-          set -e
-          python3 .restore/gen_payload/apply_gen.py
+          set -e\n          python3 .github/scripts/patch_generate_backend.py
           wc -c src/lib/generate.functions.ts
-          grep -n 'runStep: runPremiumStep\|runStep: runUltraStep\|Auto orchestration\|workspaceMode' src/lib/generate.functions.ts | head -20
-          if grep -q PLACEHOLDER src/lib/generate.functions.ts; then exit 1; fi
-      - name: Patch ImageEditor workspaceMode field
+          grep -n 'falKey, runStep\|workspaceMode\|AUTO_SERVER\|planPremiumMultiGptImage2' src/lib/generate.functions.ts | head -30
+      - name: Patch ImageEditor workspaceMode only
         run: |
           set -e
-          python3 .github/scripts/patch_ie_workspace_mode.py
-          grep -n 'workspaceMode' src/components/editor/image/ImageEditor.tsx | head -10
-          # never allow stub
-          if grep -q 'ImageEditor stub' src/components/editor/image/ImageEditor.tsx; then exit 1; fi
-          test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 50000
+          python3 << 'PY'
+          from pathlib import Path
+          path = Path("src/components/editor/image/ImageEditor.tsx")
+          text = path.read_text(encoding="utf-8")
+          if "workspaceMode," in text and "keepWatermark" in text:
+              # check if already after keepWatermark in generate payload
+              idx = text.find("keepWatermark: isFreePlanForWm ? true : keepWatermark,")
+              if idx != -1 and "workspaceMode," in text[idx:idx+120]:
+                  print("ImageEditor already has workspaceMode in payload")
+              elif idx != -1:
+                  text = text.replace(
+                      "keepWatermark: isFreePlanForWm ? true : keepWatermark,\n        },",
+                      "keepWatermark: isFreePlanForWm ? true : keepWatermark,\n          workspaceMode,\n        },",
+                      1,
+                  )
+                  path.write_text(text, encoding="utf-8")
+                  print("ImageEditor patched")
+              else:
+                  print("keepWatermark not found")
+          else:
+              print("unexpected IE state")
+          assert "export function ImageEditor" in path.read_text()
+          assert "ImageEditor stub" not in path.read_text()
+          print("IE size", path.stat().st_size)
+          PY
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/generate.functions.ts src/components/editor/image/ImageEditor.tsx
           git status
-          if git diff --cached --quiet; then echo No changes; else
-            git commit -m "fix(generate): Premium/Ultra runStep signatures, multi-ref, Auto orchestration; pass workspaceMode from ImageEditor"
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "fix(generate): Premium/Ultra execute signatures + referenceImageUrls + Auto server orchestration"
             git pull --rebase origin main || true
             git push origin HEAD:main
           fi
