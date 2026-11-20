@@ -14,130 +14,25 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-      - name: Restore ImageEditor from f3bacb03 + apply Auto/admin patches
+      - name: Extract good ImageEditor and patch
         run: |
           set -e
           GOOD_SHA=f3bacb03f70f1f0a7a07b42326a98581b63c6573
           git show ${GOOD_SHA}:src/components/editor/image/ImageEditor.tsx > /tmp/ie_good.tsx
           wc -c /tmp/ie_good.tsx
-          python3 << 'PY'
-          from pathlib import Path
-          text = Path("/tmp/ie_good.tsx").read_text(encoding="utf-8")
-          if "understandIntent" not in text:
-              text = text.replace(
-                  'import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";\nimport { type ImageQuality } from "@/lib/quality-options";',
-                  '''import { getSmartSuggestions, type AspectRatio } from "@/lib/prompt-suggestions";
-import {
-  understandIntent,
-  expandPromptDeterministic,
-  buildFinalEditPrompt,
-  type EditorIntent,
-} from "@/lib/image-edit/prompt-engine";
-import { type ImageQuality } from "@/lib/quality-options";''',
-                  1,
-              )
-          text = text.replace(
-              'const isFreePlanForWm = (profile?.plan ?? "free") === "free";',
-              'const isFreePlanForWm = (profile?.plan ?? "free") === "free" && !isAdmin;',
-              1,
-          )
-          text = text.replace(
-              'const planMaxImages = getPlanLimits(profile?.plan ?? "free").maxImages;\n  const effectiveMaxImages = Math.min(planMaxImages, experienceMax);',
-              '''const planMaxImages = isAdmin
-    ? experienceMax
-    : getPlanLimits(profile?.plan ?? "free").maxImages;
-  const effectiveMaxImages = Math.min(planMaxImages, experienceMax);''',
-              1,
-          )
-          old_run = '''  const runGenerate = async () => {
-    if (!isAdmin && !canAccessImageExperience(profile?.plan, studioTier, isAdmin)) {
-      toast.error("Upgrade to use this experience.");
-      window.location.href = "/pricing";
-      return;
-    }
-    if (!prompt.trim()) return toast.error("Enter a prompt first.");
-    await runImageJob({ jobPrompt: prompt.trim() });
-  };'''
-          new_run = '''  const runGenerate = async () => {
-    if (!isAdmin && !canAccessImageExperience(profile?.plan, studioTier, isAdmin)) {
-      toast.error("Upgrade to use this experience.");
-      window.location.href = "/pricing";
-      return;
-    }
-    if (!prompt.trim()) return toast.error("Enter a prompt first.");
-
-    let jobPrompt = prompt.trim();
-
-    // AUTO mode: classify intent + expand into a proper image-edit instruction
-    // so the same generateMedia path receives a high-quality, intent-locked prompt.
-    // Composer mode keeps the user's raw prompt (plus existing aspect/quality controls).
-    if (workspaceMode === "auto") {
-      const hasSource = !!(inputDataUrl || inputFile || inputPreview);
-      const refCount = refImages.length;
-      const hasRefs = refCount > 0 || gallery.length > 1;
-      if (hasSource) {
-        try {
-          const intent: EditorIntent = understandIntent(jobPrompt, hasRefs);
-          const expanded = expandPromptDeterministic(jobPrompt, intent, Math.max(1, refCount));
-          jobPrompt = buildFinalEditPrompt({
-            rawPrompt: prompt.trim(),
-            enhancedOrExpanded: expanded,
-            intent,
-            referenceCount: Math.max(1, refCount),
-          });
-        } catch (e) {
-          console.warn("[ImageEditor] Auto prompt expansion failed, using raw prompt", e);
-        }
-      }
-    }
-
-    await runImageJob({ jobPrompt });
-  };'''
-          if old_run in text:
-              text = text.replace(old_run, new_run, 1)
-          elif "await runImageJob({ jobPrompt: prompt.trim() });" in text:
-              text = text.replace(
-                  "await runImageJob({ jobPrompt: prompt.trim() });",
-                  '''let jobPrompt = prompt.trim();
-    if (workspaceMode === "auto") {
-      const hasSource = !!(inputDataUrl || inputFile || inputPreview);
-      const refCount = refImages.length;
-      const hasRefs = refCount > 0 || gallery.length > 1;
-      if (hasSource) {
-        try {
-          const intent: EditorIntent = understandIntent(jobPrompt, hasRefs);
-          const expanded = expandPromptDeterministic(jobPrompt, intent, Math.max(1, refCount));
-          jobPrompt = buildFinalEditPrompt({
-            rawPrompt: prompt.trim(),
-            enhancedOrExpanded: expanded,
-            intent,
-            referenceCount: Math.max(1, refCount),
-          });
-        } catch (e) {
-          console.warn("[ImageEditor] Auto prompt expansion failed, using raw prompt", e);
-        }
-      }
-    }
-    await runImageJob({ jobPrompt });''',
-                  1,
-              )
-          else:
-              raise SystemExit("runGenerate not found")
-          out = Path("src/components/editor/image/ImageEditor.tsx")
-          out.write_text(text, encoding="utf-8")
-          print("written", out, "size", out.stat().st_size)
-          assert "export function ImageEditor" in text
-          assert "ImageEditor stub" not in text
-          assert text.count("{") == text.count("}")
-          print("checks ok")
-          print("tail:", text[-100:])
-          PY
+          python3 .github/scripts/apply_ie_from_history.py
       - name: Verify
         run: |
+          set -e
           wc -c src/components/editor/image/ImageEditor.tsx
           tail -c 120 src/components/editor/image/ImageEditor.tsx
           grep -n 'understandIntent\|workspaceMode === "auto"\|isFreePlanForWm\|planMaxImages' src/components/editor/image/ImageEditor.tsx | head -20
-          if grep -q "ImageEditor stub" src/components/editor/image/ImageEditor.tsx; then exit 1; fi
+          if grep -q "ImageEditor stub" src/components/editor/image/ImageEditor.tsx; then
+            echo STUB; exit 1
+          fi
+          if ! grep -q "export function ImageEditor" src/components/editor/image/ImageEditor.tsx; then
+            echo MISSING EXPORT; exit 1
+          fi
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
