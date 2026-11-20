@@ -54,6 +54,14 @@ import {
   type FalStep,
 } from "@/lib/fal-request";
 import { composeTaggedPrompt } from "@/lib/studio/image/tag-semantic-registry";
+import {
+  understandIntent,
+  expandPromptDeterministic,
+  buildFinalEditPrompt,
+  type EditorIntent,
+} from "@/lib/image-edit/prompt-engine";
+import { quotePremiumCredits, normalizePremiumQuality } from "@/lib/studio/image/premium";
+import { quoteUltraCredits, normalizeUltraQuality } from "@/lib/studio/image/ultra";
 import { assertCircleAddAllowed, resolveCircleCharge } from "@/lib/circle-edit/server-charge";
 import { normalizeCircleGeneratePayload } from "@/lib/circle-edit/normalize-generate-payload";
 
@@ -173,6 +181,9 @@ const GenerateSchema = z.object({
   circleFactors: z.record(z.unknown()).optional().nullable(),
   standardMode: z.string().optional().nullable(),
   tags: z.array(z.string()).optional().nullable(),
+  workspaceMode: z.enum(["auto", "composer"]).optional().nullable(),
+  contextTags: z.array(z.string()).optional().nullable(),
+  keepWatermark: z.boolean().optional().nullable(),
 });
 
 export const generateMedia = createServerFn({ method: "POST" })
@@ -290,7 +301,9 @@ export const generateMedia = createServerFn({ method: "POST" })
           reservedVideoQuote = null;
         }
       } else {
-        const multiUrls = (data.imageUrls || []).filter(Boolean) as string[];
+        const multiUrls = (
+          (data.referenceImageUrls || data.imageUrls || []) as string[]
+        ).filter(Boolean);
         const circleNorm = normalizeCircleGeneratePayload({
           imageUrl: data.imageUrl,
           maskUrl: data.maskUrl,
@@ -302,6 +315,33 @@ export const generateMedia = createServerFn({ method: "POST" })
         const hasMask = !!circleNorm.maskUrl;
         const isCircleRemove = circleNorm.isCircleRemove;
         const isCircleAdd = circleNorm.isCircleAdd;
+
+        // Auto mode: server-side intent + mode-aware prompt construction.
+        // Composer leaves the user prompt untouched.
+        /* AUTO_SERVER_ORCHESTRATION */
+        if ((data as any).workspaceMode === "auto" && data.prompt && !/PRIMARY TASK|OUTFIT TRANSFER|This is a real photograph/i.test(data.prompt)) {
+          try {
+            const refCount = multiUrls.filter((u) => u && u !== data.imageUrl).length;
+            const hasRefs = refCount > 0;
+            const intent: EditorIntent = understandIntent(data.prompt, hasRefs);
+            const expanded = expandPromptDeterministic(data.prompt, intent, Math.max(1, refCount));
+            const finalPrompt = buildFinalEditPrompt({
+              rawPrompt: data.prompt,
+              enhancedOrExpanded: expanded,
+              intent,
+              referenceCount: Math.max(1, refCount),
+            });
+            (data as any).prompt = finalPrompt;
+            imageStudioMeta = {
+              ...(imageStudioMeta || {}),
+              workspaceMode: "auto",
+              editorIntent: intent,
+            };
+            console.info("[generate] Auto orchestration", { intent, refCount, promptLen: finalPrompt.length });
+          } catch (autoErr) {
+            console.warn("[generate] Auto orchestration failed, using raw prompt", autoErr);
+          }
+        }
 
         if (isCircleRemove || isCircleAdd) {
           if (isCircleAdd) {
@@ -347,11 +387,39 @@ export const generateMedia = createServerFn({ method: "POST" })
           standardCharge = cost;
           (data as any).__standardRequest = standardRequest;
         } else if (data.studioTier === "pro") {
-          cost = (computeImageExperienceCredits as any)("pro", multiUrls.length > 1) ?? CREDIT_COST.image;
-          if (typeof cost === "object") cost = (cost as any).credits ?? CREDIT_COST.image;
+          {
+            const hasSrc = Boolean(data.imageUrl);
+            const refN = multiUrls.filter((u) => u !== data.imageUrl).length;
+            if (hasSrc && refN >= 1) {
+              const plan = planPremiumMultiGptImage2({
+                prompt: data.prompt,
+                imageUrl: data.imageUrl,
+                referenceImageUrls: multiUrls.filter((u) => u !== data.imageUrl),
+                imageQuality: data.imageQuality,
+                aspectRatio: (data as any).aspectRatio,
+              });
+              cost = plan.ok ? plan.credits : quotePremiumCredits({
+                mode: hasSrc ? "image_to_image" : "text_to_image",
+                quality: normalizePremiumQuality(data.imageQuality),
+              }).credits;
+            } else {
+              cost = quotePremiumCredits({
+                mode: hasSrc ? "image_to_image" : "text_to_image",
+                quality: normalizePremiumQuality(data.imageQuality),
+              }).credits;
+            }
+          }
         } else if (data.studioTier === "premium") {
-          cost = (computeImageExperienceCredits as any)("premium", multiUrls.length > 1) ?? CREDIT_COST.image;
-          if (typeof cost === "object") cost = (cost as any).credits ?? CREDIT_COST.image;
+          {
+            const hasSrc = Boolean(data.imageUrl);
+            const refN = multiUrls.filter((u) => u !== data.imageUrl).length;
+            const totalRefs = (hasSrc ? 1 : 0) + refN;
+            cost = quoteUltraCredits({
+              mode: totalRefs >= 2 ? "multi_image" : hasSrc ? "image_to_image" : "text_to_image",
+              quality: normalizeUltraQuality(data.imageQuality),
+              referenceCount: Math.max(1, totalRefs),
+            }).credits;
+          }
         } else {
           cost = CREDIT_COST.image;
         }
@@ -412,21 +480,71 @@ export const generateMedia = createServerFn({ method: "POST" })
           };
           if (typeof result.credits === "number") standardCharge = result.credits;
         } else if (data.studioTier === "pro") {
-          const result = await executePremiumImage({
-            falKey,
-            prompt: data.prompt,
-            imageUrls: data.imageUrl ? [data.imageUrl] : multiUrls,
-          } as any);
-          outputUrl = (result as any).outputUrl;
+          const refs = multiUrls.filter((u) => u && u !== data.imageUrl);
+          const runStep = (step: { model: string; body?: Record<string, unknown>; input?: unknown; label?: string }) =>
+            runFal(
+              {
+                label: (step as any).label || "premium",
+                model: step.model,
+                endpoint: `https://fal.run/${step.model}`,
+                outputKind: "image" as const,
+                body: (step as any).body ?? (step as any).input ?? {},
+              } as any,
+              falKey,
+            );
+          if (data.imageUrl && refs.length >= 1) {
+            const plan = planPremiumMultiGptImage2({
+              prompt: data.prompt,
+              imageUrl: data.imageUrl,
+              referenceImageUrls: refs,
+              imageQuality: data.imageQuality,
+              aspectRatio: (data as any).aspectRatio,
+            });
+            if (!plan.ok) throw new Error(plan.error === "not_multi" ? "Premium multi requires 2+ images." : plan.error);
+            outputUrl = await runStep(plan.step as any);
+            if (typeof plan.credits === "number") standardCharge = plan.credits;
+          } else {
+            const result = await executePremiumImage(
+              {
+                prompt: data.prompt,
+                imageUrl: data.imageUrl ?? undefined,
+                referenceImageUrls: refs.length ? refs : undefined,
+                imageQuality: data.imageQuality,
+                aspectRatio: (data as any).aspectRatio,
+                strength: typeof (data as any).strength === "number" ? (data as any).strength : undefined,
+              },
+              { falKey, runStep: runStep as any },
+            );
+            outputUrl = result.outputUrl;
+            if (typeof result.credits === "number") standardCharge = result.credits;
+          }
           providerSourceUrl = outputUrl;
         } else if (data.studioTier === "premium") {
-          const result = await executeUltraImage({
-            falKey,
-            prompt: data.prompt,
-            imageUrl: data.imageUrl ?? undefined,
-            imageUrls: multiUrls.length ? multiUrls : undefined,
-          } as any);
-          outputUrl = (result as any).outputUrl;
+          const refs = multiUrls.filter((u) => u && u !== data.imageUrl);
+          const runStep = (step: { model: string; body?: Record<string, unknown>; input?: unknown; label?: string }) =>
+            runFal(
+              {
+                label: (step as any).label || "ultra",
+                model: step.model,
+                endpoint: `https://fal.run/${step.model}`,
+                outputKind: "image" as const,
+                body: (step as any).body ?? (step as any).input ?? {},
+              } as any,
+              falKey,
+            );
+          const result = await executeUltraImage(
+            {
+              prompt: data.prompt,
+              imageUrl: data.imageUrl ?? undefined,
+              referenceImageUrls: refs.length ? refs : undefined,
+              imageQuality: data.imageQuality,
+              aspectRatio: (data as any).aspectRatio,
+              imax: (data as any).aspectRatio === "imax" || data.imageQuality === "8k_max",
+            },
+            { falKey, runStep: runStep as any },
+          );
+          outputUrl = result.outputUrl;
+          if (typeof result.credits === "number") standardCharge = result.credits;
           providerSourceUrl = outputUrl;
         } else if (hasMask && data.imageUrl && circleNorm.maskUrl) {
           const result = await executeStandardImage(
