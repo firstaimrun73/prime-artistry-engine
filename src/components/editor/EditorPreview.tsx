@@ -29,9 +29,10 @@ function WatermarkMark({ large = false }: { large?: boolean }) {
     <span
       className={
         large
-          ? "pointer-events-none absolute bottom-4 right-4 rounded-lg border border-white/15 bg-black/55 px-3 py-1.5 text-sm font-bold tracking-wide text-white/95 shadow-lg backdrop-blur-md"
-          : "pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/45 px-2 py-1 text-[11px] font-bold tracking-wide text-white/90 backdrop-blur-[2px]"
+          ? "pointer-events-none absolute bottom-3 right-3 z-20 rounded-lg border border-white/25 bg-black/70 px-3 py-1.5 text-sm font-bold tracking-wide text-white shadow-xl backdrop-blur-md sm:bottom-4 sm:right-4"
+          : "pointer-events-none absolute bottom-2.5 right-2.5 z-20 rounded-md border border-white/20 bg-black/65 px-2 py-1 text-[11px] font-bold tracking-wide text-white shadow-lg backdrop-blur-[2px]"
       }
+      aria-hidden
     >
       Motio<span className="text-[#FF5A1F]">2</span>edit
     </span>
@@ -258,15 +259,15 @@ export function EditorPreview({
           <video
             src={output}
             controls
-            className="max-h-[min(70vh,520px)] w-full object-contain"
+            className="max-h-[min(48dvh,420px)] w-full object-contain"
             playsInline
           />
         ) : (
-          <>
+                   <>
             <img
               src={output}
               alt="output"
-              className="max-h-[min(70vh,520px)] w-full object-contain select-none"
+              className="max-h-[min(48dvh,420px)] w-full object-contain select-none"
               draggable={false}
               onContextMenu={(e) => e.preventDefault()}
               style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
