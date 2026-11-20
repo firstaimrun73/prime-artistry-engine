@@ -1,0 +1,171 @@
+name: Fix Premium Ultra execute
+on: [workflow_dispatch]
+permissions:
+  contents: write
+concurrency:
+  group: fix-premium-ultra-exec
+  cancel-in-progress: false
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Restore generate.functions base and patch
+        run: |
+          set -e
+          # Restore known-good full generateMedia if current is stub
+          if ! grep -q 'export const generateMedia' src/lib/generate.functions.ts || grep -q PLACEHOLDER src/lib/generate.functions.ts; then
+            git show 1290a060c2b48fa9d07184d147415d456028ae59:src/lib/generate.functions.ts > src/lib/generate.functions.ts
+          fi
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path('src/lib/generate.functions.ts')
+          t = p.read_text(encoding='utf-8')
+          if 'runStep: runPremiumStep' in t:
+              print('already fixed')
+          else:
+              old_multi = '        const multiUrls = (data.imageUrls || []).filter(Boolean) as string[];'
+              new_multi = '''        const refFromClient = ((data as any).referenceImageUrls || []).filter(Boolean) as string[];
+        const multiUrls = [
+          ...((data.imageUrls || []).filter(Boolean) as string[]),
+          ...refFromClient,
+        ].filter((u, i, arr) => typeof u === "string" && u.startsWith("https://") && arr.indexOf(u) === i);'''
+              if old_multi not in t:
+                  raise SystemExit('multiUrls anchor missing')
+              t = t.replace(old_multi, new_multi, 1)
+
+              old = '''        } else if (data.studioTier === "pro") {
+          const result = await executePremiumImage({
+            falKey,
+            prompt: data.prompt,
+            imageUrls: data.imageUrl ? [data.imageUrl] : multiUrls,
+          } as any);
+          outputUrl = (result as any).outputUrl;
+          providerSourceUrl = outputUrl;
+        } else if (data.studioTier === "premium") {
+          const result = await executeUltraImage({
+            falKey,
+            prompt: data.prompt,
+            imageUrl: data.imageUrl ?? undefined,
+            imageUrls: multiUrls.length ? multiUrls : undefined,
+          } as any);
+          outputUrl = (result as any).outputUrl;
+          providerSourceUrl = outputUrl;
+        }'''
+              new = '''        } else if (data.studioTier === "pro") {
+          const runPremiumStep = async (step: { model: string; body: Record<string, unknown>; label?: string }) => {
+            return runFal(
+              {
+                label: step.label || `premium ${step.model}`,
+                model: step.model,
+                endpoint: `https://fal.run/${step.model}`,
+                outputKind: "image" as const,
+                body: step.body,
+              } as any,
+              falKey,
+            );
+          };
+          const refs = refFromClient.filter((u) => u !== data.imageUrl);
+          const multiPlan = planPremiumMultiGptImage2({
+            prompt: data.prompt,
+            imageUrl: data.imageUrl,
+            referenceImageUrls: refs,
+            imageQuality: data.imageQuality,
+            aspectRatio: (data as any).aspectRatio,
+          });
+          if (multiPlan.ok) {
+            outputUrl = await runPremiumStep(multiPlan.step as any);
+            providerSourceUrl = outputUrl;
+            imageStudioMeta = { ...(imageStudioMeta || {}), mode: "multi_image", model: (multiPlan.step as any).model, credits: multiPlan.credits, experienceLabel: "Premium" };
+            if (typeof multiPlan.credits === "number") standardCharge = multiPlan.credits;
+          } else {
+            const result = await executePremiumImage(
+              {
+                prompt: data.prompt,
+                imageUrl: data.imageUrl ?? undefined,
+                imageQuality: data.imageQuality ?? undefined,
+                aspectRatio: (data as any).aspectRatio ?? undefined,
+              },
+              { falKey, runStep: runPremiumStep },
+            );
+            outputUrl = result.outputUrl;
+            providerSourceUrl = outputUrl;
+            imageStudioMeta = { ...(imageStudioMeta || {}), mode: result.mode, model: result.model, credits: result.credits, experienceLabel: "Premium" };
+            if (typeof result.credits === "number") standardCharge = result.credits;
+          }
+        } else if (data.studioTier === "premium") {
+          const runUltraStep = async (step: { model: string; body: Record<string, unknown>; label?: string }) => {
+            return runFal(
+              {
+                label: step.label || `ultra ${step.model}`,
+                model: step.model,
+                endpoint: `https://fal.run/${step.model}`,
+                outputKind: "image" as const,
+                body: step.body,
+              } as any,
+              falKey,
+            );
+          };
+          const refs = refFromClient.filter((u) => u !== data.imageUrl);
+          const result = await executeUltraImage(
+            {
+              prompt: data.prompt,
+              imageUrl: data.imageUrl ?? undefined,
+              referenceImageUrls: refs.length ? refs : undefined,
+              imageQuality: data.imageQuality ?? undefined,
+              aspectRatio: (data as any).aspectRatio ?? undefined,
+              imax: (data as any).aspectRatio === "imax" || data.imageQuality === "8k_max",
+            },
+            { falKey, runStep: runUltraStep },
+          );
+          outputUrl = result.outputUrl;
+          providerSourceUrl = outputUrl;
+          imageStudioMeta = { ...(imageStudioMeta || {}), mode: result.mode, model: result.model, credits: result.credits, experienceLabel: "Ultra AI", quality: result.quality };
+          if (typeof result.credits === "number") standardCharge = result.credits;
+        }'''
+              if old not in t:
+                  raise SystemExit('exec anchor missing — file may already differ')
+              t = t.replace(old, new, 1)
+              if t.count('{') != t.count('}'):
+                  raise SystemExit('brace mismatch')
+              p.write_text(t, encoding='utf-8')
+              print('patched generate.functions.ts', p.stat().st_size)
+          PY
+      - name: Patch ImageEditor workspaceMode field only
+        run: |
+          python3 << 'PY'
+          from pathlib import Path
+          p = Path('src/components/editor/image/ImageEditor.tsx')
+          t = p.read_text(encoding='utf-8')
+          if 'ImageEditor stub' in t:
+              raise SystemExit('ImageEditor is stub — abort')
+          if 'workspaceMode,' in t.split('generate({')[1].split('});')[0]:
+              print('workspaceMode already in payload')
+          else:
+              needle = '          keepWatermark: isFreePlanForWm ? true : keepWatermark,\n        },\n      });'
+              insert = '          keepWatermark: isFreePlanForWm ? true : keepWatermark,\n          workspaceMode,\n        },\n      });'
+              if needle not in t:
+                  raise SystemExit('IE needle missing')
+              p.write_text(t.replace(needle, insert, 1), encoding='utf-8')
+              print('IE workspaceMode added')
+          PY
+          test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 50000
+      - name: Verify
+        run: |
+          set -e
+          grep -n 'runStep: runPremiumStep\|runStep: runUltraStep\|refFromClient\|planPremiumMultiGptImage2' src/lib/generate.functions.ts | head -20
+          grep -n 'workspaceMode' src/components/editor/image/ImageEditor.tsx | head -8
+          if grep -q PLACEHOLDER src/lib/generate.functions.ts; then exit 1; fi
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts src/components/editor/image/ImageEditor.tsx
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(generate): correct Premium/Ultra execute signatures, referenceImageUrls, multi plan; pass workspaceMode"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
