@@ -1,5 +1,10 @@
 name: Fix generate backend Premium/Ultra/Auto
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fix-generate-backend.yml"
+      - ".github/scripts/patch_generate_backend.py"
 permissions:
   contents: write
 concurrency:
@@ -22,9 +27,6 @@ jobs:
           grep -n "falKey, runStep" src/lib/generate.functions.ts | head -5
           grep -n "AUTO_SERVER" src/lib/generate.functions.ts | head -3
           grep -n "workspaceMode" src/lib/generate.functions.ts | head -5
-          if grep -F "executePremiumImage({" src/lib/generate.functions.ts | grep -q falKey; then
-            echo "WARNING: check Premium call shape"
-          fi
       - name: Patch ImageEditor workspaceMode only
         run: |
           set -e
