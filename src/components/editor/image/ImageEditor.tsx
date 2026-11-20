@@ -603,6 +603,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           referenceImageUrls,
           contextTags: contextTags.length > 0 ? contextTags : undefined,
           keepWatermark: isFreePlanForWm ? true : keepWatermark,
+          workspaceMode,
         },
       });
 
