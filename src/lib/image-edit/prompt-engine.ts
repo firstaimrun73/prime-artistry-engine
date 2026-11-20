@@ -97,9 +97,11 @@ export function isOutfitIntent(prompt: string): boolean {
 
 export const LOCKS = {
   pure_enhance:
-    "This is a real photograph. ONLY improve sharpness, clarity, detail and noise reduction. " +
-    "Do NOT remove any person, object, or element. Do NOT add anything. Do NOT change composition, " +
-    "colors, lighting direction, or subject identity. Keep every pixel content identical except quality.",
+    "This is a real photograph. Improve sharpness, clarity, detail and noise reduction across the ENTIRE frame " +
+    "(every person, animal, pet, object, and background region — not only faces). " +
+    "Do NOT remove, replace, crop, or redesign any person, animal, object, or element. Do NOT add anything. " +
+    "Do NOT change composition, colors, lighting direction, or subject identity. " +
+    "Keep every subject fully present and only improve quality.",
 
   outfit_transfer:
     "This is a real photograph clothing transfer. Image 1 = person (base). Reference image(s) = target outfit. " +
@@ -153,9 +155,9 @@ export function expandPromptDeterministic(
   switch (intent) {
     case "pure_enhance":
       return (
-        "Enhance this exact photo: increase sharpness, clarity and fine detail, reduce noise and mild blur, " +
-        "improve overall professional quality. Keep composition, every person, every object, colors and framing " +
-        "identical — do not add, remove or change any content."
+        "Enhance this exact photo across the COMPLETE frame: increase sharpness, clarity and fine detail on every person, animal, object and background region; reduce noise and mild blur; " +
+        "improve overall professional quality. Keep composition, every person, every animal, every object, colors and framing " +
+        "identical — do not add, remove, crop or redesign any content. Never improve only a face while ignoring the rest."
       );
 
     case "outfit_transfer":
@@ -236,7 +238,7 @@ export function buildFinalEditPrompt(args: {
   }
 
   if (intent === "pure_enhance") {
-    return `${LOCKS.pure_enhance}\n${enhancedOrExpanded}\nDo NOT remove any person or object.`;
+    return `${LOCKS.pure_enhance}\n${enhancedOrExpanded}\nDo NOT remove or redesign any person, animal, or object. Enhance the complete photograph.`;
   }
 
   return (
