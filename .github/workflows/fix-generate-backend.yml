@@ -1,0 +1,41 @@
+name: Fix generate backend Premium Ultra Auto
+on: [workflow_dispatch]
+permissions:
+  contents: write
+concurrency:
+  group: fix-generate-backend
+  cancel-in-progress: false
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Restore generate.functions.ts
+        run: |
+          set -e
+          python3 .restore/gen_payload/apply_gen.py
+          wc -c src/lib/generate.functions.ts
+          grep -n 'runStep: runPremiumStep\|runStep: runUltraStep\|Auto orchestration\|workspaceMode' src/lib/generate.functions.ts | head -20
+          if grep -q PLACEHOLDER src/lib/generate.functions.ts; then exit 1; fi
+      - name: Patch ImageEditor workspaceMode field
+        run: |
+          set -e
+          python3 .github/scripts/patch_ie_workspace_mode.py
+          grep -n 'workspaceMode' src/components/editor/image/ImageEditor.tsx | head -10
+          # never allow stub
+          if grep -q 'ImageEditor stub' src/components/editor/image/ImageEditor.tsx; then exit 1; fi
+          test $(wc -c < src/components/editor/image/ImageEditor.tsx) -gt 50000
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/generate.functions.ts src/components/editor/image/ImageEditor.tsx
+          git status
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(generate): Premium/Ultra runStep signatures, multi-ref, Auto orchestration; pass workspaceMode from ImageEditor"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
