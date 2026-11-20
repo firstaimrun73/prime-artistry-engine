@@ -23,13 +23,13 @@ import type { StandardFalStep, StandardValidationOk } from "./types";
  * Appended after the user request so the model keeps the same person while applying only the requested change.
  */
 export const STANDARD_I2I_IDENTITY_PRESERVATION =
-  "Preserve the exact identity of every person in the source image: same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair. Do not replace, redesign, or invent faces. Only change the specific thing requested by the user. If the user explicitly requests a face/expression change, keep the same person's identity and change only that requested attribute.";
+  "Preserve the exact identity of every person AND every animal/object in the source image: same faces, facial structure, eyes, nose, mouth, skin tone, age, hair, fur, body shape, and all secondary subjects. Do not replace, redesign, invent, crop, or drop any person, pet, or object. Only change the specific thing requested by the user. If the user explicitly requests a face/expression change, keep the same person's identity and change only that requested attribute. Process the ENTIRE frame — never improve only a face while ignoring the rest of the photograph.";
 
 /**
  * Identity rule for Standard multi-reference (Kontext max/multi): image 1 is the base person/source.
  */
 export const STANDARD_MULTI_IDENTITY_PRESERVATION =
-  "Image 1 is the base/source person. Preserve the identity and face of every person in image 1 (same person, facial structure, eyes, nose, mouth, skin tone, age appearance and hair). References may influence the requested object, outfit, style, or other attributes only. Never copy a different person's face from a reference onto the base person unless the user explicitly asks for a face or identity replacement. Keep all unrequested subjects and scene details unchanged as much as possible.";
+  "Image 1 is the base/source. Preserve the identity of every person AND animal in image 1 (faces, facial structure, fur, body shape, and all secondary subjects). References may influence the requested object, outfit, style, or other attributes only. Never copy a different face or subject from a reference onto the base unless the user explicitly asks for a replacement. Keep all unrequested subjects and scene details unchanged. Process the entire frame.";
 
 /**
  * Active restoration contract — must drive real repair work, not a no-op copy of the input.
@@ -44,7 +44,7 @@ export const STANDARD_RESTORE_INSTRUCTION =
  * this instruction is intentionally forceful about edge clarity and micro-detail.
  */
 export const STANDARD_ENHANCE_INSTRUCTION =
-  "ACTIVE SHARPEN AND ENHANCE: Make this photo visibly sharper and clearer. Increase edge definition and micro-detail on faces, hair, fabric, and textures. Reduce blur, softness, and haze. Improve local contrast so details read crisp at 100% zoom. Do not leave the image looking the same softness as the input. Do not change identity, pose, composition, colors, or add new objects. Photorealistic only — no oversharpen halos or artificial look.";
+  "ACTIVE FULL-FRAME SHARPEN AND ENHANCE: Improve the COMPLETE photograph from edge to edge — every person, animal, pet, object, fabric, and background region. Increase edge definition and micro-detail uniformly across the entire frame (faces, hair, fur, paws, clothing, hands, and background). Reduce blur, softness, and haze everywhere, not only on faces. Improve local contrast so details read crisp at 100% zoom. Do not leave any subject softer than the rest. Do not change identity, pose, composition, colors, crop, or add/remove objects. Photorealistic only — no oversharpen halos or artificial look. Never reconstruct a subject as a new generated approximation.";
 
 export const STANDARD_OUTFIT_INSTRUCTION =
   "Change the clothing/outfit on the person as requested. Do not keep the original clothes when the user asked to change them. Keep face, identity, pose, and background the same unless asked otherwise.";
@@ -145,7 +145,7 @@ export function buildImageToImageStep(req: StandardValidationOk): StandardFalSte
   const core = buildStandardI2ICorePrompt(raw);
   const prompt = `${core}\n\n${STANDARD_I2I_IDENTITY_PRESERVATION}`;
   const enhanceIntent = isStandardEnhanceIntent(raw);
-  const guidance_scale = enhanceIntent ? 4.2 : 3.5;
+  const guidance_scale = enhanceIntent ? 3.8 : 3.5;
 
   return {
     label: `standard I2I kontext-pro ${req.imageQuality === "hd" ? "HD" : "SD"}`,
