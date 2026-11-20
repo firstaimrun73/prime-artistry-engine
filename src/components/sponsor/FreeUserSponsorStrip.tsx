@@ -28,7 +28,13 @@ function loadMultitagOnce() {
   document.body.appendChild(s);
 }
 
-export function FreeUserSponsorStrip({ isFree }: { isFree: boolean }) {
+export function FreeUserSponsorStrip({
+  isFree,
+  onUnlocked,
+}: {
+  isFree: boolean;
+  onUnlocked?: () => void;
+}) {
   const [active, setActive] = useState(false);
   const [remainMin, setRemainMin] = useState(0);
   const [showOffer, setShowOffer] = useState(false);
@@ -73,15 +79,20 @@ export function FreeUserSponsorStrip({ isFree }: { isFree: boolean }) {
             onClick={() => {
               setShowOffer(true);
               loadMultitagOnce();
-              toast.message("Sponsored offer loading…", {
-                description: "Complete the offer, then confirm below.",
-              });
             }}
           >
             Unlock no-watermark (Sponsored)
           </Button>
-          <Button type="button" size="sm" variant="ghost" className="text-xs" asChild>
-            <a href="/pricing">Upgrade</a>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-xs"
+            onClick={() => {
+              window.location.href = "/pricing";
+            }}
+          >
+            Upgrade
           </Button>
         </div>
       ) : (
@@ -97,12 +108,13 @@ export function FreeUserSponsorStrip({ isFree }: { isFree: boolean }) {
               grantSponsorUnlock();
               setActive(true);
               setRemainMin(SPONSOR_UNLOCK_MINUTES);
-              toast.success(`No-watermark unlocked for ${SPONSOR_UNLOCK_MINUTES} minutes`);
               try {
                 localStorage.setItem("motio2edit-keep-watermark", "0");
               } catch {
                 /* ignore */
               }
+              onUnlocked?.();
+              toast.success(`No-watermark unlocked for ${SPONSOR_UNLOCK_MINUTES} minutes`);
             }}
           >
             I completed the Sponsored offer
