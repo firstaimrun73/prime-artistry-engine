@@ -1,28 +1,32 @@
-name: emergency-restore-generate-functions
-on:
-  workflow_dispatch:
+name: Emergency restore generate.functions
+on: [workflow_dispatch]
+permissions:
+  contents: write
+concurrency:
+  group: emergency-restore-generate
+  cancel-in-progress: false
 jobs:
   restore:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-      - name: Restore generate.functions.ts from good commit 02b9cc02
+      - name: Restore from 1290a060
         run: |
-          git show 02b9cc022e4c563169bb2521e511a13f9dc09d9f:src/lib/generate.functions.ts > src/lib/generate.functions.ts
+          set -e
+          git show 1290a060c2b48fa9d07184d147415d456028ae59:src/lib/generate.functions.ts > src/lib/generate.functions.ts
           wc -c src/lib/generate.functions.ts
-          head -8 src/lib/generate.functions.ts
-          grep -c "finalizeQuote(reservedVideoQuote" src/lib/generate.functions.ts
-          grep -c "quoteVideoGeneration" src/lib/generate.functions.ts
-          ! grep -q "GENERATE_FUNCTIONS_NEEDS_RESTORE\|RESTORED_MARKER\|PLACEHOLDER" src/lib/generate.functions.ts
-      - name: Commit restore
+          grep -q 'export const generateMedia' src/lib/generate.functions.ts
+          if grep -q PLACEHOLDER src/lib/generate.functions.ts; then exit 1; fi
+      - name: Commit
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/generate.functions.ts
-          git status
-          git commit -m "fix(video): restore generate.functions.ts from commit 02b9cc02 (full body + finalizeQuote)" || echo "no change"
-          git push
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(critical): restore full generate.functions.ts from 1290a060 (remove PLACEHOLDER)"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
