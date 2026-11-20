@@ -49,7 +49,7 @@ export async function runStandardFalStep(
     Authorization: `Key ${falKey}`,
     "Content-Type": "application/json",
   };
-  const timeoutMs = opts?.timeoutMs ?? 120_000;
+  const timeoutMs = opts?.timeoutMs ?? 90_000;
 
   const promptHead =
     typeof step.body.prompt === "string" ? String(step.body.prompt).slice(0, 120) : "";

@@ -506,11 +506,25 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     const progressTimers = [
       setTimeout(() => {
         if (runId === runIdRef.current) toast("Still working — high quality takes a moment…");
-      }, 30_000),
+      }, 25_000),
       setTimeout(() => {
-        if (runId === runIdRef.current) toast("Taking longer than usual — retrying automatically…");
-      }, 75_000),
+        if (runId === runIdRef.current)
+          toast("Still generating — large edits can take up to about 2 minutes…");
+      }, 60_000),
     ];
+    // Hard client timeout: if the server function is killed (platform limit) or the
+    // network stalls, the overlay must not spin forever.
+    const CLIENT_GEN_TIMEOUT_MS = 140_000;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(
+          new Error(
+            "Generation timed out. The AI service took too long — please try again with a simpler prompt or fewer references.",
+          ),
+        );
+      }, CLIENT_GEN_TIMEOUT_MS);
+    });
     try {
       let mediaUrl: string | undefined;
       let maskImageUrl: string | undefined;
@@ -589,10 +603,11 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         referenceImageUrls = valid.length > 0 ? valid : undefined;
       }
 
-      const result = await generate({
-        data: {
-          type: "image",
-          prompt: opts.jobPrompt,
+      const result = await Promise.race([
+        generate({
+          data: {
+            type: "image",
+            prompt: opts.jobPrompt.length > 3900 ? opts.jobPrompt.slice(0, 3900) : opts.jobPrompt,
           imageUrl: mediaUrl,
           strength,
           aspectRatio,
@@ -604,8 +619,10 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           contextTags: contextTags.length > 0 ? contextTags : undefined,
           keepWatermark: isFreePlanForWm ? true : keepWatermark,
           workspaceMode,
-        },
-      });
+          },
+        }),
+        timeoutPromise,
+      ]);
 
       if (runId !== runIdRef.current) return;
 
@@ -634,6 +651,7 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       toast.error(msg);
     } finally {
       progressTimers.forEach(clearTimeout);
+      if (timeoutId) clearTimeout(timeoutId);
     }
   };
 

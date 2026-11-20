@@ -85,7 +85,11 @@ function falErrorMessage(label: string, status: number, txt: string): string {
   return `${label} failed (${status})${detail ? `: ${detail}` : ""}`;
 }
 
-async function runFal(step: FalStep, falKey: string): Promise<string> {
+async function runFal(step: FalStep, falKey: string, opts?: { timeoutMs?: number; requestId?: string }): Promise<string> {
+  // Keep under typical serverless maxDuration so the platform does not kill the
+  // function mid-poll (which leaves the client stuck on a loading overlay).
+  const timeoutMs = opts?.timeoutMs ?? 90_000;
+  const rid = opts?.requestId ?? "n/a";
   const submit = await fetch(`${FAL_QUEUE}${step.model}`, {
     method: "POST",
     headers: {
@@ -104,11 +108,21 @@ async function runFal(step: FalStep, falKey: string): Promise<string> {
   }
   const statusUrl = submitJson.status_url;
   const responseUrl = submitJson.response_url;
+  const falRequestId = submitJson.request_id ?? null;
   if (!statusUrl || !responseUrl) throw new Error(`${step.label}: missing status/response URL`);
+  console.info("[generate] fal submitted", {
+    rid,
+    falRequestId,
+    label: step.label,
+    model: step.model,
+  });
 
+  const deadline = Date.now() + timeoutMs;
   let completed = false;
-  for (let i = 0; i < 120; i++) {
-    await sleep(i < 5 ? 1000 : 2000);
+  let delay = 1000;
+  let lastStatus = "";
+  while (Date.now() < deadline) {
+    await sleep(delay);
     const st = await fetch(statusUrl, {
       headers: { Authorization: `Key ${falKey}` },
     });
@@ -118,18 +132,22 @@ async function runFal(step: FalStep, falKey: string): Promise<string> {
     try {
       stJson = JSON.parse(stTxt);
     } catch {
+      delay = Math.min(delay + 500, 3000);
       continue;
     }
+    if (stJson.status) lastStatus = stJson.status;
     if (stJson.status === "COMPLETED") {
       completed = true;
       break;
     }
-    if (stJson.status === "FAILED" || stJson.status === "CANCELLED") {
+    if (stJson.status === "FAILED" || stJson.status === "CANCELLED" || stJson.status === "ERROR") {
       throw new Error(`${step.label} ${stJson.status}`);
     }
+    delay = Math.min(Math.floor(delay * 1.25), 3000);
   }
   if (!completed) {
-    throw new Error(`${step.label}: timed out waiting for provider (120 status polls)`);
+    console.error("[generate] fal poll timeout", { rid, falRequestId, label: step.label, lastStatus, timeoutMs });
+    throw new Error(`${step.label}: timed out waiting for provider. Please try again.`);
   }
 
   const res = await fetch(responseUrl, {
@@ -204,7 +222,20 @@ export const generateMedia = createServerFn({ method: "POST" })
       console.error("[generate] FAL env missing at runtime", { hasFAL_API_KEY: Boolean(process.env.FAL_API_KEY), hasFAL_KEY: Boolean(process.env.FAL_KEY) });
       throw new Error("FAL API key is not configured.");
     }
-    console.info("[generate] FAL auth context", { source: falKeySource, keyLen: falKey.length, studioTier: (data as { studioTier?: string | null }).studioTier ?? null, type: data.type, hasImageUrl: Boolean(data.imageUrl) });
+    const genRequestId =
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    console.info("[generate] FAL auth context", {
+      rid: genRequestId,
+      source: falKeySource,
+      keyLen: falKey.length,
+      studioTier: (data as { studioTier?: string | null }).studioTier ?? null,
+      workspaceMode: (data as { workspaceMode?: string | null }).workspaceMode ?? null,
+      type: data.type,
+      hasImageUrl: Boolean(data.imageUrl),
+      promptLen: typeof data.prompt === "string" ? data.prompt.length : 0,
+    });
 
     const { data: profile, error: profileErr } = await supabase
       .from("profiles")
@@ -331,7 +362,7 @@ export const generateMedia = createServerFn({ method: "POST" })
               intent,
               referenceCount: Math.max(1, refCount),
             });
-            (data as any).prompt = finalPrompt;
+            (data as any).prompt = finalPrompt.length > 3900 ? finalPrompt.slice(0, 3900) : finalPrompt;
             imageStudioMeta = {
               ...(imageStudioMeta || {}),
               workspaceMode: "auto",
