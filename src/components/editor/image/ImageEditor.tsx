@@ -135,6 +135,8 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
   const [stage, setStage] = useState(0);
   const [progress, setProgress] = useState(0);
   const runIdRef = useRef(0);
+  /** True while a generate() server call is still outstanding. */
+  const inFlightGenRef = useRef(false);
   const [premiumCompleteHold, setPremiumCompleteHold] = useState(false);
   const [premiumGenError, setPremiumGenError] = useState<string | null>(null);
   const [ultraCompleteHold, setUltraCompleteHold] = useState(false);
@@ -486,6 +488,9 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       setState("blocked");
       return toast.error(`Not enough credits. This costs ${cost} credits.`);
     }
+    if (inFlightGenRef.current) {
+      return toast.error("A generation is already in progress. Please wait for it to finish.");
+    }
 
     const runId = ++runIdRef.current;
     setState("analyzing");
@@ -516,15 +521,18 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
     // network stalls, the overlay must not spin forever.
     const CLIENT_GEN_TIMEOUT_MS = 140_000;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(
-          new Error(
-            "Generation timed out. The AI service took too long — please try again with a simpler prompt or fewer references.",
-          ),
+    let clientTimedOut = false;
+    let genPromise: Promise<unknown> | null = null;
+    const throwIfClientTimedOut = () => {
+      if (clientTimedOut) {
+        throw new Error(
+          "Generation timed out. The AI service took too long — please try again with a simpler prompt or fewer references.",
         );
-      }, CLIENT_GEN_TIMEOUT_MS);
-    });
+      }
+    };
+    timeoutId = setTimeout(() => {
+      clientTimedOut = true;
+    }, CLIENT_GEN_TIMEOUT_MS);
     try {
       let mediaUrl: string | undefined;
       let maskImageUrl: string | undefined;
@@ -603,11 +611,12 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
         referenceImageUrls = valid.length > 0 ? valid : undefined;
       }
 
-      const result = await Promise.race([
-        generate({
-          data: {
-            type: "image",
-            prompt: opts.jobPrompt.length > 3900 ? opts.jobPrompt.slice(0, 3900) : opts.jobPrompt,
+      throwIfClientTimedOut();
+      inFlightGenRef.current = true;
+      genPromise = generate({
+        data: {
+          type: "image",
+          prompt: opts.jobPrompt.length > 3900 ? opts.jobPrompt.slice(0, 3900) : opts.jobPrompt,
           imageUrl: mediaUrl,
           strength,
           aspectRatio,
@@ -619,10 +628,23 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
           contextTags: contextTags.length > 0 ? contextTags : undefined,
           keepWatermark: isFreePlanForWm ? true : keepWatermark,
           workspaceMode,
-          },
-        }),
-        timeoutPromise,
-      ]);
+        },
+      }).finally(() => {
+        inFlightGenRef.current = false;
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          clientTimedOut = true;
+          reject(
+            new Error(
+              "Generation timed out. The AI service took too long — please try again with a simpler prompt or fewer references.",
+            ),
+          );
+        }, Math.max(5_000, CLIENT_GEN_TIMEOUT_MS - 1));
+      });
+
+      const result = await Promise.race([genPromise, timeoutPromise]);
 
       if (runId !== runIdRef.current) return;
 
@@ -649,6 +671,32 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
       if (isPremiumExp) setPremiumGenError(msg);
       if (isUltraExp) setUltraGenError(msg);
       toast.error(msg);
+
+      // Late server success after client timeout: show the image (credits already charged once).
+      // A new user-initiated run bumps runIdRef and ignores this recovery.
+      if (clientTimedOut && genPromise) {
+        void genPromise
+          .then(async (late) => {
+            if (runId !== runIdRef.current) return;
+            const lateUrl =
+              (late as { outputUrl?: string; url?: string } | null)?.outputUrl ||
+              (late as { url?: string } | null)?.url;
+            if (!lateUrl) return;
+            await preloadImage(lateUrl);
+            if (runId !== runIdRef.current) return;
+            setStandardGenError(null);
+            setPremiumGenError(null);
+            setUltraGenError(null);
+            setOutput(lateUrl);
+            setState("success");
+            setProgress(100);
+            void refreshProfile();
+            toast.success("Image ready");
+          })
+          .catch(() => {
+            /* server failed after client timeout — refund is handled server-side */
+          });
+      }
     } finally {
       progressTimers.forEach(clearTimeout);
       if (timeoutId) clearTimeout(timeoutId);
