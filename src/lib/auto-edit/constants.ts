@@ -47,7 +47,7 @@ export function autoEditTargetMegapixels(quality: AutoEditQuality = "hd"): numbe
 }
 
 /** Vision analysis on fal only. */
-export const AUTO_EDIT_VISION_MODEL = "_EDIT_VISION_MODEL = "fal-ai/any-llm/vision" as const;
+export const AUTO_EDIT_VISION_MODEL = "fal-ai/any-llm/vision" as const;
 export const AUTO_EDIT_VISION_LLM = "google/gemini-2.5-flash-lite" as const;
 
 /** Primary edit model — FLUX Kontext LoRA. */
