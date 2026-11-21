@@ -11,5 +11,13 @@
       "path": "/api/cron/plan-lifecycle",
       "schedule": "0 3 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*": {
+      "maxDuration": 120
+    },
+    "**/*.func.ts": {
+      "maxDuration": 120
+    }
+  }
 }
