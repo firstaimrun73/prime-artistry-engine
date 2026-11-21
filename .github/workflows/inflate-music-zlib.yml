@@ -1,0 +1,37 @@
+name: Inflate music functions from zlib parts
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - ".github/scripts/music_zlib_parts/**"
+      - ".github/scripts/inflate_from_zlib_parts.py"
+permissions:
+  contents: write
+concurrency:
+  group: inflate-music-zlib
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - run: python3 .github/scripts/inflate_from_zlib_parts.py
+      - name: Verify
+        run: |
+          set -e
+          grep -n "music_generation_jobs\|reservationTxId\|refund_credits" src/lib/music.functions.ts | head -20
+          ! grep -q "p_user_id: userId, p_amount" src/lib/music.functions.ts
+      - name: Commit
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/music.functions.ts
+          if git diff --cached --quiet; then echo No changes; else
+            git commit -m "fix(music): durable idempotency + reserve/refund credit flow"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
