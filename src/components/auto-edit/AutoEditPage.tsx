@@ -18,12 +18,14 @@ import {
   ArrowLeft,
   CheckCircle2,
   Download,
-  ImagePlus,
   Loader2,
   Sparkles,
   Upload,
   X,
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { resolveAvatarSrc } from "@/lib/avatar-presets";
+import { pickMalutoTagline } from "@/lib/auto-edit/maluto-taglines";
 import { Button } from "@/components/ui/button";
 import { AutoEditBeforeAfter } from "@/components/auto-edit/AutoEditBeforeAfter";
 import { MalutoPuzzleOverlay } from "@/components/auto-edit/MalutoPuzzleOverlay";
@@ -31,6 +33,7 @@ import { useAuth } from "@/lib/auth";
 import { runStandaloneAutoEdit } from "@/lib/auto-edit/auto-edit.functions";
 import {
   AUTO_EDIT_PRODUCT_NAME,
+  AUTO_EDIT_PRODUCT_VERSION,
   autoEditCreditCost,
   type AutoEditQuality,
 } from "@/lib/auto-edit/constants";
@@ -86,6 +89,8 @@ export function AutoEditPage() {
   const [normInfo, setNormInfo] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<ResultMeta | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [tagline, setTagline] = useState(() => pickMalutoTagline());
+  const [reduceMotion, setReduceMotion] = useState(false);
   const runLock = useRef(false);
   const startedAt = useRef<number>(0);
 
@@ -115,6 +120,18 @@ export function AutoEditPage() {
     setQuality(defaultAutoEditQualityForPlan(plan));
   }, [plan]);
 
+  useEffect(() => {
+    try {
+      setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (preview || busy || output) return;
+    const id = window.setInterval(() => setTagline(pickMalutoTagline()), 4200);
+    return () => window.clearInterval(id);
+  }, [preview, busy, output]);
+
   const clear = useCallback(() => {
     if (busy) return;
     setFile(null);
@@ -140,9 +157,9 @@ export function AutoEditPage() {
         setResultMeta(null);
         setStageIdx(0);
         if (norm.resized) {
-          setNormInfo(`Auto-optimized to ${norm.width}×${norm.height} (2MP max)`);
+          setNormInfo(`Auto-optimized to ${norm.width}×${norm.height} `);
         } else {
-          setNormInfo(`${norm.width}×${norm.height} · ready for Maluto AI`);
+          setNormInfo(`${norm.width}×${norm.height} · ready`);
         }
         const url = URL.createObjectURL(norm.file);
         setPreview((prev) => {
@@ -283,90 +300,39 @@ export function AutoEditPage() {
   return (
     <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background">
       {/* Header */}
-      <header className="flex shrink-0 items-center gap-2 border-b border-border/80 bg-card/40 px-3 py-2.5 backdrop-blur-sm sm:gap-3">
-        <button
-          type="button"
-          onClick={() => void navigate({ to: "/", replace: true })}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border bg-card"
-          aria-label="Back to home"
-        >
+      <header className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-border/40 bg-background/75 px-3 py-2.5 backdrop-blur-xl sm:gap-3">
+        <button type="button" onClick={() => void navigate({ to: "/", replace: true })} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border/50 bg-card/70 shadow-sm" aria-label="Back to home">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Motio<span className="text-[#FF5A1F]">2</span>edit
-          </p>
-          <h1 className="flex items-center gap-1.5 truncate text-base font-bold tracking-tight">
-            {AUTO_EDIT_PRODUCT_NAME}
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#FF5A1F]/35 bg-[#FF5A1F]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#FF5A1F]">
+          <h1 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight sm:text-xl">
+            <span className="bg-gradient-to-r from-violet-500 via-[#FF5A1F] to-cyan-500 bg-clip-text text-transparent">{AUTO_EDIT_PRODUCT_NAME}</span>
+            <span className="rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-[10px] font-normal tracking-wide text-muted-foreground">v{AUTO_EDIT_PRODUCT_VERSION}</span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
               <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF5A1F] opacity-50" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#FF5A1F]" />
+                <span className={cn("absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-60", !reduceMotion && "animate-ping")} />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
               </span>
               Live
             </span>
           </h1>
         </div>
-
-        <div className="hidden shrink-0 flex-col items-end sm:flex">
-          <span className="text-[10px] font-medium text-muted-foreground">
-            {isAdmin ? "Admin" : "Balance"}
-          </span>
-          <span className="text-xs font-bold tabular-nums text-foreground">
-            {isAdmin ? "Unlimited" : `${credits} credits`}
-          </span>
-        </div>
-
-        <div className="shrink-0 rounded-full border border-[#FF5A1F]/30 bg-[#FF5A1F]/10 px-2.5 py-1 text-[11px] font-semibold text-[#FF5A1F]">
-          {creditCost} credits
-        </div>
-
-        {/* Initials only — never Google profile photo in Studio */}
-        <div
-          className={cn(
-            "grid h-9 w-9 shrink-0 place-items-center rounded-full border text-[11px] font-bold",
-            isAdmin
-              ? "border-[#FF5A1F]/50 bg-[#FF5A1F]/15 text-[#FF5A1F]"
-              : "border-border bg-muted text-foreground",
-          )}
-          title={isAdmin ? "Admin" : displayName}
-          aria-label={isAdmin ? "Admin account" : displayName}
-        >
-          {isAdmin ? (
-            <Sparkles className="h-4 w-4" aria-hidden />
-          ) : (
-            initials
-          )}
-        </div>
+        <Link to="/profile" className="shrink-0" aria-label="Profile">
+          <Avatar className="h-9 w-9 border border-border/50 shadow-sm">
+            <AvatarImage src={resolveAvatarSrc((profile as { avatar_url?: string | null } | null)?.avatar_url, (profile as { avatar_signed_url?: string | null } | null)?.avatar_signed_url, { nameOrEmail: displayName, userId: user?.id })} alt="" />
+            <AvatarFallback className="text-[11px] font-semibold">{initials}</AvatarFallback>
+          </Avatar>
+        </Link>
       </header>
 
-      {/* Mobile credit strip */}
-      <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-1.5 text-[11px] sm:hidden">
-        <span className="text-muted-foreground">
-          {isAdmin ? (
-            <>
-              Admin · <strong className="text-foreground">Unlimited</strong>
-            </>
-          ) : (
-            <>
-              Balance: <strong className="text-foreground">{credits}</strong>
-            </>
-          )}
-        </span>
-        <span className="text-muted-foreground">
-          Cost: <strong className="text-[#FF5A1F]">{creditCost} credits</strong>
-        </span>
-      </div>
-
-      <main className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-3 sm:overflow-hidden sm:py-4">
+<main className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-3 sm:overflow-hidden sm:py-4">
         {!output && (
           <div className="w-full max-w-md shrink-0 text-center">
             <h2 className="text-lg font-extrabold tracking-tight sm:text-xl">
-              Let&apos;s solve your picture in one click.
+              Intelligent photo restoration
             </h2>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              Upload a photograph. Maluto AI will understand, analyze, and restore it
-              intelligently.
+              Upload a photograph. Maluto AI analyses and restores it with care.
             </p>
           </div>
         )}
@@ -374,7 +340,7 @@ export function AutoEditPage() {
         {/* Upload / preview / result panel */}
         <div
           className={cn(
-            "relative my-3 flex w-full max-w-md min-h-[200px] flex-1 flex-col items-center justify-center overflow-hidden rounded-2xl border bg-card/90 shadow-sm dark:bg-card/60",
+            "relative my-3 flex w-full max-w-md min-h-[200px] flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border border-white/15 bg-card/60 shadow-xl shadow-black/5 backdrop-blur-xl dark:border-white/10 dark:bg-card/40",
             dragOver ? "border-[#FF5A1F] ring-2 ring-[#FF5A1F]/30" : "border-border",
             output && "flex-none",
           )}
@@ -389,25 +355,24 @@ export function AutoEditPage() {
         >
           {!preview ? (
             <div className="flex w-full flex-1 flex-col items-center justify-center gap-3 px-5 py-10 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[#FF5A1F]/12 text-[#FF5A1F] shadow-inner">
-                <Upload className="h-7 w-7" />
-              </span>
+              <div className="relative grid h-28 w-28 place-items-center sm:h-32 sm:w-32">
+                <div className={cn("absolute inset-0 rounded-full bg-gradient-to-br from-violet-500/40 via-fuchsia-400/30 to-cyan-400/40 blur-2xl", !reduceMotion && "animate-pulse")} aria-hidden />
+                <div className={cn("absolute inset-2 rounded-full bg-gradient-to-tr from-cyan-400/50 via-[#FF5A1F]/40 to-violet-500/50 opacity-80 blur-md", !reduceMotion && "animate-[spin_14s_linear_infinite]")} aria-hidden />
+                <div className="relative grid h-20 w-20 place-items-center rounded-full border border-white/25 bg-gradient-to-br from-white/30 via-white/10 to-transparent shadow-[0_0_40px_rgba(255,90,31,0.28)] backdrop-blur-md dark:from-white/15 sm:h-24 sm:w-24">
+                  <Sparkles className="h-8 w-8 text-[#FF5A1F] drop-shadow sm:h-9 sm:w-9" />
+                </div>
+              </div>
+              <div className="min-h-[2.75rem] max-w-[18rem] px-1">
+                <p key={tagline} className={cn("text-sm font-medium leading-snug text-foreground/90 sm:text-[15px]", !reduceMotion && "animate-in fade-in duration-700")}>{tagline}</p>
+              </div>
               <div>
                 <p className="text-sm font-bold">Upload Your Photograph</p>
                 <p className="mt-1 max-w-[16rem] text-xs leading-snug text-muted-foreground">
                   Choose a photograph and let Maluto AI understand and restore it.
                 </p>
               </div>
-              <Button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="mt-1 h-10 rounded-full bg-[#FF5A1F] px-6 text-sm font-bold text-white hover:bg-[#e04e1a]"
-              >
-                <ImagePlus className="mr-1.5 h-4 w-4" />
-                Choose Photo
-              </Button>
               <p className="text-[11px] text-muted-foreground">
-                JPG · PNG · WEBP · max {MAX_MB}MB · auto 2MP normalize
+                JPG · PNG · WEBP · Maximum {MAX_MB} MB
               </p>
             </div>
           ) : output && preview ? (
