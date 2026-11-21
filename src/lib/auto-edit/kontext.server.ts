@@ -26,6 +26,9 @@ import { persistGenerationHistory } from "@/lib/history-persist.server";
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Internal COGS estimate for fal-ai/flux-kontext-lora (USD per image, HD-class). Not shown to customers. */
+const KONTEXT_PROVIDER_COGS_USD = 0.04;
+
 const PREPARE_FAILED =
   "Couldn't finish preparing your image. Please try again or contact support.";
 
@@ -182,7 +185,7 @@ export async function runAutoKontextEdit(
     provider: "fal",
     modelId: AUTO_EDIT_FAL_MODEL,
     endpoint: AUTO_EDIT_FAL_MODEL,
-    providerCogsUsd: 0,
+    providerCogsUsd: KONTEXT_PROVIDER_COGS_USD,
     legacyCustomerCredits: cost,
     idempotencyKey: `auto_edit:${args.userId}:${quality}:${args.imageUrl.slice(-48)}:${args.editPrompt.slice(0, 64)}`,
     resolution: quality,
@@ -266,7 +269,6 @@ export async function runAutoKontextEdit(
     console.log("[auto-edit/kontext] lifecycle charged", creditsCharged, "credits → remaining", newCredits);
   }
 
-  // Prefer clean fal URL for History reference; display may use watermarked outputUrl
   const providerUrl = kontext.outputUrl;
   try {
     const persist = await persistGenerationHistory({
@@ -290,6 +292,7 @@ export async function runAutoKontextEdit(
         actual_megapixels: kontext.actualMegapixels ?? null,
         credits_charged: creditsCharged,
         credits_used: creditsCharged,
+        provider_cogs_usd: KONTEXT_PROVIDER_COGS_USD,
         watermark_position: AUTO_EDIT_WATERMARK_POSITION,
         single_image: true,
         analysis_completed: true,
