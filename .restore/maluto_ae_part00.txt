@@ -1,6 +1,7 @@
 /**
  * Maluto AI Studio — premium one-tap intelligent photo restoration.
- * Client normalize (2MP internal) · SD/HD · zero retries · progress + result summary.
+ * Glass UI · rotating taglines · Siri-inspired orb · Upload-then-Enhance.
+ * 2MP normalize is internal only (not shown in customer chrome).
  */
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -18,7 +19,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Download,
-  ImagePlus,
   Loader2,
   Sparkles,
   Upload,
@@ -117,18 +117,6 @@ export function AutoEditPage() {
     user?.email,
   );
 
-  useEffect(() => {
-    setQuality(defaultAutoEditQualityForPlan(plan));
-  }, [plan]);
-
-  useEffect(() => {
-    try {
-      setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (preview || busy || output) return;
-    const t = window.setInterval(() => setTagline(pickMalutoTagline()), 4200);
-    return () => window.clearInterval(t);
-  }, [preview, busy, output]);
+  const avatarSrc = resolveAvatarSrc(
+    (profile as { avatar_url?: string | null } | null)?.avatar_url,
+    (profile as { avatar_signed_url?: string | null } | null)?.avatar_signed_url,

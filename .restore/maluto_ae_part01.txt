@@ -1,0 +1,163 @@
+
+    { nameOrEmail: displayName, userId: user?.id },
+  );
+
+  useEffect(() => {
+    setQuality(defaultAutoEditQualityForPlan(plan));
+  }, [plan]);
+
+  useEffect(() => {
+    try {
+      setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (preview || busy || output) return;
+    const t = window.setInterval(() => setTagline(pickMalutoTagline()), 4200);
+    return () => window.clearInterval(t);
+  }, [preview, busy, output]);
+
+  const clear = useCallback(() => {
+    if (busy) return;
+    setFile(null);
+    setPreview(null);
+    setOutput(null);
+    setStageIdx(0);
+    setNormInfo(null);
+    setResultMeta(null);
+    setTagline(pickMalutoTagline());
+    if (inputRef.current) inputRef.current.value = "";
+  }, [busy]);
+
+  const onPick = useCallback(
+    async (f: File | null) => {
+      if (!f || busy) return;
+      if (!isAcceptableImageFile(f)) {
+        toast.error("Please choose a JPG, PNG, or WEBP under 25MB.");
+        return;
+      }
+      try {
+        const norm = await normalizeImageTo2MP(f);
+        setFile(norm.file);
+        setOutput(null);
+        setResultMeta(null);
+        setStageIdx(0);
+        if (norm.resized) {
+          setNormInfo(`Optimized · ${norm.width}×${norm.height}`);
+        } else {
+          setNormInfo(`${norm.width}×${norm.height} · ready`);
+        }
+        const url = URL.createObjectURL(norm.file);
+        setPreview((prev) => {
+          if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+          return url;
+        });
+      } catch {
+        toast.error("Could not process this image. Try another photo.");
+      }
+    },
+    [busy],
+  );
+
+  const onInput = (e: ChangeEvent<HTMLInputElement>) => {
+    void onPick(e.target.files?.[0] ?? null);
+    e.target.value = "";
+  };
+
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    void onPick(e.dataTransfer.files?.[0] ?? null);
+  };
+
+  const run = async () => {
+    if (runLock.current || busy) return;
+    if (!user) {
+      toast.error("Sign in required");
+      return;
+    }
+    if (!file) {
+      toast.error("Upload a photograph first");
+      return;
+    }
+    if (!isAdmin && credits < creditCost) {
+      toast.error(`Not enough credits. Need ${creditCost}, you have ${credits}.`);
+      return;
+    }
+    runLock.current = true;
+    setBusy(true);
+    setOutput(null);
+    setResultMeta(null);
+    setStageIdx(0);
+    startedAt.current = Date.now();
+    try {
+      setStageIdx(0);
+      const uploaded = await uploadToStorage(file, user.id);
+      setStageIdx(1);
+      setStageIdx(2);
+      const result = await runEdit({
+        data: {
+          imageUrl: uploaded,
+          imageQuality: quality,
+        },
+      });
+      setStageIdx(4);
+      const outUrl =
+        (result as { outputUrl?: string })?.outputUrl ||
+        (result as { url?: string })?.url ||
+        null;
+      if (!outUrl) throw new Error("No output returned");
+      setStageIdx(5);
+      setOutput(outUrl);
+      const charged =
+        typeof (result as { creditsCharged?: number })?.creditsCharged === "number"
+          ? (result as { creditsCharged: number }).creditsCharged
+          : isAdmin
+            ? 0
+            : creditCost;
+      setResultMeta({
+        quality,
+        creditsCharged: charged,
+        completedAt: new Date(),
+        durationMs: Date.now() - startedAt.current,
+        normLabel: normInfo,
+      });
+      toast.success("Restoration complete");
+      void refreshProfile?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Enhancement failed");
+      setStageIdx(0);
+      void refreshProfile?.();
+    } finally {
+      setBusy(false);
+      runLock.current = false;
+    }
+  };
+
+  const downloadResult = async () => {
+    if (!output) return;
+    setDlBusy(true);
+    try {
+      try {
+        const res = await secureDl({ data: { url: output } });
+        const blobUrl =
+          typeof res === "string" ? res : (res as { url?: string })?.url || output;
+        await triggerBrowserDownload(blobUrl, "motio2edit-maluto-ai.jpg");
+      } catch {
+        await triggerBrowserDownload(output, "motio2edit-maluto-ai.jpg");
+      }
+      toast.success("Download started");
+    } catch {
+      toast.error("Download failed");
+    } finally {
+      setDlBusy(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="flex h-[100dvh] items-center justify-center bg-background">
+        <Loader2 className="h-
