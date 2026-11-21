@@ -28,9 +28,30 @@ import {
   type XaiVoiceId,
 } from "@/lib/music/voice-preview-assets";
 import { shouldRetainAsHistoryServer } from "@/lib/history-retention";
+import { isSafeExternalUrl } from "@/lib/safe-external-url";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchWithDeadline(
+  url: string,
+  init: RequestInit | undefined,
+  remainingMs: number,
+): Promise<Response> {
+  const budget = Math.max(1_000, Math.min(remainingMs, 60_000));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), budget);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Music provider request timed out. Please try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const GENRES = [
   "cinematic", "lofi", "edm", "hip hop", "rock", "pop", "classical",
@@ -80,11 +101,18 @@ async function runFalQueue(
   falKey: string,
   label: string,
 ) {
-  const submit = await fetch(`${FAL_QUEUE}${model}`, {
-    method: "POST",
-    headers: { Authorization: `Key ${falKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  // Align with typical Vercel serverless budgets; avoid 240s polls that outlive the platform.
+  const timeoutMs = 90_000;
+  const deadline = Date.now() + timeoutMs;
+  const submit = await fetchWithDeadline(
+    `${FAL_QUEUE}${model}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Key ${falKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    timeoutMs,
+  );
   if (!submit.ok) {
     const txt = await submit.text().catch(() => "");
     throw new Error(friendlyError(submit.status, txt));
@@ -94,17 +122,28 @@ async function runFalQueue(
   if (!requestId) throw new Error(`${label} did not return a request id.`);
   const statusUrl = submitted.status_url || `${FAL_QUEUE}${model}/requests/${requestId}/status`;
   const responseUrl = submitted.response_url || `${FAL_QUEUE}${model}/requests/${requestId}`;
-  const started = Date.now();
-  for (;;) {
-    if (Date.now() - started > 240_000) throw new Error(`${label} timed out.`);
+  let lastStatus = "";
+  while (Date.now() < deadline) {
     await sleep(1500);
-    const st = await fetch(statusUrl, { headers: { Authorization: `Key ${falKey}` } });
+    const st = await fetchWithDeadline(
+      statusUrl,
+      { headers: { Authorization: `Key ${falKey}` } },
+      deadline - Date.now(),
+    );
     if (!st.ok) continue;
     const sj = (await st.json()) as { status?: string };
+    if (sj.status) lastStatus = sj.status;
     if (sj.status === "COMPLETED") break;
     if (sj.status === "FAILED" || sj.status === "CANCELLED") throw new Error(`${label} failed (${sj.status}).`);
   }
-  const res = await fetch(responseUrl, { headers: { Authorization: `Key ${falKey}` } });
+  if (lastStatus !== "COMPLETED") {
+    throw new Error(`${label} timed out. Please try again.`);
+  }
+  const res = await fetchWithDeadline(
+    responseUrl,
+    { headers: { Authorization: `Key ${falKey}` } },
+    Math.max(5_000, deadline - Date.now()),
+  );
   if (!res.ok) throw new Error(friendlyError(res.status, await res.text().catch(() => "")));
   return (await res.json()) as Record<string, unknown>;
 }
@@ -147,17 +186,6 @@ async function analyzeImageMoodServer(imageUrl: string): Promise<string> {
   }
 }
 
-function isSafeExternalUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    if (u.protocol !== "https:") return false;
-    const host = u.hostname.toLowerCase();
-    if (host === "localhost" || host.endsWith(".local") || host.startsWith("127.") || host.startsWith("10.")) return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /** Voice library preview — permanent R2 assets only. No credits. No xAI/fal generation. */
 export const getVoicePreview = createServerFn({ method: "POST" })

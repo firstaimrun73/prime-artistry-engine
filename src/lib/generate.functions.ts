@@ -64,11 +64,33 @@ import { quotePremiumCredits, normalizePremiumQuality } from "@/lib/studio/image
 import { quoteUltraCredits, normalizeUltraQuality } from "@/lib/studio/image/ultra";
 import { assertCircleAddAllowed, resolveCircleCharge } from "@/lib/circle-edit/server-charge";
 import { normalizeCircleGeneratePayload } from "@/lib/circle-edit/normalize-generate-payload";
+import { assertSafeMediaUrl } from "@/lib/safe-external-url";
 
 export { completeCheckout } from "@/lib/checkout.functions";
 
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** fetch that cannot hang past remainingMs (AbortController). */
+async function fetchWithDeadline(
+  url: string,
+  init: RequestInit | undefined,
+  remainingMs: number,
+): Promise<Response> {
+  const budget = Math.max(1_000, Math.min(remainingMs, 60_000));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), budget);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Provider request timed out. Please try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function falErrorMessage(label: string, status: number, txt: string): string {
   let detail = "";
@@ -90,14 +112,18 @@ async function runFal(step: FalStep, falKey: string, opts?: { timeoutMs?: number
   // function mid-poll (which leaves the client stuck on a loading overlay).
   const timeoutMs = opts?.timeoutMs ?? 90_000;
   const rid = opts?.requestId ?? "n/a";
-  const submit = await fetch(`${FAL_QUEUE}${step.model}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Key ${falKey}`,
-      "Content-Type": "application/json",
+  const submit = await fetchWithDeadline(
+    `${FAL_QUEUE}${step.model}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Key ${falKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify((step as FalStep & { input?: unknown; body?: unknown }).input ?? (step as FalStep & { body?: unknown }).body),
     },
-    body: JSON.stringify((step as FalStep & { input?: unknown; body?: unknown }).input ?? (step as FalStep & { body?: unknown }).body),
-  });
+    timeoutMs,
+  );
   const submitTxt = await submit.text();
   if (!submit.ok) throw new Error(falErrorMessage(step.label, submit.status, submitTxt));
   let submitJson: { request_id?: string; status_url?: string; response_url?: string };
@@ -123,9 +149,11 @@ async function runFal(step: FalStep, falKey: string, opts?: { timeoutMs?: number
   let lastStatus = "";
   while (Date.now() < deadline) {
     await sleep(delay);
-    const st = await fetch(statusUrl, {
-      headers: { Authorization: `Key ${falKey}` },
-    });
+    const st = await fetchWithDeadline(
+      statusUrl,
+      { headers: { Authorization: `Key ${falKey}` } },
+      deadline - Date.now(),
+    );
     const stTxt = await st.text();
     if (!st.ok) throw new Error(falErrorMessage(`${step.label} status`, st.status, stTxt));
     let stJson: { status?: string };
@@ -150,9 +178,11 @@ async function runFal(step: FalStep, falKey: string, opts?: { timeoutMs?: number
     throw new Error(`${step.label}: timed out waiting for provider. Please try again.`);
   }
 
-  const res = await fetch(responseUrl, {
-    headers: { Authorization: `Key ${falKey}` },
-  });
+  const res = await fetchWithDeadline(
+    responseUrl,
+    { headers: { Authorization: `Key ${falKey}` } },
+    Math.max(5_000, deadline - Date.now()),
+  );
   const resTxt = await res.text();
   if (!res.ok) throw new Error(falErrorMessage(`${step.label} result`, res.status, resTxt));
   let resJson: Record<string, unknown>;
@@ -250,7 +280,15 @@ export const generateMedia = createServerFn({ method: "POST" })
     // Authoritative experience entitlement - never trust client-only tier selection
     if (data.type === "image" && data.studioTier) {
       assertImageExperienceAccess(plan, data.studioTier, isAdmin);
-      const multi = (data.imageUrls || []).filter(Boolean) as string[];
+      // Count unique refs from either client field (UI sends referenceImageUrls; older clients use imageUrls).
+      const multi = Array.from(
+        new Set(
+          ([
+            ...((data.referenceImageUrls || []) as string[]),
+            ...((data.imageUrls || []) as string[]),
+          ]).filter((u): u is string => typeof u === "string" && u.length > 0),
+        ),
+      );
       const expMax = maxImagesForStudioTier(data.studioTier);
       if (multi.length > expMax && !isAdmin) {
         throw new Error(
@@ -335,6 +373,9 @@ export const generateMedia = createServerFn({ method: "POST" })
         const multiUrls = (
           (data.referenceImageUrls || data.imageUrls || []) as string[]
         ).filter(Boolean);
+        if (data.imageUrl) assertSafeMediaUrl(data.imageUrl, "image");
+        if (data.maskImageUrl) assertSafeMediaUrl(String(data.maskImageUrl), "mask");
+        for (const u of multiUrls) assertSafeMediaUrl(u, "reference image");
         const circleNorm = normalizeCircleGeneratePayload({
           imageUrl: data.imageUrl,
           maskUrl: data.maskUrl,

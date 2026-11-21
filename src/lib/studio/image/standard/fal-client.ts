@@ -8,6 +8,26 @@ import type { StandardFalStep } from "./types";
 const FAL_QUEUE = "https://queue.fal.run/";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+async function fetchWithDeadline(
+  url: string,
+  init: RequestInit | undefined,
+  remainingMs: number,
+): Promise<Response> {
+  const budget = Math.max(1_000, Math.min(remainingMs, 60_000));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), budget);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("AI service request timed out. Please try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function falErrorMessage(label: string, status: number, txt: string): string {
   let detail = "";
   try {
@@ -67,11 +87,11 @@ export async function runStandardFalStep(
     promptHead,
   );
 
-  const submit = await fetch(`${FAL_QUEUE}${step.model}`, {
+  const submit = await fetchWithDeadline(`${FAL_QUEUE}${step.model}`, {
     method: "POST",
     headers,
     body: JSON.stringify(step.body),
-  });
+  }, timeoutMs);
   if (!submit.ok) {
     const txt = await submit.text();
     console.error("[standard-fal] submit failed", step.label, submit.status, txt.slice(0, 300));
@@ -90,7 +110,7 @@ export async function runStandardFalStep(
 
   while (Date.now() < deadline) {
     await sleep(delay);
-    const st = await fetch(status_url, { headers });
+    const st = await fetchWithDeadline(status_url, { headers }, deadline - Date.now());
     if (!st.ok) {
       delay = Math.min(delay * 1.3, 5000);
       continue;
@@ -99,7 +119,7 @@ export async function runStandardFalStep(
     if (sj.status) lastStatus = sj.status;
     if (sj.status === "COMPLETED") break;
     if (sj.status === "FAILED" || sj.status === "ERROR") {
-      const body = await fetch(response_url, { headers })
+      const body = await fetchWithDeadline(response_url, { headers }, Math.max(3_000, deadline - Date.now()))
         .then((r) => r.text())
         .catch(() => "");
       console.error("[standard-fal] job failed", step.label, body.slice(0, 400));
@@ -112,7 +132,7 @@ export async function runStandardFalStep(
     throw new Error(`${step.label} timed out. Credits not charged.`);
   }
 
-  const res = await fetch(response_url, { headers });
+  const res = await fetchWithDeadline(response_url, { headers }, Math.max(5_000, deadline - Date.now()));
   if (!res.ok) {
     throw new Error(falErrorMessage(step.label, res.status, await res.text()));
   }
