@@ -3,8 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - ".restore/maluto_ae_b64_*.txt"
-      - ".restore/install_maluto_ae.py"
+      - ".restore/patch_maluto_glass.py"
       - ".restore/TRIGGER_MALUTO_UI"
 jobs:
   apply:
@@ -15,8 +14,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Install glass AutoEditPage
-        run: python3 .restore/install_maluto_ae.py
+      - name: Patch AutoEditPage to glass UI
+        run: python3 .restore/patch_maluto_glass.py
       - name: Commit
         run: |
           git config user.name "firstaimrun73"
