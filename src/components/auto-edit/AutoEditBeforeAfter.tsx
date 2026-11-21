@@ -1,7 +1,6 @@
 /**
- * Auto Edit–only Before/After compare.
- * Uses object-fit: contain so the full image is always visible (never cover/crop).
- * Container aspect ratio follows the AFTER image natural size.
+ * Maluto AI Before/After compare — Motio orange branding.
+ * object-fit: contain so the full image is always visible.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -63,12 +62,12 @@ export function AutoEditBeforeAfter({ before, after, onOpenAfter, className }: P
     <div
       ref={ref}
       className={cn(
-        "relative w-full select-none overflow-hidden rounded-2xl border border-violet-200/60 bg-slate-950/5 dark:border-violet-500/30 dark:bg-black/40",
+        "relative w-full select-none overflow-hidden rounded-2xl border border-[#FF5A1F]/25 bg-slate-950/5 dark:border-[#FF5A1F]/35 dark:bg-black/40",
         className,
       )}
       style={{
         aspectRatio: ratio ? String(ratio) : "4 / 3",
-        maxHeight: "min(70vh, 720px)",
+        maxHeight: "min(60vh, 640px)",
       }}
       onMouseDown={(e) => {
         if ((e.target as HTMLElement).closest("[data-divider]")) {
@@ -84,39 +83,36 @@ export function AutoEditBeforeAfter({ before, after, onOpenAfter, className }: P
         }
       }}
     >
-      {/* AFTER (base) — full image, never cropped */}
       <img
         src={after}
-        alt="After"
+        alt="Restored"
         draggable={false}
         onClick={() => onOpenAfter?.()}
         className="absolute inset-0 z-0 h-full w-full cursor-zoom-in object-contain object-center"
       />
 
-      {/* BEFORE clipped by divider */}
       <div
         className="absolute inset-0 z-10 overflow-hidden"
         style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}
       >
         <img
           src={before}
-          alt="Before"
+          alt="Original"
           draggable={false}
           className="absolute inset-0 h-full w-full object-contain object-center"
         />
       </div>
 
-      <span className="pointer-events-none absolute left-2 top-2 z-20 rounded-full bg-black/55 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
+      <span className="pointer-events-none absolute left-2 top-2 z-20 rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
         Before
       </span>
-      <span className="pointer-events-none absolute right-2 top-2 z-20 rounded-full bg-violet-600/90 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
-        After
+      <span className="pointer-events-none absolute right-2 top-2 z-20 rounded-full bg-[#FF5A1F]/95 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
+        Restored
       </span>
 
-      {/* Draggable divider */}
       <div
         data-divider
-        className="absolute inset-y-0 z-30 w-1 -translate-x-1/2 cursor-ew-resize bg-violet-400 shadow-[0_0_12px_rgba(139,92,246,0.6)]"
+        className="absolute inset-y-0 z-30 w-1 -translate-x-1/2 cursor-ew-resize bg-[#FF5A1F] shadow-[0_0_12px_rgba(255,90,31,0.55)]"
         style={{ left: `${pos}%` }}
         role="slider"
         aria-valuenow={Math.round(pos)}
@@ -124,7 +120,7 @@ export function AutoEditBeforeAfter({ before, after, onOpenAfter, className }: P
         aria-valuemax={100}
         aria-label="Before after divider"
       >
-        <span className="absolute top-1/2 left-1/2 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-gradient-to-br from-violet-500 to-cyan-400 text-xs font-bold text-white shadow-lg">
+        <span className="absolute top-1/2 left-1/2 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-gradient-to-br from-[#FF5A1F] to-orange-400 text-xs font-bold text-white shadow-lg">
           ⇆
         </span>
       </div>
