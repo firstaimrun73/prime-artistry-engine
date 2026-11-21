@@ -4,7 +4,6 @@ import {
   Music,
   Image as ImageIcon,
   Video,
-  Sparkles,
   Lock,
   Circle,
   Filter,
@@ -55,31 +54,30 @@ const HOME_SLOGANS = [
     title: "Edit your photos with licensed-quality AI",
     sub: "Restore, enhance, and restyle — ready for social and print",
     to: "/editor" as const,
-    cta: "Start editing →",
+    cta: "Start editing",
   },
   {
     title: "Bring Your Old Photos Back to Life",
     sub: "Restore faded memories with Maluto AI",
     to: "/studio/image/auto-edit" as const,
-    cta: "Explore Maluto AI →",
+    cta: "Explore Maluto AI",
   },
   {
     title: "Circle 2edit · Cropmix · Remove BG · AI+",
     sub: "Powerful creative tools. Simple workflows.",
     to: "/studio" as const,
-    cta: "Explore AI Tools →",
+    cta: "Explore AI Tools",
   },
   {
     title: "From idea to download in seconds",
     sub: "Standard · Premium · Ultra AI modes",
     to: "/editor" as const,
-    cta: "Open Image Studio →",
+    cta: "Open Image Studio",
   },
 ] as const;
 
-/** Older representation: orange diagrammatic icons in rounded squares — no AI Studio tile */
+/** Horizontal AI tools — Maluto AI intentionally omitted (dedicated Restore card + bottom tab). */
 const AI_TOOLS = [
-  { to: "/studio/image/auto-edit" as const, label: "Maluto AI", icon: Sparkles },
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
   { to: "/studio/image/remove-bg" as const, label: "Remove BG", icon: Eraser },
@@ -111,7 +109,6 @@ export function SignedInHomeBody() {
     <main className="mx-auto w-full max-w-6xl px-4 pt-4 pb-24 sm:pt-6 md:max-w-7xl md:pb-12">
       <MalutoHomeHint />
 
-      {/* Horizontal AI tools — orange rounded squares (previous style) */}
       <section className="mb-5" aria-label="AI tools">
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [scrollbar-width:none] md:flex-wrap md:gap-3 md:overflow-visible [&::-webkit-scrollbar]:hidden">
           {AI_TOOLS.map((q) => {
@@ -130,7 +127,6 @@ export function SignedInHomeBody() {
                     | "/studio/music"
                     | "/studio/image/circle-remove"
                     | "/studio/image/remove-bg"
-                    | "/studio/image/auto-edit"
                     | "/studio/image/filters"
                 }
                 {...(!locked && q.label === "Circle"
@@ -190,7 +186,7 @@ export function SignedInHomeBody() {
             </div>
             <span className="flex shrink-0 items-center gap-1 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-orange-600 shadow-sm transition group-hover:bg-white md:text-sm">
               {slogan.cta}
-              <ArrowRight className="h-3.5 w-3.5" />
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
             </span>
           </div>
         </Link>
@@ -198,7 +194,6 @@ export function SignedInHomeBody() {
 
       <AutoEditHomeCard />
 
-      {/* Try Something New — moved from Image Studio to homepage */}
       <section className="mt-6" aria-label="Try something new">
         <ImageStudioWeeklyCarousel />
       </section>

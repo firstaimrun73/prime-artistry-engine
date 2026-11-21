@@ -1,28 +1,56 @@
 /**
  * Compact discovery hint on Home — Maluto AI.
- * Mobile only (never shown on desktop).
- * Dismissible once per session; hides on scroll.
+ * Mobile only. 30-minute cooldown after dismiss; session + localStorage.
  */
 import { useEffect, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { X } from "lucide-react";
 
-const SESSION_KEY = "motio2edit-maluto-home-hint-dismissed";
+const STORAGE_KEY = "motio2edit-maluto-home-hint-until";
+const SESSION_KEY = "motio2edit-maluto-home-hint-session";
+const COOLDOWN_MS = 30 * 60 * 1000;
+const SHOW_DELAY_MS = 2500;
 const SCROLL_HIDE_PX = 48;
 
+function isSuppressed(): boolean {
+  try {
+    if (sessionStorage.getItem(SESSION_KEY) === "1") return true;
+    const until = Number(localStorage.getItem(STORAGE_KEY) || "0");
+    if (until && Date.now() < until) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+function suppress(cooldownMs = COOLDOWN_MS) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, "1");
+    localStorage.setItem(STORAGE_KEY, String(Date.now() + cooldownMs));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function MalutoHomeHint() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [visible, setVisible] = useState(false);
   const [scrolledAway, setScrolledAway] = useState(false);
 
+  const onMaluto = pathname.startsWith("/studio/image/auto-edit");
+
   useEffect(() => {
-    try {
-      if (sessionStorage.getItem(SESSION_KEY) === "1") return;
-    } catch {
-      /* ignore */
+    if (onMaluto) {
+      suppress(COOLDOWN_MS);
+      setVisible(false);
+      return;
     }
-    const t = window.setTimeout(() => setVisible(true), 600);
+    if (isSuppressed()) return;
+    const t = window.setTimeout(() => {
+      if (!isSuppressed()) setVisible(true);
+    }, SHOW_DELAY_MS);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [onMaluto]);
 
   useEffect(() => {
     if (!visible) return;
@@ -36,14 +64,10 @@ export function MalutoHomeHint() {
 
   const dismiss = () => {
     setVisible(false);
-    try {
-      sessionStorage.setItem(SESSION_KEY, "1");
-    } catch {
-      /* ignore */
-    }
+    suppress(COOLDOWN_MS);
   };
 
-  if (!visible || scrolledAway) return null;
+  if (onMaluto || !visible || scrolledAway) return null;
 
   return (
     <div
@@ -63,19 +87,6 @@ export function MalutoHomeHint() {
           <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
             Bring your memories back to life with Maluto AI.
           </p>
-          <div className="mt-1.5 flex items-center justify-center gap-1 text-orange-500" aria-hidden>
-            <span className="text-[10px] font-semibold uppercase tracking-wide">Tap +</span>
-            <svg width="16" height="20" viewBox="0 0 16 20" className="animate-bounce">
-              <path
-                d="M8 2v12M3 10l5 6 5-6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
         </Link>
         <button
           type="button"
