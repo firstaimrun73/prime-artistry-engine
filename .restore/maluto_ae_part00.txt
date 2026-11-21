@@ -1,0 +1,134 @@
+/**
+ * Maluto AI Studio — premium one-tap intelligent photo restoration.
+ * Client normalize (2MP internal) · SD/HD · zero retries · progress + result summary.
+ */
+import { Link, useNavigate } from "@tanstack/react-router";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  ImagePlus,
+  Loader2,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { resolveAvatarSrc } from "@/lib/avatar-presets";
+import { pickMalutoTagline } from "@/lib/auto-edit/maluto-taglines";
+import { Button } from "@/components/ui/button";
+import { AutoEditBeforeAfter } from "@/components/auto-edit/AutoEditBeforeAfter";
+import { MalutoPuzzleOverlay } from "@/components/auto-edit/MalutoPuzzleOverlay";
+import { useAuth } from "@/lib/auth";
+import { runStandaloneAutoEdit } from "@/lib/auto-edit/auto-edit.functions";
+import {
+  AUTO_EDIT_PRODUCT_NAME,
+  AUTO_EDIT_PRODUCT_VERSION,
+  autoEditCreditCost,
+  type AutoEditQuality,
+} from "@/lib/auto-edit/constants";
+import {
+  autoEditQualitiesForPlan,
+  defaultAutoEditQualityForPlan,
+  getAutoEditQualityOption,
+} from "@/lib/auto-edit/auto-edit.quality";
+import { isAdminEmail } from "@/lib/admin-config";
+import { secureDownloadImage } from "@/lib/download.functions";
+import { triggerBrowserDownload } from "@/lib/secure-image-download";
+import { uploadToStorage } from "@/lib/editor/editor.utils";
+import { normalizeImageTo2MP } from "@/lib/auto-edit/normalize-image";
+import { cn } from "@/lib/utils";
+
+const MAX_MB = 25;
+
+function isAcceptableImageFile(file: File): boolean {
+  const ok =
+    /image\/(jpeg|jpg|png|webp)/i.test(file.type) ||
+    /\.(jpe?g|png|webp)$/i.test(file.name);
+  return ok && file.size <= MAX_MB * 1024 * 1024;
+}
+
+function avatarInitials(name?: string | null, email?: string | null): string {
+  const s = (name || email || "U").trim();
+  const parts = s.split(/[\s@._-]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
+}
+
+type ResultMeta = {
+  quality: AutoEditQuality;
+  creditsCharged: number;
+  completedAt: Date;
+  durationMs: number;
+  normLabel: string | null;
+};
+
+export function AutoEditPage() {
+  const { user, profile, refreshProfile, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const runEdit = useServerFn(runStandaloneAutoEdit);
+  const secureDl = useServerFn(secureDownloadImage);
+
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [output, setOutput] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [stageIdx, setStageIdx] = useState(0);
+  const [dragOver, setDragOver] = useState(false);
+  const [dlBusy, setDlBusy] = useState(false);
+  const [normInfo, setNormInfo] = useState<string | null>(null);
+  const [resultMeta, setResultMeta] = useState<ResultMeta | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [tagline, setTagline] = useState(() => pickMalutoTagline());
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const runLock = useRef(false);
+  const startedAt = useRef<number>(0);
+
+  const plan = (profile as { plan?: string } | null)?.plan ?? "free";
+  const credits = Number((profile as { credits?: number } | null)?.credits ?? 0);
+  const qualityOptions = useMemo(() => autoEditQualitiesForPlan(plan), [plan]);
+  const [quality, setQuality] = useState<AutoEditQuality>(() =>
+    defaultAutoEditQualityForPlan(plan),
+  );
+  const isAdmin = isAdminEmail(user?.email);
+  const creditCost = autoEditCreditCost(quality);
+  const qualityOpt = getAutoEditQualityOption(quality);
+
+  const displayName =
+    (user as { user_metadata?: { full_name?: string; name?: string } } | null)?.user_metadata
+      ?.full_name ||
+    (user as { user_metadata?: { name?: string } } | null)?.user_metadata?.name ||
+    user?.email ||
+    "User";
+
+  const initials = avatarInitials(
+    (user as { user_metadata?: { full_name?: string } })?.user_metadata?.full_name,
+    user?.email,
+  );
+
+  useEffect(() => {
+    setQuality(defaultAutoEditQualityForPlan(plan));
+  }, [plan]);
+
+  useEffect(() => {
+    try {
+      setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (preview || busy || output) return;
+    const t = window.setInterval(() => setTagline(pickMalutoTagline()), 4200);
+    return () => window.clearInterval(t);
+  }, [preview, busy, output]);
