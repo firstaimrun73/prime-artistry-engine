@@ -1,6 +1,7 @@
 /**
  * Maluto AI Studio — premium one-tap intelligent photo restoration.
- * 2MP auto-normalize · SD/HD · zero retries · progress + result summary.
+ * Glass UI · rotating taglines · Siri-inspired orb · Upload-then-Enhance.
+ * 2MP normalize is internal only (not shown in customer chrome).
  */
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -116,6 +117,12 @@ export function AutoEditPage() {
     user?.email,
   );
 
+  const avatarSrc = resolveAvatarSrc(
+    (profile as { avatar_url?: string | null } | null)?.avatar_url,
+    (profile as { avatar_signed_url?: string | null } | null)?.avatar_signed_url,
+    { nameOrEmail: displayName, userId: user?.id },
+  );
+
   useEffect(() => {
     setQuality(defaultAutoEditQualityForPlan(plan));
   }, [plan]);
@@ -123,13 +130,15 @@ export function AutoEditPage() {
   useEffect(() => {
     try {
       setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
     if (preview || busy || output) return;
-    const id = window.setInterval(() => setTagline(pickMalutoTagline()), 4200);
-    return () => window.clearInterval(id);
+    const t = window.setInterval(() => setTagline(pickMalutoTagline()), 4200);
+    return () => window.clearInterval(t);
   }, [preview, busy, output]);
 
   const clear = useCallback(() => {
@@ -140,6 +149,7 @@ export function AutoEditPage() {
     setStageIdx(0);
     setNormInfo(null);
     setResultMeta(null);
+    setTagline(pickMalutoTagline());
     if (inputRef.current) inputRef.current.value = "";
   }, [busy]);
 
@@ -157,7 +167,7 @@ export function AutoEditPage() {
         setResultMeta(null);
         setStageIdx(0);
         if (norm.resized) {
-          setNormInfo(`Auto-optimized to ${norm.width}×${norm.height} `);
+          setNormInfo(`Optimized · ${norm.width}×${norm.height}`);
         } else {
           setNormInfo(`${norm.width}×${norm.height} · ready`);
         }
@@ -278,18 +288,19 @@ export function AutoEditPage() {
 
   if (!user) {
     return (
-      <div className="flex h-[100dvh] flex-col items-center justify-center bg-background px-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#FF5A1F]">
-          Motio2edit
-        </p>
-        <h1 className="mt-1 text-2xl font-extrabold tracking-tight">
+      <div className="relative flex h-[100dvh] flex-col items-center justify-center overflow-hidden bg-background px-4">
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.18),_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(255,90,31,0.14),_transparent_50%)]"
+          aria-hidden
+        />
+        <h1 className="bg-gradient-to-r from-violet-500 via-[#FF5A1F] to-cyan-500 bg-clip-text text-2xl font-semibold tracking-tight text-transparent">
           {AUTO_EDIT_PRODUCT_NAME}
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">Sign in to enhance one photo.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Sign in to restore one photograph.</p>
         <Link
           to="/auth"
           search={{ redirect: "/studio/image/auto-edit" }}
-          className="mt-6 inline-flex rounded-full bg-[#FF5A1F] px-5 py-2.5 text-sm font-semibold text-white"
+          className="mt-6 inline-flex rounded-full bg-gradient-to-r from-violet-600 via-[#FF5A1F] to-cyan-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg"
         >
           Sign in
         </Link>
@@ -298,19 +309,37 @@ export function AutoEditPage() {
   }
 
   return (
-    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background">
-      {/* Header */}
+    <div className="relative flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.12),_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(255,90,31,0.10),_transparent_50%)]"
+        aria-hidden
+      />
+
       <header className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-border/40 bg-background/75 px-3 py-2.5 backdrop-blur-xl sm:gap-3">
-        <button type="button" onClick={() => void navigate({ to: "/", replace: true })} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border/50 bg-card/70 shadow-sm" aria-label="Back to home">
+        <button
+          type="button"
+          onClick={() => void navigate({ to: "/", replace: true })}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border/50 bg-card/70 shadow-sm backdrop-blur"
+          aria-label="Back to home"
+        >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="min-w-0 flex-1">
           <h1 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight sm:text-xl">
-            <span className="bg-gradient-to-r from-violet-500 via-[#FF5A1F] to-cyan-500 bg-clip-text text-transparent">{AUTO_EDIT_PRODUCT_NAME}</span>
-            <span className="rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-[10px] font-normal tracking-wide text-muted-foreground">v{AUTO_EDIT_PRODUCT_VERSION}</span>
+            <span className="bg-gradient-to-r from-violet-500 via-[#FF5A1F] to-cyan-500 bg-clip-text text-transparent">
+              {AUTO_EDIT_PRODUCT_NAME}
+            </span>
+            <span className="rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-[10px] font-normal tracking-wide text-muted-foreground">
+              v{AUTO_EDIT_PRODUCT_VERSION}
+            </span>
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
               <span className="relative flex h-1.5 w-1.5">
-                <span className={cn("absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-60", !reduceMotion && "animate-ping")} />
+                <span
+                  className={cn(
+                    "absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-60",
+                    !reduceMotion && "animate-ping",
+                  )}
+                />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
               </span>
               Live
@@ -319,16 +348,16 @@ export function AutoEditPage() {
         </div>
         <Link to="/profile" className="shrink-0" aria-label="Profile">
           <Avatar className="h-9 w-9 border border-border/50 shadow-sm">
-            <AvatarImage src={resolveAvatarSrc((profile as { avatar_url?: string | null } | null)?.avatar_url, (profile as { avatar_signed_url?: string | null } | null)?.avatar_signed_url, { nameOrEmail: displayName, userId: user?.id })} alt="" />
+            <AvatarImage src={avatarSrc} alt="" />
             <AvatarFallback className="text-[11px] font-semibold">{initials}</AvatarFallback>
           </Avatar>
         </Link>
       </header>
 
-<main className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-3 sm:overflow-hidden sm:py-4">
+      <main className="relative flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-3 sm:overflow-hidden sm:py-4">
         {!output && (
           <div className="w-full max-w-md shrink-0 text-center">
-            <h2 className="text-lg font-extrabold tracking-tight sm:text-xl">
+            <h2 className="text-lg font-semibold tracking-tight sm:text-xl">
               Intelligent photo restoration
             </h2>
             <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
@@ -337,11 +366,10 @@ export function AutoEditPage() {
           </div>
         )}
 
-        {/* Upload / preview / result panel */}
         <div
           className={cn(
-            "relative my-3 flex w-full max-w-md min-h-[200px] flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border border-white/15 bg-card/60 shadow-xl shadow-black/5 backdrop-blur-xl dark:border-white/10 dark:bg-card/40",
-            dragOver ? "border-[#FF5A1F] ring-2 ring-[#FF5A1F]/30" : "border-border",
+            "relative my-3 flex w-full max-w-md min-h-[220px] flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border border-white/15 bg-card/60 shadow-xl shadow-black/5 backdrop-blur-xl dark:border-white/10 dark:bg-card/40",
+            dragOver && "border-[#FF5A1F]/60 ring-2 ring-[#FF5A1F]/25",
             output && "flex-none",
           )}
           onDragOver={(e) => {
@@ -354,21 +382,36 @@ export function AutoEditPage() {
           }}
         >
           {!preview ? (
-            <div className="flex w-full flex-1 flex-col items-center justify-center gap-3 px-5 py-10 text-center">
+            <div className="flex w-full flex-1 flex-col items-center justify-center gap-4 px-5 py-8 text-center">
+              {/* Siri-inspired orb */}
               <div className="relative grid h-28 w-28 place-items-center sm:h-32 sm:w-32">
-                <div className={cn("absolute inset-0 rounded-full bg-gradient-to-br from-violet-500/40 via-fuchsia-400/30 to-cyan-400/40 blur-2xl", !reduceMotion && "animate-pulse")} aria-hidden />
-                <div className={cn("absolute inset-2 rounded-full bg-gradient-to-tr from-cyan-400/50 via-[#FF5A1F]/40 to-violet-500/50 opacity-80 blur-md", !reduceMotion && "animate-[spin_14s_linear_infinite]")} aria-hidden />
+                <div
+                  className={cn(
+                    "absolute inset-0 rounded-full bg-gradient-to-br from-violet-500/40 via-fuchsia-400/30 to-cyan-400/40 blur-2xl",
+                    !reduceMotion && "animate-pulse",
+                  )}
+                  aria-hidden
+                />
+                <div
+                  className={cn(
+                    "absolute inset-2 rounded-full bg-gradient-to-tr from-cyan-400/50 via-[#FF5A1F]/40 to-violet-500/50 opacity-80 blur-md",
+                    !reduceMotion && "animate-[spin_14s_linear_infinite]",
+                  )}
+                  aria-hidden
+                />
                 <div className="relative grid h-20 w-20 place-items-center rounded-full border border-white/25 bg-gradient-to-br from-white/30 via-white/10 to-transparent shadow-[0_0_40px_rgba(255,90,31,0.28)] backdrop-blur-md dark:from-white/15 sm:h-24 sm:w-24">
                   <Sparkles className="h-8 w-8 text-[#FF5A1F] drop-shadow sm:h-9 sm:w-9" />
                 </div>
               </div>
               <div className="min-h-[2.75rem] max-w-[18rem] px-1">
-                <p key={tagline} className={cn("text-sm font-medium leading-snug text-foreground/90 sm:text-[15px]", !reduceMotion && "animate-in fade-in duration-700")}>{tagline}</p>
-              </div>
-              <div>
-                <p className="text-sm font-bold">Upload Your Photograph</p>
-                <p className="mt-1 max-w-[16rem] text-xs leading-snug text-muted-foreground">
-                  Choose a photograph and let Maluto AI understand and restore it.
+                <p
+                  key={tagline}
+                  className={cn(
+                    "text-sm font-medium leading-snug text-foreground/90 sm:text-[15px]",
+                    !reduceMotion && "animate-in fade-in duration-700",
+                  )}
+                >
+                  {tagline}
                 </p>
               </div>
               <p className="text-[11px] text-muted-foreground">
@@ -384,7 +427,7 @@ export function AutoEditPage() {
               <img
                 src={preview}
                 alt="Upload preview"
-                className="max-h-full max-w-full rounded-lg object-contain"
+                className="max-h-full max-w-full rounded-2xl object-contain"
                 draggable={false}
               />
               {busy && (
@@ -394,7 +437,7 @@ export function AutoEditPage() {
                 <button
                   type="button"
                   onClick={() => inputRef.current?.click()}
-                  className="absolute bottom-2 left-2 rounded-full border border-border bg-background/95 px-2.5 py-1 text-[11px] font-semibold shadow"
+                  className="absolute bottom-2 left-2 rounded-full border border-border/60 bg-background/90 px-2.5 py-1 text-[11px] font-semibold shadow backdrop-blur"
                 >
                   Replace Photo
                 </button>
@@ -403,7 +446,7 @@ export function AutoEditPage() {
                 <button
                   type="button"
                   onClick={clear}
-                  className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-border bg-background/95 text-foreground shadow"
+                  className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow backdrop-blur"
                   aria-label="Clear"
                 >
                   <X className="h-4 w-4" />
@@ -424,7 +467,6 @@ export function AutoEditPage() {
           <p className="mb-1 text-center text-[10px] text-muted-foreground">{normInfo}</p>
         )}
 
-        {/* Quality selector — always visible when photo ready and not complete */}
         {preview && !output && !busy && (
           <div className="mb-2 grid w-full max-w-md grid-cols-2 gap-2">
             {qualityOptions.map((opt) => (
@@ -433,22 +475,22 @@ export function AutoEditPage() {
                 type="button"
                 onClick={() => setQuality(opt.id)}
                 className={cn(
-                  "rounded-xl border px-3 py-2.5 text-left transition",
+                  "rounded-2xl border px-3 py-2.5 text-left transition backdrop-blur",
                   quality === opt.id
-                    ? "border-[#FF5A1F] bg-[#FF5A1F]/10 shadow-sm"
-                    : "border-border bg-card hover:border-[#FF5A1F]/40",
+                    ? "border-[#FF5A1F]/70 bg-[#FF5A1F]/10 shadow-sm"
+                    : "border-border/60 bg-card/50 hover:border-[#FF5A1F]/40",
                 )}
               >
                 <div className="flex items-center justify-between gap-1">
                   <span
                     className={cn(
-                      "text-sm font-extrabold",
+                      "text-sm font-semibold",
                       quality === opt.id ? "text-[#FF5A1F]" : "text-foreground",
                     )}
                   >
                     {opt.label}
                   </span>
-                  <span className="text-[11px] font-bold tabular-nums text-muted-foreground">
+                  <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">
                     {opt.credits} cr
                   </span>
                 </div>
@@ -458,10 +500,9 @@ export function AutoEditPage() {
           </div>
         )}
 
-        {/* Result summary */}
         {output && resultMeta && (
-          <div className="mb-2 w-full max-w-md rounded-xl border border-[#FF5A1F]/25 bg-[#FF5A1F]/5 px-3 py-2.5">
-            <div className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+          <div className="mb-2 w-full max-w-md rounded-2xl border border-[#FF5A1F]/25 bg-[#FF5A1F]/5 px-3 py-2.5 backdrop-blur">
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
               <CheckCircle2 className="h-4 w-4 text-[#FF5A1F]" />
               Your photograph has been restored
             </div>
@@ -495,43 +536,50 @@ export function AutoEditPage() {
                   {Math.max(1, Math.round(resultMeta.durationMs / 1000))}s
                 </strong>
               </div>
-              {resultMeta.normLabel && (
-                <div className="col-span-2 truncate">
-                  Processing: <strong className="text-foreground">{resultMeta.normLabel}</strong>
-                </div>
-              )}
             </dl>
           </div>
         )}
 
-        {/* Actions */}
+        {/* Actions — Upload when empty, Enhance when ready */}
         <div className="w-full max-w-md shrink-0 space-y-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           {!output ? (
-            <Button
-              className="h-12 w-full rounded-full bg-[#FF5A1F] text-base font-bold text-white shadow-lg shadow-orange-500/20 hover:bg-[#e04e1a] disabled:opacity-50"
-              size="lg"
-              disabled={busy || !file}
-              onClick={() => void run()}
-            >
-              {busy ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Enhancing…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-1.5 h-4 w-4" />
-                  Enhance · {creditCost} credits
-                </>
-              )}
-            </Button>
+            !file ? (
+              <Button
+                className="h-12 w-full rounded-full border border-white/20 bg-gradient-to-r from-violet-600 via-[#FF5A1F] to-cyan-500 text-base font-semibold text-white shadow-lg shadow-[#FF5A1F]/25 transition hover:opacity-95"
+                size="lg"
+                type="button"
+                onClick={() => inputRef.current?.click()}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Your Photo
+              </Button>
+            ) : (
+              <Button
+                className="h-12 w-full rounded-full bg-gradient-to-r from-[#FF5A1F] to-orange-500 text-base font-semibold text-white shadow-lg shadow-orange-500/25 hover:opacity-95 disabled:opacity-50"
+                size="lg"
+                disabled={busy}
+                onClick={() => void run()}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enhancing…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-1.5 h-4 w-4" />
+                    Enhance · {creditCost} credits
+                  </>
+                )}
+              </Button>
+            )
           ) : (
             <div className="flex gap-2">
               <Button variant="outline" className="h-11 flex-1 rounded-full" onClick={clear}>
                 New photo
               </Button>
               <Button
-                className="h-11 flex-1 rounded-full bg-[#FF5A1F] text-white hover:bg-[#e04e1a]"
+                className="h-11 flex-1 rounded-full bg-gradient-to-r from-[#FF5A1F] to-orange-500 text-white hover:opacity-95"
                 disabled={dlBusy}
                 onClick={() => void downloadResult()}
               >
