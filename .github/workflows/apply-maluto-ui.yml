@@ -3,7 +3,8 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - ".restore/maluto_ae_part*.txt"
+      - ".restore/maluto_ae_b64_*.txt"
+      - ".restore/install_maluto_ae.py"
       - ".restore/TRIGGER_MALUTO_UI"
 jobs:
   apply:
@@ -14,31 +15,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Assemble AutoEditPage
-        run: |
-          set -e
-          parts=(.restore/maluto_ae_part*.txt)
-          test ${#parts[@]} -ge 5
-          cat .restore/maluto_ae_part*.txt | sort -V | xargs cat > src/components/auto-edit/AutoEditPage.tsx
-          # fix: cat in numeric order
-          python3 - <<'PY'
-from pathlib import Path
-parts = sorted(Path('.').glob('.restore/maluto_ae_part*.txt'))
-text = ''.join(p.read_text() for p in parts)
-assert 'pickMalutoTagline' in text
-assert 'Upload Your Photo' in text
-assert 'auto 2MP' not in text
-assert 'resolveAvatarSrc' in text
-assert len(text) > 15000
-Path('src/components/auto-edit/AutoEditPage.tsx').write_text(text)
-print('OK', len(text))
-PY
+      - name: Install glass AutoEditPage
+        run: python3 .restore/install_maluto_ae.py
       - name: Commit
         run: |
           git config user.name "firstaimrun73"
           git config user.email "firstaimrun73@gmail.com"
           git add src/components/auto-edit/AutoEditPage.tsx
           git diff --cached --quiet && echo nochange && exit 0
-          git commit -m "feat(maluto): apply redesigned AutoEditPage (orb, taglines, header v1.8, Upload CTA, avatar)"
+          git commit -m "feat(maluto): glass AutoEditPage — orb, taglines, v1.8, Upload CTA, avatar, no 2MP chrome"
           git pull --rebase origin main || true
           git push origin HEAD:main
