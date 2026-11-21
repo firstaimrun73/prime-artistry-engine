@@ -6,7 +6,7 @@
  *   2) fal-ai/flux-kontext-lora — single-image edit
  *   3) watermark / finalize → charge once
  *
- * Product: Maluto AI (HD only, max 2MP input)
+ * Product: Maluto AI (HD only, max 2MP input — enforced client-side, not shown in chrome)
  */
 
 /** Auto Edit quality tiers. Maluto AI is HD-capped in product UI. */
@@ -56,11 +56,11 @@ export const AUTO_EDIT_FAL_MODEL = "fal-ai/flux-kontext-lora" as const;
 /** Default watermark position metadata (server stamp applies it). */
 export const AUTO_EDIT_WATERMARK_POSITION = "bottom-right" as const;
 
-/** Product name shown in UI (no version number). */
+/** Product name shown in UI. */
 export const AUTO_EDIT_PRODUCT_NAME = "Maluto AI" as const;
 
-/** Semantic version for History / metadata only (not shown in public chrome). */
-export const AUTO_EDIT_PRODUCT_VERSION = "2.0" as const;
+/** Public chrome version label + history metadata. */
+export const AUTO_EDIT_PRODUCT_VERSION = "1.8" as const;
 
 /** Max input pixels for Maluto (2MP). */
 export const MALUTO_MAX_INPUT_PIXELS = 2_000_000;

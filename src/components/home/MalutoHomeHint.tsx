@@ -1,6 +1,6 @@
 /**
- * Compact discovery hint on Home — Maluto AI.
- * Mobile only. 30-minute cooldown after dismiss; session + localStorage.
+ * Floating discovery hint — Maluto AI.
+ * Floating discovery hint. 30-minute cooldown after dismiss; session + localStorage.
  */
 import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -71,27 +71,36 @@ export function MalutoHomeHint() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-[max(4.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-3 md:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-[max(4.75rem,env(safe-area-inset-bottom))] z-30 flex justify-center px-3 sm:bottom-6 md:bottom-8"
       role="status"
     >
       <div
-        className="pointer-events-auto relative max-w-[min(20rem,92vw)] animate-in fade-in slide-in-from-bottom-2 duration-500"
+        className="pointer-events-auto relative max-w-[min(21rem,92vw)] animate-in fade-in slide-in-from-bottom-3 duration-500"
         style={{ animationFillMode: "both" }}
       >
         <Link
           to="/studio/image/auto-edit"
           onClick={dismiss}
-          className="block rounded-2xl border border-orange-500/40 bg-card/95 px-3.5 py-2.5 shadow-lg shadow-orange-500/15 backdrop-blur-md"
+          className="block overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-violet-500/15 via-card/95 to-cyan-500/15 px-3.5 py-2.5 shadow-xl shadow-[#FF5A1F]/20 backdrop-blur-xl ring-1 ring-[#FF5A1F]/25"
         >
-          <p className="text-sm font-bold text-foreground">Restore your photo here</p>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-            Bring your memories back to life with Maluto AI.
-          </p>
+          <div className="flex items-start gap-2.5">
+            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500/40 via-[#FF5A1F]/50 to-cyan-400/40 text-[11px] font-semibold text-white shadow-inner">
+              AI
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold tracking-tight text-foreground">
+                Restore your photo here
+              </p>
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                Bring your memories back to life with Maluto AI.
+              </p>
+            </div>
+          </div>
         </Link>
         <button
           type="button"
           onClick={dismiss}
-          className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full border border-border bg-background text-muted-foreground shadow"
+          className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full border border-border/80 bg-background/95 text-muted-foreground shadow-md backdrop-blur"
           aria-label="Dismiss"
         >
           <X className="h-3 w-3" />
