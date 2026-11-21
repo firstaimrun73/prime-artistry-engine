@@ -1,0 +1,40 @@
+name: Apply music reservation body
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - ".github/scripts/assemble_music_functions.py"
+      - ".github/scripts/music_fn_chunks/**"
+permissions:
+  contents: write
+concurrency:
+  group: apply-music-reservation
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Assemble music.functions.ts
+        run: python3 .github/scripts/assemble_music_functions.py
+      - name: Verify
+        run: |
+          set -e
+          grep -n "music_generation_jobs\|reservationTxId\|refund_credits\|_amount" src/lib/music.functions.ts | head -25
+          ! grep -q "p_user_id: userId, p_amount" src/lib/music.functions.ts
+      - name: Commit
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/music.functions.ts
+          if git diff --cached --quiet; then
+            echo No changes
+          else
+            git commit -m "fix(music): wire durable job table + reserve/refund credit flow"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          fi
