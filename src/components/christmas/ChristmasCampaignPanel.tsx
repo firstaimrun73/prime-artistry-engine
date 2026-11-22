@@ -82,6 +82,15 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
     setLoading(true);
     try {
       const res = await startFn();
+      if (!res.ok) {
+        if (res.reason === "campaign_inactive") {
+          toast.error(res.message || "This campaign is not active right now.");
+        } else {
+          toast.error(res.message || "Could not start campaign");
+        }
+        await refresh();
+        return;
+      }
       if (res.alreadyClaimed) {
         toast.message("You already claimed this Christmas gift");
       } else {
@@ -112,6 +121,9 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
         await refresh();
       } else if (res.reason === "already_claimed") {
         toast.message(res.message || "Already claimed");
+        await refresh();
+      } else if (res.reason === "campaign_inactive") {
+        toast.error(res.message || "This campaign is not active right now.");
         await refresh();
       } else {
         toast.error(res.message || "Could not claim gift");
