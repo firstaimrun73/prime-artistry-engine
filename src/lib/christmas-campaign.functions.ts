@@ -1,6 +1,6 @@
 /**
- * Server functions for Christmas Gift Campaign.
- * All credit mutations go through SECURITY DEFINER RPCs.
+ * Server functions for Christmas / seasonal gift campaign.
+ * RPCs use auth.uid() only — never pass user id from the client.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -10,17 +10,20 @@ export const startChristmasCampaign = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.rpc("start_christmas_campaign_session", {
-      _user_id: context.userId,
       _campaign_id: CHRISTMAS_CAMPAIGN_ID,
     });
     if (error) throw new Error(error.message || "Could not start campaign session.");
     return data as {
       ok: boolean;
+      reason?: string;
+      message?: string;
       sessionId?: string;
       startedAt?: string;
       claimedAt?: string | null;
       creditsGranted?: number | null;
       alreadyClaimed?: boolean;
+      rewardCredits?: number;
+      sessionSeconds?: number;
     };
   });
 
@@ -28,7 +31,6 @@ export const getChristmasCampaignStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.rpc("get_christmas_campaign_status", {
-      _user_id: context.userId,
       _campaign_id: CHRISTMAS_CAMPAIGN_ID,
     });
     if (error) throw new Error(error.message || "Could not load campaign status.");
@@ -44,6 +46,9 @@ export const getChristmasCampaignStatus = createServerFn({ method: "GET" })
       remainingSeconds?: number;
       eligible?: boolean;
       reason?: string;
+      campaignActive?: boolean;
+      rewardCredits?: number;
+      sessionSeconds?: number;
     };
   });
 
@@ -51,7 +56,6 @@ export const claimChristmasGift = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.rpc("claim_christmas_gift_credits", {
-      _user_id: context.userId,
       _campaign_id: CHRISTMAS_CAMPAIGN_ID,
     });
     if (error) throw new Error(error.message || "Could not claim gift.");

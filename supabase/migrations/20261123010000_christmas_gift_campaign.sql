@@ -1,7 +1,70 @@
--- Christmas Gift Campaign 2026: server-verified 10-min session + one-time 25 credits
--- Separate from sponsor-unlock (watermark) and from payment top-ups.
--- Idempotent via unique (user_id, campaign_id) and credit_ledger.transaction_id.
+-- Christmas Gift Campaign 2026 + seasonal campaign_config
+-- SECURITY: identity ONLY from auth.uid() — never trust client-supplied user ids.
+-- Credits: exactly 25 via credit_ledger unique transaction_id + profiles update.
+-- search_path locked to pg_catalog, public.
 
+-- ---------------------------------------------------------------------------
+-- 1. Seasonal campaign configuration (server-authoritative windows)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.campaign_config (
+  id text PRIMARY KEY,
+  display_name text NOT NULL,
+  label_short text NOT NULL,
+  headline text NOT NULL,
+  body text NOT NULL,
+  reward_credits integer NOT NULL DEFAULT 0 CHECK (reward_credits >= 0),
+  session_seconds integer NOT NULL DEFAULT 0 CHECK (session_seconds >= 0),
+  starts_at timestamptz NOT NULL,
+  ends_at timestamptz NOT NULL,
+  active boolean NOT NULL DEFAULT true,
+  eligible_countries text[] DEFAULT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT campaign_config_window CHECK (ends_at > starts_at)
+);
+
+ALTER TABLE public.campaign_config ENABLE ROW LEVEL SECURITY;
+
+-- Anyone signed-in can read active campaigns for UI labels; writes are service_role only.
+DROP POLICY IF EXISTS "Authenticated read campaign_config" ON public.campaign_config;
+CREATE POLICY "Authenticated read campaign_config"
+  ON public.campaign_config
+  FOR SELECT
+  TO authenticated
+  USING (active = true);
+
+GRANT SELECT ON public.campaign_config TO authenticated;
+GRANT ALL ON public.campaign_config TO service_role;
+
+INSERT INTO public.campaign_config (
+  id, display_name, label_short, headline, body,
+  reward_credits, session_seconds, starts_at, ends_at, active
+) VALUES (
+  'christmas-gift-2026',
+  'Christmas Gift',
+  'Christmas Gift',
+  'Stay, Explore & Get Free Credits!',
+  'Explore Motio2edit for 10 minutes, then claim 25 credits — enough for one Standard image generation.',
+  25,
+  600,
+  '2026-11-20T00:00:00Z',
+  '2027-01-07T00:00:00Z',
+  true
+) ON CONFLICT (id) DO UPDATE SET
+  display_name = EXCLUDED.display_name,
+  label_short = EXCLUDED.label_short,
+  headline = EXCLUDED.headline,
+  body = EXCLUDED.body,
+  reward_credits = EXCLUDED.reward_credits,
+  session_seconds = EXCLUDED.session_seconds,
+  starts_at = EXCLUDED.starts_at,
+  ends_at = EXCLUDED.ends_at,
+  active = EXCLUDED.active,
+  updated_at = now();
+
+-- ---------------------------------------------------------------------------
+-- 2. Per-user campaign sessions
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.christmas_campaign_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -19,39 +82,59 @@ CREATE INDEX IF NOT EXISTS idx_christmas_sessions_user
 
 ALTER TABLE public.christmas_campaign_sessions ENABLE ROW LEVEL SECURITY;
 
--- Users can read their own session (for timer UI); writes only via SECURITY DEFINER RPCs.
+DROP POLICY IF EXISTS "Users can view own christmas session" ON public.christmas_campaign_sessions;
 CREATE POLICY "Users can view own christmas session"
   ON public.christmas_campaign_sessions
   FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
--- Atomic start: insert or return existing session start time.
+-- No INSERT/UPDATE/DELETE for authenticated — only SECURITY DEFINER RPCs write.
+
+-- ---------------------------------------------------------------------------
+-- 3. start_christmas_campaign_session — identity from auth.uid() only
+-- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.start_christmas_campaign_session(
-  _user_id uuid,
   _campaign_id text DEFAULT 'christmas-gift-2026'
 )
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public'
 AS $function$
 DECLARE
+  _uid uuid := auth.uid();
   _row public.christmas_campaign_sessions%ROWTYPE;
+  _cfg public.campaign_config%ROWTYPE;
 BEGIN
-  IF _user_id IS NULL THEN
-    RAISE EXCEPTION 'AUTH_REQUIRED';
+  IF _uid IS NULL THEN
+    RAISE EXCEPTION 'NOT_AUTHENTICATED';
+  END IF;
+
+  SELECT * INTO _cfg
+    FROM public.campaign_config
+   WHERE id = _campaign_id
+     AND active = true
+     AND now() >= starts_at
+     AND now() < ends_at;
+
+  IF _cfg.id IS NULL THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'reason', 'campaign_inactive',
+      'message', 'This campaign is not active.'
+    );
   END IF;
 
   INSERT INTO public.christmas_campaign_sessions (user_id, campaign_id, started_at)
-  VALUES (_user_id, _campaign_id, now())
+  VALUES (_uid, _campaign_id, now())
   ON CONFLICT (user_id, campaign_id) DO NOTHING
   RETURNING * INTO _row;
 
   IF _row.id IS NULL THEN
     SELECT * INTO _row
       FROM public.christmas_campaign_sessions
-     WHERE user_id = _user_id AND campaign_id = _campaign_id;
+     WHERE user_id = _uid AND campaign_id = _campaign_id;
   END IF;
 
   RETURN jsonb_build_object(
@@ -60,51 +143,82 @@ BEGIN
     'startedAt', _row.started_at,
     'claimedAt', _row.claimed_at,
     'creditsGranted', _row.credits_granted,
-    'alreadyClaimed', (_row.claimed_at IS NOT NULL)
+    'alreadyClaimed', (_row.claimed_at IS NOT NULL),
+    'rewardCredits', _cfg.reward_credits,
+    'sessionSeconds', _cfg.session_seconds
   );
 END;
 $function$;
 
-REVOKE EXECUTE ON FUNCTION public.start_christmas_campaign_session(uuid, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.start_christmas_campaign_session(uuid, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.start_christmas_campaign_session(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.start_christmas_campaign_session(text) TO authenticated, service_role;
 
--- Claim after >= 10 minutes; grants exactly 25 credits once.
+-- ---------------------------------------------------------------------------
+-- 4. claim_christmas_gift_credits — auth.uid(), 25 credits, ledger + session
+-- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.claim_christmas_gift_credits(
-  _user_id uuid,
   _campaign_id text DEFAULT 'christmas-gift-2026'
 )
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public'
 AS $function$
 DECLARE
+  _uid uuid := auth.uid();
   _row public.christmas_campaign_sessions%ROWTYPE;
+  _cfg public.campaign_config%ROWTYPE;
   _elapsed_seconds numeric;
   _tx_id text;
   _inserted uuid;
   _new_credits integer;
-  _required_seconds integer := 600; -- 10 minutes
-  _reward integer := 25;
+  _reward integer;
+  _required_seconds integer;
 BEGIN
-  IF _user_id IS NULL THEN
-    RAISE EXCEPTION 'AUTH_REQUIRED';
+  IF _uid IS NULL THEN
+    RAISE EXCEPTION 'NOT_AUTHENTICATED';
+  END IF;
+
+  SELECT * INTO _cfg
+    FROM public.campaign_config
+   WHERE id = _campaign_id
+     AND active = true;
+
+  IF _cfg.id IS NULL THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'reason', 'campaign_inactive',
+      'message', 'This campaign is not active.'
+    );
+  END IF;
+
+  -- Reward is always taken from config; Christmas is fixed at 25 in seed data.
+  _reward := _cfg.reward_credits;
+  _required_seconds := _cfg.session_seconds;
+
+  IF _reward IS DISTINCT FROM 25 AND _campaign_id = 'christmas-gift-2026' THEN
+    -- Hard safety: Christmas campaign must remain exactly 25.
+    _reward := 25;
   END IF;
 
   SELECT * INTO _row
     FROM public.christmas_campaign_sessions
-   WHERE user_id = _user_id AND campaign_id = _campaign_id
+   WHERE user_id = _uid AND campaign_id = _campaign_id
    FOR UPDATE;
 
   IF _row.id IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'reason', 'no_session', 'message', 'Start the campaign first.');
+    RETURN jsonb_build_object(
+      'ok', false,
+      'reason', 'no_session',
+      'message', 'Start the campaign first.'
+    );
   END IF;
 
   IF _row.claimed_at IS NOT NULL THEN
     RETURN jsonb_build_object(
       'ok', false,
       'reason', 'already_claimed',
-      'message', 'You already claimed this Christmas gift.',
+      'message', 'You already claimed this gift.',
       'creditsGranted', _row.credits_granted,
       'claimedAt', _row.claimed_at
     );
@@ -122,16 +236,15 @@ BEGIN
     );
   END IF;
 
-  -- Unique ledger key prevents multi-tab / retry double grants
-  _tx_id := 'CHRISTMAS-GIFT-2026-' || _user_id::text;
+  -- Unique per user+campaign — concurrent tabs / retries cannot double-grant.
+  _tx_id := 'CAMPAIGN-' || _campaign_id || '-' || _uid::text;
 
   INSERT INTO public.credit_ledger (user_id, transaction_id, credits_added, reason)
-  VALUES (_user_id, _tx_id, _reward, 'christmas_gift_2026')
+  VALUES (_uid, _tx_id, _reward, 'campaign_' || _campaign_id)
   ON CONFLICT (transaction_id) DO NOTHING
   RETURNING id INTO _inserted;
 
   IF _inserted IS NULL THEN
-    -- Ledger already has the row; mark session claimed if not yet
     UPDATE public.christmas_campaign_sessions
        SET claimed_at = COALESCE(claimed_at, now()),
            credits_granted = COALESCE(credits_granted, _reward),
@@ -140,15 +253,20 @@ BEGIN
     RETURN jsonb_build_object(
       'ok', false,
       'reason', 'already_claimed',
-      'message', 'You already claimed this Christmas gift.',
+      'message', 'You already claimed this gift.',
       'creditsGranted', _reward
     );
   END IF;
 
   UPDATE public.profiles
      SET credits = credits + _reward, updated_at = now()
-   WHERE id = _user_id
+   WHERE id = _uid
    RETURNING credits INTO _new_credits;
+
+  IF _new_credits IS NULL THEN
+    -- Should not happen for valid auth user; abort so transaction rolls back ledger insert.
+    RAISE EXCEPTION 'PROFILE_NOT_FOUND';
+  END IF;
 
   UPDATE public.christmas_campaign_sessions
      SET claimed_at = now(),
@@ -160,39 +278,58 @@ BEGIN
     'ok', true,
     'creditsGranted', _reward,
     'newBalance', _new_credits,
-    'message', 'Merry Christmas! 25 credits added to your account.'
+    'message', format('%s credits added to your account.', _reward)
   );
 END;
 $function$;
 
-REVOKE EXECUTE ON FUNCTION public.claim_christmas_gift_credits(uuid, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.claim_christmas_gift_credits(uuid, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.claim_christmas_gift_credits(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.claim_christmas_gift_credits(text) TO authenticated, service_role;
 
--- Status helper for UI timer (no side effects)
+-- ---------------------------------------------------------------------------
+-- 5. get_christmas_campaign_status — auth.uid() only, no side effects
+-- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_christmas_campaign_status(
-  _user_id uuid,
   _campaign_id text DEFAULT 'christmas-gift-2026'
 )
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public'
 AS $function$
 DECLARE
+  _uid uuid := auth.uid();
   _row public.christmas_campaign_sessions%ROWTYPE;
+  _cfg public.campaign_config%ROWTYPE;
   _elapsed integer;
-  _required integer := 600;
+  _required integer;
 BEGIN
-  IF _user_id IS NULL THEN
+  IF _uid IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'auth_required');
   END IF;
 
+  SELECT * INTO _cfg FROM public.campaign_config WHERE id = _campaign_id;
+
+  _required := COALESCE(_cfg.session_seconds, 600);
+
   SELECT * INTO _row
     FROM public.christmas_campaign_sessions
-   WHERE user_id = _user_id AND campaign_id = _campaign_id;
+   WHERE user_id = _uid AND campaign_id = _campaign_id;
 
   IF _row.id IS NULL THEN
-    RETURN jsonb_build_object('ok', true, 'hasSession', false, 'claimed', false);
+    RETURN jsonb_build_object(
+      'ok', true,
+      'hasSession', false,
+      'claimed', false,
+      'campaignActive', (
+        _cfg.id IS NOT NULL
+        AND _cfg.active
+        AND now() >= _cfg.starts_at
+        AND now() < _cfg.ends_at
+      ),
+      'rewardCredits', COALESCE(_cfg.reward_credits, 25),
+      'sessionSeconds', _required
+    );
   END IF;
 
   _elapsed := floor(EXTRACT(EPOCH FROM (now() - _row.started_at)))::int;
@@ -207,10 +344,22 @@ BEGIN
     'elapsedSeconds', _elapsed,
     'requiredSeconds', _required,
     'remainingSeconds', GREATEST(0, _required - _elapsed),
-    'eligible', (_row.claimed_at IS NULL AND _elapsed >= _required)
+    'eligible', (_row.claimed_at IS NULL AND _elapsed >= _required),
+    'rewardCredits', COALESCE(_cfg.reward_credits, 25),
+    'campaignActive', (
+      _cfg.id IS NOT NULL
+      AND _cfg.active
+      AND now() >= _cfg.starts_at
+      AND now() < _cfg.ends_at
+    )
   );
 END;
 $function$;
 
-REVOKE EXECUTE ON FUNCTION public.get_christmas_campaign_status(uuid, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.get_christmas_campaign_status(uuid, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.get_christmas_campaign_status(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_christmas_campaign_status(text) TO authenticated, service_role;
+
+-- Drop insecure overload that accepted arbitrary _user_id (if previously applied).
+DROP FUNCTION IF EXISTS public.start_christmas_campaign_session(uuid, text);
+DROP FUNCTION IF EXISTS public.claim_christmas_gift_credits(uuid, text);
+DROP FUNCTION IF EXISTS public.get_christmas_campaign_status(uuid, text);
