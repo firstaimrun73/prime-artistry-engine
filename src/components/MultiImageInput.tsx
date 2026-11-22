@@ -1,8 +1,6 @@
 import { getPlanLimits } from "@/utils/planLimits";
-import { Link } from "@tanstack/react-router";
-import { Lock, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface MultiImageInputProps {
   userPlan: string;
@@ -23,39 +21,15 @@ export function MultiImageInput({
 }: MultiImageInputProps) {
   const limits = getPlanLimits(userPlan);
   const isFree = userPlan === "free" || !userPlan;
-  const planMax = isFree ? 1 : limits.maxImages;
+  // Free users may select multiple images to explore the feature; submit is blocked server-side.
+  const planMax = limits.maxImages;
   const maxAllowed = Math.min(planMax, experienceMax ?? planMax);
   const canAddMore = images.length < maxAllowed;
   const atLimit = images.length >= maxAllowed;
 
-  const notifyFreeLock = () => {
-    toast.error("1 image on Free. Upgrade to use multiple references.", {
-      action: {
-        label: "Upgrade",
-        onClick: () => {
-          window.location.href = "/pricing";
-        },
-      },
-    });
-  };
-
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image"));
     e.target.value = "";
-
-    if (isFree) {
-      if (images.length >= 1 || files.length > 1) {
-        notifyFreeLock();
-        return;
-      }
-      if (files.length === 1 && images.length === 0) {
-        const f = files[0];
-        const reader = new FileReader();
-        reader.onload = () => onChange([reader.result as string]);
-        reader.readAsDataURL(f);
-      }
-      return;
-    }
 
     const remaining = maxAllowed - images.length;
     const toAdd = files.slice(0, Math.max(0, remaining));
@@ -98,9 +72,9 @@ export function MultiImageInput({
             {!disabled && (
               <button
                 type="button"
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground shadow"
                 onClick={() => removeImage(i)}
-                aria-label="Remove image"
-                className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-destructive text-[11px] text-destructive-foreground"
+                aria-label={`Remove reference ${i + 1}`}
               >
                 ✕
               </button>
@@ -108,7 +82,7 @@ export function MultiImageInput({
           </div>
         ))}
 
-        {canAddMore && !disabled && !isFree && (
+        {canAddMore && !disabled && (
           <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border transition hover:border-primary sm:h-20 sm:w-20">
             <Plus className="h-5 w-5 text-muted-foreground" />
             <input
@@ -121,9 +95,7 @@ export function MultiImageInput({
           </label>
         )}
 
-        {/* No standalone lock tile — gallery + slot is the only add/limit control.
-            At paid plan limit, show a quiet disabled + rather than a lock card. */}
-        {!isFree && atLimit && (
+        {atLimit && (
           <div
             className="flex h-16 w-16 items-center justify-center rounded-lg border-2 border-dashed border-border/50 text-[10px] font-medium text-muted-foreground sm:h-20 sm:w-20"
             aria-label="Reference limit reached"
@@ -133,11 +105,12 @@ export function MultiImageInput({
         )}
       </div>
 
-      {!isFree && (
-        <p className="text-[11px] text-muted-foreground">
-          {images.length}/{maxAllowed} references
-        </p>
-      )}
+      <p className="text-[11px] text-muted-foreground">
+        {images.length}/{maxAllowed} references
+        {isFree && images.length >= 2
+          ? " · Upgrade to generate with multiple references"
+          : ""}
+      </p>
     </div>
   );
 }
