@@ -1,6 +1,9 @@
 /**
  * Minimal fal queue client for Standard Image Studio.
  * Throws on failure / timeout / missing URL — caller must not deduct credits.
+ *
+ * Aligned with generate.functions runFal for status validation, CANCELLED handling,
+ * and multi-shape output URL extraction.
  */
 
 import type { StandardFalStep } from "./types";
@@ -57,19 +60,46 @@ function falErrorMessage(label: string, status: number, txt: string): string {
 }
 
 /**
+ * Extract first HTTPS image/video URL from common fal.ai result shapes.
+ * Exported for unit tests.
+ */
+export function extractFalOutputUrl(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const root = json as Record<string, unknown>;
+
+  const candidates: unknown[] = [
+    (root.image as { url?: unknown } | undefined)?.url,
+    Array.isArray(root.images) ? (root.images[0] as { url?: unknown } | undefined)?.url : undefined,
+    (root.video as { url?: unknown } | undefined)?.url,
+    root.output,
+    root.url,
+    (root.data as { image?: { url?: unknown } } | undefined)?.image?.url,
+    Array.isArray((root.data as { images?: unknown } | undefined)?.images)
+      ? ((root.data as { images: { url?: unknown }[] }).images[0] as { url?: unknown } | undefined)?.url
+      : undefined,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.startsWith("http")) return c;
+  }
+  return null;
+}
+
+/**
  * Submit step → poll → return output URL.
  * Never returns empty string. Never returns the input image URL as a fake result.
  */
 export async function runStandardFalStep(
   step: StandardFalStep,
   falKey: string,
-  opts?: { timeoutMs?: number },
+  opts?: { timeoutMs?: number; requestId?: string },
 ): Promise<string> {
   const headers = {
     Authorization: `Key ${falKey}`,
     "Content-Type": "application/json",
   };
   const timeoutMs = opts?.timeoutMs ?? 90_000;
+  const rid = opts?.requestId ?? "n/a";
 
   const promptHead =
     typeof step.body.prompt === "string" ? String(step.body.prompt).slice(0, 120) : "";
@@ -87,22 +117,41 @@ export async function runStandardFalStep(
     promptHead,
   );
 
-  const submit = await fetchWithDeadline(`${FAL_QUEUE}${step.model}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(step.body),
-  }, timeoutMs);
+  const submit = await fetchWithDeadline(
+    `${FAL_QUEUE}${step.model}`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(step.body),
+    },
+    timeoutMs,
+  );
+  const submitTxt = await submit.text();
   if (!submit.ok) {
-    const txt = await submit.text();
-    console.error("[standard-fal] submit failed", step.label, submit.status, txt.slice(0, 300));
-    throw new Error(falErrorMessage(step.label, submit.status, txt));
+    console.error("[standard-fal] submit failed", step.label, submit.status, submitTxt.slice(0, 300));
+    throw new Error(falErrorMessage(step.label, submit.status, submitTxt));
   }
 
-  const { status_url, response_url } = (await submit.json()) as {
-    request_id?: string;
-    status_url: string;
-    response_url: string;
-  };
+  let submitJson: { request_id?: string; status_url?: string; response_url?: string };
+  try {
+    submitJson = JSON.parse(submitTxt) as typeof submitJson;
+  } catch {
+    throw new Error(`${step.label}: invalid queue response`);
+  }
+
+  const statusUrl = submitJson.status_url;
+  const responseUrl = submitJson.response_url;
+  const falRequestId = submitJson.request_id ?? null;
+  if (!statusUrl || !responseUrl) {
+    console.error("[standard-fal] missing status/response URL", step.label, submitTxt.slice(0, 200));
+    throw new Error(`${step.label}: missing status/response URL from queue`);
+  }
+  console.info("[standard-fal] submitted", {
+    rid,
+    falRequestId,
+    label: step.label,
+    model: step.model,
+  });
 
   const deadline = Date.now() + timeoutMs;
   let delay = 1200;
@@ -110,42 +159,82 @@ export async function runStandardFalStep(
 
   while (Date.now() < deadline) {
     await sleep(delay);
-    const st = await fetchWithDeadline(status_url, { headers }, deadline - Date.now());
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+
+    const st = await fetchWithDeadline(statusUrl, { headers }, remaining);
+    const stTxt = await st.text();
+
     if (!st.ok) {
+      // Auth failures must not be silently retried
+      if (st.status === 401 || st.status === 403) {
+        throw new Error(falErrorMessage(`${step.label} status`, st.status, stTxt));
+      }
       delay = Math.min(delay * 1.3, 5000);
       continue;
     }
-    const sj = (await st.json()) as { status?: string };
+
+    let sj: { status?: string };
+    try {
+      sj = JSON.parse(stTxt) as { status?: string };
+    } catch {
+      delay = Math.min(delay * 1.3, 5000);
+      continue;
+    }
+
     if (sj.status) lastStatus = sj.status;
     if (sj.status === "COMPLETED") break;
-    if (sj.status === "FAILED" || sj.status === "ERROR") {
-      const body = await fetchWithDeadline(response_url, { headers }, Math.max(3_000, deadline - Date.now()))
+    if (sj.status === "FAILED" || sj.status === "ERROR" || sj.status === "CANCELLED") {
+      const body = await fetchWithDeadline(
+        responseUrl,
+        { headers },
+        Math.max(3_000, deadline - Date.now()),
+      )
         .then((r) => r.text())
         .catch(() => "");
-      console.error("[standard-fal] job failed", step.label, body.slice(0, 400));
-      throw new Error(falErrorMessage(step.label, 500, body));
+      console.error("[standard-fal] job terminal", step.label, lastStatus, body.slice(0, 400), {
+        falRequestId,
+      });
+      throw new Error(falErrorMessage(step.label, 500, body || `status=${lastStatus}`));
     }
     delay = Math.min(delay * 1.3, 5000);
   }
 
   if (lastStatus !== "COMPLETED") {
+    console.error("[standard-fal] poll timeout", {
+      rid,
+      falRequestId,
+      label: step.label,
+      lastStatus,
+      timeoutMs,
+    });
     throw new Error(`${step.label} timed out. Credits not charged.`);
   }
 
-  const res = await fetchWithDeadline(response_url, { headers }, Math.max(5_000, deadline - Date.now()));
+  const res = await fetchWithDeadline(
+    responseUrl,
+    { headers },
+    Math.max(5_000, deadline - Date.now()),
+  );
+  const resTxt = await res.text();
   if (!res.ok) {
-    throw new Error(falErrorMessage(step.label, res.status, await res.text()));
+    throw new Error(falErrorMessage(step.label, res.status, resTxt));
   }
 
-  const json = (await res.json()) as {
-    image?: { url?: string };
-    images?: { url?: string }[];
-  };
-  const url = json.image?.url ?? json.images?.[0]?.url ?? null;
-  if (!url || typeof url !== "string" || !url.startsWith("http")) {
-    console.error("[standard-fal] no output URL", step.label, JSON.stringify(json).slice(0, 200));
+  let json: unknown;
+  try {
+    json = JSON.parse(resTxt);
+  } catch {
+    throw new Error(`${step.label}: invalid result JSON`);
+  }
+
+  const url = extractFalOutputUrl(json);
+  if (!url) {
+    console.error("[standard-fal] no output URL", step.label, resTxt.slice(0, 200), {
+      falRequestId,
+    });
     throw new Error(`${step.label} returned no output URL. Credits not charged.`);
   }
-  console.log("[standard-fal] ✓", step.label, "→", url.slice(0, 80));
+  console.log("[standard-fal] ✓", step.label, "→", url.slice(0, 80), { falRequestId });
   return url;
 }
