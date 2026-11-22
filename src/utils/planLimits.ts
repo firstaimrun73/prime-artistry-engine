@@ -93,7 +93,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   },
   ultra: {
     maxImages: 10,
-    maxPromptChars: 7000,
+    maxPromptChars: 6000,
     videoEnabled: true,
     hd: true,
     premiumUnlocked: true,
@@ -106,7 +106,7 @@ export function getPlanLimits(plan: string): PlanLimits {
   return PLAN_LIMITS[plan as PlanId] ?? PLAN_LIMITS.free;
 }
 
-/** True when the plan matrix does not allow multi-image gallery size. */
+/** True when plan max is a single image only. */
 export function isMultiImageLocked(plan: string | undefined | null, isAdmin = false): boolean {
   if (isAdmin) return false;
   return getPlanLimits(plan ?? "free").maxImages <= 1;
