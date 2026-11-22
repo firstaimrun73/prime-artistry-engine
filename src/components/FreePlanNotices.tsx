@@ -12,22 +12,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FreeCreditOffer } from "@/components/FreeCreditOffer";
+import { showOptInFreeCreditCta } from "@/config/ads";
 
-/** Once per browser (localStorage) — do not re-show after dismiss. */
 const FREE_INTRO_KEY = "motio2edit-free-intro-seen-v2";
-/** Once per session for out-of-credits. */
 const OUT_OF_CREDITS_KEY = "motio2edit-out-of-credits-seen";
+const LOW_CREDITS_POPUP_KEY = "motio2edit-low-credits-popup-v1";
 
 /**
- * Free plan notices — minimal interruption:
- *  1) Intro: once per device, soft copy, Continue free primary
- *  2) Zero credits: once per session, credit-focused (not generic upgrade spam)
- * Does not change generation or credit enforcement.
+ * Free plan notices — minimal interruption.
+ * Low credits (~10 or less): once per session, offer upgrade OR opt-in free credits partner link.
  */
 export function FreePlanNotices() {
   const { profile } = useAuth();
   const [introOpen, setIntroOpen] = useState(false);
   const [outOpen, setOutOpen] = useState(false);
+  const [lowOpen, setLowOpen] = useState(false);
 
   const admin = isAdminEmail(profile?.email);
   const free = !admin && isFreePlan(profile?.plan);
@@ -35,24 +35,32 @@ export function FreePlanNotices() {
 
   useEffect(() => {
     if (!profile || !free) return;
-
     try {
       if (localStorage.getItem(FREE_INTRO_KEY) !== "1") {
         setIntroOpen(true);
       }
     } catch {
-      /* ignore storage — skip intro rather than spam */
+      /* skip */
     }
   }, [profile, free]);
 
   useEffect(() => {
     if (!profile || !free || credits > 0) return;
-
     try {
       if (sessionStorage.getItem(OUT_OF_CREDITS_KEY) === "1") return;
       setOutOpen(true);
     } catch {
       setOutOpen(true);
+    }
+  }, [profile, free, credits]);
+
+  useEffect(() => {
+    if (!profile || !free || credits <= 0 || credits > 10) return;
+    try {
+      if (sessionStorage.getItem(LOW_CREDITS_POPUP_KEY) === "1") return;
+      setLowOpen(true);
+    } catch {
+      setLowOpen(true);
     }
   }, [profile, free, credits]);
 
@@ -74,11 +82,20 @@ export function FreePlanNotices() {
     }
   };
 
+  const dismissLow = () => {
+    setLowOpen(false);
+    try {
+      sessionStorage.setItem(LOW_CREDITS_POPUP_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  };
+
   if (!free) return null;
 
   return (
     <>
-      <Dialog open={introOpen && !outOpen} onOpenChange={(o) => !o && dismissIntro()}>
+      <Dialog open={introOpen && !outOpen && !lowOpen} onOpenChange={(o) => !o && dismissIntro()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Welcome to Motio2edit Free</DialogTitle>
@@ -108,17 +125,47 @@ export function FreePlanNotices() {
             <DialogTitle>You're out of credits</DialogTitle>
             <DialogDescription className="space-y-2 pt-1 text-left">
               <span className="block">
-                Add credits or choose a plan to keep generating. This notice only appears once per
-                session.
+                Add credits or choose a plan to keep generating. Or try partner offers for free credits.
               </span>
             </DialogDescription>
           </DialogHeader>
+          {showOptInFreeCreditCta() && (
+            <div className="py-1">
+              <FreeCreditOffer variant="button" />
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={dismissOut}>
               Not now
             </Button>
             <Button asChild onClick={dismissOut}>
-              <Link to="/pricing">View plans</Link>
+              <Link to="/pricing">Upgrade plan</Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={lowOpen && !outOpen} onOpenChange={(o) => !o && dismissLow()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Low on credits ({credits} left)</DialogTitle>
+            <DialogDescription className="space-y-2 pt-1 text-left">
+              <span className="block">
+                Upgrade your plan for more power — or claim free credits via partner offers.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          {showOptInFreeCreditCta() && (
+            <div className="py-1">
+              <FreeCreditOffer variant="button" />
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={dismissLow}>
+              Keep creating
+            </Button>
+            <Button asChild onClick={dismissLow}>
+              <Link to="/pricing">Upgrade plan</Link>
             </Button>
           </DialogFooter>
         </DialogContent>

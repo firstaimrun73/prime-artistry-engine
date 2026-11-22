@@ -1,6 +1,6 @@
 /**
- * Compact homepage Christmas promo — one placement, dismissible, non-blocking.
- * Reuses Motio2edit orange identity; does not load third-party ad scripts.
+ * Compact homepage Christmas promo — dismissible, non-blocking.
+ * Title: Claim your Christmas gift. Tree emoji for seasonal visual.
  */
 import { useEffect, useState } from "react";
 import { Gift, X } from "lucide-react";
@@ -11,10 +11,11 @@ import {
   isChristmasCampaignActiveWindow,
 } from "@/lib/christmas-campaign";
 import { ChristmasGiftIcon } from "@/components/christmas/ChristmasGiftIcon";
+import { FreeCreditOffer } from "@/components/FreeCreditOffer";
+import { showOptInFreeCreditCta } from "@/config/ads";
 
 export function ChristmasPromoStrip() {
   const [dismissed, setDismissed] = useState(true);
-  const [openSheet, setOpenSheet] = useState(false);
 
   useEffect(() => {
     if (!isChristmasCampaignActiveWindow()) return;
@@ -29,23 +30,22 @@ export function ChristmasPromoStrip() {
   if (dismissed) return null;
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-3">
+    <section className="mx-auto w-full max-w-6xl space-y-3 px-4 py-3">
       <div className="relative flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/35 bg-gradient-to-r from-orange-500/10 via-red-500/5 to-emerald-500/10 px-4 py-3 shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/80 text-xl shadow-sm">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/80 text-xl shadow-sm" aria-hidden>
             🎄
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">
-              Get Your Christmas Gift — {CHRISTMAS_REWARD_CREDITS} free credits
+              Claim your Christmas gift — {CHRISTMAS_REWARD_CREDITS} free credits
             </p>
             <p className="text-xs text-muted-foreground">
-              Explore Motio2edit for 10 minutes, then claim. One Standard image worth of credits.
+              Stay on Motio2edit for 10 minutes, then claim. One gift per account. Exciting seasonal bonus.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Reuse gift icon component which owns the sheet */}
           <span className="hidden sm:inline-flex">
             <ChristmasGiftIcon variant="pill" />
           </span>
@@ -54,16 +54,13 @@ export function ChristmasPromoStrip() {
             size="sm"
             className="gap-1.5 sm:hidden"
             onClick={() => {
-              // Trigger the header-level icon by focusing gift flow via same panel path:
-              // On mobile the strip opens nothing extra — user uses header gift icon.
-              // Provide direct affordance:
               document
                 .querySelector<HTMLButtonElement>('[aria-label="Get Free Credits — Christmas Gift"]')
                 ?.click();
             }}
           >
             <Gift className="h-3.5 w-3.5" />
-            Claim
+            Claim gift
           </Button>
           <button
             type="button"
@@ -82,6 +79,9 @@ export function ChristmasPromoStrip() {
           </button>
         </div>
       </div>
+      {showOptInFreeCreditCta() && (
+        <FreeCreditOffer variant="card" className="max-w-xl" />
+      )}
     </section>
   );
 }
