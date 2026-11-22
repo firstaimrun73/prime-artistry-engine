@@ -194,7 +194,8 @@ export function Header() {
                   </Link>
                   {admin ? (
                     <Link
-                      to="/admin"ersch onClick={() => setMenuOpen(false)}
+                      to="/admin"
+                      onClick={() => setMenuOpen(false)}
                       className="rounded-lg px-4 py-3 text-base font-medium text-primary"
                     >
                       Admin
