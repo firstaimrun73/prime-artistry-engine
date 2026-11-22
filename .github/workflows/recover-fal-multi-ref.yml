@@ -1,0 +1,53 @@
+name: Recover fal multi-ref branch
+on:
+  workflow_dispatch:
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout known-good fal-client base
+        uses: actions/checkout@v4
+        with:
+          ref: ee66cd6e21f7c269376ca0536022dddbe10507eb
+          fetch-depth: 0
+      - name: Build recovery branch from ee66cd6e + patches
+        run: |
+          set -euo pipefail
+          git checkout -B fix/fal-generation-reliability-audit
+          git apply --verbose .recovery/fal-multi-ref/01-generate.functions.patch
+          git apply --verbose .recovery/fal-multi-ref/02-ImageEditor.patch
+          git apply --verbose .recovery/fal-multi-ref/03-planLimits.patch
+          git apply --verbose .recovery/fal-multi-ref/04-multi-config.patch
+          mkdir -p src/lib/studio/image src/utils src/components
+          cp .recovery/fal-multi-ref/free-multi-ref-guard.ts src/lib/studio/image/free-multi-ref-guard.ts
+          cp .recovery/fal-multi-ref/planLimits.multi-ref.test.ts src/utils/planLimits.multi-ref.test.ts
+          cp .recovery/fal-multi-ref/MultiImageInput.tsx src/components/MultiImageInput.tsx
+          if grep -qE 'PLACEHOLDER|IMAGE_HANDLER_MUST_BE_COMPLETE|temporarily incomplete' src/lib/generate.functions.ts; then
+            echo "FATAL: generate.functions.ts still incomplete"
+            exit 1
+          fi
+          lines=$(wc -l < src/lib/generate.functions.ts)
+          echo "generate.functions.ts lines=$lines"
+          test "$lines" -ge 700
+          grep -q 'blocked free multi-reference' src/lib/generate.functions.ts
+          grep -q 'extractRunFalOutputUrl' src/lib/generate.functions.ts
+          grep -q 'export const generateMedia' src/lib/generate.functions.ts
+          grep -q 'export const getMyPlan' src/lib/generate.functions.ts
+          grep -q 'canSubmitMultiReference' src/utils/planLimits.ts
+          grep -q 'freeMultiRefSubmitBlockMessage' src/components/editor/image/ImageEditor.tsx
+          git config user.name "firstaimrun73"
+          git config user.email "firstaimrun73@gmail.com"
+          git add -A
+          git commit -m "fix(fal): free multi-ref select-only + server submit block; harden runFal
+
+- Free users may select multiple references but cannot submit multi-ref jobs
+- Server generateMedia rejects free multi-ref before credits/fal/history
+- Client ImageEditor shows upgrade CTA without loading spinner
+- MultiImageInput allows free selection with upgrade hint
+- runFal: broader output extraction + clearer provider errors
+- Standard fal-client hardening retained from ee66cd6e
+
+Recovered via workflow from ee66cd6e + verified patches."
+          git push -f origin fix/fal-generation-reliability-audit
