@@ -1,5 +1,6 @@
 /**
  * Campaign claim UI — non-blocking, dismissible, server-verified timer.
+ * Congrats only after confirmed successful claim.
  */
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,11 +12,13 @@ import {
   CHRISTMAS_SESSION_SECONDS,
   formatRemaining,
 } from "@/lib/christmas-campaign";
+import { getActiveCampaignConfig, isChristmasGiftActive } from "@/lib/campaign-config";
 import {
   startChristmasCampaign,
   getChristmasCampaignStatus,
   claimChristmasGift,
 } from "@/lib/christmas-campaign.functions";
+import { ClaimCelebration } from "@/components/christmas/ClaimCelebration";
 import { Gift, Loader2, CheckCircle2, Clock } from "lucide-react";
 
 type Props = {
@@ -27,9 +30,14 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
   const startFn = useServerFn(startChristmasCampaign);
   const statusFn = useServerFn(getChristmasCampaignStatus);
   const claimFn = useServerFn(claimChristmasGift);
+  const campaign = getActiveCampaignConfig();
 
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [celebration, setCelebration] = useState<{
+    creditsGranted: number;
+    newBalance?: number;
+  } | null>(null);
   const [status, setStatus] = useState<{
     hasSession: boolean;
     claimed: boolean;
@@ -64,7 +72,11 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
 
   const onStart = async () => {
     if (!signedIn) {
-      toast.message("Sign in to start the Christmas gift campaign");
+      toast.message("Sign in to start the campaign");
+      return;
+    }
+    if (!isChristmasGiftActive()) {
+      toast.message("This seasonal gift campaign has ended");
       return;
     }
     setLoading(true);
@@ -88,7 +100,12 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
     try {
       const res = await claimFn();
       if (res.ok) {
-        toast.success(res.message || `+${CHRISTMAS_REWARD_CREDITS} credits added!`);
+        const granted = res.creditsGranted ?? CHRISTMAS_REWARD_CREDITS;
+        setCelebration({
+          creditsGranted: granted,
+          newBalance: res.newBalance,
+        });
+        toast.success(res.message || `+${granted} credits added!`);
         await refresh();
       } else if (res.reason === "too_early") {
         toast.message(res.message || "Keep exploring a little longer");
@@ -106,6 +123,31 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
     }
   };
 
+  if (celebration) {
+    return (
+      <ClaimCelebration
+        creditsGranted={celebration.creditsGranted}
+        newBalance={celebration.newBalance}
+        onDismiss={() => {
+          setCelebration(null);
+          onClose?.();
+        }}
+      />
+    );
+  }
+
+  if (!isChristmasGiftActive()) {
+    return (
+      <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4 text-sm">
+        <p className="font-semibold text-foreground">{campaign.headline}</p>
+        <p className="text-muted-foreground">{campaign.body}</p>
+        <Button asChild className="w-full">
+          <Link to="/pricing">{campaign.ctaStart}</Link>
+        </Button>
+      </div>
+    );
+  }
+
   if (!signedIn) {
     return (
       <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
@@ -114,11 +156,8 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
             🎅
           </div>
           <div>
-            <p className="font-semibold text-foreground">Stay, Explore & Get Free Credits!</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Sign in, explore Motio2edit for 10 minutes, then claim exactly {CHRISTMAS_REWARD_CREDITS}{" "}
-              credits — enough for one Standard image.
-            </p>
+            <p className="font-semibold text-foreground">{campaign.headline}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{campaign.body}</p>
           </div>
         </div>
         <Button asChild className="w-full">
@@ -156,18 +195,17 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
           🎅
         </div>
         <div className="min-w-0">
-          <p className="font-semibold text-foreground">🎁 Stay, Explore & Get Free Credits!</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Complete a 10-minute campaign session and receive {CHRISTMAS_REWARD_CREDITS} Motio2edit
-            credits (one Standard image).
+          <p className="font-semibold text-foreground">
+            {campaign.emoji} {campaign.headline}
           </p>
+          <p className="mt-1 text-sm text-muted-foreground">{campaign.body}</p>
         </div>
       </div>
 
       {!status?.hasSession ? (
         <Button type="button" className="w-full gap-2" disabled={loading} onClick={() => void onStart()}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
-          Start Christmas Gift Campaign
+          {campaign.ctaStart}
         </Button>
       ) : (
         <div className="space-y-3">
@@ -177,9 +215,7 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
               Session timer
             </span>
             <span className="font-mono font-semibold tabular-nums">
-              {status.eligible
-                ? "Ready to claim"
-                : formatRemaining(status.remainingSeconds)}
+              {status.eligible ? "Ready to claim" : formatRemaining(status.remainingSeconds)}
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -191,14 +227,8 @@ export function ChristmasCampaignPanel({ onClose, signedIn }: Props) {
             disabled={!status.eligible || claiming}
             onClick={() => void onClaim()}
           >
-            {claiming ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Gift className="h-4 w-4" />
-            )}
-            {status.eligible
-              ? `Claim ${CHRISTMAS_REWARD_CREDITS} Free Credits`
-              : "Keep exploring…"}
+            {claiming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Gift className="h-4 w-4" />}
+            {status.eligible ? campaign.ctaClaim : "Keep exploring…"}
           </Button>
         </div>
       )}
