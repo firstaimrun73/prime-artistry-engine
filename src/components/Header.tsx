@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CrownBadge } from "@/components/CrownBadge";
 import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
+import { ChristmasGiftIcon } from "@/components/christmas/ChristmasGiftIcon";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
@@ -89,6 +90,10 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          {/* Christmas gift — mobile icon + desktop pill; same campaign panel */}
+          <ChristmasGiftIcon variant="icon" className="sm:hidden" />
+          <ChristmasGiftIcon variant="pill" className="hidden sm:inline-flex" />
+
           {user ? <GoogleLanguageSelect /> : null}
 
           {user ? (
@@ -189,8 +194,7 @@ export function Header() {
                   </Link>
                   {admin ? (
                     <Link
-                      to="/admin"
-                      onClick={() => setMenuOpen(false)}
+                      to="/admin"ersch onClick={() => setMenuOpen(false)}
                       className="rounded-lg px-4 py-3 text-base font-medium text-primary"
                     >
                       Admin
