@@ -93,7 +93,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
   },
   ultra: {
     maxImages: 10,
-    maxPromptChars: 6000,
+    maxPromptChars: 7000,
     videoEnabled: true,
     hd: true,
     premiumUnlocked: true,
@@ -106,7 +106,7 @@ export function getPlanLimits(plan: string): PlanLimits {
   return PLAN_LIMITS[plan as PlanId] ?? PLAN_LIMITS.free;
 }
 
-/** True when plan max is a single image only. */
+/** True when the plan matrix does not allow multi-image gallery size. */
 export function isMultiImageLocked(plan: string | undefined | null, isAdmin = false): boolean {
   if (isAdmin) return false;
   return getPlanLimits(plan ?? "free").maxImages <= 1;
@@ -133,5 +133,20 @@ export function isPromptEffectivelyUnlimited(plan: string | undefined | null): b
   return id === "business" || getPlanLimits(plan ?? "free").ultraFullUnlocked;
 }
 
+/** Shown when Free users try to SUBMIT a multi-reference generation (selection is still allowed). */
 export const MULTI_IMAGE_UPGRADE_MESSAGE =
-  "You can add up to 5 images on Standard. Premium and Ultra AI unlock higher limits and stronger models.";
+  "Multiple-reference generation requires a paid plan. You can still select and preview multiple images — upgrade to generate with them.";
+
+/**
+ * Free users may select multiple reference images in the UI, but must not submit
+ * multi-reference jobs to fal.ai. Paid plans follow getPlanLimits().maxImages.
+ */
+export function canSubmitMultiReference(
+  plan: string | undefined | null,
+  isAdmin = false,
+): boolean {
+  if (isAdmin) return true;
+  const id = (plan ?? "free").toLowerCase().trim();
+  if (id === "free") return false;
+  return getPlanLimits(id).maxImages > 1;
+}
