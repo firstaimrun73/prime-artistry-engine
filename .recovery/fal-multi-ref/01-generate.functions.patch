@@ -1,0 +1,107 @@
+diff --git a/src/lib/generate.functions.ts b/src/lib/generate.functions.ts
+index 7692688..3433798 100644
+--- a/src/lib/generate.functions.ts
++++ b/src/lib/generate.functions.ts
+@@ -29,6 +29,7 @@ import { buildVideoFromRegistry } from "@/lib/video-fal-step";
+ import { computeImageExperienceCredits } from "@/lib/studio/image/image-experience-credits";
+ import { assertImageExperienceAccess } from "@/lib/studio/image/image-experience-access";
+ import { maxImagesForStudioTier } from "@/lib/studio/studio-tier";
++import { canSubmitMultiReference, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
+ import { isAdminClaims } from "@/lib/admin-guard.server";
+ import {
+   executeStandardImage,
+@@ -104,7 +105,40 @@ function falErrorMessage(label: string, status: number, txt: string): string {
+   } catch {
+     detail = txt.slice(0, 200);
+   }
+-  return `${label} failed (${status})${detail ? `: ${detail}` : ""}`;
++  if (status === 429) return "AI service is rate-limited right now. Please retry in a moment.";
++  if (status === 401 || status === 403)
++    return "AI service authentication failed (invalid or expired API key).";
++  if (/balance|locked|billing|top up|exhausted/i.test(detail))
++    return "AI service is out of credits. Top up the fal.ai account balance to continue.";
++  if (/file_download_error|download the file/i.test(detail))
++    return "The uploaded media could not be fetched by the AI. Please re-upload and try again.";
++  if (/image_load_error|corrupted|supported format/i.test(detail))
++    return "The uploaded image is invalid or in an unsupported format. Try a JPG or PNG.";
++  if (/nsfw|safety/i.test(detail))
++    return "The request was blocked by the safety filter. Try a different prompt or image.";
++  if (detail) return `${label} failed: ${detail.slice(0, 160)}`;
++  return `${label} failed (status ${status}). Please try again.`;
++}
++
++/** Extract first HTTPS image/video URL from common fal.ai result shapes. */
++function extractRunFalOutputUrl(json: unknown): string | null {
++  if (!json || typeof json !== "object") return null;
++  const root = json as Record<string, unknown>;
++  const candidates: unknown[] = [
++    (root.image as { url?: unknown } | undefined)?.url,
++    Array.isArray(root.images) ? (root.images[0] as { url?: unknown } | undefined)?.url : undefined,
++    (root.video as { url?: unknown } | undefined)?.url,
++    root.output,
++    root.url,
++    (root.data as { image?: { url?: unknown } } | undefined)?.image?.url,
++    Array.isArray((root.data as { images?: unknown } | undefined)?.images)
++      ? ((root.data as { images: { url?: unknown }[] }).images[0] as { url?: unknown } | undefined)?.url
++      : undefined,
++  ];
++  for (const c of candidates) {
++    if (typeof c === "string" && c.startsWith("http")) return c;
++  }
++  return null;
+ }
+ 
+ async function runFal(step: FalStep, falKey: string, opts?: { timeoutMs?: number; requestId?: string }): Promise<string> {
+@@ -192,13 +226,16 @@ async function runFal(step: FalStep, falKey: string, opts?: { timeoutMs?: number
+     throw new Error(`${step.label}: invalid result JSON`);
+   }
+ 
+-  const url =
+-    (resJson.image as { url?: string } | undefined)?.url ||
+-    (resJson.video as { url?: string } | undefined)?.url ||
+-    (Array.isArray(resJson.images) && (resJson.images[0] as { url?: string })?.url) ||
+-    (typeof resJson.output === "string" ? resJson.output : null) ||
+-    (typeof resJson.url === "string" ? resJson.url : null);
+-  if (!url || typeof url !== "string") throw new Error(`${step.label}: no output URL in result`);
++  const url = extractRunFalOutputUrl(resJson);
++  if (!url) {
++    console.error("[generate] fal no output URL", {
++      rid,
++      falRequestId,
++      label: step.label,
++      snippet: resTxt.slice(0, 200),
++    });
++    throw new Error(`${step.label}: no output URL in result`);
++  }
+   return url;
+ }
+ 
+@@ -297,6 +334,28 @@ export const generateMedia = createServerFn({ method: "POST" })
+       }
+     }
+ 
++    // Free users may select multiple references in the UI, but must never submit
++    // multi-reference jobs to fal.ai (no credits, no history, no provider call).
++    if (data.type === "image" && !isAdmin && !canSubmitMultiReference(plan, isAdmin)) {
++      const multiCandidates = Array.from(
++        new Set(
++          ([
++            data.imageUrl,
++            ...((data.referenceImageUrls || []) as string[]),
++            ...((data.imageUrls || []) as string[]),
++          ]).filter((u): u is string => typeof u === "string" && u.length > 0),
++        ),
++      );
++      if (multiCandidates.length >= 2) {
++        console.info("[generate] blocked free multi-reference submit", {
++          rid: genRequestId,
++          plan,
++          imageCount: multiCandidates.length,
++        });
++        throw new Error(MULTI_IMAGE_UPGRADE_MESSAGE);
++      }
++    }
++
+     let cost = 0;
+     let reservedVideoQuote: GenerationQuote | null = null;
+     let imageReservationTxId: string | null = null;

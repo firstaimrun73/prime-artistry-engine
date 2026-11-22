@@ -1,0 +1,42 @@
+diff --git a/src/components/editor/image/ImageEditor.tsx b/src/components/editor/image/ImageEditor.tsx
+index f8d7064..da48e78 100644
+--- a/src/components/editor/image/ImageEditor.tsx
++++ b/src/components/editor/image/ImageEditor.tsx
+@@ -27,6 +27,7 @@ import { isAdminEmail } from "@/lib/admin-config";
+ import { useServerFn } from "@tanstack/react-start";
+ import { Button } from "@/components/ui/button";
+ import { getPlanLimits, maxPromptCharsForPlan, isPromptEffectivelyUnlimited, MULTI_IMAGE_UPGRADE_MESSAGE } from "@/utils/planLimits";
++import { freeMultiRefSubmitBlockMessage } from "@/lib/studio/image/free-multi-ref-guard";
+ import { startGeneration, endGeneration } from "@/lib/generation-status";
+ import { CreditWarningBanner, LOW_CREDIT_TOAST_KEY } from "@/components/CreditWarningBanner";
+ import { FreeUserSponsorStrip } from "@/components/sponsor/FreeUserSponsorStrip";
+@@ -492,6 +493,29 @@ export function ImageEditor({ bootstrap }: ImageEditorProps) {
+       return toast.error("A generation is already in progress. Please wait for it to finish.");
+     }
+ 
++    // Free users may select multiple references, but must upgrade before generating with them.
++    // Server also enforces this; client avoids upload/spin and shows upgrade CTA.
++    {
++      const extras = gallery.filter((_, i) => i !== activeImage);
++      const blockMsg = freeMultiRefSubmitBlockMessage({
++        plan: profile?.plan ?? "free",
++        isAdmin,
++        extraGalleryCount: extras.length,
++        refImagesCount: Array.isArray(refImages) ? refImages.length : 0,
++      });
++      if (blockMsg) {
++        toast.error(blockMsg, {
++          action: {
++            label: "Upgrade",
++            onClick: () => {
++              window.location.href = "/pricing";
++            },
++          },
++        });
++        return;
++      }
++    }
++
+     const runId = ++runIdRef.current;
+     setState("analyzing");
+     setOutput(null);
