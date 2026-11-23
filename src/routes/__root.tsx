@@ -21,6 +21,7 @@ import { TranslateWidget } from "../components/TranslateWidget";
 import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
+import { MonetagMultiTag } from "../components/ads/MonetagMultiTag";
 import {
   SITE_NAME,
   SITE_URL,
@@ -112,9 +113,9 @@ const BOOT_GUARD_SCRIPT = `
     });
     try { localStorage.removeItem('motio2edit-gt-lang'); } catch(e) {}
 
-    /* EMERGENCY: strip known ad scripts on boot */
+    /* Strip forced vignette / IPP only — do not remove Multitag (quge5 zone 314190). */
     try {
-      document.querySelectorAll('script[src*="n6wxm.com"],script[src*="nap5k.com"],script[src*="monetag"],#motio-monetag-vignette,#motio-monetag-ipp').forEach(function(el){ el.remove(); });
+      document.querySelectorAll('script[src*="n6wxm.com"],script[src*="nap5k.com"],#motio-monetag-vignette,#motio-monetag-ipp,#monetag-vignette').forEach(function(el){ el.remove(); });
     } catch (e) {}
 
     var href = ${JSON.stringify(appCss)};
@@ -253,8 +254,8 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <PageViewTracker />
-          {/* Ads OFF — only cleanup gate remains */}
           <AdPolicyGate />
+          <MonetagMultiTag />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />
