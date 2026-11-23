@@ -23,7 +23,6 @@ import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 import { MalutoGuideTour } from "@/components/home/MalutoGuideTour";
 import { DirectLinkAd, PartnerZoneAd } from "@/components/ads";
-import { MonthlySpinEntry } from "@/components/monthly-spin/MonthlySpinEntry";
 import { MalutoHomeHint } from "@/components/home/MalutoHomeHint";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
 
@@ -64,14 +63,14 @@ const HOME_SLOGANS = [
     cta: "Explore Maluto AI",
   },
   {
-    title: "Circle 2edit · Cropmix · Remove BG · AI+",
+    title: "Circle 2edit \u00b7 Cropmix \u00b7 Remove BG \u00b7 AI+",
     sub: "Powerful creative tools. Simple workflows.",
     to: "/studio" as const,
     cta: "Explore AI Tools",
   },
   {
     title: "From idea to download in seconds",
-    sub: "Standard · Premium · Ultra AI modes",
+    sub: "Standard \u00b7 Premium \u00b7 Ultra AI modes",
     to: "/editor" as const,
     cta: "Open Image Studio",
   },
@@ -197,7 +196,9 @@ export function SignedInHomeBody() {
       <DirectLinkAd
         placement="discover-after-maluto"
         variant="compact"
-        title="Seasonal partner deals"
+        title="Tools worth discovering"
+        subtitle="Recommended for creators \u00b7 Sponsored partner offer"
+        cta="Explore Tool"
       />
 
       <section className="mt-6" aria-label="Try something new">
@@ -216,9 +217,8 @@ export function SignedInHomeBody() {
         <VisualDiscoveryGallery />
       </div>
 
-      <div className="mt-6 flex flex-col items-center gap-2">
-        <MonthlySpinEntry variant="inline-card" />
-        <PartnerZoneAd className="w-full max-w-lg" />
+      <div className="mt-8">
+        <PartnerZoneAd className="mx-auto w-full max-w-lg" />
       </div>
 
       <section className="mt-5" aria-label="Creative tags">
@@ -242,7 +242,9 @@ export function SignedInHomeBody() {
       <DirectLinkAd
         placement="discover-after-tags"
         variant="compact"
-        title="More ways to earn with partners"
+        title="Explore partner offers"
+        subtitle="Discover exclusive partner opportunities \u00b7 Sponsored"
+        cta="Visit Partner"
       />
 
       <div className="mt-10 space-y-8 md:mt-12">
@@ -250,7 +252,12 @@ export function SignedInHomeBody() {
         <RemoveBgHomeCard />
       </div>
 
-      <DirectLinkAd placement="discover-lower" title="Featured partner spotlight" />
+      <DirectLinkAd
+        placement="discover-lower"
+        title="Unlock more creative possibilities"
+        subtitle="Sponsored \u00b7 Explore tools from our partners"
+        cta="Discover More"
+      />
 
       <ObserveBuildProtect />
 
