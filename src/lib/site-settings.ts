@@ -32,7 +32,10 @@ export function usePlanVisible(): (plan: string) => boolean {
 /** Admin master switch + compile-time kill switch. */
 export function useAdsMasterEnabled(): boolean {
   const settings = useAppSettings();
-  return ADS_CONFIG.enabled && settings.ads.enabled === true;
+  // If compile-time ADS_CONFIG.enabled, treat missing admin flag as ON (user enabled ads).
+  if (!ADS_CONFIG.enabled) return false;
+  if (settings.ads.enabled === false) return false;
+  return true;
 }
 
 /**
@@ -46,11 +49,12 @@ export function useAdsVisible(placement?: AdPlacement): boolean {
   const admin = isAdminEmail(profile?.email);
 
   if (!ADS_CONFIG.enabled) return false;
-  if (settings.ads.enabled !== true) return false;
   if (admin) return false;
-  if (placement && settings.ads.placements[placement] === false) return false;
+  // Admin panel can force off; undefined/true = allow when ADS_CONFIG.enabled
+  if (settings.ads.enabled === false) return false;
+  if (placement && settings.ads.placements?.[placement] === false) return false;
   if (settings.ads.target === "none") return false;
-  if (settings.ads.target === "free") return plan === "free";
   if (settings.ads.target === "paid") return plan !== "free";
-  return true;
+  // default + "free": free plan only
+  return plan === "free" || settings.ads.target === "all";
 }
