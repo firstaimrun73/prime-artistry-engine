@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 
 /**
- * EMERGENCY ad cleanup — always strip Monetag, AdSense, and known ad iframes.
+ * Strip only unwanted third-party ad networks (e.g. AdSense).
+ * Do NOT remove Monetag, Partner zone, Adsterra, or Direct Link assets.
  */
-function stripAllAdArtifacts() {
+function stripUnwantedAdArtifacts() {
   if (typeof document === "undefined") return;
 
   const selectors = [
@@ -14,22 +15,9 @@ function stripAllAdArtifacts() {
     'iframe[src*="doubleclick"]',
     "#adsense-loader",
     "ins.adsbygoogle",
-    "#monetag-tag",
-    "#monetag-loader",
-    "#motio-monetag-vignette",
-    "#motio-monetag-ipp",
-    "#monetag-vignette",
-    'script[src*="n6wxm.com"]',
-    'script[src*="nap5k.com"]',
-    'script[src*="monetag"]',
-    'script[src*="omg10.com"]',
-    'iframe[src*="n6wxm"]',
-    'iframe[src*="nap5k"]',
-    'iframe[src*="monetag"]',
   ];
 
   document.querySelectorAll(selectors.join(", ")).forEach((el) => el.remove());
-  document.querySelectorAll('meta[name="monetag"]').forEach((el) => el.remove());
 
   try {
     const w = window as Window & { adsbygoogle?: unknown[] };
@@ -41,8 +29,8 @@ function stripAllAdArtifacts() {
 
 export function AdPolicyGate() {
   useEffect(() => {
-    stripAllAdArtifacts();
-    const observer = new MutationObserver(() => stripAllAdArtifacts());
+    stripUnwantedAdArtifacts();
+    const observer = new MutationObserver(() => stripUnwantedAdArtifacts());
     observer.observe(document.documentElement, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);

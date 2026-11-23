@@ -11,3 +11,4 @@ export { MonetagVignette } from "./MonetagVignette";
 export { AdDebugPanel } from "./AdDebugPanel";
 export { CreditSpendHint } from "./CreditSpendHint";
 export { PartnerZoneAd } from "./PartnerZoneAd";
+export { AdsterraBanner, AdsterraResponsive } from "./AdsterraBanner";

@@ -1,7 +1,9 @@
 /**
- * Ad configuration — revenue without wrecking UX/SEO.
+ * Ad configuration — Monetag + Adsterra coexist.
  *
- * - Static Direct Link / multitags cards: ON for free signed-in users on allowed routes
+ * - Direct Link / multitags cards: ON for free signed-in users on allowed routes
+ * - Adsterra iframe banners: ON (isolated per placement)
+ * - Partner zone (Monetag-family): ON, load once
  * - Vignette / In-Page Push scripts: OFF by default
  * - Never on pricing, auth, checkout, settings, admin, editor canvas
  * - Never grant Motio2edit credits from a client click alone
@@ -18,9 +20,33 @@ export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" a
 export const MONETAG_IPP_ZONE = "12004581" as const;
 export const MONETAG_IPP_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
 
-/** Partner zone script (independent of monthly spin). */
+/** Partner zone script (Monetag network — keep enabled). */
 export const PARTNER_ZONE_SCRIPT_SRC = "https://quge5.com/88/tag.min.js" as const;
 export const PARTNER_ZONE_ID = "314581" as const;
+
+/** Adsterra banner units — each key must load with its own atOptions isolation. */
+export const ADSTERRA_UNITS = {
+  rect300x250: {
+    key: "f45af7729b5f87f7f631224b9914355a",
+    width: 300,
+    height: 250,
+    scriptSrc: "https://bauval.org/22/f45af7729b5f87f7f631224b9914355a",
+  },
+  leaderboard728x90: {
+    key: "4bf9a15b0b48e00aa7a747f6c839281b",
+    width: 728,
+    height: 90,
+    scriptSrc: "https://bauval.org/22/4bf9a15b0b48e00aa7a747f6c839281b",
+  },
+  mobile320x50: {
+    key: "6b55fa106a712c45e0ecc3101176947f",
+    width: 320,
+    height: 50,
+    scriptSrc: "https://bauval.org/22/6b55fa106a712c45e0ecc3101176947f",
+  },
+} as const;
+
+export type AdsterraUnitId = keyof typeof ADSTERRA_UNITS;
 
 export const ADS_CONFIG = {
   enabled: true,
@@ -28,6 +54,7 @@ export const ADS_CONFIG = {
   pagePushEnabled: false,
   optInFreeCreditCta: false,
   partnerZoneEnabled: true,
+  adsterraEnabled: true,
   excludedRoutes: [
     "/editor",
     "/login",
@@ -65,7 +92,8 @@ export function adPlacementCategory(
     p.startsWith("earn") ||
     p.startsWith("discover") ||
     p.startsWith("footer") ||
-    p.startsWith("in-content")
+    p.startsWith("in-content") ||
+    p.startsWith("adsterra")
   ) {
     return "home";
   }

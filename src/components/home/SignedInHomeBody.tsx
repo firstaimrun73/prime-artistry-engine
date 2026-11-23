@@ -22,7 +22,13 @@ import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 import { MalutoGuideTour } from "@/components/home/MalutoGuideTour";
-import { DirectLinkAd, PartnerZoneAd, InContentAd } from "@/components/ads";
+import {
+  DirectLinkAd,
+  PartnerZoneAd,
+  InContentAd,
+  AdsterraBanner,
+  AdsterraResponsive,
+} from "@/components/ads";
 import { MalutoHomeHint } from "@/components/home/MalutoHomeHint";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
 
@@ -205,7 +211,7 @@ export function SignedInHomeBody() {
         <ImageStudioWeeklyCarousel />
       </section>
 
-      <InContentAd placement="discover-after-carousel" />
+      <AdsterraResponsive placement="discover-after-carousel" />
 
       <div className="mt-8 md:mt-10">
         <div className="mb-3 flex items-end justify-between gap-2">
@@ -218,6 +224,8 @@ export function SignedInHomeBody() {
         </div>
         <VisualDiscoveryGallery />
       </div>
+
+      <AdsterraBanner unit="rect300x250" placement="discover-after-gallery" className="hidden sm:flex" />
 
       <div className="mt-8">
         <PartnerZoneAd className="mx-auto w-full max-w-lg" />
@@ -253,6 +261,8 @@ export function SignedInHomeBody() {
         <CircleSampleGallery />
         <RemoveBgHomeCard />
       </div>
+
+      <AdsterraResponsive placement="discover-after-samples" includeRect={false} />
 
       <DirectLinkAd
         placement="discover-lower"
