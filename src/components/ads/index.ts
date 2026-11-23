@@ -10,3 +10,4 @@ export { MonetagInPagePush } from "./MonetagInPagePush";
 export { MonetagVignette } from "./MonetagVignette";
 export { AdDebugPanel } from "./AdDebugPanel";
 export { CreditSpendHint } from "./CreditSpendHint";
+export { PartnerZoneAd } from "./PartnerZoneAd";
