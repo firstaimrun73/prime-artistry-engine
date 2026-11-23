@@ -21,6 +21,7 @@ import { TranslateWidget } from "../components/TranslateWidget";
 import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
+import { MonetagInPagePush } from "../components/ads/MonetagInPagePush";
 import {
   SITE_NAME,
   SITE_URL,
@@ -250,8 +251,9 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <PageViewTracker />
-          {/* Policy gate only strips unwanted AdSense — Monetag + Adsterra stay */}
           <AdPolicyGate />
+          {/* Desktop-only Monetag in-page push */}
+          <MonetagInPagePush />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />

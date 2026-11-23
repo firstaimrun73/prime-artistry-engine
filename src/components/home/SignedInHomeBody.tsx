@@ -21,7 +21,7 @@ import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
-import { AdsterraBanner, AdsterraResponsive } from "@/components/ads";
+import { AdsterraBanner, AdsterraResponsive, DirectLinkAd, EarnCreditsCard } from "@/components/ads";
 import { MalutoHomeHint } from "@/components/home/MalutoHomeHint";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
 
@@ -192,11 +192,20 @@ export function SignedInHomeBody() {
 
       <AutoEditHomeCard />
 
+      <EarnCreditsCard />
+
       <section className="mt-6" aria-label="Try something new">
         <ImageStudioWeeklyCarousel />
       </section>
 
       <AdsterraResponsive placement="discover-after-carousel" />
+
+      <DirectLinkAd
+        placement="discover-mid"
+        title="A small gift for you"
+        subtitle="Sponsored · stay here & open when ready"
+        cta="Open gift"
+      />
 
       <div className="mt-8 md:mt-10">
         <div className="mb-3 flex items-end justify-between gap-2">
@@ -236,6 +245,14 @@ export function SignedInHomeBody() {
       </div>
 
       <AdsterraResponsive placement="discover-after-samples" includeRect={false} />
+
+      <DirectLinkAd
+        placement="discover-lower"
+        variant="compact"
+        title="Partner gift for creators"
+        subtitle="Sponsored · open when you want"
+        cta="Explore"
+      />
 
       <ObserveBuildProtect />
 
