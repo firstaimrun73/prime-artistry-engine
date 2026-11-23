@@ -22,7 +22,8 @@ import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 import { MalutoGuideTour } from "@/components/home/MalutoGuideTour";
-import { DirectLinkAd } from "@/components/ads";
+import { DirectLinkAd, PartnerZoneAd } from "@/components/ads";
+import { MonthlySpinEntry } from "@/components/monthly-spin/MonthlySpinEntry";
 import { MalutoHomeHint } from "@/components/home/MalutoHomeHint";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
 
@@ -76,7 +77,6 @@ const HOME_SLOGANS = [
   },
 ] as const;
 
-/** Horizontal AI tools — Maluto AI intentionally omitted (dedicated Restore card + bottom tab). */
 const AI_TOOLS = [
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
@@ -210,7 +210,10 @@ export function SignedInHomeBody() {
         <VisualDiscoveryGallery />
       </div>
 
-      <DirectLinkAd placement="home-upper" variant="compact" />
+      <div className="mt-6 flex flex-col items-center">
+        <MonthlySpinEntry variant="inline-card" />
+        <PartnerZoneAd className="w-full max-w-lg" />
+      </div>
 
       <section className="mt-5" aria-label="Creative tags">
         <p className="mb-2 text-xs font-medium text-muted-foreground">
