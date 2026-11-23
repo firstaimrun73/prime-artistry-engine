@@ -17,7 +17,6 @@ import { FeedbackCard } from "@/components/FeedbackCard";
 import { TrustSection } from "@/components/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
-import { ChristmasPromoStrip } from "@/components/christmas/ChristmasPromoStrip";
 import { pageHead, SITE_BRAND_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
@@ -49,7 +48,6 @@ function SignedInHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <ChristmasPromoStrip />
       <SignedInHomeBody />
       <Footer />
     </div>
@@ -66,7 +64,6 @@ function SignedOutHome() {
     <div className="min-h-screen bg-background">
       <Header />
       <HomeHero />
-      <ChristmasPromoStrip />
       <PreLoginSampleStrip />
       <BeforeAfterShowcase />
       <PrivacyPhilosophySection />
