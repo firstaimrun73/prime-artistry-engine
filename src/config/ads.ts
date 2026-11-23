@@ -1,12 +1,14 @@
 /**
- * Ad configuration — Monetag multitag only on /offers (explicit click).
- * Adsterra banners on allowed content routes. Partner zone scripts NOT auto-loaded on core app.
+ * Ad configuration — Monetag multitag + Direct Link + Adsterra banners.
+ * Multitag opens only on explicit user click (new tab).
+ * In-page push: desktop only (never mobile).
+ * Partner zone scripts not auto-loaded on core app.
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 export const MONETAG_MULTITAG_URL = DIRECT_LINK_URL;
 
 export const SPONSOR_DISPLAY_NAME = "Partner offer" as const;
-export const SPONSOR_TAGLINE = "Sponsored · Explore partner offers · opens in a new tab" as const;
+export const SPONSOR_TAGLINE = "Sponsored · Gift offers · stay here & click when ready" as const;
 
 export const MONETAG_VIGNETTE_ZONE = "12136694" as const;
 export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" as const;
@@ -42,8 +44,9 @@ export type AdsterraUnitId = keyof typeof ADSTERRA_UNITS;
 export const ADS_CONFIG = {
   enabled: true,
   vignetteEnabled: false,
-  pagePushEnabled: false,
-  optInFreeCreditCta: false,
+  /** Desktop-only in-page push (MonetagInPagePush enforces md+). */
+  pagePushEnabled: true,
+  optInFreeCreditCta: true,
   /** Core app must NOT auto-load partner/multitag scripts. */
   partnerZoneEnabled: false,
   adsterraEnabled: true,
@@ -97,4 +100,20 @@ export function adPlacementCategory(
 
 export function showOptInFreeCreditCta(): boolean {
   return ADS_CONFIG.optInFreeCreditCta === true;
+}
+
+/** Rough ad-blocker heuristic — used only to decide which gift CTAs to emphasize. */
+export function detectAdBlocker(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const bait = document.createElement("div");
+    bait.className = "adsbox ad-banner adsbygoogle ad-placement";
+    bait.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;";
+    document.body.appendChild(bait);
+    const blocked = bait.offsetParent === null || bait.offsetHeight === 0;
+    document.body.removeChild(bait);
+    return blocked;
+  } catch {
+    return false;
+  }
 }
