@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CrownBadge } from "@/components/CrownBadge";
 import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
-import { ChristmasGiftIcon } from "@/components/christmas/ChristmasGiftIcon";
+import { MonthlySpinEntry } from "@/components/monthly-spin/MonthlySpinEntry";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
@@ -85,8 +85,8 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          <ChristmasGiftIcon variant="icon" className="sm:hidden" />
-          <ChristmasGiftIcon variant="pill" className="hidden sm:inline-flex" />
+          <MonthlySpinEntry variant="icon" className="sm:hidden" />
+          <MonthlySpinEntry variant="pill" className="hidden sm:inline-flex" />
 
           {user ? <GoogleLanguageSelect /> : null}
 
