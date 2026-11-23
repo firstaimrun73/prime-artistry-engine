@@ -194,6 +194,12 @@ export function SignedInHomeBody() {
 
       <AutoEditHomeCard />
 
+      <DirectLinkAd
+        placement="discover-after-maluto"
+        variant="compact"
+        title="Seasonal partner deals"
+      />
+
       <section className="mt-6" aria-label="Try something new">
         <ImageStudioWeeklyCarousel />
       </section>
@@ -210,7 +216,7 @@ export function SignedInHomeBody() {
         <VisualDiscoveryGallery />
       </div>
 
-      <div className="mt-6 flex flex-col items-center">
+      <div className="mt-6 flex flex-col items-center gap-2">
         <MonthlySpinEntry variant="inline-card" />
         <PartnerZoneAd className="w-full max-w-lg" />
       </div>
@@ -233,12 +239,18 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
+      <DirectLinkAd
+        placement="discover-after-tags"
+        variant="compact"
+        title="More ways to earn with partners"
+      />
+
       <div className="mt-10 space-y-8 md:mt-12">
         <CircleSampleGallery />
         <RemoveBgHomeCard />
       </div>
 
-      <DirectLinkAd placement="home-mid" />
+      <DirectLinkAd placement="discover-lower" title="Featured partner spotlight" />
 
       <ObserveBuildProtect />
 

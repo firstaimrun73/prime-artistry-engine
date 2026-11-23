@@ -1,4 +1,8 @@
 -- Monthly Credit Spin — one claim per user per UTC calendar month
+-- Winner policy (enforced in server functions, not only SQL):
+--   - At most 1 winner per prize level per 100,000 spins in the period
+--   - Zero-credit outcomes are valid and common
+--   - No guaranteed 25-credit consolation
 -- Apply only after preflight on the verified production project.
 
 CREATE TABLE IF NOT EXISTS public.monthly_spin_claims (
@@ -16,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.monthly_spin_claims (
 
 CREATE INDEX IF NOT EXISTS idx_monthly_spin_period ON public.monthly_spin_claims (period_key);
 CREATE INDEX IF NOT EXISTS idx_monthly_spin_user ON public.monthly_spin_claims (user_id);
+CREATE INDEX IF NOT EXISTS idx_monthly_spin_period_prize ON public.monthly_spin_claims (period_key, prize_id);
 
 ALTER TABLE public.monthly_spin_claims ENABLE ROW LEVEL SECURITY;
 
@@ -24,7 +29,6 @@ CREATE POLICY "Users read own monthly spin"
   ON public.monthly_spin_claims FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
--- No client inserts/updates — server (service_role) only
 REVOKE INSERT, UPDATE, DELETE ON public.monthly_spin_claims FROM authenticated, anon;
 GRANT SELECT ON public.monthly_spin_claims TO authenticated;
 GRANT ALL ON public.monthly_spin_claims TO service_role;
