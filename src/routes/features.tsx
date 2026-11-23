@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FooterAd } from "@/components/ads";
+import { FooterAd, AdsterraResponsive, DirectLinkAd } from "@/components/ads";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,6 @@ const MUSIC_FEATURES = [
   { icon: Gauge, title: "BPM & Tempo Control", desc: "Dial in the exact tempo from 60 to 180 BPM so the track fits your edit." },
 ];
 
-
 function Card({ icon: Icon, title, desc }: { icon: typeof Wand2; title: string; desc: string }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 transition-colors hover:border-primary">
@@ -85,6 +84,9 @@ function Features() {
             ))}
           </div>
         </section>
+
+        <AdsterraResponsive placement="features-mid" className="my-10" />
+        <DirectLinkAd placement="features-mid" variant="compact" />
 
         <section className="mt-14">
           <div className="flex items-center gap-2">

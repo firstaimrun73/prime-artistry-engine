@@ -10,6 +10,8 @@ import {
   type Currency,
 } from "@/lib/plans";
 import {
+  createRazorpayOrder,
+  verifyRazorpayPayment,
   getPaypalClientId,
   createPaypalOrder,
   capturePaypalOrder,
@@ -21,6 +23,7 @@ import { Lock, ArrowLeft } from "lucide-react";
 
 declare global {
   interface Window {
+    Razorpay: any;
     paypal: any;
   }
 }
@@ -35,12 +38,18 @@ export function CheckoutPage() {
     if (!plan || planId === "free") navigate({ to: "/pricing" });
   }, [plan, planId, navigate]);
   const { user, refreshProfile } = useAuth();
+  const createOrder = useServerFn(createRazorpayOrder);
+  const verifyPayment = useServerFn(verifyRazorpayPayment);
   const paypalClientId = useServerFn(getPaypalClientId);
   const createPp = useServerFn(createPaypalOrder);
   const capturePp = useServerFn(capturePaypalOrder);
   const getPpMode = useServerFn(getPaypalSubscriptionMode);
 
+  /** India / INR → Razorpay; everyone else → PayPal only */
+  const useRazorpay = (currency as Currency) === "INR";
+
   const [processing, setProcessing] = useState(false);
+  const [cardRetry, setCardRetry] = useState<string | null>(null);
   const [paypalReady, setPaypalReady] = useState(false);
   const [paypalError, setPaypalError] = useState<string | null>(null);
   const [paypalMode, setPaypalMode] = useState<PaypalMode>("loading");
@@ -61,7 +70,7 @@ export function CheckoutPage() {
   const priceLabel = `${symbol}${currency === "INR" ? Math.round(displayAmount).toLocaleString("en-IN") : displayAmount}`;
 
   useEffect(() => {
-    if (planId === "free") return;
+    if (planId === "free" || useRazorpay) return;
     let cancelled = false;
     setPaypalMode("loading");
     getPpMode({ data: { plan: planId, interval } })
@@ -74,10 +83,10 @@ export function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [planId, interval, getPpMode]);
+  }, [planId, interval, getPpMode, useRazorpay]);
 
   useEffect(() => {
-    if (planId === "free" || !user) return;
+    if (planId === "free" || useRazorpay || !user) return;
     if (paypalMode !== "order") return;
     let cancelled = false;
     paypalRenderedRef.current = false;
@@ -154,7 +163,69 @@ export function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, planId, interval, paypalMode, createPp, capturePp, paypalClientId, navigate, refreshProfile]);
+  }, [user, planId, interval, paypalMode, useRazorpay, createPp, capturePp, paypalClientId, navigate, refreshProfile]);
+
+  const handleRazorpay = async () => {
+    if (!user) {
+      navigate({ to: "/auth", search: { redirect: "/checkout" } });
+      return;
+    }
+    if (typeof window === "undefined" || !window.Razorpay) {
+      toast.error("Payment library is still loading.");
+      return;
+    }
+    setProcessing(true);
+    setCardRetry(null);
+    try {
+      const order = await createOrder({ data: { plan: planId, interval } });
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Motio2edit",
+        description: `${plan?.name ?? "Plan"} (${isAnnual ? "yearly" : "monthly"})`,
+        order_id: order.orderId,
+        theme: { color: "#FF6A1A" },
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            await verifyPayment({
+              data: {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                internalOrderId: order.internalOrderId,
+              },
+            });
+            await refreshProfile();
+            navigate({ to: "/payment-success" });
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Verification failed.");
+            navigate({ to: "/payment-failed" });
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setProcessing(false);
+            setCardRetry("Payment window closed. Click to try again.");
+          },
+        },
+      });
+      rzp.on("payment.failed", () => {
+        setProcessing(false);
+        setCardRetry("Payment failed. Please try again.");
+      });
+      rzp.open();
+    } catch (err) {
+      setProcessing(false);
+      const msg = err instanceof Error ? err.message : "Could not start payment.";
+      setCardRetry(msg);
+      toast.error(msg);
+    }
+  };
 
   if (!plan) return null;
 
@@ -179,12 +250,15 @@ export function CheckoutPage() {
         <div>
           <h1 className="text-2xl font-bold">Checkout</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {plan.name} · {isAnnual ? "Yearly" : "Monthly"} · PayPal
+            {plan.name} · {isAnnual ? "Yearly" : "Monthly"} · {" "}
+            {useRazorpay ? "Razorpay (India)" : "PayPal"}
           </p>
 
           {!user && (
             <div className="mt-6 rounded-xl border border-border bg-muted/30 p-4 text-sm">
-              <p className="mb-3 text-muted-foreground">Sign in to complete payment with PayPal.</p>
+              <p className="mb-3 text-muted-foreground">
+                Sign in to complete payment with {useRazorpay ? "Razorpay" : "PayPal"}.
+              </p>
               <Button asChild>
                 <Link to="/auth" search={{ mode: "signin", redirect: "/checkout" }}>
                   Sign in to continue
@@ -193,7 +267,20 @@ export function CheckoutPage() {
             </div>
           )}
 
-          {user && (
+          {user && useRazorpay && (
+            <div className="mt-6 space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Pay with Razorpay
+              </h2>
+              <p className="text-sm text-muted-foreground">UPI, cards, and netbanking for India (INR).</p>
+              {cardRetry && <p className="text-sm text-destructive">{cardRetry}</p>}
+              <Button className="w-full" onClick={handleRazorpay} disabled={processing}>
+                {processing ? "Processing…" : "Pay with Razorpay"}
+              </Button>
+            </div>
+          )}
+
+          {user && !useRazorpay && (
             <div className="mt-6 space-y-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Pay with PayPal
@@ -218,7 +305,7 @@ export function CheckoutPage() {
 
           <p className="mt-8 flex items-center gap-2 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5" />
-            Secure PayPal checkout · one-time purchase · no AutoPay
+            Secure checkout · {useRazorpay ? "Razorpay" : "PayPal"} · no AutoPay
           </p>
         </div>
 

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { DirectLinkAd } from "@/components/ads";
+import { DirectLinkAd, AdsterraBanner } from "@/components/ads";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -155,7 +155,8 @@ function HistoryPage() {
         </div>
       )}
 
-      <DirectLinkAd placement="history-mid" className="mt-8" />
+      <AdsterraBanner unit="rect300x250" placement="history-mid" className="mt-8" />
+      <DirectLinkAd placement="history-mid" className="mt-4" />
     </div>
   );
 }
