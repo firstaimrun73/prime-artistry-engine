@@ -1,22 +1,30 @@
 /**
- * Isolated advertising / rewards offers page.
- * Monetag multitag opens ONLY after explicit button click (new tab).
- * No scripts auto-load on page view. noindex for SEO isolation.
+ * Gift / partner offers page.
+ * Soft framing: stay here, claim gift by clicking ads.
+ * Both multitag and direct-link CTAs (ad-blocker resilient).
+ * Multitag opens only after explicit click (new tab). noindex.
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ExternalLink, Gift, ArrowLeft, Shield } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ExternalLink, Gift, ArrowLeft, Sparkles } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
-import { MONETAG_MULTITAG_URL } from "@/config/ads";
+import {
+  MONETAG_MULTITAG_URL,
+  DIRECT_LINK_URL,
+  detectAdBlocker,
+  SPONSOR_DISPLAY_NAME,
+} from "@/config/ads";
 import { Button } from "@/components/ui/button";
+import { AdsterraBanner } from "@/components/ads";
 
 export const Route = createFileRoute("/offers")({
   head: () => ({
     meta: [
       { name: "robots", content: "noindex, nofollow" },
-      { title: "Partner offers — Motio2edit" },
+      { title: "Gift offers — Motio2edit" },
       {
         name: "description",
-        content: "Optional partner advertising offers. Separate from Motio2edit creative tools.",
+        content: "Gift offers for Motio2edit creators. Stay on this page and explore sponsored partner gifts.",
       },
     ],
   }),
@@ -24,6 +32,11 @@ export const Route = createFileRoute("/offers")({
 });
 
 function OffersPage() {
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => {
+    setBlocked(detectAdBlocker());
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
@@ -36,7 +49,7 @@ function OffersPage() {
             className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Motio2edit
+            Back
           </Link>
         </div>
       </header>
@@ -48,37 +61,52 @@ function OffersPage() {
               <Gift className="h-6 w-6" />
             </span>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Partner offers</h1>
+              <h1 className="text-xl font-bold tracking-tight">You have a gift waiting</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                You are leaving the Motio2edit creative workspace to view third-party advertising
-                offers. This is optional and separate from your plan credits.
+                Stay on this page and open a sponsored gift below. Pick any offer that looks useful —
+                no automatic redirects.
               </p>
             </div>
           </div>
 
-          <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
-            <li className="flex gap-2">
-              <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              Offers open only when you press the button below — never automatically.
-            </li>
-            <li className="flex gap-2">
-              <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              Partner sites may show ads. Motio2edit does not add credits from a client click alone.
-            </li>
-          </ul>
+          {blocked && (
+            <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+              Ad blocker detected — use the gift buttons below (they still work).
+            </p>
+          )}
 
-          <a
-            href={MONETAG_MULTITAG_URL}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-md transition hover:opacity-95"
-          >
-            Open partner offers
-            <ExternalLink className="h-4 w-4" />
-          </a>
+          <div className="mt-6 space-y-3">
+            <a
+              href={MONETAG_MULTITAG_URL}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-md transition hover:opacity-95"
+            >
+              <Gift className="h-4 w-4" />
+              Claim gift offer
+              <ExternalLink className="h-4 w-4" />
+            </a>
 
-          <Button asChild variant="outline" className="mt-3 w-full rounded-full">
-            <Link to="/">Return to Motio2edit</Link>
+            <a
+              href={DIRECT_LINK_URL}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-bold text-primary transition hover:bg-primary/15"
+            >
+              <Sparkles className="h-4 w-4" />
+              Explore partner gift
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+
+          <p className="mt-4 text-center text-[11px] text-muted-foreground">
+            Sponsored · {SPONSOR_DISPLAY_NAME} · opens in a new tab when you click
+          </p>
+
+          <AdsterraBanner unit="rect300x250" placement="offers-mid" className="mt-6" />
+
+          <Button asChild variant="outline" className="mt-4 w-full rounded-full">
+            <Link to="/">Back to Motio2edit</Link>
           </Button>
         </div>
       </main>
