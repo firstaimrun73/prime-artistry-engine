@@ -1,17 +1,10 @@
 /**
- * Ad configuration — Monetag + Adsterra coexist.
- *
- * - Direct Link / multitags cards: ON for free signed-in users on allowed routes
- * - Adsterra iframe banners: ON (isolated per placement)
- * - Partner zone (Monetag-family): ON, load once
- * - Vignette / In-Page Push scripts: OFF by default
- * - Never on pricing, auth, checkout, settings, admin, editor canvas
- * - Never grant Motio2edit credits from a client click alone
+ * Ad configuration — Monetag multitag only on /offers (explicit click).
+ * Adsterra banners on allowed content routes. Partner zone scripts NOT auto-loaded on core app.
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 export const MONETAG_MULTITAG_URL = DIRECT_LINK_URL;
 
-/** Display label for sponsor link cards (not a verified brand claim). */
 export const SPONSOR_DISPLAY_NAME = "Partner offer" as const;
 export const SPONSOR_TAGLINE = "Sponsored · Explore partner offers · opens in a new tab" as const;
 
@@ -20,11 +13,9 @@ export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" a
 export const MONETAG_IPP_ZONE = "12004581" as const;
 export const MONETAG_IPP_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
 
-/** Partner zone script (Monetag network — keep enabled). */
 export const PARTNER_ZONE_SCRIPT_SRC = "https://quge5.com/88/tag.min.js" as const;
 export const PARTNER_ZONE_ID = "314581" as const;
 
-/** Adsterra banner units — each key must load with its own atOptions isolation. */
 export const ADSTERRA_UNITS = {
   rect300x250: {
     key: "f45af7729b5f87f7f631224b9914355a",
@@ -53,7 +44,8 @@ export const ADS_CONFIG = {
   vignetteEnabled: false,
   pagePushEnabled: false,
   optInFreeCreditCta: false,
-  partnerZoneEnabled: true,
+  /** Core app must NOT auto-load partner/multitag scripts. */
+  partnerZoneEnabled: false,
   adsterraEnabled: true,
   excludedRoutes: [
     "/editor",

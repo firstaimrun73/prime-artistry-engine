@@ -9,7 +9,7 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import type { PlanId } from "@/lib/plans";
-import { Coins, ShieldCheck } from "lucide-react";
+import { Coins, Gift, ShieldCheck } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NavItem = { to: any; label: string };
@@ -57,7 +57,6 @@ export function Header() {
           <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        {/* Desktop center nav — unchanged; no mobile hamburger */}
         <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
           {centerLinks.map((l) => (
             <Link
@@ -83,6 +82,17 @@ export function Header() {
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {user ? <GoogleLanguageSelect /> : null}
 
+          {/* Explicit entry only — does not load multitag scripts here */}
+          <Link
+            to="/offers"
+            className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-500/15 dark:text-amber-300 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+            title="Partner offers"
+            aria-label="Get free credits via partner offers"
+          >
+            <Gift className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Get free credits</span>
+          </Link>
+
           {user ? (
             <>
               <button
@@ -96,22 +106,22 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => navigate({ to: "/dashboard" })}
-                className="relative rounded-full ring-offset-2 ring-offset-background transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
+                className="relative cursor-pointer rounded-full ring-offset-2 ring-offset-background transition hover:ring-2 hover:ring-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label="Open dashboard"
                 title="Dashboard"
               >
                 <Avatar className="h-9 w-9 border border-border transition hover:opacity-90">
                   <AvatarImage src={avatarSrc} alt="" />
-                  <AvatarFallback className="bg-secondary p-0 overflow-hidden">
+                  <AvatarFallback className="overflow-hidden bg-secondary p-0">
                     {avatarSrc ? (
                       <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-xs font-semibold">\u00b7</span>
+                      <span className="text-xs font-semibold">·</span>
                     )}
                   </AvatarFallback>
                 </Avatar>
                 {isPaidPlan(profile?.plan) && (
-                  <span className="absolute -right-1 -top-1 pointer-events-none">
+                  <span className="pointer-events-none absolute -right-1 -top-1">
                     <CrownBadge plan={(profile?.plan as PlanId) ?? "free"} />
                   </span>
                 )}
