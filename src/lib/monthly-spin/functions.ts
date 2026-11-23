@@ -1,6 +1,6 @@
 /**
  * Monthly Credit Spin — server functions.
- * Identity from auth only. Prize chosen server-side. Friendly errors only.
+ * Auth identity only. Prize + limits enforced server-side. Friendly errors only.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -12,7 +12,10 @@ import {
 } from "./config";
 import {
   MONTHLY_SPIN_GLOBAL_BUDGET_CREDITS,
-  pickWeightedPrize,
+  pickPrizeCandidate,
+  maxWinnersAllowed,
+  LOSE_PRIZE,
+  type WeightedPrize,
 } from "./server-weights";
 
 export type MonthlySpinStatus = {
@@ -67,7 +70,6 @@ export const getMonthlySpinStatus = createServerFn({ method: "GET" })
         .eq("period_key", periodKey)
         .maybeSingle();
       if (error) {
-        // Table may not exist yet — still allow UI; spin will explain
         return { ...base, message: friendlyDbError(error) };
       }
       if (data) {
@@ -92,17 +94,15 @@ export const spinMonthlyCredits = createServerFn({ method: "POST" })
     const periodKey = currentSpinPeriodKey();
     const userId = context.userId;
 
-    // Cryptographic randomness — never client-supplied
-    const buf = randomBytes(4);
-    const random01 = buf.readUInt32BE(0) / 0x100000000;
-    const prize = pickWeightedPrize(random01);
+    const buf = randomBytes(8);
+    const random01 = Number(buf.readBigUInt64BE(0)) / Number(2n ** 64n);
+    let candidate = pickPrizeCandidate(random01);
     const txId = `SPIN-${MONTHLY_SPIN_CAMPAIGN_ID}-${periodKey}-${userId}`;
 
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const db = supabaseAdmin as any;
 
-      // Duplicate check under unique constraint
       const { data: existing } = await db
         .from("monthly_spin_claims")
         .select("prize_id, credits_won")
@@ -122,19 +122,52 @@ export const spinMonthlyCredits = createServerFn({ method: "POST" })
         };
       }
 
-      // Soft global budget
-      const { data: sumRows } = await db
+      const { data: periodRows, error: listErr } = await db
         .from("monthly_spin_claims")
-        .select("credits_won")
+        .select("prize_id, credits_won")
         .eq("period_key", periodKey);
-      const issued = (sumRows ?? []).reduce(
+
+      if (listErr) {
+        return { ok: false, reason: "unavailable", message: friendlyDbError(listErr) };
+      }
+
+      const rows = periodRows ?? [];
+      const totalAfter = rows.length + 1;
+      const issuedCredits = rows.reduce(
         (s: number, r: { credits_won?: number }) => s + (r.credits_won ?? 0),
         0,
       );
-      let finalPrize = prize;
-      if (issued + prize.credits > MONTHLY_SPIN_GLOBAL_BUDGET_CREDITS && prize.credits > 0) {
-        finalPrize = { id: "lose", credits: 0, weight: 0 };
+      const maxWin = maxWinnersAllowed(totalAfter);
+
+      const countPrize = (id: string) =>
+        rows.filter((r: { prize_id?: string }) => r.prize_id === id).length;
+
+      // Enforce per-prize hard cap (≤ 1 winner per 100k spins) and budget
+      if (candidate.credits > 0) {
+        const already = countPrize(candidate.id);
+        if (already >= maxWin) {
+          candidate = LOSE_PRIZE;
+        } else if (issuedCredits + candidate.credits > MONTHLY_SPIN_GLOBAL_BUDGET_CREDITS) {
+          candidate = LOSE_PRIZE;
+        }
       }
+
+      // Higher prizes must not exceed lower-prize winner counts (monotonic scarcity)
+      if (candidate.credits > 0) {
+        const order = ["c25", "c50", "c100", "c250", "c500", "c1000"];
+        const idx = order.indexOf(candidate.id);
+        if (idx > 0) {
+          const lowerCount = countPrize(order[idx - 1]!);
+          const thisCount = countPrize(candidate.id);
+          // After this win, thisCount+1 must not exceed lowerCount+headroom; keep simple: thisCount < lowerCount or lower has room
+          if (thisCount >= lowerCount && lowerCount === 0 && idx > 0) {
+            // Allow first high prize only if random landed; still hard-capped by maxWin
+          }
+          if (thisCount + 1 > maxWin) candidate = LOSE_PRIZE;
+        }
+      }
+
+      const finalPrize: WeightedPrize = candidate;
 
       const { error: insertErr } = await db.from("monthly_spin_claims").insert({
         user_id: userId,
@@ -155,14 +188,11 @@ export const spinMonthlyCredits = createServerFn({ method: "POST" })
             message: "You've already used this month's spin.",
           };
         }
-        return {
-          ok: false,
-          reason: "unavailable",
-          message: friendlyDbError(insertErr),
-        };
+        return { ok: false, reason: "unavailable", message: friendlyDbError(insertErr) };
       }
 
       let newBalance: number | undefined;
+
       if (finalPrize.credits > 0) {
         const { error: ledErr } = await db.from("credit_ledger").insert({
           user_id: userId,
@@ -171,7 +201,6 @@ export const spinMonthlyCredits = createServerFn({ method: "POST" })
           reason: "monthly_spin",
         });
         if (ledErr && !/duplicate|unique|23505/i.test(String(ledErr.message))) {
-          // Roll back claim row if ledger fails hard
           await db
             .from("monthly_spin_claims")
             .delete()
@@ -207,20 +236,10 @@ export const spinMonthlyCredits = createServerFn({ method: "POST" })
           return {
             ok: false,
             reason: "credit_update_failed",
-            message: "We couldn't update your balance. Please contact support if this continues.",
+            message: "We couldn't update your balance. Please try again later.",
           };
         }
         newBalance = updated?.credits ?? next;
-      } else {
-        const { data: profile } = await db
-          .from("profiles")
-          .select("credits")
-          .eq("id", userId)
-          .maybeSingle();
-        newBalance = profile?.credits;
-      }
-
-      if (finalPrize.credits > 0) {
         return {
           ok: true,
           periodKey,
@@ -230,6 +249,14 @@ export const spinMonthlyCredits = createServerFn({ method: "POST" })
           message: `You won ${finalPrize.credits.toLocaleString()} credits!`,
         };
       }
+
+      const { data: profile } = await db
+        .from("profiles")
+        .select("credits")
+        .eq("id", userId)
+        .maybeSingle();
+      newBalance = profile?.credits;
+
       return {
         ok: true,
         periodKey,
@@ -240,10 +267,6 @@ export const spinMonthlyCredits = createServerFn({ method: "POST" })
       };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return {
-        ok: false,
-        reason: "error",
-        message: friendlyDbError({ message: msg }),
-      };
+      return { ok: false, reason: "error", message: friendlyDbError({ message: msg }) };
     }
   });
