@@ -7,6 +7,7 @@ export { DirectLinkAd } from "./DirectLinkAd";
 export { AdPolicyGate } from "./AdPolicyGate";
 export { MonetagInPagePush } from "./MonetagInPagePush";
 export { MonetagVignette } from "./MonetagVignette";
+export { MonetagMultiTag, loadMultitagOnce } from "./MonetagMultiTag";
 export { AdDebugPanel } from "./AdDebugPanel";
 export { EarnCreditsCard } from "./EarnCreditsCard";
 export { CreditSpendHint } from "./CreditSpendHint";

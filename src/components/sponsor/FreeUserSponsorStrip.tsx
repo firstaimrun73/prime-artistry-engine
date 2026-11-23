@@ -1,6 +1,6 @@
 /**
  * Opt-in Sponsored strip for free users only.
- * Script loads ONLY after the user taps "Unlock no-watermark".
+ * MultiTag (zone 314190) loads ONLY after the user taps unlock.
  * Not auto-popup. Not mixed with Generate controls.
  */
 import { useEffect, useState } from "react";
@@ -11,22 +11,8 @@ import {
   sponsorUnlockRemainingMs,
   SPONSOR_UNLOCK_MINUTES,
 } from "@/lib/sponsor-unlock";
+import { loadMultitagOnce } from "@/components/ads/MonetagMultiTag";
 import { toast } from "sonner";
-
-const MULTITAG_SRC = "https://quge5.com/88/tag.min.js";
-const MULTITAG_ZONE = "305489";
-
-function loadMultitagOnce() {
-  if (typeof document === "undefined") return;
-  if (document.getElementById("motio-multitag-sponsor")) return;
-  const s = document.createElement("script");
-  s.id = "motio-multitag-sponsor";
-  s.src = MULTITAG_SRC;
-  s.async = true;
-  s.setAttribute("data-zone", MULTITAG_ZONE);
-  s.setAttribute("data-cfasync", "false");
-  document.body.appendChild(s);
-}
 
 export function FreeUserSponsorStrip({ isFree }: { isFree: boolean }) {
   const [active, setActive] = useState(false);

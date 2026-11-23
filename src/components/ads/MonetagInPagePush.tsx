@@ -1,4 +1,4 @@
-/** EMERGENCY: Monetag In-Page Push permanently inactive. */
+/** Forced Monetag In-Page Push stays OFF. */
 export function MonetagInPagePush() {
   return null;
 }
