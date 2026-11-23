@@ -29,18 +29,21 @@ export function usePlanVisible(): (plan: string) => boolean {
   return (plan: string) => settings.planVisibility[plan as ManagedPlanId] !== false;
 }
 
-/** Admin master switch + compile-time kill switch. */
+/** Compile-time ADS_CONFIG + admin panel. */
 export function useAdsMasterEnabled(): boolean {
   const settings = useAppSettings();
-  // If compile-time ADS_CONFIG.enabled, treat missing admin flag as ON (user enabled ads).
   if (!ADS_CONFIG.enabled) return false;
+  // Explicit admin OFF wins; otherwise allow when compile-time ON
+  if (settings.ads.enabled === false && settings !== DEFAULT_SETTINGS) {
+    // still respect DEFAULT which we set enabled:true below when ADS_CONFIG is on
+  }
   if (settings.ads.enabled === false) return false;
   return true;
 }
 
 /**
- * True when ads should render for the current user on the given placement.
- * Placement is optional — omit to check global enablement + audience only.
+ * Static Direct Link / Earn cards visibility.
+ * Free signed-in users on allowed routes. Never grants credits.
  */
 export function useAdsVisible(placement?: AdPlacement): boolean {
   const settings = useAppSettings();
@@ -50,11 +53,10 @@ export function useAdsVisible(placement?: AdPlacement): boolean {
 
   if (!ADS_CONFIG.enabled) return false;
   if (admin) return false;
-  // Admin panel can force off; undefined/true = allow when ADS_CONFIG.enabled
   if (settings.ads.enabled === false) return false;
   if (placement && settings.ads.placements?.[placement] === false) return false;
   if (settings.ads.target === "none") return false;
   if (settings.ads.target === "paid") return plan !== "free";
-  // default + "free": free plan only
-  return plan === "free" || settings.ads.target === "all";
+  // free or all
+  return plan === "free" || settings.ads.target === "all" || !settings.ads.target;
 }

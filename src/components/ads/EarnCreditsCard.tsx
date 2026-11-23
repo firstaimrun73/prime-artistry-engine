@@ -1,5 +1,4 @@
-import { MONETAG_MULTITAG_URL, isAdRouteAllowed } from "@/config/ads";
-import { useAdsVisible } from "@/lib/site-settings";
+import { MONETAG_MULTITAG_URL, isAdRouteAllowed, ADS_CONFIG } from "@/config/ads";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
@@ -8,11 +7,11 @@ import { Coins, ExternalLink } from "lucide-react";
 
 /** Multitags / direct-link partner card — free users only. */
 export function EarnCreditsCard({ className = "" }: { className?: string }) {
-  const adsOn = useAdsVisible("home");
   const { profile, user, loading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  if (loading || !user || !profile || !adsOn) return null;
+  if (!ADS_CONFIG.enabled) return null;
+  if (loading || !user || !profile) return null;
   const admin = isAdminEmail(profile.email);
   if (!shouldShowAds({ plan: profile.plan, email: profile.email, isAdmin: admin })) return null;
   if (!isAdRouteAllowed(pathname)) return null;

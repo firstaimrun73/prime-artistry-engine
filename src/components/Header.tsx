@@ -11,6 +11,7 @@ import { ChristmasGiftIcon } from "@/components/christmas/ChristmasGiftIcon";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
+import type { PlanId } from "@/lib/plans";
 import { Coins, ShieldCheck, Menu } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,13 +109,17 @@ export function Header() {
               >
                 <Avatar className="h-9 w-9 border border-border transition hover:opacity-90">
                   <AvatarImage src={avatarSrc} alt="" />
-                  <AvatarFallback className="bg-secondary p-0">
-                    <img src={avatarSrc} alt="" className="h-full w-full rounded-full object-cover" />
+                  <AvatarFallback className="bg-secondary p-0 overflow-hidden">
+                    {avatarSrc ? (
+                      <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-semibold">·</span>
+                    )}
                   </AvatarFallback>
                 </Avatar>
                 {isPaidPlan(profile?.plan) && (
                   <span className="absolute -right-1 -top-1 pointer-events-none">
-                    <CrownBadge />
+                    <CrownBadge plan={(profile?.plan as PlanId) ?? "free"} />
                   </span>
                 )}
               </button>
@@ -139,7 +144,6 @@ export function Header() {
             </div>
           )}
 
-          {/* Mobile hamburger: admin only. Everyone else uses bottom tabs. */}
           {user && admin ? (
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>

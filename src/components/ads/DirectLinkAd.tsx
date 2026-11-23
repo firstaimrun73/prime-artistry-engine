@@ -1,15 +1,12 @@
+import { DIRECT_LINK_URL, isAdRouteAllowed, adPlacementCategory, ADS_CONFIG } from "@/config/ads";
 import { useAdsVisible } from "@/lib/site-settings";
-import { DIRECT_LINK_URL, isAdRouteAllowed, adPlacementCategory } from "@/config/ads";
 import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
 import { ExternalLink, Sparkles } from "lucide-react";
 
-/**
- * Sponsored Direct Link card — free signed-in non-admin only.
- * Fail closed while loading. No credit grant on click.
- */
+/** Sponsored Direct Link — free signed-in non-admin only. No credit grant on click. */
 export function DirectLinkAd({
   placement = "in-content",
   className = "",
@@ -24,13 +21,15 @@ export function DirectLinkAd({
   const { profile, user, loading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  if (!ADS_CONFIG.enabled) return null;
   if (loading) return null;
   if (!user || !profile) return null;
-  if (!adsOn) return null;
 
   const admin = isAdminEmail(profile.email);
   if (!shouldShowAds({ plan: profile.plan, email: profile.email, isAdmin: admin })) return null;
   if (!isAdRouteAllowed(pathname)) return null;
+  // Prefer settings visibility; if settings still loading/fail-closed, still show for free users when compile-time ON
+  if (!adsOn && profile.plan !== "free") return null;
 
   const compact = variant === "compact";
 
@@ -48,7 +47,6 @@ export function DirectLinkAd({
         className="group relative block w-full max-w-lg overflow-hidden rounded-2xl border border-orange-500/25 bg-gradient-to-br from-card via-card to-orange-500/5 shadow-md transition hover:border-orange-500/50 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
       >
         <span className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-500/10 blur-2xl" />
-        <span className="pointer-events-none absolute -bottom-8 -left-4 h-20 w-20 rounded-full bg-violet-500/10 blur-2xl" />
         <div className={`relative flex items-center gap-3 ${compact ? "p-3.5" : "p-4 sm:p-5"}`}>
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-violet-600 text-white shadow-sm">
             <Sparkles className="h-5 w-5" />
