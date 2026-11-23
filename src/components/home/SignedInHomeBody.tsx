@@ -21,14 +21,7 @@ import { VisualDiscoveryGallery } from "@/components/home/VisualDiscoveryGallery
 import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
-import { MalutoGuideTour } from "@/components/home/MalutoGuideTour";
-import {
-  DirectLinkAd,
-  PartnerZoneAd,
-  InContentAd,
-  AdsterraBanner,
-  AdsterraResponsive,
-} from "@/components/ads";
+import { AdsterraBanner, AdsterraResponsive } from "@/components/ads";
 import { MalutoHomeHint } from "@/components/home/MalutoHomeHint";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
 
@@ -199,14 +192,6 @@ export function SignedInHomeBody() {
 
       <AutoEditHomeCard />
 
-      <DirectLinkAd
-        placement="discover-after-maluto"
-        variant="compact"
-        title="Tools worth discovering"
-        subtitle="Recommended for creators · Sponsored partner offer"
-        cta="Explore Tool"
-      />
-
       <section className="mt-6" aria-label="Try something new">
         <ImageStudioWeeklyCarousel />
       </section>
@@ -227,10 +212,6 @@ export function SignedInHomeBody() {
 
       <AdsterraBanner unit="rect300x250" placement="discover-after-gallery" className="hidden sm:flex" />
 
-      <div className="mt-8">
-        <PartnerZoneAd className="mx-auto w-full max-w-lg" />
-      </div>
-
       <section className="mt-5" aria-label="Creative tags">
         <p className="mb-2 text-xs font-medium text-muted-foreground">
           Use tags to create your photo in seconds
@@ -249,14 +230,6 @@ export function SignedInHomeBody() {
         </div>
       </section>
 
-      <DirectLinkAd
-        placement="discover-after-tags"
-        variant="compact"
-        title="Explore partner offers"
-        subtitle="Discover exclusive partner opportunities · Sponsored"
-        cta="Visit Partner"
-      />
-
       <div className="mt-10 space-y-8 md:mt-12">
         <CircleSampleGallery />
         <RemoveBgHomeCard />
@@ -264,20 +237,9 @@ export function SignedInHomeBody() {
 
       <AdsterraResponsive placement="discover-after-samples" includeRect={false} />
 
-      <DirectLinkAd
-        placement="discover-lower"
-        title="Unlock more creative possibilities"
-        subtitle="Sponsored · Explore tools from our partners"
-        cta="Discover More"
-      />
-
       <ObserveBuildProtect />
 
-      <InContentAd placement="discover-before-prompt" />
-
       <HomePromptBar />
-
-      <MalutoGuideTour />
     </main>
   );
 }

@@ -12,17 +12,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FreeCreditOffer } from "@/components/FreeCreditOffer";
-import { showOptInFreeCreditCta } from "@/config/ads";
 
 const FREE_INTRO_KEY = "motio2edit-free-intro-seen-v2";
 const OUT_OF_CREDITS_KEY = "motio2edit-out-of-credits-seen";
 const LOW_CREDITS_POPUP_KEY = "motio2edit-low-credits-popup-v1";
 
-/**
- * Free plan notices — minimal interruption.
- * Low credits: once per session, offer upgrade. Partner offer only if opt-in CTA is enabled.
- */
+/** Compact free-plan notices — rectangular, theme-aware, non-intrusive. */
 export function FreePlanNotices() {
   const { profile } = useAuth();
   const [introOpen, setIntroOpen] = useState(false);
@@ -36,9 +31,7 @@ export function FreePlanNotices() {
   useEffect(() => {
     if (!profile || !free) return;
     try {
-      if (localStorage.getItem(FREE_INTRO_KEY) !== "1") {
-        setIntroOpen(true);
-      }
+      if (localStorage.getItem(FREE_INTRO_KEY) !== "1") setIntroOpen(true);
     } catch {
       /* skip */
     }
@@ -93,79 +86,63 @@ export function FreePlanNotices() {
 
   if (!free) return null;
 
+  const shell =
+    "max-w-[min(100%,22rem)] rounded-2xl border border-border bg-card p-0 shadow-lg sm:max-w-sm";
+
   return (
     <>
       <Dialog open={introOpen && !outOpen && !lowOpen} onOpenChange={(o) => !o && dismissIntro()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Welcome to Motio2edit Free</DialogTitle>
-            <DialogDescription className="space-y-2 pt-1 text-left">
-              <span className="block">
-                You can create with free credits. The Free plan includes a Motio2edit watermark on
-                exports.
-              </span>
-              <span className="block text-muted-foreground">
-                Plans are always available from your Profile when you need more credits or clean
-                exports.
-              </span>
+        <DialogContent className={shell}>
+          <DialogHeader className="space-y-1 px-4 pt-4 text-left">
+            <DialogTitle className="text-base">Welcome to Free</DialogTitle>
+            <DialogDescription className="text-sm">
+              Create with starter credits. Free exports include a Motio2edit watermark.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button onClick={dismissIntro}>Continue free</Button>
-            <Button asChild variant="outline" onClick={dismissIntro}>
-              <Link to="/pricing">View plans</Link>
+          <DialogFooter className="flex-row gap-2 border-t border-border px-4 py-3 sm:justify-end">
+            <Button size="sm" variant="outline" onClick={dismissIntro}>
+              Continue
+            </Button>
+            <Button size="sm" asChild onClick={dismissIntro}>
+              <Link to="/pricing">Plans</Link>
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={outOpen} onOpenChange={(o) => !o && dismissOut()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>You're out of credits</DialogTitle>
-            <DialogDescription className="space-y-2 pt-1 text-left">
-              <span className="block">
-                Add credits or choose a plan to keep generating.
-              </span>
+        <DialogContent className={shell}>
+          <DialogHeader className="space-y-1 px-4 pt-4 text-left">
+            <DialogTitle className="text-base">Out of credits</DialogTitle>
+            <DialogDescription className="text-sm">
+              Choose a plan to keep generating, or explore partner offers from the header.
             </DialogDescription>
           </DialogHeader>
-          {showOptInFreeCreditCta() && (
-            <div className="py-1">
-              <FreeCreditOffer variant="button" />
-            </div>
-          )}
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={dismissOut}>
+          <DialogFooter className="flex-row gap-2 border-t border-border px-4 py-3 sm:justify-end">
+            <Button size="sm" variant="outline" onClick={dismissOut}>
               Not now
             </Button>
-            <Button asChild onClick={dismissOut}>
-              <Link to="/pricing">Upgrade plan</Link>
+            <Button size="sm" asChild onClick={dismissOut}>
+              <Link to="/pricing">Upgrade</Link>
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={lowOpen && !outOpen} onOpenChange={(o) => !o && dismissLow()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Low on credits ({credits} left)</DialogTitle>
-            <DialogDescription className="space-y-2 pt-1 text-left">
-              <span className="block">
-                Upgrade your plan for more power and clean exports.
-              </span>
+        <DialogContent className={shell}>
+          <DialogHeader className="space-y-1 px-4 pt-4 text-left">
+            <DialogTitle className="text-base">Low credits ({credits} left)</DialogTitle>
+            <DialogDescription className="text-sm">
+              Upgrade for more credits and watermark-free exports.
             </DialogDescription>
           </DialogHeader>
-          {showOptInFreeCreditCta() && (
-            <div className="py-1">
-              <FreeCreditOffer variant="button" />
-            </div>
-          )}
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={dismissLow}>
+          <DialogFooter className="flex-row gap-2 border-t border-border px-4 py-3 sm:justify-end">
+            <Button size="sm" variant="outline" onClick={dismissLow}>
               Keep creating
             </Button>
-            <Button asChild onClick={dismissLow}>
-              <Link to="/pricing">Upgrade plan</Link>
+            <Button size="sm" asChild onClick={dismissLow}>
+              <Link to="/pricing">Upgrade</Link>
             </Button>
           </DialogFooter>
         </DialogContent>
