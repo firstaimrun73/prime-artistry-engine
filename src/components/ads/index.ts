@@ -1,2 +1,12 @@
 export { DirectLinkAd } from "./DirectLinkAd";
 export { EarnCreditsCard } from "./EarnCreditsCard";
+export { FooterAd } from "./FooterAd";
+export { InContentAd } from "./InContentAd";
+export { AdContainer } from "./AdContainer";
+export { ResponsiveBanner } from "./ResponsiveBanner";
+export { SidebarAd } from "./SidebarAd";
+export { AdPolicyGate } from "./AdPolicyGate";
+export { MonetagInPagePush } from "./MonetagInPagePush";
+export { MonetagVignette } from "./MonetagVignette";
+export { AdDebugPanel } from "./AdDebugPanel";
+export { CreditSpendHint } from "./CreditSpendHint";
