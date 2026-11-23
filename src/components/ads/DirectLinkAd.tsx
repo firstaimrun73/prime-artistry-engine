@@ -1,4 +1,11 @@
-import { DIRECT_LINK_URL, isAdRouteAllowed, adPlacementCategory, ADS_CONFIG } from "@/config/ads";
+import {
+  DIRECT_LINK_URL,
+  SPONSOR_DISPLAY_NAME,
+  SPONSOR_TAGLINE,
+  isAdRouteAllowed,
+  adPlacementCategory,
+  ADS_CONFIG,
+} from "@/config/ads";
 import { useAdsVisible } from "@/lib/site-settings";
 import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
@@ -11,10 +18,13 @@ export function DirectLinkAd({
   placement = "in-content",
   className = "",
   variant = "default",
+  title,
 }: {
   placement?: string;
   className?: string;
   variant?: "default" | "compact";
+  /** Optional unique title so multiple placements are not identical. */
+  title?: string;
 }) {
   const category = adPlacementCategory(placement);
   const adsOn = useAdsVisible(category ?? undefined);
@@ -28,17 +38,17 @@ export function DirectLinkAd({
   const admin = isAdminEmail(profile.email);
   if (!shouldShowAds({ plan: profile.plan, email: profile.email, isAdmin: admin })) return null;
   if (!isAdRouteAllowed(pathname)) return null;
-  // Prefer settings visibility; if settings still loading/fail-closed, still show for free users when compile-time ON
   if (!adsOn && profile.plan !== "free") return null;
 
   const compact = variant === "compact";
+  const headline = title ?? "Partner offers available";
 
   return (
     <div
-      className={`${compact ? "my-5" : "my-7"} flex justify-center ${className}`}
+      className={`${compact ? "my-4" : "my-6"} flex justify-center ${className}`}
       data-ad-placement={placement}
       role="complementary"
-      aria-label="Sponsored"
+      aria-label="Sponsored advertisement"
     >
       <a
         href={DIRECT_LINK_URL}
@@ -53,15 +63,13 @@ export function DirectLinkAd({
           </span>
           <div className="min-w-0 flex-1">
             <span className="rounded-md bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
-              Sponsored
+              Sponsored · {SPONSOR_DISPLAY_NAME}
             </span>
-            <p className="mt-1 text-sm font-bold leading-snug text-foreground sm:text-[15px]">
-              Partner offer · claim free credits
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Tap to open · trusted partner link</p>
+            <p className="mt-1 text-sm font-bold leading-snug text-foreground sm:text-[15px]">{headline}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{SPONSOR_TAGLINE}</p>
           </div>
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm transition group-hover:bg-primary/90">
-            Open
+            Visit
             <ExternalLink className="h-3.5 w-3.5" />
           </span>
         </div>

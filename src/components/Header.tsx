@@ -1,9 +1,7 @@
-import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CrownBadge } from "@/components/CrownBadge";
 import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
@@ -12,7 +10,7 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import type { PlanId } from "@/lib/plans";
-import { Coins, ShieldCheck, Menu } from "lucide-react";
+import { Coins, ShieldCheck } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NavItem = { to: any; label: string };
@@ -30,7 +28,6 @@ const PUBLIC_LINKS: NavItem[] = [
 export function Header() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
 
@@ -42,7 +39,6 @@ export function Header() {
     ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
   ];
   const centerLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
-  const sheetLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
 
   const avatarSrc = resolveAvatarSrc(profile?.avatar_url, profile?.avatar_signed_url, {
     nameOrEmail: profile?.display_name || profile?.email,
@@ -62,6 +58,7 @@ export function Header() {
           <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
+        {/* Desktop center nav — unchanged; no mobile hamburger */}
         <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
           {centerLinks.map((l) => (
             <Link
@@ -143,49 +140,6 @@ export function Header() {
               </Button>
             </div>
           )}
-
-          {user && admin ? (
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 md:hidden">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[85vw] max-w-xs overflow-y-auto p-0">
-                <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-                  <BrandMark />
-                </div>
-                <nav className="flex flex-col p-2">
-                  <Link
-                    to="/dashboard"
-                    onClick={() => setMenuOpen(false)}
-                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
-                  >
-                    Dashboard
-                  </Link>
-                  {sheetLinks.map((l) => (
-                    <Link
-                      key={`${l.to}-${l.label}`}
-                      to={l.to}
-                      onClick={() => setMenuOpen(false)}
-                      activeProps={{ className: "bg-secondary text-foreground" }}
-                      activeOptions={l.to === "/" ? { exact: true } : undefined}
-                      className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      {l.label}
-                    </Link>
-                  ))}
-                  <Link
-                    to="/admin"
-                    onClick={() => setMenuOpen(false)}
-                    className="rounded-lg px-4 py-3 text-base font-medium text-primary"
-                  >
-                    Admin
-                  </Link>
-                </nav>
-              </SheetContent>
-            </Sheet>
-          ) : null}
         </div>
       </div>
     </header>
