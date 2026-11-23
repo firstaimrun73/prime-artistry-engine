@@ -9,9 +9,9 @@
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 export const MONETAG_MULTITAG_URL = DIRECT_LINK_URL;
 
-/** Display name for sponsor link cards (not a credit promise). */
-export const SPONSOR_DISPLAY_NAME = "Motio Partner Network" as const;
-export const SPONSOR_TAGLINE = "Sponsored \u00b7 Explore partner offers \u00b7 opens in a new tab" as const;
+/** Display label for sponsor link cards (not a verified brand claim). */
+export const SPONSOR_DISPLAY_NAME = "Partner offer" as const;
+export const SPONSOR_TAGLINE = "Sponsored · Explore partner offers · opens in a new tab" as const;
 
 export const MONETAG_VIGNETTE_ZONE = "12136694" as const;
 export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" as const;
@@ -63,7 +63,9 @@ export function adPlacementCategory(
     p.startsWith("dashboard") ||
     p.startsWith("sample") ||
     p.startsWith("earn") ||
-    p.startsWith("discover")
+    p.startsWith("discover") ||
+    p.startsWith("footer") ||
+    p.startsWith("in-content")
   ) {
     return "home";
   }

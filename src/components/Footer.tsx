@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { BrandMark, BRAND_NAME } from "@/components/BrandMark";
 import { useAuth } from "@/lib/auth";
+import { FooterAd } from "@/components/ads";
 
 const LINKS: { label: string; to: string }[] = [
   { label: "Privacy", to: "/privacy" },
@@ -50,6 +51,9 @@ export function Footer({
 
   return (
     <footer className="border-t border-border bg-background">
+      <div className="mx-auto max-w-6xl px-4 pt-6">
+        <FooterAd placement="footer-main" />
+      </div>
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between">
         <Link to="/" className="flex items-center gap-2">
           <BrandMark size="md" />

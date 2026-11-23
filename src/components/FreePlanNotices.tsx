@@ -21,7 +21,7 @@ const LOW_CREDITS_POPUP_KEY = "motio2edit-low-credits-popup-v1";
 
 /**
  * Free plan notices — minimal interruption.
- * Low credits (~10 or less): once per session, offer upgrade OR opt-in free credits partner link.
+ * Low credits: once per session, offer upgrade. Partner offer only if opt-in CTA is enabled.
  */
 export function FreePlanNotices() {
   const { profile } = useAuth();
@@ -125,7 +125,7 @@ export function FreePlanNotices() {
             <DialogTitle>You're out of credits</DialogTitle>
             <DialogDescription className="space-y-2 pt-1 text-left">
               <span className="block">
-                Add credits or choose a plan to keep generating. Or try partner offers for free credits.
+                Add credits or choose a plan to keep generating.
               </span>
             </DialogDescription>
           </DialogHeader>
@@ -151,7 +151,7 @@ export function FreePlanNotices() {
             <DialogTitle>Low on credits ({credits} left)</DialogTitle>
             <DialogDescription className="space-y-2 pt-1 text-left">
               <span className="block">
-                Upgrade your plan for more power — or claim free credits via partner offers.
+                Upgrade your plan for more power and clean exports.
               </span>
             </DialogDescription>
           </DialogHeader>

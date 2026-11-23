@@ -22,7 +22,7 @@ import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 import { MalutoGuideTour } from "@/components/home/MalutoGuideTour";
-import { DirectLinkAd, PartnerZoneAd } from "@/components/ads";
+import { DirectLinkAd, PartnerZoneAd, InContentAd } from "@/components/ads";
 import { MalutoHomeHint } from "@/components/home/MalutoHomeHint";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
 
@@ -63,14 +63,14 @@ const HOME_SLOGANS = [
     cta: "Explore Maluto AI",
   },
   {
-    title: "Circle 2edit \u00b7 Cropmix \u00b7 Remove BG \u00b7 AI+",
+    title: "Circle 2edit · Cropmix · Remove BG · AI+",
     sub: "Powerful creative tools. Simple workflows.",
     to: "/studio" as const,
     cta: "Explore AI Tools",
   },
   {
     title: "From idea to download in seconds",
-    sub: "Standard \u00b7 Premium \u00b7 Ultra AI modes",
+    sub: "Standard · Premium · Ultra AI modes",
     to: "/editor" as const,
     cta: "Open Image Studio",
   },
@@ -197,13 +197,15 @@ export function SignedInHomeBody() {
         placement="discover-after-maluto"
         variant="compact"
         title="Tools worth discovering"
-        subtitle="Recommended for creators \u00b7 Sponsored partner offer"
+        subtitle="Recommended for creators · Sponsored partner offer"
         cta="Explore Tool"
       />
 
       <section className="mt-6" aria-label="Try something new">
         <ImageStudioWeeklyCarousel />
       </section>
+
+      <InContentAd placement="discover-after-carousel" />
 
       <div className="mt-8 md:mt-10">
         <div className="mb-3 flex items-end justify-between gap-2">
@@ -243,7 +245,7 @@ export function SignedInHomeBody() {
         placement="discover-after-tags"
         variant="compact"
         title="Explore partner offers"
-        subtitle="Discover exclusive partner opportunities \u00b7 Sponsored"
+        subtitle="Discover exclusive partner opportunities · Sponsored"
         cta="Visit Partner"
       />
 
@@ -255,11 +257,13 @@ export function SignedInHomeBody() {
       <DirectLinkAd
         placement="discover-lower"
         title="Unlock more creative possibilities"
-        subtitle="Sponsored \u00b7 Explore tools from our partners"
+        subtitle="Sponsored · Explore tools from our partners"
         cta="Discover More"
       />
 
       <ObserveBuildProtect />
+
+      <InContentAd placement="discover-before-prompt" />
 
       <HomePromptBar />
 
