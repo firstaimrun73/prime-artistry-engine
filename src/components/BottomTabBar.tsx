@@ -1,18 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutGrid, User, Crown, Plus, Home } from "lucide-react";
+import { LayoutGrid, User, Crown, Plus, Compass } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { bottomNavOrder, type NavTabId } from "@/lib/nav-priority";
-
 import { hideBottomNav } from "@/components/hideBottomNav";
 export { hideBottomNav };
 
-/**
- * Mobile bottom nav — country-aware order + iPhone glassy floating capsule.
- * Studio-first markets: Studio → Pricing → Home → Maluto → Profile
- */
+/** Studio → Pricing → Discover → Maluto → Profile. iOS glassy capsule. */
 export function BottomTabBar() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -45,10 +41,7 @@ export function BottomTabBar() {
     }
     const vv = window.visualViewport;
     if (!vv) return;
-    const check = () => {
-      const keyboardOpen = vv.height < window.innerHeight * 0.75;
-      setHiddenByKeyboard(keyboardOpen);
-    };
+    const check = () => setHiddenByKeyboard(vv.height < window.innerHeight * 0.75);
     check();
     vv.addEventListener("resize", check);
     vv.addEventListener("scroll", check);
@@ -59,18 +52,14 @@ export function BottomTabBar() {
   }, [pathname]);
 
   useEffect(() => {
-    const onStudio = pathname === "/studio";
-    if (!onStudio) {
+    if (pathname !== "/studio") {
       setHiddenByComposer(false);
       return;
     }
     const observer = new MutationObserver(() => {
       setHiddenByComposer(document.documentElement.classList.contains("studio-composer-focus"));
     });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     setHiddenByComposer(document.documentElement.classList.contains("studio-composer-focus"));
     return () => observer.disconnect();
   }, [pathname]);
@@ -78,11 +67,11 @@ export function BottomTabBar() {
   const catalog = useMemo(
     () =>
       ({
-        home: {
+        discover: {
           to: "/" as const,
-          label: t("nav.home") || "Home",
-          icon: Home,
-          active: pathname === "/",
+          label: "Discover",
+          icon: Compass,
+          active: pathname === "/" || pathname.startsWith("/discover"),
         },
         studio: {
           to: "/studio" as const,
@@ -115,7 +104,12 @@ export function BottomTabBar() {
         },
       }) satisfies Record<
         NavTabId,
-        { to: "/" | "/studio" | "/studio/image/auto-edit" | "/pricing" | "/profile"; label: string; icon: typeof Home; active: boolean }
+        {
+          to: "/" | "/studio" | "/studio/image/auto-edit" | "/pricing" | "/profile";
+          label: string;
+          icon: typeof Compass;
+          active: boolean;
+        }
       >,
     [pathname, t],
   );
