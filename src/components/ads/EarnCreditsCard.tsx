@@ -1,43 +1,43 @@
-import { MONETAG_MULTITAG_URL, isAdRouteAllowed, ADS_CONFIG } from "@/config/ads";
-import { useAuth } from "@/lib/auth";
-import { isAdminEmail } from "@/lib/admin-config";
-import { shouldShowAds } from "@/lib/policy";
+import { ExternalLink, Sparkles } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
-import { Coins, ExternalLink } from "lucide-react";
+import { MONETAG_MULTITAG_URL, SPONSOR_DISPLAY_NAME, isAdRouteAllowed } from "@/config/ads";
 
-/** Multitags / direct-link partner card — free users only. */
+/**
+ * Compact partner recommendation — never promises automatic free credits.
+ */
 export function EarnCreditsCard({ className = "" }: { className?: string }) {
-  const { profile, user, loading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  if (!ADS_CONFIG.enabled) return null;
-  if (loading || !user || !profile) return null;
-  const admin = isAdminEmail(profile.email);
-  if (!shouldShowAds({ plan: profile.plan, email: profile.email, isAdmin: admin })) return null;
   if (!isAdRouteAllowed(pathname)) return null;
 
   return (
     <div
       className={`my-5 flex justify-center ${className}`}
-      data-ad-placement="earn-credits"
+      data-ad-placement="partner-recommend"
       role="complementary"
-      aria-label="Partner offer"
+      aria-label="Sponsored partner recommendation"
     >
       <a
         href={MONETAG_MULTITAG_URL}
         target="_blank"
         rel="sponsored noopener noreferrer"
-        className="group flex w-full max-w-lg items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3.5 shadow-sm transition hover:border-primary/50 hover:bg-primary/10"
+        className="group flex w-full max-w-lg items-center gap-3 rounded-2xl border border-primary/25 bg-gradient-to-r from-primary/5 via-card to-card px-4 py-3.5 shadow-sm transition hover:border-primary/45 hover:from-primary/10"
       >
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-          <Coins className="h-5 w-5" />
+          <Sparkles className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1 text-left">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-primary">Partner · Sponsored</p>
-          <p className="text-sm font-bold text-foreground">Get free credits via partners</p>
-          <p className="text-xs text-muted-foreground">Optional · opens partner site · not automatic credits</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-primary">
+            Sponsored · {SPONSOR_DISPLAY_NAME}
+          </p>
+          <p className="text-sm font-bold text-foreground">Discover something useful</p>
+          <p className="text-xs text-muted-foreground">
+            Explore partner offers · opens in a new tab
+          </p>
         </div>
-        <ExternalLink className="h-4 w-4 shrink-0 text-primary" />
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+          Explore Offer
+          <ExternalLink className="h-3.5 w-3.5" />
+        </span>
       </a>
     </div>
   );
