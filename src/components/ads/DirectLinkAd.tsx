@@ -19,12 +19,15 @@ export function DirectLinkAd({
   className = "",
   variant = "default",
   title,
+  subtitle,
+  cta,
 }: {
   placement?: string;
   className?: string;
   variant?: "default" | "compact";
-  /** Optional unique title so multiple placements are not identical. */
   title?: string;
+  subtitle?: string;
+  cta?: string;
 }) {
   const category = adPlacementCategory(placement);
   const adsOn = useAdsVisible(category ?? undefined);
@@ -41,7 +44,9 @@ export function DirectLinkAd({
   if (!adsOn && profile.plan !== "free") return null;
 
   const compact = variant === "compact";
-  const headline = title ?? "Partner offers available";
+  const headline = title ?? "Discover something useful";
+  const sub = subtitle ?? SPONSOR_TAGLINE;
+  const action = cta ?? "Explore Offer";
 
   return (
     <div
@@ -63,13 +68,13 @@ export function DirectLinkAd({
           </span>
           <div className="min-w-0 flex-1">
             <span className="rounded-md bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
-              Sponsored · {SPONSOR_DISPLAY_NAME}
+              Sponsored \u00b7 {SPONSOR_DISPLAY_NAME}
             </span>
             <p className="mt-1 text-sm font-bold leading-snug text-foreground sm:text-[15px]">{headline}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{SPONSOR_TAGLINE}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
           </div>
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm transition group-hover:bg-primary/90">
-            Visit
+            {action}
             <ExternalLink className="h-3.5 w-3.5" />
           </span>
         </div>

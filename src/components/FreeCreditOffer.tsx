@@ -1,18 +1,18 @@
 /**
- * Opt-in "Get free credits" CTA — opens Monetag / direct-link in a new tab.
- * Does NOT grant app credits. Credits only via server (purchase, Christmas RPC, signed callbacks).
+ * Partner exploration CTA — opens approved partner link in a new tab.
+ * Does NOT grant Motio2edit credits. Credits only via server (purchase, signed callbacks).
  */
-import { Gift, ExternalLink } from "lucide-react";
-import { DIRECT_LINK_URL } from "@/config/ads";
+import { ExternalLink, Sparkles } from "lucide-react";
+import { DIRECT_LINK_URL, SPONSOR_DISPLAY_NAME } from "@/config/ads";
 import { cn } from "@/lib/utils";
 
 type Variant = "card" | "inline" | "button";
 
 const COPY = {
-  title: "Claim free credits",
-  subtitle: "Visit partner offers · complete simple tasks · unlock extra credits",
-  cta: "Get free credits",
-  note: "Opens partner site. App credits are added only after partner confirmation — not automatic.",
+  title: "Explore partner offers",
+  subtitle: "Discover tools and opportunities from our partners",
+  cta: "Explore Offer",
+  note: "Sponsored \u00b7 Opens partner site in a new tab \u00b7 Does not add credits automatically",
 } as const;
 
 export function FreeCreditOffer({
@@ -33,13 +33,12 @@ export function FreeCreditOffer({
         target="_blank"
         rel="noopener noreferrer sponsored"
         className={cn(
-          "inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400",
+          "inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
           className,
         )}
       >
-        <Gift className="h-4 w-4" aria-hidden />
+        <Sparkles className="h-4 w-4" aria-hidden />
         {COPY.cta}
-        <ExternalLink className="h-3.5 w-3.5 opacity-80" aria-hidden />
       </a>
     );
   }
@@ -51,44 +50,39 @@ export function FreeCreditOffer({
         target="_blank"
         rel="noopener noreferrer sponsored"
         className={cn(
-          "inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 underline-offset-2 hover:underline dark:text-emerald-400",
+          "inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline",
           className,
         )}
       >
-        <Gift className="h-3.5 w-3.5" aria-hidden />
-        {COPY.cta}
+        {COPY.title}
+        <ExternalLink className="h-3.5 w-3.5" aria-hidden />
       </a>
     );
   }
 
   return (
-    <div
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer sponsored"
       className={cn(
-        "rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 via-background to-violet-500/10 p-4 shadow-sm",
+        "group flex w-full items-center gap-3 rounded-2xl border border-border bg-card/80 px-4 py-3.5 shadow-sm transition hover:border-primary/40 hover:bg-card",
         className,
       )}
     >
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-          <Gift className="h-5 w-5" aria-hidden />
-        </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div>
-            <p className="font-semibold tracking-tight">{COPY.title}</p>
-            <p className="text-sm text-muted-foreground">{COPY.subtitle}</p>
-          </div>
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
-          >
-            {COPY.cta}
-            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-          </a>
-          <p className="text-[11px] leading-snug text-muted-foreground">{COPY.note}</p>
-        </div>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+        <Sparkles className="h-5 w-5" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1 text-left">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+          Sponsored \u00b7 {SPONSOR_DISPLAY_NAME}
+        </p>
+        <p className="text-sm font-bold text-foreground">{COPY.title}</p>
+        <p className="text-xs text-muted-foreground">{COPY.note}</p>
       </div>
-    </div>
+      <span className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+        {COPY.cta}
+      </span>
+    </a>
   );
 }
