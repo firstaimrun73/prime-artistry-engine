@@ -1,17 +1,17 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, User, Crown, Plus, Home } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { bottomNavOrder, type NavTabId } from "@/lib/nav-priority";
 
 import { hideBottomNav } from "@/components/hideBottomNav";
 export { hideBottomNav };
 
 /**
- * Mobile bottom nav — Home restored + Studio | Maluto AI | Pricing | Profile
- * iPhone: floating capsule with strong left/right curves + safe-area.
- * On /studio: hide when keyboard opens or composer is focused.
+ * Mobile bottom nav — country-aware order + iPhone glassy floating capsule.
+ * Studio-first markets: Studio → Pricing → Home → Maluto → Profile
  */
 export function BottomTabBar() {
   const { user } = useAuth();
@@ -45,7 +45,6 @@ export function BottomTabBar() {
     }
     const vv = window.visualViewport;
     if (!vv) return;
-
     const check = () => {
       const keyboardOpen = vv.height < window.innerHeight * 0.75;
       setHiddenByKeyboard(keyboardOpen);
@@ -76,42 +75,56 @@ export function BottomTabBar() {
     return () => observer.disconnect();
   }, [pathname]);
 
+  const catalog = useMemo(
+    () =>
+      ({
+        home: {
+          to: "/" as const,
+          label: t("nav.home") || "Home",
+          icon: Home,
+          active: pathname === "/",
+        },
+        studio: {
+          to: "/studio" as const,
+          label: "Studio",
+          icon: LayoutGrid,
+          active:
+            pathname === "/studio" ||
+            (pathname.startsWith("/studio/") && !pathname.startsWith("/studio/image/auto-edit")),
+        },
+        maluto: {
+          to: "/studio/image/auto-edit" as const,
+          label: "Maluto AI",
+          icon: Plus,
+          active: pathname.startsWith("/studio/image/auto-edit"),
+        },
+        pricing: {
+          to: "/pricing" as const,
+          label: t("nav.pricing") || "Pricing",
+          icon: Crown,
+          active: pathname.startsWith("/pricing") || pathname.startsWith("/checkout"),
+        },
+        profile: {
+          to: "/profile" as const,
+          label: t("nav.profile") || "Profile",
+          icon: User,
+          active:
+            pathname.startsWith("/profile") ||
+            pathname.startsWith("/settings") ||
+            pathname.startsWith("/dashboard"),
+        },
+      }) satisfies Record<
+        NavTabId,
+        { to: "/" | "/studio" | "/studio/image/auto-edit" | "/pricing" | "/profile"; label: string; icon: typeof Home; active: boolean }
+      >,
+    [pathname, t],
+  );
+
+  const items = useMemo(() => bottomNavOrder().map((id) => catalog[id]), [catalog]);
+
   if (!user) return null;
 
   const shouldHide = hideBottomNav(pathname) || hiddenByScroll || hiddenByKeyboard || hiddenByComposer;
-
-  const items = [
-    {
-      to: "/" as const,
-      label: t("nav.home") || "Home",
-      icon: Home,
-      active: pathname === "/",
-    },
-    {
-      to: "/studio" as const,
-      label: "Studio",
-      icon: LayoutGrid,
-      active: pathname === "/studio" || (pathname.startsWith("/studio/") && !pathname.startsWith("/studio/image/auto-edit")),
-    },
-    {
-      to: "/studio/image/auto-edit" as const,
-      label: "Maluto AI",
-      icon: Plus,
-      active: pathname.startsWith("/studio/image/auto-edit"),
-    },
-    {
-      to: "/pricing" as const,
-      label: t("nav.pricing") || "Pricing",
-      icon: Crown,
-      active: pathname.startsWith("/pricing") || pathname.startsWith("/checkout"),
-    },
-    {
-      to: "/profile" as const,
-      label: t("nav.profile") || "Profile",
-      icon: User,
-      active: pathname.startsWith("/profile") || pathname.startsWith("/settings") || pathname.startsWith("/dashboard"),
-    },
-  ];
 
   const isIOS =
     typeof navigator !== "undefined" &&
@@ -127,11 +140,11 @@ export function BottomTabBar() {
         isIOS
           ? [
               "left-3 right-3",
-              "bottom-[max(0.6rem,env(safe-area-inset-bottom))]",
-              "rounded-[1.75rem]",
-              "border border-white/20 dark:border-white/10",
-              "bg-background/75 dark:bg-background/70",
-              "shadow-[0_10px_40px_rgba(0,0,0,0.22),0_2px_8px_rgba(0,0,0,0.08)]",
+              "bottom-[max(0.65rem,env(safe-area-inset-bottom))]",
+              "rounded-[2rem]",
+              "border border-white/25 dark:border-white/12",
+              "bg-background/70 dark:bg-background/55",
+              "shadow-[0_12px_40px_rgba(0,0,0,0.28),0_2px_10px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.35)]",
               "backdrop-blur-2xl backdrop-saturate-150",
               "ring-1 ring-black/5 dark:ring-white/10",
             ].join(" ")
@@ -142,12 +155,12 @@ export function BottomTabBar() {
     >
       <ul
         className={cn(
-          "mx-auto grid h-[3.6rem] max-w-lg grid-cols-5 items-center",
+          "mx-auto grid h-[3.7rem] max-w-lg grid-cols-5 items-center",
           isIOS ? "px-2.5 gap-0.5" : "px-1",
         )}
       >
         {items.map(({ to, label, icon: Icon, active }) => (
-          <li key={to} className="flex justify-center">
+          <li key={to + label} className="flex justify-center">
             <Link
               to={to}
               className={cn(
@@ -157,7 +170,7 @@ export function BottomTabBar() {
             >
               {isIOS && active && (
                 <span
-                  className="absolute inset-x-1 top-0.5 bottom-0.5 -z-10 rounded-2xl bg-primary/12"
+                  className="absolute inset-x-1 top-0.5 bottom-0.5 -z-10 rounded-2xl bg-primary/14 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]"
                   aria-hidden
                 />
               )}
