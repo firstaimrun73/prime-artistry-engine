@@ -10,13 +10,14 @@ import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
+import { WinterGiftCard } from "@/components/campaign/WinterGiftCard";
+import { isSeasonalGiftActive } from "@/lib/campaign-config";
 
-import { Coins, ShieldCheck, Menu } from "lucide-react";
+import { Coins, ShieldCheck, Menu, Gift } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NavItem = { to: any; label: string };
 
-/** Lean public nav — About / Security remain in the footer. */
 const PUBLIC_LINKS: NavItem[] = [
   { to: "/", label: "Home" },
   { to: "/features", label: "Features" },
@@ -32,12 +33,8 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
+  const giftActive = isSeasonalGiftActive();
 
-  /**
-   * Signed-in top nav — single primary system.
-   * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
-   * Chat page removed from product navigation.
-   */
   const authLinks: NavItem[] = [
     { to: "/", label: "Home" },
     { to: "/studio", label: "AI Studio" },
@@ -89,6 +86,18 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          {giftActive ? (
+            <Link
+              to="/pricing"
+              className="inline-flex items-center gap-1 rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-[11px] font-semibold text-orange-700 hover:bg-orange-500/20 dark:text-orange-300 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+              aria-label="Winter Gift — free 25 credits"
+              title="Winter Gift"
+            >
+              <Gift className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Winter Gift</span>
+            </Link>
+          ) : null}
+
           {user ? <GoogleLanguageSelect /> : null}
 
           {user ? (
@@ -101,7 +110,6 @@ export function Header() {
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
-              {/* Avatar = Dashboard shortcut (not a separate Dashboard nav item) */}
               <button
                 type="button"
                 onClick={() => navigate({ to: "/dashboard" })}
@@ -153,6 +161,11 @@ export function Header() {
                 <div className="flex items-center gap-2 border-b border-border px-5 py-4">
                   <BrandMark />
                 </div>
+                {giftActive ? (
+                  <div className="border-b border-border px-4 py-3">
+                    <WinterGiftCard variant="compact" />
+                  </div>
+                ) : null}
                 <nav className="flex flex-col p-2">
                   <Link
                     to="/dashboard"

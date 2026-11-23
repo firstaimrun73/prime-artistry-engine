@@ -18,6 +18,8 @@ import { TrustSection } from "@/components/TrustSection";
 import { FinalCTA } from "@/components/home/FinalCTA";
 import { SignedInHomeBody } from "@/components/home/SignedInHomeBody";
 import { pageHead, SITE_BRAND_DESCRIPTION, SITE_NAME } from "@/lib/seo";
+import { WinterGiftCard } from "@/components/campaign/WinterGiftCard";
+import { DirectLinkAd } from "@/components/ads/DirectLinkAd";
 
 export const Route = createFileRoute("/")({
   head: () =>
@@ -48,22 +50,24 @@ function SignedInHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+      <div className="mx-auto w-full max-w-6xl space-y-4 px-4 pt-4">
+        <WinterGiftCard variant="hero" />
+        <DirectLinkAd placement="home-signed-in" />
+      </div>
       <SignedInHomeBody />
       <Footer />
     </div>
   );
 }
 
-/**
- * Signed-out homepage — PUBLIC MARKETING ONLY.
- * Single official demo lives in HomeHero (no duplicate WatchDemoSection).
- * No FooterAd on the public homepage.
- */
 function SignedOutHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <HomeHero />
+      <div className="mx-auto w-full max-w-6xl px-4 py-4">
+        <WinterGiftCard variant="hero" />
+      </div>
       <PreLoginSampleStrip />
       <BeforeAfterShowcase />
       <PrivacyPhilosophySection />
