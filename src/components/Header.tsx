@@ -5,7 +5,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
 import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
-import { MonthlySpinEntry } from "@/components/monthly-spin/MonthlySpinEntry";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
@@ -82,9 +81,6 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          <MonthlySpinEntry variant="icon" className="sm:hidden" />
-          <MonthlySpinEntry variant="pill" className="hidden sm:inline-flex" />
-
           {user ? <GoogleLanguageSelect /> : null}
 
           {user ? (
@@ -110,7 +106,7 @@ export function Header() {
                     {avatarSrc ? (
                       <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-xs font-semibold">·</span>
+                      <span className="text-xs font-semibold">\u00b7</span>
                     )}
                   </AvatarFallback>
                 </Avatar>
