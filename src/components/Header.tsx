@@ -7,19 +7,20 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CrownBadge } from "@/components/CrownBadge";
 import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
+import { ChristmasGiftIcon } from "@/components/christmas/ChristmasGiftIcon";
 import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
-
+import type { PlanId } from "@/lib/plans";
 import { Coins, ShieldCheck, Menu } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NavItem = { to: any; label: string };
 
-/** Lean public nav — About / Security remain in the footer. */
 const PUBLIC_LINKS: NavItem[] = [
-  { to: "/", label: "Home" },
+  { to: "/", label: "Discover" },
   { to: "/features", label: "Features" },
+  { to: "/studio", label: "Studio" },
   { to: "/studio/image/auto-edit", label: "Maluto AI" },
   { to: "/pricing", label: "Pricing" },
   { to: "/faq", label: "FAQ" },
@@ -33,17 +34,12 @@ export function Header() {
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
 
-  /**
-   * Signed-in top nav — single primary system.
-   * No Plans (Pricing only). No Dashboard button — avatar opens Dashboard.
-   * Chat page removed from product navigation.
-   */
   const authLinks: NavItem[] = [
-    { to: "/", label: "Home" },
-    { to: "/studio", label: "AI Studio" },
+    { to: "/studio", label: "Studio" },
+    { to: "/pricing", label: "Pricing" },
+    { to: "/", label: "Discover" },
     { to: "/studio/image/auto-edit", label: "Maluto AI" },
     ...(paid ? [{ to: "/history" as const, label: "History" }] : []),
-    { to: "/pricing", label: "Pricing" },
   ];
   const centerLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
   const sheetLinks: NavItem[] = user ? authLinks : PUBLIC_LINKS;
@@ -89,6 +85,9 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <ChristmasGiftIcon variant="icon" className="sm:hidden" />
+          <ChristmasGiftIcon variant="pill" className="hidden sm:inline-flex" />
+
           {user ? <GoogleLanguageSelect /> : null}
 
           {user ? (
@@ -101,7 +100,6 @@ export function Header() {
                 <Coins className="h-3.5 w-3.5 text-amber-500" />
                 {(profile?.credits ?? 0).toLocaleString()}
               </button>
-              {/* Avatar = Dashboard shortcut (not a separate Dashboard nav item) */}
               <button
                 type="button"
                 onClick={() => navigate({ to: "/dashboard" })}
@@ -111,13 +109,17 @@ export function Header() {
               >
                 <Avatar className="h-9 w-9 border border-border transition hover:opacity-90">
                   <AvatarImage src={avatarSrc} alt="" />
-                  <AvatarFallback>
-                    {(profile?.display_name || profile?.email || "U").slice(0, 1).toUpperCase()}
+                  <AvatarFallback className="bg-secondary p-0 overflow-hidden">
+                    {avatarSrc ? (
+                      <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-semibold">·</span>
+                    )}
                   </AvatarFallback>
                 </Avatar>
                 {isPaidPlan(profile?.plan) && (
                   <span className="absolute -right-1 -top-1 pointer-events-none">
-                    <CrownBadge />
+                    <CrownBadge plan={(profile?.plan as PlanId) ?? "free"} />
                   </span>
                 )}
               </button>
@@ -142,7 +144,7 @@ export function Header() {
             </div>
           )}
 
-          {user ? (
+          {user && admin ? (
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" aria-label="Open menu" className="h-9 w-9 shrink-0 md:hidden">
@@ -174,28 +176,12 @@ export function Header() {
                     </Link>
                   ))}
                   <Link
-                    to="/profile"
+                    to="/admin"
                     onClick={() => setMenuOpen(false)}
-                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    className="rounded-lg px-4 py-3 text-base font-medium text-primary"
                   >
-                    Profile
+                    Admin
                   </Link>
-                  <Link
-                    to="/settings"
-                    onClick={() => setMenuOpen(false)}
-                    className="rounded-lg px-4 py-3 text-base font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
-                  >
-                    Settings
-                  </Link>
-                  {admin ? (
-                    <Link
-                      to="/admin"
-                      onClick={() => setMenuOpen(false)}
-                      className="rounded-lg px-4 py-3 text-base font-medium text-primary"
-                    >
-                      Admin
-                    </Link>
-                  ) : null}
                 </nav>
               </SheetContent>
             </Sheet>

@@ -4,10 +4,8 @@ import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { useI18n } from "@/lib/i18n";
+import { DirectLinkAd, EarnCreditsCard } from "@/components/ads";
 
-/**
- * Signed-in home: quick start + studios + capability discovery (grouped).
- */
 export function SignedInStudioCards() {
   const { profile } = useAuth();
   const { t } = useI18n();
@@ -117,6 +115,8 @@ export function SignedInStudioCards() {
         </div>
       </section>
 
+      <EarnCreditsCard />
+
       <section className="grid gap-4 md:grid-cols-3">
         {studios.map((s) => {
           const Icon = s.icon;
@@ -173,6 +173,8 @@ export function SignedInStudioCards() {
         })}
       </section>
 
+      <DirectLinkAd placement="studio-mid" />
+
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {t("home.popularTools")}
@@ -208,6 +210,8 @@ export function SignedInStudioCards() {
           ))}
         </div>
       </section>
+
+      <DirectLinkAd placement="studio-bottom" variant="compact" />
     </div>
   );
 }
