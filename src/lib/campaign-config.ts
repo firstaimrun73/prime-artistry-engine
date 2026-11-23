@@ -1,67 +1,52 @@
 /**
- * Seasonal / promotional campaign configuration.
- * Copy and windows live here so UI components do not hard-code seasonal text.
- * Server claim logic remains authoritative for credits.
+ * Public campaign copy and windows.
+ * Christmas gift claim UI is retired (isChristmasGiftActive always false).
  */
 
-export type CampaignId = "christmas-gift-2026" | "default-explore";
+export type CampaignId = "christmas-gift-2026" | "explore-default";
 
 export type CampaignConfig = {
   id: CampaignId;
-  /** Inclusive start (UTC ms) */
-  startUtcMs: number;
-  /** Exclusive end (UTC ms) */
-  endUtcMs: number;
-  rewardCredits: number;
-  sessionSeconds: number;
   title: string;
   shortTitle: string;
-  headline: string;
-  body: string;
+  description: string;
+  badge?: string;
   ctaStart: string;
   ctaClaim: string;
-  emoji: string;
+  creditsLabel?: string;
 };
 
-/** Christmas window: 20 Nov 2026 – 6 Jan 2027 (local display; eligibility is server-side). */
-export const CHRISTMAS_GIFT_2026: CampaignConfig = {
+/** Christmas window retained for historical reference only — not activated. */
+export const CHRISTMAS_GIFT_START_MS = Date.UTC(2026, 10, 20, 0, 0, 0);
+export const CHRISTMAS_GIFT_END_MS = Date.UTC(2027, 0, 6, 23, 59, 59);
+
+const CHRISTMAS_GIFT_2026: CampaignConfig = {
   id: "christmas-gift-2026",
-  startUtcMs: Date.UTC(2026, 10, 20),
-  endUtcMs: Date.UTC(2027, 0, 7),
-  rewardCredits: 25,
-  sessionSeconds: 600,
-  title: "Get Your Christmas Gift",
-  shortTitle: "Christmas Gift",
-  headline: "Stay, Explore & Get Free Credits!",
-  body: "Explore Motio2edit for 10 minutes, then claim 25 credits — enough for one Standard image generation.",
-  ctaStart: "Start Christmas Gift Campaign",
-  ctaClaim: "Claim 25 Free Credits",
-  emoji: "🎄",
+  title: "Explore Motio2edit",
+  shortTitle: "Explore",
+  description: "Create with AI tools. Credits come from your plan — not from ads.",
+  badge: undefined,
+  ctaStart: "Open Studio",
+  ctaClaim: "View pricing",
+  creditsLabel: undefined,
 };
 
-/** Fallback after Christmas window ends — still points users to explore + pricing. */
+/** Default explore campaign — no free-credit claim. */
 export const DEFAULT_EXPLORE_CAMPAIGN: CampaignConfig = {
-  id: "default-explore",
-  startUtcMs: 0,
-  endUtcMs: Number.MAX_SAFE_INTEGER,
-  rewardCredits: 0,
-  sessionSeconds: 0,
-  title: "Free credits & plans",
-  shortTitle: "Credits",
-  headline: "Need more credits?",
-  body: "Upgrade for monthly credits, or check Pricing for current offers. Free plan includes starter credits on signup.",
-  ctaStart: "View pricing",
+  id: "explore-default",
+  title: "Create with Motio2edit",
+  shortTitle: "Create",
+  description: "Image, video, and music tools in one studio.",
+  ctaStart: "Open Studio",
   ctaClaim: "View pricing",
-  emoji: "✨",
 };
 
 export function getActiveCampaignConfig(nowMs: number = Date.now()): CampaignConfig {
-  if (nowMs >= CHRISTMAS_GIFT_2026.startUtcMs && nowMs < CHRISTMAS_GIFT_2026.endUtcMs) {
-    return CHRISTMAS_GIFT_2026;
-  }
+  void nowMs;
   return DEFAULT_EXPLORE_CAMPAIGN;
 }
 
-export function isChristmasGiftActive(nowMs: number = Date.now()): boolean {
-  return getActiveCampaignConfig(nowMs).id === "christmas-gift-2026";
+export function isChristmasGiftActive(_nowMs: number = Date.now()): boolean {
+  // Campaign retired — no free-credit claim UI or messaging.
+  return false;
 }

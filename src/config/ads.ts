@@ -11,7 +11,7 @@ export const MONETAG_MULTITAG_URL = DIRECT_LINK_URL;
 
 /** Display name for sponsor link cards (not a credit promise). */
 export const SPONSOR_DISPLAY_NAME = "Motio Partner Network" as const;
-export const SPONSOR_TAGLINE = "Explore partner offers · opens in a new tab" as const;
+export const SPONSOR_TAGLINE = "Sponsored \u00b7 Explore partner offers \u00b7 opens in a new tab" as const;
 
 export const MONETAG_VIGNETTE_ZONE = "12136694" as const;
 export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" as const;
@@ -26,7 +26,7 @@ export const ADS_CONFIG = {
   enabled: true,
   vignetteEnabled: false,
   pagePushEnabled: false,
-  optInFreeCreditCta: true,
+  optInFreeCreditCta: false,
   partnerZoneEnabled: true,
   excludedRoutes: [
     "/editor",
