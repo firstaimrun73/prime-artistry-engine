@@ -112,10 +112,7 @@ const BOOT_GUARD_SCRIPT = `
     });
     try { localStorage.removeItem('motio2edit-gt-lang'); } catch(e) {}
 
-    /* EMERGENCY: strip known ad scripts on boot */
-    try {
-      document.querySelectorAll('script[src*="n6wxm.com"],script[src*="nap5k.com"],script[src*="monetag"],#motio-monetag-vignette,#motio-monetag-ipp').forEach(function(el){ el.remove(); });
-    } catch (e) {}
+    /* Do not strip Monetag / Adsterra / partner zone — ads are intentional */
 
     var href = ${JSON.stringify(appCss)};
     function cssLoaded(){
@@ -253,7 +250,7 @@ function RootComponent() {
       <ThemeProvider>
         <AuthProvider>
           <PageViewTracker />
-          {/* Ads OFF — only cleanup gate remains */}
+          {/* Policy gate only strips unwanted AdSense — Monetag + Adsterra stay */}
           <AdPolicyGate />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />

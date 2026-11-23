@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CrownBadge } from "@/components/CrownBadge";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import { ArrowRight, LayoutGrid, Image as ImageIcon, History } from "lucide-react";
+import { AdsterraBanner, DirectLinkAd } from "@/components/ads";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -160,7 +161,17 @@ export function Dashboard() {
         </div>
       </section>
 
+      <AdsterraBanner unit="rect300x250" placement="dashboard-mid" />
+
       <RecentProjects gens={gens} loading={loading} historyUnlocked={historyUnlocked} />
+
+      <DirectLinkAd
+        placement="dashboard-lower"
+        variant="compact"
+        title="Partner tools for creators"
+        subtitle="Sponsored · Opens in a new tab"
+        cta="Explore"
+      />
     </div>
   );
 }
