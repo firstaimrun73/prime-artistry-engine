@@ -22,7 +22,7 @@ import { ObserveBuildProtect } from "@/components/home/ObserveBuildProtect";
 import { HomePromptBar } from "@/components/home/HomePromptBar";
 import { AutoEditHomeCard } from "@/components/home/AutoEditHomeCard";
 import { MalutoGuideTour } from "@/components/home/MalutoGuideTour";
-import { DirectLinkAd } from "@/components/ads";
+import { DirectLinkAd, ResponsiveBanner, InContentAd } from "@/components/ads";
 import { MalutoHomeHint } from "@/components/home/MalutoHomeHint";
 import { ImageStudioWeeklyCarousel } from "@/components/editor/image/ImageStudioWeeklyCarousel";
 
@@ -76,7 +76,6 @@ const HOME_SLOGANS = [
   },
 ] as const;
 
-/** Horizontal AI tools — Maluto AI intentionally omitted (dedicated Restore card + bottom tab). */
 const AI_TOOLS = [
   { to: "/editor" as const, label: "Image", icon: ImageIcon },
   { to: "/studio/image/circle-remove" as const, label: "Circle", icon: Circle },
@@ -150,6 +149,9 @@ export function SignedInHomeBody() {
           })}
         </div>
       </section>
+
+      {/* Adsterra responsive banner under studio tools */}
+      <ResponsiveBanner placement="home-tools" className="mb-2" />
 
       <section className="mt-1" aria-label="Promo">
         <Link
@@ -235,11 +237,13 @@ export function SignedInHomeBody() {
         <RemoveBgHomeCard />
       </div>
 
-      <DirectLinkAd placement="home-mid" />
+      <InContentAd placement="home-mid" />
 
       <ObserveBuildProtect />
 
       <HomePromptBar />
+
+      <ResponsiveBanner placement="home-lower" className="mt-6" />
 
       <MalutoGuideTour />
     </main>
