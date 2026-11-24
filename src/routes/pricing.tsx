@@ -4,8 +4,6 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { CrownBadge } from "@/components/CrownBadge";
-import { RewardedAdsSection } from "@/components/pricing/RewardedAdsSection";
-import { PrizePromotionSection } from "@/components/pricing/PrizePromotionSection";
 import { useAuth } from "@/lib/auth";
 import {
   PLANS,
@@ -280,9 +278,6 @@ function PricingPage() {
             );
           })}
         </div>
-
-        <RewardedAdsSection />
-        <PrizePromotionSection />
 
         <div className="mx-auto mt-6 max-w-2xl space-y-2 rounded-2xl border border-border bg-muted/30 px-3 py-3 text-sm sm:mt-10 sm:space-y-3 sm:px-6 sm:py-4">
           <p className="font-semibold text-foreground">Good to know</p>
