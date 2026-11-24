@@ -85,7 +85,6 @@ function VideoCard({ sample }: { sample: R2Sample }) {
             playsInline
             muted
             preload="metadata"
-            crossOrigin="anonymous"
             className={cn(
               "absolute inset-0 h-full w-full object-contain transition-opacity",
               ready ? "opacity-100" : "opacity-0",
