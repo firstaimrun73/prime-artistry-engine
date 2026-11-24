@@ -1,10 +1,9 @@
 /**
  * Retention systems foundation — not launched.
- * Daily challenges, limited daily spin, achievements.
- * No iPhone giveaway / lottery without legal + budget approval.
+ * Daily challenges and achievements only (no spin campaign).
  */
 
-export type RetentionFeatureId = "daily_challenge" | "daily_spin" | "achievements";
+export type RetentionFeatureId = "daily_challenge" | "achievements";
 
 export type RetentionFeatureMeta = {
   id: RetentionFeatureId;
@@ -19,12 +18,6 @@ export const RETENTION_FEATURES: RetentionFeatureMeta[] = [
     id: "daily_challenge",
     title: "Daily challenge",
     description: "Complete a simple creative task for a small credit bonus.",
-    enabled: false,
-  },
-  {
-    id: "daily_spin",
-    title: "Daily spin",
-    description: "Limited once-per-day spin for a small reward. Not a paid lottery.",
     enabled: false,
   },
   {
