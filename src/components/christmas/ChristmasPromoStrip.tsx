@@ -1,6 +1,7 @@
 /**
  * Compact homepage Christmas promo — dismissible, non-blocking.
  * Title: Claim your Christmas gift. Tree emoji for seasonal visual.
+ * Free-credit partner cards live in DirectLinkAd / GiftFloatingNotice — not duplicated here.
  */
 import { useEffect, useState } from "react";
 import { Gift, X } from "lucide-react";
@@ -11,8 +12,6 @@ import {
   isChristmasCampaignActiveWindow,
 } from "@/lib/christmas-campaign";
 import { ChristmasGiftIcon } from "@/components/christmas/ChristmasGiftIcon";
-import { FreeCreditOffer } from "@/components/FreeCreditOffer";
-import { showOptInFreeCreditCta } from "@/config/ads";
 
 export function ChristmasPromoStrip() {
   const [dismissed, setDismissed] = useState(true);
@@ -55,7 +54,7 @@ export function ChristmasPromoStrip() {
             className="gap-1.5 sm:hidden"
             onClick={() => {
               document
-                .querySelector<HTMLButtonElement>('[aria-label="Get Free Credits — Christmas Gift"]')
+                .querySelector<HTMLButtonElement>('[aria-label="Gift — open sponsored offer"]')
                 ?.click();
             }}
           >
@@ -79,9 +78,6 @@ export function ChristmasPromoStrip() {
           </button>
         </div>
       </div>
-      {showOptInFreeCreditCta() && (
-        <FreeCreditOffer variant="card" className="max-w-xl" />
-      )}
     </section>
   );
 }

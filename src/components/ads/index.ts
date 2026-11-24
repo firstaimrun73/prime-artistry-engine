@@ -10,6 +10,7 @@ export { MonetagInPagePush } from "./MonetagInPagePush";
 export { MonetagVignette } from "./MonetagVignette";
 export { MonetagMultiTag, loadMultitagOnce } from "./MonetagMultiTag";
 export { FreeUserAdsNotice } from "./FreeUserAdsNotice";
+export { GiftFloatingNotice } from "./GiftFloatingNotice";
 export { AdDebugPanel } from "./AdDebugPanel";
 export { CreditSpendHint } from "./CreditSpendHint";
 export { AdsterraBanner, AdsterraResponsiveBanner } from "./AdsterraBanner";
