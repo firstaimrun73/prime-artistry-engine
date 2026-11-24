@@ -12,3 +12,4 @@ export { MonetagMultiTag, loadMultitagOnce } from "./MonetagMultiTag";
 export { FreeUserAdsNotice } from "./FreeUserAdsNotice";
 export { AdDebugPanel } from "./AdDebugPanel";
 export { CreditSpendHint } from "./CreditSpendHint";
+export { AdsterraBanner, AdsterraResponsiveBanner } from "./AdsterraBanner";

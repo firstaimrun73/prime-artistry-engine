@@ -1,8 +1,9 @@
 /**
  * One-time (per session) glass notification for free users after login.
- * Paid users never see this.
+ * Ads-on-free alert + upgrade path. Paid users never see this.
  */
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
@@ -57,18 +58,28 @@ export function FreeUserAdsNotice() {
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-violet-600 text-white shadow-sm">
             <Sparkles className="h-5 w-5" />
           </span>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Free plan notice</p>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Free plan · ads enabled</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Advertisements are displayed for free users. Enjoy your free access to Motio2edit!
+              This website displays advertisements on the free plan. Upgrade for an ad-free experience
+              and more credits.
             </p>
-            <button
-              type="button"
-              onClick={dismiss}
-              className="mt-3 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400"
-            >
-              Got it
-            </button>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Link
+                to="/pricing"
+                onClick={dismiss}
+                className="inline-flex items-center rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
+              >
+                Upgrade — remove ads
+              </Link>
+              <button
+                type="button"
+                onClick={dismiss}
+                className="text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                Got it
+              </button>
+            </div>
           </div>
         </div>
       </div>

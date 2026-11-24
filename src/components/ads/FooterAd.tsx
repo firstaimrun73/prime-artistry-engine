@@ -1,7 +1,5 @@
-/**
- * Footer placement — verified Adsterra Direct Link card (compact).
- */
-import { DirectLinkAd } from "./DirectLinkAd";
+/** Footer: responsive Adsterra banner */
+import { AdsterraResponsiveBanner } from "./AdsterraBanner";
 
 export function FooterAd({
   placement = "footer",
@@ -10,5 +8,9 @@ export function FooterAd({
   placement?: string;
   className?: string;
 }) {
-  return <DirectLinkAd placement={placement} className={className} variant="compact" />;
+  return (
+    <div className={`my-4 ${className}`}>
+      <AdsterraResponsiveBanner placement={placement} />
+    </div>
+  );
 }

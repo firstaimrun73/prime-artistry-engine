@@ -1,8 +1,5 @@
-/**
- * Generic ad container — routes to Direct Link (verified Adsterra).
- * AdSense permanently disabled; this is not an AdSense slot.
- */
-import { DirectLinkAd } from "./DirectLinkAd";
+/** Generic container → responsive Adsterra banner */
+import { AdsterraResponsiveBanner } from "./AdsterraBanner";
 
 export function AdContainer({
   placement = "container",
@@ -11,5 +8,9 @@ export function AdContainer({
   placement?: string;
   className?: string;
 }) {
-  return <DirectLinkAd placement={placement} className={className} variant="default" />;
+  return (
+    <div className={className}>
+      <AdsterraResponsiveBanner placement={placement} />
+    </div>
+  );
 }
