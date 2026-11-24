@@ -24,6 +24,7 @@ import { AdPolicyGate } from "../components/ads/AdPolicyGate";
 import { MonetagMultiTag } from "../components/ads/MonetagMultiTag";
 import { MonetagVignette } from "../components/ads/MonetagVignette";
 import { FreeUserAdsNotice } from "../components/ads/FreeUserAdsNotice";
+import { AdDebugPanel } from "../components/ads/AdDebugPanel";
 import {
   SITE_NAME,
   SITE_URL,
@@ -257,6 +258,7 @@ function RootComponent() {
           <MonetagMultiTag />
           <MonetagVignette />
           <FreeUserAdsNotice />
+          <AdDebugPanel />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />
