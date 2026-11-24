@@ -6,6 +6,7 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
+import { AdsterraResponsive, DirectLinkAd, FreeStudioAdPrompt } from "@/components/ads";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
@@ -107,6 +108,11 @@ function StudioLauncher() {
           ))}
         </div>
 
+        <div className="mt-12 w-full max-w-lg">
+          <AdsterraResponsive placement="studio-launcher" includeRect />
+          <DirectLinkAd placement="studio-launcher" variant="compact" />
+        </div>
+
         <style>{`
           @keyframes studioToolEnter {
             0% { opacity: 0; transform: scale(0.82) translateY(16px); }
@@ -130,6 +136,7 @@ function StudioLauncher() {
           }
         `}</style>
       </main>
+      <FreeStudioAdPrompt />
     </div>
   );
 }
