@@ -1,5 +1,5 @@
 /**
- * TEMP: recovering ImageEditor - see useOptionalImageDownloadAd for download ad.
- * Full restore from commit a699df98 required if this ships.
+ * Image Editor — full workspace with optional free-user first-download ad prompt.
+ * Re-exports the implementation so imports stay stable.
  */
 export { ImageEditor } from "./ImageEditor.impl";
