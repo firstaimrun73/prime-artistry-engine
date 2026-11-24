@@ -9,7 +9,6 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { isPaidPlan } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import type { PlanId } from "@/lib/plans";
-import { MONETAG_MULTITAG_URL } from "@/config/ads";
 import { Coins, Gift, ShieldCheck } from "lucide-react";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,18 +82,16 @@ export function Header() {
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {user ? <GoogleLanguageSelect /> : null}
 
-          {/* Gift → open multitag directly in a new blank tab */}
-          <a
-            href={MONETAG_MULTITAG_URL}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
+          {/* Gift → Partner Offers page (not a direct external jump) */}
+          <Link
+            to="/offers"
             className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-500/15 dark:text-amber-300 sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            title="Gift offers"
-            aria-label="Open gift offers"
+            title="Get gifts & rewards"
+            aria-label="Get gifts and rewards"
           >
             <Gift className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span className="hidden sm:inline">Gift</span>
-          </a>
+          </Link>
 
           {user ? (
             <>

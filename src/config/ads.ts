@@ -1,17 +1,19 @@
 /**
- * Ad configuration — Monetag multitag + Direct Link + Adsterra banners.
- * Multitag opens only on explicit user click (new tab).
- * In-page push: desktop only (never mobile).
- * Partner zone scripts not auto-loaded on core app.
+ * Ad configuration — Adsterra banners + Monetag (Direct Link, Multitag buttons, Vignette, In-Page Push).
+ * Multitag is NEVER embedded; only opens via explicit button → new tab.
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
+/** Multitag destination (same partner link family; opens only on explicit click). */
 export const MONETAG_MULTITAG_URL = DIRECT_LINK_URL;
 
 export const SPONSOR_DISPLAY_NAME = "Partner offer" as const;
-export const SPONSOR_TAGLINE = "Sponsored · Gift offers · stay here & click when ready" as const;
+export const SPONSOR_TAGLINE = "Sponsored · Optional partner offers" as const;
 
-export const MONETAG_VIGNETTE_ZONE = "12136694" as const;
+/** Monetag Vignette — zone from publisher dashboard */
+export const MONETAG_VIGNETTE_ZONE = "12004579" as const;
 export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" as const;
+
+/** Monetag In-Page Push */
 export const MONETAG_IPP_ZONE = "12004581" as const;
 export const MONETAG_IPP_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
 
@@ -43,13 +45,16 @@ export type AdsterraUnitId = keyof typeof ADSTERRA_UNITS;
 
 export const ADS_CONFIG = {
   enabled: true,
-  vignetteEnabled: false,
-  /** Desktop-only in-page push (MonetagInPagePush enforces md+). */
+  /** Monetag vignette overlay — session-capped in component */
+  vignetteEnabled: true,
+  /** Monetag in-page push (not browser notification permission) */
   pagePushEnabled: true,
   optInFreeCreditCta: true,
-  /** Core app must NOT auto-load partner/multitag scripts. */
+  /** Do not auto-load partner zone on core routes */
   partnerZoneEnabled: false,
   adsterraEnabled: true,
+  /** Show banner/direct-link units to logged-out visitors on public pages */
+  showToVisitors: true,
   excludedRoutes: [
     "/editor",
     "/login",
@@ -88,7 +93,8 @@ export function adPlacementCategory(
     p.startsWith("discover") ||
     p.startsWith("footer") ||
     p.startsWith("in-content") ||
-    p.startsWith("adsterra")
+    p.startsWith("adsterra") ||
+    p.startsWith("offers")
   ) {
     return "home";
   }
@@ -102,7 +108,6 @@ export function showOptInFreeCreditCta(): boolean {
   return ADS_CONFIG.optInFreeCreditCta === true;
 }
 
-/** Rough ad-blocker heuristic — used only to decide which gift CTAs to emphasize. */
 export function detectAdBlocker(): boolean {
   if (typeof document === "undefined") return false;
   try {
