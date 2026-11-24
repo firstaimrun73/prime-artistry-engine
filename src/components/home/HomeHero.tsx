@@ -27,7 +27,6 @@ const STEPS = [
   { icon: Download, label: "Generate" },
 ];
 
-/** Pre-login hero — never deep-link into product editors (Circle, Lens, etc.). */
 const AUTH_THEN_CIRCLE = "/studio/image/circle-remove?mode=remove&from=home";
 
 const DEMO = getDemoVideoSample();
@@ -37,14 +36,12 @@ function scrollToHeroDemo() {
   if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-/**
- * Hero: copy + CTAs + single official R2 demo under Watch demo.
- * WatchDemoSection is not rendered on signed-out home (avoids duplicate).
- */
 export function HomeHero() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [ratio, setRatio] = useState("9 / 16");
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -53,32 +50,45 @@ export function HomeHero() {
       if (v.videoWidth > 0 && v.videoHeight > 0) {
         setRatio(`${v.videoWidth} / ${v.videoHeight}`);
       }
+      try {
+        v.currentTime = 0.05;
+      } catch {
+        /* ignore */
+      }
+      setReady(true);
     };
+    const onErr = () => setFailed(true);
     v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("loadeddata", onMeta);
+    v.addEventListener("error", onErr);
     if (v.readyState >= 1) onMeta();
-    return () => v.removeEventListener("loadedmetadata", onMeta);
+    return () => {
+      v.removeEventListener("loadedmetadata", onMeta);
+      v.removeEventListener("loadeddata", onMeta);
+      v.removeEventListener("error", onErr);
+    };
   }, []);
 
   const toggle = useCallback(() => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || failed) return;
     if (v.paused) {
-      void v.play().catch(() => {});
+      void v.play().catch(() => setFailed(true));
       setPlaying(true);
     } else {
       v.pause();
       setPlaying(false);
     }
-  }, []);
+  }, [failed]);
 
   const onWatchDemo = useCallback(() => {
     scrollToHeroDemo();
     const v = videoRef.current;
-    if (v && v.paused) {
-      void v.play().catch(() => {});
+    if (v && v.paused && !failed) {
+      void v.play().catch(() => setFailed(true));
       setPlaying(true);
     }
-  }, []);
+  }, [failed]);
 
   return (
     <section className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-10 sm:pb-16 sm:pt-16">
@@ -115,29 +125,39 @@ export function HomeHero() {
           </Button>
         </div>
 
-        {/* Single official demo — first and only product demo on pre-login home */}
         <div className="mx-auto mt-8 max-w-[280px] sm:max-w-[320px]" data-watch-demo="hero">
           <div
-            className="relative overflow-hidden rounded-2xl border border-border/60 bg-muted/20 shadow-md"
+            className="relative overflow-hidden rounded-2xl border border-border/60 bg-muted shadow-md"
             style={{ aspectRatio: ratio }}
           >
-            <video
-              ref={videoRef}
-              src={DEMO.url}
-              playsInline
-              preload="metadata"
-              className="h-full w-full object-contain"
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              aria-label={DEMO.title}
-            />
+            {!failed ? (
+              <video
+                ref={videoRef}
+                src={DEMO.url}
+                playsInline
+                muted
+                preload="metadata"
+                crossOrigin="anonymous"
+                className={`h-full w-full object-contain transition-opacity ${ready ? "opacity-100" : "opacity-0"}`}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onEnded={() => setPlaying(false)}
+                aria-label={DEMO.title}
+              />
+            ) : (
+              <div className="flex h-full min-h-[200px] items-center justify-center text-xs text-muted-foreground">
+                Demo unavailable
+              </div>
+            )}
+            {!ready && !failed && <div className="absolute inset-0 animate-pulse bg-muted" aria-hidden />}
             <button
               type="button"
               onClick={toggle}
               className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/10"
               aria-label={playing ? "Pause demo" : "Play demo"}
+              disabled={failed}
             >
-              {!playing && (
+              {!playing && !failed && (
                 <span className="grid h-12 w-12 place-items-center rounded-full border border-white/30 bg-black/50 text-white backdrop-blur-md">
                   <Play className="h-5 w-5 fill-current" />
                 </span>

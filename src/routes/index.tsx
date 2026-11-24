@@ -58,15 +58,13 @@ function SignedInHome() {
 
 /**
  * Signed-out homepage — PUBLIC MARKETING ONLY.
- * Single official demo lives in HomeHero (no duplicate WatchDemoSection).
- * No FooterAd on the public homepage.
+ * No gift icon, no Christmas strip, no ads, no sponsor links.
  */
 function SignedOutHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <HomeHero />
-      <ChristmasPromoStrip />
       <PreLoginSampleStrip />
       <BeforeAfterShowcase />
       <PrivacyPhilosophySection />

@@ -1,8 +1,8 @@
 /**
  * Homepage sample strip (images + six R2 videos).
- * Ads removed — emergency.
+ * Pre-login only — no ads.
  */
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Play } from "lucide-react";
 import { getAccount2PreloginSamples } from "@/lib/r2-account2-samples";
@@ -25,49 +25,93 @@ function isVideoSample(s: R2Sample): boolean {
 function VideoCard({ sample }: { sample: R2Sample }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [ready, setReady] = useState(false);
   const w = sample.width || 16;
   const h = sample.height || 9;
 
-  const toggle = useCallback(() => {
+  // Seek to first frame so card is not a blank black box before play
+  useEffect(() => {
     const v = ref.current;
     if (!v) return;
+    const onMeta = () => {
+      try {
+        if (v.readyState >= 1) {
+          v.currentTime = 0.05;
+        }
+      } catch {
+        /* ignore seek errors */
+      }
+      setReady(true);
+    };
+    const onErr = () => setFailed(true);
+    v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("loadeddata", onMeta);
+    v.addEventListener("error", onErr);
+    if (v.readyState >= 1) onMeta();
+    return () => {
+      v.removeEventListener("loadedmetadata", onMeta);
+      v.removeEventListener("loadeddata", onMeta);
+      v.removeEventListener("error", onErr);
+    };
+  }, [sample.url]);
+
+  const toggle = useCallback(() => {
+    const v = ref.current;
+    if (!v || failed) return;
     if (v.paused) {
       document.querySelectorAll<HTMLVideoElement>("[data-prelogin-sample-video]").forEach((other) => {
         if (other !== v) other.pause();
       });
-      void v.play().catch(() => {});
+      void v.play().catch(() => setFailed(true));
       setPlaying(true);
     } else {
       v.pause();
       setPlaying(false);
     }
-  }, []);
+  }, [failed]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div
-        className="relative w-full overflow-hidden bg-black"
+        className="relative w-full overflow-hidden bg-muted"
         style={{ aspectRatio: `${w} / ${h}` }}
       >
-        <video
-          ref={ref}
-          data-prelogin-sample-video
-          src={sample.url}
-          playsInline
-          preload="none"
-          className="absolute inset-0 h-full w-full object-contain"
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          aria-label={sample.title}
-        />
+        {!failed ? (
+          <video
+            ref={ref}
+            data-prelogin-sample-video
+            src={sample.url}
+            playsInline
+            muted
+            preload="metadata"
+            crossOrigin="anonymous"
+            className={cn(
+              "absolute inset-0 h-full w-full object-contain transition-opacity",
+              ready ? "opacity-100" : "opacity-0",
+            )}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            aria-label={sample.title}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted text-xs text-muted-foreground">
+            Preview unavailable
+          </div>
+        )}
+        {!ready && !failed && (
+          <div className="absolute inset-0 animate-pulse bg-muted" aria-hidden />
+        )}
         <button
           type="button"
           onClick={toggle}
           className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/20"
           aria-label={playing ? `Pause ${sample.title}` : `Play ${sample.title}`}
+          disabled={failed}
         >
-          {!playing && (
-            <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-black/55 text-white backdrop-blur-md">
+          {!playing && !failed && (
+            <span className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-black/55 text-white backdrop-blur-md shadow-lg">
               <Play className="h-5 w-5 fill-current" />
             </span>
           )}

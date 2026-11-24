@@ -58,7 +58,6 @@ export function Header() {
           <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">by Motion2AI</span>
         </Link>
 
-        {/* Desktop nav only — no mobile hamburger */}
         <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 md:flex">
           {centerLinks.map((l) => (
             <Link
@@ -82,8 +81,13 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          <ChristmasGiftIcon variant="icon" className="sm:hidden" />
-          <ChristmasGiftIcon variant="pill" className="hidden sm:inline-flex" />
+          {/* Gift / sponsor only after sign-in — never on pre-login */}
+          {user ? (
+            <>
+              <ChristmasGiftIcon variant="icon" className="sm:hidden" />
+              <ChristmasGiftIcon variant="pill" className="hidden sm:inline-flex" />
+            </>
+          ) : null}
 
           {user ? <GoogleLanguageSelect /> : null}
 
