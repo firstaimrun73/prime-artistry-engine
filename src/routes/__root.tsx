@@ -23,6 +23,7 @@ import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
 import { MonetagMultiTag } from "../components/ads/MonetagMultiTag";
 import { MonetagVignette } from "../components/ads/MonetagVignette";
+import { MonetagInPagePush } from "../components/ads/MonetagInPagePush";
 import { FreeUserAdsNotice } from "../components/ads/FreeUserAdsNotice";
 import { AdDebugPanel } from "../components/ads/AdDebugPanel";
 import {
@@ -116,7 +117,7 @@ const BOOT_GUARD_SCRIPT = `
     });
     try { localStorage.removeItem('motio2edit-gt-lang'); } catch(e) {}
 
-    /* Do NOT strip Monetag/Multitag here — AdPolicyGate handles eligibility. */
+    /* Do NOT strip Monetag/Multitag/Adsterra here — AdPolicyGate handles eligibility. */
 
     var href = ${JSON.stringify(appCss)};
     function cssLoaded(){
@@ -257,6 +258,7 @@ function RootComponent() {
           <AdPolicyGate />
           <MonetagMultiTag />
           <MonetagVignette />
+          <MonetagInPagePush />
           <FreeUserAdsNotice />
           <AdDebugPanel />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>

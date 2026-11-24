@@ -6,6 +6,7 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { canAccessVideo, canAccessMusic } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
+import { ResponsiveBanner } from "@/components/ads";
 
 export const Route = createFileRoute("/studio")({
   head: () => ({
@@ -105,6 +106,10 @@ function StudioLauncher() {
           {tools.map((tool, index) => (
             <ToolIcon key={tool.id} tool={tool} index={index} />
           ))}
+        </div>
+
+        <div className="mt-10 w-full max-w-3xl">
+          <ResponsiveBanner placement="studio-launcher" />
         </div>
 
         <style>{`
