@@ -12,3 +12,4 @@ export { AdDebugPanel } from "./AdDebugPanel";
 export { CreditSpendHint } from "./CreditSpendHint";
 export { PartnerZoneAd } from "./PartnerZoneAd";
 export { AdsterraBanner, AdsterraResponsive } from "./AdsterraBanner";
+export { FreeStudioAdPrompt, FreeDownloadAdPrompt } from "./OptionalAdPrompt";

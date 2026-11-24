@@ -3,17 +3,15 @@ import {
   SPONSOR_DISPLAY_NAME,
   SPONSOR_TAGLINE,
   isAdRouteAllowed,
-  adPlacementCategory,
   ADS_CONFIG,
 } from "@/config/ads";
-import { useAdsVisible } from "@/lib/site-settings";
 import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
 import { ExternalLink, Gift } from "lucide-react";
 
-/** Sponsored Direct Link — free signed-in non-admin only. No credit grant on click. */
+/** Sponsored Direct Link — visitors + free users. No credit grant on click. */
 export function DirectLinkAd({
   placement = "in-content",
   className = "",
@@ -29,31 +27,39 @@ export function DirectLinkAd({
   subtitle?: string;
   cta?: string;
 }) {
-  const category = adPlacementCategory(placement);
-  const adsOn = useAdsVisible(category ?? undefined);
   const { profile, user, loading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   if (!ADS_CONFIG.enabled) return null;
   if (loading) return null;
-  if (!user || !profile) return null;
-
-  const admin = isAdminEmail(profile.email);
-  if (!shouldShowAds({ plan: profile.plan, email: profile.email, isAdmin: admin })) return null;
   if (!isAdRouteAllowed(pathname)) return null;
-  if (!adsOn && profile.plan !== "free") return null;
+
+  if (!user) {
+    if (!ADS_CONFIG.showToVisitors) return null;
+  } else if (profile) {
+    if (
+      !shouldShowAds({
+        plan: profile.plan,
+        email: profile.email,
+        isAdmin: isAdminEmail(profile.email),
+      })
+    )
+      return null;
+  } else {
+    return null;
+  }
 
   const compact = variant === "compact";
-  const headline = title ?? "A small gift for you";
+  const headline = title ?? "Partner offers for you";
   const sub = subtitle ?? SPONSOR_TAGLINE;
-  const action = cta ?? "Open gift";
+  const action = cta ?? "Open offer";
 
   return (
     <div
       className={`${compact ? "my-4" : "my-6"} flex justify-center ${className}`}
       data-ad-placement={placement}
       role="complementary"
-      aria-label="Sponsored gift offer"
+      aria-label="Sponsored advertisement"
     >
       <a
         href={DIRECT_LINK_URL}

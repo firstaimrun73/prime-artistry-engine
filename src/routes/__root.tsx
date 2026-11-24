@@ -22,6 +22,7 @@ import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
 import { MonetagInPagePush } from "../components/ads/MonetagInPagePush";
+import { MonetagVignette } from "../components/ads/MonetagVignette";
 import {
   SITE_NAME,
   SITE_URL,
@@ -252,8 +253,8 @@ function RootComponent() {
         <AuthProvider>
           <PageViewTracker />
           <AdPolicyGate />
-          {/* Desktop-only Monetag in-page push */}
           <MonetagInPagePush />
+          <MonetagVignette />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
             <GenerationStatusBar />

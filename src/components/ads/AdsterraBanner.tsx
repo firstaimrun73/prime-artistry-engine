@@ -1,7 +1,6 @@
 /**
  * Adsterra iframe banner — one unit per instance.
- * Isolates global `atOptions` per mount so multiple units do not conflict.
- * Does not touch Monetag / PartnerZone scripts.
+ * Visitors (public) + free signed-in non-admin. Paid/admin skipped.
  */
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
@@ -10,21 +9,16 @@ import {
   ADSTERRA_UNITS,
   type AdsterraUnitId,
   isAdRouteAllowed,
-  adPlacementCategory,
 } from "@/config/ads";
-import { useAdsVisible } from "@/lib/site-settings";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
 import { cn } from "@/lib/utils";
 
-/** Serialize Adsterra script injects so concurrent mounts do not clobber atOptions. */
 let adsterraChain: Promise<void> = Promise.resolve();
 
 function enqueueAdsterra(task: () => Promise<void>): Promise<void> {
-  adsterraChain = adsterraChain.then(task).catch(() => {
-    /* fail soft */
-  });
+  adsterraChain = adsterraChain.then(task).catch(() => {});
   return adsterraChain;
 }
 
@@ -40,24 +34,29 @@ export function AdsterraBanner({
   const hostRef = useRef<HTMLDivElement>(null);
   const reactId = useId();
   const [visible, setVisible] = useState(false);
-  const category = adPlacementCategory(placement);
-  const adsOn = useAdsVisible(category ?? undefined);
   const { profile, user, loading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // Visitors on public routes, or free users via shouldShowAds. Never paid/admin.
+  let audienceOk = false;
+  if (!loading) {
+    if (!user) {
+      audienceOk = ADS_CONFIG.showToVisitors === true;
+    } else if (profile) {
+      audienceOk = shouldShowAds({
+        plan: profile.plan,
+        email: profile.email,
+        isAdmin: isAdminEmail(profile.email),
+      });
+    }
+  }
 
   const allowed =
     ADS_CONFIG.enabled &&
     ADS_CONFIG.adsterraEnabled &&
     !loading &&
-    !!user &&
-    !!profile &&
     isAdRouteAllowed(pathname) &&
-    shouldShowAds({
-      plan: profile.plan,
-      email: profile.email,
-      isAdmin: isAdminEmail(profile.email),
-    }) &&
-    (adsOn || profile.plan === "free");
+    audienceOk;
 
   useEffect(() => {
     if (!allowed) {
@@ -109,7 +108,6 @@ export function AdsterraBanner({
         inv.onerror = () => resolve();
         el.appendChild(conf);
         el.appendChild(inv);
-        // Allow network a beat even if onload is flaky
         window.setTimeout(() => resolve(), 1200);
       });
 
@@ -128,13 +126,16 @@ export function AdsterraBanner({
 
   return (
     <div
-      className={cn("my-5 flex w-full justify-center overflow-x-hidden", className)}
+      className={cn("my-5 flex w-full flex-col items-center overflow-x-hidden", className)}
       data-ad-placement={placement}
       data-ad-network="adsterra"
       data-ad-unit={unit}
       role="complementary"
       aria-label="Advertisement"
     >
+      <span className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        Ad
+      </span>
       <div
         className={cn(
           "relative flex max-w-full items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/20",
@@ -148,9 +149,6 @@ export function AdsterraBanner({
   );
 }
 
-/**
- * Responsive Adsterra: mobile 320×50, desktop 728×90, optional mid 300×250.
- */
 export function AdsterraResponsive({
   placement = "adsterra-responsive",
   className = "",
@@ -158,7 +156,6 @@ export function AdsterraResponsive({
 }: {
   placement?: string;
   className?: string;
-  /** Show 300×250 between mobile strip and desktop leaderboard on md+ when space allows */
   includeRect?: boolean;
 }) {
   return (
