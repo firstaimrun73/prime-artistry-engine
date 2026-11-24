@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,11 +25,19 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/support", label: "Support" },
 ];
 
+function isInsideStudioOrEditor(pathname: string): boolean {
+  if (pathname === "/editor" || pathname.startsWith("/editor/")) return true;
+  if (pathname.startsWith("/studio/")) return true;
+  return false;
+}
+
 export function Header() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
+  const showGift = !!user && !isInsideStudioOrEditor(pathname);
 
   const authLinks: NavItem[] = [
     { to: "/studio", label: "Studio" },
@@ -81,8 +89,8 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          {/* Gift / sponsor only after sign-in — never on pre-login */}
-          {user ? (
+          {/* Gift only outside studios/editor — intentional sponsor entry */}
+          {showGift ? (
             <>
               <ChristmasGiftIcon variant="icon" className="sm:hidden" />
               <ChristmasGiftIcon variant="pill" className="hidden sm:inline-flex" />
