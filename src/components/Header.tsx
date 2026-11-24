@@ -7,7 +7,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { ChristmasGiftIcon } from "@/components/christmas/ChristmasGiftIcon";
 import { isAdminEmail } from "@/lib/admin-config";
-import { isPaidPlan } from "@/lib/policy";
+import { isPaidPlan, shouldShowAds } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import type { PlanId } from "@/lib/plans";
 import { Coins, ShieldCheck } from "lucide-react";
@@ -32,12 +32,19 @@ function isInsideStudioOrEditor(pathname: string): boolean {
 }
 
 export function Header() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
-  const showGift = !!user && !isInsideStudioOrEditor(pathname);
+
+  // Only eligible free users, outside studios/editor. Wait for profile so paid/admin never flash gift.
+  const showGift =
+    !loading &&
+    !!user &&
+    !!profile &&
+    !isInsideStudioOrEditor(pathname) &&
+    shouldShowAds({ plan: profile.plan, email: profile.email, isAdmin: admin });
 
   const authLinks: NavItem[] = [
     { to: "/studio", label: "Studio" },
@@ -89,7 +96,6 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          {/* Gift only outside studios/editor — intentional sponsor entry */}
           {showGift ? (
             <>
               <ChristmasGiftIcon variant="icon" className="sm:hidden" />

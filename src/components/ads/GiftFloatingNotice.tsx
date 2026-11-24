@@ -1,10 +1,10 @@
 /**
  * Compact floating glass gift notification for eligible free users.
- * Shows at ~60s intervals while browsing non-editor routes.
- * Dismissible; never reopens in the same session after dismiss.
- * Does not cover editor, prompt bar, or generation workflow.
+ * ~60s intervals while actively browsing non-editor routes.
+ * Dismissible; never reopens same session after dismiss.
+ * Skips when tab hidden or user inactive.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -17,12 +17,12 @@ import { Gift, X } from "lucide-react";
 const DISMISS_KEY = "motio2edit-gift-float-dismissed";
 const INTERVAL_MS = 60_000;
 const FIRST_DELAY_MS = 45_000;
-
-const EDITOR_PATHS = ["/editor", "/studio/image/circle-remove", "/studio/image/filter-editor"];
+const ACTIVITY_IDLE_MS = 90_000;
 
 function isEditorPath(pathname: string): boolean {
   if (pathname === "/editor" || pathname.startsWith("/editor/")) return true;
-  return EDITOR_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (pathname.startsWith("/studio/")) return true;
+  return false;
 }
 
 export function GiftFloatingNotice() {
@@ -30,6 +30,7 @@ export function GiftFloatingNotice() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const lastActiveRef = useRef(Date.now());
 
   useEffect(() => {
     try {
@@ -37,6 +38,20 @@ export function GiftFloatingNotice() {
     } catch {
       /* ignore */
     }
+  }, []);
+
+  // Activity tracking — do not show when user is idle or tab hidden
+  useEffect(() => {
+    const bump = () => {
+      lastActiveRef.current = Date.now();
+    };
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
+    events.forEach((e) => window.addEventListener(e, bump, { passive: true }));
+    document.addEventListener("visibilitychange", bump);
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, bump));
+      document.removeEventListener("visibilitychange", bump);
+    };
   }, []);
 
   useEffect(() => {
@@ -51,20 +66,23 @@ export function GiftFloatingNotice() {
       return;
     }
 
-    let intervalId: number | undefined;
-    const first = window.setTimeout(() => {
+    const tryShow = () => {
+      try {
+        if (sessionStorage.getItem(DISMISS_KEY) === "1") return;
+      } catch {
+        /* ignore */
+      }
+      if (document.visibilityState === "hidden") return;
+      if (Date.now() - lastActiveRef.current > ACTIVITY_IDLE_MS) return;
+      if (isEditorPath(window.location.pathname)) return;
       setVisible(true);
       trackAdEvent("impression", "gift-float");
-      intervalId = window.setInterval(() => {
-        try {
-          if (sessionStorage.getItem(DISMISS_KEY) === "1") return;
-        } catch {
-          /* ignore */
-        }
-        if (isEditorPath(window.location.pathname)) return;
-        setVisible(true);
-        trackAdEvent("impression", "gift-float");
-      }, INTERVAL_MS);
+    };
+
+    let intervalId: number | undefined;
+    const first = window.setTimeout(() => {
+      tryShow();
+      intervalId = window.setInterval(tryShow, INTERVAL_MS);
     }, FIRST_DELAY_MS);
 
     return () => {
@@ -72,6 +90,11 @@ export function GiftFloatingNotice() {
       if (intervalId) window.clearInterval(intervalId);
     };
   }, [user, profile, loading, pathname, dismissed]);
+
+  // Hide immediately when entering editor/studio
+  useEffect(() => {
+    if (isEditorPath(pathname)) setVisible(false);
+  }, [pathname]);
 
   if (!visible || dismissed) return null;
   if (isEditorPath(pathname)) return null;
