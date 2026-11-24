@@ -27,6 +27,7 @@ import { MonetagInPagePush } from "../components/ads/MonetagInPagePush";
 import { FreeUserAdsNotice } from "../components/ads/FreeUserAdsNotice";
 import { GiftFloatingNotice } from "../components/ads/GiftFloatingNotice";
 import { AdDebugPanel } from "../components/ads/AdDebugPanel";
+import { ImageStudioStrengthDock } from "../components/editor/image/ImageStudioStrengthDock";
 import {
   SITE_NAME,
   SITE_URL,
@@ -262,6 +263,7 @@ function RootComponent() {
           <MonetagInPagePush />
           <FreeUserAdsNotice />
           <GiftFloatingNotice />
+          <ImageStudioStrengthDock />
           <AdDebugPanel />
           <div className={padForTabs ? "pb-16 md:pb-0" : undefined}>
             <Outlet />
