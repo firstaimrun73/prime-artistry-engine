@@ -1,34 +1,44 @@
 import { useEffect } from "react";
+import { useAuth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin-config";
+import { shouldShowAds } from "@/lib/policy";
+import { ADS_CONFIG } from "@/config/ads";
 
 /**
- * EMERGENCY ad cleanup — always strip Monetag, AdSense, and known ad iframes.
+ * Cleanup disallowed ad artifacts only.
+ * Allows Multitag / vignette scripts marked data-motio-allowed="1" when user is eligible free.
+ * Always strips AdSense / googlesyndication.
  */
-function stripAllAdArtifacts() {
+function removeDisallowedAdScripts(stripAllowedMotio: boolean) {
   if (typeof document === "undefined") return;
 
-  const selectors = [
-    'script[src*="pagead2.googlesyndication.com"]',
-    'script[src*="adsbygoogle.js"]',
-    'script[src*="googlesyndication"]',
-    'iframe[src*="googlesyndication"]',
-    'iframe[src*="doubleclick"]',
-    "#adsense-loader",
-    "ins.adsbygoogle",
-    "#monetag-tag",
-    "#monetag-loader",
-    "#motio-monetag-vignette",
-    "#motio-monetag-ipp",
-    "#monetag-vignette",
-    'script[src*="n6wxm.com"]',
-    'script[src*="nap5k.com"]',
-    'script[src*="monetag"]',
-    'script[src*="omg10.com"]',
-    'iframe[src*="n6wxm"]',
-    'iframe[src*="nap5k"]',
-    'iframe[src*="monetag"]',
-  ];
+  // Always remove AdSense / Google ad network
+  document
+    .querySelectorAll(
+      [
+        'script[src*="pagead2.googlesyndication.com"]',
+        'script[src*="adsbygoogle.js"]',
+        'script[src*="googlesyndication"]',
+        'iframe[src*="googlesyndication"]',
+        'iframe[src*="doubleclick"]',
+        "#adsense-loader",
+        "ins.adsbygoogle",
+      ].join(", "),
+    )
+    .forEach((el) => el.remove());
 
-  document.querySelectorAll(selectors.join(", ")).forEach((el) => el.remove());
+  // Monetag / Multitag: keep only data-motio-allowed="1" when eligible
+  document
+    .querySelectorAll(
+      'script[src*="n6wxm.com"], script[src*="nap5k.com"], script[src*="quge5.com"], script[src*="monetag"], #motio-monetag-vignette, #motio-monetag-ipp, #motio-multitag-314190, #motio-multitag-sponsor',
+    )
+    .forEach((el) => {
+      const allowed = el.getAttribute("data-motio-allowed") === "1";
+      if (!allowed || stripAllowedMotio) {
+        el.remove();
+      }
+    });
+
   document.querySelectorAll('meta[name="monetag"]').forEach((el) => el.remove());
 
   try {
@@ -40,11 +50,33 @@ function stripAllAdArtifacts() {
 }
 
 export function AdPolicyGate() {
+  const { user, profile, loading } = useAuth();
+
   useEffect(() => {
-    stripAllAdArtifacts();
-    const observer = new MutationObserver(() => stripAllAdArtifacts());
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    const admin = isAdminEmail(profile?.email);
+    const eligible =
+      ADS_CONFIG.enabled &&
+      !loading &&
+      !!user &&
+      !!profile &&
+      shouldShowAds({
+        plan: profile.plan,
+        email: profile.email,
+        isAdmin: admin,
+      });
+
+    const stripAllowed = !eligible;
+    removeDisallowedAdScripts(stripAllowed);
+
+    const observer = new MutationObserver(() => {
+      removeDisallowedAdScripts(stripAllowed);
+    });
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
     return () => observer.disconnect();
-  }, []);
+  }, [user, profile, loading]);
+
   return null;
 }

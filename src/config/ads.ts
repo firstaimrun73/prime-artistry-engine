@@ -1,13 +1,17 @@
 /**
- * Ad configuration — revenue without wrecking UX/SEO.
+ * Ad configuration — Adsterra Direct Link + Monetag Multitag / Vignette.
  *
- * - Static Direct Link / multitags cards: ON for free signed-in users on allowed routes
- * - Vignette / In-Page Push scripts: OFF by default (turn on only after measuring bounce)
- * - Never on pricing, auth, checkout, settings, admin, editor canvas
+ * - Static Direct Link cards: free signed-in users on allowed routes
+ * - Multitag zone 314190: gift icon + sponsor unlock
+ * - Vignette: free users on allowed routes (not auth/checkout/admin/editor)
  * - Never grant Motio2edit credits from a client click alone
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
 export const MONETAG_MULTITAG_URL = DIRECT_LINK_URL;
+
+/** Monetag MultiTag — owner zone */
+export const MONETAG_MULTITAG_SRC = "https://quge5.com/88/tag.min.js" as const;
+export const MONETAG_MULTITAG_ZONE = "314190" as const;
 
 export const MONETAG_VIGNETTE_ZONE = "12136694" as const;
 export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" as const;
@@ -15,11 +19,11 @@ export const MONETAG_IPP_ZONE = "12004581" as const;
 export const MONETAG_IPP_SCRIPT_SRC = "https://nap5k.com/tag.min.js" as const;
 
 export const ADS_CONFIG = {
-  /** Master for static Direct Link / Earn cards (uses site-settings + shouldShowAds). */
+  /** Master for static Direct Link / Earn cards. */
   enabled: true,
-  /** Forced vignette script — keep false until bounce rate is acceptable. */
-  vignetteEnabled: false,
-  /** In-page push script — keep false (high friction). */
+  /** Monetag vignette for eligible free users. */
+  vignetteEnabled: true,
+  /** In-page push — keep false (high friction). */
   pagePushEnabled: false,
   /** User-initiated free-credit partner buttons. */
   optInFreeCreditCta: true,
@@ -57,7 +61,8 @@ export function adPlacementCategory(
     p.startsWith("profile") ||
     p.startsWith("dashboard") ||
     p.startsWith("sample") ||
-    p.startsWith("earn")
+    p.startsWith("earn") ||
+    p.startsWith("gift")
   ) {
     return "home";
   }
