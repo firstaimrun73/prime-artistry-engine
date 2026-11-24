@@ -1,1 +1,1 @@
-export { ImageEditor } from "./ImageEditor.legacy";
+PLACEHOLDER
