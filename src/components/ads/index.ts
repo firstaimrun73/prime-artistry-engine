@@ -8,5 +8,7 @@ export { SidebarAd } from "./SidebarAd";
 export { AdPolicyGate } from "./AdPolicyGate";
 export { MonetagInPagePush } from "./MonetagInPagePush";
 export { MonetagVignette } from "./MonetagVignette";
+export { MonetagMultiTag, loadMultitagOnce } from "./MonetagMultiTag";
+export { FreeUserAdsNotice } from "./FreeUserAdsNotice";
 export { AdDebugPanel } from "./AdDebugPanel";
 export { CreditSpendHint } from "./CreditSpendHint";
