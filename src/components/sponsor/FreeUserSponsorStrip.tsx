@@ -1,7 +1,7 @@
 /**
  * Opt-in Sponsored strip for free users only.
- * Script loads ONLY after the user taps "Unlock no-watermark".
- * Not auto-popup. Not mixed with Generate controls.
+ * Opens Direct Link only after the user taps "Unlock no-watermark".
+ * No Multitag. Not mixed with Generate controls.
  */
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,21 +11,15 @@ import {
   sponsorUnlockRemainingMs,
   SPONSOR_UNLOCK_MINUTES,
 } from "@/lib/sponsor-unlock";
+import { DIRECT_LINK_URL } from "@/config/ads";
 import { toast } from "sonner";
 
-const MULTITAG_SRC = "https://quge5.com/88/tag.min.js";
-const MULTITAG_ZONE = "305489";
-
-function loadMultitagOnce() {
-  if (typeof document === "undefined") return;
-  if (document.getElementById("motio-multitag-sponsor")) return;
-  const s = document.createElement("script");
-  s.id = "motio-multitag-sponsor";
-  s.src = MULTITAG_SRC;
-  s.async = true;
-  s.setAttribute("data-zone", MULTITAG_ZONE);
-  s.setAttribute("data-cfasync", "false");
-  document.body.appendChild(s);
+function openSponsorDirectLink() {
+  try {
+    window.open(DIRECT_LINK_URL, "_blank", "noopener,noreferrer");
+  } catch {
+    /* ignore */
+  }
 }
 
 export function FreeUserSponsorStrip({ isFree }: { isFree: boolean }) {
@@ -72,9 +66,9 @@ export function FreeUserSponsorStrip({ isFree }: { isFree: boolean }) {
             className="text-xs"
             onClick={() => {
               setShowOffer(true);
-              loadMultitagOnce();
-              toast.message("Sponsored offer loading…", {
-                description: "Complete the offer, then confirm below.",
+              openSponsorDirectLink();
+              toast.message("Sponsored offer opened", {
+                description: "Complete the partner offer in the new tab, then confirm below.",
               });
             }}
           >
@@ -87,7 +81,7 @@ export function FreeUserSponsorStrip({ isFree }: { isFree: boolean }) {
       ) : (
         <div className="mt-2 space-y-2">
           <p className="text-[11px] text-muted-foreground">
-            After the Sponsored unit appears, complete it, then confirm:
+            After completing the Sponsored offer in the new tab, confirm:
           </p>
           <Button
             type="button"
@@ -106,6 +100,15 @@ export function FreeUserSponsorStrip({ isFree }: { isFree: boolean }) {
             }}
           >
             I completed the Sponsored offer
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-xs"
+            onClick={() => openSponsorDirectLink()}
+          >
+            Re-open offer
           </Button>
         </div>
       )}

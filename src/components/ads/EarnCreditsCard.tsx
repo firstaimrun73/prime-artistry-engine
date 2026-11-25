@@ -1,11 +1,11 @@
-import { MONETAG_MULTITAG_URL, isAdRouteAllowed, ADS_CONFIG } from "@/config/ads";
+import { DIRECT_LINK_URL, isAdRouteAllowed, ADS_CONFIG } from "@/config/ads";
 import { useAuth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin-config";
 import { shouldShowAds } from "@/lib/policy";
 import { useRouterState } from "@tanstack/react-router";
 import { Coins, ExternalLink } from "lucide-react";
 
-/** Multitags / direct-link partner card — free users only. */
+/** Direct-link partner card — free users only. Explicit link only; no Multitag. */
 export function EarnCreditsCard({ className = "" }: { className?: string }) {
   const { profile, user, loading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -24,7 +24,7 @@ export function EarnCreditsCard({ className = "" }: { className?: string }) {
       aria-label="Partner offer"
     >
       <a
-        href={MONETAG_MULTITAG_URL}
+        href={DIRECT_LINK_URL}
         target="_blank"
         rel="sponsored noopener noreferrer"
         className="group flex w-full max-w-lg items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3.5 shadow-sm transition hover:border-primary/50 hover:bg-primary/10"

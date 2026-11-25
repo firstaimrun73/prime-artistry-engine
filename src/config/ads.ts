@@ -1,20 +1,17 @@
 /**
- * Ad configuration — Adsterra (Direct Link + banners) + Monetag Multitag / Vignette / IPP.
+ * Ad configuration — Adsterra (Direct Link + banners) + Monetag Vignette / IPP.
+ *
+ * Multitag is permanently disabled (removed from product).
  *
  * Adsterra banners (verified publisher keys):
  * - 728×90 desktop leaderboard
  * - 320×50 mobile banner
  * - 300×250 medium rectangle
  *
- * Monetag: Multitag 314190, Vignette 12136694, IPP desktop-only
+ * Monetag: Vignette 12136694, IPP desktop-only
  * Never grant Motio2edit credits from a client click alone
  */
 export const DIRECT_LINK_URL = "https://omg10.com/4/10768443" as const;
-export const MONETAG_MULTITAG_URL = DIRECT_LINK_URL;
-
-/** Monetag MultiTag — owner zone */
-export const MONETAG_MULTITAG_SRC = "https://quge5.com/88/tag.min.js" as const;
-export const MONETAG_MULTITAG_ZONE = "314190" as const;
 
 export const MONETAG_VIGNETTE_ZONE = "12136694" as const;
 export const MONETAG_VIGNETTE_SCRIPT_SRC = "https://n6wxm.com/vignette.min.js" as const;
@@ -46,7 +43,7 @@ export const ADSTERRA_BANNERS = {
 export type AdsterraBannerSize = keyof typeof ADSTERRA_BANNERS;
 
 export const ADS_CONFIG = {
-  /** Master for static Direct Link / banners / Monetag. */
+  /** Master for static Direct Link / banners / Monetag vignette+IPP. */
   enabled: true,
   /** Monetag vignette for eligible free users (mobile + desktop). */
   vignetteEnabled: true,

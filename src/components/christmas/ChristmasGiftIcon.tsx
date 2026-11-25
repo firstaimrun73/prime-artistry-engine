@@ -1,7 +1,7 @@
 /**
- * HeaderHeader gift entry — Multitag click target (zone 314190).
- * Opens partner Multitag experience; does not auto-grant credits.
- * Sheet copy: Visit the site and claim your gift!
+ * Header gift entry — Christmas / partner Direct Link only.
+ * Opens DIRECT_LINK_URL in a new tab on explicit user click.
+ * Does NOT load Multitag or attach global click handlers.
  */
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,10 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { GiftMark } from "@/components/christmas/GiftMark";
-import { loadMultitagOnce } from "@/components/ads/MonetagMultiTag";
 import { DIRECT_LINK_URL } from "@/config/ads";
 import { ExternalLink } from "lucide-react";
 
-function openGiftMultitag() {
-  loadMultitagOnce();
+function openGiftDirectLink() {
   try {
     window.open(DIRECT_LINK_URL, "_blank", "noopener,noreferrer");
   } catch {
@@ -36,7 +34,7 @@ export function ChristmasGiftIcon({
   const [open, setOpen] = useState(false);
 
   const onGiftClick = () => {
-    openGiftMultitag();
+    openGiftDirectLink();
     setOpen(true);
   };
 
@@ -87,7 +85,7 @@ export function ChristmasGiftIcon({
               type="button"
               className="w-full gap-2 bg-orange-600 hover:bg-orange-500"
               onClick={() => {
-                openGiftMultitag();
+                openGiftDirectLink();
               }}
             >
               Open gift offer

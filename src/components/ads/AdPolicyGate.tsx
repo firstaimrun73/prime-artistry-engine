@@ -5,9 +5,9 @@ import { shouldShowAds } from "@/lib/policy";
 import { ADS_CONFIG } from "@/config/ads";
 
 /**
- * Cleanup disallowed ad artifacts only.
- * Allows Multitag / vignette / Adsterra (bauval) scripts marked data-motio-allowed="1" when eligible free.
- * Always strips AdSense / googlesyndication.
+ * Cleanup disallowed ad artifacts.
+ * - Always strips AdSense and Monetag Multitag (quge5) — Multitag is banned.
+ * - Allows vignette / IPP / Adsterra (bauval) only when marked data-motio-allowed="1" and user is eligible free.
  */
 function removeDisallowedAdScripts(stripAllowedMotio: boolean) {
   if (typeof document === "undefined") return;
@@ -26,20 +26,30 @@ function removeDisallowedAdScripts(stripAllowedMotio: boolean) {
     )
     .forEach((el) => el.remove());
 
-  // Monetag + Adsterra: keep only data-motio-allowed="1" when eligible
+  // Multitag permanently banned — always remove regardless of eligibility
+  document
+    .querySelectorAll(
+      [
+        'script[src*="quge5.com"]',
+        "#motio-multitag-314190",
+        "#motio-multitag-sponsor",
+        'script[data-zone="314190"]',
+        'script[data-zone="305489"]',
+      ].join(", "),
+    )
+    .forEach((el) => el.remove());
+
+  // Vignette + IPP + Adsterra: keep only data-motio-allowed="1" when eligible
   document
     .querySelectorAll(
       [
         'script[src*="n6wxm.com"]',
         'script[src*="nap5k.com"]',
-        'script[src*="quge5.com"]',
         'script[src*="monetag"]',
         'script[src*="bauval.org"]',
         'iframe[src*="bauval.org"]',
         "#motio-monetag-vignette",
         "#motio-monetag-ipp",
-        "#motio-multitag-314190",
-        "#motio-multitag-sponsor",
       ].join(", "),
     )
     .forEach((el) => {

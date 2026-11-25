@@ -7,8 +7,7 @@ import {
   isAdRouteAllowed,
   MONETAG_VIGNETTE_ZONE,
   MONETAG_VIGNETTE_SCRIPT_SRC,
-  MONETAG_MULTITAG_ZONE,
-  MONETAG_MULTITAG_SRC,
+  MONETAG_IPP_ZONE,
   DIRECT_LINK_URL,
   ADS_CONFIG,
 } from "@/config/ads";
@@ -25,7 +24,8 @@ export function AdDebugPanel() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [enabled, setEnabled] = useState(false);
   const [vignettePresent, setVignettePresent] = useState(false);
-  const [multitagPresent, setMultitagPresent] = useState(false);
+  const [ippPresent, setIppPresent] = useState(false);
+  const [multitagLeak, setMultitagLeak] = useState(0);
   const [monetagScripts, setMonetagScripts] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -42,10 +42,15 @@ export function AdDebugPanel() {
     if (!enabled) return;
     const tick = () => {
       setVignettePresent(!!document.getElementById("motio-monetag-vignette"));
-      setMultitagPresent(!!document.getElementById("motio-multitag-314190"));
+      setIppPresent(!!document.getElementById("motio-monetag-ipp"));
+      setMultitagLeak(
+        document.querySelectorAll(
+          'script[src*="quge5.com"], #motio-multitag-314190, #motio-multitag-sponsor',
+        ).length,
+      );
       setMonetagScripts(
         document.querySelectorAll(
-          'script[src*="n6wxm.com"], script[src*="nap5k.com"], script[src*="quge5.com"], script[src*="monetag"]',
+          'script[src*="n6wxm.com"], script[src*="nap5k.com"], script[src*="monetag"]',
         ).length,
       );
     };
@@ -77,7 +82,9 @@ export function AdDebugPanel() {
       >
         <p className="mb-1.5 font-bold text-orange-400">Ad Debug (admin only)</p>
         <ul className="space-y-0.5 text-muted-foreground">
-          <li>Role: admin · Plan: <span className="text-foreground">{plan}</span></li>
+          <li>
+            Role: admin · Plan: <span className="text-foreground">{plan}</span>
+          </li>
           <li>
             Master:{" "}
             <span className={masterOn ? "text-emerald-500" : "text-red-400"}>{String(masterOn)}</span>
@@ -100,10 +107,10 @@ export function AdDebugPanel() {
             Eligible for real ads:{" "}
             <span className={eligible ? "text-emerald-500" : "text-red-400"}>{String(eligible)}</span>
           </li>
-          <li className="pt-1 border-t border-border mt-1">
-            Multitag zone {MONETAG_MULTITAG_ZONE}:{" "}
-            <span className={multitagPresent ? "text-emerald-500" : "text-amber-500"}>
-              {multitagPresent ? "script in DOM" : "not injected (expected for admin)"}
+          <li className="mt-1 border-t border-border pt-1">
+            Multitag (must be 0):{" "}
+            <span className={multitagLeak === 0 ? "text-emerald-500" : "text-red-400"}>
+              {multitagLeak === 0 ? "removed" : `${multitagLeak} leak(s)`}
             </span>
           </li>
           <li>
@@ -112,12 +119,18 @@ export function AdDebugPanel() {
               {vignettePresent ? "script in DOM" : "not injected (expected for admin)"}
             </span>
           </li>
+          <li>
+            IPP zone {MONETAG_IPP_ZONE}:{" "}
+            <span className={ippPresent ? "text-emerald-500" : "text-amber-500"}>
+              {ippPresent ? "script in DOM" : "not injected (expected for admin)"}
+            </span>
+          </li>
           <li>Monetag scripts in DOM: {monetagScripts}</li>
           <li className="truncate">Direct Link: {DIRECT_LINK_URL}</li>
-          <li className="truncate text-[10px] opacity-70">Multitag src: {MONETAG_MULTITAG_SRC}</li>
           <li className="truncate text-[10px] opacity-70">Vignette src: {MONETAG_VIGNETTE_SCRIPT_SRC}</li>
           <li className="pt-1 text-[10px] opacity-80">
-            Use a free non-admin account to verify real fills. This panel never loads provider scripts for admin.
+            Use a free non-admin account to verify real fills. This panel never loads provider scripts
+            for admin.
           </li>
         </ul>
         <button
@@ -139,7 +152,7 @@ export function AdDebugPanel() {
               Admin layout preview · not a live ad · no impressions
             </p>
             <div className="flex items-center gap-3 rounded-xl border border-orange-500/25 bg-gradient-to-br from-card via-card to-orange-500/5 p-4">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-violet-600 text-white text-xs font-bold">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-violet-600 text-xs font-bold text-white">
                 AD
               </span>
               <div className="min-w-0 flex-1">
