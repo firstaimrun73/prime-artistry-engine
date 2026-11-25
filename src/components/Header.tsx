@@ -7,7 +7,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { GoogleLanguageSelect } from "@/components/TranslateWidget";
 import { ChristmasGiftIcon } from "@/components/christmas/ChristmasGiftIcon";
 import { isAdminEmail } from "@/lib/admin-config";
-import { isPaidPlan } from "@/lib/policy";
+import { isPaidPlan, shouldShowAds } from "@/lib/policy";
 import { resolveAvatarSrc } from "@/lib/avatar-presets";
 import type { PlanId } from "@/lib/plans";
 import { Coins, ShieldCheck } from "lucide-react";
@@ -26,10 +26,17 @@ const PUBLIC_LINKS: NavItem[] = [
 ];
 
 export function Header() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const admin = isAdminEmail(profile?.email);
   const paid = admin || isPaidPlan(profile?.plan);
+
+  // Christmas / Direct Link gift — free non-admin only; wait for profile to avoid flash
+  const showGift =
+    !loading &&
+    !!user &&
+    !!profile &&
+    shouldShowAds({ plan: profile.plan, email: profile.email, isAdmin: admin });
 
   const authLinks: NavItem[] = [
     { to: "/studio", label: "Studio" },
@@ -81,8 +88,7 @@ export function Header() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-          {/* Gift / sponsor only after sign-in — never on pre-login */}
-          {user ? (
+          {showGift ? (
             <>
               <ChristmasGiftIcon variant="icon" className="sm:hidden" />
               <ChristmasGiftIcon variant="pill" className="hidden sm:inline-flex" />
