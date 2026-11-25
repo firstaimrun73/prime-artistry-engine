@@ -21,7 +21,6 @@ import { TranslateWidget } from "../components/TranslateWidget";
 import { BottomTabBar, hideBottomNav } from "../components/BottomTabBar";
 import { GenerationStatusBar } from "../components/GenerationStatusBar";
 import { AdPolicyGate } from "../components/ads/AdPolicyGate";
-import { MonetagMultiTag } from "../components/ads/MonetagMultiTag";
 import { MonetagVignette } from "../components/ads/MonetagVignette";
 import { MonetagInPagePush } from "../components/ads/MonetagInPagePush";
 import { FreeUserAdsNotice } from "../components/ads/FreeUserAdsNotice";
@@ -117,7 +116,10 @@ const BOOT_GUARD_SCRIPT = `
     });
     try { localStorage.removeItem('motio2edit-gt-lang'); } catch(e) {}
 
-    /* Do NOT strip Monetag/Multitag/Adsterra here — AdPolicyGate handles eligibility. */
+    /* Multitag (quge5) is banned — strip on boot if any stale injection exists */
+    try {
+      document.querySelectorAll('script[src*="quge5.com"], #motio-multitag-314190, #motio-multitag-sponsor').forEach(function(el){ el.remove(); });
+    } catch (e) {}
 
     var href = ${JSON.stringify(appCss)};
     function cssLoaded(){
@@ -256,7 +258,6 @@ function RootComponent() {
         <AuthProvider>
           <PageViewTracker />
           <AdPolicyGate />
-          <MonetagMultiTag />
           <MonetagVignette />
           <MonetagInPagePush />
           <FreeUserAdsNotice />
